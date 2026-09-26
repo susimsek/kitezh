@@ -102,7 +102,9 @@ public enum ApiErrorCode {
             "user_profile_invalid_definition", "The profile attribute definition is invalid."),
     USER_PROFILE_INVALID_VALUE(
             "user_profile_invalid_value", "The profile attribute value is invalid."),
-    USER_PROFILE_REQUIRED("user_profile_required", "The profile attribute is required.");
+    USER_PROFILE_REQUIRED("user_profile_required", "The profile attribute is required."),
+    LDAP_READ_ONLY("ldap_read_only", "The LDAP profile is read-only."),
+    LDAP_WRITE_FAILED("ldap_write_failed", "The LDAP profile could not be updated.");
 
     private final String value;
     private final String defaultMessage;

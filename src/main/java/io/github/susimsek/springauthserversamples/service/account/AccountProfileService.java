@@ -6,6 +6,7 @@ import io.github.susimsek.springauthserversamples.dto.account.AccountProfileDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountProfileRequestDTO;
 import io.github.susimsek.springauthserversamples.mapper.AccountProfileMapper;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.github.susimsek.springauthserversamples.service.LdapFederationWriteService;
 import io.github.susimsek.springauthserversamples.service.LoginSettingsService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import io.github.susimsek.springauthserversamples.service.admin.UserAccessInvalidationService;
@@ -31,6 +32,7 @@ public class AccountProfileService {
     private final UserAccessInvalidationService userAccessInvalidationService;
     private final UserActionService userActionService;
     private final LoginSettingsService loginSettingsService;
+    private final LdapFederationWriteService ldapFederationWriteService;
 
     @Autowired
     public AccountProfileService(
@@ -40,7 +42,8 @@ public class AccountProfileService {
             AdminAuditEventService auditEventService,
             UserAccessInvalidationService userAccessInvalidationService,
             UserActionService userActionService,
-            LoginSettingsService loginSettingsService) {
+            LoginSettingsService loginSettingsService,
+            LdapFederationWriteService ldapFederationWriteService) {
         this.userRepository = userRepository;
         this.accountProfileMapper = accountProfileMapper;
         this.passwordService = passwordService;
@@ -48,23 +51,7 @@ public class AccountProfileService {
         this.userAccessInvalidationService = userAccessInvalidationService;
         this.userActionService = userActionService;
         this.loginSettingsService = loginSettingsService;
-    }
-
-    public AccountProfileService(
-            UserRepository userRepository,
-            AccountProfileMapper accountProfileMapper,
-            PasswordService passwordService,
-            AdminAuditEventService auditEventService,
-            UserAccessInvalidationService userAccessInvalidationService,
-            UserActionService userActionService) {
-        this(
-                userRepository,
-                accountProfileMapper,
-                passwordService,
-                auditEventService,
-                userAccessInvalidationService,
-                userActionService,
-                null);
+        this.ldapFederationWriteService = ldapFederationWriteService;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +84,7 @@ public class AccountProfileService {
         boolean emailChanged = !java.util.Objects.equals(user.getEmail(), email);
         if (emailChanged) {
             requireRecentAuthentication(user, normalized.currentPassword(), authenticationTime);
+            writeLdapProfile(user, email, normalized.firstName(), normalized.lastName());
             accountProfileMapper.updateNames(normalized, user);
             user.setPendingEmail(email);
             user.setEmailVerified(false);
@@ -104,11 +92,18 @@ public class AccountProfileService {
             userActionService.executeActionsEmail(
                     user.getId(), UserAction.UPDATE_EMAIL, null, java.util.Locale.ENGLISH);
         } else {
+            writeLdapProfile(user, email, normalized.firstName(), normalized.lastName());
             accountProfileMapper.updateEntity(normalized, user);
         }
         userRepository.save(user);
         auditEventService.record("account.profile.updated", "user", user.getId().toString());
         return accountProfileMapper.toDTO(user);
+    }
+
+    private void writeLdapProfile(
+            UserEntity user, String email, String firstName, String lastName) {
+        ldapFederationWriteService.updateProfile(
+                user, user.getUsername(), email, firstName, lastName);
     }
 
     private void requireRecentAuthentication(

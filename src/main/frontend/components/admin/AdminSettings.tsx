@@ -15,12 +15,14 @@ import AdminUserProfileSettings from "./AdminUserProfileSettings";
 import { DetailTabs } from "./DetailTabs";
 import EmailSettings from "./EmailSettings";
 import LoginSettings, { type LoginSettingsSection } from "./LoginSettings";
+import LdapFederationSettings from "./LdapFederationSettings";
 import AdminLocalizationSettings, { type LocalizationSection } from "./AdminLocalizationSettings";
 
 const SETTINGS_SECTIONS = [
   "general",
   "login",
   "social-login",
+  "user-federation",
   "email",
   "brute-force",
   "sessions",
@@ -69,6 +71,11 @@ export default function AdminSettings({
       key: "social-login",
       label: dictionary.admin.settings.sections.socialLogin,
       href: "/admin/settings/social-login",
+    },
+    {
+      key: "user-federation",
+      label: dictionary.admin.settings.sections.userFederation,
+      href: "/admin/settings/user-federation",
     },
     {
       key: "email",
@@ -139,11 +146,13 @@ export default function AdminSettings({
           mode={localizationAction === "create" ? "create" : "list"}
         />
       ) : null}
+      {active === "user-federation" ? <LdapFederationSettings /> : null}
       {active !== "general" &&
       active !== "email" &&
       active !== "events" &&
       active !== "user-profile" &&
-      active !== "localization" ? (
+      active !== "localization" &&
+      active !== "user-federation" ? (
         <LoginSettings embedded focusSection={active as LoginSettingsSection} />
       ) : null}
     </>

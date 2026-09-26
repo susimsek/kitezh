@@ -19,6 +19,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DefaultAuthenticationEventPublisher;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -89,6 +91,14 @@ public class SecurityConfig {
         return requestMatcher;
     }
 
+    private static SavedRequestAwareAuthenticationSuccessHandler
+            defaultAuthenticationSuccessHandler() {
+        SavedRequestAwareAuthenticationSuccessHandler successHandler =
+                new SavedRequestAwareAuthenticationSuccessHandler();
+        successHandler.setDefaultTargetUrl("/admin");
+        return successHandler;
+    }
+
     @Bean
     PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -98,40 +108,15 @@ public class SecurityConfig {
     @Order(3)
     SecurityFilterChain defaultSecurityFilterChain(
             HttpSecurity http,
-            @Qualifier("browserSecurityContextRepository")
-                    SecurityContextRepository securityContextRepository,
-            LoginRateLimitFilter loginRateLimitFilter,
-            LoginCaptchaFilter loginCaptchaFilter,
             ApplicationProperties applicationProperties,
-            AuthenticationManager webAuthnAuthenticationManager,
-            PublicKeyCredentialRequestOptionsRepository webAuthnRequestOptionsRepository,
-            WebAuthnRelyingPartyOperations webAuthnRelyingPartyOperations,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
-            ObjectProvider<SocialLoginAuthenticationSuccessHandler> socialLoginSuccessHandler,
-            ObjectProvider<OAuth2AuthorizationRequestResolver> socialAuthorizationRequestResolver,
-            SocialLoginService socialLoginService,
-            OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
-            OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
-                    socialTokenResponseClient) {
-        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
-        ApplicationProperties.WebAuthn policy = applicationProperties.webAuthn();
-        String configuredRpId = policy.rpId() == null ? "" : policy.rpId().trim();
-        String rpId = configuredRpId.isBlank() ? issuer.getHost() : configuredRpId;
-        String configuredOrigins = policy.allowedOrigins() == null ? "" : policy.allowedOrigins();
-        Set<String> allowedOrigins =
-                configuredOrigins.isBlank()
-                        ? Set.of(issuer.getScheme() + "://" + issuer.getRawAuthority())
-                        : Arrays.stream(configuredOrigins.split(","))
-                                .map(String::trim)
-                                .filter(value -> !value.isBlank())
-                                .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        SavedRequestAwareAuthenticationSuccessHandler successHandler =
-                new SavedRequestAwareAuthenticationSuccessHandler();
-        successHandler.setDefaultTargetUrl("/admin");
+            BrowserSecurityDependencies browserDependencies,
+            SocialSecurityDependencies socialDependencies) {
+        http.authenticationManager(browserDependencies.formAuthenticationManager());
         http.securityContext(
                         securityContext ->
                                 securityContext
-                                        .securityContextRepository(securityContextRepository)
+                                        .securityContextRepository(
+                                                browserDependencies.securityContextRepository())
                                         .requireExplicitSave(false))
                 .csrf(
                         AbstractHttpConfigurer
@@ -205,23 +190,30 @@ public class SecurityConfig {
                                         .loginPage(LOGIN_PATH)
                                         .successHandler(
                                                 new SocialAccountLinkingAuthenticationSuccessHandler(
-                                                        socialLoginService, successHandler))
-                                        .securityContextRepository(securityContextRepository)
+                                                        socialDependencies.socialLoginService(),
+                                                        defaultAuthenticationSuccessHandler()))
+                                        .securityContextRepository(
+                                                browserDependencies.securityContextRepository())
                                         .permitAll())
                 .rememberMe(rememberMe -> rememberMe.rememberMeServices(rememberMeServices));
 
+        WebAuthnSettings webAuthnSettings = resolveWebAuthnSettings(applicationProperties);
         http.webAuthn(
                 webAuthn ->
-                        webAuthn.rpId(rpId)
-                                .allowedOrigins(allowedOrigins)
+                        webAuthn.rpId(webAuthnSettings.rpId())
+                                .allowedOrigins(webAuthnSettings.allowedOrigins())
                                 .disableDefaultRegistrationPage(true));
 
         PublicKeyCredentialRequestOptionsFilter requestOptionsFilter =
-                new PublicKeyCredentialRequestOptionsFilter(webAuthnRelyingPartyOperations);
-        requestOptionsFilter.setRequestOptionsRepository(webAuthnRequestOptionsRepository);
+                new PublicKeyCredentialRequestOptionsFilter(
+                        browserDependencies.webAuthnRelyingPartyOperations());
+        requestOptionsFilter.setRequestOptionsRepository(
+                browserDependencies.webAuthnRequestOptionsRepository());
         WebAuthnAuthenticationFilter authenticationFilter = new WebAuthnAuthenticationFilter();
-        authenticationFilter.setAuthenticationManager(webAuthnAuthenticationManager);
-        authenticationFilter.setRequestOptionsRepository(webAuthnRequestOptionsRepository);
+        authenticationFilter.setAuthenticationManager(
+                browserDependencies.webAuthnAuthenticationManager());
+        authenticationFilter.setRequestOptionsRepository(
+                browserDependencies.webAuthnRequestOptionsRepository());
         authenticationFilter.setAuthenticationSuccessHandler(
                 (request, response, authentication) -> {
                     MfaAuthorizationFilter.markCredentialVerified(request.getSession(true));
@@ -241,25 +233,35 @@ public class SecurityConfig {
         http.addFilterBefore(requestOptionsFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        http.addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(loginCaptchaFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(
+                        browserDependencies.loginRateLimitFilter(),
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(
+                        browserDependencies.loginCaptchaFilter(),
+                        UsernamePasswordAuthenticationFilter.class);
 
-        if (clientRegistrationRepository.getIfAvailable() != null) {
+        if (socialDependencies.clientRegistrationRepository().getIfAvailable() != null) {
             http.oauth2Login(
                     oauth2 ->
                             oauth2.loginPage(LOGIN_PATH)
-                                    .authorizedClientRepository(socialAuthorizedClientRepository)
-                                    .successHandler(socialLoginSuccessHandler.getObject())
+                                    .authorizedClientRepository(
+                                            socialDependencies.socialAuthorizedClientRepository())
+                                    .successHandler(
+                                            socialDependencies
+                                                    .socialLoginSuccessHandler()
+                                                    .getObject())
                                     .authorizationEndpoint(
                                             authorizationEndpoint ->
                                                     authorizationEndpoint
                                                             .authorizationRequestResolver(
-                                                                    socialAuthorizationRequestResolver
+                                                                    socialDependencies
+                                                                            .socialAuthorizationRequestResolver()
                                                                             .getObject()))
                                     .tokenEndpoint(
                                             tokenEndpoint ->
                                                     tokenEndpoint.accessTokenResponseClient(
-                                                            socialTokenResponseClient))
+                                                            socialDependencies
+                                                                    .socialTokenResponseClient()))
                                     .failureHandler(
                                             new SimpleUrlAuthenticationFailureHandler(
                                                     "/login?error"))
@@ -270,6 +272,81 @@ public class SecurityConfig {
 
         return http.build();
     }
+
+    @Bean
+    BrowserSecurityDependencies browserSecurityDependencies(
+            @Qualifier("browserSecurityContextRepository")
+                    SecurityContextRepository securityContextRepository,
+            LoginRateLimitFilter loginRateLimitFilter,
+            LoginCaptchaFilter loginCaptchaFilter,
+            @Qualifier("webAuthnAuthenticationManager")
+                    AuthenticationManager webAuthnAuthenticationManager,
+            @Qualifier("formAuthenticationManager") AuthenticationManager formAuthenticationManager,
+            PublicKeyCredentialRequestOptionsRepository webAuthnRequestOptionsRepository,
+            WebAuthnRelyingPartyOperations webAuthnRelyingPartyOperations) {
+        return new BrowserSecurityDependencies(
+                securityContextRepository,
+                loginRateLimitFilter,
+                loginCaptchaFilter,
+                webAuthnAuthenticationManager,
+                formAuthenticationManager,
+                webAuthnRequestOptionsRepository,
+                webAuthnRelyingPartyOperations);
+    }
+
+    @Bean
+    SocialSecurityDependencies socialSecurityDependencies(
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
+            ObjectProvider<SocialLoginAuthenticationSuccessHandler> socialLoginSuccessHandler,
+            ObjectProvider<OAuth2AuthorizationRequestResolver> socialAuthorizationRequestResolver,
+            SocialLoginService socialLoginService,
+            OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
+            OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+                    socialTokenResponseClient) {
+        return new SocialSecurityDependencies(
+                clientRegistrationRepository,
+                socialLoginSuccessHandler,
+                socialAuthorizationRequestResolver,
+                socialLoginService,
+                socialAuthorizedClientRepository,
+                socialTokenResponseClient);
+    }
+
+    record BrowserSecurityDependencies(
+            SecurityContextRepository securityContextRepository,
+            LoginRateLimitFilter loginRateLimitFilter,
+            LoginCaptchaFilter loginCaptchaFilter,
+            AuthenticationManager webAuthnAuthenticationManager,
+            AuthenticationManager formAuthenticationManager,
+            PublicKeyCredentialRequestOptionsRepository webAuthnRequestOptionsRepository,
+            WebAuthnRelyingPartyOperations webAuthnRelyingPartyOperations) {}
+
+    record SocialSecurityDependencies(
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
+            ObjectProvider<SocialLoginAuthenticationSuccessHandler> socialLoginSuccessHandler,
+            ObjectProvider<OAuth2AuthorizationRequestResolver> socialAuthorizationRequestResolver,
+            SocialLoginService socialLoginService,
+            OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
+            OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+                    socialTokenResponseClient) {}
+
+    private static WebAuthnSettings resolveWebAuthnSettings(
+            ApplicationProperties applicationProperties) {
+        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
+        ApplicationProperties.WebAuthn policy = applicationProperties.webAuthn();
+        String configuredRpId = policy.rpId() == null ? "" : policy.rpId().trim();
+        String configuredOrigins = policy.allowedOrigins() == null ? "" : policy.allowedOrigins();
+        return new WebAuthnSettings(
+                configuredRpId.isBlank() ? issuer.getHost() : configuredRpId,
+                configuredOrigins.isBlank()
+                        ? Set.of(issuer.getScheme() + "://" + issuer.getRawAuthority())
+                        : Arrays.stream(configuredOrigins.split(","))
+                                .map(String::trim)
+                                .filter(value -> !value.isBlank())
+                                .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+    }
+
+    private record WebAuthnSettings(String rpId, Set<String> allowedOrigins) {}
 
     @Bean
     OAuth2AuthorizedClientRepository socialAuthorizedClientRepository() {
@@ -404,6 +481,16 @@ public class SecurityConfig {
                 socialAuthorizedClientRepository,
                 socialTokenService,
                 mfaService);
+    }
+
+    @Bean(name = "formAuthenticationManager")
+    AuthenticationManager formAuthenticationManager(
+            org.springframework.security.core.userdetails.UserDetailsService userDetailsService,
+            LdapAuthenticationProvider ldapAuthenticationProvider,
+            PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider localProvider = new DaoAuthenticationProvider(userDetailsService);
+        localProvider.setPasswordEncoder(passwordEncoder);
+        return new ProviderManager(ldapAuthenticationProvider, localProvider);
     }
 
     @Bean

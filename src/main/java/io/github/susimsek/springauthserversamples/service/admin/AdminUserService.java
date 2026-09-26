@@ -16,6 +16,7 @@ import io.github.susimsek.springauthserversamples.repository.RecoveryCodeReposit
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
+import io.github.susimsek.springauthserversamples.service.LdapFederationWriteService;
 import io.github.susimsek.springauthserversamples.service.account.UserActionService;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
@@ -29,7 +30,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -57,31 +57,7 @@ public class AdminUserService {
     private final AdminUserMapper adminUserMapper;
     private final AdminGroupMapper adminGroupMapper;
     private final RecoveryCodeRepository recoveryCodeRepository;
-
-    public AdminUserService(
-            UserRepository userRepository,
-            GroupRepository groupRepository,
-            UserAvatarRepository userAvatarRepository,
-            AuthorityRepository authorityRepository,
-            UserAccessInvalidationService userAccessInvalidationService,
-            AccountLockService accountLockService,
-            PasswordService passwordService,
-            AdminAuditEventService adminAuditEventService,
-            UserActionService userActionService) {
-        this(
-                userRepository,
-                groupRepository,
-                userAvatarRepository,
-                authorityRepository,
-                userAccessInvalidationService,
-                accountLockService,
-                passwordService,
-                adminAuditEventService,
-                userActionService,
-                Mappers.getMapper(AdminUserMapper.class),
-                Mappers.getMapper(AdminGroupMapper.class),
-                null);
-    }
+    private final LdapFederationWriteService ldapFederationWriteService;
 
     @Transactional(readOnly = true)
     public AdminUserDTO user(Long id, String currentUsername) {
@@ -327,6 +303,8 @@ public class AdminUserService {
         }
         assertRoleAssignmentAllowed(roles, currentUsername);
         assertNotLastAdmin(user, requestedRoleNames(roles));
+        ldapFederationWriteService.updateProfile(
+                user, username, normalizedEmail, firstName, lastName);
         userAccessInvalidationService.invalidate(user.getUsername());
         userActionService.invalidateActions(user.getId());
         adminUserMapper.update(

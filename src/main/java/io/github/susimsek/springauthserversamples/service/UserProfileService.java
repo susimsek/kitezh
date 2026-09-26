@@ -216,7 +216,7 @@ public class UserProfileService {
     public UserProfileAttributesDTO saveAttributes(
             Long userId, Map<String, List<String>> values, String actor) {
         UserEntity user = findUser(userId);
-        return saveUserAttributes(user, values);
+        return saveUserAttributes(user, values, actor);
     }
 
     @Transactional
@@ -229,7 +229,7 @@ public class UserProfileService {
                                         .findIdByUsername(username)
                                         .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND)))
                         .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
-        return saveUserAttributes(user, values);
+        return saveUserAttributes(user, values, actor);
     }
 
     /** Persists mapper-owned built-in fields without replacing the stable username. */
@@ -291,7 +291,7 @@ public class UserProfileService {
     }
 
     private UserProfileAttributesDTO saveUserAttributes(
-            UserEntity user, Map<String, List<String>> values) {
+            UserEntity user, Map<String, List<String>> values, String actor) {
         Map<String, List<String>> normalized = validateValues(values == null ? Map.of() : values);
         attributeRepository.deleteAllByUserId(user.getId());
         entityManager.flush();
@@ -310,7 +310,9 @@ public class UserProfileService {
             }
         }
         attributeRepository.saveAll(rows);
-        userAccessInvalidationService.invalidate(user.getUsername());
+        if (!user.getUsername().equals(actor)) {
+            userAccessInvalidationService.invalidate(user.getUsername());
+        }
         auditEventService.record(
                 "user-profile.attributes.updated", "user", user.getId().toString());
         return toAttributes(user);

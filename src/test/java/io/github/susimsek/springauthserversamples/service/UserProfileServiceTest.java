@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
@@ -485,6 +486,24 @@ class UserProfileServiceTest {
         assertThatThrownBy(() -> service().saveAttributes("gone", Map.of(), "admin"))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("User not found");
+    }
+
+    @Test
+    void doesNotInvalidateAccessWhenUserUpdatesOwnAttributes() {
+        UserEntity user = user();
+        when(userRepository.findIdByUsername("alice")).thenReturn(Optional.of(7L));
+        when(userRepository.findForActionById(7L)).thenReturn(Optional.of(user));
+        when(definitionRepository.findAllByEnabledTrueOrderByDisplayOrderAscNameAsc())
+                .thenReturn(List.of());
+        when(definitionRepository.findAllByOrderByDisplayOrderAscNameAsc()).thenReturn(List.of());
+        when(attributeRepository
+                        .findAllByUserIdOrderByDefinitionDisplayOrderAscDefinitionNameAscPositionAsc(
+                                7L))
+                .thenReturn(List.of());
+
+        service().saveAttributes("alice", Map.of(), "alice");
+
+        verifyNoInteractions(userAccessInvalidationService);
     }
 
     @Test
