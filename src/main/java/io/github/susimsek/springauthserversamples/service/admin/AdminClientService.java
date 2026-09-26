@@ -9,6 +9,7 @@ import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationConsentRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.net.URI;
@@ -353,6 +354,12 @@ public class AdminClientService {
                 builder.requireAuthorizationConsent(request.requireAuthorizationConsent())
                         .requireProofKey(request.requireProofKey())
                         .build();
+        var values = new HashMap<>(settings.getSettings());
+        values.put(ClientSecuritySettings.REQUIRE_DPOP_PROOF, request.requireDpop());
+        values.put(ClientSecuritySettings.REQUIRE_DPOP_JKT, request.requireDpopJkt());
+        values.put(ClientSecuritySettings.DPOP_REFRESH_TOKEN_ONLY, request.dpopRefreshTokenOnly());
+        values.put(ClientSecuritySettings.DPOP_SIGNING_ALGORITHMS, request.dpopSigningAlgorithms());
+        settings = ClientSettings.withSettings(values).build();
         if (existing == null
                 || existing.getClientSettings().getSetting(ClientScopeSettings.DEFAULT_SCOPES)
                         == null) {

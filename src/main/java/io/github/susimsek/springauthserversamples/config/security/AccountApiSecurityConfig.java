@@ -18,14 +18,39 @@ public class AccountApiSecurityConfig {
     @Bean
     @Order(2)
     SecurityFilterChain accountApiSecurityFilterChain(
+            HttpSecurity http,
+            JwtDecoder accountApiJwtDecoder,
+            ApplicationProperties applicationProperties) {
+        return accountApiSecurityFilterChain(
+                http, accountApiJwtDecoder, new DpopNonceService(applicationProperties.dpop()));
+    }
+
+    SecurityFilterChain accountApiSecurityFilterChain(
             HttpSecurity http, JwtDecoder accountApiJwtDecoder) {
+        return accountApiSecurityFilterChain(
+                http,
+                accountApiJwtDecoder,
+                new DpopNonceService(new ApplicationProperties().dpop()));
+    }
+
+    private SecurityFilterChain accountApiSecurityFilterChain(
+            HttpSecurity http, JwtDecoder accountApiJwtDecoder, DpopNonceService nonceService) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/account/**", "/api/auth/localization/me")
                 .authorizeHttpRequests(
                         authorize -> authorize.anyRequest().hasAuthority("SCOPE_account-api"))
                 .oauth2ResourceServer(
                         resourceServer ->
-                                resourceServer.jwt(jwt -> jwt.decoder(accountApiJwtDecoder)));
+                                resourceServer
+                                        .jwt(jwt -> jwt.decoder(accountApiJwtDecoder))
+                                        .dPoP(
+                                                dpop ->
+                                                        dpop.authenticationConverter(
+                                                                        new DpopNonceAuthenticationConverter(
+                                                                                nonceService))
+                                                                .authenticationFailureHandler(
+                                                                        new DpopNonceAuthenticationFailureHandler(
+                                                                                nonceService))));
         return http.build();
     }
 

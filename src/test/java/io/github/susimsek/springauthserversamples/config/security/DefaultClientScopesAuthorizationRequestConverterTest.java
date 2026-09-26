@@ -1,9 +1,11 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.service.admin.ClientScopeSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +19,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext;
 import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 
 class DefaultClientScopesAuthorizationRequestConverterTest {
 
@@ -88,6 +91,77 @@ class DefaultClientScopesAuthorizationRequestConverterTest {
         assertThat(unchanged).isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationToken.class);
         assertThat(((OAuth2AuthorizationCodeRequestAuthenticationToken) unchanged).getScopes())
                 .containsExactly("openid");
+    }
+
+    @Test
+    void requiresValidDpopJktWhenClientPolicyIsEnabled() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .redirectUri("https://client.example/callback")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .scope("openid")
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                java.util.Map.of(
+                                                        ClientSecuritySettings.REQUIRE_DPOP_JKT,
+                                                        true))
+                                        .build())
+                        .build();
+        RegisteredClientRepository repository = mock(RegisteredClientRepository.class);
+        when(repository.findByClientId("client")).thenReturn(client);
+        DefaultClientScopesAuthorizationRequestConverter converter =
+                new DefaultClientScopesAuthorizationRequestConverter(repository);
+
+        MockHttpServletRequest request = request("client", "openid");
+        String dpopJkt = validDpopJkt();
+        request.addParameter("dpop_jkt", dpopJkt);
+        request.setQueryString(request.getQueryString() + "&dpop_jkt=" + dpopJkt);
+
+        assertThat(converter.convert(request))
+                .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationToken.class);
+
+        MockHttpServletRequest missing = request("client", "openid");
+        assertThatThrownBy(() -> converter.convert(missing))
+                .isInstanceOf(
+                        org.springframework.security.oauth2.server.authorization.authentication
+                                .OAuth2AuthorizationCodeRequestAuthenticationException.class);
+    }
+
+    @Test
+    void requiresDpopJktOnPushedAuthorizationRequests() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .redirectUri("https://client.example/callback")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .scope("openid")
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                java.util.Map.of(
+                                                        ClientSecuritySettings.REQUIRE_DPOP_JKT,
+                                                        true))
+                                        .build())
+                        .build();
+        RegisteredClientRepository repository = mock(RegisteredClientRepository.class);
+        when(repository.findByClientId("client")).thenReturn(client);
+        DefaultClientScopesAuthorizationRequestConverter converter =
+                new DefaultClientScopesAuthorizationRequestConverter(repository);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/oauth2/par");
+        request.addParameter(OAuth2ParameterNames.CLIENT_ID, "client");
+        request.addParameter(OAuth2ParameterNames.RESPONSE_TYPE, "code");
+        request.addParameter(OAuth2ParameterNames.REDIRECT_URI, "https://client.example/callback");
+        request.addParameter(OAuth2ParameterNames.SCOPE, "openid");
+
+        assertThatThrownBy(() -> converter.convert(request))
+                .isInstanceOf(
+                        org.springframework.security.oauth2.server.authorization.authentication
+                                .OAuth2AuthorizationCodeRequestAuthenticationException.class);
+    }
+
+    private static String validDpopJkt() {
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);
     }
 
     private static MockHttpServletRequest request(String clientId, String scope) {

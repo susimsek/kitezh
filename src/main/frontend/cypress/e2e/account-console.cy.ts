@@ -116,6 +116,19 @@ describe("account console", () => {
     cy.get("#account-confirm-password").type("different-password").blur();
     cy.get("#account-confirm-password").should("have.class", "is-invalid");
 
+    cy.intercept("PUT", "/api/account/password", (request) => {
+      request.reply({ delay: 300, statusCode: 204, body: null });
+    }).as("changePassword");
+    cy.get("#account-current-password").type("admin", { log: false });
+    cy.get("#account-new-password").clear().type("temporary-password-1", { log: false });
+    cy.get("#account-confirm-password").clear().type("temporary-password-1", { log: false });
+    cy.get('[data-cy="save-password"]').click();
+    cy.get('[data-cy="save-password"]')
+      .should("be.disabled")
+      .find(".spinner-border")
+      .should("exist");
+    cy.wait("@changePassword").its("response.statusCode").should("eq", 204);
+
     cy.contains("a", /Device activity|Cihaz etkinliği/).click();
     cy.get('[data-cy="session-row"]', { timeout: 10_000 }).should("have.length.at.least", 1);
 

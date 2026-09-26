@@ -71,6 +71,31 @@ public record AdminClientDTO(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 boolean requireProofKey,
         @Schema(
+                        description =
+                                "Whether this client must send DPoP proofs for token requests.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean requireDpop,
+        @Schema(
+                        description =
+                                "Whether authorization-code requests must include the DPoP key"
+                                        + " thumbprint.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean requireDpopJkt,
+        @Schema(
+                        description =
+                                "Whether refresh-token requests must include DPoP proofs without"
+                                        + " binding the new access token.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean dpopRefreshTokenOnly,
+        @Schema(
+                        description = "Allowed DPoP proof signature algorithms for this client.",
+                        example = "[\"ES256\", \"RS256\"]",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                Set<String> dpopSigningAlgorithms,
+        @Schema(
                         description = "Authorization-code lifetime in ISO-8601 duration format.",
                         example = "PT5M",
                         format = "duration",
@@ -87,4 +112,43 @@ public record AdminClientDTO(
                         example = "PT8H",
                         format = "duration",
                         requiredMode = Schema.RequiredMode.REQUIRED)
-                Duration refreshTokenTimeToLive) {}
+                Duration refreshTokenTimeToLive) {
+
+    public AdminClientDTO(
+            String id,
+            String clientId,
+            String clientName,
+            Instant clientIdIssuedAt,
+            Instant clientSecretExpiresAt,
+            Set<String> clientAuthenticationMethods,
+            Set<String> authorizationGrantTypes,
+            Set<String> redirectUris,
+            Set<String> postLogoutRedirectUris,
+            Set<String> scopes,
+            boolean requireAuthorizationConsent,
+            boolean requireProofKey,
+            Duration authorizationCodeTimeToLive,
+            Duration accessTokenTimeToLive,
+            Duration refreshTokenTimeToLive) {
+        this(
+                id,
+                clientId,
+                clientName,
+                clientIdIssuedAt,
+                clientSecretExpiresAt,
+                clientAuthenticationMethods,
+                authorizationGrantTypes,
+                redirectUris,
+                postLogoutRedirectUris,
+                scopes,
+                requireAuthorizationConsent,
+                requireProofKey,
+                false,
+                false,
+                false,
+                java.util.Set.of("RS256", "ES256"),
+                authorizationCodeTimeToLive,
+                accessTokenTimeToLive,
+                refreshTokenTimeToLive);
+    }
+}

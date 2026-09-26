@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@/routing/navigation";
 import { Alert, Spinner } from "react-bootstrap";

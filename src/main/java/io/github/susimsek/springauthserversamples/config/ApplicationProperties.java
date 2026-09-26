@@ -13,7 +13,8 @@ public record ApplicationProperties(
         @DefaultValue Mail mail,
         @DefaultValue Security security,
         @DefaultValue WebAuthn webAuthn,
-        @DefaultValue RegistrationCaptcha registrationCaptcha) {
+        @DefaultValue RegistrationCaptcha registrationCaptcha,
+        @DefaultValue DPoP dpop) {
 
     @ConstructorBinding
     public ApplicationProperties(
@@ -23,7 +24,8 @@ public record ApplicationProperties(
             Mail mail,
             Security security,
             WebAuthn webAuthn,
-            RegistrationCaptcha registrationCaptcha) {
+            RegistrationCaptcha registrationCaptcha,
+            DPoP dpop) {
         this.cache = cache;
         this.session = session;
         this.authorizationServer = authorizationServer;
@@ -32,6 +34,7 @@ public record ApplicationProperties(
         this.webAuthn = webAuthn == null ? new WebAuthn() : webAuthn;
         this.registrationCaptcha =
                 registrationCaptcha == null ? new RegistrationCaptcha() : registrationCaptcha;
+        this.dpop = dpop == null ? new DPoP() : dpop;
     }
 
     public ApplicationProperties() {
@@ -45,7 +48,8 @@ public record ApplicationProperties(
                         "http://127.0.0.1:9090"),
                 new Security(),
                 new WebAuthn(),
-                new RegistrationCaptcha());
+                new RegistrationCaptcha(),
+                new DPoP());
     }
 
     public ApplicationProperties(
@@ -57,7 +61,8 @@ public record ApplicationProperties(
                 mail,
                 new Security(),
                 new WebAuthn(),
-                new RegistrationCaptcha());
+                new RegistrationCaptcha(),
+                new DPoP());
     }
 
     public ApplicationProperties(
@@ -73,7 +78,27 @@ public record ApplicationProperties(
                 mail,
                 security,
                 new WebAuthn(),
-                new RegistrationCaptcha());
+                new RegistrationCaptcha(),
+                new DPoP());
+    }
+
+    public ApplicationProperties(
+            Cache cache,
+            Session session,
+            AuthorizationServer authorizationServer,
+            Mail mail,
+            Security security,
+            WebAuthn webAuthn,
+            RegistrationCaptcha registrationCaptcha) {
+        this(
+                cache,
+                session,
+                authorizationServer,
+                mail,
+                security,
+                webAuthn,
+                registrationCaptcha,
+                new DPoP());
     }
 
     public record Cache(@DefaultValue Caffeine caffeine) {}
@@ -121,6 +146,14 @@ public record ApplicationProperties(
 
         public RegistrationCaptcha() {
             this("disabled", "", "", "", "", "register", false, 0.7, false);
+        }
+    }
+
+    public record DPoP(
+            @DefaultValue("false") boolean nonceRequired, @DefaultValue("PT5M") Duration nonceTtl) {
+
+        public DPoP() {
+            this(false, Duration.ofMinutes(5));
         }
     }
 

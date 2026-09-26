@@ -145,6 +145,17 @@ class AuthorizationServerEndpointsIT {
     }
 
     @Test
+    void tokenEndpointRejectsInvalidClientCredentials() throws Exception {
+        mockMvc.perform(
+                        post("/oauth2/token")
+                                .with(httpBasic("demo-client", "not-the-client-secret"))
+                                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                .param("grant_type", "client_credentials"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("invalid_client"));
+    }
+
+    @Test
     void openApiGroupsExposeDocumentedControllerContracts() throws Exception {
         mockMvc.perform(get("/v3/api-docs/admin-api"))
                 .andExpect(status().isOk())
@@ -399,6 +410,18 @@ class AuthorizationServerEndpointsIT {
                                 .param("grant_type", "refresh_token")
                                 .param("refresh_token", rotatedRefreshToken))
                 .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        post("/oauth2/token")
+                                .cookie(sessionCookie)
+                                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                .param("client_id", "admin-console")
+                                .param("code", authorizationCode)
+                                .param("code_verifier", codeVerifier)
+                                .param("grant_type", "authorization_code")
+                                .param("redirect_uri", redirectUri))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
     }
 
     @Test

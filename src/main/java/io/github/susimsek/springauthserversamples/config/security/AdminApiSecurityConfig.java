@@ -28,7 +28,21 @@ public class AdminApiSecurityConfig {
     @Bean
     @Order(1)
     SecurityFilterChain adminApiSecurityFilterChain(
+            HttpSecurity http,
+            JwtDecoder adminApiJwtDecoder,
+            ApplicationProperties applicationProperties) {
+        return adminApiSecurityFilterChain(
+                http, adminApiJwtDecoder, new DpopNonceService(applicationProperties.dpop()));
+    }
+
+    SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http, JwtDecoder adminApiJwtDecoder) {
+        return adminApiSecurityFilterChain(
+                http, adminApiJwtDecoder, new DpopNonceService(new ApplicationProperties().dpop()));
+    }
+
+    private SecurityFilterChain adminApiSecurityFilterChain(
+            HttpSecurity http, JwtDecoder adminApiJwtDecoder, DpopNonceService nonceService) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
                 .authorizeHttpRequests(
@@ -207,11 +221,20 @@ public class AdminApiSecurityConfig {
                                         .hasAuthority(AuthoritiesConstants.ADMIN))
                 .oauth2ResourceServer(
                         resourceServer ->
-                                resourceServer.jwt(
-                                        jwt ->
-                                                jwt.decoder(adminApiJwtDecoder)
-                                                        .jwtAuthenticationConverter(
-                                                                jwtAuthenticationConverter())));
+                                resourceServer
+                                        .jwt(
+                                                jwt ->
+                                                        jwt.decoder(adminApiJwtDecoder)
+                                                                .jwtAuthenticationConverter(
+                                                                        jwtAuthenticationConverter()))
+                                        .dPoP(
+                                                dpop ->
+                                                        dpop.authenticationConverter(
+                                                                        new DpopNonceAuthenticationConverter(
+                                                                                nonceService))
+                                                                .authenticationFailureHandler(
+                                                                        new DpopNonceAuthenticationFailureHandler(
+                                                                                nonceService))));
 
         return http.build();
     }

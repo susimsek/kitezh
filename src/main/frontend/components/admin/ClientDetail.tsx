@@ -174,6 +174,34 @@ export function ClientDetail({
                         <Badge bg="secondary">{copy.pkceNotRequired}</Badge>
                       )}
                     </dd>
+                    <dt className="col-sm-4">{copy.requireDpop}</dt>
+                    <dd className="col-sm-8">
+                      {client.requireDpop ? (
+                        <Badge bg="success">{dictionary.admin.common.on}</Badge>
+                      ) : (
+                        <Badge bg="secondary">{dictionary.admin.common.off}</Badge>
+                      )}
+                    </dd>
+                    <dt className="col-sm-4">{copy.requireDpopJkt}</dt>
+                    <dd className="col-sm-8">
+                      {client.requireDpopJkt ? (
+                        <Badge bg="success">{dictionary.admin.common.on}</Badge>
+                      ) : (
+                        <Badge bg="secondary">{dictionary.admin.common.off}</Badge>
+                      )}
+                    </dd>
+                    <dt className="col-sm-4">{copy.dpopRefreshTokenOnly}</dt>
+                    <dd className="col-sm-8">
+                      {client.dpopRefreshTokenOnly ? (
+                        <Badge bg="info">{dictionary.admin.common.on}</Badge>
+                      ) : (
+                        <Badge bg="secondary">{dictionary.admin.common.off}</Badge>
+                      )}
+                    </dd>
+                    <dt className="col-sm-4">{copy.dpopAlgorithms}</dt>
+                    <dd className="col-sm-8 font-monospace">
+                      {(client.dpopSigningAlgorithms ?? ["RS256", "ES256"]).join(", ")}
+                    </dd>
                     <dt className="col-sm-4">{copy.clientCreated}</dt>
                     <dd className="col-sm-8">
                       {client.clientIdIssuedAt

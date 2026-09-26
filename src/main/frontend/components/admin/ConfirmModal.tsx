@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Modal, Spinner, type ButtonProps } from "react-bootstrap";
 
 import { ActionIcon, type ActionIconName } from "@/components/shared/ActionIcon";

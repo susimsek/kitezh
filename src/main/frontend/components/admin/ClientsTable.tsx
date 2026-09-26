@@ -26,6 +26,10 @@ export type AdminClient = {
   scopes: string[];
   requireAuthorizationConsent: boolean;
   requireProofKey: boolean;
+  requireDpop: boolean;
+  requireDpopJkt: boolean;
+  dpopRefreshTokenOnly: boolean;
+  dpopSigningAlgorithms: string[];
 };
 
 export function ClientsTable({ dictionary }: { locale: Locale; dictionary: Dictionary }) {
@@ -184,6 +188,22 @@ export function ClientsTable({ dictionary }: { locale: Locale; dictionary: Dicti
                 <Badge bg={c.requireProofKey ? "success" : "secondary"}>
                   PKCE{" "}
                   {c.requireProofKey ? dictionary.admin.common.on : dictionary.admin.common.off}
+                </Badge>
+                <Badge bg={c.requireDpop ? "success" : "secondary"} className="ms-1">
+                  DPoP {c.requireDpop ? dictionary.admin.common.on : dictionary.admin.common.off}
+                </Badge>
+                {c.requireDpopJkt && (
+                  <Badge bg="success" className="ms-1">
+                    dpop_jkt {dictionary.admin.common.on}
+                  </Badge>
+                )}
+                {c.dpopRefreshTokenOnly && (
+                  <Badge bg="info" className="ms-1">
+                    DPoP refresh
+                  </Badge>
+                )}
+                <Badge bg="secondary" className="ms-1">
+                  DPoP {(c.dpopSigningAlgorithms ?? ["RS256", "ES256"]).join("/")}
                 </Badge>
               </td>
               <td className="text-end">

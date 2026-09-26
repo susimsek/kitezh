@@ -40,6 +40,18 @@ public final class GatlingDefaults {
         return rampDuration().plus(testDuration()).plusSeconds(30);
     }
 
+    public static double maxFailurePercentage() {
+        return Double.parseDouble(System.getProperty("maxFailurePercentage", "1.0"));
+    }
+
+    public static int maxResponseTimeMillis() {
+        return Integer.getInteger("maxResponseTimeMillis", 2_000);
+    }
+
+    public static int maxP99ResponseTimeMillis() {
+        return Integer.getInteger("maxP99ResponseTimeMillis", 3_000);
+    }
+
     public static Duration minPause() {
         return Duration.ofSeconds(Long.getLong("minPauseSeconds", 5));
     }
@@ -69,7 +81,11 @@ public final class GatlingDefaults {
     }
 
     public static String basicAuthorizationValue() {
-        String credentials = clientId() + ":" + clientSecret();
+        return basicAuthorizationValue(clientId(), clientSecret());
+    }
+
+    public static String basicAuthorizationValue(String clientId, String clientSecret) {
+        String credentials = clientId + ":" + clientSecret;
         String encoded =
                 Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
         return "Basic " + encoded;

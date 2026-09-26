@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRequestDTO;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -119,6 +120,24 @@ class AdminClientConfigurationValidatorTest {
     }
 
     @Test
+    void acceptsTokenExchangeGrantType() {
+        ConstraintContextFixture context = new ConstraintContextFixture();
+
+        boolean valid =
+                validator.isValid(
+                        request(
+                                Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue()),
+                                Set.of(AuthorizationGrantTypes.TOKEN_EXCHANGE),
+                                Set.of(),
+                                false),
+                        context.context);
+
+        assertThat(valid).isTrue();
+        verify(context.context).disableDefaultConstraintViolation();
+        verify(context.context, never()).buildConstraintViolationWithTemplate(anyString());
+    }
+
+    @Test
     void rejectsUnknownGrantType() {
         ConstraintContextFixture context = new ConstraintContextFixture();
 
@@ -126,7 +145,7 @@ class AdminClientConfigurationValidatorTest {
                 validator.isValid(
                         request(
                                 Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue()),
-                                Set.of("urn:ietf:params:oauth:grant-type:token-exchange"),
+                                Set.of("urn:ietf:params:oauth:grant-type:unknown"),
                                 Set.of(),
                                 false),
                         context.context);
@@ -214,7 +233,7 @@ class AdminClientConfigurationValidatorTest {
                                         ClientAuthenticationMethod.NONE.getValue(),
                                         ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue()),
                                 Set.of(
-                                        "urn:ietf:params:oauth:grant-type:token-exchange",
+                                        "urn:ietf:params:oauth:grant-type:unknown",
                                         AuthorizationGrantType.CLIENT_CREDENTIALS.getValue(),
                                         AuthorizationGrantType.AUTHORIZATION_CODE.getValue()),
                                 Set.of(),

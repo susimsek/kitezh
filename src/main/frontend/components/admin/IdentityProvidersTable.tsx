@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge, Dropdown } from "react-bootstrap";
 import Link from "@/routing/Link";
 import type { Dictionary } from "@/i18n/get-dictionary";
@@ -45,7 +45,7 @@ export function IdentityProvidersTable({ dictionary }: { dictionary: Dictionary 
   const [providerToDelete, setProviderToDelete] = useState<IdentityProvider | null>(null);
   const { clearFilters, page, query, setPage, setQuery, setSize, setSort, size, sort } =
     useAdminTableState(10, false, "guiOrder,asc");
-  const load = () => {
+  const load = useCallback(() => {
     if (!accessToken) return;
     setLoading(true);
     adminRequest<PageResponse<IdentityProvider>>(accessToken, {
@@ -60,11 +60,11 @@ export function IdentityProvidersTable({ dictionary }: { dictionary: Dictionary 
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  };
+  }, [accessToken, page, query, size, sort]);
   useEffect(() => {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
-  }, [accessToken, page, query, size, sort]);
+  }, [load]);
   const remove = async (row: IdentityProvider) => {
     if (!accessToken) return;
     const response = await adminRequest(accessToken, {

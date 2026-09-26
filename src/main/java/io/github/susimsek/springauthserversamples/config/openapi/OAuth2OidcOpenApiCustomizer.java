@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.config.openapi;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
@@ -50,7 +51,8 @@ final class OAuth2OidcOpenApiCustomizer implements OpenApiCustomizer {
                                 List.of(
                                         "authorization_code",
                                         REFRESH_TOKEN,
-                                        "client_credentials"))));
+                                        "client_credentials",
+                                        AuthorizationGrantTypes.TOKEN_EXCHANGE))));
         paths.addPathItem(
                 "/oauth2/jwks",
                 jsonGet(
@@ -68,8 +70,9 @@ final class OAuth2OidcOpenApiCustomizer implements OpenApiCustomizer {
                 "/oauth2/token",
                 tokenEndpoint(
                         "Token Endpoint",
-                        "Exchanges authorization codes or refresh tokens. Refresh tokens are"
-                                + " rotated and cannot be reused."));
+                        "Exchanges authorization codes, refresh tokens, client credentials, or"
+                                + " RFC 8693 subject tokens. Refresh tokens are rotated and cannot"
+                                + " be reused."));
         paths.addPathItem(
                 "/oauth2/introspect",
                 formPost(

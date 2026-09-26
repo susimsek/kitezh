@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, Dropdown, Form, Modal, Spinner } from "react-bootstrap";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import type { PageResponse } from "@/lib/api-types";
@@ -54,7 +54,7 @@ export function IdentityProviderDetail({
   const { page, query, setPage, setQuery, setSize, setSort, size, sort, clearFilters } =
     useAdminTableState(10, false, "name,asc");
   const [mappers, setMappers] = useState<PageResponse<Mapper> | null>(null);
-  const load = () => {
+  const load = useCallback(() => {
     if (!accessToken) return;
     setLoading(true);
     adminRequest<Provider>(accessToken, { url: `/api/admin/identity-providers/${id}` })
@@ -65,8 +65,8 @@ export function IdentityProviderDetail({
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  };
-  const loadMappers = () => {
+  }, [accessToken, id]);
+  const loadMappers = useCallback(() => {
     if (!accessToken || tab !== "mappers") return;
     adminRequest<PageResponse<Mapper>>(accessToken, {
       url: `/api/admin/identity-providers/${id}/mappers?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}`,
@@ -76,18 +76,21 @@ export function IdentityProviderDetail({
         setMappers(r.data);
       })
       .catch(() => setMappers(null));
-  };
+  }, [accessToken, id, page, query, size, sort, tab]);
   useEffect(() => {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
-  }, [accessToken, id]);
+  }, [load]);
   useEffect(() => {
     const timer = window.setTimeout(loadMappers, 0);
     return () => window.clearTimeout(timer);
-  }, [accessToken, id, tab, page, query, size, sort]);
+  }, [loadMappers]);
+  const formInitial = useMemo<Partial<IdentityProviderFormData>>(
+    () => (provider ? { ...provider, clientSecret: "" } : {}),
+    [provider],
+  );
   if (loading) return <LoadingState />;
   if (error || !provider) return <ErrorState message={copy.notFound} />;
-  const formInitial: Partial<IdentityProviderFormData> = { ...provider, clientSecret: "" };
   const deleteMapper = async (row: Mapper) => {
     if (!accessToken) return;
     const response = await adminRequest(accessToken, {

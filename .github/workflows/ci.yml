@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24.18.0'
+  PNPM_VERSION: '11.22.0'
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: 'maven'
+          native-image-musl: 'true'
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          install: false
+
+      - name: Print tool versions
+        run: |
+          java -version
+          node --version
+          pnpm --version
+          native-image --version
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Install Maven dependencies
+        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
+
+      - name: Install frontend dependencies
+        run: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - name: Set up Snyk CLI
+        if: ${{ env.SNYK_TOKEN != '' }}
+        uses: snyk/actions/setup@v1
+
+      - name: Verify Snyk CLI
+        if: ${{ env.SNYK_TOKEN != '' }}
+        run: snyk --version
+
+      - name: Run Snyk test
+        if: ${{ env.SNYK_TOKEN != '' }}
+        continue-on-error: true
+        run: snyk test --all-projects
+
+      - name: Run Snyk monitor
+        if: ${{ github.ref == 'refs/heads/main' && env.SNYK_TOKEN != '' }}
+        continue-on-error: true
+        run: snyk monitor --all-projects
+
+      - name: Backend verification
+        run: ./mvnw -B -ntp verify -Dskip.frontend=true
+
+      - name: Frontend type check
+        run: pnpm --dir src/main/frontend typecheck
+
+      - name: Frontend lint
+        run: pnpm --dir src/main/frontend lint
+
+      - name: Frontend format check
+        run: pnpm --dir src/main/frontend format:check
+
+      - name: Frontend build
+        run: pnpm --dir src/main/frontend build
+
+      - name: Analyze code with SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: |
+          ./mvnw -B -ntp -Psonar initialize sonar:sonar \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=susimsek \
+            -Dsonar.token="${SONAR_TOKEN}"
+
+      - name: Install UPX
+        run: |
+          UPX_VERSION=5.1.0
+          UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
+          curl -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
+          tar -xJf "${UPX_ARCHIVE}"
+          mkdir -p "${RUNNER_TEMP}/bin"
+          mv "upx-${UPX_VERSION}-amd64_linux/upx" "${RUNNER_TEMP}/bin/upx"
+          chmod +x "${RUNNER_TEMP}/bin/upx"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+          rm -rf "${UPX_ARCHIVE}" "upx-${UPX_VERSION}-amd64_linux"
+          upx --version
+
+      - name: Build GraalVM native executable
+        run: |
+          ./mvnw -B -ntp -Pprod,native -DskipTests \
+            -Dskip.frontend=true \
+            -Dspotless.skip=true \
+            -Dcheckstyle.skip=true \
+            -DbuildArgs="--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g" \
+            native:compile
+
+      - name: Compress native executable
+        run: upx --lzma --best target/native-executable
+
+      - name: Publish Docker image
+        if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
+        run: |
+          ./mvnw -ntp -Pprod,native -DskipTests \
+            -Dskip.frontend=true \
+            jib:build \
+            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
+            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
+            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
+
+      - name: Update Docker Hub description
+        if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
+        run: |
+          README_PATH="docs/README-dockerhub.md"
+          if [ ! -f "${README_PATH}" ]; then
+            echo "${README_PATH} not found; skipping Docker Hub README update."
+            exit 0
+          fi
+
+          TOKEN="$({
+            jq -n \
+              --arg identifier "${DOCKERHUB_USERNAME}" \
+              --arg secret "${DOCKERHUB_TOKEN}" \
+              '{identifier: $identifier, secret: $secret}'
+          } | curl -fsS -X POST \
+            -H 'Content-Type: application/json' \
+            --data-binary @- \
+            https://hub.docker.com/v2/auth/token | jq -er '.access_token')"
+
+          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
+            | curl -fsS -X PATCH \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"

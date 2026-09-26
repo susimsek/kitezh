@@ -1,5 +1,7 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
@@ -12,11 +14,13 @@ import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepos
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationEndpointErrorResponseHandler;
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +42,14 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
@@ -51,6 +60,7 @@ import org.springframework.security.oauth2.server.authorization.token.Delegating
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2AccessTokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
@@ -136,6 +146,9 @@ public class AuthorizationServerConfig {
                                         .pushedAuthorizationRequestEndpoint(
                                                 pushedAuthorizationRequestEndpoint ->
                                                         pushedAuthorizationRequestEndpoint
+                                                                .pushedAuthorizationRequestConverter(
+                                                                        new DefaultClientScopesAuthorizationRequestConverter(
+                                                                                registeredClientRepository))
                                                                 .errorResponseHandler(
                                                                         localizedOAuth2ErrorResponseHandler))
                                         .deviceAuthorizationEndpoint(
@@ -162,7 +175,21 @@ public class AuthorizationServerConfig {
                                                                         localizedOAuth2ErrorResponseHandler)))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .oauth2ResourceServer(
-                        resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
+                        resourceServer ->
+                                resourceServer
+                                        .jwt(Customizer.withDefaults())
+                                        .dPoP(
+                                                dpop -> {
+                                                    DpopNonceService nonceService =
+                                                            new DpopNonceService(
+                                                                    applicationProperties.dpop());
+                                                    dpop.authenticationConverter(
+                                                                    new DpopNonceAuthenticationConverter(
+                                                                            nonceService))
+                                                            .authenticationFailureHandler(
+                                                                    new DpopNonceAuthenticationFailureHandler(
+                                                                            nonceService));
+                                                }))
                 .exceptionHandling(
                         exceptions ->
                                 exceptions.defaultAuthenticationEntryPointFor(
@@ -198,7 +225,18 @@ public class AuthorizationServerConfig {
 
     @Bean
     JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
-        return new NimbusJwtEncoder(jwkSource);
+        NimbusJwtEncoder jwtEncoder = new NimbusJwtEncoder(jwkSource);
+        jwtEncoder.setJwkSelector(
+                keys ->
+                        keys.stream()
+                                .filter(JWK::isPrivate)
+                                .findFirst()
+                                .orElseThrow(
+                                        () ->
+                                                new IllegalStateException(
+                                                        "No private OAuth2 signing key is"
+                                                                + " available")));
+        return jwtEncoder;
     }
 
     @Bean
@@ -263,6 +301,7 @@ public class AuthorizationServerConfig {
             appendGroupMapperClaims(context, tokenUser, groupMappers);
             appendClientRoleClaims(context, tokenUser);
             appendSessionIdClaim(context, authorizationRepository);
+            appendDpopConfirmationClaim(context);
         };
     }
 
@@ -445,6 +484,63 @@ public class AuthorizationServerConfig {
             authorizationSessionId(context, authorizationRepository)
                     .map(OidcSessionIdentifier::fromSessionId)
                     .ifPresent(sessionId -> context.getClaims().claim("sid", sessionId));
+        }
+    }
+
+    private static void appendDpopConfirmationClaim(JwtEncodingContext context) {
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+            return;
+        }
+        Object proof = context.get(OAuth2TokenContext.DPOP_PROOF_KEY);
+        if (!(proof instanceof Jwt dpopProof)) {
+            return;
+        }
+        if (AuthorizationGrantType.REFRESH_TOKEN.equals(context.getAuthorizationGrantType())
+                && ClientSecuritySettings.requiresDpopForRefreshToken(context.getRegisteredClient())
+                && !ClientSecuritySettings.requiresDpopProof(context.getRegisteredClient())) {
+            if (!context.getRegisteredClient()
+                    .getClientAuthenticationMethods()
+                    .contains(ClientAuthenticationMethod.NONE)) {
+                return;
+            }
+        }
+        Object jwkHeader = dpopProof.getHeaders().get("jwk");
+        if (!(jwkHeader instanceof Map<?, ?> jwkMap)) {
+            return;
+        }
+        Map<String, Object> jwkJson = new java.util.LinkedHashMap<>();
+        jwkMap.forEach(
+                (key, value) -> {
+                    if (key instanceof String stringKey) {
+                        jwkJson.put(stringKey, value);
+                    }
+                });
+        try {
+            String thumbprint = JWK.parse(jwkJson).computeThumbprint().toString();
+            validateDpopJkt(context, thumbprint);
+            context.getClaims().claim("cnf", Map.of("jkt", thumbprint));
+        } catch (ParseException | JOSEException exception) {
+            throw new IllegalStateException("Unable to compute the DPoP key thumbprint", exception);
+        }
+    }
+
+    private static void validateDpopJkt(JwtEncodingContext context, String thumbprint) {
+        if (!AuthorizationGrantType.AUTHORIZATION_CODE.equals(context.getAuthorizationGrantType())
+                || !ClientSecuritySettings.requiresDpopJkt(context.getRegisteredClient())) {
+            return;
+        }
+        OAuth2AuthorizationRequest authorizationRequest =
+                context.getAuthorization().getAttribute(OAuth2AuthorizationRequest.class.getName());
+        Object expected =
+                authorizationRequest == null
+                        ? null
+                        : authorizationRequest.getAdditionalParameters().get("dpop_jkt");
+        if (!thumbprint.equals(expected)) {
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error(
+                            OAuth2ErrorCodes.INVALID_DPOP_PROOF,
+                            "DPoP proof key does not match dpop_jkt",
+                            "https://www.rfc-editor.org/rfc/rfc9449#section-10.1"));
         }
     }
 

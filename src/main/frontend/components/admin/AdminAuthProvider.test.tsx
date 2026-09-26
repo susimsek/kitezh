@@ -272,6 +272,54 @@ describe("AdminAuthProvider", () => {
     expect(localStorage.getItem("ACCOUNT_OIDC_TRANSACTION:pending")).toBeNull();
   });
 
+  it("coalesces concurrent refresh requests into one token exchange", async () => {
+    storeTokens();
+    let resolveRefresh!: (value: { data: Record<string, unknown> }) => void;
+    mockPost.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }),
+    );
+    renderProvider();
+    await waitFor(() => expect(auth.authenticated).toBe(true));
+
+    let first!: Promise<string | null>;
+    let second!: Promise<string | null>;
+    await act(async () => {
+      first = auth.refreshAccessToken(-1);
+      second = auth.refreshAccessToken(-1);
+      resolveRefresh({
+        data: {
+          access_token: jwt({
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + 60,
+          }),
+          expires_in: 60,
+        },
+      });
+      await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    });
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears persisted authentication after a permanent refresh rejection", async () => {
+    storeTokens();
+    const error = Object.assign(new Error("invalid refresh"), {
+      isAxiosError: true,
+      response: { status: 400 },
+    });
+    mockPost.mockRejectedValueOnce(error);
+    renderProvider();
+    await waitFor(() => expect(auth.authenticated).toBe(true));
+
+    await act(async () => {
+      await expect(auth.refreshAccessToken(-1)).resolves.toBeNull();
+    });
+    expect(auth.authenticated).toBe(false);
+    expect(localStorage.getItem("AUTH_CONSOLE_TOKEN:admin")).toBeNull();
+  });
+
   it("allows access state to be updated by guards", async () => {
     renderProvider();
 

@@ -100,37 +100,40 @@ export function IdentityProviderForm({
       }),
     [copy.aliasInvalid, dictionary.admin.common.validation.required],
   );
-  const defaults: IdentityProviderFormData = {
-    registrationId: "",
-    providerType: "oidc",
-    displayName: "",
-    alias: "",
-    iconKey: "generic",
-    shortStateParameter: false,
-    caseSensitiveUsername: false,
-    enabled: true,
-    clientId: "",
-    clientSecret: "",
-    hideOnLogin: false,
-    accountLinkingOnly: false,
-    trustEmail: false,
-    mfaRequired: false,
-    requiredClaims: "sub,email",
-    storeTokens: false,
-    storedTokensReadable: false,
-    guiOrder: 0,
-    showInAccountConsole: "always",
-    syncMode: "import",
-    authorizationUri: "",
-    tokenUri: "",
-    userInfoUri: "",
-    jwkSetUri: "",
-    issuerUri: "",
-    clientAuthenticationMethod: "client_secret_basic",
-    scopes: "openid,profile,email",
-    userNameAttribute: "sub",
-    ...initial,
-  };
+  const defaults = useMemo<IdentityProviderFormData>(
+    () => ({
+      registrationId: "",
+      providerType: "oidc",
+      displayName: "",
+      alias: "",
+      iconKey: "generic",
+      shortStateParameter: false,
+      caseSensitiveUsername: false,
+      enabled: true,
+      clientId: "",
+      clientSecret: "",
+      hideOnLogin: false,
+      accountLinkingOnly: false,
+      trustEmail: false,
+      mfaRequired: false,
+      requiredClaims: "sub,email",
+      storeTokens: false,
+      storedTokensReadable: false,
+      guiOrder: 0,
+      showInAccountConsole: "always",
+      syncMode: "import",
+      authorizationUri: "",
+      tokenUri: "",
+      userInfoUri: "",
+      jwkSetUri: "",
+      issuerUri: "",
+      clientAuthenticationMethod: "client_secret_basic",
+      scopes: "openid,profile,email",
+      userNameAttribute: "sub",
+      ...initial,
+    }),
+    [initial],
+  );
   const {
     register,
     handleSubmit,
@@ -144,7 +147,7 @@ export function IdentityProviderForm({
   });
   useEffect(() => {
     reset(defaults);
-  }, [id]);
+  }, [defaults, reset]);
   const submit = async (data: IdentityProviderFormData) => {
     if (!accessToken) return;
     const response = await adminRequest<{ id: string }>(accessToken, {

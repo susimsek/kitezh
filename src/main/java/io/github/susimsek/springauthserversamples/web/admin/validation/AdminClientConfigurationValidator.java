@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.web.admin.validation;
 
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRequestDTO;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.Set;
@@ -23,7 +24,8 @@ public class AdminClientConfigurationValidator
             Set.of(
                     AuthorizationGrantType.AUTHORIZATION_CODE.getValue(),
                     AuthorizationGrantType.REFRESH_TOKEN.getValue(),
-                    AuthorizationGrantType.CLIENT_CREDENTIALS.getValue());
+                    AuthorizationGrantType.CLIENT_CREDENTIALS.getValue(),
+                    AuthorizationGrantTypes.TOKEN_EXCHANGE);
 
     @Override
     public boolean isValid(AdminClientRequestDTO request, ConstraintValidatorContext context) {

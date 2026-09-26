@@ -222,8 +222,10 @@ The following matrix compares the behavior currently implemented in this reposit
 | Client credentials | Seeded client and integration coverage | Service accounts and client credentials | Partial | Add a service-account user model and role assignment. |
 | PAR, Device Authorization, introspection, revocation | Implemented and tested | Supported protocol endpoints | Implemented | Preserve endpoint metadata and integration tests. |
 | OIDC discovery, UserInfo, JWKS, logout | Implemented | Standard OIDC provider endpoints and session/logout behavior | Implemented | Keep issuer and metadata stable for clients. |
-| Token exchange | No standard token-exchange grant | Standard and administrator token exchange options[^12] | Missing | Add only with explicit audience, impersonation, and policy controls. |
-| CIBA, DPoP, resource indicators | Not implemented | Available as advanced protocol capabilities in Keycloak distributions | Missing | Treat as separate protocol epics, not UI-only work. |
+| Token exchange | RFC 8693 token exchange is available to clients that explicitly include the token-exchange grant; Spring Authorization Server performs the standard subject-token exchange | Keycloak supports standard token exchange and administrator-controlled exchange permissions[^12] | Partial | Add explicit audience, actor/impersonation, scope, and exchange-policy controls before exposing broader delegation. |
+| CIBA | Not implemented | Keycloak supports CIBA with a configured backchannel authentication channel and CIBA policy | Missing | Add a separate backchannel authentication endpoint, auth-channel provider, pending-request store, polling/push completion, and administrator policy before claiming CIBA support. |
+| DPoP | DPoP proofs are accepted at all token/resource grant paths, DPoP-bound access tokens carry a `cnf.jkt` confirmation claim, clients can require proofs, authorization-code and PAR clients can require and validate `dpop_jkt`, refresh-token requests can require DPoP, public clients retain the same `cnf.jkt` key for refresh validation, protected-resource metadata advertises supported proof algorithms, each client can allow only selected asymmetric proof algorithms (currently RS256 and/or ES256), and resource APIs can enforce short-lived single-use nonce challenges | Keycloak supports DPoP-bound tokens, client-level requirement for DPoP proofs, refresh-token-only and strict `dpop_jkt` client policies, nonce challenge handling, and asymmetric proof algorithm policy | Implemented | Keep the client policy controls aligned with RFC 9449 and preserve the public-client same-key refresh check. |
+| Resource indicators | The OAuth `resource` parameter is not interpreted | Current Keycloak documentation states that the server does not currently process OAuth 2.0 resource indicators[^13] | Not a current parity gap | Keep resource indicators out of the parity claim; evaluate RFC 8707 support only when the upstream server and product need are established. |
 | SAML | No SAML IdP/SP | SAML client and identity-provider support | Missing | Separate protocol product decision. |
 | Authentication flows | Fixed Spring Security flow with custom MFA filter and required actions | Configurable browser, registration, reset-credential, first-broker-login, and conditional flows[^8] | Partial | Introduce a flow graph only when administrators need reordering/conditions. |
 | WebAuthn/passkeys | Spring Security WebAuthn registration/authentication ceremonies, account/admin credential inventory, labels, deletion, and required-action enrollment | WebAuthn credential and passkey authenticators | Partial | Registration, persistence, primary-factor sign-in, OTP step-up, account/admin inventory with signature and verification metadata, label management, deletion, configurable mediation, conditional sign-in, automatic passkey autofill, and standard/passwordless required actions are implemented. Broader Keycloak authentication-flow composition remains outside this sample. |
@@ -560,7 +562,7 @@ The application now implements the OAuth2/OIDC identity-broker subset needed for
 ### P2 — optional Keycloak platform parity
 
 - Extend the implemented identity-broker subset with SAML, LDAP/AD federation, broader provider mapper types, additional provider types, and realm-scoped broker configuration.
-- SAML, token exchange, CIBA, DPoP, resource indicators.
+- CIBA backchannel authentication and its auth-channel provider/pending-request lifecycle.
 - Organizations and organization groups.
 - Authorization Services/UMA.
 - Event listeners, webhooks, delivery retries, and metrics.
@@ -729,4 +731,5 @@ Add listener providers, delivery status, tenant/realm isolation, and the remaini
 [^9]: Keycloak, *Server Administration Guide*, identity brokering and user federation: <https://www.keycloak.org/docs/latest/server_admin/#_identity_brokering>
 [^10]: Keycloak, *Server Administration Guide*, Organizations: <https://www.keycloak.org/docs/latest/server_admin/#_organizations>
 [^11]: Keycloak, *Server Administration Guide*, protocol mappers and client scopes: <https://www.keycloak.org/docs/latest/server_admin/#_client_scopes>
-[^12]: Keycloak, *Securing Applications and Services Guide*, token exchange and advanced OAuth capabilities: <https://www.keycloak.org/docs/latest/securing_apps/#_token-exchange>
+[^12]: Keycloak, *Securing Applications and Services Guide*, token exchange and advanced OAuth capabilities: <https://www.keycloak.org/securing-apps/token-exchange>
+[^13]: Keycloak, *MCP authorization server guide*, current resource-parameter support status: <https://www.keycloak.org/securing-apps/mcp-authz-server>

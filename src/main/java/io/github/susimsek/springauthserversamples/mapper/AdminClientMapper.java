@@ -2,6 +2,7 @@ package io.github.susimsek.springauthserversamples.mapper;
 
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientDTO;
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
@@ -30,6 +31,10 @@ public interface AdminClientMapper {
                 client.getScopes(),
                 client.getClientSettings().isRequireAuthorizationConsent(),
                 client.getClientSettings().isRequireProofKey(),
+                ClientSecuritySettings.requiresDpopProof(client),
+                ClientSecuritySettings.requiresDpopJkt(client),
+                ClientSecuritySettings.requiresDpopForRefreshToken(client),
+                ClientSecuritySettings.allowedDpopSigningAlgorithms(client),
                 client.getTokenSettings().getAuthorizationCodeTimeToLive(),
                 client.getTokenSettings().getAccessTokenTimeToLive(),
                 client.getTokenSettings().getRefreshTokenTimeToLive());

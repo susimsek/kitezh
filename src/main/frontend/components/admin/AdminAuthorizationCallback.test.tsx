@@ -35,6 +35,16 @@ describe("AdminAuthorizationCallback", () => {
     expect(completeAuthorization).not.toHaveBeenCalled();
   });
 
+  it("shows an error when the provider returns access_denied", async () => {
+    window.history.replaceState({}, "", "/admin/callback#error=access_denied&state=state");
+    render(<AdminAuthorizationCallback />);
+
+    expect(
+      await screen.findByText("The administration session could not be established."),
+    ).toBeVisible();
+    expect(completeAuthorization).not.toHaveBeenCalled();
+  });
+
   it("completes a valid response and redirects to the saved location", async () => {
     window.history.replaceState({}, "", "/admin/callback#code=code&state=state");
     completeAuthorization.mockResolvedValue("/admin/clients");

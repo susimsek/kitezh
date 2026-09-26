@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Modal } from "react-bootstrap";
 
 import { ActionIcon } from "@/components/shared/ActionIcon";

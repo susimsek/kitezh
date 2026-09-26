@@ -4,30 +4,33 @@ set -eu
 MVN="./mvnw"
 
 if [ ! -f "$MVN" ]; then
-  echo "[pre-push] Maven wrapper bulunamadı: $MVN" >&2
+  echo "[pre-push] Maven wrapper not found: $MVN" >&2
   exit 1
 fi
 
-echo "[pre-push] Spotless, Checkstyle ve verify çalıştırılıyor..."
-"$MVN" -q spotless:check checkstyle:check verify
+echo "[pre-push] Running Maven verify..."
+"$MVN" -B -ntp verify
 
-SONAR_TOKEN_VALUE="${SONARQUBE_TOKEN:-${SONAR_TOKEN:-}}"
+SONAR_TOKEN_VALUE="${SONAR_TOKEN:-${SONARQUBE_TOKEN:-}}"
 if [ -z "$SONAR_TOKEN_VALUE" ]; then
-  echo "[pre-push] SONARQUBE_TOKEN veya SONAR_TOKEN tanımlı değil; Sonar taraması atlandı."
-  echo "[pre-push] Sonar Quality Gate CI tarafından doğrulanmalıdır."
+  echo "[pre-push] Sonar token is not configured; Sonar analysis will run in CI."
   exit 0
 fi
 
 BRANCH_NAME="$(git branch --show-current)"
 if [ -z "$BRANCH_NAME" ]; then
-  echo "[pre-push] Aktif Git branch'i belirlenemedi." >&2
+  echo "[pre-push] Unable to determine the current Git branch." >&2
   exit 1
 fi
 
-echo "[pre-push] Sonar taraması çalıştırılıyor: $BRANCH_NAME"
-"$MVN" -q -Psonar initialize sonar:sonar \
-  "-Dsonar.token=$SONAR_TOKEN_VALUE" \
-  "-Dsonar.branch.name=$BRANCH_NAME" \
-  "-Dsonar.java.checkstyle.reportPaths="
+echo "[pre-push] Running Sonar analysis for branch: $BRANCH_NAME"
+if [ "$BRANCH_NAME" = "main" ]; then
+  SONAR_TOKEN="$SONAR_TOKEN_VALUE" "$MVN" -B -ntp -Psonar initialize sonar:sonar \
+    "-Dsonar.java.checkstyle.reportPaths="
+else
+  SONAR_TOKEN="$SONAR_TOKEN_VALUE" "$MVN" -B -ntp -Psonar initialize sonar:sonar \
+    "-Dsonar.branch.name=$BRANCH_NAME" \
+    "-Dsonar.java.checkstyle.reportPaths="
+fi
 
-echo "[pre-push] Tüm kontroller başarılı."
+echo "[pre-push] Local checks passed. SonarCloud Quality Gate will be enforced by CI."

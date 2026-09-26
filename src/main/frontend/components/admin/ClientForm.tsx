@@ -47,6 +47,10 @@ type FormState = {
   scopes: string;
   requireAuthorizationConsent: boolean;
   requireProofKey: boolean;
+  requireDpop: boolean;
+  requireDpopJkt: boolean;
+  dpopRefreshTokenOnly: boolean;
+  dpopSigningAlgorithms: (typeof DPOP_ALGORITHMS)[number][];
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
@@ -62,13 +66,23 @@ const EMPTY: FormState = {
   scopes: "openid profile",
   requireAuthorizationConsent: true,
   requireProofKey: true,
+  requireDpop: false,
+  requireDpopJkt: false,
+  dpopRefreshTokenOnly: false,
+  dpopSigningAlgorithms: ["RS256", "ES256"],
   authorizationCodeTimeToLive: "PT5M",
   accessTokenTimeToLive: "PT5M",
   refreshTokenTimeToLive: "PT1H",
 };
 
 const METHODS = ["client_secret_basic", "client_secret_post", "none"] as const;
-const GRANTS = ["authorization_code", "refresh_token", "client_credentials"] as const;
+const GRANTS = [
+  "authorization_code",
+  "refresh_token",
+  "client_credentials",
+  "urn:ietf:params:oauth:grant-type:token-exchange",
+] as const;
+const DPOP_ALGORITHMS = ["RS256", "ES256"] as const;
 const CLIENT_FORM_STEP_FIELDS: (keyof FormState)[][] = [
   ["clientId", "clientName"],
   [
@@ -95,6 +109,10 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
         .refine((value) => lines(value).every(isValidAbsoluteUri), validation.uri),
       requireAuthorizationConsent: z.boolean(),
       requireProofKey: z.boolean(),
+      requireDpop: z.boolean(),
+      requireDpopJkt: z.boolean(),
+      dpopRefreshTokenOnly: z.boolean(),
+      dpopSigningAlgorithms: z.array(z.enum(DPOP_ALGORITHMS)).min(1, validation.selection),
       authorizationCodeTimeToLive: z.string(),
       accessTokenTimeToLive: z.string(),
       refreshTokenTimeToLive: z.string(),
@@ -210,6 +228,26 @@ export function ClientForm({
     name: "requireAuthorizationConsent",
     defaultValue: EMPTY.requireAuthorizationConsent,
   });
+  const requireDpop = useWatch({
+    control,
+    name: "requireDpop",
+    defaultValue: EMPTY.requireDpop,
+  });
+  const requireDpopJkt = useWatch({
+    control,
+    name: "requireDpopJkt",
+    defaultValue: EMPTY.requireDpopJkt,
+  });
+  const dpopRefreshTokenOnly = useWatch({
+    control,
+    name: "dpopRefreshTokenOnly",
+    defaultValue: EMPTY.dpopRefreshTokenOnly,
+  });
+  const dpopSigningAlgorithms = useWatch({
+    control,
+    name: "dpopSigningAlgorithms",
+    defaultValue: EMPTY.dpopSigningAlgorithms,
+  });
   const selectedScopes = useWatch({ control, name: "scopes", defaultValue: EMPTY.scopes });
 
   useEffect(() => {
@@ -254,6 +292,13 @@ export function ClientForm({
           scopes: client.scopes.join(" "),
           requireAuthorizationConsent: client.requireAuthorizationConsent,
           requireProofKey: client.requireProofKey,
+          requireDpop: client.requireDpop ?? false,
+          requireDpopJkt: client.requireDpopJkt ?? false,
+          dpopRefreshTokenOnly: client.dpopRefreshTokenOnly ?? false,
+          dpopSigningAlgorithms: (client.dpopSigningAlgorithms ?? [
+            "RS256",
+            "ES256",
+          ]) as FormState["dpopSigningAlgorithms"],
           authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "PT5M",
           accessTokenTimeToLive: client.accessTokenTimeToLive ?? "PT5M",
           refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "PT1H",
@@ -566,6 +611,94 @@ export function ClientForm({
                       })
                     }
                   />
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="admin-setting-row">
+                  <div className="fw-semibold">
+                    <HelpItem
+                      label={dictionary.admin.clients.requireDpop}
+                      help={dictionary.admin.clients.requireDpopHelp}
+                    />
+                  </div>
+                  <Form.Check
+                    type="switch"
+                    checked={requireDpop}
+                    disabled={!canManageClients}
+                    onChange={(e) =>
+                      setValue("requireDpop", e.target.checked, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="admin-setting-row">
+                  <div className="fw-semibold">
+                    <HelpItem
+                      label={dictionary.admin.clients.requireDpopJkt}
+                      help={dictionary.admin.clients.requireDpopJktHelp}
+                    />
+                  </div>
+                  <Form.Check
+                    type="switch"
+                    checked={requireDpopJkt}
+                    disabled={!canManageClients}
+                    onChange={(e) =>
+                      setValue("requireDpopJkt", e.target.checked, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="admin-setting-row">
+                  <div className="fw-semibold">
+                    <HelpItem
+                      label={dictionary.admin.clients.dpopRefreshTokenOnly}
+                      help={dictionary.admin.clients.dpopRefreshTokenOnlyHelp}
+                    />
+                  </div>
+                  <Form.Check
+                    type="switch"
+                    checked={dpopRefreshTokenOnly}
+                    disabled={!canManageClients}
+                    onChange={(e) =>
+                      setValue("dpopRefreshTokenOnly", e.target.checked, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="admin-setting-row">
+                  <div className="fw-semibold">{dictionary.admin.clients.dpopAlgorithms}</div>
+                  <div className="d-flex gap-3">
+                    {DPOP_ALGORITHMS.map((algorithm) => (
+                      <Form.Check
+                        checked={dpopSigningAlgorithms.includes(algorithm)}
+                        disabled={!canManageClients}
+                        key={algorithm}
+                        label={algorithm}
+                        onChange={(event) => {
+                          const next = event.target.checked
+                            ? [...dpopSigningAlgorithms, algorithm]
+                            : dpopSigningAlgorithms.filter((value) => value !== algorithm);
+                          setValue("dpopSigningAlgorithms", next, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }}
+                        type="checkbox"
+                      />
+                    ))}
+                  </div>
                 </div>
               </Col>
             </Row>
