@@ -5,7 +5,7 @@ The local LDAP fixture is intended for development and end-to-end testing only.
 Start it from the repository root:
 
 ```powershell
-docker compose -f src/main/docker/services.yml up -d openldap
+docker compose -f src/main/docker/openldap.yml up -d
 ```
 
 Connection settings for the application running on the host:
@@ -33,5 +33,5 @@ the fixture, remove only the project volumes after confirming that no other data
 them:
 
 ```powershell
-docker compose -f src/main/docker/services.yml down -v
+docker compose -f src/main/docker/openldap.yml down -v
 ```
