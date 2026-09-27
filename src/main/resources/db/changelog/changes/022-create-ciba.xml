@@ -33,6 +33,7 @@
 				<constraints nullable="false"/>
 			</column>
 			<column name="binding_message" type="varchar(20)"/>
+			<column name="acr_values" type="varchar(1000)"/>
 			<column name="user_code" type="varchar(32)">
 				<constraints nullable="false" unique="true" uniqueConstraintName="uk_ciba_user_code"/>
 			</column>
@@ -40,7 +41,7 @@
 				<constraints nullable="false"/>
 			</column>
 			<column name="notification_endpoint" type="varchar(2000)"/>
-			<column name="client_notification_token" type="varchar(512)"/>
+			<column name="client_notification_token" type="varchar(2000)"/>
 			<column name="status" type="varchar(20)" defaultValue="PENDING">
 				<constraints nullable="false"/>
 			</column>

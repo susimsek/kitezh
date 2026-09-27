@@ -121,7 +121,7 @@ export function CibaApprovalPanel({ dictionary }: { dictionary: Dictionary }) {
                     </Button>
                     <Button
                       type="button"
-                      variant="outline-danger"
+                      variant="danger"
                       disabled={busy || action !== null}
                       onClick={() => void decide(request, "deny")}
                     >

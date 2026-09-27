@@ -150,7 +150,8 @@ Secret/API key handling:
 The admin API accepts the secret/API key only on an authenticated update and stores them encrypted
 with AES-GCM in the `login_settings` table. The values are never returned to the browser; the
 panel only receives a configured/not-configured flag. A blank secret field preserves the current
-value. Configure a stable `SOCIAL_LOGIN_ENCRYPTION_KEY` before saving secrets, and keep it stable
+value. The demo profiles use a fixed sample encryption key; replace it with a deployment-managed
+secret before using the production profile outside local development, and keep it stable
 across restarts and deployments.
 
 The registration endpoint always verifies the token server-side and rejects missing, expired,
@@ -483,6 +484,12 @@ Notes:
 
 The seeded `ciba-client` is a confidential client that uses the poll delivery mode. It has no
 redirect URI because the user approves the request in the Account Console.
+
+Ping and push clients must register a notification endpoint and send a fresh
+`client_notification_token` with every backchannel request. The token is encrypted before it is
+stored with the pending request and is sent as a bearer token only to the registered endpoint.
+The demo profiles provide a fixed AES-GCM key for ping or push delivery. Replace that sample key
+with a deployment-managed secret before using the production profile outside this demo.
 
 Create a backchannel authentication request:
 

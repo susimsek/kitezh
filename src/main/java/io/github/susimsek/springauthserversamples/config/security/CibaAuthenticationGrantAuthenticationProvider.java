@@ -89,6 +89,13 @@ public class CibaAuthenticationGrantAuthenticationProvider implements Authentica
         Authentication userPrincipal =
                 UsernamePasswordAuthenticationToken.authenticated(
                         user.getUsername(), null, user.getAuthorities());
+        CibaAuthenticationGrantAuthenticationToken tokenGrant =
+                new CibaAuthenticationGrantAuthenticationToken(
+                        grant.getAuthReqId(),
+                        clientPrincipal,
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                request.getAcrValues() == null ? "" : request.getAcrValues()));
         OAuth2TokenContext tokenContext =
                 DefaultOAuth2TokenContext.builder()
                         .registeredClient(registeredClient)
@@ -97,7 +104,7 @@ public class CibaAuthenticationGrantAuthenticationProvider implements Authentica
                         .authorizedScopes(authorizedScopes)
                         .tokenType(OAuth2TokenType.ACCESS_TOKEN)
                         .authorizationGrantType(CIBA_GRANT_TYPE)
-                        .authorizationGrant(grant)
+                        .authorizationGrant(tokenGrant)
                         .build();
 
         OAuth2Token generatedAccessToken = tokenGenerator.generate(tokenContext);
@@ -117,16 +124,27 @@ public class CibaAuthenticationGrantAuthenticationProvider implements Authentica
                                 generatedAccessToken.getIssuedAt(),
                                 generatedAccessToken.getExpiresAt(),
                                 authorizedScopes);
-        OidcIdToken idToken =
-                generateIdToken(registeredClient, userPrincipal, authorizedScopes, grant);
         OAuth2RefreshToken refreshToken =
                 authorizedScopes.contains("offline_access")
                                 && registeredClient
                                         .getAuthorizationGrantTypes()
                                         .contains(AuthorizationGrantType.REFRESH_TOKEN)
                         ? generateRefreshToken(
-                                registeredClient, userPrincipal, authorizedScopes, grant)
+                                registeredClient, userPrincipal, authorizedScopes, tokenGrant)
                         : null;
+        CibaAuthenticationGrantAuthenticationToken idTokenGrant =
+                new CibaAuthenticationGrantAuthenticationToken(
+                        grant.getAuthReqId(),
+                        clientPrincipal,
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                request.getAcrValues() == null ? "" : request.getAcrValues(),
+                                CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE,
+                                accessToken.getTokenValue(),
+                                CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE,
+                                refreshToken == null ? "" : refreshToken.getTokenValue()));
+        OidcIdToken idToken =
+                generateIdToken(registeredClient, userPrincipal, authorizedScopes, idTokenGrant);
         OAuth2Authorization.Builder authorizationBuilder =
                 OAuth2Authorization.withRegisteredClient(registeredClient)
                         .principalName(user.getUsername())

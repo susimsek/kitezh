@@ -66,7 +66,7 @@ public class CibaController {
                             description = "Space-delimited scopes.",
                             example = "openid profile",
                             required = true)
-                    @RequestParam
+                    @RequestParam(required = false)
                     String scope,
             @Parameter(description = "Local username used as the login hint.", example = "admin")
                     @RequestParam(name = "login_hint", required = false)
@@ -100,6 +100,17 @@ public class CibaController {
                     @RequestParam(name = "backchannel_token_delivery_mode", required = false)
                     String deliveryMode,
             @Parameter(
+                            description =
+                                    "Bearer token used to authenticate ping or push callbacks.",
+                            example = "8d67dc78-7faa-4d41-aabd-67707b374255")
+                    @RequestParam(name = "client_notification_token", required = false)
+                    String clientNotificationToken,
+            @Parameter(
+                            description = "Optional requested authentication context class values.",
+                            example = "urn:mace:incommon:iap:silver")
+                    @RequestParam(name = "acr_values", required = false)
+                    String acrValues,
+            @Parameter(
                             description = "Signed request JWT containing CIBA request parameters.",
                             example = "eyJhbGciOiJSUzI1NiJ9...")
                     @RequestParam(name = "request", required = false)
@@ -115,7 +126,9 @@ public class CibaController {
                         bindingMessage,
                         requestedExpiry,
                         deliveryMode,
+                        clientNotificationToken,
                         userCode,
+                        acrValues,
                         requestObject);
         return response(cibaRequest);
     }

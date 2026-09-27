@@ -754,10 +754,8 @@
       "next": "Devam",
       "back": "Geri",
       "cibaDeliveryMode": "CIBA teslim yöntemi",
-      "cibaDeliveryModeHelp": "İstemcinin CIBA token yanıtını nasıl alacağını seçin.",
-      "cibaNotificationEndpoint": "CIBA bildirim endpoint’i",
-      "cibaClientNotificationToken": "CIBA istemci bildirim tokenı",
-      "cibaClientNotificationTokenHelp": "Güncellemede mevcut tokenı korumak için boş bırakın."
+      "cibaDeliveryModeHelp": "İstemcinin CIBA token yanıtını nasıl alacağını seçin. Ping ve push istekleri her istekte yeni bir callback tokenı gönderir.",
+      "cibaNotificationEndpoint": "CIBA bildirim endpoint’i"
     },
     "common": {
       "yes": "Evet",

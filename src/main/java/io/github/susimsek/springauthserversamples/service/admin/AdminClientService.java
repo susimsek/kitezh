@@ -370,18 +370,7 @@ public class AdminClientService {
             values.put(
                     ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
                     request.cibaNotificationEndpoint());
-            if (hasText(request.cibaClientNotificationToken())) {
-                values.put(
-                        ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN,
-                        request.cibaClientNotificationToken());
-            }
-            if (!hasText(
-                    (String) values.get(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN))) {
-                throw ApiException.badRequest(
-                        "cibaClientNotificationToken",
-                        ApiErrorCode.CLIENT_INVALID_REQUEST,
-                        "A client notification token is required for ping or push delivery");
-            }
+            values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
         }
         settings = ClientSettings.withSettings(values).build();
         if (existing == null

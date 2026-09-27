@@ -1,5 +1,6 @@
 package io.github.susimsek.springauthserversamples.service.ciba;
 
+import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestEntity;
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
@@ -29,7 +30,9 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -53,6 +56,8 @@ public class CibaAuthenticationService {
     private final CibaPushTokenService pushTokenService;
     private final JwtDecoder jwtDecoder;
     private final CibaPolicyService policyService;
+    private final String authorizationServerIssuer;
+    private final SocialLoginSecretCipher notificationTokenCipher;
 
     @Autowired
     public CibaAuthenticationService(
@@ -61,13 +66,39 @@ public class CibaAuthenticationService {
             CibaNotificationService notificationService,
             CibaPushTokenService pushTokenService,
             JwtDecoder jwtDecoder,
-            CibaPolicyService policyService) {
+            CibaPolicyService policyService,
+            AuthorizationServerSettings authorizationServerSettings,
+            SocialLoginSecretCipher notificationTokenCipher) {
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.pushTokenService = pushTokenService;
         this.jwtDecoder = jwtDecoder;
         this.policyService = policyService;
+        this.authorizationServerIssuer =
+                authorizationServerSettings == null
+                        ? null
+                        : authorizationServerSettings.getIssuer();
+        this.notificationTokenCipher = notificationTokenCipher;
+    }
+
+    public CibaAuthenticationService(
+            CibaAuthenticationRequestRepository requestRepository,
+            UserRepository userRepository,
+            CibaNotificationService notificationService,
+            CibaPushTokenService pushTokenService,
+            JwtDecoder jwtDecoder,
+            CibaPolicyService policyService,
+            AuthorizationServerSettings authorizationServerSettings) {
+        this(
+                requestRepository,
+                userRepository,
+                notificationService,
+                pushTokenService,
+                jwtDecoder,
+                policyService,
+                authorizationServerSettings,
+                null);
     }
 
     public CibaAuthenticationService(
@@ -82,6 +113,26 @@ public class CibaAuthenticationService {
                 notificationService,
                 pushTokenService,
                 jwtDecoder,
+                null,
+                null,
+                null);
+    }
+
+    public CibaAuthenticationService(
+            CibaAuthenticationRequestRepository requestRepository,
+            UserRepository userRepository,
+            CibaNotificationService notificationService,
+            CibaPushTokenService pushTokenService,
+            JwtDecoder jwtDecoder,
+            CibaPolicyService policyService) {
+        this(
+                requestRepository,
+                userRepository,
+                notificationService,
+                pushTokenService,
+                jwtDecoder,
+                policyService,
+                null,
                 null);
     }
 
@@ -90,19 +141,35 @@ public class CibaAuthenticationService {
             UserRepository userRepository,
             CibaNotificationService notificationService,
             CibaPushTokenService pushTokenService) {
-        this(requestRepository, userRepository, notificationService, pushTokenService, null);
+        this(
+                requestRepository,
+                userRepository,
+                notificationService,
+                pushTokenService,
+                null,
+                null,
+                null,
+                null);
     }
 
     public CibaAuthenticationService(
             CibaAuthenticationRequestRepository requestRepository, UserRepository userRepository) {
-        this(requestRepository, userRepository, new CibaNotificationService(), null, null);
+        this(
+                requestRepository,
+                userRepository,
+                new CibaNotificationService(),
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     public CibaAuthenticationService(
             CibaAuthenticationRequestRepository requestRepository,
             UserRepository userRepository,
             CibaNotificationService notificationService) {
-        this(requestRepository, userRepository, notificationService, null, null);
+        this(requestRepository, userRepository, notificationService, null, null, null, null, null);
     }
 
     @Transactional
@@ -113,7 +180,17 @@ public class CibaAuthenticationService {
             String bindingMessage,
             Integer requestedExpiry) {
         return persistRequest(
-                client, scope, loginHint, null, null, bindingMessage, requestedExpiry, null, null);
+                client,
+                scope,
+                loginHint,
+                null,
+                null,
+                bindingMessage,
+                requestedExpiry,
+                null,
+                null,
+                null,
+                null);
     }
 
     @Transactional
@@ -133,6 +210,8 @@ public class CibaAuthenticationService {
                 bindingMessage,
                 requestedExpiry,
                 requestedDeliveryMode,
+                null,
+                null,
                 null);
     }
 
@@ -156,6 +235,8 @@ public class CibaAuthenticationService {
                 bindingMessage,
                 requestedExpiry,
                 requestedDeliveryMode,
+                null,
+                null,
                 null);
     }
 
@@ -171,7 +252,7 @@ public class CibaAuthenticationService {
             Integer requestedExpiry,
             String requestedDeliveryMode,
             String requestObject) {
-        return persistRequestFromObject(
+        return create(
                 client,
                 scope,
                 loginHint,
@@ -180,6 +261,7 @@ public class CibaAuthenticationService {
                 bindingMessage,
                 requestedExpiry,
                 requestedDeliveryMode,
+                null,
                 null,
                 requestObject);
     }
@@ -197,6 +279,64 @@ public class CibaAuthenticationService {
             String requestedDeliveryMode,
             String requestedUserCode,
             String requestObject) {
+        return create(
+                client,
+                scope,
+                loginHint,
+                loginHintToken,
+                idTokenHint,
+                bindingMessage,
+                requestedExpiry,
+                requestedDeliveryMode,
+                null,
+                requestedUserCode,
+                requestObject);
+    }
+
+    @Transactional
+    @SuppressWarnings("java:S107")
+    public CibaAuthenticationRequestEntity create(
+            RegisteredClient client,
+            String scope,
+            String loginHint,
+            String loginHintToken,
+            String idTokenHint,
+            String bindingMessage,
+            Integer requestedExpiry,
+            String requestedDeliveryMode,
+            String clientNotificationToken,
+            String requestedUserCode,
+            String requestObject) {
+        return create(
+                client,
+                scope,
+                loginHint,
+                loginHintToken,
+                idTokenHint,
+                bindingMessage,
+                requestedExpiry,
+                requestedDeliveryMode,
+                clientNotificationToken,
+                requestedUserCode,
+                null,
+                requestObject);
+    }
+
+    @Transactional
+    @SuppressWarnings("java:S107")
+    public CibaAuthenticationRequestEntity create(
+            RegisteredClient client,
+            String scope,
+            String loginHint,
+            String loginHintToken,
+            String idTokenHint,
+            String bindingMessage,
+            Integer requestedExpiry,
+            String requestedDeliveryMode,
+            String clientNotificationToken,
+            String requestedUserCode,
+            String acrValues,
+            String requestObject) {
         return persistRequestFromObject(
                 client,
                 scope,
@@ -207,6 +347,8 @@ public class CibaAuthenticationService {
                 requestedExpiry,
                 requestedDeliveryMode,
                 requestedUserCode,
+                clientNotificationToken,
+                acrValues,
                 requestObject);
     }
 
@@ -221,8 +363,25 @@ public class CibaAuthenticationService {
             Integer requestedExpiry,
             String requestedDeliveryMode,
             String requestedUserCode,
+            String clientNotificationToken,
+            String acrValues,
             String requestObject) {
         CibaRequestObjectParameters requestParameters = decodeRequestObject(client, requestObject);
+        if (StringUtils.hasText(requestObject)
+                && (StringUtils.hasText(scope)
+                        || StringUtils.hasText(loginHint)
+                        || StringUtils.hasText(loginHintToken)
+                        || StringUtils.hasText(idTokenHint)
+                        || StringUtils.hasText(bindingMessage)
+                        || requestedExpiry != null
+                        || StringUtils.hasText(requestedDeliveryMode)
+                        || StringUtils.hasText(clientNotificationToken)
+                        || StringUtils.hasText(acrValues)
+                        || StringUtils.hasText(requestedUserCode))) {
+            throw protocol(
+                    INVALID_REQUEST,
+                    "Authentication request parameters must be sent inside the request JWT");
+        }
         return persistRequest(
                 client,
                 mergeString("scope", scope, requestParameters.scope()),
@@ -236,7 +395,12 @@ public class CibaAuthenticationService {
                         "backchannel_token_delivery_mode",
                         requestedDeliveryMode,
                         requestParameters.deliveryMode()),
-                mergeString("user_code", requestedUserCode, requestParameters.userCode()));
+                mergeString("user_code", requestedUserCode, requestParameters.userCode()),
+                mergeString(
+                        "client_notification_token",
+                        clientNotificationToken,
+                        requestParameters.clientNotificationToken()),
+                mergeString("acr_values", acrValues, requestParameters.acrValues()));
     }
 
     @SuppressWarnings("java:S107")
@@ -249,7 +413,9 @@ public class CibaAuthenticationService {
             String bindingMessage,
             Integer requestedExpiry,
             String requestedDeliveryMode,
-            String requestedUserCode) {
+            String requestedUserCode,
+            String clientNotificationToken,
+            String acrValues) {
         requireCibaGrant(client);
         Set<String> scopes = parseScopes(scope);
         if (!scopes.contains("openid")) {
@@ -261,9 +427,9 @@ public class CibaAuthenticationService {
         AdminCibaPolicyDTO policy = policy();
         String deliveryMode = resolveDeliveryMode(client, requestedDeliveryMode, policy);
         String notificationEndpoint = ClientSecuritySettings.cibaNotificationEndpoint(client);
-        String clientNotificationToken = ClientSecuritySettings.cibaClientNotificationToken(client);
         if (!ClientSecuritySettings.CIBA_POLL.equals(deliveryMode)
-                && (!isHttpUri(notificationEndpoint) || clientNotificationToken == null)) {
+                && (!isHttpUri(notificationEndpoint)
+                        || !isValidNotificationToken(clientNotificationToken))) {
             throw protocol(
                     INVALID_REQUEST,
                     "A notification endpoint and client notification token are required for "
@@ -286,6 +452,8 @@ public class CibaAuthenticationService {
                         ? user.getUsername().trim()
                         : requireLoginHint(loginHint);
         Instant now = Instant.now();
+        String persistedNotificationToken =
+                persistNotificationToken(clientNotificationToken, deliveryMode);
         CibaAuthenticationRequestEntity entity =
                 new CibaAuthenticationRequestEntity(
                         newAuthReqId(),
@@ -295,16 +463,32 @@ public class CibaAuthenticationService {
                         bindingMessage,
                         deliveryMode,
                         notificationEndpoint,
-                        clientNotificationToken,
+                        persistedNotificationToken,
                         now,
                         now.plusSeconds(ttlSeconds),
                         policy.pollingIntervalSeconds());
         entity.setUserCode(resolveUserCode(requestedUserCode));
+        entity.setAcrValues(normalizeAcrValues(acrValues));
         entity.setUserVerification(policy.userVerification());
         entity.setMfaRequired(policy.mfaRequired());
         entity.setStepUpRequired(policy.stepUpRequired());
         entity.setStepUpAcr(policy.stepUpAcr());
         return requestRepository.save(entity);
+    }
+
+    private String persistNotificationToken(String token, String deliveryMode) {
+        if (ClientSecuritySettings.CIBA_POLL.equals(deliveryMode) || !StringUtils.hasText(token)) {
+            return null;
+        }
+        if (notificationTokenCipher == null) {
+            return token;
+        }
+        if (!notificationTokenCipher.isConfigured()) {
+            throw protocol(
+                    INVALID_REQUEST,
+                    "SOCIAL_LOGIN_ENCRYPTION_KEY is required for ping or push delivery");
+        }
+        return notificationTokenCipher.encrypt(token);
     }
 
     private UserEntity resolveUser(
@@ -337,20 +521,29 @@ public class CibaAuthenticationService {
         if (!StringUtils.hasText(requestObject)) {
             return CibaRequestObjectParameters.empty();
         }
-        if (jwtDecoder == null) {
+        if (jwtDecoder == null && !StringUtils.hasText(client.getClientSettings().getJwkSetUrl())) {
             throw protocol(INVALID_REQUEST, "Signed CIBA requests are not configured");
         }
         try {
-            Jwt jwt = jwtDecoder.decode(requestObject.trim());
+            Jwt jwt = requestObjectDecoder(client).decode(requestObject.trim());
             Object algorithm = jwt.getHeaders().get("alg");
             if (!(algorithm instanceof String value)
                     || !ClientSecuritySettings.allowedCibaRequestSigningAlgorithms(client)
                             .contains(value)) {
                 throw protocol(INVALID_REQUEST, "The CIBA request uses a disallowed algorithm");
             }
+            Object issuer = jwt.getClaims().get("iss");
+            if (!client.getClientId().equals(issuer)
+                    || jwt.getExpiresAt() == null
+                    || jwt.getIssuedAt() == null
+                    || jwt.getNotBefore() == null
+                    || !StringUtils.hasText(jwt.getId())) {
+                throw protocol(INVALID_REQUEST, "The CIBA request JWT claims are invalid");
+            }
             if (jwt.getAudience() == null
                     || jwt.getAudience().isEmpty()
-                    || !jwt.getAudience().contains(client.getClientId())) {
+                    || (authorizationServerIssuer != null
+                            && !jwt.getAudience().contains(authorizationServerIssuer))) {
                 throw protocol(INVALID_REQUEST, "The CIBA request was not issued to this client");
             }
             Map<String, Object> claims = jwt.getClaims();
@@ -362,10 +555,20 @@ public class CibaAuthenticationService {
                     stringClaim(claims, "binding_message"),
                     integerClaim(claims, "requested_expiry"),
                     stringClaim(claims, "backchannel_token_delivery_mode"),
-                    stringClaim(claims, "user_code"));
-        } catch (JwtException _) {
+                    stringClaim(claims, "user_code"),
+                    stringClaim(claims, "client_notification_token"),
+                    stringClaim(claims, "acr_values"));
+        } catch (JwtException | IllegalArgumentException _) {
             throw protocol(INVALID_REQUEST, "The CIBA request signature is invalid");
         }
+    }
+
+    private JwtDecoder requestObjectDecoder(RegisteredClient client) {
+        String jwkSetUrl = client.getClientSettings().getJwkSetUrl();
+        if (StringUtils.hasText(jwkSetUrl)) {
+            return NimbusJwtDecoder.withJwkSetUri(jwkSetUrl).build();
+        }
+        return jwtDecoder;
     }
 
     private static String stringClaim(Map<String, Object> claims, String name) {
@@ -420,9 +623,9 @@ public class CibaAuthenticationService {
         }
         try {
             Jwt jwt = jwtDecoder.decode(token);
-            if (jwt.getAudience() != null
-                    && !jwt.getAudience().isEmpty()
-                    && !jwt.getAudience().contains(client.getClientId())) {
+            if (jwt.getAudience() == null
+                    || jwt.getAudience().isEmpty()
+                    || !jwt.getAudience().contains(client.getClientId())) {
                 throw protocol(INVALID_REQUEST, "The token hint was not issued to this client");
             }
             return findUserByTokenClaims(jwt)
@@ -643,6 +846,23 @@ public class CibaAuthenticationService {
         }
     }
 
+    private static boolean isValidNotificationToken(String value) {
+        return StringUtils.hasText(value)
+                && value.length() <= 1024
+                && value.chars().allMatch(character -> character >= 0x21 && character <= 0x7e);
+    }
+
+    private static String normalizeAcrValues(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        if (normalized.length() > 1000) {
+            throw protocol(INVALID_REQUEST, "acr_values is too long");
+        }
+        return normalized;
+    }
+
     private CibaAuthenticationRequestEntity pending(
             CibaAuthenticationRequestEntity request, Instant now) {
         Instant lastPolledAt = request.getLastPolledAt();
@@ -777,10 +997,13 @@ public class CibaAuthenticationService {
             String bindingMessage,
             Integer requestedExpiry,
             String deliveryMode,
-            String userCode) {
+            String userCode,
+            String clientNotificationToken,
+            String acrValues) {
 
         private static CibaRequestObjectParameters empty() {
-            return new CibaRequestObjectParameters(null, null, null, null, null, null, null, null);
+            return new CibaRequestObjectParameters(
+                    null, null, null, null, null, null, null, null, null, null);
         }
     }
 }

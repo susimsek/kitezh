@@ -1,5 +1,6 @@
 package io.github.susimsek.springauthserversamples.service.ciba;
 
+import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestEntity;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -20,18 +21,32 @@ public class CibaNotificationService {
     private static final Logger LOGGER = LoggerFactory.getLogger(CibaNotificationService.class);
 
     private final RestClient restClient;
+    private final SocialLoginSecretCipher tokenCipher;
+
+    public CibaNotificationService() {
+        this(null, buildRestClient());
+    }
 
     @Autowired
-    public CibaNotificationService() {
+    public CibaNotificationService(SocialLoginSecretCipher tokenCipher) {
+        this(tokenCipher, buildRestClient());
+    }
+
+    private CibaNotificationService(SocialLoginSecretCipher tokenCipher, RestClient restClient) {
+        this.tokenCipher = tokenCipher;
+        this.restClient = restClient;
+    }
+
+    private static RestClient buildRestClient() {
         JdkClientHttpRequestFactory requestFactory =
                 new JdkClientHttpRequestFactory(
                         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
-        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+        return RestClient.builder().requestFactory(requestFactory).build();
     }
 
     CibaNotificationService(RestClient restClient) {
-        this.restClient = restClient;
+        this(null, restClient);
     }
 
     /** Sends the CIBA ping notification. */
@@ -40,12 +55,13 @@ public class CibaNotificationService {
             return false;
         }
         try {
+            String notificationToken = notificationToken(request);
             restClient
                     .post()
                     .uri(request.getNotificationEndpoint())
-                    .headers(headers -> headers.setBearerAuth(request.getClientNotificationToken()))
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body("auth_req_id=" + encode(request.getAuthReqId()))
+                    .headers(headers -> headers.setBearerAuth(notificationToken))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("auth_req_id", request.getAuthReqId()))
                     .retrieve()
                     .toBodilessEntity();
             return true;
@@ -65,10 +81,11 @@ public class CibaNotificationService {
             return false;
         }
         try {
+            String notificationToken = notificationToken(request);
             restClient
                     .post()
                     .uri(request.getNotificationEndpoint())
-                    .headers(headers -> headers.setBearerAuth(request.getClientNotificationToken()))
+                    .headers(headers -> headers.setBearerAuth(notificationToken))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(tokenResponse)
                     .retrieve()
@@ -91,6 +108,13 @@ public class CibaNotificationService {
                 && isHttpUri(request.getNotificationEndpoint());
     }
 
+    private String notificationToken(CibaAuthenticationRequestEntity request) {
+        String value = request.getClientNotificationToken();
+        return tokenCipher == null || value == null || !value.startsWith("v1:")
+                ? value
+                : tokenCipher.decrypt(value);
+    }
+
     private static boolean isHttpUri(String value) {
         try {
             URI uri = URI.create(value);
@@ -100,9 +124,5 @@ public class CibaNotificationService {
         } catch (IllegalArgumentException _) {
             return false;
         }
-    }
-
-    private static String encode(String value) {
-        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 }

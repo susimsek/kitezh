@@ -93,19 +93,34 @@ public class CibaPushTokenService {
                         client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, null);
         CibaAuthenticationGrantAuthenticationToken grant =
                 new CibaAuthenticationGrantAuthenticationToken(
-                        request.getAuthReqId(), clientPrincipal, Map.of());
+                        request.getAuthReqId(),
+                        clientPrincipal,
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                request.getAcrValues() == null ? "" : request.getAcrValues()));
         Authentication userPrincipal =
                 UsernamePasswordAuthenticationToken.authenticated(
                         user.getUsername(), null, user.getAuthorities());
         AuthorizationServerContext context = currentContext();
         OAuth2AccessToken accessToken = accessToken(client, userPrincipal, scopes, grant, context);
-        OidcIdToken idToken = idToken(client, userPrincipal, scopes, grant, context);
         final OAuth2RefreshToken refreshToken =
                 scopes.contains("offline_access")
                                 && client.getAuthorizationGrantTypes()
                                         .contains(AuthorizationGrantType.REFRESH_TOKEN)
                         ? refreshToken(client, userPrincipal, scopes, grant, context)
                         : null;
+        CibaAuthenticationGrantAuthenticationToken idTokenGrant =
+                new CibaAuthenticationGrantAuthenticationToken(
+                        request.getAuthReqId(),
+                        clientPrincipal,
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                request.getAcrValues() == null ? "" : request.getAcrValues(),
+                                CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE,
+                                accessToken.getTokenValue(),
+                                CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE,
+                                refreshToken == null ? "" : refreshToken.getTokenValue()));
+        OidcIdToken idToken = idToken(client, userPrincipal, scopes, idTokenGrant, context);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("access_token", accessToken.getTokenValue());

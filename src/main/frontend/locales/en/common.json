@@ -754,10 +754,8 @@
       "next": "Next",
       "back": "Back",
       "cibaDeliveryMode": "CIBA delivery mode",
-      "cibaDeliveryModeHelp": "Choose how the client receives the CIBA token response.",
-      "cibaNotificationEndpoint": "CIBA notification endpoint",
-      "cibaClientNotificationToken": "CIBA client notification token",
-      "cibaClientNotificationTokenHelp": "Leave blank on update to keep the existing token."
+      "cibaDeliveryModeHelp": "Choose how the client receives the CIBA token response. Ping and push requests provide a fresh callback token per request.",
+      "cibaNotificationEndpoint": "CIBA notification endpoint"
     },
     "common": {
       "yes": "Yes",

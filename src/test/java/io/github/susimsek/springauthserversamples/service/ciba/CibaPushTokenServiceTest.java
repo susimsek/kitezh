@@ -174,7 +174,7 @@ class CibaPushTokenServiceTest {
                 request(CibaAuthenticationRequestStatus.APPROVED);
         assertThatThrownBy(() -> service.issue(invalidIdTokenRequest))
                 .isInstanceOf(CibaProtocolException.class)
-                .hasMessageContaining("ID token");
+                .hasMessageContaining("refresh token");
 
         Mockito.reset(tokens);
         when(tokens.generate(any()))
@@ -190,12 +190,16 @@ class CibaPushTokenServiceTest {
                                                 issuedAt,
                                                 issuedAt.plusSeconds(300));
                                 case "id_token" ->
-                                        Jwt.withTokenValue("id-token")
-                                                .header("alg", "RS256")
-                                                .claim("sub", "admin")
-                                                .issuedAt(issuedAt)
-                                                .expiresAt(issuedAt.plusSeconds(300))
-                                                .build();
+                                        new OAuth2AccessToken(
+                                                OAuth2AccessToken.TokenType.BEARER,
+                                                "unexpected-id",
+                                                issuedAt,
+                                                issuedAt.plusSeconds(300));
+                                case "refresh_token" ->
+                                        new OAuth2RefreshToken(
+                                                "refresh-token",
+                                                issuedAt,
+                                                issuedAt.plusSeconds(600));
                                 default ->
                                         new OAuth2AccessToken(
                                                 OAuth2AccessToken.TokenType.BEARER,
@@ -209,7 +213,7 @@ class CibaPushTokenServiceTest {
                 request(CibaAuthenticationRequestStatus.APPROVED);
         assertThatThrownBy(() -> service.issue(invalidRefreshTokenRequest))
                 .isInstanceOf(CibaProtocolException.class)
-                .hasMessageContaining("refresh token");
+                .hasMessageContaining("ID token");
     }
 
     private CibaAuthenticationRequestEntity request(CibaAuthenticationRequestStatus status) {

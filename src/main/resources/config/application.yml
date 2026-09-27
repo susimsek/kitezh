@@ -82,7 +82,6 @@ app:
     cleanup-cron: "0 * * * * *"
   social-login:
     enabled: ${APP_SOCIAL_LOGIN_ENABLED:false}
-    encryption-key: ${SOCIAL_LOGIN_ENCRYPTION_KEY:}
     google:
       client-id: ${GOOGLE_CLIENT_ID:}
       client-secret: ${GOOGLE_CLIENT_SECRET:}

@@ -137,6 +137,15 @@ public class AuthorizationServerConfig {
                                                                                                                 "poll",
                                                                                                                 "ping",
                                                                                                                 "push"))
+                                                                                        .claim(
+                                                                                                "backchannel_authentication_request_signing_alg_values_supported",
+                                                                                                List
+                                                                                                        .of(
+                                                                                                                "RS256",
+                                                                                                                "ES256"))
+                                                                                        .claim(
+                                                                                                "backchannel_user_code_parameter",
+                                                                                                true)
                                                                                         .grantType(
                                                                                                 AuthorizationGrantTypes
                                                                                                         .CIBA)))
@@ -165,6 +174,15 @@ public class AuthorizationServerConfig {
                                                                                                                                         "poll",
                                                                                                                                         "ping",
                                                                                                                                         "push"))
+                                                                                                                .claim(
+                                                                                                                        "backchannel_authentication_request_signing_alg_values_supported",
+                                                                                                                        List
+                                                                                                                                .of(
+                                                                                                                                        "RS256",
+                                                                                                                                        "ES256"))
+                                                                                                                .claim(
+                                                                                                                        "backchannel_user_code_parameter",
+                                                                                                                        true)
                                                                                                                 .grantType(
                                                                                                                         AuthorizationGrantTypes
                                                                                                                                 .CIBA))))
@@ -582,8 +600,59 @@ public class AuthorizationServerConfig {
                 instanceof CibaAuthenticationGrantAuthenticationToken cibaGrant) {
             context.getClaims()
                     .claim(
-                            CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_ATTRIBUTE,
+                            CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_CLAIM,
                             cibaGrant.getAuthReqId());
+            Object acrValues =
+                    cibaGrant
+                            .getAdditionalParameters()
+                            .get(CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE);
+            if (acrValues instanceof String acr && !acr.isBlank()) {
+                context.getClaims().claim("acr", acr.trim().split("\\s+")[0]);
+            }
+            if (OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) {
+                addCibaTokenHash(
+                        context,
+                        cibaGrant,
+                        "at_hash",
+                        CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE);
+                addCibaTokenHash(
+                        context,
+                        cibaGrant,
+                        "urn:openid:params:jwt:claim:rt_hash",
+                        CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE);
+            }
+        }
+    }
+
+    private static void addCibaTokenHash(
+            JwtEncodingContext context,
+            CibaAuthenticationGrantAuthenticationToken grant,
+            String claimName,
+            String contextKey) {
+        Object token = grant.getAdditionalParameters().get(contextKey);
+        if (!(token instanceof String tokenValue) || tokenValue.isBlank()) {
+            return;
+        }
+        try {
+            String signatureAlgorithm = context.getJwsHeader().build().getAlgorithm().getName();
+            String digestAlgorithm =
+                    signatureAlgorithm.endsWith("512")
+                            ? "SHA-512"
+                            : signatureAlgorithm.endsWith("384") ? "SHA-384" : "SHA-256";
+            byte[] digest =
+                    java.security.MessageDigest.getInstance(digestAlgorithm)
+                            .digest(
+                                    tokenValue.getBytes(
+                                            java.nio.charset.StandardCharsets.US_ASCII));
+            context.getClaims()
+                    .claim(
+                            claimName,
+                            java.util.Base64.getUrlEncoder()
+                                    .withoutPadding()
+                                    .encodeToString(
+                                            java.util.Arrays.copyOf(digest, digest.length / 2)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("The token hash algorithm is not available", exception);
         }
     }
 

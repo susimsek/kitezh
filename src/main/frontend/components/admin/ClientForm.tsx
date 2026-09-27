@@ -53,7 +53,6 @@ type FormState = {
   dpopSigningAlgorithms: (typeof DPOP_ALGORITHMS)[number][];
   cibaDeliveryMode: (typeof CIBA_DELIVERY_MODES)[number];
   cibaNotificationEndpoint: string;
-  cibaClientNotificationToken: string;
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
@@ -75,7 +74,6 @@ const EMPTY: FormState = {
   dpopSigningAlgorithms: ["RS256", "ES256"],
   cibaDeliveryMode: "poll",
   cibaNotificationEndpoint: "",
-  cibaClientNotificationToken: "",
   authorizationCodeTimeToLive: "PT5M",
   accessTokenTimeToLive: "PT5M",
   refreshTokenTimeToLive: "PT1H",
@@ -123,7 +121,6 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
       dpopSigningAlgorithms: z.array(z.enum(DPOP_ALGORITHMS)).min(1, validation.selection),
       cibaDeliveryMode: z.enum(CIBA_DELIVERY_MODES),
       cibaNotificationEndpoint: z.string(),
-      cibaClientNotificationToken: z.string().max(512),
       authorizationCodeTimeToLive: z.string(),
       accessTokenTimeToLive: z.string(),
       refreshTokenTimeToLive: z.string(),
@@ -332,7 +329,6 @@ export function ClientForm({
           ]) as FormState["dpopSigningAlgorithms"],
           cibaDeliveryMode: client.cibaDeliveryMode ?? "poll",
           cibaNotificationEndpoint: client.cibaNotificationEndpoint ?? "",
-          cibaClientNotificationToken: "",
           authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "PT5M",
           accessTokenTimeToLive: client.accessTokenTimeToLive ?? "PT5M",
           refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "PT1H",
@@ -769,19 +765,6 @@ export function ClientForm({
                     />
                     <Form.Control.Feedback type="invalid">
                       {errors.cibaNotificationEndpoint?.message}
-                    </Form.Control.Feedback>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Label>{dictionary.admin.clients.cibaClientNotificationToken}</Form.Label>
-                    <Form.Control
-                      type="password"
-                      disabled={!canManageClients}
-                      isInvalid={Boolean(errors.cibaClientNotificationToken)}
-                      placeholder={dictionary.admin.clients.cibaClientNotificationTokenHelp}
-                      {...register("cibaClientNotificationToken")}
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.cibaClientNotificationToken?.message}
                     </Form.Control.Feedback>
                   </Col>
                 </>

@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.service.ciba;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -11,7 +12,9 @@ import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationReque
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -27,6 +30,8 @@ class CibaNotificationServiceTest {
         server.expect(requestTo("https://client.example/ciba"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer token"))
+                .andExpect(header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
+                .andExpect(content().json("{\"auth_req_id\":\"request id\"}"))
                 .andRespond(withSuccess());
         server.expect(requestTo("https://client.example/ciba"))
                 .andExpect(method(HttpMethod.POST))

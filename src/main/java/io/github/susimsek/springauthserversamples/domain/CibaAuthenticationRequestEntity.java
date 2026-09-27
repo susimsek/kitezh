@@ -47,6 +47,9 @@ public class CibaAuthenticationRequestEntity {
     @Column(name = "binding_message", length = 20)
     private String bindingMessage;
 
+    @Column(name = "acr_values", length = 1000)
+    private String acrValues;
+
     @Column(name = "user_code", nullable = false, unique = true, length = 32)
     private String userCode;
 
@@ -56,7 +59,7 @@ public class CibaAuthenticationRequestEntity {
     @Column(name = "notification_endpoint", length = 2000)
     private String notificationEndpoint;
 
-    @Column(name = "client_notification_token", length = 512)
+    @Column(name = "client_notification_token", length = 2000)
     private String clientNotificationToken;
 
     @Enumerated(EnumType.STRING)

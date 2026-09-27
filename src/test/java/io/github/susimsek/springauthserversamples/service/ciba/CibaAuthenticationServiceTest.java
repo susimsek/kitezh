@@ -254,7 +254,18 @@ class CibaAuthenticationServiceTest {
                 new CibaAuthenticationService(requestRepository, userRepository, notifications);
 
         CibaAuthenticationRequestEntity request =
-                pingService.create(pingClient, "openid", "admin", null, null);
+                pingService.create(
+                        pingClient,
+                        "openid",
+                        "admin",
+                        null,
+                        null,
+                        null,
+                        null,
+                        ClientSecuritySettings.CIBA_PING,
+                        "notification-token",
+                        null,
+                        null);
         when(requestRepository.findByAuthReqIdForUpdate(request.getAuthReqId()))
                 .thenReturn(Optional.of(request));
 
@@ -346,12 +357,15 @@ class CibaAuthenticationServiceTest {
                 .thenReturn(
                         Jwt.withTokenValue("request-jwt")
                                 .header("alg", "RS256")
+                                .issuer("demo")
                                 .audience(List.of("demo"))
+                                .claim("jti", "request-jwt-id")
                                 .claim("scope", "openid profile")
                                 .claim("login_hint", "admin")
                                 .claim("binding_message", "Approve")
                                 .claim("requested_expiry", 120)
                                 .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
                                 .expiresAt(issuedAt.plusSeconds(300))
                                 .build());
         CibaAuthenticationService requestService =
@@ -507,10 +521,13 @@ class CibaAuthenticationServiceTest {
                 .thenReturn(
                         Jwt.withTokenValue("custom-algorithm")
                                 .header("alg", "HS256")
+                                .issuer("custom-client")
                                 .audience(List.of("custom-client"))
+                                .claim("jti", "custom-request-id")
                                 .claim("scope", "openid")
                                 .claim("login_hint", "admin")
                                 .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
                                 .expiresAt(issuedAt.plusSeconds(300))
                                 .build());
         assertThat(

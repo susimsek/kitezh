@@ -12,6 +12,10 @@ public final class CibaAuthenticationGrantAuthenticationToken
         extends OAuth2AuthorizationGrantAuthenticationToken {
 
     public static final String AUTH_REQ_ID_ATTRIBUTE = "ciba.auth_req_id";
+    public static final String AUTH_REQ_ID_CLAIM = "urn:openid:params:jwt:claim:auth_req_id";
+    public static final String ACR_VALUES_ATTRIBUTE = "ciba.acr_values";
+    public static final String ACCESS_TOKEN_VALUE = "ciba.access_token";
+    public static final String REFRESH_TOKEN_VALUE = "ciba.refresh_token";
 
     private static final AuthorizationGrantType CIBA_GRANT_TYPE =
             new AuthorizationGrantType(AuthorizationGrantTypes.CIBA);
