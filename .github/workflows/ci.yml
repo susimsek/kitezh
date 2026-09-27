@@ -206,19 +206,19 @@ jobs:
     needs:
       - infrastructure-validation
       - build
-    if: ${{ github.ref == 'refs/heads/main' && needs.infrastructure-validation.result == 'success' && needs.build.result == 'success' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
 
     steps:
+      - name: Skip Render deploy when hook is not configured
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' }}
+        run: echo "RENDER_DEPLOY_HOOK_URL is not configured; skipping Render deployment."
+
       - name: Trigger Render deploy
         if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' }}
         run: |
           curl --fail --silent --show-error --retry 3 --retry-delay 5 \
             --request POST "${RENDER_DEPLOY_HOOK_URL}"
-
-      - name: Skip Render deploy when hook is not configured
-        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' }}
-        run: echo "RENDER_DEPLOY_HOOK_URL is not configured; skipping Render deployment."
