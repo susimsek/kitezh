@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+  <changeSet id="015-01-email-settings" author="susimsek">
+    <createTable tableName="email_settings">
+      <column name="id" type="bigint"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_email_settings"/></column>
+      <column name="enabled" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="from_address" type="varchar(255)"><constraints nullable="false"/></column>
+      <column name="base_url" type="varchar(255)"><constraints nullable="false"/></column>
+      <column name="host" type="varchar(255)"><constraints nullable="false"/></column>
+      <column name="port" type="int"><constraints nullable="false"/></column>
+      <column name="username" type="varchar(255)"/><column name="password" type="varchar(1000)"/>
+      <column name="smtp_auth" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="starttls" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+      <column name="ssl" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+    </createTable>
+    <loadData encoding="UTF-8" file="db/data/email-settings.csv" separator=";" tableName="email_settings" usePreparedStatements="true">
+      <column header="id" type="numeric"/>
+      <column header="enabled" type="boolean"/>
+      <column header="from_address" type="string"/>
+      <column header="base_url" type="string"/>
+      <column header="host" type="string"/>
+      <column header="port" type="numeric"/>
+      <column header="smtp_auth" type="boolean"/>
+      <column header="starttls" type="boolean"/>
+      <column header="ssl" type="boolean"/>
+    </loadData>
+  </changeSet>
+</databaseChangeLog>

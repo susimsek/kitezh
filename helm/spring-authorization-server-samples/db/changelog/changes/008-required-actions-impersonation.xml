@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="012-02-required-action-tables" author="susimsek">
+		<createSequence sequenceName="user_required_action_seq" startValue="1" incrementBy="1"/>
+		<createSequence sequenceName="required_action_completion_seq" startValue="1" incrementBy="1"/>
+		<createTable tableName="required_action_definition">
+			<column name="action_key" type="varchar(100)"><constraints primaryKey="true" nullable="false" primaryKeyName="pk_required_action_definition"/></column>
+			<column name="display_name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="description" type="varchar(1000)"/>
+			<column name="enabled" type="boolean"><constraints nullable="false"/></column>
+			<column name="global_policy" type="boolean"><constraints nullable="false"/></column>
+			<column name="version" type="bigint"><constraints nullable="false"/></column>
+			<column name="priority" type="bigint"><constraints nullable="false"/></column>
+			<column name="configuration" type="varchar(4000)"/>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp"><constraints nullable="false"/></column>
+		</createTable>
+		<createIndex tableName="required_action_definition" indexName="ix_required_action_definition_enabled_priority">
+			<column name="enabled"/>
+			<column name="priority"/>
+			<column name="action_key"/>
+		</createIndex>
+		<createTable tableName="user_required_action">
+			<column name="id" type="bigint"><constraints primaryKey="true" nullable="false" primaryKeyName="pk_user_required_action"/></column>
+			<column name="user_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="action_key" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="version" type="bigint"><constraints nullable="false"/></column>
+			<column name="assigned_at" type="timestamp"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="user_required_action" columnNames="user_id,action_key" constraintName="ux_user_required_action_user_key"/>
+		<addForeignKeyConstraint baseTableName="user_required_action" baseColumnNames="user_id" constraintName="fk_user_required_action_user" referencedTableName="users" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createTable tableName="required_action_completion">
+			<column name="id" type="bigint"><constraints primaryKey="true" nullable="false" primaryKeyName="pk_required_action_completion"/></column>
+			<column name="user_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="action_key" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="version" type="bigint"><constraints nullable="false"/></column>
+			<column name="completed_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="ip_address" type="varchar(100)"/>
+			<column name="user_agent" type="varchar(500)"/>
+		</createTable>
+		<addForeignKeyConstraint baseTableName="required_action_completion" baseColumnNames="user_id" constraintName="fk_required_action_completion_user" referencedTableName="users" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex tableName="required_action_completion" indexName="ix_required_action_completion_user_key">
+			<column name="user_id"/><column name="action_key"/><column name="version" descending="true"/>
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="012-03-impersonation-ticket" author="susimsek">
+		<createSequence sequenceName="impersonation_ticket_seq" startValue="1" incrementBy="1"/>
+		<createTable tableName="impersonation_ticket">
+			<column name="id" type="bigint"><constraints primaryKey="true" nullable="false" primaryKeyName="pk_impersonation_ticket"/></column>
+			<column name="ticket_hash" type="varchar(64)"><constraints nullable="false" unique="true" uniqueConstraintName="ux_impersonation_ticket_hash"/></column>
+			<column name="actor_username" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="target_user_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="issued_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="expires_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="consumed_at" type="timestamp"/>
+		</createTable>
+		<addForeignKeyConstraint baseTableName="impersonation_ticket" baseColumnNames="target_user_id" constraintName="fk_impersonation_ticket_target" referencedTableName="users" referencedColumnNames="id" onDelete="CASCADE"/>
+	</changeSet>
+
+	<changeSet id="012-04-seed-required-actions" author="susimsek">
+		<loadData encoding="UTF-8" file="db/data/required-action-definitions.csv" separator=";" tableName="required_action_definition" usePreparedStatements="true">
+			<column header="action_key" type="string"/>
+			<column header="display_name" type="string"/>
+			<column header="description" type="string"/>
+			<column header="enabled" type="boolean"/>
+			<column header="global_policy" type="boolean"/>
+			<column header="version" type="numeric"/>
+			<column header="priority" type="numeric"/>
+			<column header="created_by" type="string"/>
+			<column header="created_at" type="date"/>
+			<column header="updated_at" type="date"/>
+		</loadData>
+	</changeSet>
+</databaseChangeLog>

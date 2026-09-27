@@ -1137,7 +1137,7 @@ Terraform provisions:
 - a local `kind` cluster
 - namespace `apps`
 - namespace `ingress-nginx`
-- an `ingress-nginx` controller reachable on host ports `8080` and `8443`
+- an `ingress-nginx` controller reachable on host ports `9090` and `8443`
 - the local Helm chart
 - PostgreSQL from the chart dependency
 - an active HTTP ingress for the Authorization Server
@@ -1195,13 +1195,13 @@ spring-authorization-server.127.0.0.1.nip.io
 Example:
 
 ```bash
-curl http://spring-authorization-server.127.0.0.1.nip.io:8080/.well-known/openid-configuration
+curl http://spring-authorization-server.127.0.0.1.nip.io:9090/.well-known/openid-configuration
 ```
 
 Fetch the JWK Set:
 
 ```bash
-curl http://spring-authorization-server.127.0.0.1.nip.io:8080/oauth2/jwks
+curl http://spring-authorization-server.127.0.0.1.nip.io:9090/oauth2/jwks
 ```
 
 Fallback access:
@@ -1234,6 +1234,7 @@ terraform -chdir=terraform destroy -auto-approve
 
 Pipeline: `.github/workflows/ci.yml`
 
+- Docker Compose, Helm, and Terraform definitions are validated on every branch.
 - `./mvnw verify` for backend tests + quality gates
 - `./mvnw -Pprod,native -DskipTests native:compile` for a musl static native build
 - Compress `target/native-executable` with UPX

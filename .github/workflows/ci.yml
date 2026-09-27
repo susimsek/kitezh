@@ -23,6 +23,38 @@ env:
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
+  infrastructure-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Validate Docker Compose definitions
+        run: |
+          docker compose -f src/main/docker/services.yml config --quiet
+          docker compose -f src/main/docker/postgresql.yml config --quiet
+          docker compose -f src/main/docker/app.yml config --quiet
+
+      - name: Validate Helm chart
+        run: |
+          diff -qr src/main/resources/db helm/spring-authorization-server-samples/db
+          helm lint helm/spring-authorization-server-samples
+          helm template spring-authorization-server-samples helm/spring-authorization-server-samples >/dev/null
+
+      - name: Validate Terraform configuration
+        run: |
+          terraform -chdir=terraform fmt -check
+          terraform -chdir=terraform init -backend=false -input=false
+          terraform -chdir=terraform validate
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40

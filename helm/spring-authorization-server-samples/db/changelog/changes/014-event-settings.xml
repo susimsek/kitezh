@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="016-01-event-settings" author="susimsek">
+        <createTable tableName="event_settings">
+            <column name="id" type="bigint">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_event_settings"/>
+            </column>
+            <column name="events_enabled" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="admin_events_enabled" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="admin_events_details_enabled" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="events_expiration_days" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <loadData
+            encoding="UTF-8"
+            file="db/data/event-settings.csv"
+            separator=";"
+            tableName="event_settings"
+            usePreparedStatements="true">
+            <column header="id" type="numeric"/>
+            <column header="events_enabled" type="boolean"/>
+            <column header="admin_events_enabled" type="boolean"/>
+            <column header="admin_events_details_enabled" type="boolean"/>
+            <column header="events_expiration_days" type="numeric"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

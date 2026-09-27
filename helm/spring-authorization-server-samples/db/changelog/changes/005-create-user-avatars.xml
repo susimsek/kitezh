@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="001-create-user-avatars" author="susimsek">
+		<createTable tableName="user_avatars">
+			<column name="user_id" type="bigint">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_avatars"/>
+			</column>
+			<column name="public_id" type="char(36)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="uk_user_avatars_public_id"/>
+			</column>
+			<column name="content_type" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="content" type="${blobType}">
+				<constraints nullable="false"/>
+			</column>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}">
+				<constraints nullable="false"/>
+			</column>
+		</createTable>
+		<addForeignKeyConstraint
+			baseTableName="user_avatars"
+			baseColumnNames="user_id"
+			constraintName="fk_user_avatars_user"
+			referencedTableName="users"
+			referencedColumnNames="id"
+			onDelete="CASCADE"/>
+	</changeSet>
+
+	<changeSet id="002-seed-user-avatars" author="susimsek">
+		<loadData
+			encoding="UTF-8"
+			file="db/data/user-avatar.csv"
+			separator=";"
+			tableName="user_avatars"
+			usePreparedStatements="true">
+			<column header="user_id" type="numeric"/>
+			<column header="public_id" type="string"/>
+			<column header="content_type" type="string"/>
+			<column header="content" type="BLOB"/>
+		</loadData>
+	</changeSet>
+</databaseChangeLog>

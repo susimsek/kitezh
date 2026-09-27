@@ -1,0 +1,7 @@
+name;display_name;description;attribute_type;required;multivalued;min_length;max_length;pattern;enabled;display_order;created_by;last_modified_by
+username;Username;The user's username.;STRING;true;false;;100;;true;10;system;
+email;Email;The user's email address.;EMAIL;false;false;;200;;true;20;system;
+firstName;First name;The user's first name.;STRING;false;false;;100;;true;30;system;
+lastName;Last name;The user's last name.;STRING;false;false;;100;;true;40;system;
+department;Department;The user's department.;STRING;false;false;;100;;true;50;system;
+employeeNumber;Employee number;An optional employee identifier.;STRING;false;false;;50;^[A-Z0-9-]+$;true;60;system;

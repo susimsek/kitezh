@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="001-create-client-role-sequence" author="susimsek">
+		<createSequence
+			sequenceName="client_role_seq"
+			startValue="1"
+			incrementBy="1"
+			minValue="1"
+			maxValue="9999999999999999"
+			cacheSize="100"
+			cycle="false"/>
+	</changeSet>
+
+	<changeSet id="002-create-client-role-table" author="susimsek">
+		<createTable tableName="oauth2_client_role">
+			<column name="id" type="bigint" defaultValueSequenceNext="client_role_seq">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_oauth2_client_role"/>
+			</column>
+			<column name="client_id" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="description" type="varchar(500)"/>
+			<column name="created_by" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}">
+				<constraints nullable="false"/>
+			</column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}">
+				<constraints nullable="false"/>
+			</column>
+		</createTable>
+		<addUniqueConstraint
+			tableName="oauth2_client_role"
+			columnNames="client_id, name"
+			constraintName="uk_oauth2_client_role_client_name"/>
+		<addForeignKeyConstraint
+			baseTableName="oauth2_client_role"
+			baseColumnNames="client_id"
+			constraintName="fk_oauth2_client_role_client"
+			referencedTableName="oauth2_registered_client"
+			referencedColumnNames="id"
+			onDelete="CASCADE"/>
+		<createIndex indexName="idx_oauth2_client_role_client" tableName="oauth2_client_role">
+			<column name="client_id"/>
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="003-create-user-client-role-table" author="susimsek">
+		<createTable tableName="user_client_roles">
+			<column name="user_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="client_role_id" type="bigint"><constraints nullable="false"/></column>
+		</createTable>
+		<addPrimaryKey tableName="user_client_roles" columnNames="user_id, client_role_id" constraintName="pk_user_client_roles"/>
+		<addForeignKeyConstraint baseTableName="user_client_roles" baseColumnNames="user_id" constraintName="fk_user_client_roles_user" referencedTableName="users" referencedColumnNames="id" onDelete="CASCADE"/>
+		<addForeignKeyConstraint baseTableName="user_client_roles" baseColumnNames="client_role_id" constraintName="fk_user_client_roles_role" referencedTableName="oauth2_client_role" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex indexName="idx_user_client_roles_role" tableName="user_client_roles"><column name="client_role_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="004-create-group-client-role-table" author="susimsek">
+		<createTable tableName="group_client_roles">
+			<column name="group_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="client_role_id" type="bigint"><constraints nullable="false"/></column>
+		</createTable>
+		<addPrimaryKey tableName="group_client_roles" columnNames="group_id, client_role_id" constraintName="pk_group_client_roles"/>
+		<addForeignKeyConstraint baseTableName="group_client_roles" baseColumnNames="group_id" constraintName="fk_group_client_roles_group" referencedTableName="groups" referencedColumnNames="id" onDelete="CASCADE"/>
+		<addForeignKeyConstraint baseTableName="group_client_roles" baseColumnNames="client_role_id" constraintName="fk_group_client_roles_role" referencedTableName="oauth2_client_role" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex indexName="idx_group_client_roles_role" tableName="group_client_roles"><column name="client_role_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="005-seed-roles-client-scope" author="susimsek">
+		<insert tableName="oauth2_client_scope">
+			<column name="id" value="scope-roles"/>
+			<column name="name" value="roles"/>
+			<column name="display_name" value="Roles"/>
+			<column name="description" value="Client-scoped roles in the resource_access claim."/>
+			<column name="group_mapper_enabled" valueBoolean="false"/>
+			<column name="group_claim_name" value="groups"/>
+			<column name="group_mapper_full_path" valueBoolean="true"/>
+			<column name="created_by" value="system"/>
+			<column name="last_modified_by" value="system"/>
+		</insert>
+	</changeSet>
+</databaseChangeLog>

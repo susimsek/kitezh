@@ -10,6 +10,26 @@
 	<property name="blobType" value="bytea" dbms="postgresql"/>
 
 	<include file="db/changelog/changes/001-create-users.xml"/>
-	<include file="db/changelog/changes/002-create-authorization-server.xml"/>
-	<include file="db/changelog/changes/003-create-user-session.xml"/>
+	<include file="db/changelog/changes/002-create-groups.xml"/>
+	<include file="db/changelog/changes/003-create-authorization-server.xml"/>
+	<include file="db/changelog/changes/004-create-user-session.xml"/>
+	<include file="db/changelog/changes/005-create-user-avatars.xml"/>
+	<include file="db/changelog/changes/006-create-admin-events.xml"/>
+	<include file="db/changelog/changes/007-add-user-actions.xml"/>
+	<include file="db/changelog/changes/008-required-actions-impersonation.xml"/>
+	<include file="db/changelog/changes/009-password-security.xml"/>
+	<include file="db/changelog/changes/010-login-settings.xml"/>
+	<include file="db/changelog/changes/011-email-settings.xml"/>
+	<include file="db/changelog/changes/013-recovery-codes.xml"/>
+	<include file="db/changelog/changes/014-event-settings.xml"/>
+	<include file="db/changelog/changes/015-user-profile-attributes.xml"/>
+	<include file="db/changelog/changes/016-webauthn.xml"/>
+	<include file="db/changelog/changes/017-localization.xml"/>
+	<include file="db/changelog/changes/017-create-social-identities.xml"/>
+	<include file="db/changelog/changes/018-social-provider-catalog.xml"/>
+	<include file="db/changelog/changes/019-impersonation-audit-details.xml"/>
+	<include file="db/changelog/changes/020-client-roles.xml"/>
+	<include file="db/changelog/changes/021-create-ldap-federation.xml"/>
+	<include file="db/changelog/changes/022-create-ciba.xml"/>
+	<include file="db/changelog/changes/023-create-ciba-policy.xml"/>
 </databaseChangeLog>

@@ -1,0 +1,21 @@
+id;provider_alias;name;source_claim;target;mapper_type;sync_mode;add_to_id_token;add_to_access_token;created_by;last_modified_by
+google-subject;google;Subject to username;sub;username;user-attribute;inherit;false;false;system;
+google-email;google;Email;email;email;user-attribute;inherit;false;false;system;
+google-given-name;google;Given name;given_name;firstName;user-attribute;inherit;false;false;system;
+google-family-name;google;Family name;family_name;lastName;user-attribute;inherit;false;false;system;
+google-picture;google;Profile picture;picture;pictureUrl;user-attribute;inherit;false;false;system;
+github-subject;github;Subject to username;id;username;user-attribute;inherit;false;false;system;
+github-email;github;Email;email;email;user-attribute;inherit;false;false;system;
+github-login;github;Login;login;username;user-attribute;inherit;false;false;system;
+github-name;github;Display name;name;firstName;user-attribute;inherit;false;false;system;
+github-avatar;github;Profile picture;avatar_url;pictureUrl;user-attribute;inherit;false;false;system;
+linkedin-subject;linkedin;Subject to username;sub;username;user-attribute;inherit;false;false;system;
+linkedin-email;linkedin;Email;email;email;user-attribute;inherit;false;false;system;
+linkedin-given-name;linkedin;Given name;given_name;firstName;user-attribute;inherit;false;false;system;
+linkedin-family-name;linkedin;Family name;family_name;lastName;user-attribute;inherit;false;false;system;
+linkedin-picture;linkedin;Profile picture;picture;pictureUrl;user-attribute;inherit;false;false;system;
+microsoft-subject;microsoft;Subject to username;sub;username;user-attribute;inherit;false;false;system;
+microsoft-email;microsoft;Email;email;email;user-attribute;inherit;false;false;system;
+microsoft-given-name;microsoft;Given name;given_name;firstName;user-attribute;inherit;false;false;system;
+microsoft-family-name;microsoft;Family name;family_name;lastName;user-attribute;inherit;false;false;system;
+microsoft-picture;microsoft;Profile picture;picture;pictureUrl;user-attribute;inherit;false;false;system;

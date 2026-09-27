@@ -1,0 +1,15 @@
+user_id;definition_id;position;attribute_value
+1;5;0;Platform
+1;6;0;ADM-001
+2;5;0;Sales
+2;6;0;USR-001
+3;5;0;Design
+3;6;0;USR-002
+4;5;0;Support
+4;6;0;USR-003
+5;5;0;Engineering
+5;6;0;USR-004
+6;5;0;Marketing
+6;6;0;USR-005
+7;5;0;Finance
+7;6;0;USR-006
