@@ -44,7 +44,7 @@ public final class DpopNonceAuthenticationConverter implements AuthenticationCon
         }
         try {
             return SignedJWT.parse(proof).getJWTClaimsSet().getStringClaim("nonce");
-        } catch (ParseException exception) {
+        } catch (ParseException _) {
             return null;
         }
     }

@@ -20,6 +20,7 @@
 			<org.mapstruct.version>1.6.3</org.mapstruct.version>
 			<zxing.version>3.5.3</zxing.version>
 			<jacoco.version>0.8.14</jacoco.version>
+			<coverage.minimum>0.96</coverage.minimum>
 			<spotless-maven-plugin.version>3.9.0</spotless-maven-plugin.version>
 			<google-java-format.version>1.35.0</google-java-format.version>
 			<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
@@ -378,6 +379,33 @@
 						</goals>
 						<configuration>
 							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco-it.exec</dataFile>
+						</configuration>
+					</execution>
+					<execution>
+						<id>check-coverage</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</dataFile>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>INSTRUCTION</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>${coverage.minimum}</minimum>
+										</limit>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>${coverage.minimum}</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
 						</configuration>
 					</execution>
 				</executions>

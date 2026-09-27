@@ -497,12 +497,11 @@ public class AuthorizationServerConfig {
         }
         if (AuthorizationGrantType.REFRESH_TOKEN.equals(context.getAuthorizationGrantType())
                 && ClientSecuritySettings.requiresDpopForRefreshToken(context.getRegisteredClient())
-                && !ClientSecuritySettings.requiresDpopProof(context.getRegisteredClient())) {
-            if (!context.getRegisteredClient()
-                    .getClientAuthenticationMethods()
-                    .contains(ClientAuthenticationMethod.NONE)) {
-                return;
-            }
+                && !ClientSecuritySettings.requiresDpopProof(context.getRegisteredClient())
+                && !context.getRegisteredClient()
+                        .getClientAuthenticationMethods()
+                        .contains(ClientAuthenticationMethod.NONE)) {
+            return;
         }
         Object jwkHeader = dpopProof.getHeaders().get("jwk");
         if (!(jwkHeader instanceof Map<?, ?> jwkMap)) {

@@ -145,8 +145,6 @@ class DefaultClientScopesAuthorizationRequestConverterTest {
                         .build();
         RegisteredClientRepository repository = mock(RegisteredClientRepository.class);
         when(repository.findByClientId("client")).thenReturn(client);
-        DefaultClientScopesAuthorizationRequestConverter converter =
-                new DefaultClientScopesAuthorizationRequestConverter(repository);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/oauth2/par");
         request.addParameter(OAuth2ParameterNames.CLIENT_ID, "client");
@@ -154,6 +152,8 @@ class DefaultClientScopesAuthorizationRequestConverterTest {
         request.addParameter(OAuth2ParameterNames.REDIRECT_URI, "https://client.example/callback");
         request.addParameter(OAuth2ParameterNames.SCOPE, "openid");
 
+        DefaultClientScopesAuthorizationRequestConverter converter =
+                new DefaultClientScopesAuthorizationRequestConverter(repository);
         assertThatThrownBy(() -> converter.convert(request))
                 .isInstanceOf(
                         org.springframework.security.oauth2.server.authorization.authentication

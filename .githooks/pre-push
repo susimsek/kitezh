@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
+REPOSITORY_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPOSITORY_ROOT"
+
 MVN="./mvnw"
 
 if [ ! -f "$MVN" ]; then

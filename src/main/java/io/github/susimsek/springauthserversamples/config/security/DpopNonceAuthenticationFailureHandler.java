@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.server.resource.web.DPoPAuthenticationEntryPoint;
-import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.AuthenticationEntryPointFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
@@ -15,8 +14,7 @@ public final class DpopNonceAuthenticationFailureHandler implements Authenticati
 
     private final DpopNonceService nonceService;
     private final AuthenticationFailureHandler delegate =
-            new AuthenticationEntryPointFailureHandler(
-                    (AuthenticationEntryPoint) new DPoPAuthenticationEntryPoint());
+            new AuthenticationEntryPointFailureHandler(new DPoPAuthenticationEntryPoint());
 
     public DpopNonceAuthenticationFailureHandler(DpopNonceService nonceService) {
         this.nonceService = nonceService;

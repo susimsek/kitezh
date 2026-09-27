@@ -1,22 +1,20 @@
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$hooksDirectory = Join-Path $repositoryRoot '.githooks'
-$prePushHook = Join-Path $hooksDirectory 'pre-push'
+$prePushHook = Join-Path $repositoryRoot '.githooks\pre-push'
 
 if (-not (Test-Path -LiteralPath $prePushHook -PathType Leaf)) {
     throw "Pre-push hook bulunamadı: $prePushHook"
 }
 
-Push-Location $repositoryRoot
-try {
-    git config core.hooksPath .githooks
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Git hooks yolu ayarlanamadı.'
-    }
+git -C $repositoryRoot config --local core.hooksPath .githooks
+if ($LASTEXITCODE -ne 0) {
+    throw 'Git hooks yolu ayarlanamadı.'
 }
-finally {
-    Pop-Location
+
+git -C $repositoryRoot update-index --chmod=+x -- .githooks/pre-push
+if ($LASTEXITCODE -ne 0) {
+    throw 'Pre-push hook çalıştırılabilir olarak işaretlenemedi.'
 }
 
 $userToken = [Environment]::GetEnvironmentVariable('SONARQUBE_TOKEN', 'User')
