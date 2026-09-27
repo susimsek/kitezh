@@ -7,6 +7,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AdminEventSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.EmailSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.LocalizationMessageOverrideEntity;
@@ -87,6 +88,9 @@ class CacheConfigTest {
         assertThat(cacheManager.getCache(AdminEventSettingsEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorizationConsentEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorityEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(ClientRoleEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".groups")).isNotNull();
+        assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".users")).isNotNull();
         assertThat(cacheManager.getCache(EmailSettingsEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(GroupEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(GroupEntity.class.getName() + ".authorities")).isNotNull();

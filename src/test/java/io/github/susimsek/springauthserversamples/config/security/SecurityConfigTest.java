@@ -153,21 +153,9 @@ class SecurityConfigTest {
         SecurityFilterChain chain =
                 securityConfig.defaultSecurityFilterChain(
                         httpSecurity(),
-                        mock(SecurityContextRepository.class),
-                        mock(LoginRateLimitFilter.class),
-                        mock(LoginCaptchaFilter.class),
                         new ApplicationProperties(),
-                        mock(
-                                org.springframework.security.authentication.AuthenticationManager
-                                        .class),
-                        mock(PublicKeyCredentialRequestOptionsRepository.class),
-                        mock(WebAuthnRelyingPartyOperations.class),
-                        emptyProvider(),
-                        emptyProvider(),
-                        emptyProvider(),
-                        mock(SocialLoginService.class),
-                        mock(OAuth2AuthorizedClientRepository.class),
-                        mock(OAuth2AccessTokenResponseClient.class));
+                        browserDependencies(),
+                        socialDependencies());
 
         assertThat(chain).isNotNull();
         assertThat(chain.getFilters()).isNotEmpty();
@@ -242,21 +230,15 @@ class SecurityConfigTest {
         assertThat(
                         securityConfig.defaultSecurityFilterChain(
                                 httpSecurity(repository),
-                                mock(SecurityContextRepository.class),
-                                mock(LoginRateLimitFilter.class),
-                                mock(LoginCaptchaFilter.class),
                                 new ApplicationProperties(),
-                                mock(
-                                        org.springframework.security.authentication
-                                                .AuthenticationManager.class),
-                                mock(PublicKeyCredentialRequestOptionsRepository.class),
-                                mock(WebAuthnRelyingPartyOperations.class),
-                                clientProvider,
-                                successProvider,
-                                resolverProvider,
-                                mock(SocialLoginService.class),
-                                mock(OAuth2AuthorizedClientRepository.class),
-                                mock(OAuth2AccessTokenResponseClient.class)))
+                                browserDependencies(),
+                                new SecurityConfig.SocialSecurityDependencies(
+                                        clientProvider,
+                                        successProvider,
+                                        resolverProvider,
+                                        mock(SocialLoginService.class),
+                                        mock(OAuth2AuthorizedClientRepository.class),
+                                        mock(OAuth2AccessTokenResponseClient.class))))
                 .isNotNull();
     }
 
@@ -322,21 +304,9 @@ class SecurityConfigTest {
         assertThat(
                         securityConfig.defaultSecurityFilterChain(
                                 httpSecurity(),
-                                mock(SecurityContextRepository.class),
-                                mock(LoginRateLimitFilter.class),
-                                mock(LoginCaptchaFilter.class),
                                 properties,
-                                mock(
-                                        org.springframework.security.authentication
-                                                .AuthenticationManager.class),
-                                mock(PublicKeyCredentialRequestOptionsRepository.class),
-                                mock(WebAuthnRelyingPartyOperations.class),
-                                emptyProvider(),
-                                emptyProvider(),
-                                emptyProvider(),
-                                mock(SocialLoginService.class),
-                                mock(OAuth2AuthorizedClientRepository.class),
-                                mock(OAuth2AccessTokenResponseClient.class)))
+                                browserDependencies(),
+                                socialDependencies()))
                 .isNotNull();
 
         ApplicationProperties nullWebAuthnProperties =
@@ -354,21 +324,9 @@ class SecurityConfigTest {
         assertThat(
                         securityConfig.defaultSecurityFilterChain(
                                 httpSecurity(),
-                                mock(SecurityContextRepository.class),
-                                mock(LoginRateLimitFilter.class),
-                                mock(LoginCaptchaFilter.class),
                                 nullWebAuthnProperties,
-                                mock(
-                                        org.springframework.security.authentication
-                                                .AuthenticationManager.class),
-                                mock(PublicKeyCredentialRequestOptionsRepository.class),
-                                mock(WebAuthnRelyingPartyOperations.class),
-                                emptyProvider(),
-                                emptyProvider(),
-                                emptyProvider(),
-                                mock(SocialLoginService.class),
-                                mock(OAuth2AuthorizedClientRepository.class),
-                                mock(OAuth2AccessTokenResponseClient.class)))
+                                browserDependencies(),
+                                socialDependencies()))
                 .isNotNull();
     }
 
@@ -395,6 +353,29 @@ class SecurityConfigTest {
     @SuppressWarnings("unchecked")
     private static <T> ObjectProvider<T> emptyProvider() {
         return mock(ObjectProvider.class);
+    }
+
+    private static SecurityConfig.BrowserSecurityDependencies browserDependencies() {
+        org.springframework.security.authentication.AuthenticationManager authenticationManager =
+                mock(org.springframework.security.authentication.AuthenticationManager.class);
+        return new SecurityConfig.BrowserSecurityDependencies(
+                mock(SecurityContextRepository.class),
+                mock(LoginRateLimitFilter.class),
+                mock(LoginCaptchaFilter.class),
+                authenticationManager,
+                authenticationManager,
+                mock(PublicKeyCredentialRequestOptionsRepository.class),
+                mock(WebAuthnRelyingPartyOperations.class));
+    }
+
+    private static SecurityConfig.SocialSecurityDependencies socialDependencies() {
+        return new SecurityConfig.SocialSecurityDependencies(
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                mock(SocialLoginService.class),
+                mock(OAuth2AuthorizedClientRepository.class),
+                mock(OAuth2AccessTokenResponseClient.class));
     }
 
     private static HttpSecurity httpSecurity() {

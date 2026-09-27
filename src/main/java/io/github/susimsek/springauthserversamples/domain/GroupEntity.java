@@ -53,6 +53,17 @@ public class GroupEntity {
             inverseJoinColumns = @JoinColumn(name = "authority_id"))
     private Set<AuthorityEntity> authorities = new HashSet<>();
 
+    @ManyToMany
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    @JoinTable(
+            name = "group_client_roles",
+            joinColumns = @JoinColumn(name = "group_id"),
+            inverseJoinColumns = @JoinColumn(name = "client_role_id"))
+    private Set<ClientRoleEntity> clientRoles = new HashSet<>();
+
+    @ManyToMany(mappedBy = "groups")
+    private Set<UserEntity> users = new HashSet<>();
+
     @ElementCollection(fetch = FetchType.EAGER)
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @CollectionTable(name = "group_attributes", joinColumns = @JoinColumn(name = "group_id"))

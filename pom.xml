@@ -23,6 +23,7 @@
 			<spotless-maven-plugin.version>3.9.0</spotless-maven-plugin.version>
 			<google-java-format.version>1.35.0</google-java-format.version>
 			<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+			<maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
 			<checkstyle.version>13.9.0</checkstyle.version>
 			<properties-maven-plugin.version>1.2.1</properties-maven-plugin.version>
 			<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
@@ -598,6 +599,9 @@
 		</profile>
 		<profile>
 			<id>sonar</id>
+			<properties>
+				<sonar.java.checkstyle.reportPaths>target/checkstyle-result-sonar.xml</sonar.java.checkstyle.reportPaths>
+			</properties>
 			<build>
 				<plugins>
 					<plugin>
@@ -614,6 +618,36 @@
 									<files>
 										<file>sonar-project.properties</file>
 									</files>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-antrun-plugin</artifactId>
+						<version>${maven-antrun-plugin.version}</version>
+						<executions>
+							<execution>
+								<id>filter-checkstyle-report-for-sonar</id>
+								<phase>initialize</phase>
+								<goals>
+									<goal>run</goal>
+								</goals>
+								<configuration>
+									<target>
+										<copy
+											file="${project.build.directory}/checkstyle-result.xml"
+											tofile="${project.build.directory}/checkstyle-result-sonar.xml"
+											overwrite="true"
+											encoding="UTF-8"
+											outputencoding="UTF-8">
+											<filterchain>
+												<linecontainsregexp negate="true">
+													<regexp pattern="NewlineAtEndOfFileCheck" />
+												</linecontainsregexp>
+											</filterchain>
+										</copy>
+									</target>
 								</configuration>
 							</execution>
 						</executions>

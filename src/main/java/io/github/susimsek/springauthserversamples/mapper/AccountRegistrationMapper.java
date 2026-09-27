@@ -17,6 +17,8 @@ public interface AccountRegistrationMapper {
     @Mapping(target = "pendingEmail", ignore = true)
     @Mapping(target = "pictureUrl", ignore = true)
     @Mapping(target = "groups", ignore = true)
+    @Mapping(target = "clientRoles", ignore = true)
+    @Mapping(target = "preferredLocale", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)

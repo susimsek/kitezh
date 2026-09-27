@@ -36,7 +36,7 @@ public class AccountApiSecurityConfig {
     private SecurityFilterChain accountApiSecurityFilterChain(
             HttpSecurity http, JwtDecoder accountApiJwtDecoder, DpopNonceService nonceService) {
         ConsoleApiSecurity.stateless(http);
-        http.securityMatcher("/api/account/**")
+        http.securityMatcher("/api/account/**", "/api/auth/localization/me")
                 .authorizeHttpRequests(
                         authorize -> authorize.anyRequest().hasAuthority("SCOPE_account-api"))
                 .oauth2ResourceServer(

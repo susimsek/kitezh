@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="021-create-ldap-federation-sequence" author="susimsek">
+		<createSequence sequenceName="ldap_identity_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+	</changeSet>
+
+	<changeSet id="022-create-ldap-federation-providers" author="susimsek">
+		<createTable tableName="ldap_federation_providers">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_ldap_federation_providers"/></column>
+			<column name="name" type="varchar(100)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_ldap_federation_provider_name"/></column>
+			<column name="enabled" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="priority" type="int" defaultValueNumeric="100"><constraints nullable="false"/></column>
+			<column name="connection_url" type="varchar(1000)"><constraints nullable="false"/></column>
+			<column name="bind_dn" type="varchar(500)"/>
+			<column name="bind_password_encrypted" type="varchar(2000)"/>
+			<column name="users_dn" type="varchar(1000)"><constraints nullable="false"/></column>
+			<column name="username_attribute" type="varchar(100)" defaultValue="uid"><constraints nullable="false"/></column>
+			<column name="uuid_attribute" type="varchar(100)" defaultValue="entryUUID"><constraints nullable="false"/></column>
+			<column name="email_attribute" type="varchar(100)" defaultValue="mail"><constraints nullable="false"/></column>
+			<column name="first_name_attribute" type="varchar(100)" defaultValue="givenName"><constraints nullable="false"/></column>
+			<column name="last_name_attribute" type="varchar(100)" defaultValue="sn"><constraints nullable="false"/></column>
+			<column name="rdn_attribute" type="varchar(100)" defaultValue="uid"><constraints nullable="false"/></column>
+			<column name="object_classes" type="varchar(1000)" defaultValue="inetOrgPerson"><constraints nullable="false"/></column>
+			<column name="search_scope" type="varchar(20)" defaultValue="SUBTREE"><constraints nullable="false"/></column>
+			<column name="edit_mode" type="varchar(20)" defaultValue="READ_ONLY"><constraints nullable="false"/></column>
+			<column name="import_users" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
+			<column name="trust_email" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)" defaultValue="system"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="023-create-ldap-federation-identities" author="susimsek">
+		<createTable tableName="ldap_federation_identities">
+			<column name="id" type="bigint" defaultValueSequenceNext="ldap_identity_seq"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_ldap_federation_identities"/></column>
+			<column name="external_id" type="varchar(500)"><constraints nullable="false"/></column>
+			<column name="distinguished_name" type="varchar(2000)"><constraints nullable="false"/></column>
+			<column name="provider_id" type="varchar(36)"><constraints nullable="false"/></column>
+			<column name="user_id" type="bigint"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="ldap_federation_identities" columnNames="provider_id, external_id" constraintName="uk_ldap_federation_identity"/>
+		<addForeignKeyConstraint baseTableName="ldap_federation_identities" baseColumnNames="provider_id" constraintName="fk_ldap_identity_provider" referencedTableName="ldap_federation_providers" referencedColumnNames="id" onDelete="CASCADE"/>
+		<addForeignKeyConstraint baseTableName="ldap_federation_identities" baseColumnNames="user_id" constraintName="fk_ldap_identity_user" referencedTableName="users" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex indexName="idx_ldap_identity_user" tableName="ldap_federation_identities"><column name="user_id"/></createIndex>
+	</changeSet>
+</databaseChangeLog>

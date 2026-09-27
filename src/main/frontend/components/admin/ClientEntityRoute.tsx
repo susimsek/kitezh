@@ -7,7 +7,15 @@ import type { Dictionary } from "@/i18n/get-dictionary";
 
 import { ClientDetail } from "./ClientDetail";
 
-const SECTIONS = new Set(["settings", "credentials", "scopes", "sessions", "consents", "events"]);
+const SECTIONS = new Set([
+  "settings",
+  "credentials",
+  "scopes",
+  "roles",
+  "sessions",
+  "consents",
+  "events",
+]);
 
 export function ClientEntityRoute({
   locale,

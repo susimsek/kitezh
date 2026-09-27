@@ -16,12 +16,14 @@ import { AdminBreadcrumb } from "./AdminBreadcrumb";
 import { ClientForm } from "./ClientForm";
 import { EntityRelatedData } from "./EntityRelatedData";
 import { ClientScopeAssignments } from "./ClientScopeAssignments";
+import { ClientRoles } from "./ClientRoles";
 import type { AdminClient } from "./ClientsTable";
 
 const CLIENT_DETAIL_TABS = [
   "settings",
   "credentials",
   "scopes",
+  "roles",
   "sessions",
   "consents",
   "events",
@@ -106,6 +108,7 @@ export function ClientDetail({
       label: copy.clientScopes,
       href: `${detailUrl}/scopes`,
     },
+    { key: "roles", label: copy.roles.title, href: `${detailUrl}/roles` },
     { key: "sessions", label: copy.sessions, href: `${detailUrl}/sessions` },
     { key: "consents", label: copy.consents, href: `${detailUrl}/consents` },
     ...(access?.viewEvents
@@ -250,6 +253,7 @@ export function ClientDetail({
           }
         />
       )}
+      {activeTab === "roles" && <ClientRoles clientId={client.id} dictionary={dictionary} />}
       {activeTab === "sessions" && (
         <EntityRelatedData
           resource="sessions"

@@ -249,15 +249,15 @@ export function AccountProfileForm({ dictionary }: { dictionary: Dictionary }) {
           currentPassword: values.currentPassword.trim() || undefined,
         },
       });
-      const attributesResponse = await requestAccount<ProfileAttributes>(accessToken, {
-        method: "PUT",
-        url: "/api/account/profile/attributes",
-        data: { attributes: values.profile },
-      });
       await requestAccount<{ locale: Locale }>(accessToken, {
         method: "PUT",
         url: "/api/auth/localization/me",
         data: { locale: values.preferredLocale },
+      });
+      const attributesResponse = await requestAccount<ProfileAttributes>(accessToken, {
+        method: "PUT",
+        url: "/api/account/profile/attributes",
+        data: { attributes: values.profile },
       });
       persistLocale(values.preferredLocale);
       await i18n.changeLanguage(values.preferredLocale);

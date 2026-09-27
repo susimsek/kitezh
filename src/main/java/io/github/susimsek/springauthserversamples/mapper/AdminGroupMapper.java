@@ -30,6 +30,8 @@ public interface AdminGroupMapper {
     @Mapping(target = "parent", source = "parent")
     @Mapping(target = "defaultGroup", source = "request.defaultGroup")
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "clientRoles", ignore = true)
+    @Mapping(target = "users", ignore = true)
     @Mapping(target = "attributes", ignore = true)
     GroupEntity toEntity(AdminGroupRequestDTO request, GroupEntity parent);
 
@@ -38,6 +40,8 @@ public interface AdminGroupMapper {
     @Mapping(target = "parent", ignore = true)
     @Mapping(target = "defaultGroup", source = "defaultGroup")
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "clientRoles", ignore = true)
+    @Mapping(target = "users", ignore = true)
     @Mapping(target = "attributes", ignore = true)
     void update(AdminGroupRequestDTO request, @MappingTarget GroupEntity target);
 

@@ -7,6 +7,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AdminEventSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.EmailSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
@@ -104,6 +105,9 @@ public class CacheConfig {
                 createCache(cacheManager, AdminEventSettingsEntity.class.getName());
                 createCache(cacheManager, AuthorizationConsentEntity.class.getName());
                 createCache(cacheManager, ClientScopeEntity.class.getName());
+                createCache(cacheManager, ClientRoleEntity.class.getName());
+                createCache(cacheManager, ClientRoleEntity.class.getName() + ".groups");
+                createCache(cacheManager, ClientRoleEntity.class.getName() + ".users");
                 createCache(cacheManager, EmailSettingsEntity.class.getName());
                 createCache(cacheManager, GroupEntity.class.getName());
                 createCache(cacheManager, GroupEntity.class.getName() + ".authorities");
@@ -124,6 +128,8 @@ public class CacheConfig {
                 createCache(cacheManager, UserEntity.class.getName());
                 createCache(cacheManager, UserEntity.class.getName() + ".authorities");
                 createCache(cacheManager, UserEntity.class.getName() + ".groups");
+                createCache(cacheManager, UserEntity.class.getName() + ".clientRoles");
+                createCache(cacheManager, GroupEntity.class.getName() + ".clientRoles");
                 createCache(cacheManager, UserProfileAttributeDefinitionEntity.class.getName());
                 createCache(cacheManager, RequiredActionDefinitionEntity.class.getName());
                 createCache(cacheManager, SocialProviderEntity.class.getName());

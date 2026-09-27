@@ -74,6 +74,25 @@ final class HibernateProxySupport {
         }
     }
 
+    static final class ProxyClientRoleEntity extends ClientRoleEntity implements HibernateProxy {
+
+        private final LazyInitializer lazyInitializer;
+
+        ProxyClientRoleEntity(Class<?> persistentClass) {
+            this.lazyInitializer = lazyInitializer(persistentClass);
+        }
+
+        @Override
+        public Object writeReplace() {
+            return this;
+        }
+
+        @Override
+        public LazyInitializer getHibernateLazyInitializer() {
+            return lazyInitializer;
+        }
+    }
+
     static final class ProxyAuthorizationConsentEntity extends AuthorizationConsentEntity
             implements HibernateProxy {
 

@@ -18,6 +18,18 @@ public interface GroupRepository extends JpaRepository<GroupEntity, Long> {
     @EntityGraph(attributePaths = {"authorities", "parent"})
     Page<GroupEntity> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"parent"})
+    Page<GroupEntity> findByClientRolesIdAndNameContainingIgnoreCase(
+            Long clientRoleId, String name, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"parent"})
+    @Query(
+            "select g from GroupEntity g where"
+                    + " (:query = '' or lower(g.name) like lower(concat('%', :query, '%')))"
+                    + " and not exists (select r.id from g.clientRoles r where r.id = :roleId)")
+    Page<GroupEntity> findAvailableClientRoleGroups(
+            @Param("roleId") Long roleId, @Param("query") String query, Pageable pageable);
+
     boolean existsByName(String name);
 
     boolean existsByParentId(Long parentId);

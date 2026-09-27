@@ -11,6 +11,7 @@ import io.github.susimsek.springauthserversamples.dto.account.AccountProfileDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountProfileRequestDTO;
 import io.github.susimsek.springauthserversamples.mapper.AccountProfileMapper;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.github.susimsek.springauthserversamples.service.LdapFederationWriteService;
 import io.github.susimsek.springauthserversamples.service.LoginSettingsService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import io.github.susimsek.springauthserversamples.service.admin.UserAccessInvalidationService;
@@ -37,6 +38,7 @@ class AccountProfileServiceTest {
     @Mock private UserAccessInvalidationService userAccessInvalidationService;
     @Mock private UserActionService userActionService;
     @Mock private LoginSettingsService loginSettingsService;
+    @Mock private LdapFederationWriteService ldapFederationWriteService;
 
     @Test
     void normalizesAndUpdatesProfile() {
@@ -48,6 +50,8 @@ class AccountProfileServiceTest {
         when(accountProfileMapper.normalize(request))
                 .thenReturn(new AccountProfileRequestDTO("Alice", "User", "alice@example.test"));
         when(accountProfileMapper.toDTO(user)).thenReturn(expected);
+        when(loginSettingsService.emailUpdateReauthenticationAge())
+                .thenReturn(Duration.ofDays(365_000));
 
         assertThat(service().updateProfile("alice", request)).isEqualTo(expected);
 
@@ -162,7 +166,9 @@ class AccountProfileServiceTest {
                 passwordService,
                 auditEventService,
                 userAccessInvalidationService,
-                userActionService);
+                userActionService,
+                loginSettingsService,
+                ldapFederationWriteService);
     }
 
     private AccountProfileService serviceWithSettings() {
@@ -173,7 +179,8 @@ class AccountProfileServiceTest {
                 auditEventService,
                 userAccessInvalidationService,
                 userActionService,
-                loginSettingsService);
+                loginSettingsService,
+                ldapFederationWriteService);
     }
 
     private static UserEntity user() {

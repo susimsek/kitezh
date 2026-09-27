@@ -85,6 +85,19 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     Page<UserEntity> findByAuthoritiesNameAndUsernameContainingIgnoreCase(
             String authorityName, String username, Pageable pageable);
 
+    @EntityGraph(value = "User.withEffectiveAuthorities")
+    Page<UserEntity> findByClientRolesIdAndUsernameContainingIgnoreCase(
+            Long clientRoleId, String username, Pageable pageable);
+
+    @EntityGraph(value = "User.withEffectiveAuthorities")
+    @Query(
+            "select u from UserEntity u where"
+                    + " (:query = '' or lower(u.username) like lower(concat('%', :query, '%')))"
+                    + " and u.enabled = true"
+                    + " and not exists (select r.id from u.clientRoles r where r.id = :roleId)")
+    Page<UserEntity> findAvailableClientRoleUsers(
+            @Param("roleId") Long roleId, @Param("query") String query, Pageable pageable);
+
     @EntityGraph(value = "User.withAuthorities")
     @Query(
             "select u from UserEntity u where"
@@ -96,6 +109,8 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     long countByAuthoritiesName(String authorityName);
 
     long countByAuthoritiesId(Long authorityId);
+
+    long countByClientRolesId(Long clientRoleId);
 
     long countByGroupsId(Long groupId);
 

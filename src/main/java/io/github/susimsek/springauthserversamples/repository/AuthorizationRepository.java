@@ -45,6 +45,8 @@ public interface AuthorizationRepository extends JpaRepository<AuthorizationEnti
 
     long deleteByPrincipalName(String principalName);
 
+    long deleteByPrincipalNameAndSessionIdNot(String principalName, String sessionId);
+
     long deleteByRegisteredClientId(String registeredClientId);
 
     long deleteBySessionId(String sessionId);

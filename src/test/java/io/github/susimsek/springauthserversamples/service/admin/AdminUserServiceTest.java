@@ -23,6 +23,7 @@ import io.github.susimsek.springauthserversamples.repository.RecoveryCodeReposit
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
+import io.github.susimsek.springauthserversamples.service.LdapFederationWriteService;
 import io.github.susimsek.springauthserversamples.service.account.UserActionService;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.AccountLockService;
@@ -54,6 +55,7 @@ class AdminUserServiceTest {
     @Mock private PasswordService passwordService;
     @Mock private AdminAuditEventService adminAuditEventService;
     @Mock private UserActionService userActionService;
+    @Mock private LdapFederationWriteService ldapFederationWriteService;
 
     @Test
     void userReturnsMappedViewWithAvatar() {
@@ -940,7 +942,8 @@ class AdminUserServiceTest {
                 userActionService,
                 Mappers.getMapper(AdminUserMapper.class),
                 Mappers.getMapper(AdminGroupMapper.class),
-                recoveryCodeRepository);
+                recoveryCodeRepository,
+                ldapFederationWriteService);
     }
 
     private static AuthorityEntity authority(Long id, String role) {

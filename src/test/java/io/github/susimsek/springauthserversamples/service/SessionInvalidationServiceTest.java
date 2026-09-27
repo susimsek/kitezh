@@ -59,6 +59,7 @@ class SessionInvalidationServiceTest {
 
         verify(userSessionRepository)
                 .deleteByPrincipalNameAndSessionIdNot("alice", "current-session");
-        verify(authorizationRepository).deleteByPrincipalName("alice");
+        verify(authorizationRepository)
+                .deleteByPrincipalNameAndSessionIdNot("alice", "current-session");
     }
 }

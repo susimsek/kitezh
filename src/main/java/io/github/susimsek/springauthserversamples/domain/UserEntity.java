@@ -39,12 +39,18 @@ import org.hibernate.proxy.HibernateProxy;
         name = "User.withEffectiveAuthorities",
         attributeNodes = {
             @NamedAttributeNode("authorities"),
+            @NamedAttributeNode("clientRoles"),
             @NamedAttributeNode(value = "groups", subgraph = "groups")
         },
-        subgraphs =
-                @NamedSubgraph(
-                        name = "groups",
-                        attributeNodes = @NamedAttributeNode("authorities")))
+        subgraphs = {
+            @NamedSubgraph(
+                    name = "groups",
+                    attributeNodes = {
+                        @NamedAttributeNode("authorities"),
+                        @NamedAttributeNode(value = "clientRoles", subgraph = "clientRoles")
+                    }),
+            @NamedSubgraph(name = "clientRoles", attributeNodes = @NamedAttributeNode("client"))
+        })
 public class UserEntity extends AuditableEntity {
 
     @Id
@@ -128,6 +134,14 @@ public class UserEntity extends AuditableEntity {
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "authority_id"))
     private Set<AuthorityEntity> authorities = new HashSet<>();
+
+    @ManyToMany
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    @JoinTable(
+            name = "user_client_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "client_role_id"))
+    private Set<ClientRoleEntity> clientRoles = new HashSet<>();
 
     @ManyToMany
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)

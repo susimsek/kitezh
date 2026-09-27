@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -92,6 +93,9 @@ class AdminClientScopeServiceTest {
                                         null));
 
         assertThat(result.name()).isEqualTo("billing");
+        var entityCaptor = ArgumentCaptor.forClass(ClientScopeEntity.class);
+        verify(clientScopeRepository).save(entityCaptor.capture());
+        assertThat(entityCaptor.getValue().getId()).isNotBlank();
         verify(adminAuditEventService).record("client-scope.created", "client-scope", "scope-1");
     }
 

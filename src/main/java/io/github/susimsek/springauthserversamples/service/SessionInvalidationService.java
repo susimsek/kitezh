@@ -44,6 +44,6 @@ public class SessionInvalidationService {
     @Transactional
     public void invalidatePrincipalExceptSession(String username, String currentSessionId) {
         userSessionRepository.deleteByPrincipalNameAndSessionIdNot(username, currentSessionId);
-        authorizationRepository.deleteByPrincipalName(username);
+        authorizationRepository.deleteByPrincipalNameAndSessionIdNot(username, currentSessionId);
     }
 }

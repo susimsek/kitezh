@@ -19,6 +19,7 @@ import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorR
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
+import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,6 +76,7 @@ import tools.jackson.databind.ObjectMapper;
 public class AuthorizationServerConfig {
 
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
+    private static final String ROLES_SCOPE = "roles";
 
     private final ApplicationProperties applicationProperties;
     private final AuthorizationEndpointErrorResponseHandler
@@ -297,6 +299,7 @@ public class AuthorizationServerConfig {
             appendNonceClaim(context);
             appendAdminClaims(context, tokenUser, legacyAdminGroups, adminAccessToken);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
+            appendClientRoleClaims(context, tokenUser);
             appendSessionIdClaim(context, authorizationRepository);
             appendDpopConfirmationClaim(context);
         };
@@ -326,6 +329,7 @@ public class AuthorizationServerConfig {
                 || isUserLocaleToken(context)
                 || adminAccessToken
                 || !groupMappers.isEmpty()
+                || isRoleToken(context)
                 || isUserSocialClaimsToken(context)) {
             return userRepository.findByUsername(context.getPrincipal().getName());
         }
@@ -401,7 +405,7 @@ public class AuthorizationServerConfig {
         if (adminAccessToken) {
             context.getClaims()
                     .claim(
-                            "roles",
+                            ROLES_SCOPE,
                             context.getPrincipal().getAuthorities().stream()
                                     .map(GrantedAuthority::getAuthority)
                                     .sorted()
@@ -453,6 +457,24 @@ public class AuthorizationServerConfig {
                                                                                         .toCollection(
                                                                                                 ArrayList
                                                                                                         ::new)))));
+    }
+
+    private static void appendClientRoleClaims(
+            JwtEncodingContext context, Optional<UserEntity> tokenUser) {
+        if (!isRoleToken(context) || tokenUser.isEmpty()) {
+            return;
+        }
+        String clientId = context.getRegisteredClient().getClientId();
+        Set<String> roles =
+                EffectiveRoleService.effectiveClientRoleNames(tokenUser.get())
+                        .getOrDefault(clientId, Set.of());
+        if (roles.isEmpty()) {
+            return;
+        }
+        context.getClaims()
+                .claim(
+                        "resource_access",
+                        Map.of(clientId, Map.of(ROLES_SCOPE, new ArrayList<>(roles))));
     }
 
     private static void appendSessionIdClaim(
@@ -597,6 +619,16 @@ public class AuthorizationServerConfig {
                                 context.getAuthorizationGrantType()))
                 && (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
                         || OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue()));
+    }
+
+    private static boolean isRoleToken(JwtEncodingContext context) {
+        return context.getAuthorizedScopes().contains(ROLES_SCOPE)
+                && (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                        || OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue()))
+                && (AuthorizationGrantType.AUTHORIZATION_CODE.equals(
+                                context.getAuthorizationGrantType())
+                        || AuthorizationGrantType.REFRESH_TOKEN.equals(
+                                context.getAuthorizationGrantType()));
     }
 
     private static String groupPath(GroupEntity group) {

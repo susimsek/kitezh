@@ -57,6 +57,10 @@ public enum ApiErrorCode {
     CLIENT_SECRET_REQUIRED(
             "client_secret_required",
             "A client secret must be generated before enabling secret authentication."),
+    CLIENT_ROLE_DUPLICATE_NAME("client_role_duplicate_name", "Client role already exists."),
+    CLIENT_ROLE_INVALID_NAME("client_role_invalid_name", "Client role name is invalid."),
+    CLIENT_ROLE_ASSIGNED(
+            "client_role_assigned", "Client role is assigned to one or more users or groups."),
     GROUP_DUPLICATE_NAME("group_duplicate_name", "Group name is already registered."),
     GROUP_HAS_CHILDREN(
             "group_has_children", "Move or delete child groups before deleting this group."),
@@ -98,7 +102,9 @@ public enum ApiErrorCode {
             "user_profile_invalid_definition", "The profile attribute definition is invalid."),
     USER_PROFILE_INVALID_VALUE(
             "user_profile_invalid_value", "The profile attribute value is invalid."),
-    USER_PROFILE_REQUIRED("user_profile_required", "The profile attribute is required.");
+    USER_PROFILE_REQUIRED("user_profile_required", "The profile attribute is required."),
+    LDAP_READ_ONLY("ldap_read_only", "The LDAP profile is read-only."),
+    LDAP_WRITE_FAILED("ldap_write_failed", "The LDAP profile could not be updated.");
 
     private final String value;
     private final String defaultMessage;

@@ -8,8 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
+import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
@@ -161,6 +163,45 @@ class AuthorizationServerConfigTest {
                                 .fromSessionId("browser-session"));
         verify(userRepository).findByUsername("admin");
         verify(avatarRepository).findVersionByUserId(42L);
+    }
+
+    @Test
+    void addsClientRolesOnlyWhenRolesScopeIsAuthorized() {
+        UserEntity user = new UserEntity();
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setClientId("orders-api");
+        user.setClientRoles(Set.of(new ClientRoleEntity(client, "orders.read", null)));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
+        AuthorizationRepository authorizationRepository = mock(AuthorizationRepository.class);
+
+        JwtClaimsSet.Builder rolesClaims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(userRepository, avatarRepository, authorizationRepository)
+                .customize(
+                        jwtContext(
+                                rolesClaims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "orders-api",
+                                Set.of("roles")));
+
+        assertThat(rolesClaims.build().getClaims())
+                .containsEntry(
+                        "resource_access",
+                        Map.of("orders-api", Map.of("roles", List.of("orders.read"))));
+
+        JwtClaimsSet.Builder noRolesClaims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(userRepository, avatarRepository, authorizationRepository)
+                .customize(
+                        jwtContext(
+                                noRolesClaims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "orders-api",
+                                Set.of("openid")));
+
+        assertThat(noRolesClaims.build().getClaims()).doesNotContainKey("resource_access");
     }
 
     @Test

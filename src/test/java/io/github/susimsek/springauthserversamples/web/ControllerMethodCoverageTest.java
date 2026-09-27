@@ -27,6 +27,7 @@ class ControllerMethodCoverageTest {
         "io.github.susimsek.springauthserversamples.web.account.MfaController",
         "io.github.susimsek.springauthserversamples.web.account.RequiredActionController",
         "io.github.susimsek.springauthserversamples.web.admin.AdminClientController",
+        "io.github.susimsek.springauthserversamples.web.admin.AdminClientRoleController",
         "io.github.susimsek.springauthserversamples.web.admin.AdminClientScopeController",
         "io.github.susimsek.springauthserversamples.web.admin.AdminConsentController",
         "io.github.susimsek.springauthserversamples.web.admin.AdminDashboardController",

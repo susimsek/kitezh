@@ -14,7 +14,7 @@ import org.mapstruct.MappingTarget;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface AdminClientScopeMapper {
 
-    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "id", source = "id")
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "name", source = "name")
     @Mapping(target = "displayName", source = "displayName")
