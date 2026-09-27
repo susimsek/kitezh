@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
@@ -202,6 +203,49 @@ class AuthorizationServerConfigTest {
                                 Set.of("openid")));
 
         assertThat(noRolesClaims.build().getClaims()).doesNotContainKey("resource_access");
+    }
+
+    @Test
+    void addsRealmAndCrossClientCompositeRolesToRoleToken() {
+        UserEntity user = new UserEntity();
+        AuthorityEntity administrator = new AuthorityEntity(1L, "ROLE_ADMINISTRATOR");
+        RegisteredClientEntity ordersClient = new RegisteredClientEntity();
+        ordersClient.setClientId("orders-api");
+        ClientRoleEntity ordersRead = new ClientRoleEntity(ordersClient, "orders.read", null);
+        administrator.setCompositeClientRoles(Set.of(ordersRead));
+        AuthorityEntity auditor = new AuthorityEntity(2L, "ROLE_AUDITOR");
+        RegisteredClientEntity billingClient = new RegisteredClientEntity();
+        billingClient.setClientId("billing-api");
+        ClientRoleEntity billingManage =
+                new ClientRoleEntity(billingClient, "billing.manage", null);
+        billingManage.setCompositeRealmRoles(Set.of(auditor));
+        user.setAuthorities(Set.of(administrator));
+        user.setClientRoles(Set.of(billingManage));
+
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
+        AuthorizationRepository authorizationRepository = mock(AuthorizationRepository.class);
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(userRepository, avatarRepository, authorizationRepository)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "orders-api",
+                                Set.of("roles")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry(
+                        "realm_access",
+                        Map.of("roles", List.of("ROLE_ADMINISTRATOR", "ROLE_AUDITOR")))
+                .containsEntry(
+                        "resource_access",
+                        Map.of(
+                                "billing-api", Map.of("roles", List.of("billing.manage")),
+                                "orders-api", Map.of("roles", List.of("orders.read"))));
     }
 
     @Test

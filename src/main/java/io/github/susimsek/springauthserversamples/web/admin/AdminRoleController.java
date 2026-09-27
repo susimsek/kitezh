@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.web.admin;
 
 import io.github.susimsek.springauthserversamples.config.openapi.OpenApiConfig;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDetailDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleRequestDTO;
@@ -94,6 +95,78 @@ class AdminRoleController {
                     String q,
             @PageableDefault(size = 10, sort = "username") Pageable pageable) {
         return adminRoleService.availableUsers(name, q, pageable);
+    }
+
+    @GetMapping("/{name}/available-composites")
+    @Operation(
+            summary = "Search roles available as composite children",
+            description = "Returns roles that can be included without creating a cycle.")
+    @ApiResponse(responseCode = "200", description = "Paged composite candidates returned.")
+    Page<AdminRoleDTO> availableComposites(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "") String q,
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+        return adminRoleService.availableComposites(name, q, pageable);
+    }
+
+    @GetMapping("/{name}/available-client-composites")
+    @Operation(
+            summary = "Search client roles available as composite children",
+            description = "Returns client roles that can be included without creating a cycle.")
+    @ApiResponse(responseCode = "200", description = "Paged client-role candidates returned.")
+    Page<AdminClientRoleDTO> availableClientComposites(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "") String q,
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+        return adminRoleService.availableClientComposites(name, q, pageable);
+    }
+
+    @PostMapping("/{name}/composites/{childName}")
+    @Operation(
+            summary = "Add a composite child role",
+            description = "Includes one realm role in another after cycle validation.")
+    @ApiResponse(responseCode = "200", description = "Updated role details returned.")
+    AdminRoleDetailDTO addComposite(
+            @PathVariable String name,
+            @PathVariable String childName,
+            @PageableDefault(size = 20, sort = "username") Pageable pageable) {
+        return adminRoleService.addComposite(name, childName, pageable);
+    }
+
+    @DeleteMapping("/{name}/composites/{childName}")
+    @Operation(
+            summary = "Remove a composite child role",
+            description = "Removes one realm role from a composite role.")
+    @ApiResponse(responseCode = "200", description = "Updated role details returned.")
+    AdminRoleDetailDTO removeComposite(
+            @PathVariable String name,
+            @PathVariable String childName,
+            @PageableDefault(size = 20, sort = "username") Pageable pageable) {
+        return adminRoleService.removeComposite(name, childName, pageable);
+    }
+
+    @PostMapping("/{name}/client-composites/{childRoleId}")
+    @Operation(
+            summary = "Add a client role to a composite realm role",
+            description = "Includes one client role in a realm role after cycle validation.")
+    @ApiResponse(responseCode = "200", description = "Updated role details returned.")
+    AdminRoleDetailDTO addClientComposite(
+            @PathVariable String name,
+            @PathVariable Long childRoleId,
+            @PageableDefault(size = 20, sort = "username") Pageable pageable) {
+        return adminRoleService.addClientComposite(name, childRoleId, pageable);
+    }
+
+    @DeleteMapping("/{name}/client-composites/{childRoleId}")
+    @Operation(
+            summary = "Remove a client role from a composite realm role",
+            description = "Removes one client role from a realm role composite.")
+    @ApiResponse(responseCode = "200", description = "Updated role details returned.")
+    AdminRoleDetailDTO removeClientComposite(
+            @PathVariable String name,
+            @PathVariable Long childRoleId,
+            @PageableDefault(size = 20, sort = "username") Pageable pageable) {
+        return adminRoleService.removeClientComposite(name, childRoleId, pageable);
     }
 
     @PostMapping("/{name}/users")

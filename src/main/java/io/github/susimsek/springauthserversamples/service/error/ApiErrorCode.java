@@ -61,6 +61,9 @@ public enum ApiErrorCode {
     CLIENT_ROLE_INVALID_NAME("client_role_invalid_name", "Client role name is invalid."),
     CLIENT_ROLE_ASSIGNED(
             "client_role_assigned", "Client role is assigned to one or more users or groups."),
+    CLIENT_ROLE_COMPOSITE_CYCLE(
+            "client_role_composite_cycle",
+            "A client role composite relationship would create a cycle."),
     GROUP_DUPLICATE_NAME("group_duplicate_name", "Group name is already registered."),
     GROUP_HAS_CHILDREN(
             "group_has_children", "Move or delete child groups before deleting this group."),
@@ -76,6 +79,8 @@ public enum ApiErrorCode {
     ROLE_ESCALATION("role_escalation", "You can only assign roles you already have."),
     ROLE_INVALID_NAME("role_invalid_name", "Role names must use uppercase ROLE_ format."),
     ROLE_PROTECTED("role_protected", "This default role cannot be removed."),
+    ROLE_COMPOSITE_CYCLE(
+            "role_composite_cycle", "A role composite relationship would create a cycle."),
     SEARCH_TOO_LONG("search_too_long", "Search query must not exceed 100 characters."),
     USER_DUPLICATE_USERNAME("user_duplicate_username", "Username is already registered."),
     USER_DUPLICATE_EMAIL("user_duplicate_email", "Email is already registered."),

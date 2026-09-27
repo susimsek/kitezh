@@ -1,4 +1,6 @@
 const signInAdmin = () => {
+  cy.visit("/");
+  cy.setCookie("locale", "en");
   cy.visit("/admin/");
 
   cy.env(["adminUsername", "adminPassword"], { log: false }).then(
@@ -18,6 +20,8 @@ const signInAdmin = () => {
 
 describe("admin console", () => {
   it("signs in from /admin, keeps the callback URL clean and survives reload", () => {
+    cy.visit("/");
+    cy.setCookie("locale", "en");
     cy.visit("/admin");
 
     cy.env(["adminUsername", "adminPassword"], { log: false }).then(
@@ -115,9 +119,24 @@ describe("admin console", () => {
     sections.forEach(([label, path, saveLabel]) => {
       cy.contains(".admin-detail-tabs a", label).click();
       cy.location("pathname", { timeout: 15_000 }).should("eq", path);
-      cy.get('.admin-detail-tabs a[aria-current="page"]').should("contain.text", label);
-      if (saveLabel) cy.contains("button", saveLabel, { timeout: 15_000 }).should("be.visible");
+      cy.get(".admin-detail-tabs a.active").should("contain.text", label);
+      if (saveLabel) {
+        const sectionKey = path.split("/").pop();
+        const loginSettingsSections = ["login", "brute-force", "sessions"];
+        if (sectionKey && loginSettingsSections.includes(sectionKey)) {
+          cy.get(`#login-settings-${sectionKey}`)
+            .closest("section")
+            .contains("button", saveLabel, { timeout: 15_000 })
+            .should("be.visible");
+        } else {
+          cy.contains("button", saveLabel, { timeout: 15_000 }).should("be.visible");
+        }
+      }
       if (label === "Email") {
+        cy.get("#email-from-address").clear().type("admin@example.com");
+        cy.get("#email-username").clear();
+        cy.get("#email-host").clear().type("smtp.example.com");
+        cy.get("#email-base-url").clear().type("http://localhost:9090");
         cy.intercept("POST", "/api/admin/settings/email/test", { statusCode: 204 }).as(
           "testEmailConnection",
         );
@@ -134,7 +153,10 @@ describe("admin console", () => {
     cy.location("pathname").should("match", /^\/admin\/authentication\/?$/);
     cy.contains(".admin-detail-tabs a", "OTP policy").click();
     cy.location("pathname").should("eq", "/admin/authentication/policies/otp-policy");
-    cy.contains("button", "Save settings", { timeout: 15_000 }).should("be.visible");
+    cy.get("#login-settings-otp-policy")
+      .closest("section")
+      .contains("button", "Save settings", { timeout: 15_000 })
+      .should("be.visible");
     cy.contains(".admin-detail-tabs a", "WebAuthn policy").click();
     cy.location("pathname").should("eq", "/admin/authentication/policies/webauthn");
   });
@@ -177,11 +199,13 @@ describe("admin console", () => {
     cy.contains("a", "Credentials").click();
     cy.contains("Required actions", { timeout: 15_000 }).should("be.visible");
     cy.contains("Temporary password").should("be.visible");
-    cy.contains("a", "Sessions").click();
+    cy.contains(".admin-detail-tabs a", "Sessions").click();
     cy.contains("button", "Sign out all sessions", { timeout: 15_000 }).should("be.visible");
   });
 
   it("rejects a callback without a saved authorization transaction", () => {
+    cy.visit("/");
+    cy.setCookie("locale", "en");
     cy.visit("/admin/callback#code=stale-code&state=stale-state");
 
     cy.location("pathname", { timeout: 20_000 }).should("eq", "/admin/callback");

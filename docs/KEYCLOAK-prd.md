@@ -209,9 +209,9 @@ The following matrix compares the behavior currently implemented in this reposit
 | User impersonation | Admin-only or dedicated impersonation authority, single-use ticket flow, console action, and actor/target audit details | Admin impersonation permission and console action | Implemented / Partial | The Keycloak-equivalent dedicated impersonation authority and audit context are implemented. Resource-specific user scopes remain part of the future fine-grained permission model. |
 | Groups | CRUD, membership, hierarchy, parent role inheritance, multi-valued attributes, default groups, configurable group claims, and group-scoped permissions | Hierarchical groups, attributes, role mappings, default groups, membership permissions[^6] | Implemented / Partial | Preserve the single-issuer boundary; add broader Keycloak protocol mapper types and realm boundaries later. |
 | Group claims | Configurable group membership mapper on client scopes with claim name and full-path options | Group membership mapper is configurable per client/client scope | Implemented / Partial | Add the remaining protocol mapper types and token-preview tooling. |
-| Realm roles | Global application authorities | Realm-level roles with direct, group, and composite assignment | Partial | Add realm ownership and composite-role relationships. |
-| Client roles | Client-owned roles with direct user/group mappings, client-role administration, and `roles`-scope filtered `resource_access` claims | Client roles are scoped to a client and appear in `resource_access` | Implemented / Partial | Composite client roles, realm ownership, and finer-grained scope policies remain future work. |
-| Composite roles | No composite role graph | Roles can include other roles with cycle protection | Missing | Add a role graph and effective-role resolver. |
+| Realm roles | Global application authorities with direct, group, and composite assignment | Realm-level roles with direct, group, and composite assignment | Implemented / Partial | Realm ownership and multi-tenant boundaries remain future work. |
+| Client roles | Client-owned roles with direct/group mappings, composite relationships, client-role administration, and `roles`-scope filtered `resource_access` claims | Client roles are scoped to a client and appear in `resource_access` | Implemented / Partial | Realm ownership and finer-grained scope policies remain future work. |
+| Composite roles | Single-issuer global and client role graphs, including cross-scope/cross-client composites, cycle protection, effective-role resolution, and standard role claims | Roles can include other roles with cycle protection | Implemented / Partial | Multi-realm ownership, client-scope role filtering, and fine-grained composite-management permissions remain separate increments. |
 | Query permissions | Resource roles combine discovery and access | `query-users`, `query-groups`, and `query-clients` control console discovery | Partial | Split navigation/query permissions from view/manage permissions where needed. |
 | Event permissions | Event viewer/manager authorities protect event APIs | `view-events` and `manage-events` are separate realm-management roles[^1] | Implemented / Partial | Preserve the split; add user-event/provider scope later. |
 | Client CRUD | Registered OAuth/OIDC clients, redirect URIs, secrets, grants, scopes | Clients have settings, credentials, client scopes, roles, sessions, and service accounts | Partial | Add client roles, service accounts, mapper configuration, and richer credentials. |
@@ -546,7 +546,7 @@ The application now implements the OAuth2/OIDC identity-broker subset needed for
 
 - Keep the current roles and event settings behavior stable.
 - Add realm/client ownership to role, client scope, group, and mapper models before multi-tenant support.
-- Keep client roles, standard role claims, and scope filtering stable; composite roles remain the next role-model increment.
+- Keep client roles, composite-role expansion, standard role claims, and scope filtering stable; realm ownership remains the next role-model increment.
 - Extend group attributes and add protocol mappers; dynamic user profile attributes are implemented for the single issuer.
 - Keep Settings and Events visually consistent with the existing screens.
 - Maintain session/token invalidation, audit events, cache eviction, OpenAPI schemas, localized messages, native hints, and tests for each mutation.
@@ -678,7 +678,8 @@ Liquibase changelogs, CSV seed data, and i18n bundles must remain available to n
 - [x] Client roles support direct user and group mappings, with affected user sessions and authorizations invalidated after changes.
 - [x] Client roles are emitted under `resource_access.{client_id}.roles` only when the `roles` scope is authorized for the token.
 - [x] Client role names, ownership, duplicate protection, assignment protection, localized validation, audit events, OpenAPI schemas, and bounded user lists are enforced server-side.
-- [ ] Composite client roles and realm/tenant ownership remain future parity work.
+- [x] Composite client roles are cycle-protected, auditable, cache-invalidating, and reflected in effective token roles.
+- [ ] Realm/tenant ownership remains future parity work.
 
 ### Quality and security
 
@@ -692,7 +693,9 @@ Liquibase changelogs, CSV seed data, and i18n bundles must remain available to n
 
 The current sample implements the recommended split with `/admin/settings/events` for event configuration and `/admin/events` for history. The Settings navigation includes Events, the event form uses the shared card and action-row pattern, and the history page owns filtering and clear-history behavior. The backend exposes the four resource-oriented endpoints listed above and protects them with viewer/manager/admin rules.
 
-Client roles are implemented as client-owned role entities with direct user and group mappings. The client detail screen exposes a Roles tab backed by bounded administration endpoints. When a token requests the `roles` scope, effective roles assigned directly to the user or inherited through groups are emitted only for the current client under `resource_access`; role changes invalidate affected sessions and persisted authorizations. Composite roles, realm ownership, and fine-grained role-scope policies remain intentionally outside this increment.
+Client roles are implemented as client-owned role entities with direct user and group mappings plus cycle-protected composite relationships. The client detail screen exposes a Roles tab backed by bounded administration endpoints. When a token requests the `roles` scope, effective global roles are emitted under `realm_access` and effective roles for every client represented in the unified composite graph are emitted under `resource_access`; role and composite changes invalidate affected sessions and persisted authorizations. Multi-realm ownership and client-scope role filtering remain intentionally outside this increment.
+
+Fine-grained administration is intentionally kept as a separate capability from composite-role modeling. The composite endpoints currently use the application's existing administrative role guards; when the fine-grained permission evaluator is introduced, these mutations should additionally require Keycloak-compatible `map-role-composite` and `map-roles-composite` permissions. This dependency is tracked under the separate Fine-grained admin permissions item rather than being folded into the role graph.
 
 The following parity items remain product decisions rather than silent assumptions:
 

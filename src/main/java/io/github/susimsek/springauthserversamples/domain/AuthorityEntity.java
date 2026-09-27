@@ -5,9 +5,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -36,8 +41,34 @@ public class AuthorityEntity {
     @Column(name = "description", length = 500)
     private String description;
 
+    @ManyToMany
+    @JoinTable(
+            name = "authority_composites",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "child_role_id"))
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    private Set<AuthorityEntity> compositeRoles = new HashSet<>();
+
+    @ManyToMany(mappedBy = "compositeRoles")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    private Set<AuthorityEntity> compositeParents = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+            name = "authority_client_composites",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "child_role_id"))
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    private Set<ClientRoleEntity> compositeClientRoles = new HashSet<>();
+
     public AuthorityEntity(Long id, String name) {
         this(id, name, null);
+    }
+
+    public AuthorityEntity(Long id, String name, String description) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
     }
 
     @Override

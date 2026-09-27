@@ -399,6 +399,12 @@ textarea.form-control {
   padding: var(--console-space-5);
 }
 
+.admin-role-user-assignment-card {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+
 .admin-stat-card {
   transition:
     transform var(--admin-transition),

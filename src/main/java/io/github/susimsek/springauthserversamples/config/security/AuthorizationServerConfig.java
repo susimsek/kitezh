@@ -298,6 +298,7 @@ public class AuthorizationServerConfig {
             appendUserClaims(context, tokenUser, userAvatarRepository, applicationProperties);
             appendNonceClaim(context);
             appendAdminClaims(context, tokenUser, legacyAdminGroups, adminAccessToken);
+            appendRealmRoleClaims(context, tokenUser);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
             appendClientRoleClaims(context, tokenUser);
             appendSessionIdClaim(context, authorizationRepository);
@@ -464,17 +465,28 @@ public class AuthorizationServerConfig {
         if (!isRoleToken(context) || tokenUser.isEmpty()) {
             return;
         }
-        String clientId = context.getRegisteredClient().getClientId();
-        Set<String> roles =
-                EffectiveRoleService.effectiveClientRoleNames(tokenUser.get())
-                        .getOrDefault(clientId, Set.of());
+        Map<String, Set<String>> roles =
+                EffectiveRoleService.effectiveClientRoleNames(tokenUser.get());
         if (roles.isEmpty()) {
             return;
         }
-        context.getClaims()
-                .claim(
-                        "resource_access",
-                        Map.of(clientId, Map.of(ROLES_SCOPE, new ArrayList<>(roles))));
+        Map<String, Object> resourceAccess = new java.util.LinkedHashMap<>();
+        roles.forEach(
+                (clientId, clientRoles) ->
+                        resourceAccess.put(
+                                clientId, Map.of(ROLES_SCOPE, new ArrayList<>(clientRoles))));
+        context.getClaims().claim("resource_access", resourceAccess);
+    }
+
+    private static void appendRealmRoleClaims(
+            JwtEncodingContext context, Optional<UserEntity> tokenUser) {
+        if (!isRoleToken(context) || tokenUser.isEmpty()) {
+            return;
+        }
+        Set<String> roles = EffectiveRoleService.effectiveRoleNames(tokenUser.get());
+        if (!roles.isEmpty()) {
+            context.getClaims().claim("realm_access", Map.of(ROLES_SCOPE, new ArrayList<>(roles)));
+        }
     }
 
     private static void appendSessionIdClaim(

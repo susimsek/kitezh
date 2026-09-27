@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
@@ -46,6 +47,26 @@ public class ClientRoleEntity extends AuditableEntity {
 
     @Column(name = "description", length = 500)
     private String description;
+
+    @ManyToMany
+    @JoinTable(
+            name = "oauth2_client_role_composites",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "child_role_id"))
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    private Set<ClientRoleEntity> compositeRoles = new HashSet<>();
+
+    @ManyToMany(mappedBy = "compositeRoles")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    private Set<ClientRoleEntity> compositeParents = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+            name = "oauth2_client_role_realm_composites",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "child_role_id"))
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    private Set<AuthorityEntity> compositeRealmRoles = new HashSet<>();
 
     @ManyToMany(mappedBy = "clientRoles")
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)

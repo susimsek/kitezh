@@ -24,6 +24,13 @@ import { ResourceFilters } from "./ResourceFilters";
 import { useAdminTableState } from "./useAdminTableState";
 
 type RoleUser = { id: number; username: string; enabled: boolean };
+type RoleSummary = { name: string; description?: string | null };
+type ClientRoleSummary = {
+  id: number;
+  clientId: string;
+  name: string;
+  description?: string | null;
+};
 export type RoleDetailTab = "details" | "users";
 type RoleDetailData = {
   name: string;
@@ -31,6 +38,8 @@ type RoleDetailData = {
   userCount: number;
   protectedRole: boolean;
   users: PageResponse<RoleUser>;
+  compositeRoles?: string[];
+  compositeClientRoles?: ClientRoleSummary[];
 };
 
 export function RoleDetail({
@@ -53,6 +62,16 @@ export function RoleDetail({
   const [suggestions, setSuggestions] = useState<RoleUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<RoleUser | null>(null);
   const [searchingUsers, setSearchingUsers] = useState(false);
+  const [compositeQuery, setCompositeQuery] = useState("");
+  const [compositeSuggestions, setCompositeSuggestions] = useState<RoleSummary[]>([]);
+  const [selectedComposite, setSelectedComposite] = useState<RoleSummary | null>(null);
+  const [clientCompositeQuery, setClientCompositeQuery] = useState("");
+  const [clientCompositeSuggestions, setClientCompositeSuggestions] = useState<ClientRoleSummary[]>(
+    [],
+  );
+  const [selectedClientComposite, setSelectedClientComposite] = useState<ClientRoleSummary | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
   const {
     clearFilters,
@@ -149,6 +168,50 @@ export function RoleDetail({
     };
   }, [accessToken, actualName, selectedUser, userQuery]);
 
+  useEffect(() => {
+    if (!accessToken || compositeQuery.trim().length < 2 || selectedComposite) {
+      const timeout = window.setTimeout(() => setCompositeSuggestions([]), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      adminRequest<PageResponse<RoleSummary>>(accessToken, {
+        url: `/api/admin/roles/${encodeURIComponent(actualName)}/available-composites?q=${encodeURIComponent(compositeQuery.trim())}&page=0&size=10&sort=name,asc`,
+        signal: controller.signal,
+      })
+        .then((response) =>
+          setCompositeSuggestions(response.status < 300 ? response.data.content : []),
+        )
+        .catch(() => setCompositeSuggestions([]));
+    }, 300);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [accessToken, actualName, compositeQuery, selectedComposite]);
+
+  useEffect(() => {
+    if (!accessToken || clientCompositeQuery.trim().length < 2 || selectedClientComposite) {
+      const timeout = window.setTimeout(() => setClientCompositeSuggestions([]), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      adminRequest<PageResponse<ClientRoleSummary>>(accessToken, {
+        url: `/api/admin/roles/${encodeURIComponent(actualName)}/available-client-composites?q=${encodeURIComponent(clientCompositeQuery.trim())}&page=0&size=10&sort=name,asc`,
+        signal: controller.signal,
+      })
+        .then((response) =>
+          setClientCompositeSuggestions(response.status < 300 ? response.data.content : []),
+        )
+        .catch(() => setClientCompositeSuggestions([]));
+    }, 300);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [accessToken, actualName, clientCompositeQuery, selectedClientComposite]);
+
   const assign = async () => {
     if (!access?.manageRoles || !accessToken || !selectedUser) return;
     setSaving(true);
@@ -186,6 +249,56 @@ export function RoleDetail({
       }
       alerts.addAlert(dictionary.admin.roles.assignmentRemoved);
       await load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateComposite = async (composite: RoleSummary, method: "POST" | "DELETE") => {
+    if (!access?.manageRoles || !accessToken) return;
+    setSaving(true);
+    try {
+      const response = await adminRequest<RoleDetailData>(accessToken, {
+        url: `/api/admin/roles/${encodeURIComponent(actualName)}/composites/${encodeURIComponent(composite.name)}?page=0&size=${size}&sort=${encodeURIComponent(sort)}`,
+        method,
+      });
+      if (response.status >= 300) throw new Error();
+      setDetail(response.data);
+      setSelectedComposite(null);
+      setCompositeQuery("");
+      setCompositeSuggestions([]);
+      alerts.addAlert(
+        method === "POST"
+          ? dictionary.admin.roles.compositeSaved
+          : dictionary.admin.roles.compositeRemoved,
+      );
+    } catch {
+      alerts.addError(dictionary.admin.roles.operationError);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateClientComposite = async (composite: ClientRoleSummary, method: "POST" | "DELETE") => {
+    if (!access?.manageRoles || !accessToken) return;
+    setSaving(true);
+    try {
+      const response = await adminRequest<RoleDetailData>(accessToken, {
+        url: `/api/admin/roles/${encodeURIComponent(actualName)}/client-composites/${composite.id}?page=0&size=${size}&sort=${encodeURIComponent(sort)}`,
+        method,
+      });
+      if (response.status >= 300) throw new Error();
+      setDetail(response.data);
+      setSelectedClientComposite(null);
+      setClientCompositeQuery("");
+      setClientCompositeSuggestions([]);
+      alerts.addAlert(
+        method === "POST"
+          ? dictionary.admin.roles.compositeSaved
+          : dictionary.admin.roles.compositeRemoved,
+      );
+    } catch {
+      alerts.addError(dictionary.admin.roles.operationError);
     } finally {
       setSaving(false);
     }
@@ -230,42 +343,230 @@ export function RoleDetail({
       />
 
       {activeTab === "details" && (
-        <Card className="admin-panel-card">
-          <Card.Body>
-            <Form noValidate onSubmit={handleSubmit(saveDescription)}>
-              <Form.Group controlId="role-description-detail">
-                <Form.Label>{dictionary.admin.roles.description}</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  maxLength={500}
-                  disabled={!access?.manageRoles || descriptionSaving}
-                  isInvalid={Boolean(descriptionErrors.description)}
-                  {...register("description")}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {descriptionErrors.description?.message}
-                </Form.Control.Feedback>
-                <Form.Text>{dictionary.admin.roles.descriptionHelp}</Form.Text>
-              </Form.Group>
+        <>
+          <Card className="admin-panel-card">
+            <Card.Body>
+              <Form noValidate onSubmit={handleSubmit(saveDescription)}>
+                <Form.Group controlId="role-description-detail">
+                  <Form.Label>{dictionary.admin.roles.description}</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    maxLength={500}
+                    disabled={!access?.manageRoles || descriptionSaving}
+                    isInvalid={Boolean(descriptionErrors.description)}
+                    {...register("description")}
+                  />
+                  <Form.Control.Feedback type="invalid">
+                    {descriptionErrors.description?.message}
+                  </Form.Control.Feedback>
+                  <Form.Text>{dictionary.admin.roles.descriptionHelp}</Form.Text>
+                </Form.Group>
+                {access?.manageRoles && (
+                  <Button className="mt-3" disabled={descriptionSaving} type="submit">
+                    {descriptionSaving ? (
+                      <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                    ) : (
+                      <AdminActionIcon action="save" />
+                    )}
+                    {dictionary.admin.roles.saveDescription}
+                  </Button>
+                )}
+              </Form>
+            </Card.Body>
+          </Card>
+          <Card className="admin-panel-card">
+            <Card.Body>
+              <div className="admin-detail-heading mb-3">
+                <div>
+                  <h2 className="h5 mb-1">{dictionary.admin.roles.compositeRoles}</h2>
+                  <p className="small text-body-secondary mb-0">
+                    {dictionary.admin.roles.compositeHelp}
+                  </p>
+                </div>
+              </div>
               {access?.manageRoles && (
-                <Button className="mt-3" disabled={descriptionSaving} type="submit">
-                  {descriptionSaving ? (
-                    <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
-                  ) : (
-                    <AdminActionIcon action="save" />
+                <div className="position-relative">
+                  <Form.Label htmlFor="role-composite-search">
+                    {dictionary.admin.roles.assignComposite}
+                  </Form.Label>
+                  <Form.Control
+                    id="role-composite-search"
+                    value={selectedComposite?.name ?? compositeQuery}
+                    placeholder={dictionary.admin.roles.searchRolesPlaceholder}
+                    onChange={(event) => {
+                      setSelectedComposite(null);
+                      setCompositeQuery(event.target.value);
+                    }}
+                  />
+                  {compositeSuggestions.length > 0 && !selectedComposite && (
+                    <ListGroup className="position-absolute start-0 end-0 mt-1 shadow-sm z-3">
+                      {compositeSuggestions.map((role) => (
+                        <ListGroup.Item
+                          action
+                          type="button"
+                          key={role.name}
+                          onClick={() => {
+                            setSelectedComposite(role);
+                            setCompositeSuggestions([]);
+                          }}
+                        >
+                          {role.name}
+                        </ListGroup.Item>
+                      ))}
+                    </ListGroup>
                   )}
-                  {dictionary.admin.roles.saveDescription}
-                </Button>
+                  <Button
+                    className="mt-2"
+                    disabled={!selectedComposite || saving}
+                    onClick={() =>
+                      selectedComposite && void updateComposite(selectedComposite, "POST")
+                    }
+                  >
+                    {saving ? (
+                      <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                    ) : (
+                      <AdminActionIcon action="add" />
+                    )}
+                    {dictionary.admin.roles.assign}
+                  </Button>
+                </div>
               )}
-            </Form>
-          </Card.Body>
-        </Card>
+              {(detail.compositeRoles ?? []).length === 0 ? (
+                <div className="text-body-secondary small mt-3">
+                  {dictionary.admin.roles.noCompositeRoles}
+                </div>
+              ) : (
+                <div className="d-grid gap-2 mt-3">
+                  {detail.compositeRoles?.map((composite) => (
+                    <div
+                      className="d-flex justify-content-between align-items-center border rounded p-2"
+                      key={composite}
+                    >
+                      <span className="font-monospace">{composite}</span>
+                      {access?.manageRoles && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={saving}
+                          onClick={() => void updateComposite({ name: composite }, "DELETE")}
+                        >
+                          {saving ? (
+                            <Spinner
+                              animation="border"
+                              aria-hidden="true"
+                              className="me-2"
+                              size="sm"
+                            />
+                          ) : (
+                            <AdminActionIcon action="remove" />
+                          )}
+                          {dictionary.admin.roles.remove}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-top mt-4 pt-4">
+                <h3 className="h6">{dictionary.admin.roles.clientCompositeRoles}</h3>
+                {access?.manageRoles && (
+                  <div className="position-relative">
+                    <Form.Label htmlFor="role-client-composite-search">
+                      {dictionary.admin.roles.assignClientComposite}
+                    </Form.Label>
+                    <Form.Control
+                      id="role-client-composite-search"
+                      value={selectedClientComposite?.name ?? clientCompositeQuery}
+                      placeholder={dictionary.admin.roles.searchClientRolesPlaceholder}
+                      onChange={(event) => {
+                        setSelectedClientComposite(null);
+                        setClientCompositeQuery(event.target.value);
+                      }}
+                    />
+                    {clientCompositeSuggestions.length > 0 && !selectedClientComposite && (
+                      <ListGroup className="position-absolute start-0 end-0 mt-1 shadow-sm z-3">
+                        {clientCompositeSuggestions.map((role) => (
+                          <ListGroup.Item
+                            action
+                            type="button"
+                            key={role.id}
+                            onClick={() => {
+                              setSelectedClientComposite(role);
+                              setClientCompositeSuggestions([]);
+                            }}
+                          >
+                            <span className="font-monospace">
+                              {role.clientId}:{role.name}
+                            </span>
+                          </ListGroup.Item>
+                        ))}
+                      </ListGroup>
+                    )}
+                    <Button
+                      className="mt-2"
+                      disabled={!selectedClientComposite || saving}
+                      onClick={() =>
+                        selectedClientComposite &&
+                        void updateClientComposite(selectedClientComposite, "POST")
+                      }
+                    >
+                      {saving ? (
+                        <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                      ) : (
+                        <AdminActionIcon action="add" />
+                      )}
+                      {dictionary.admin.roles.assign}
+                    </Button>
+                  </div>
+                )}
+                {(detail.compositeClientRoles ?? []).length === 0 ? (
+                  <div className="text-body-secondary small mt-3">
+                    {dictionary.admin.roles.noClientCompositeRoles}
+                  </div>
+                ) : (
+                  <div className="d-grid gap-2 mt-3">
+                    {detail.compositeClientRoles?.map((composite) => (
+                      <div
+                        className="d-flex justify-content-between align-items-center border rounded p-2"
+                        key={composite.id}
+                      >
+                        <span className="font-monospace">
+                          {composite.clientId}:{composite.name}
+                        </span>
+                        {access?.manageRoles && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={saving}
+                            onClick={() => void updateClientComposite(composite, "DELETE")}
+                          >
+                            {saving ? (
+                              <Spinner
+                                animation="border"
+                                aria-hidden="true"
+                                className="me-2"
+                                size="sm"
+                              />
+                            ) : (
+                              <AdminActionIcon action="remove" />
+                            )}
+                            {dictionary.admin.roles.remove}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card.Body>
+          </Card>
+        </>
       )}
 
       {activeTab === "users" && (
         <>
-          <Card className="admin-panel-card">
+          <Card className="admin-panel-card admin-role-user-assignment-card">
             <Card.Body>
               <h2 className="h5">{dictionary.admin.roles.assignUser}</h2>
               <div className="d-flex flex-wrap align-items-start gap-2">
