@@ -1064,42 +1064,22 @@ Files under `src/main/docker/*.yml` are marked as "dev purpose only".
 - OpenLDAP: `docker compose -f src/main/docker/openldap.yml up -d`
 - App with prebuilt native image: `docker compose -f src/main/docker/app.yml up -d`
 
-### Local OpenLDAP
+### LDAP
 
-The OpenLDAP fixture is intended for development and end-to-end testing only. Start it from
-the repository root:
+The OpenLDAP fixture is for local development and end-to-end tests:
 
 ```bash
 docker compose -f src/main/docker/openldap.yml up -d
 ```
 
-Connection settings for the application running on the host:
-
-| Setting | Value |
-| --- | --- |
-| Connection URL | `ldap://localhost:1389` |
-| Bind DN | `cn=admin,dc=example,dc=com` |
-| Bind password | `admin` |
-| Users DN | `ou=users,dc=example,dc=com` |
-| Username attribute | `uid` |
-| UUID attribute | `entryUUID` |
-| Email attribute | `mail` |
-| First name attribute | `givenName` |
-| Last name attribute | `sn` |
-| RDN attribute | `uid` |
-| Object classes | `inetOrgPerson` |
-| Search scope | `SUBTREE` |
-| Edit mode | `WRITABLE` |
-
-The seeded user is `ldap-user` with password `ldap-password`. The fixture is intentionally
-ephemeral: removing the container removes the LDAP database as well. To reset it:
+Use `ldap://localhost:1389` with bind DN `cn=admin,dc=example,dc=com` and password `admin`.
+The seeded user is `ldap-user` / `ldap-password`. Data is ephemeral by default; reset it with:
 
 ```bash
 docker compose -f src/main/docker/openldap.yml down
 ```
 
-The OpenLDAP service has no enabled named volumes by default. To persist its data, uncomment
-the two service mounts and the top-level volume declarations in
+To persist LDAP data, uncomment the service mounts and top-level volume declarations in
 `src/main/docker/openldap.yml` together.
 
 Spring Boot Docker Compose integration:
