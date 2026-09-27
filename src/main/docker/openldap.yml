@@ -4,6 +4,8 @@ name: spring-authorization-server-samples-openldap
 services:
   openldap:
     image: osixia/openldap:1.5.0
+    command:
+      - --copy-service
     environment:
       LDAP_ORGANISATION: Example
       LDAP_DOMAIN: example.com
