@@ -16,9 +16,11 @@ services:
     ports:
       - "127.0.0.1:1389:389"
     volumes:
-      - openldap-data:/var/lib/ldap
-      - openldap-config:/etc/ldap/slapd.d
       - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      # Uncomment these mounts together with the top-level volume declarations below
+      # when persistent LDAP data is needed.
+      # - openldap-data:/var/lib/ldap
+      # - openldap-config:/etc/ldap/slapd.d
     healthcheck:
       test: ['CMD-SHELL', 'ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin -b "dc=example,dc=com" -s base "(objectClass=*)" >/dev/null 2>&1']
       start_period: 10s
@@ -26,6 +28,8 @@ services:
       timeout: 5s
       retries: 20
 
-volumes:
-  openldap-data:
-  openldap-config:
+# Persistence is intentionally disabled by default for this development fixture.
+# Uncomment this block together with the two service mounts above to persist LDAP data.
+# volumes:
+#   openldap-data:
+#   openldap-config:
