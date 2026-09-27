@@ -28,10 +28,9 @@ Connection settings for the application running on the host:
 
 The seeded user is `ldap-user` with password `ldap-password`.
 
-The seed data is loaded only when the LDAP volumes are created for the first time. To reset
-the fixture, remove only the project volumes after confirming that no other data is stored in
-them:
+The fixture is intentionally ephemeral. The seed data is loaded when the container starts,
+and removing the container removes the LDAP database as well. To reset the fixture:
 
 ```powershell
-docker compose -f src/main/docker/openldap.yml down -v
+docker compose -f src/main/docker/openldap.yml down
 ```
