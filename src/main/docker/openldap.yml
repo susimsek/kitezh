@@ -20,12 +20,7 @@ services:
       - openldap-config:/etc/ldap/slapd.d
       - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          ldapsearch -x -H ldap://localhost:389
-          -D "cn=admin,dc=example,dc=com" -w admin
-          -b "dc=example,dc=com" -s base "(objectClass=*)" >/dev/null 2>&1
+      test: ['CMD-SHELL', 'ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin -b "dc=example,dc=com" -s base "(objectClass=*)" >/dev/null 2>&1']
       start_period: 10s
       interval: 5s
       timeout: 5s
