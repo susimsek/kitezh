@@ -1,18 +1,56 @@
 [
   {
+    "name": "com.github.benmanes.caffeine.cache.PSAMS",
+    "fields": [
+      {
+        "name": "FACTORY"
+      }
+    ],
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.github.benmanes.caffeine.cache.PSWMS",
+    "fields": [
+      {
+        "name": "FACTORY"
+      }
+    ],
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "com.github.benmanes.caffeine.cache.SSMSA",
-    "fields": [{"name": "FACTORY"}]
+    "fields": [
+      {
+        "name": "FACTORY"
+      }
+    ],
+    "allDeclaredConstructors": true
   },
   {
     "name": "com.github.benmanes.caffeine.cache.SSMSW",
-    "fields": [{"name": "FACTORY"}]
+    "fields": [
+      {
+        "name": "FACTORY"
+      }
+    ],
+    "allDeclaredConstructors": true
   },
   {
     "name": "com.github.benmanes.caffeine.cache.SSSMSA",
-    "fields": [{"name": "FACTORY"}]
+    "fields": [
+      {
+        "name": "FACTORY"
+      }
+    ],
+    "allDeclaredConstructors": true
   },
   {
     "name": "com.github.benmanes.caffeine.cache.SSSMSW",
-    "fields": [{"name": "FACTORY"}]
+    "fields": [
+      {
+        "name": "FACTORY"
+      }
+    ],
+    "allDeclaredConstructors": true
   }
 ]
