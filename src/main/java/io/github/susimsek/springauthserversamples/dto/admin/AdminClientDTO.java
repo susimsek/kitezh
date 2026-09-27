@@ -96,6 +96,22 @@ public record AdminClientDTO(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 Set<String> dpopSigningAlgorithms,
         @Schema(
+                        description = "Registered CIBA backchannel token delivery mode.",
+                        example = "poll",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                String cibaDeliveryMode,
+        @Schema(
+                        description = "Registered CIBA notification endpoint.",
+                        example = "https://client.example/ciba/notify",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String cibaNotificationEndpoint,
+        @Schema(
+                        description = "Whether a CIBA client notification token is configured.",
+                        example = "true",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean cibaClientNotificationTokenConfigured,
+        @Schema(
                         description = "Authorization-code lifetime in ISO-8601 duration format.",
                         example = "PT5M",
                         format = "duration",
@@ -147,6 +163,9 @@ public record AdminClientDTO(
                 false,
                 false,
                 java.util.Set.of("RS256", "ES256"),
+                "poll",
+                null,
+                false,
                 authorizationCodeTimeToLive,
                 accessTokenTimeToLive,
                 refreshTokenTimeToLive);

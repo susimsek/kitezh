@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="001-create-ciba-sequence" author="susimsek">
+		<createSequence
+			sequenceName="ciba_request_seq"
+			startValue="1"
+			incrementBy="1"
+			minValue="1"
+			maxValue="9999999999999999"
+			cacheSize="100"
+			cycle="false"/>
+	</changeSet>
+
+	<changeSet id="002-create-ciba-requests" author="susimsek">
+		<createTable tableName="ciba_authentication_requests">
+			<column name="id" type="bigint" defaultValueSequenceNext="ciba_request_seq">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_ciba_requests"/>
+			</column>
+			<column name="auth_req_id" type="varchar(128)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="uk_ciba_auth_req_id"/>
+			</column>
+			<column name="registered_client_id" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="principal_name" type="varchar(200)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="authorized_scopes" type="varchar(1000)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="binding_message" type="varchar(20)"/>
+			<column name="user_code" type="varchar(32)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="uk_ciba_user_code"/>
+			</column>
+			<column name="delivery_mode" type="varchar(10)" defaultValue="poll">
+				<constraints nullable="false"/>
+			</column>
+			<column name="notification_endpoint" type="varchar(2000)"/>
+			<column name="client_notification_token" type="varchar(512)"/>
+			<column name="status" type="varchar(20)" defaultValue="PENDING">
+				<constraints nullable="false"/>
+			</column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}">
+				<constraints nullable="false"/>
+			</column>
+			<column name="expires_at" type="timestamp">
+				<constraints nullable="false"/>
+			</column>
+			<column name="interval_seconds" type="int" defaultValueNumeric="5">
+				<constraints nullable="false"/>
+			</column>
+			<column name="user_verification" type="varchar(20)" defaultValue="preferred">
+				<constraints nullable="false"/>
+			</column>
+			<column name="mfa_required" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="step_up_required" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="step_up_acr" type="varchar(100)"/>
+			<column name="last_polled_at" type="timestamp"/>
+			<column name="approved_at" type="timestamp"/>
+			<column name="denied_at" type="timestamp"/>
+			<column name="consumed_at" type="timestamp"/>
+		</createTable>
+		<createIndex indexName="idx_ciba_client_status" tableName="ciba_authentication_requests">
+			<column name="registered_client_id"/>
+			<column name="status"/>
+		</createIndex>
+		<createIndex indexName="idx_ciba_expires_at" tableName="ciba_authentication_requests">
+			<column name="expires_at"/>
+		</createIndex>
+		<createIndex indexName="idx_ciba_principal_status_expiry" tableName="ciba_authentication_requests">
+			<column name="principal_name"/>
+			<column name="status"/>
+			<column name="expires_at"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

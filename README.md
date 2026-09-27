@@ -350,6 +350,7 @@ Public infrastructure:
 - `/.well-known/oauth-authorization-server`
 - `/oauth2/jwks`
 - `/oauth2/token`
+- `/oauth2/bc-authorize`
 - `/oauth2/authorize`
 - `/actuator/health`
 - `/actuator/health/liveness`
@@ -373,6 +374,7 @@ Authorization Server endpoints:
 - `GET /oauth2/jwks`
 - `GET /oauth2/authorize`
 - `POST /oauth2/token`
+- `POST /oauth2/bc-authorize`
 - `POST /oauth2/revoke`
 - `POST /oauth2/introspect`
 
@@ -398,7 +400,7 @@ Framework endpoint families supported by Spring Security's Authorization Server:
 - OIDC logout: `GET /connect/logout`
 - Optional when configured: `GET /userinfo`, `POST /oauth2/par`, `POST /oauth2/device_authorization`, `GET|POST /oauth2/device_verification`, `POST /connect/register`
 
-This sample currently focuses on metadata, JWK Set, authorization code, refresh token, client credentials, introspection, revocation, and logout.
+This sample currently focuses on metadata, JWK Set, authorization code, refresh token, client credentials, CIBA, introspection, revocation, and logout.
 
 ## Authorization Server Flows
 
@@ -476,6 +478,41 @@ Notes:
 - `redirect_uri` must exactly match the value used in the authorize request
 - this flow is not practical as a curl-only test because login and redirect handling require a browser
 - this flow is the one that produces end-user authorization and consent records
+
+### CIBA Backchannel Authentication Flow
+
+The seeded `ciba-client` is a confidential client that uses the poll delivery mode. It has no
+redirect URI because the user approves the request in the Account Console.
+
+Create a backchannel authentication request:
+
+```bash
+CIBA_RESPONSE=$(curl -s -u ciba-client:demo-secret \
+  -H 'Accept-Language: en' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d scope='openid profile offline_access' \
+  -d login_hint=admin \
+  -d binding_message='Approve sign in' \
+  http://127.0.0.1:9090/oauth2/bc-authorize)
+
+AUTH_REQ_ID=$(printf '%s' "$CIBA_RESPONSE" | jq -r '.auth_req_id')
+printf 'Approve this request in Account Console, then poll with auth_req_id=%s\n' "$AUTH_REQ_ID"
+```
+
+After the signed-in user approves the pending request at `/account/security`, poll the token
+endpoint:
+
+```bash
+curl -u ciba-client:demo-secret \
+  -H 'Accept-Language: en' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d grant_type=urn:openid:params:grant-type:ciba \
+  -d auth_req_id="$AUTH_REQ_ID" \
+  http://127.0.0.1:9090/oauth2/token
+```
+
+The first poll returns `authorization_pending`. After approval, the response contains an access
+token, an ID token, and a refresh token because the seeded client requests `offline_access`.
 
 ### Confidential Client with PKCE
 
@@ -647,13 +684,15 @@ Seeded OAuth2 clients:
 
 | Client ID | Client Secret | Grants |
 | --- | --- | --- |
-| `demo-client` | `demo-secret` | `authorization_code`, `refresh_token`, `client_credentials` |
+| `demo-client` | `demo-secret` | `authorization_code`, `refresh_token`, `client_credentials`, token exchange, CIBA |
+| `ciba-client` | `demo-secret` | CIBA, refresh_token |
 | `pkce-client` | `demo-secret` | `authorization_code`, `refresh_token` |
 
 Seeded client scopes:
 
 - `pkce-client`: `openid`, `profile`
-- `demo-client`: `openid`, `profile`, `user.read`, `user.write`
+- `demo-client`: `openid`, `profile`, `offline_access`, `user.read`, `user.write`
+- `ciba-client`: `openid`, `profile`, `offline_access`
 
 Get a client credentials token:
 
@@ -727,6 +766,10 @@ That file seeds:
 - post-logout redirect URI: `http://127.0.0.1:8082/`
 - scopes: `openid`, `profile`
 - PKCE required
+- `ciba-client`
+- BCrypt-encoded client secret
+- CIBA grant with poll delivery mode
+- scopes: `openid`, `profile`, `offline_access`
 - serialized `client_settings`
 - serialized `token_settings`
 

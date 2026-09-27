@@ -30,4 +30,6 @@
 	<include file="db/changelog/changes/019-impersonation-audit-details.xml"/>
 	<include file="db/changelog/changes/020-client-roles.xml"/>
 	<include file="db/changelog/changes/021-create-ldap-federation.xml"/>
+	<include file="db/changelog/changes/022-create-ciba.xml"/>
+	<include file="db/changelog/changes/023-create-ciba-policy.xml"/>
 </databaseChangeLog>

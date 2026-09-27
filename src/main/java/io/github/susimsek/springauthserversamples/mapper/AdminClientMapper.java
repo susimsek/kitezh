@@ -35,6 +35,9 @@ public interface AdminClientMapper {
                 ClientSecuritySettings.requiresDpopJkt(client),
                 ClientSecuritySettings.requiresDpopForRefreshToken(client),
                 ClientSecuritySettings.allowedDpopSigningAlgorithms(client),
+                ClientSecuritySettings.cibaDeliveryMode(client),
+                ClientSecuritySettings.cibaNotificationEndpoint(client),
+                ClientSecuritySettings.cibaClientNotificationToken(client) != null,
                 client.getTokenSettings().getAuthorizationCodeTimeToLive(),
                 client.getTokenSettings().getAccessTokenTimeToLive(),
                 client.getTokenSettings().getRefreshTokenTimeToLive());

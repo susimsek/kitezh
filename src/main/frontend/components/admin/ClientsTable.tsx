@@ -30,6 +30,9 @@ export type AdminClient = {
   requireDpopJkt: boolean;
   dpopRefreshTokenOnly: boolean;
   dpopSigningAlgorithms: string[];
+  cibaDeliveryMode: "poll" | "ping" | "push";
+  cibaNotificationEndpoint: string | null;
+  cibaClientNotificationTokenConfigured: boolean;
 };
 
 export function ClientsTable({ dictionary }: { locale: Locale; dictionary: Dictionary }) {

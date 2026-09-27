@@ -2,6 +2,7 @@ package io.github.susimsek.springauthserversamples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -23,10 +24,12 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -137,7 +140,15 @@ class AuthorizationServerEndpointsIT {
         mockMvc.perform(get("/.well-known/openid-configuration"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.issuer").exists())
-                .andExpect(jsonPath("$.token_endpoint").exists());
+                .andExpect(jsonPath("$.token_endpoint").exists())
+                .andExpect(
+                        jsonPath("$.backchannel_authentication_endpoint")
+                                .value(org.hamcrest.Matchers.endsWith("/oauth2/bc-authorize")))
+                .andExpect(
+                        jsonPath("$.grant_types_supported")
+                                .value(
+                                        org.hamcrest.Matchers.hasItem(
+                                                "urn:openid:params:grant-type:ciba")));
 
         mockMvc.perform(get("/oauth2/jwks"))
                 .andExpect(status().isOk())
@@ -153,6 +164,67 @@ class AuthorizationServerEndpointsIT {
                                 .param("grant_type", "client_credentials"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("invalid_client"));
+    }
+
+    @Test
+    void cibaPollGrantWaitsForApprovalThenIssuesToken() throws Exception {
+        MvcResult requestResult =
+                mockMvc.perform(
+                                post("/oauth2/bc-authorize")
+                                        .with(httpBasic("ciba-client", "demo-secret"))
+                                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                        .param("scope", "openid profile offline_access")
+                                        .param("login_hint", "admin")
+                                        .param("binding_message", "Approve sign in"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.auth_req_id").isNotEmpty())
+                        .andExpect(jsonPath("$.expires_in").value(300))
+                        .andExpect(jsonPath("$.interval").value(5))
+                        .andReturn();
+        String authReqId =
+                JSON_MAPPER
+                        .readTree(requestResult.getResponse().getContentAsString())
+                        .get("auth_req_id")
+                        .asText();
+
+        mockMvc.perform(
+                        get("/api/ciba/requests")
+                                .param("page", "0")
+                                .param("size", "20")
+                                .with(accountApi("admin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].authReqId").value(authReqId));
+
+        mockMvc.perform(
+                        post("/oauth2/token")
+                                .with(httpBasic("ciba-client", "demo-secret"))
+                                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                .param("grant_type", "urn:openid:params:grant-type:ciba")
+                                .param("auth_req_id", authReqId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("authorization_pending"));
+
+        mockMvc.perform(
+                        post("/api/ciba/requests/{authReqId}/approve", authReqId)
+                                .with(accountApi("admin")))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(
+                        post("/oauth2/token")
+                                .with(httpBasic("ciba-client", "demo-secret"))
+                                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                .param("grant_type", "urn:openid:params:grant-type:ciba")
+                                .param("auth_req_id", authReqId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.access_token").isNotEmpty())
+                .andExpect(jsonPath("$.id_token").isNotEmpty())
+                .andExpect(jsonPath("$.refresh_token").isNotEmpty())
+                .andExpect(jsonPath("$.token_type").value("Bearer"));
+    }
+
+    private static JwtRequestPostProcessor accountApi(String subject) {
+        return jwt().jwt(token -> token.subject(subject))
+                .authorities(new SimpleGrantedAuthority("SCOPE_account-api"));
     }
 
     @Test

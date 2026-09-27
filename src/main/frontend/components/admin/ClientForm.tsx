@@ -51,6 +51,9 @@ type FormState = {
   requireDpopJkt: boolean;
   dpopRefreshTokenOnly: boolean;
   dpopSigningAlgorithms: (typeof DPOP_ALGORITHMS)[number][];
+  cibaDeliveryMode: (typeof CIBA_DELIVERY_MODES)[number];
+  cibaNotificationEndpoint: string;
+  cibaClientNotificationToken: string;
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
@@ -70,6 +73,9 @@ const EMPTY: FormState = {
   requireDpopJkt: false,
   dpopRefreshTokenOnly: false,
   dpopSigningAlgorithms: ["RS256", "ES256"],
+  cibaDeliveryMode: "poll",
+  cibaNotificationEndpoint: "",
+  cibaClientNotificationToken: "",
   authorizationCodeTimeToLive: "PT5M",
   accessTokenTimeToLive: "PT5M",
   refreshTokenTimeToLive: "PT1H",
@@ -81,8 +87,10 @@ const GRANTS = [
   "refresh_token",
   "client_credentials",
   "urn:ietf:params:oauth:grant-type:token-exchange",
+  "urn:openid:params:grant-type:ciba",
 ] as const;
 const DPOP_ALGORITHMS = ["RS256", "ES256"] as const;
+const CIBA_DELIVERY_MODES = ["poll", "ping", "push"] as const;
 const CLIENT_FORM_STEP_FIELDS: (keyof FormState)[][] = [
   ["clientId", "clientName"],
   [
@@ -113,6 +121,9 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
       requireDpopJkt: z.boolean(),
       dpopRefreshTokenOnly: z.boolean(),
       dpopSigningAlgorithms: z.array(z.enum(DPOP_ALGORITHMS)).min(1, validation.selection),
+      cibaDeliveryMode: z.enum(CIBA_DELIVERY_MODES),
+      cibaNotificationEndpoint: z.string(),
+      cibaClientNotificationToken: z.string().max(512),
       authorizationCodeTimeToLive: z.string(),
       accessTokenTimeToLive: z.string(),
       refreshTokenTimeToLive: z.string(),
@@ -145,6 +156,21 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
           code: "custom",
           path: ["authorizationGrantTypes"],
           message: validation.selection,
+        });
+      if (
+        value.cibaDeliveryMode !== "poll" &&
+        !value.authorizationGrantTypes.includes("urn:openid:params:grant-type:ciba")
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["authorizationGrantTypes"],
+          message: validation.selection,
+        });
+      if (value.cibaDeliveryMode !== "poll" && !value.cibaNotificationEndpoint.trim())
+        context.addIssue({
+          code: "custom",
+          path: ["cibaNotificationEndpoint"],
+          message: validation.required,
         });
     });
 
@@ -248,6 +274,11 @@ export function ClientForm({
     name: "dpopSigningAlgorithms",
     defaultValue: EMPTY.dpopSigningAlgorithms,
   });
+  const cibaDeliveryMode = useWatch({
+    control,
+    name: "cibaDeliveryMode",
+    defaultValue: EMPTY.cibaDeliveryMode,
+  });
   const selectedScopes = useWatch({ control, name: "scopes", defaultValue: EMPTY.scopes });
 
   useEffect(() => {
@@ -299,6 +330,9 @@ export function ClientForm({
             "RS256",
             "ES256",
           ]) as FormState["dpopSigningAlgorithms"],
+          cibaDeliveryMode: client.cibaDeliveryMode ?? "poll",
+          cibaNotificationEndpoint: client.cibaNotificationEndpoint ?? "",
+          cibaClientNotificationToken: "",
           authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "PT5M",
           accessTokenTimeToLive: client.accessTokenTimeToLive ?? "PT5M",
           refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "PT1H",
@@ -701,6 +735,57 @@ export function ClientForm({
                   </div>
                 </div>
               </Col>
+              <Col md={6}>
+                <Form.Label className="fw-semibold">
+                  <HelpItem
+                    label={dictionary.admin.clients.cibaDeliveryMode}
+                    help={dictionary.admin.clients.cibaDeliveryModeHelp}
+                  />
+                </Form.Label>
+                <Form.Select
+                  disabled={!canManageClients}
+                  isInvalid={Boolean(errors.cibaDeliveryMode)}
+                  {...register("cibaDeliveryMode")}
+                >
+                  {CIBA_DELIVERY_MODES.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
+                  ))}
+                </Form.Select>
+                <Form.Control.Feedback type="invalid">
+                  {errors.cibaDeliveryMode?.message}
+                </Form.Control.Feedback>
+              </Col>
+              {cibaDeliveryMode !== "poll" && (
+                <>
+                  <Col md={6}>
+                    <Form.Label>{dictionary.admin.clients.cibaNotificationEndpoint}</Form.Label>
+                    <Form.Control
+                      disabled={!canManageClients}
+                      isInvalid={Boolean(errors.cibaNotificationEndpoint)}
+                      placeholder="https://client.example/ciba/notify"
+                      {...register("cibaNotificationEndpoint")}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {errors.cibaNotificationEndpoint?.message}
+                    </Form.Control.Feedback>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Label>{dictionary.admin.clients.cibaClientNotificationToken}</Form.Label>
+                    <Form.Control
+                      type="password"
+                      disabled={!canManageClients}
+                      isInvalid={Boolean(errors.cibaClientNotificationToken)}
+                      placeholder={dictionary.admin.clients.cibaClientNotificationTokenHelp}
+                      {...register("cibaClientNotificationToken")}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {errors.cibaClientNotificationToken?.message}
+                    </Form.Control.Feedback>
+                  </Col>
+                </>
+              )}
             </Row>
           </Card.Body>
         </Card>

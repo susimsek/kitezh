@@ -41,6 +41,19 @@ export type AccountSession = {
   clients: Array<{ clientId: string; clientName: string }>;
 };
 
+export type CibaPendingRequest = {
+  authReqId: string;
+  userCode: string;
+  bindingMessage: string | null;
+  authorizedScopes: string;
+  deliveryMode: string;
+  createdAt: string;
+  expiresAt: string;
+  status: string;
+  mfaRequired: boolean;
+  stepUpRequired: boolean;
+};
+
 export type AccountWebAuthnCredential = {
   credentialId: string;
   label: string;

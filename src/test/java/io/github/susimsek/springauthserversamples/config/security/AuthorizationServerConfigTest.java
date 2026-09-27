@@ -115,6 +115,7 @@ class AuthorizationServerConfigTest {
                         mock(RegisteredClientRepository.class),
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
+                        mock(CibaAuthenticationGrantAuthenticationProvider.class),
                         mock(SocialProviderLogoutSuccessHandler.class),
                         mock(SecurityContextRepository.class));
 

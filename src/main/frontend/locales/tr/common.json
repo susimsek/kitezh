@@ -645,7 +645,8 @@
         "sessions": "Oturumlar",
         "events": "Olaylar",
         "userProfile": "Kullanıcı profili",
-        "localization": "Yerelleştirme"
+        "localization": "Yerelleştirme",
+        "cibaPolicy": "CIBA politikası"
       }
     },
     "clients": {
@@ -751,7 +752,12 @@
       "secretError": "Client secret yenilenemedi.",
       "saved": "İstemci başarıyla kaydedildi.",
       "next": "Devam",
-      "back": "Geri"
+      "back": "Geri",
+      "cibaDeliveryMode": "CIBA teslim yöntemi",
+      "cibaDeliveryModeHelp": "İstemcinin CIBA token yanıtını nasıl alacağını seçin.",
+      "cibaNotificationEndpoint": "CIBA bildirim endpoint’i",
+      "cibaClientNotificationToken": "CIBA istemci bildirim tokenı",
+      "cibaClientNotificationTokenHelp": "Güncellemede mevcut tokenı korumak için boş bırakın."
     },
     "common": {
       "yes": "Evet",
@@ -1155,7 +1161,7 @@
       "requiredClaims": "Zorunlu claimler",
       "storeTokens": "Tokenları sakla",
       "storedTokensReadable": "Saklanan tokenlar okunabilir",
-      "syncMode": "Kullanıcı senkronizasyon modu",
+      "syncMode": "Senkronizasyon modu",
       "syncModeLegacy": "Legacy",
       "syncModeImport": "Import (yalnızca ilk giriş)",
       "syncModeReadOnly": "Salt okunur",
@@ -1165,7 +1171,6 @@
       "sourceClaim": "Kaynak claim",
       "target": "Hedef",
       "mapperType": "Mapper türü",
-      "syncMode": "Senkronizasyon modu",
       "createMapper": "Mapper oluştur",
       "editMapper": "Mapper düzenle",
       "mapperEmpty": "Mapper bulunamadı.",
@@ -1174,6 +1179,37 @@
       "mapperError": "Mapper kaydedilemedi.",
       "addToIdToken": "ID tokena ekle",
       "addToAccessToken": "Access tokena ekle"
+    },
+    "ciba": {
+      "title": "CIBA politikası",
+      "description": "İstemci başlatmalı arka kanal kimlik doğrulaması için istek süresi, polling, teslimat ve güvence gereksinimlerini yönetin.",
+      "loading": "CIBA politikası yükleniyor…",
+      "error": "CIBA politikası yüklenemedi veya kaydedilemedi.",
+      "saved": "CIBA politikası kaydedildi.",
+      "save": "CIBA politikasını kaydet",
+      "requestLifespan": "İstek süresi (saniye)",
+      "requestLifespanHint": "Bekleyen CIBA isteği için varsayılan ve en uzun süredir.",
+      "pollingInterval": "Polling aralığı (saniye)",
+      "pollingIntervalHint": "İstemciler token polling denemeleri arasında en az bu kadar beklemelidir.",
+      "deliveryMode": "İzin verilen teslimat modu",
+      "deliveryModeHint": "Tümü, her istemcinin kayıtlı poll, ping veya push modunu kullanmasına izin verir.",
+      "deliveryModes": {
+        "all": "Kayıtlı tüm modlar",
+        "poll": "Poll",
+        "ping": "Ping",
+        "push": "Push"
+      },
+      "userVerification": "Kullanıcı doğrulaması",
+      "userVerificationHint": "Onaydan önce doğrulanmış kullanıcı faktörünü zorunlu tutun, tercih edin veya önermeyin.",
+      "userVerificationModes": {
+        "required": "Zorunlu",
+        "preferred": "Tercihli",
+        "discouraged": "Önerilmez"
+      },
+      "mfaRequired": "Onaydan önce MFA iste",
+      "stepUpRequired": "Onaydan önce step-up kimlik doğrulaması iste",
+      "stepUpAcr": "Step-up ACR",
+      "stepUpAcrHint": "Step-up gerektiğinde kullanılan isteğe bağlı güvence bağlamı."
     }
   },
   "account": {
@@ -1271,6 +1307,24 @@
         "removeConfirm": "Bu sosyal hesap bağlantısı kaldırılsın mı?",
         "removeError": "Sosyal hesap bağlantısı kaldırılamadı.",
         "error": "Bağlı hesaplar yüklenemedi."
+      },
+      "ciba": {
+        "title": "Bekleyen giriş istekleri",
+        "help": "Uygulamalardan gelen istekleri inceleyin ve yalnızca tanıdıklarınızı onaylayın.",
+        "requestTitle": "Giriş isteği",
+        "code": "Onay kodu",
+        "scopes": "İstenen erişim",
+        "expires": "Son geçerlilik",
+        "approve": "Onayla",
+        "deny": "Reddet",
+        "approved": "Giriş isteği onaylandı.",
+        "denied": "Giriş isteği reddedildi.",
+        "actionError": "İstek güncellenemedi. Süresi dolmuş olabilir.",
+        "loadError": "Bekleyen giriş istekleri yüklenemedi.",
+        "empty": "Bekleyen giriş isteği yok.",
+        "mfaRequired": "Onaydan önce MFA doğrulaması gerekiyor.",
+        "stepUpRequired": "Onaydan önce ek doğrulama gerekiyor.",
+        "mfaAndStepUp": "Onaydan önce MFA ve ek doğrulama gerekiyor."
       },
       "policyTitle": "Parola gereksinimleri",
       "policyMinLength": "En az 12 karakter",

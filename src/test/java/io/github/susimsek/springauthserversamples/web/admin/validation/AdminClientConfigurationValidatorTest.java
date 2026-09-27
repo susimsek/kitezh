@@ -138,6 +138,24 @@ class AdminClientConfigurationValidatorTest {
     }
 
     @Test
+    void acceptsCibaGrantType() {
+        ConstraintContextFixture context = new ConstraintContextFixture();
+
+        boolean valid =
+                validator.isValid(
+                        request(
+                                Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue()),
+                                Set.of(AuthorizationGrantTypes.CIBA),
+                                Set.of(),
+                                false),
+                        context.context);
+
+        assertThat(valid).isTrue();
+        verify(context.context).disableDefaultConstraintViolation();
+        verify(context.context, never()).buildConstraintViolationWithTemplate(anyString());
+    }
+
+    @Test
     void rejectsUnknownGrantType() {
         ConstraintContextFixture context = new ConstraintContextFixture();
 

@@ -146,6 +146,8 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers("/api/auth/**")
                                         .permitAll()
+                                        .requestMatchers("/oauth2/bc-authorize")
+                                        .permitAll()
                                         .requestMatchers(
                                                 "/admin",
                                                 "/admin/**",

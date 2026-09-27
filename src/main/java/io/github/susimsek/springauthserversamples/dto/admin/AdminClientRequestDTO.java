@@ -102,6 +102,26 @@ public record AdminClientRequestDTO(
                                         message = "{app.api.problem.violation.selection}")
                                 String>
                         dpopSigningAlgorithms,
+        @Pattern(regexp = "poll|ping|push", message = "{app.api.problem.violation.selection}")
+                @Schema(
+                        description = "CIBA backchannel token delivery mode.",
+                        example = "poll",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                String cibaDeliveryMode,
+        @Schema(
+                        description = "CIBA ping or push notification endpoint.",
+                        example = "https://client.example/ciba/notify",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String cibaNotificationEndpoint,
+        @Size(max = 512)
+                @Schema(
+                        description =
+                                "CIBA client notification token. Leave blank when updating to keep"
+                                        + " the current token.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String cibaClientNotificationToken,
         @Schema(
                         description = "Authorization-code lifetime in ISO-8601 duration format.",
                         example = "PT5M",
@@ -151,6 +171,9 @@ public record AdminClientRequestDTO(
                 false,
                 false,
                 java.util.Set.of("RS256", "ES256"),
+                "poll",
+                null,
+                null,
                 authorizationCodeTimeToLive,
                 accessTokenTimeToLive,
                 refreshTokenTimeToLive);

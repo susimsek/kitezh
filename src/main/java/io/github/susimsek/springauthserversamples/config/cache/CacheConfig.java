@@ -7,6 +7,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AdminEventSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
+import io.github.susimsek.springauthserversamples.domain.CibaPolicyEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.EmailSettingsEntity;
@@ -106,6 +107,7 @@ public class CacheConfig {
                 createCache(cacheManager, AuthorizationConsentEntity.class.getName());
                 createCache(cacheManager, ClientScopeEntity.class.getName());
                 createCache(cacheManager, ClientRoleEntity.class.getName());
+                createCache(cacheManager, CibaPolicyEntity.class.getName());
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".groups");
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".users");
                 createCache(cacheManager, EmailSettingsEntity.class.getName());
