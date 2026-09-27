@@ -1061,7 +1061,6 @@ readinessProbe:
 Files under `src/main/docker/*.yml` are marked as "dev purpose only".
 
 - PostgreSQL: `docker compose -f src/main/docker/postgresql.yml up -d`
-- OpenLDAP: `docker compose -f src/main/docker/openldap.yml up -d`
 - App with prebuilt native image: `docker compose -f src/main/docker/app.yml up -d`
 
 Spring Boot Docker Compose integration:

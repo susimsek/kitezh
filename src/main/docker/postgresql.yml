@@ -10,9 +10,18 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "127.0.0.1:5432:5432"
+    # Persistence is disabled by default for this development fixture.
+    # Uncomment this mount together with the top-level volume declaration below
+    # when persistent PostgreSQL data is needed.
+    # volumes:
+    #   - postgresql-data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER}']
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+# Uncomment together with the service mount above to persist PostgreSQL data.
+# volumes:
+#   postgresql-data:
