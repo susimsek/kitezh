@@ -169,6 +169,7 @@ jobs:
         run: |
           ./mvnw -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
+            -Djib-maven-plugin.architecture=amd64 \
             jib:build \
             -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
             -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
