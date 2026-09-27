@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -56,6 +57,15 @@ class CibaAuthenticationGrantAuthenticationProviderTest {
                 new CibaAuthenticationGrantAuthenticationToken("id", mock(), Map.of());
         assertThatThrownBy(() -> provider.authenticate(grant))
                 .isInstanceOf(OAuth2AuthenticationException.class);
+        RegisteredClient client = client();
+        OAuth2ClientAuthenticationToken unauthenticated =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        unauthenticated.setAuthenticated(false);
+        CibaAuthenticationGrantAuthenticationToken unauthenticatedGrant =
+                new CibaAuthenticationGrantAuthenticationToken("id", unauthenticated, Map.of());
+        assertThatThrownBy(() -> provider.authenticate(unauthenticatedGrant))
+                .isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @Test
@@ -69,11 +79,12 @@ class CibaAuthenticationGrantAuthenticationProviderTest {
                         "request",
                         client.getId(),
                         "admin",
-                        "openid profile",
+                        "openid  profile",
                         null,
                         Instant.now(),
                         Instant.now().plusSeconds(60),
                         5);
+        request.setAcrValues("loa2");
         when(cibaService.poll("request", client.getId())).thenReturn(request);
         when(users.loadUserByUsername("admin"))
                 .thenReturn(User.withUsername("admin").password("unused").roles("USER").build());
@@ -124,11 +135,197 @@ class CibaAuthenticationGrantAuthenticationProviderTest {
                         .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                         .build();
-        OAuth2ClientAuthenticationToken principal =
+        final OAuth2ClientAuthenticationToken principal =
                 new OAuth2ClientAuthenticationToken(
                         client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
         CibaAuthenticationGrantAuthenticationToken grant =
                 new CibaAuthenticationGrantAuthenticationToken("id", principal, Map.of());
+        assertThatThrownBy(() -> provider.authenticate(grant))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    @Test
+    void supportsRefreshTokenAndConvertsGenericAccessToken() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .clientSecret("secret")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .scope("openid")
+                        .scope("offline_access")
+                        .build();
+        CibaAuthenticationRequestEntity request =
+                new CibaAuthenticationRequestEntity(
+                        "request",
+                        client.getId(),
+                        "admin",
+                        "openid offline_access",
+                        null,
+                        Instant.now(),
+                        Instant.now().plusSeconds(60),
+                        5);
+        when(cibaService.poll("request", client.getId())).thenReturn(request);
+        when(users.loadUserByUsername("admin"))
+                .thenReturn(User.withUsername("admin").password("unused").roles("USER").build());
+        when(tokenGenerator.generate(any()))
+                .thenAnswer(
+                        invocation -> {
+                            var context =
+                                    invocation
+                                            .<org.springframework.security.oauth2.server
+                                                            .authorization.token.OAuth2TokenContext>
+                                                    getArgument(0);
+                            if (OidcParameterNames.ID_TOKEN.equals(
+                                    context.getTokenType().getValue())) {
+                                return Jwt.withTokenValue("id-token")
+                                        .header("alg", "RS256")
+                                        .subject("admin")
+                                        .issuedAt(Instant.now())
+                                        .expiresAt(Instant.now().plusSeconds(1800))
+                                        .build();
+                            }
+                            if (org.springframework.security.oauth2.core.AuthorizationGrantType
+                                    .REFRESH_TOKEN
+                                    .getValue()
+                                    .equals(context.getTokenType().getValue())) {
+                                return new OAuth2RefreshToken(
+                                        "refresh-token",
+                                        Instant.now(),
+                                        Instant.now().plusSeconds(3600));
+                            }
+                            return Jwt.withTokenValue("access-token")
+                                    .header("alg", "none")
+                                    .issuedAt(Instant.now())
+                                    .expiresAt(Instant.now().plusSeconds(300))
+                                    .build();
+                        });
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+        final OAuth2ClientAuthenticationToken principal =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+
+        AuthenticationResult result =
+                new AuthenticationResult(
+                        provider.authenticate(
+                                new CibaAuthenticationGrantAuthenticationToken(
+                                        "request", principal, Map.of())));
+
+        assertThat(result.token().getTokenValue()).isEqualTo("access-token");
+        assertThat(
+                        ((OAuth2AccessTokenAuthenticationToken) result.authentication())
+                                .getRefreshToken())
+                .isNotNull();
+        verify(authorizationService).save(any());
+    }
+
+    @Test
+    void rejectsMissingAccessIdAndRefreshTokens() {
+        RegisteredClient client = client();
+        CibaAuthenticationRequestEntity request =
+                new CibaAuthenticationRequestEntity(
+                        "request",
+                        client.getId(),
+                        "admin",
+                        "openid",
+                        null,
+                        Instant.now(),
+                        Instant.now().plusSeconds(60),
+                        5);
+        when(cibaService.poll("request", client.getId())).thenReturn(request);
+        when(users.loadUserByUsername("admin"))
+                .thenReturn(User.withUsername("admin").password("unused").roles("USER").build());
+        when(tokenGenerator.generate(any())).thenReturn(null);
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+        final OAuth2ClientAuthenticationToken principal =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        CibaAuthenticationGrantAuthenticationToken grant =
+                new CibaAuthenticationGrantAuthenticationToken("request", principal, Map.of());
+
+        assertThatThrownBy(() -> provider.authenticate(grant))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    @Test
+    void rejectsInvalidGeneratedIdAndRefreshTokens() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .scope("openid")
+                        .scope("offline_access")
+                        .build();
+        CibaAuthenticationRequestEntity request =
+                new CibaAuthenticationRequestEntity(
+                        "request",
+                        client.getId(),
+                        "admin",
+                        "openid offline_access",
+                        null,
+                        Instant.now(),
+                        Instant.now().plusSeconds(60),
+                        5);
+        when(cibaService.poll("request", client.getId())).thenReturn(request);
+        when(users.loadUserByUsername("admin"))
+                .thenReturn(User.withUsername("admin").password("unused").roles("USER").build());
+        OAuth2AccessToken access =
+                new OAuth2AccessToken(
+                        OAuth2AccessToken.TokenType.BEARER,
+                        "access",
+                        Instant.now(),
+                        Instant.now().plusSeconds(300));
+        when(tokenGenerator.generate(any()))
+                .thenAnswer(
+                        invocation -> {
+                            var context =
+                                    invocation
+                                            .<org.springframework.security.oauth2.server
+                                                            .authorization.token.OAuth2TokenContext>
+                                                    getArgument(0);
+                            if (context == null) {
+                                return access;
+                            }
+                            return OidcParameterNames.ID_TOKEN.equals(
+                                            context.getTokenType().getValue())
+                                    ? access
+                                    : access;
+                        });
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+        OAuth2ClientAuthenticationToken principal =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        CibaAuthenticationGrantAuthenticationToken grant =
+                new CibaAuthenticationGrantAuthenticationToken("request", principal, Map.of());
+        assertThatThrownBy(() -> provider.authenticate(grant))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+
+        when(tokenGenerator.generate(any()))
+                .thenAnswer(
+                        invocation -> {
+                            var context =
+                                    invocation
+                                            .<org.springframework.security.oauth2.server
+                                                            .authorization.token.OAuth2TokenContext>
+                                                    getArgument(0);
+                            if (context == null) {
+                                return access;
+                            }
+                            if (OidcParameterNames.ID_TOKEN.equals(
+                                    context.getTokenType().getValue())) {
+                                return Jwt.withTokenValue("id")
+                                        .header("alg", "RS256")
+                                        .subject("admin")
+                                        .issuedAt(Instant.now())
+                                        .expiresAt(Instant.now().plusSeconds(300))
+                                        .build();
+                            }
+                            return access;
+                        });
         assertThatThrownBy(() -> provider.authenticate(grant))
                 .isInstanceOf(OAuth2AuthenticationException.class);
     }

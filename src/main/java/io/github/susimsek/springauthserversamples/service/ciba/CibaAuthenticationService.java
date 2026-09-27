@@ -252,7 +252,7 @@ public class CibaAuthenticationService {
             Integer requestedExpiry,
             String requestedDeliveryMode,
             String requestObject) {
-        return create(
+        return persistRequestFromObject(
                 client,
                 scope,
                 loginHint,
@@ -261,6 +261,7 @@ public class CibaAuthenticationService {
                 bindingMessage,
                 requestedExpiry,
                 requestedDeliveryMode,
+                null,
                 null,
                 null,
                 requestObject);
@@ -279,7 +280,7 @@ public class CibaAuthenticationService {
             String requestedDeliveryMode,
             String requestedUserCode,
             String requestObject) {
-        return create(
+        return persistRequestFromObject(
                 client,
                 scope,
                 loginHint,
@@ -288,8 +289,9 @@ public class CibaAuthenticationService {
                 bindingMessage,
                 requestedExpiry,
                 requestedDeliveryMode,
-                null,
                 requestedUserCode,
+                null,
+                null,
                 requestObject);
     }
 
@@ -307,7 +309,7 @@ public class CibaAuthenticationService {
             String clientNotificationToken,
             String requestedUserCode,
             String requestObject) {
-        return create(
+        return persistRequestFromObject(
                 client,
                 scope,
                 loginHint,
@@ -316,8 +318,8 @@ public class CibaAuthenticationService {
                 bindingMessage,
                 requestedExpiry,
                 requestedDeliveryMode,
-                clientNotificationToken,
                 requestedUserCode,
+                clientNotificationToken,
                 null,
                 requestObject);
     }

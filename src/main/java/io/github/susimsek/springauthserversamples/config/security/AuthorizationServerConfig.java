@@ -635,10 +635,14 @@ public class AuthorizationServerConfig {
         }
         try {
             String signatureAlgorithm = context.getJwsHeader().build().getAlgorithm().getName();
-            String digestAlgorithm =
-                    signatureAlgorithm.endsWith("512")
-                            ? "SHA-512"
-                            : signatureAlgorithm.endsWith("384") ? "SHA-384" : "SHA-256";
+            String digestAlgorithm;
+            if (signatureAlgorithm.endsWith("512")) {
+                digestAlgorithm = "SHA-512";
+            } else if (signatureAlgorithm.endsWith("384")) {
+                digestAlgorithm = "SHA-384";
+            } else {
+                digestAlgorithm = "SHA-256";
+            }
             byte[] digest =
                     java.security.MessageDigest.getInstance(digestAlgorithm)
                             .digest(

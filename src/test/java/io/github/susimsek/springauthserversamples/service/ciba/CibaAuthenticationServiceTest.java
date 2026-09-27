@@ -18,6 +18,7 @@ import io.github.susimsek.springauthserversamples.security.ClientSecuritySetting
 import io.github.susimsek.springauthserversamples.service.admin.CibaPolicyService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 
 class CibaAuthenticationServiceTest {
@@ -104,6 +106,44 @@ class CibaAuthenticationServiceTest {
                                 client, "openid", "admin", null, null, null, null, null, "TAKEN",
                                 null),
                 "invalid_request");
+
+        RegisteredClient validEndpointClient =
+                RegisteredClient.withId("valid-endpoint")
+                        .clientId("valid-endpoint")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .scope("openid")
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(ClientSecuritySettings.CIBA_DELIVERY_MODE, "ping")
+                                        .setting(
+                                                ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
+                                                "https://client.example/ciba/notify")
+                                        .build())
+                        .build();
+        assertProtocol(
+                () ->
+                        service.create(
+                                validEndpointClient,
+                                "openid",
+                                "admin",
+                                null,
+                                null,
+                                null,
+                                null,
+                                "ping",
+                                "bad token\n",
+                                null,
+                                null),
+                "invalid_request");
+
+        UserEntity blankUsername = new UserEntity();
+        blankUsername.setUsername(" ");
+        blankUsername.setEnabled(true);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(blankUsername));
+        CibaAuthenticationRequestEntity fallback =
+                service.create(client, "openid", "admin", null, null);
+        assertThat(fallback.getPrincipalName()).isEqualTo("admin");
         assertProtocol(
                 () ->
                         service.create(
@@ -165,6 +205,17 @@ class CibaAuthenticationServiceTest {
         assertProtocol(
                 () -> service.create(client, "openid", "admin", null, 3601), "invalid_request");
         assertProtocol(() -> service.create(client, " ", "admin", null, null), "invalid_scope");
+
+        RegisteredClient openidOnly =
+                RegisteredClient.withId("openid-only")
+                        .clientId("openid-only")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .scope("openid")
+                        .build();
+        assertProtocol(
+                () -> service.create(openidOnly, "openid profile", "admin", null, null),
+                "invalid_scope");
     }
 
     @Test
@@ -223,6 +274,7 @@ class CibaAuthenticationServiceTest {
         service.deny("denied", "admin");
         assertThat(denied.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.DENIED);
         assertThat(denied.getDeniedAt()).isNotNull();
+        service.deny("denied", "admin");
     }
 
     @Test
@@ -240,6 +292,8 @@ class CibaAuthenticationServiceTest {
         assertProtocol(() -> service.poll("request", "client-id"), "access_denied");
         request.setStatus(CibaAuthenticationRequestStatus.CONSUMED);
         assertProtocol(() -> service.poll("request", "client-id"), "invalid_grant");
+        request.setStatus(CibaAuthenticationRequestStatus.EXPIRED);
+        assertProtocol(() -> service.poll("request", "client-id"), "expired_token");
     }
 
     @Test
@@ -274,6 +328,122 @@ class CibaAuthenticationServiceTest {
         assertThat(request.getDeliveryMode()).isEqualTo(ClientSecuritySettings.CIBA_PING);
         verify(notifications).notifyPing(request);
         assertThat(pingService.poll(request.getAuthReqId(), pingClient.getId())).isSameAs(request);
+    }
+
+    @Test
+    void rejectsInvalidPingNotificationConfigurationAndUsesBlankUsernameFallback() {
+        UserEntity user = new UserEntity();
+        user.setUsername(" ");
+        user.setEnabled(true);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        RegisteredClient badPingClient =
+                RegisteredClient.withId("bad-ping")
+                        .clientId("bad-ping")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .scope("openid")
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(ClientSecuritySettings.CIBA_DELIVERY_MODE, "ping")
+                                        .setting(
+                                                ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
+                                                "file:///tmp/callback")
+                                        .setting(
+                                                ClientSecuritySettings
+                                                        .CIBA_CLIENT_NOTIFICATION_TOKEN,
+                                                "notification-token")
+                                        .build())
+                        .build();
+        assertProtocol(
+                () ->
+                        service.create(
+                                badPingClient,
+                                "openid",
+                                "admin",
+                                null,
+                                null,
+                                null,
+                                null,
+                                "ping",
+                                "notification-token",
+                                null,
+                                null),
+                "invalid_request");
+    }
+
+    @Test
+    void pushApprovalIssuesNotificationTokenAndRejectsPolling() {
+        final CibaPushTokenService pushTokens = mock(CibaPushTokenService.class);
+        final CibaNotificationService notifications = mock(CibaNotificationService.class);
+        final RegisteredClient pushClient =
+                RegisteredClient.withId("push-client-id")
+                        .clientId("push-client")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .scope("openid")
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(ClientSecuritySettings.CIBA_DELIVERY_MODE, "push")
+                                        .setting(
+                                                ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
+                                                "https://client.example/ciba/notify")
+                                        .setting(
+                                                ClientSecuritySettings
+                                                        .CIBA_CLIENT_NOTIFICATION_TOKEN,
+                                                "notification-token")
+                                        .build())
+                        .build();
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setEnabled(true);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        CibaAuthenticationService pushService =
+                new CibaAuthenticationService(
+                        requestRepository, userRepository, notifications, pushTokens, null);
+        CibaAuthenticationRequestEntity request =
+                pushService.create(
+                        pushClient,
+                        "openid",
+                        "admin",
+                        null,
+                        null,
+                        null,
+                        null,
+                        "push",
+                        "notification-token",
+                        null,
+                        null);
+        when(requestRepository.findByAuthReqIdForUpdate(request.getAuthReqId()))
+                .thenReturn(Optional.of(request));
+
+        pushService.approve(request.getAuthReqId(), "admin");
+
+        verify(pushTokens).issue(request);
+        CibaAuthenticationService noPushService =
+                new CibaAuthenticationService(
+                        requestRepository, userRepository, notifications, null, null);
+        noPushService.approve(request.getAuthReqId(), "admin");
+        request.setStatus(CibaAuthenticationRequestStatus.DENIED);
+        pushService.approve(request.getAuthReqId(), "admin");
+        assertProtocol(
+                () -> pushService.poll(request.getAuthReqId(), pushClient.getId()),
+                "invalid_grant");
+        when(notifications.deliverPush(request, Map.of("access_token", "token"))).thenReturn(true);
+        assertThat(pushService.deliverPush(request, Map.of("access_token", "token"))).isTrue();
+        when(notifications.deliverPush(request, Map.of("access_token", "other"))).thenReturn(false);
+        assertThat(pushService.deliverPush(request, Map.of("access_token", "other"))).isFalse();
+        assertThat(pushService.deliverPush(request, Map.of())).isFalse();
+        CibaAuthenticationRequestEntity pollRequest =
+                new CibaAuthenticationRequestEntity(
+                        "poll-request",
+                        "client-id",
+                        "admin",
+                        "openid",
+                        null,
+                        Instant.now(),
+                        Instant.now().plusSeconds(60),
+                        5);
+        assertThat(pushService.deliverPush(pollRequest, Map.of())).isFalse();
     }
 
     @Test
@@ -342,6 +512,23 @@ class CibaAuthenticationServiceTest {
                 () ->
                         hintService.create(
                                 client(), "openid", "admin", "login-token", null, null, null, null),
+                "invalid_request");
+
+        Jwt noAlgorithm =
+                Jwt.withTokenValue("no-alg")
+                        .header("typ", "JWT")
+                        .issuer("demo")
+                        .audience(List.of("demo"))
+                        .claim("jti", "no-alg-id")
+                        .issuedAt(issuedAt)
+                        .notBefore(issuedAt)
+                        .expiresAt(issuedAt.plusSeconds(300))
+                        .build();
+        when(decoder.decode("no-alg")).thenReturn(noAlgorithm);
+        assertProtocol(
+                () ->
+                        hintService.create(
+                                client(), null, null, null, null, null, null, null, "no-alg"),
                 "invalid_request");
     }
 
@@ -457,6 +644,30 @@ class CibaAuthenticationServiceTest {
                         requestService.create(
                                 client(), null, null, null, null, null, null, null, "invalid"),
                 "invalid_request");
+        when(decoder.decode("empty-audience"))
+                .thenReturn(
+                        Jwt.withTokenValue("empty-audience")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .audience(List.of())
+                                .claim("jti", "empty-audience-id")
+                                .issuedAt(Instant.now())
+                                .notBefore(Instant.now())
+                                .expiresAt(Instant.now().plusSeconds(300))
+                                .build());
+        assertProtocol(
+                () ->
+                        requestService.create(
+                                client(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "empty-audience"),
+                "invalid_request");
         Instant issuedAt = Instant.now();
         when(decoder.decode("missing-audience"))
                 .thenReturn(
@@ -544,6 +755,211 @@ class CibaAuthenticationServiceTest {
                                         "custom-algorithm")
                                 .getPrincipalName())
                 .isEqualTo("admin");
+    }
+
+    @Test
+    void validatesSignedRequestIssuerTemporalClaimsAndAudience() {
+        final JwtDecoder decoder = mock(JwtDecoder.class);
+        CibaAuthenticationService requestService =
+                new CibaAuthenticationService(
+                        requestRepository,
+                        userRepository,
+                        new CibaNotificationService(),
+                        null,
+                        decoder,
+                        null,
+                        AuthorizationServerSettings.builder()
+                                .issuer("https://issuer.example")
+                                .build(),
+                        null);
+        Instant issuedAt = Instant.now();
+        List<Jwt> invalidRequests =
+                List.of(
+                        Jwt.withTokenValue("missing-issuer")
+                                .header("alg", "RS256")
+                                .audience(List.of("https://issuer.example"))
+                                .claim("jti", "request-id")
+                                .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
+                                .expiresAt(issuedAt.plusSeconds(300))
+                                .build(),
+                        Jwt.withTokenValue("missing-expiry")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .audience(List.of("https://issuer.example"))
+                                .claim("jti", "request-id")
+                                .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
+                                .build(),
+                        Jwt.withTokenValue("missing-issued-at")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .audience(List.of("https://issuer.example"))
+                                .claim("jti", "request-id")
+                                .notBefore(issuedAt)
+                                .expiresAt(issuedAt.plusSeconds(300))
+                                .build(),
+                        Jwt.withTokenValue("missing-not-before")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .audience(List.of("https://issuer.example"))
+                                .claim("jti", "request-id")
+                                .issuedAt(issuedAt)
+                                .expiresAt(issuedAt.plusSeconds(300))
+                                .build(),
+                        Jwt.withTokenValue("missing-jti")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .audience(List.of("https://issuer.example"))
+                                .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
+                                .expiresAt(issuedAt.plusSeconds(300))
+                                .build(),
+                        Jwt.withTokenValue("missing-audience")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .claim("jti", "request-id")
+                                .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
+                                .expiresAt(issuedAt.plusSeconds(300))
+                                .build(),
+                        Jwt.withTokenValue("wrong-audience")
+                                .header("alg", "RS256")
+                                .issuer("demo")
+                                .audience(List.of("demo"))
+                                .claim("jti", "request-id")
+                                .issuedAt(issuedAt)
+                                .notBefore(issuedAt)
+                                .expiresAt(issuedAt.plusSeconds(300))
+                                .build());
+        for (Jwt invalidRequest : invalidRequests) {
+            when(decoder.decode(invalidRequest.getTokenValue())).thenReturn(invalidRequest);
+            assertProtocol(
+                    () ->
+                            requestService.create(
+                                    client(),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    invalidRequest.getTokenValue()),
+                    "invalid_request");
+        }
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setEnabled(true);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        Jwt validRequest =
+                Jwt.withTokenValue("valid-request")
+                        .header("alg", "RS256")
+                        .issuer("demo")
+                        .audience(List.of("https://issuer.example"))
+                        .claim("jti", "valid-request-id")
+                        .claim("scope", "openid")
+                        .claim("login_hint", "admin")
+                        .issuedAt(issuedAt)
+                        .notBefore(issuedAt)
+                        .expiresAt(issuedAt.plusSeconds(300))
+                        .build();
+        when(decoder.decode("valid-request")).thenReturn(validRequest);
+        assertThat(
+                        requestService
+                                .create(
+                                        client(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        "valid-request")
+                                .getPrincipalName())
+                .isEqualTo("admin");
+    }
+
+    @Test
+    void rejectsEveryDirectParameterWhenRequestObjectContainsIt() {
+        final JwtDecoder decoder = mock(JwtDecoder.class);
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setEnabled(true);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        CibaAuthenticationService requestService =
+                new CibaAuthenticationService(
+                        requestRepository,
+                        userRepository,
+                        new CibaNotificationService(),
+                        null,
+                        decoder);
+        Instant issuedAt = Instant.now();
+        Map<String, Object[]> conflicts =
+                Map.of(
+                        "login_hint", new Object[] {"other", null, "other"},
+                        "login_hint_token", new Object[] {null, "token", null},
+                        "id_token_hint", new Object[] {null, null, "token"},
+                        "binding_message", new Object[] {null, null, "message"},
+                        "requested_expiry", new Object[] {null, null, 121},
+                        "backchannel_token_delivery_mode", new Object[] {null, null, "poll"},
+                        "user_code", new Object[] {null, null, "ABCD"},
+                        "client_notification_token", new Object[] {null, null, "token"},
+                        "acr_values", new Object[] {null, null, "loa2"});
+        for (var entry : conflicts.entrySet()) {
+            String token = "conflict-" + entry.getKey();
+            Jwt.Builder jwt =
+                    Jwt.withTokenValue(token)
+                            .header("alg", "RS256")
+                            .issuer("demo")
+                            .audience(List.of("demo"))
+                            .claim("jti", token)
+                            .claim("scope", "openid")
+                            .claim("login_hint", "admin")
+                            .issuedAt(issuedAt)
+                            .notBefore(issuedAt)
+                            .expiresAt(issuedAt.plusSeconds(300));
+            Object requestValue =
+                    switch (entry.getKey()) {
+                        case "login_hint" -> "jwt-user";
+                        case "login_hint_token" -> "jwt-login-token";
+                        case "id_token_hint" -> "jwt-id-token";
+                        case "binding_message" -> "jwt-binding";
+                        case "requested_expiry" -> 120;
+                        case "backchannel_token_delivery_mode" -> "poll";
+                        case "user_code" -> "JWT-CODE";
+                        case "client_notification_token" -> "jwt-notification";
+                        case "acr_values" -> "loa1";
+                        default -> throw new IllegalStateException();
+                    };
+            jwt.claim(entry.getKey(), requestValue);
+            when(decoder.decode(token)).thenReturn(jwt.build());
+            assertProtocol(
+                    () ->
+                            requestService.create(
+                                    client(),
+                                    null,
+                                    "login_hint".equals(entry.getKey()) ? "direct-user" : null,
+                                    "login_hint_token".equals(entry.getKey())
+                                            ? "direct-token"
+                                            : null,
+                                    "id_token_hint".equals(entry.getKey()) ? "direct-id" : null,
+                                    "binding_message".equals(entry.getKey())
+                                            ? "direct-binding"
+                                            : null,
+                                    "requested_expiry".equals(entry.getKey()) ? 121 : null,
+                                    "backchannel_token_delivery_mode".equals(entry.getKey())
+                                            ? "poll"
+                                            : null,
+                                    "user_code".equals(entry.getKey()) ? "DIRECT-CODE" : null,
+                                    "client_notification_token".equals(entry.getKey())
+                                            ? "direct-token"
+                                            : null,
+                                    "acr_values".equals(entry.getKey()) ? "loa2" : null,
+                                    token),
+                    "invalid_request");
+        }
     }
 
     @Test

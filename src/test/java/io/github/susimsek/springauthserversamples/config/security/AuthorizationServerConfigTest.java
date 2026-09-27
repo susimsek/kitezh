@@ -23,6 +23,7 @@ import io.github.susimsek.springauthserversamples.security.AuthorizationEndpoint
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -48,6 +50,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -305,6 +308,137 @@ class AuthorizationServerConfigTest {
                 .containsEntry("email", "")
                 .containsEntry("email_verified", false)
                 .doesNotContainKey("locale");
+    }
+
+    @Test
+    void addsCibaRequestAndTokenHashesForSupportedSigningAlgorithms() {
+        UserRepository userRepository = mock(UserRepository.class);
+        UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
+        AuthorizationRepository authorizationRepository = mock(AuthorizationRepository.class);
+        RegisteredClient client =
+                RegisteredClient.withId("ciba-id")
+                        .clientId("ciba-client")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(
+                                        io.github.susimsek.springauthserversamples.security
+                                                .AuthorizationGrantTypes.CIBA))
+                        .scope("openid")
+                        .build();
+        OAuth2ClientAuthenticationToken clientPrincipal =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        CibaAuthenticationGrantAuthenticationToken grant =
+                new CibaAuthenticationGrantAuthenticationToken(
+                        "auth-req-id",
+                        clientPrincipal,
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                "loa2 loa3",
+                                CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE,
+                                "access-token",
+                                CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE,
+                                "refresh-token"));
+
+        for (SignatureAlgorithm algorithm :
+                List.of(
+                        SignatureAlgorithm.RS256,
+                        SignatureAlgorithm.ES384,
+                        SignatureAlgorithm.ES512)) {
+            JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+            config.jwtTokenCustomizer(userRepository, avatarRepository, authorizationRepository)
+                    .customize(cibaJwtContext(claims, client, grant, algorithm));
+
+            assertThat(claims.build().getClaims())
+                    .containsEntry(
+                            CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_CLAIM,
+                            "auth-req-id")
+                    .containsEntry("acr", "loa2")
+                    .containsKey("at_hash")
+                    .containsKey("urn:openid:params:jwt:claim:rt_hash");
+        }
+    }
+
+    @Test
+    void classifiesTokenTypesAcrossGrantAndScopeCombinations() {
+        JwtEncodingContext authorizationCode =
+                jwtContext(
+                        JwtClaimsSet.builder(),
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        "account-console",
+                        Set.of("profile", "email", "roles"));
+        JwtEncodingContext refresh =
+                jwtContext(
+                        JwtClaimsSet.builder(),
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.REFRESH_TOKEN,
+                        "account-console",
+                        Set.of("profile", "email", "roles"));
+        JwtEncodingContext ciba =
+                cibaJwtContext(
+                        JwtClaimsSet.builder(),
+                        RegisteredClient.withId("ciba")
+                                .clientId("ciba")
+                                .authorizationGrantType(
+                                        new AuthorizationGrantType(
+                                                io.github.susimsek.springauthserversamples.security
+                                                        .AuthorizationGrantTypes.CIBA))
+                                .build(),
+                        new CibaAuthenticationGrantAuthenticationToken("req", mock(), Map.of()),
+                        SignatureAlgorithm.RS256);
+        JwtEncodingContext clientCredentials =
+                jwtContextWithoutAuthorization(
+                        JwtClaimsSet.builder(),
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.CLIENT_CREDENTIALS,
+                        "api",
+                        Set.of());
+
+        for (JwtEncodingContext context :
+                List.of(authorizationCode, refresh, ciba, clientCredentials)) {
+            invokeTokenPredicate("isUserProfileToken", context);
+            invokeTokenPredicate("isUserEmailToken", context);
+            invokeTokenPredicate("isUserLocaleToken", context);
+            invokeTokenPredicate("isUserSocialClaimsToken", context);
+            invokeTokenPredicate("isRoleToken", context);
+        }
+        assertThat(invokeTokenPredicate("isUserProfileToken", authorizationCode)).isTrue();
+        assertThat(invokeTokenPredicate("isUserEmailToken", authorizationCode)).isTrue();
+        assertThat(invokeTokenPredicate("isRoleToken", authorizationCode)).isTrue();
+        assertThat(invokeTokenPredicate("isUserLocaleToken", clientCredentials)).isFalse();
+    }
+
+    private static boolean invokeTokenPredicate(String name, JwtEncodingContext context) {
+        try {
+            Method method =
+                    AuthorizationServerConfig.class.getDeclaredMethod(
+                            name, JwtEncodingContext.class);
+            method.setAccessible(true);
+            return (Boolean) method.invoke(null, context);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private static JwtEncodingContext cibaJwtContext(
+            JwtClaimsSet.Builder claims,
+            RegisteredClient client,
+            CibaAuthenticationGrantAuthenticationToken grant,
+            SignatureAlgorithm algorithm) {
+        UsernamePasswordAuthenticationToken principal =
+                new UsernamePasswordAuthenticationToken("admin", "n/a", List.of());
+        return JwtEncodingContext.with(JwsHeader.with(algorithm), claims)
+                .registeredClient(client)
+                .principal(principal)
+                .authorizedScopes(Set.of("openid", "profile", "email", "roles"))
+                .tokenType(new OAuth2TokenType(OidcParameterNames.ID_TOKEN))
+                .authorizationGrantType(
+                        new AuthorizationGrantType(
+                                io.github.susimsek.springauthserversamples.security
+                                        .AuthorizationGrantTypes.CIBA))
+                .authorizationGrant(grant)
+                .build();
     }
 
     @Test

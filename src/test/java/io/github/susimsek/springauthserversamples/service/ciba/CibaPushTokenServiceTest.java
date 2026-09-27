@@ -216,6 +216,53 @@ class CibaPushTokenServiceTest {
                 .hasMessageContaining("ID token");
     }
 
+    @Test
+    void issuesAccessOnlyPushResponseWithAcrAndGenericAccessToken() {
+        CibaAuthenticationRequestEntity request =
+                new CibaAuthenticationRequestEntity(
+                        "auth-req-id",
+                        client.getId(),
+                        "admin",
+                        "openid  ",
+                        null,
+                        ClientSecuritySettings.CIBA_PUSH,
+                        "https://client.example/ciba/notify",
+                        "notification-token",
+                        Instant.now(),
+                        Instant.now().plusSeconds(300),
+                        5);
+        request.setStatus(CibaAuthenticationRequestStatus.APPROVED);
+        request.setAcrValues("loa2");
+        Mockito.reset(tokens);
+        when(tokens.generate(any()))
+                .thenAnswer(
+                        invocation -> {
+                            OAuth2TokenContext context = invocation.getArgument(0);
+                            Instant issuedAt = Instant.now();
+                            return switch (context.getTokenType().getValue()) {
+                                case "access_token" ->
+                                        Jwt.withTokenValue("access-token")
+                                                .header("alg", "RS256")
+                                                .issuedAt(issuedAt)
+                                                .expiresAt(issuedAt.plusSeconds(300))
+                                                .build();
+                                case "id_token" ->
+                                        Jwt.withTokenValue("id-token")
+                                                .header("alg", "RS256")
+                                                .claim("sub", "admin")
+                                                .issuedAt(issuedAt)
+                                                .expiresAt(issuedAt.plusSeconds(300))
+                                                .build();
+                                default -> null;
+                            };
+                        });
+
+        service.issue(request);
+
+        assertThat(request.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.CONSUMED);
+        verify(notifications).deliverPush(eq(request), any());
+    }
+
     private CibaAuthenticationRequestEntity request(CibaAuthenticationRequestStatus status) {
         CibaAuthenticationRequestEntity request =
                 new CibaAuthenticationRequestEntity(
