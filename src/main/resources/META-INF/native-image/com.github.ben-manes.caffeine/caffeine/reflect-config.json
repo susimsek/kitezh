@@ -1,0 +1,18 @@
+[
+  {
+    "name": "com.github.benmanes.caffeine.cache.SSMSA",
+    "fields": [{"name": "FACTORY"}]
+  },
+  {
+    "name": "com.github.benmanes.caffeine.cache.SSMSW",
+    "fields": [{"name": "FACTORY"}]
+  },
+  {
+    "name": "com.github.benmanes.caffeine.cache.SSSMSA",
+    "fields": [{"name": "FACTORY"}]
+  },
+  {
+    "name": "com.github.benmanes.caffeine.cache.SSSMSW",
+    "fields": [{"name": "FACTORY"}]
+  }
+]

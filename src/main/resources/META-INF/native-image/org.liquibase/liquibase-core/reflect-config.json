@@ -29,6 +29,15 @@
     "allPublicMethods": true
   },
   {
+    "name": "liquibase.change.core.AddUniqueConstraintChange",
+    "methods": [
+      {
+        "name": "getDeferrable",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
     "name": "liquibase.change.core.CreateIndexChange",
     "allPublicMethods": true
   }
