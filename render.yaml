@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: spring-authorization-server-samples
+    runtime: image
+    plan: free
+    region: frankfurt
+    image:
+      url: docker.io/suayb/spring-authorization-server-samples:latest-native
+    healthCheckPath: /actuator/health/readiness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SERVER_PORT
+        value: "10000"
+      # Render prompts for these values when the Blueprint is first created.
+      # They are intentionally not stored in the repository.
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: APP_AUTHORIZATION_SERVER_ISSUER
+        sync: false

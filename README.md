@@ -1258,9 +1258,23 @@ Pipeline: `.github/workflows/ci.yml`
 - `./mvnw -Pprod,native -DskipTests native:compile` for a musl static native build
 - Compress `target/native-executable` with UPX
 - Push the native Docker image to Docker Hub on the `main` branch via Jib
+- Trigger the Render image-backed service through its Deploy Hook after the image is published
+
+### Render Blueprint deployment
+
+`render.yaml` keeps the Render web service configuration in Git. It uses the published
+`latest-native` amd64 image and the `/actuator/health/readiness` health check. Connect the
+repository in Render with **New → Blueprint**, select the `main` branch, and apply the Blueprint
+to manage the existing `spring-authorization-server-samples` service. Render prompts for the
+database URL, username, password, and public issuer because those values are marked `sync: false`.
+
+Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
+Render Deploy Hook. A successful `main` image publish then calls the hook and starts a new Render
+deployment. Keep the hook URL only in GitHub Secrets.
 
 Environment variables:
 
 - SonarCloud: `SONAR_TOKEN` (optional)
 - Snyk: `SNYK_TOKEN` (optional)
 - Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (only on `main`)
+- Render deploy: `RENDER_DEPLOY_HOOK_URL` (optional; only on `main`)
