@@ -925,30 +925,6 @@ with JaCoCo. This keeps a one percentage point safety margin above the 95%
 coverage target reported by SonarCloud. The SonarCloud project uses the
 `Spring Authorization Server 95 Coverage` quality gate for that floor.
 
-### Git hooks
-
-Install the shared pre-push hook once after cloning. It runs the Maven
-verification checks and, when `SONARQUBE_TOKEN` or `SONAR_TOKEN` is available,
-starts the SonarCloud analysis.
-
-macOS, Linux, or Git Bash:
-
-```bash
-./scripts/setup-git-hooks.sh
-```
-
-PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup-git-hooks.ps1
-```
-
-Windows Command Prompt:
-
-```bat
-scripts\setup-git-hooks.cmd
-```
-
 ## GraalVM Native Image
 
 Native executable:
