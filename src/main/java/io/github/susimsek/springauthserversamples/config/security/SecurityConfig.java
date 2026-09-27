@@ -112,7 +112,6 @@ public class SecurityConfig {
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies) {
-        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
         http.authenticationManager(browserDependencies.formAuthenticationManager());
         http.securityContext(
                         securityContext ->
@@ -270,6 +269,7 @@ public class SecurityConfig {
                                     .permitAll());
         }
 
+        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
         http.oauth2ResourceServer(
                 resourceServer ->
                         resourceServer
