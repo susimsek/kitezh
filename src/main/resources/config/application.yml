@@ -64,6 +64,37 @@ server:
   shutdown: graceful
 
 management:
+  opentelemetry:
+    enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+    resource-attributes:
+      service.name: ${OTEL_SERVICE_NAME:spring-authorization-server-samples}
+      deployment.environment: ${SPRING_PROFILES_ACTIVE:dev}
+    tracing:
+      export:
+        otlp:
+          endpoint: ${GRAFANA_CLOUD_OTLP_TRACES_ENDPOINT:}
+          headers:
+            Authorization: ${GRAFANA_CLOUD_OTLP_AUTHORIZATION:}
+    logging:
+      export:
+        otlp:
+          endpoint: ${GRAFANA_CLOUD_OTLP_LOGS_ENDPOINT:}
+          headers:
+            Authorization: ${GRAFANA_CLOUD_OTLP_AUTHORIZATION:}
+  logging:
+    export:
+      otlp:
+        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+  tracing:
+    sampling:
+      probability: ${GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    metrics:
+      export:
+        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+        url: ${GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT:}
+        headers:
+          Authorization: ${GRAFANA_CLOUD_OTLP_AUTHORIZATION:}
   health:
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}

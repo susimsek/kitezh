@@ -3,6 +3,12 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
 
+    <appender name="OPENTELEMETRY"
+              class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureExperimentalAttributes>true</captureExperimentalAttributes>
+        <captureMdcAttributes>*</captureMdcAttributes>
+    </appender>
+
     <logger name="com.zaxxer" level="WARN"/>
     <logger name="org.apache" level="WARN"/>
     <logger name="org.hibernate" level="WARN"/>
@@ -16,5 +22,6 @@
     <springProperty name="log.level" source="logging.level.root" defaultValue="INFO"/>
     <root level="${log.level}">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="OPENTELEMETRY"/>
     </root>
 </configuration>

@@ -12,6 +12,20 @@ services:
         value: prod
       - key: SPRING_LIQUIBASE_DROP_FIRST
         value: "true"
+      - key: GRAFANA_CLOUD_OTLP_ENABLED
+        value: "false"
+      - key: GRAFANA_CLOUD_OTLP_AUTHORIZATION
+        sync: false
+      - key: GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT
+        sync: false
+      - key: GRAFANA_CLOUD_OTLP_TRACES_ENDPOINT
+        sync: false
+      - key: GRAFANA_CLOUD_OTLP_LOGS_ENDPOINT
+        sync: false
+      - key: GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY
+        value: "1.0"
+      - key: OTEL_SERVICE_NAME
+        value: spring-authorization-server-samples
       - key: SERVER_PORT
         value: "10000"
       # Render prompts for these database values when the Blueprint is first created.

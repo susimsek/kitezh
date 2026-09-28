@@ -29,29 +29,30 @@ This repository is a Spring Boot 4.1 + Java 25 sample application built around t
 2. [Requirements](#requirements)
 3. [Project Layout](#project-layout)
 4. [Configuration](#configuration)
-5. [Configuration and Profiles](#configuration-and-profiles)
-6. [RSA Signing Keys](#rsa-signing-keys)
-7. [Persistent User Sessions](#persistent-user-sessions)
-8. [Frontend](#frontend)
-9. [Administration and Account Consoles](#administration-and-account-consoles)
-10. [Run Locally](#run-locally)
-11. [API Quick Overview](#api-quick-overview)
-12. [OAuth2 and OIDC Endpoints](#oauth2-and-oidc-endpoints)
-13. [Authorization Server Flows](#authorization-server-flows)
-14. [Try with curl](#try-with-curl)
-15. [Client Registration and Seed Data](#client-registration-and-seed-data)
-16. [Database](#database)
-17. [Internationalization](#internationalization)
-18. [Build](#build)
-19. [Performance Tests](#performance-tests)
-20. [Code Quality](#code-quality)
-21. [GraalVM Native Image](#graalvm-native-image)
-22. [Docker Image](#docker-image)
-23. [Kubernetes Health Probe](#kubernetes-health-probe)
-24. [Docker Compose Support](#docker-compose-support)
-25. [Helm](#helm)
-26. [Terraform](#terraform)
-27. [Continuous Integration](#continuous-integration)
+5. [Grafana Cloud Observability](#grafana-cloud-observability)
+6. [Configuration and Profiles](#configuration-and-profiles)
+7. [RSA Signing Keys](#rsa-signing-keys)
+8. [Persistent User Sessions](#persistent-user-sessions)
+9. [Frontend](#frontend)
+10. [Administration and Account Consoles](#administration-and-account-consoles)
+11. [Run Locally](#run-locally)
+12. [API Quick Overview](#api-quick-overview)
+13. [OAuth2 and OIDC Endpoints](#oauth2-and-oidc-endpoints)
+14. [Authorization Server Flows](#authorization-server-flows)
+15. [Try with curl](#try-with-curl)
+16. [Client Registration and Seed Data](#client-registration-and-seed-data)
+17. [Database](#database)
+18. [Internationalization](#internationalization)
+19. [Build](#build)
+20. [Performance Tests](#performance-tests)
+21. [Code Quality](#code-quality)
+22. [GraalVM Native Image](#graalvm-native-image)
+23. [Docker Image](#docker-image)
+24. [Kubernetes Health Probe](#kubernetes-health-probe)
+25. [Docker Compose Support](#docker-compose-support)
+26. [Helm](#helm)
+27. [Terraform](#terraform)
+28. [Continuous Integration](#continuous-integration)
 
 ## Features
 
@@ -159,6 +160,31 @@ invalid, or failed tokens before creating a user. The login filter verifies the 
 Spring Security processes the username and password, so failed CAPTCHA requests never reach the
 authentication provider. Tokens are generated at submit time for v3 so the backend can validate
 the expected action and score.
+
+## Grafana Cloud Observability
+
+The application can export metrics, traces, and Logback logs to Grafana Cloud over OTLP. Export is
+disabled by default, so local development does not send telemetry anywhere. Enable it by adding
+the following variables to `.env` or the Render environment:
+
+```dotenv
+GRAFANA_CLOUD_OTLP_ENABLED=true
+GRAFANA_CLOUD_OTLP_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
+GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT=https://<otlp-gateway>/otlp/v1/metrics
+GRAFANA_CLOUD_OTLP_TRACES_ENDPOINT=https://<otlp-gateway>/otlp/v1/traces
+GRAFANA_CLOUD_OTLP_LOGS_ENDPOINT=https://<otlp-gateway>/otlp/v1/logs
+GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY=1.0
+OTEL_SERVICE_NAME=spring-authorization-server-samples
+```
+
+Create the `Authorization` value from the Grafana Cloud stack's instance ID and an API token with
+the required write permissions. Keep it in Render Secrets or `.env`; never commit it. The three
+signal endpoints are available in the Grafana Cloud stack's OpenTelemetry connection details.
+
+Grafana Cloud's free tier is suitable for this demo and includes metrics, logs, and traces with
+usage limits and 14-day retention. See the [Grafana Cloud Free tier](https://grafana.com/products/cloud/free-tier/)
+and [OTLP ingestion guide](https://grafana.com/docs/grafana-cloud/send-data/otlp/) for current limits
+and connection details.
 
 ## Configuration and Profiles
 
