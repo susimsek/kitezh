@@ -19,8 +19,10 @@ describe("runtime entity routing", () => {
   it.each([
     ["/admin/clients/abc", "abc", "settings"],
     ["/admin/clients/client-1/credentials", "client-1", "credentials"],
+    ["/admin/clients/client-2/mappers", "client-2", "mappers"],
+    ["/admin/clients/client-3/evaluation", "client-3", "evaluation"],
     ["/admin/clients/client%20with%20spaces/sessions", "client with spaces", "sessions"],
-    ["/admin/clients/client-2/unknown", "client-2", "settings"],
+    ["/admin/clients/client-4/unknown", "client-4", "settings"],
     ["/admin/users/123", "123", "details"],
     ["/admin/users/42/sessions", "42", "sessions"],
   ])("resolves %s without any build-time parameters", (path, id, tab) => {

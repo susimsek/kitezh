@@ -17,11 +17,16 @@ import { ClientForm } from "./ClientForm";
 import { EntityRelatedData } from "./EntityRelatedData";
 import { ClientScopeAssignments } from "./ClientScopeAssignments";
 import { ClientRoles } from "./ClientRoles";
+import { ClientMappers } from "./ClientMappers";
+import { ClientScopeEvaluation } from "./ClientScopeEvaluation";
+import { ServiceAccountRoles } from "./ServiceAccountRoles";
 import type { AdminClient } from "./ClientsTable";
 
 const CLIENT_DETAIL_TABS = [
   "settings",
   "credentials",
+  "mappers",
+  "evaluation",
   "scopes",
   "roles",
   "sessions",
@@ -109,6 +114,8 @@ export function ClientDetail({
       href: `${detailUrl}/scopes`,
     },
     { key: "roles", label: copy.roles.title, href: `${detailUrl}/roles` },
+    { key: "mappers", label: copy.mappers.title, href: `${detailUrl}/mappers` },
+    { key: "evaluation", label: copy.scopeEvaluation.title, href: `${detailUrl}/evaluation` },
     { key: "sessions", label: copy.sessions, href: `${detailUrl}/sessions` },
     { key: "consents", label: copy.consents, href: `${detailUrl}/consents` },
     ...(access?.viewEvents
@@ -253,7 +260,18 @@ export function ClientDetail({
           }
         />
       )}
-      {activeTab === "roles" && <ClientRoles clientId={client.id} dictionary={dictionary} />}
+      {activeTab === "roles" && (
+        <div className="d-grid gap-3">
+          <ClientRoles clientId={client.id} dictionary={dictionary} />
+          {client.serviceAccountEnabled && (
+            <ServiceAccountRoles clientId={client.id} dictionary={dictionary} />
+          )}
+        </div>
+      )}
+      {activeTab === "mappers" && <ClientMappers clientId={client.id} dictionary={dictionary} />}
+      {activeTab === "evaluation" && (
+        <ClientScopeEvaluation clientId={client.id} dictionary={dictionary} />
+      )}
       {activeTab === "sessions" && (
         <EntityRelatedData
           resource="sessions"

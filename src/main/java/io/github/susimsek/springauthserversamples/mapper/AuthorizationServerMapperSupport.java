@@ -12,7 +12,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ConfigurationSettingNames;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -107,7 +109,23 @@ public class AuthorizationServerMapperSupport {
     }
 
     public ClientSettings readClientSettings(String value) {
-        return ClientSettings.withSettings(readMap(value)).build();
+        Map<String, Object> settings = new java.util.HashMap<>(readMap(value));
+        Object algorithm =
+                settings.get(
+                        ConfigurationSettingNames.Client
+                                .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM);
+        if (algorithm instanceof String name) {
+            SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.from(name);
+            if (signatureAlgorithm != null) {
+                settings.put(
+                        ConfigurationSettingNames.Client
+                                .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM,
+                        signatureAlgorithm);
+            }
+        }
+        return settings.isEmpty()
+                ? ClientSettings.builder().build()
+                : ClientSettings.withSettings(settings).build();
     }
 
     public String writeTokenSettings(TokenSettings tokenSettings) {

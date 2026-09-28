@@ -1,5 +1,8 @@
 package io.github.susimsek.springauthserversamples.service.admin;
 
+import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
+import io.github.susimsek.springauthserversamples.domain.ServiceAccountEntity;
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRequestDTO;
@@ -9,6 +12,8 @@ import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationConsentRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
+import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
+import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
@@ -16,16 +21,20 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.mapstruct.factory.Mappers;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
@@ -33,7 +42,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 @SuppressWarnings("java:S4449")
 public class AdminClientService {
 
@@ -46,6 +54,7 @@ public class AdminClientService {
     private static final Duration DEFAULT_AUTHORIZATION_CODE_TTL = Duration.ofMinutes(5);
     private static final Duration DEFAULT_ACCESS_TOKEN_TTL = Duration.ofMinutes(5);
     private static final Duration DEFAULT_REFRESH_TOKEN_TTL = Duration.ofHours(1);
+    private static final Duration DEFAULT_SECRET_GRACE_PERIOD = Duration.ofHours(24);
 
     private final ClientRepository clientRepository;
     private final AuthorizationRepository authorizationRepository;
@@ -55,6 +64,32 @@ public class AdminClientService {
     private final PasswordEncoder passwordEncoder;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminClientMapper adminClientMapper;
+    private final ServiceAccountRepository serviceAccountRepository;
+    private final UserRepository userRepository;
+
+    @Autowired
+    public AdminClientService(
+            ClientRepository clientRepository,
+            AuthorizationRepository authorizationRepository,
+            AuthorizationConsentRepository authorizationConsentRepository,
+            RegisteredClientMapper registeredClientMapper,
+            AuthorizationServerMapperSupport mapperSupport,
+            PasswordEncoder passwordEncoder,
+            AdminAuditEventService adminAuditEventService,
+            ServiceAccountRepository serviceAccountRepository,
+            UserRepository userRepository) {
+        this(
+                clientRepository,
+                authorizationRepository,
+                authorizationConsentRepository,
+                registeredClientMapper,
+                mapperSupport,
+                passwordEncoder,
+                adminAuditEventService,
+                Mappers.getMapper(AdminClientMapper.class),
+                serviceAccountRepository,
+                userRepository);
+    }
 
     public AdminClientService(
             ClientRepository clientRepository,
@@ -72,25 +107,64 @@ public class AdminClientService {
                 mapperSupport,
                 passwordEncoder,
                 adminAuditEventService,
-                Mappers.getMapper(AdminClientMapper.class));
+                null,
+                null);
+    }
+
+    private AdminClientService(
+            ClientRepository clientRepository,
+            AuthorizationRepository authorizationRepository,
+            AuthorizationConsentRepository authorizationConsentRepository,
+            RegisteredClientMapper registeredClientMapper,
+            AuthorizationServerMapperSupport mapperSupport,
+            PasswordEncoder passwordEncoder,
+            AdminAuditEventService adminAuditEventService,
+            AdminClientMapper adminClientMapper,
+            ServiceAccountRepository serviceAccountRepository,
+            UserRepository userRepository) {
+        this.clientRepository = clientRepository;
+        this.authorizationRepository = authorizationRepository;
+        this.authorizationConsentRepository = authorizationConsentRepository;
+        this.registeredClientMapper = registeredClientMapper;
+        this.mapperSupport = mapperSupport;
+        this.passwordEncoder = passwordEncoder;
+        this.adminAuditEventService = adminAuditEventService;
+        this.adminClientMapper = adminClientMapper;
+        this.serviceAccountRepository = serviceAccountRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
     public Page<AdminClientDTO> findAll(String query, Pageable pageable) {
         String searchQuery = AdminSearch.normalize(query);
-        return clientRepository
-                .findByClientIdContainingIgnoreCaseOrClientNameContainingIgnoreCase(
-                        searchQuery, searchQuery, pageable)
-                .map(entity -> registeredClientMapper.toObject(entity, mapperSupport))
-                .map(adminClientMapper::toDTO);
+        Page<RegisteredClientEntity> clients =
+                clientRepository.findByClientIdContainingIgnoreCaseOrClientNameContainingIgnoreCase(
+                        searchQuery, searchQuery, pageable);
+        Map<String, ServiceAccountEntity> serviceAccounts = serviceAccounts(clients.getContent());
+        return clients.map(
+                entity ->
+                        adminClientMapper.toDTO(
+                                registeredClientMapper.toObject(entity, mapperSupport),
+                                entity.getId() != null
+                                        && serviceAccounts.containsKey(entity.getId()),
+                                entity.getId() == null
+                                        ? null
+                                        : serviceAccountUsername(
+                                                serviceAccounts.get(entity.getId()))));
     }
 
     @Transactional(readOnly = true)
     public AdminClientDTO findById(String id) {
         return clientRepository
                 .findById(id)
-                .map(entity -> registeredClientMapper.toObject(entity, mapperSupport))
-                .map(adminClientMapper::toDTO)
+                .map(
+                        entity -> {
+                            RegisteredClient client =
+                                    registeredClientMapper.toObject(entity, mapperSupport);
+                            ServiceAccountEntity account = serviceAccount(id);
+                            return adminClientMapper.toDTO(
+                                    client, account != null, serviceAccountUsername(account));
+                        })
                 .orElse(null);
     }
 
@@ -108,20 +182,20 @@ public class AdminClientService {
         }
 
         String rawSecret = requiresSecret(request) ? generateSecret() : null;
-        RegisteredClient client =
-                apply(
-                                RegisteredClient.withId(UUID.randomUUID().toString())
-                                        .clientId(request.clientId())
-                                        .clientIdIssuedAt(Instant.now())
-                                        .clientSecret(
-                                                rawSecret == null
-                                                        ? null
-                                                        : passwordEncoder.encode(rawSecret)),
-                                request,
-                                null)
-                        .build();
+        RegisteredClient.Builder clientBuilder =
+                RegisteredClient.withId(UUID.randomUUID().toString())
+                        .clientId(request.clientId())
+                        .clientIdIssuedAt(Instant.now())
+                        .clientSecret(rawSecret == null ? null : passwordEncoder.encode(rawSecret));
+        if (rawSecret != null && request.clientSecretTimeToLive() != null) {
+            clientBuilder.clientSecretExpiresAt(
+                    Instant.now().plus(request.clientSecretTimeToLive()));
+        }
+        RegisteredClient client = apply(clientBuilder, request, null).build();
 
-        AdminClientDTO saved = adminClientMapper.toDTO(save(client));
+        RegisteredClient savedClient = save(client);
+        updateServiceAccount(savedClient, request.serviceAccountEnabled());
+        AdminClientDTO saved = clientDTO(savedClient);
         adminAuditEventService.record("client.created", CLIENT_TARGET, saved.id());
         return adminClientMapper.toCreatedDTO(saved, rawSecret);
     }
@@ -154,10 +228,14 @@ public class AdminClientService {
                     CLIENT_AUTHENTICATION_METHODS_FIELD,
                     ApiErrorCode.CLIENT_SECRET_REQUIRED,
                     "Regenerate a client secret before enabling a secret authentication method");
+        } else if (request.clientSecretTimeToLive() != null) {
+            builder.clientSecretExpiresAt(Instant.now().plus(request.clientSecretTimeToLive()));
         }
 
         RegisteredClient updated = apply(builder, request, existing).build();
-        AdminClientDTO saved = adminClientMapper.toDTO(save(updated));
+        RegisteredClient savedClient = save(updated);
+        updateServiceAccount(savedClient, request.serviceAccountEnabled());
+        AdminClientDTO saved = clientDTO(savedClient);
         adminAuditEventService.record("client.updated", CLIENT_TARGET, saved.id());
         return saved;
     }
@@ -170,6 +248,7 @@ public class AdminClientService {
         rejectAdminConsoleMutation(findRequired(id));
         authorizationRepository.deleteByRegisteredClientId(id);
         authorizationConsentRepository.deleteByIdRegisteredClientId(id);
+        removeServiceAccount(id);
         clientRepository.deleteById(id);
         adminAuditEventService.record("client.deleted", CLIENT_TARGET, id);
     }
@@ -181,15 +260,101 @@ public class AdminClientService {
     public String regenerateSecret(String id) {
         RegisteredClient existing = findRequired(id);
         rejectAdminConsoleMutation(existing);
-
         String rawSecret = generateSecret();
+        Map<String, Object> settings = new HashMap<>(existing.getClientSettings().getSettings());
+        if (existing.getClientSecret() == null) {
+            settings.remove(ClientSecuritySettings.PREVIOUS_SECRET);
+            settings.remove(ClientSecuritySettings.PREVIOUS_SECRET_EXPIRES_AT);
+        } else {
+            settings.put(ClientSecuritySettings.PREVIOUS_SECRET, existing.getClientSecret());
+            settings.put(
+                    ClientSecuritySettings.PREVIOUS_SECRET_EXPIRES_AT,
+                    Instant.now().plus(secretGracePeriod(existing)).toString());
+        }
         RegisteredClient updated =
                 RegisteredClient.from(existing)
                         .clientSecret(passwordEncoder.encode(rawSecret))
+                        .clientSettings(ClientSettings.withSettings(settings).build())
                         .build();
         save(updated);
         adminAuditEventService.record("client.secret.regenerated", CLIENT_TARGET, id);
         return rawSecret;
+    }
+
+    private Map<String, ServiceAccountEntity> serviceAccounts(
+            List<RegisteredClientEntity> clients) {
+        if (serviceAccountRepository == null || clients.isEmpty()) {
+            return Map.of();
+        }
+        return serviceAccountRepository
+                .findAllByClientIdIn(clients.stream().map(RegisteredClientEntity::getId).toList())
+                .stream()
+                .collect(
+                        java.util.stream.Collectors.toMap(
+                                ServiceAccountEntity::getClientId, account -> account));
+    }
+
+    private ServiceAccountEntity serviceAccount(String clientId) {
+        return serviceAccountRepository == null
+                ? null
+                : serviceAccountRepository.findByClientId(clientId).orElse(null);
+    }
+
+    private AdminClientDTO clientDTO(RegisteredClient client) {
+        ServiceAccountEntity account = serviceAccount(client.getId());
+        return adminClientMapper.toDTO(client, account != null, serviceAccountUsername(account));
+    }
+
+    private void updateServiceAccount(RegisteredClient client, boolean enabled) {
+        if (serviceAccountRepository == null || userRepository == null) {
+            return;
+        }
+        ServiceAccountEntity existing = serviceAccount(client.getId());
+        if (enabled && existing == null) {
+            UserEntity saved = userRepository.save(serviceAccountUser(client.getClientId()));
+            serviceAccountRepository.save(new ServiceAccountEntity(client.getId(), saved));
+        } else if (enabled && existing != null) {
+            UserEntity user = existing.getUser();
+            user.setUsername(serviceAccountUsername(client.getClientId()));
+            userRepository.save(user);
+        } else if (!enabled && existing != null) {
+            serviceAccountRepository.delete(existing);
+            userRepository.delete(existing.getUser());
+        }
+    }
+
+    private void removeServiceAccount(String clientId) {
+        if (serviceAccountRepository == null || userRepository == null) {
+            return;
+        }
+        ServiceAccountEntity existing = serviceAccount(clientId);
+        if (existing != null) {
+            serviceAccountRepository.delete(existing);
+            userRepository.delete(existing.getUser());
+        }
+    }
+
+    private UserEntity serviceAccountUser(String clientId) {
+        UserEntity user = new UserEntity();
+        user.setUsername(serviceAccountUsername(clientId));
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        user.setEnabled(true);
+        user.setServiceAccount(true);
+        user.setEmailVerified(true);
+        user.setAuthorities(new HashSet<>());
+        user.setClientRoles(new HashSet<>());
+        user.setGroups(new HashSet<>());
+        return user;
+    }
+
+    private static String serviceAccountUsername(ServiceAccountEntity account) {
+        return account == null || account.getUser() == null
+                ? null
+                : account.getUser().getUsername();
+    }
+
+    private static String serviceAccountUsername(String clientId) {
+        return "service-account-" + clientId;
     }
 
     private static void validate(AdminClientRequestDTO request) {
@@ -264,6 +429,34 @@ public class AdminClientService {
                     ApiErrorCode.CLIENT_INVALID_PKCE,
                     "PKCE requires the authorization_code grant");
         }
+        if (request.serviceAccountEnabled()
+                && !grants.contains(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())) {
+            throw ApiException.badRequest(
+                    AUTHORIZATION_GRANT_TYPES_FIELD,
+                    ApiErrorCode.CLIENT_INVALID_GRANT_TYPES,
+                    "A service account requires the client_credentials grant");
+        }
+        if (methods.contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue())) {
+            if (!hasText(request.jwkSetUrl())) {
+                throw ApiException.badRequest(
+                        "jwkSetUrl",
+                        ApiErrorCode.CLIENT_INVALID_URI,
+                        "A JWKS URL is required for private_key_jwt");
+            }
+            if (!hasText(request.tokenEndpointAuthenticationSigningAlgorithm())) {
+                throw ApiException.badRequest(
+                        "tokenEndpointAuthenticationSigningAlgorithm",
+                        ApiErrorCode.CLIENT_INVALID_AUTHENTICATION_METHODS,
+                        "A signing algorithm is required for private_key_jwt");
+            }
+        }
+        if (methods.contains(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue())
+                && !hasText(request.x509CertificateSubjectDN())) {
+            throw ApiException.badRequest(
+                    "x509CertificateSubjectDN",
+                    ApiErrorCode.CLIENT_INVALID_AUTHENTICATION_METHODS,
+                    "A certificate subject DN is required for tls_client_auth");
+        }
 
         redirectUris.forEach(uri -> validateUri("redirectUris", "redirect URI", uri));
         nullSafe(request.postLogoutRedirectUris())
@@ -271,6 +464,12 @@ public class AdminClientService {
                         uri ->
                                 validateUri(
                                         "postLogoutRedirectUris", "post logout redirect URI", uri));
+
+        validateOptionalUri("rootUrl", "root URL", request.rootUrl());
+        validateOptionalUri("homeUrl", "home URL", request.homeUrl());
+        validateOptionalUri("adminUrl", "admin URL", request.adminUrl());
+        nullSafe(request.webOrigins()).forEach(uri -> validateUri("webOrigins", "web origin", uri));
+        validateOptionalUri("jwkSetUrl", "JWKS URL", request.jwkSetUrl());
 
         validatePositiveDuration(
                 "authorizationCodeTimeToLive",
@@ -280,6 +479,12 @@ public class AdminClientService {
                 "accessTokenTimeToLive", "access token TTL", request.accessTokenTimeToLive());
         validatePositiveDuration(
                 "refreshTokenTimeToLive", "refresh token TTL", request.refreshTokenTimeToLive());
+        validatePositiveDuration(
+                "clientSecretTimeToLive", "client secret TTL", request.clientSecretTimeToLive());
+        validatePositiveDuration(
+                "clientSecretGracePeriod",
+                "client secret grace period",
+                request.clientSecretGracePeriod());
     }
 
     private RegisteredClient save(RegisteredClient client) {
@@ -359,6 +564,68 @@ public class AdminClientService {
         values.put(ClientSecuritySettings.REQUIRE_DPOP_JKT, request.requireDpopJkt());
         values.put(ClientSecuritySettings.DPOP_REFRESH_TOKEN_ONLY, request.dpopRefreshTokenOnly());
         values.put(ClientSecuritySettings.DPOP_SIGNING_ALGORITHMS, request.dpopSigningAlgorithms());
+        if (request.enabled() != null || existing == null) {
+            values.put(
+                    ClientSecuritySettings.CLIENT_ENABLED,
+                    request.enabled() == null || request.enabled());
+        }
+        if (request.rootUrl() != null) {
+            putOrRemove(values, ClientSecuritySettings.ROOT_URL, request.rootUrl());
+        }
+        if (request.homeUrl() != null) {
+            putOrRemove(values, ClientSecuritySettings.HOME_URL, request.homeUrl());
+        }
+        if (request.adminUrl() != null) {
+            putOrRemove(values, ClientSecuritySettings.ADMIN_URL, request.adminUrl());
+        }
+        if (request.webOrigins() == null) {
+            if (existing == null) {
+                values.remove(ClientSecuritySettings.WEB_ORIGINS);
+            }
+        } else {
+            values.put(ClientSecuritySettings.WEB_ORIGINS, request.webOrigins());
+        }
+        if (request.frontChannelLogout() != null) {
+            values.put(ClientSecuritySettings.FRONT_CHANNEL_LOGOUT, request.frontChannelLogout());
+        }
+        if (request.backchannelLogout() != null) {
+            values.put(ClientSecuritySettings.BACK_CHANNEL_LOGOUT, request.backchannelLogout());
+        }
+        if (request.jwkSetUrl() != null) {
+            putOrRemove(
+                    values,
+                    org.springframework.security.oauth2.server.authorization.settings
+                            .ConfigurationSettingNames.Client.JWK_SET_URL,
+                    request.jwkSetUrl());
+        }
+        if (request.clientSecretGracePeriod() != null) {
+            values.put(
+                    ClientSecuritySettings.SECRET_GRACE_PERIOD_SECONDS,
+                    request.clientSecretGracePeriod().toSeconds());
+        }
+        if (hasText(request.tokenEndpointAuthenticationSigningAlgorithm())) {
+            SignatureAlgorithm algorithm =
+                    SignatureAlgorithm.from(request.tokenEndpointAuthenticationSigningAlgorithm());
+            if (algorithm != null) {
+                values.put(
+                        org.springframework.security.oauth2.server.authorization.settings
+                                .ConfigurationSettingNames.Client
+                                .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM,
+                        algorithm);
+            }
+        } else if (existing == null || !hasPrivateKeyJwt(request)) {
+            values.remove(
+                    org.springframework.security.oauth2.server.authorization.settings
+                            .ConfigurationSettingNames.Client
+                            .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM);
+        }
+        if (request.x509CertificateSubjectDN() != null) {
+            putOrRemove(
+                    values,
+                    org.springframework.security.oauth2.server.authorization.settings
+                            .ConfigurationSettingNames.Client.X509_CERTIFICATE_SUBJECT_DN,
+                    request.x509CertificateSubjectDN());
+        }
         settings = ClientSettings.withSettings(values).build();
         if (existing == null
                 || existing.getClientSettings().getSetting(ClientScopeSettings.DEFAULT_SCOPES)
@@ -424,6 +691,39 @@ public class AdminClientService {
                 || ClientAuthenticationMethod.CLIENT_SECRET_POST.equals(method);
     }
 
+    private static boolean hasPrivateKeyJwt(AdminClientRequestDTO request) {
+        return request.clientAuthenticationMethods()
+                .contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue());
+    }
+
+    private static Duration secretGracePeriod(RegisteredClient client) {
+        Object value =
+                client.getClientSettings()
+                        .getSetting(ClientSecuritySettings.SECRET_GRACE_PERIOD_SECONDS);
+        if (value instanceof Number number && number.longValue() > 0) {
+            return Duration.ofSeconds(number.longValue());
+        }
+        if (value instanceof String text) {
+            try {
+                long seconds = Long.parseLong(text);
+                if (seconds > 0) {
+                    return Duration.ofSeconds(seconds);
+                }
+            } catch (NumberFormatException _) {
+                // Use the safe default for legacy or malformed settings.
+            }
+        }
+        return DEFAULT_SECRET_GRACE_PERIOD;
+    }
+
+    private static void putOrRemove(Map<String, Object> values, String key, String value) {
+        if (hasText(value)) {
+            values.put(key, value.trim());
+        } else {
+            values.remove(key);
+        }
+    }
+
     private static void validateUri(String field, String label, String value) {
         if (!hasText(value)) {
             throw ApiException.badRequest(
@@ -437,6 +737,12 @@ public class AdminClientService {
         } catch (IllegalArgumentException _) {
             throw ApiException.badRequest(
                     field, ApiErrorCode.CLIENT_INVALID_URI, "Invalid " + label + ": " + value);
+        }
+    }
+
+    private static void validateOptionalUri(String field, String label, String value) {
+        if (hasText(value)) {
+            validateUri(field, label, value);
         }
     }
 

@@ -44,20 +44,27 @@ public class DomainUserDetailsService implements UserDetailsService {
                         : userRepository.findForAuthentication(username);
         return query.map(
                         user ->
-                                User.withUsername(user.getUsername())
-                                        .password(user.getPassword())
-                                        .authorities(authorities(user))
-                                        .disabled(
-                                                !user.isEnabled()
-                                                        || (loginSettingsService != null
-                                                                && loginSettingsService
-                                                                        .isVerifyEmailEnabled()
-                                                                && user.getEmail() != null
-                                                                && !user.isEmailVerified()))
-                                        .accountLocked(
-                                                accountLockService.isLocked(user, Instant.now()))
-                                        .build())
+                                user.isServiceAccount()
+                                        ? throwServiceAccountLogin(user.getUsername())
+                                        : User.withUsername(user.getUsername())
+                                                .password(user.getPassword())
+                                                .authorities(authorities(user))
+                                                .disabled(
+                                                        !user.isEnabled()
+                                                                || (loginSettingsService != null
+                                                                        && loginSettingsService
+                                                                                .isVerifyEmailEnabled()
+                                                                        && user.getEmail() != null
+                                                                        && !user.isEmailVerified()))
+                                                .accountLocked(
+                                                        accountLockService.isLocked(
+                                                                user, Instant.now()))
+                                                .build())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+    }
+
+    private static UserDetails throwServiceAccountLogin(String username) {
+        throw new UsernameNotFoundException("Service accounts cannot use form login: " + username);
     }
 
     private static String[] authorities(UserEntity user) {

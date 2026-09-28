@@ -10,6 +10,8 @@ import { ClientDetail } from "./ClientDetail";
 const SECTIONS = new Set([
   "settings",
   "credentials",
+  "mappers",
+  "evaluation",
   "scopes",
   "roles",
   "sessions",

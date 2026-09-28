@@ -57,6 +57,12 @@ public enum ApiErrorCode {
     CLIENT_SECRET_REQUIRED(
             "client_secret_required",
             "A client secret must be generated before enabling secret authentication."),
+    CLIENT_MAPPER_DUPLICATE_NAME(
+            "client_mapper_duplicate_name", "Client mapper name is already registered."),
+    CLIENT_MAPPER_SOURCE_REQUIRED(
+            "client_mapper_source_required", "A source is required for this mapper type."),
+    CLIENT_MAPPER_TARGET_REQUIRED(
+            "client_mapper_target_required", "Select at least one token target."),
     CLIENT_ROLE_DUPLICATE_NAME("client_role_duplicate_name", "Client role already exists."),
     CLIENT_ROLE_INVALID_NAME("client_role_invalid_name", "Client role name is invalid."),
     CLIENT_ROLE_ASSIGNED(

@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.service;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
@@ -33,6 +34,7 @@ public class DomainRegisteredClientService implements RegisteredClientRepository
         return clientRepository
                 .findById(id)
                 .map(entity -> registeredClientMapper.toObject(entity, mapperSupport))
+                .filter(ClientSecuritySettings::isEnabled)
                 .orElse(null);
     }
 
@@ -42,6 +44,7 @@ public class DomainRegisteredClientService implements RegisteredClientRepository
         return clientRepository
                 .findByClientId(clientId)
                 .map(entity -> registeredClientMapper.toObject(entity, mapperSupport))
+                .filter(ClientSecuritySettings::isEnabled)
                 .orElse(null);
     }
 }

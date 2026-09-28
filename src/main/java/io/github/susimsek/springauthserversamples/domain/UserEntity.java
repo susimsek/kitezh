@@ -116,6 +116,9 @@ public class UserEntity extends AuditableEntity {
     @Column(name = "enabled", nullable = false)
     private boolean enabled;
 
+    @Column(name = "service_account", nullable = false)
+    private boolean serviceAccount;
+
     @Column(name = "password_changed_at")
     private Instant passwordChangedAt;
 

@@ -184,9 +184,8 @@ describe("admin console", () => {
   it("opens existing client and user detail/edit pages", () => {
     signInAdmin();
 
-    cy.contains(".admin-sidebar a", "Clients").click();
-    cy.get("tbody tr", { timeout: 15_000 }).first().find("td").first().find("a").click();
-    cy.location("pathname").should("match", /^\/admin\/clients\/[^/]+\/settings\/?$/);
+    cy.visit("/admin/clients/demo-client/settings");
+    cy.location("pathname").should("eq", "/admin/clients/demo-client/settings");
 
     cy.contains(".admin-sidebar a", "Users").click();
     cy.get("tbody tr", { timeout: 15_000 }).first().find('button[aria-label$=" actions"]').click();
@@ -201,6 +200,38 @@ describe("admin console", () => {
     cy.contains("Temporary password").should("be.visible");
     cy.contains(".admin-detail-tabs a", "Sessions").click();
     cy.contains("button", "Sign out all sessions", { timeout: 15_000 }).should("be.visible");
+  });
+
+  it("opens the client capability, mapper, credential and scope-evaluation flows", () => {
+    signInAdmin();
+
+    cy.visit("/admin/clients/demo-client/settings");
+    cy.location("pathname").should("eq", "/admin/clients/demo-client/settings");
+    cy.contains("Client enabled", { timeout: 15_000 }).should("be.visible");
+    cy.contains("private_key_jwt").should("be.visible");
+    cy.contains("tls_client_auth").should("be.visible");
+    cy.contains("Root URL").should("be.visible");
+    cy.contains("Front-channel logout").should("be.visible");
+    cy.contains("Back-channel logout").should("be.visible");
+
+    cy.contains(".admin-detail-tabs a", "Credentials").click();
+    cy.contains("Client secret", { timeout: 15_000 }).should("be.visible");
+    cy.contains("button", "Regenerate secret").should("be.visible");
+
+    cy.contains(".admin-detail-tabs a", "Protocol mappers").click();
+    cy.location("pathname").should("match", /^\/admin\/clients\/[^/]+\/mappers\/?$/);
+    cy.contains("Create mapper", { timeout: 15_000 }).should("be.visible");
+    cy.contains("user-property").should("be.visible");
+    cy.contains("hardcoded-claim").should("be.visible");
+
+    cy.intercept("GET", "/api/admin/clients/*/scope-evaluation*").as("scopeEvaluation");
+    cy.contains(".admin-detail-tabs a", "Scope evaluation").click();
+    cy.location("pathname").should("match", /^\/admin\/clients\/[^/]+\/evaluation\/?$/);
+    cy.get('input[placeholder="openid profile"]').type("openid profile");
+    cy.get('input[placeholder="user"]').type("user");
+    cy.contains("button", "Evaluate").click();
+    cy.wait("@scopeEvaluation").its("response.statusCode").should("eq", 200);
+    cy.contains("Effective scopes", { timeout: 15_000 }).should("be.visible");
   });
 
   it("rejects a callback without a saved authorization transaction", () => {

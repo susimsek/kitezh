@@ -35,4 +35,5 @@
 	<include file="db/changelog/changes/024-add-ldap-synchronization.xml"/>
 	<include file="db/changelog/changes/025-add-ldap-sync-membership.xml"/>
 	<include file="db/changelog/changes/026-add-ldap-connection-options.xml"/>
+	<include file="db/changelog/changes/027-client-service-accounts-and-mappers.xml"/>
 </databaseChangeLog>

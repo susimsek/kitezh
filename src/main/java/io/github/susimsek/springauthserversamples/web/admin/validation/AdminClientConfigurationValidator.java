@@ -19,6 +19,9 @@ public class AdminClientConfigurationValidator
             Set.of(
                     ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue(),
                     ClientAuthenticationMethod.CLIENT_SECRET_POST.getValue(),
+                    ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue(),
+                    ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue(),
+                    ClientAuthenticationMethod.SELF_SIGNED_TLS_CLIENT_AUTH.getValue(),
                     ClientAuthenticationMethod.NONE.getValue());
     private static final Set<String> ALLOWED_GRANTS =
             Set.of(
@@ -51,6 +54,20 @@ public class AdminClientConfigurationValidator
                         && grants.contains(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()))) {
             valid = false;
             violation(context, AUTHORIZATION_GRANT_TYPES_FIELD, SELECTION_MESSAGE);
+        }
+        if (methods.contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue())
+                && (request.jwkSetUrl() == null
+                        || request.jwkSetUrl().isBlank()
+                        || request.tokenEndpointAuthenticationSigningAlgorithm() == null
+                        || request.tokenEndpointAuthenticationSigningAlgorithm().isBlank())) {
+            valid = false;
+            violation(context, CLIENT_AUTHENTICATION_METHODS_FIELD, SELECTION_MESSAGE);
+        }
+        if (methods.contains(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue())
+                && (request.x509CertificateSubjectDN() == null
+                        || request.x509CertificateSubjectDN().isBlank())) {
+            valid = false;
+            violation(context, CLIENT_AUTHENTICATION_METHODS_FIELD, SELECTION_MESSAGE);
         }
 
         boolean authorizationCode =

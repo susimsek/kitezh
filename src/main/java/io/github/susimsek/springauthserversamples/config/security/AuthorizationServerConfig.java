@@ -5,19 +5,24 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
+import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
 import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
+import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationEndpointErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
+import io.github.susimsek.springauthserversamples.security.RotatingClientSecretAuthenticationProvider;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import java.text.ParseException;
@@ -41,6 +46,7 @@ import org.springframework.security.config.annotation.web.configuration.OAuth2Au
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -89,6 +95,7 @@ public class AuthorizationServerConfig {
             HttpSecurity http,
             OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
             RegisteredClientRepository registeredClientRepository,
+            PasswordEncoder passwordEncoder,
             RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
             MfaAuthorizationFilter mfaAuthorizationFilter,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
@@ -138,6 +145,10 @@ public class AuthorizationServerConfig {
                                                         clientAuthentication
                                                                 .authenticationConverter(
                                                                         new ConsolePublicClientAuthenticationConverter())
+                                                                .authenticationProvider(
+                                                                        new RotatingClientSecretAuthenticationProvider(
+                                                                                registeredClientRepository,
+                                                                                passwordEncoder))
                                                                 .authenticationProvider(
                                                                         new ConsolePublicClientAuthenticationProvider(
                                                                                 registeredClientRepository))
@@ -199,6 +210,26 @@ public class AuthorizationServerConfig {
         return http.build();
     }
 
+    SecurityFilterChain authorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+            RegisteredClientRepository registeredClientRepository,
+            RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
+            MfaAuthorizationFilter mfaAuthorizationFilter,
+            SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
+            SecurityContextRepository securityContextRepository) {
+        return authorizationServerSecurityFilterChain(
+                http,
+                tokenGenerator,
+                registeredClientRepository,
+                org.springframework.security.crypto.factory.PasswordEncoderFactories
+                        .createDelegatingPasswordEncoder(),
+                requiredActionAuthorizationFilter,
+                mfaAuthorizationFilter,
+                socialProviderLogoutSuccessHandler,
+                securityContextRepository);
+    }
+
     private static MediaTypeRequestMatcher htmlRequestMatcher() {
         MediaTypeRequestMatcher requestMatcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
         requestMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
@@ -255,6 +286,9 @@ public class AuthorizationServerConfig {
             UserAvatarRepository userAvatarRepository,
             AuthorizationRepository authorizationRepository,
             ClientScopeRepository clientScopeRepository,
+            ClientMapperRepository clientMapperRepository,
+            ServiceAccountRepository serviceAccountRepository,
+            UserProfileAttributeRepository userProfileAttributeRepository,
             SocialIdentityRepository socialIdentityRepository,
             ObjectMapper objectMapper) {
         return jwtTokenCustomizer(
@@ -262,6 +296,9 @@ public class AuthorizationServerConfig {
                 userAvatarRepository,
                 authorizationRepository,
                 clientScopeRepository,
+                clientMapperRepository,
+                serviceAccountRepository,
+                userProfileAttributeRepository,
                 false,
                 socialIdentityRepository,
                 objectMapper);
@@ -276,9 +313,32 @@ public class AuthorizationServerConfig {
                 userAvatarRepository,
                 authorizationRepository,
                 null,
+                null,
+                null,
+                null,
                 true,
                 null,
                 null);
+    }
+
+    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+            UserRepository userRepository,
+            UserAvatarRepository userAvatarRepository,
+            AuthorizationRepository authorizationRepository,
+            ClientScopeRepository clientScopeRepository,
+            SocialIdentityRepository socialIdentityRepository,
+            ObjectMapper objectMapper) {
+        return jwtTokenCustomizer(
+                userRepository,
+                userAvatarRepository,
+                authorizationRepository,
+                clientScopeRepository,
+                null,
+                null,
+                null,
+                false,
+                socialIdentityRepository,
+                objectMapper);
     }
 
     private OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
@@ -286,14 +346,27 @@ public class AuthorizationServerConfig {
             UserAvatarRepository userAvatarRepository,
             AuthorizationRepository authorizationRepository,
             ClientScopeRepository clientScopeRepository,
+            ClientMapperRepository clientMapperRepository,
+            ServiceAccountRepository serviceAccountRepository,
+            UserProfileAttributeRepository userProfileAttributeRepository,
             boolean legacyAdminGroups,
             SocialIdentityRepository socialIdentityRepository,
             ObjectMapper objectMapper) {
         return context -> {
             boolean adminAccessToken = isAdminAccessToken(context);
             List<ClientScopeEntity> groupMappers = groupMappers(context, clientScopeRepository);
+            List<ClientMapperEntity> clientMappers = clientMappers(context, clientMapperRepository);
             Optional<UserEntity> tokenUser =
-                    tokenUser(context, userRepository, adminAccessToken, groupMappers);
+                    tokenUser(
+                            context,
+                            userRepository,
+                            adminAccessToken,
+                            groupMappers,
+                            clientMappers,
+                            serviceAccountRepository);
+            tokenUser
+                    .filter(UserEntity::isServiceAccount)
+                    .ifPresent(user -> context.getClaims().subject(user.getUsername()));
             appendMappedClaims(context, tokenUser, socialIdentityRepository, objectMapper);
             appendUserClaims(context, tokenUser, userAvatarRepository, applicationProperties);
             appendNonceClaim(context);
@@ -301,6 +374,7 @@ public class AuthorizationServerConfig {
             appendRealmRoleClaims(context, tokenUser);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
             appendClientRoleClaims(context, tokenUser);
+            appendClientMappers(context, tokenUser, clientMappers, userProfileAttributeRepository);
             appendSessionIdClaim(context, authorizationRepository);
             appendDpopConfirmationClaim(context);
         };
@@ -320,16 +394,42 @@ public class AuthorizationServerConfig {
                         .toList();
     }
 
+    private static List<ClientMapperEntity> clientMappers(
+            JwtEncodingContext context, ClientMapperRepository repository) {
+        return repository == null || context.getRegisteredClient() == null
+                ? List.of()
+                : repository.findAllByClientIdOrderByPriorityAscNameAsc(
+                        context.getRegisteredClient().getId());
+    }
+
     private static Optional<UserEntity> tokenUser(
             JwtEncodingContext context,
             UserRepository userRepository,
             boolean adminAccessToken,
-            List<ClientScopeEntity> groupMappers) {
+            List<ClientScopeEntity> groupMappers,
+            List<ClientMapperEntity> clientMappers,
+            ServiceAccountRepository serviceAccountRepository) {
+        if (serviceAccountRepository != null
+                && context.getRegisteredClient() != null
+                && AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
+                        context.getAuthorizationGrantType())) {
+            Optional<UserEntity> serviceAccount =
+                    serviceAccountRepository
+                            .findByClientId(context.getRegisteredClient().getId())
+                            .flatMap(
+                                    account ->
+                                            userRepository.findByUsername(
+                                                    account.getUser().getUsername()));
+            if (serviceAccount.isPresent()) {
+                return serviceAccount;
+            }
+        }
         if (isUserProfileToken(context)
                 || isUserEmailToken(context)
                 || isUserLocaleToken(context)
                 || adminAccessToken
                 || !groupMappers.isEmpty()
+                || !clientMappers.isEmpty()
                 || isRoleToken(context)
                 || isUserSocialClaimsToken(context)) {
             return userRepository.findByUsername(context.getPrincipal().getName());
@@ -478,9 +578,131 @@ public class AuthorizationServerConfig {
         context.getClaims().claim("resource_access", resourceAccess);
     }
 
+    private static void appendClientMappers(
+            JwtEncodingContext context,
+            Optional<UserEntity> tokenUser,
+            List<ClientMapperEntity> mappers,
+            UserProfileAttributeRepository attributeRepository) {
+        if (mappers.isEmpty()) {
+            return;
+        }
+        boolean idToken = OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue());
+        boolean accessToken = OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType());
+        UserEntity user = tokenUser.get();
+        mappers.stream()
+                .filter(
+                        mapper ->
+                                (idToken && mapper.isAddToIdToken())
+                                        || (accessToken && mapper.isAddToAccessToken()))
+                .forEach(
+                        mapper -> {
+                            Object value =
+                                    switch (mapper.getMapperType()) {
+                                        case "audience", "hardcoded-claim" -> mapper.getValue();
+                                        case "user-property" ->
+                                                tokenUser
+                                                        .map(
+                                                                accountUser ->
+                                                                        userProperty(
+                                                                                accountUser,
+                                                                                mapper.getSource()))
+                                                        .orElse(null);
+                                        case "user-attribute" ->
+                                                tokenUser
+                                                        .map(
+                                                                accountUser ->
+                                                                        userAttribute(
+                                                                                accountUser,
+                                                                                mapper.getSource(),
+                                                                                attributeRepository))
+                                                        .orElse(null);
+                                        case "group-membership" ->
+                                                tokenUser
+                                                        .map(
+                                                                accountUser ->
+                                                                        accountUser
+                                                                                .getGroups()
+                                                                                .stream()
+                                                                                .map(
+                                                                                        AuthorizationServerConfig
+                                                                                                ::groupPath)
+                                                                                .sorted()
+                                                                                .toList())
+                                                        .orElse(null);
+                                        case "client-role" ->
+                                                tokenUser
+                                                        .map(
+                                                                accountUser ->
+                                                                        EffectiveRoleService
+                                                                                .effectiveClientRoleNames(
+                                                                                        accountUser)
+                                                                                .getOrDefault(
+                                                                                        context.getRegisteredClient()
+                                                                                                .getClientId(),
+                                                                                        Set.of()))
+                                                        .orElse(null);
+                                        case "email" ->
+                                                tokenUser.map(UserEntity::getEmail).orElse(null);
+                                        case "full-name" ->
+                                                tokenUser
+                                                        .map(AuthorizationServerConfig::fullName)
+                                                        .orElse(null);
+                                        case "locale" ->
+                                                tokenUser
+                                                        .map(UserEntity::getPreferredLocale)
+                                                        .orElse(null);
+                                        case "username" ->
+                                                tokenUser.map(UserEntity::getUsername).orElse(null);
+                                        default -> null;
+                                    };
+                            if (value != null) {
+                                context.getClaims().claim(mapper.getClaimName(), value);
+                            }
+                        });
+    }
+
+    private static String fullName(UserEntity user) {
+        return java.util.stream.Stream.of(user.getFirstName(), user.getLastName())
+                .filter(value -> value != null && !value.isBlank())
+                .collect(Collectors.joining(" "));
+    }
+
+    private static Object userProperty(UserEntity user, String source) {
+        return switch (source == null ? "" : source) {
+            case "username" -> user.getUsername();
+            case "firstName" -> user.getFirstName();
+            case "lastName" -> user.getLastName();
+            case "email" -> user.getEmail();
+            case "preferredLocale" -> user.getPreferredLocale();
+            default -> null;
+        };
+    }
+
+    private static Object userAttribute(
+            UserEntity user, String source, UserProfileAttributeRepository attributeRepository) {
+        if (attributeRepository == null || source == null || source.isBlank()) {
+            return null;
+        }
+        List<String> values =
+                attributeRepository
+                        .findAllByUserIdOrderByDefinitionDisplayOrderAscDefinitionNameAscPositionAsc(
+                                user.getId())
+                        .stream()
+                        .filter(attribute -> source.equals(attribute.getDefinition().getName()))
+                        .map(
+                                io.github.susimsek.springauthserversamples.domain
+                                                .UserProfileAttributeEntity
+                                        ::getValue)
+                        .toList();
+        return values.isEmpty() ? null : values.size() == 1 ? values.getFirst() : values;
+    }
+
     private static void appendRealmRoleClaims(
             JwtEncodingContext context, Optional<UserEntity> tokenUser) {
-        if (!isRoleToken(context) || tokenUser.isEmpty()) {
+        if (!isRoleToken(context)
+                || AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
+                        context.getAuthorizationGrantType())
+                || tokenUser.isEmpty()) {
             return;
         }
         Set<String> roles = EffectiveRoleService.effectiveRoleNames(tokenUser.get());
@@ -640,6 +862,8 @@ public class AuthorizationServerConfig {
                 && (AuthorizationGrantType.AUTHORIZATION_CODE.equals(
                                 context.getAuthorizationGrantType())
                         || AuthorizationGrantType.REFRESH_TOKEN.equals(
+                                context.getAuthorizationGrantType())
+                        || AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                                 context.getAuthorizationGrantType()));
     }
 
