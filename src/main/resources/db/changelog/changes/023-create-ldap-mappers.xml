@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="023-create-ldap-federation-mapper-sequence" author="susimsek">
+        <createSequence sequenceName="ldap_mapper_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+    </changeSet>
+
+    <changeSet id="024-create-ldap-federation-mappers" author="susimsek">
+        <createTable tableName="ldap_federation_mappers">
+            <column name="id" type="bigint" defaultValueSequenceNext="ldap_mapper_seq"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_ldap_federation_mappers"/></column>
+            <column name="provider_id" type="varchar(36)"><constraints nullable="false"/></column>
+            <column name="name" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="mapper_type" type="varchar(40)"><constraints nullable="false"/></column>
+            <column name="enabled" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="ldap_attribute" type="varchar(100)"/>
+            <column name="user_attribute" type="varchar(100)"/>
+            <column name="hardcoded_value" type="varchar(2000)"/>
+            <column name="target_name" type="varchar(200)"/>
+            <column name="group_search_base" type="varchar(1000)"/>
+            <column name="group_object_class" type="varchar(100)" defaultValue="groupOfNames"/>
+            <column name="group_name_attribute" type="varchar(100)" defaultValue="cn"/>
+            <column name="group_member_attribute" type="varchar(100)" defaultValue="member"/>
+        </createTable>
+        <addUniqueConstraint tableName="ldap_federation_mappers" columnNames="provider_id, name" constraintName="uk_ldap_federation_mapper_name"/>
+        <addForeignKeyConstraint baseTableName="ldap_federation_mappers" baseColumnNames="provider_id" constraintName="fk_ldap_mapper_provider" referencedTableName="ldap_federation_providers" referencedColumnNames="id" onDelete="CASCADE"/>
+        <createIndex indexName="idx_ldap_mapper_provider" tableName="ldap_federation_mappers"><column name="provider_id"/></createIndex>
+    </changeSet>
+</databaseChangeLog>

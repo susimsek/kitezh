@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,63 @@ public class LdapFederationWriteService {
                         identity ->
                                 updateDirectory(
                                         identity, requestedUsername, email, firstName, lastName));
+    }
+
+    @Transactional
+    public void registerUser(UserEntity user, String password) {
+        settingsService.enabledProviders().stream()
+                .filter(LdapFederationProviderEntity::isSyncRegistrations)
+                .filter(provider -> "WRITABLE".equals(provider.getEditMode()))
+                .findFirst()
+                .ifPresent(
+                        provider -> {
+                            String distinguishedName =
+                                    directoryClient.registerUser(
+                                            settingsService.configuration(provider, null),
+                                            user.getUsername(),
+                                            user.getEmail(),
+                                            user.getFirstName(),
+                                            user.getLastName(),
+                                            password);
+                            identityRepository.save(
+                                    new LdapFederationIdentityEntity(
+                                            distinguishedName, distinguishedName, provider, user));
+                        });
+    }
+
+    @Transactional
+    public boolean changePassword(UserEntity user, String currentPassword, String newPassword) {
+        LdapFederationIdentityEntity identity =
+                identityRepository.findByUserUsername(user.getUsername()).orElse(null);
+        if (identity == null || "UNSYNCED".equals(identity.getProvider().getEditMode())) {
+            return false;
+        }
+        LdapFederationProviderEntity provider = identity.getProvider();
+        if (!"WRITABLE".equals(provider.getEditMode())) {
+            throw ApiException.forbidden(
+                    ApiErrorCode.LDAP_READ_ONLY, "The LDAP password is read-only");
+        }
+        try {
+            directoryClient.authenticate(
+                    settingsService.configuration(provider, null),
+                    user.getUsername(),
+                    currentPassword);
+            directoryClient.updatePassword(
+                    settingsService.configuration(provider, null),
+                    identity.getDistinguishedName(),
+                    newPassword);
+            return true;
+        } catch (BadCredentialsException exception) {
+            throw ApiException.badRequest(
+                    "currentPassword",
+                    ApiErrorCode.INVALID_CURRENT_PASSWORD,
+                    "The current LDAP password is incorrect");
+        } catch (RuntimeException exception) {
+            throw ApiException.serverError(
+                    ApiErrorCode.LDAP_WRITE_FAILED,
+                    "The LDAP password could not be updated",
+                    exception);
+        }
     }
 
     private void updateDirectory(

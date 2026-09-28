@@ -136,4 +136,137 @@ public record AdminLdapProviderRequestDTO(
                         description = "Trust directory email as verified.",
                         example = "false",
                         requiredMode = Schema.RequiredMode.REQUIRED)
-                boolean trustEmail) {}
+                boolean trustEmail,
+        @Schema(description = "Create application registrations in LDAP.")
+                boolean syncRegistrations,
+        @Min(0)
+                @Max(525600)
+                @Schema(description = "Periodic full synchronization interval in minutes.")
+                int fullSyncIntervalMinutes,
+        @Min(0)
+                @Max(525600)
+                @Schema(description = "Periodic changed-user synchronization interval in minutes.")
+                int changedSyncIntervalMinutes,
+        @Schema(
+                        description = "Directory vendor profile.",
+                        allowableValues = {"LDAP", "ACTIVE_DIRECTORY"},
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                @NotNull
+                @Pattern(regexp = "LDAP|ACTIVE_DIRECTORY")
+                String vendor,
+        @Schema(
+                        description = "Bind authentication mechanism.",
+                        allowableValues = {"SIMPLE", "KERBEROS"},
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                @NotNull
+                @Pattern(regexp = "SIMPLE|KERBEROS")
+                String authenticationType,
+        @Schema(description = "Use LDAP StartTLS on ldap:// connections.") boolean startTls,
+        @Schema(
+                        description =
+                                "Truststore path used for LDAPS or StartTLS certificate"
+                                        + " validation.",
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                        nullable = true)
+                @Size(max = 1000)
+                String trustStorePath,
+        @Schema(
+                        description = "Truststore password; blank keeps the current password.",
+                        writeOnly = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                        nullable = true)
+                @Size(max = 2000)
+                String trustStorePassword,
+        @Schema(
+                        description = "Truststore type.",
+                        allowableValues = {"JKS", "PKCS12"},
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                @NotNull
+                @Pattern(regexp = "JKS|PKCS12")
+                String trustStoreType,
+        @Schema(description = "Enable the JNDI LDAP connection pool.") boolean connectionPooling,
+        @Schema(
+                        description = "LDAP referral handling.",
+                        allowableValues = {"FOLLOW", "IGNORE", "THROW"},
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                @NotNull
+                @Pattern(regexp = "FOLLOW|IGNORE|THROW")
+                String referral,
+        @Schema(
+                        description = "LDAP connect timeout in milliseconds.",
+                        minimum = "100",
+                        maximum = "600000")
+                @Min(100)
+                @Max(600000)
+                int connectTimeoutMs,
+        @Schema(
+                        description = "LDAP read timeout in milliseconds.",
+                        minimum = "100",
+                        maximum = "600000")
+                @Min(100)
+                @Max(600000)
+                int readTimeoutMs,
+        @Schema(
+                        description = "Maximum users returned by one synchronization page.",
+                        minimum = "1",
+                        maximum = "10000")
+                @Min(1)
+                @Max(10000)
+                int batchSize) {
+
+    public AdminLdapProviderRequestDTO(
+            String id,
+            String name,
+            boolean enabled,
+            int priority,
+            String connectionUrl,
+            String bindDn,
+            String bindPassword,
+            String usersDn,
+            String usernameAttribute,
+            String uuidAttribute,
+            String emailAttribute,
+            String firstNameAttribute,
+            String lastNameAttribute,
+            String rdnAttribute,
+            String objectClasses,
+            String searchScope,
+            String editMode,
+            boolean importUsers,
+            boolean trustEmail) {
+        this(
+                id,
+                name,
+                enabled,
+                priority,
+                connectionUrl,
+                bindDn,
+                bindPassword,
+                usersDn,
+                usernameAttribute,
+                uuidAttribute,
+                emailAttribute,
+                firstNameAttribute,
+                lastNameAttribute,
+                rdnAttribute,
+                objectClasses,
+                searchScope,
+                editMode,
+                importUsers,
+                trustEmail,
+                false,
+                0,
+                0,
+                "LDAP",
+                "SIMPLE",
+                false,
+                null,
+                null,
+                "JKS",
+                false,
+                "THROW",
+                5000,
+                5000,
+                500);
+    }
+}

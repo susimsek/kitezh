@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.BadCredentialsException;
 
 class LdapAuthenticationServiceTest {
 
@@ -158,14 +157,16 @@ class LdapAuthenticationServiceTest {
     }
 
     @Test
-    void rejectsAUserWhenImportIsDisabled() {
+    void authenticatesAUserWithoutPersistingWhenImportIsDisabled() {
         provider.setImportUsers(false);
         when(directoryClient.authenticate(configuration, "alice", "directory-password"))
                 .thenReturn(externalUser("object-id"));
 
-        assertThatThrownBy(() -> service.authenticate("alice", "directory-password"))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("LDAP user import is disabled");
+        UserEntity user = service.authenticate("alice", "directory-password");
+
+        assertThat(user).extracting(UserEntity::getUsername).isEqualTo("alice");
+        org.mockito.Mockito.verify(userRepository, org.mockito.Mockito.never())
+                .save(any(UserEntity.class));
     }
 
     @Test

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
@@ -26,6 +27,7 @@ import javax.naming.directory.DirContext;
 import javax.naming.directory.ModificationItem;
 import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
+import javax.net.ssl.SSLSocketFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -296,6 +298,32 @@ class LdapDirectoryClientTest {
     }
 
     @Test
+    void searchesOnlyEntriesChangedSinceThePreviousSynchronization() throws NamingException {
+        DirContext context = mock(DirContext.class);
+        NamingEnumeration<SearchResult> results = results(false, null);
+        when(context.search(
+                        anyString(), anyString(), any(Object[].class), any(SearchControls.class)))
+                .thenReturn(results);
+        LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
+
+        client.searchUsers(configuration("SUBTREE"), Instant.parse("2026-09-27T10:11:12Z"));
+
+        ArgumentCaptor<String> filterCaptor = ArgumentCaptor.forClass(String.class);
+        verify(context)
+                .search(
+                        eq("ou=users,dc=example,dc=com"),
+                        filterCaptor.capture(),
+                        any(Object[].class),
+                        any(SearchControls.class));
+        assertThat(filterCaptor.getValue())
+                .isEqualTo(
+                        "(&(&(objectClass=inetOrgPerson))"
+                                + "(|(modifyTimestamp>=20260927101112Z)"
+                                + "(whenChanged>=20260927101112Z)))");
+        verify(context).close();
+    }
+
+    @Test
     void rejectsUnsupportedSearchScopes() throws NamingException {
         DirContext context = mock(DirContext.class);
         LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
@@ -373,6 +401,105 @@ class LdapDirectoryClientTest {
                 .hasMessage("LDAP user update failed")
                 .hasCauseInstanceOf(NamingException.class);
         verify(context).close();
+    }
+
+    @Test
+    void configuresAdvancedConnectionOptions() throws NamingException {
+        DirContext context = mock(DirContext.class);
+        List<Hashtable<String, Object>> environments = new ArrayList<>();
+        LdapDirectoryClient client =
+                new LdapDirectoryClient(
+                        environment -> {
+                            environments.add(environment);
+                            return context;
+                        });
+
+        client.testConnection(
+                advancedConfiguration("LDAP", "ldaps://directory.example.com:636", false));
+
+        assertThat(environments)
+                .singleElement()
+                .satisfies(
+                        environment ->
+                                assertThat(environment)
+                                        .containsEntry("java.naming.referral", "follow")
+                                        .containsEntry("com.sun.jndi.ldap.connect.timeout", "1234")
+                                        .containsEntry("com.sun.jndi.ldap.read.timeout", "2345")
+                                        .containsEntry("com.sun.jndi.ldap.connect.pool", "true"));
+    }
+
+    @Test
+    void writesActiveDirectoryUnicodePasswordsAndRegistrationAttributes() throws NamingException {
+        DirContext context = mock(DirContext.class);
+        DirContext created = mock(DirContext.class);
+        when(context.createSubcontext(anyString(), any(Attributes.class))).thenReturn(created);
+        LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
+        LdapDirectoryClient.Configuration configuration =
+                advancedConfiguration(
+                        "ACTIVE_DIRECTORY", "ldaps://directory.example.com:636", false);
+
+        client.updatePassword(configuration, "CN=alice,OU=Users,DC=example,DC=com", "secret");
+        client.registerUser(
+                configuration, "alice", "alice@example.com", "Alice", "Example", "secret");
+
+        ArgumentCaptor<ModificationItem[]> changes =
+                ArgumentCaptor.forClass(ModificationItem[].class);
+        verify(context)
+                .modifyAttributes(eq("CN=alice,OU=Users,DC=example,DC=com"), changes.capture());
+        assertThat(changes.getValue()[0].getAttribute().getID()).isEqualTo("unicodePwd");
+        assertThat((byte[]) changes.getValue()[0].getAttribute().get())
+                .isEqualTo("\"secret\"".getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
+        verify(context).createSubcontext(anyString(), any(Attributes.class));
+        verify(created).close();
+        verify(context, org.mockito.Mockito.times(2)).close();
+    }
+
+    @Test
+    void rejectsInsecureActiveDirectoryPasswordOperations() {
+        LdapDirectoryClient client = new LdapDirectoryClient(environment -> mock(DirContext.class));
+        LdapDirectoryClient.Configuration configuration =
+                advancedConfiguration(
+                        "ACTIVE_DIRECTORY", "ldap://directory.example.com:389", false);
+
+        assertThatThrownBy(() -> client.updatePassword(configuration, "uid=alice", "secret"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Active Directory password operations require LDAPS or StartTLS");
+        assertThatThrownBy(
+                        () ->
+                                client.registerUser(
+                                        configuration,
+                                        "alice",
+                                        "alice@example.com",
+                                        "Alice",
+                                        "Example",
+                                        "secret"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Active Directory password operations require LDAPS or StartTLS");
+    }
+
+    @Test
+    void delegatesConfiguredSslSocketFactoryOperations() throws Exception {
+        SSLSocketFactory delegate = mock(SSLSocketFactory.class);
+        LdapDirectoryClient.ConfiguredSslSocketFactory factory =
+                new LdapDirectoryClient.ConfiguredSslSocketFactory(delegate);
+        java.net.Socket socket = new java.net.Socket();
+        java.net.InetAddress address = java.net.InetAddress.getLoopbackAddress();
+
+        factory.getDefaultCipherSuites();
+        factory.getSupportedCipherSuites();
+        factory.createSocket(socket, "localhost", 636, true);
+        factory.createSocket("localhost", 636);
+        factory.createSocket("localhost", 636, address, 0);
+        factory.createSocket(address, 636);
+        factory.createSocket(address, 636, address, 0);
+
+        verify(delegate).getDefaultCipherSuites();
+        verify(delegate).getSupportedCipherSuites();
+        verify(delegate).createSocket(socket, "localhost", 636, true);
+        verify(delegate).createSocket("localhost", 636);
+        verify(delegate).createSocket("localhost", 636, address, 0);
+        verify(delegate).createSocket(address, 636);
+        verify(delegate).createSocket(address, 636, address, 0);
     }
 
     private static void assertServiceBind(Hashtable<String, Object> environment) {
@@ -455,5 +582,33 @@ class LdapDirectoryClientTest {
                 "uid",
                 objectClasses,
                 scope);
+    }
+
+    private static LdapDirectoryClient.Configuration advancedConfiguration(
+            String vendor, String connectionUrl, boolean startTls) {
+        return new LdapDirectoryClient.Configuration(
+                connectionUrl,
+                "cn=admin,dc=example,dc=com",
+                "bind-password",
+                "ou=users,dc=example,dc=com",
+                "uid",
+                "entryUUID",
+                "mail",
+                "givenName",
+                "sn",
+                "uid",
+                "inetOrgPerson",
+                "SUBTREE",
+                vendor,
+                "SIMPLE",
+                startTls,
+                null,
+                null,
+                "JKS",
+                true,
+                "FOLLOW",
+                1234,
+                2345,
+                2);
     }
 }

@@ -90,6 +90,10 @@ public class LdapFederationSettingsService {
         return secretCipher.decrypt(provider.getBindPasswordEncrypted());
     }
 
+    String trustStorePassword(LdapFederationProviderEntity provider) {
+        return secretCipher.decrypt(provider.getTrustStorePasswordEncrypted());
+    }
+
     LdapDirectoryClient.Configuration configuration(
             LdapFederationProviderEntity provider, String candidatePassword) {
         String password =
@@ -108,7 +112,18 @@ public class LdapFederationSettingsService {
                 provider.getLastNameAttribute(),
                 provider.getRdnAttribute(),
                 provider.getObjectClasses(),
-                provider.getSearchScope());
+                provider.getSearchScope(),
+                provider.getVendor(),
+                provider.getAuthenticationType(),
+                provider.isStartTls(),
+                provider.getTrustStorePath(),
+                trustStorePassword(provider),
+                provider.getTrustStoreType(),
+                provider.isConnectionPooling(),
+                provider.getReferral(),
+                provider.getConnectTimeoutMs(),
+                provider.getReadTimeoutMs(),
+                provider.getBatchSize());
     }
 
     private LdapFederationProviderEntity findOrCreate(String id) {
@@ -144,8 +159,24 @@ public class LdapFederationSettingsService {
         entity.setEditMode(value.editMode().toUpperCase(Locale.ROOT));
         entity.setImportUsers(value.importUsers());
         entity.setTrustEmail(value.trustEmail());
+        entity.setSyncRegistrations(value.syncRegistrations());
+        entity.setFullSyncIntervalMinutes(value.fullSyncIntervalMinutes());
+        entity.setChangedSyncIntervalMinutes(value.changedSyncIntervalMinutes());
+        entity.setVendor(value.vendor().toUpperCase(Locale.ROOT));
+        entity.setAuthenticationType(value.authenticationType().toUpperCase(Locale.ROOT));
+        entity.setStartTls(value.startTls());
+        entity.setTrustStorePath(normalize(value.trustStorePath()));
+        entity.setTrustStoreType(value.trustStoreType().toUpperCase(Locale.ROOT));
+        entity.setConnectionPooling(value.connectionPooling());
+        entity.setReferral(value.referral().toUpperCase(Locale.ROOT));
+        entity.setConnectTimeoutMs(value.connectTimeoutMs());
+        entity.setReadTimeoutMs(value.readTimeoutMs());
+        entity.setBatchSize(value.batchSize());
         if (value.bindPassword() != null && !value.bindPassword().isBlank()) {
             entity.setBindPasswordEncrypted(secretCipher.encrypt(value.bindPassword()));
+        }
+        if (value.trustStorePassword() != null && !value.trustStorePassword().isBlank()) {
+            entity.setTrustStorePasswordEncrypted(secretCipher.encrypt(value.trustStorePassword()));
         }
     }
 
@@ -170,7 +201,25 @@ public class LdapFederationSettingsService {
                 value.getSearchScope(),
                 value.getEditMode(),
                 value.isImportUsers(),
-                value.isTrustEmail());
+                value.isTrustEmail(),
+                value.isSyncRegistrations(),
+                value.getFullSyncIntervalMinutes(),
+                value.getChangedSyncIntervalMinutes(),
+                value.getLastSyncAt(),
+                value.getLastSyncStatus(),
+                value.getLastSyncError(),
+                value.getLastSyncImported(),
+                value.getLastSyncUpdated(),
+                value.getVendor(),
+                value.getAuthenticationType(),
+                value.isStartTls(),
+                value.getTrustStorePath(),
+                value.getTrustStoreType(),
+                value.isConnectionPooling(),
+                value.getReferral(),
+                value.getConnectTimeoutMs(),
+                value.getReadTimeoutMs(),
+                value.getBatchSize());
     }
 
     private static void assertUniqueNames(List<AdminLdapProviderRequestDTO> providers) {

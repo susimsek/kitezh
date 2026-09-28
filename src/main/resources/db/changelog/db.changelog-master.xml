@@ -31,4 +31,8 @@
 	<include file="db/changelog/changes/020-client-roles.xml"/>
 	<include file="db/changelog/changes/021-create-ldap-federation.xml"/>
 	<include file="db/changelog/changes/022-composite-roles.xml"/>
+	<include file="db/changelog/changes/023-create-ldap-mappers.xml"/>
+	<include file="db/changelog/changes/024-add-ldap-synchronization.xml"/>
+	<include file="db/changelog/changes/025-add-ldap-sync-membership.xml"/>
+	<include file="db/changelog/changes/026-add-ldap-connection-options.xml"/>
 </databaseChangeLog>

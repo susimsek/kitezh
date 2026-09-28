@@ -206,6 +206,7 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void addsRealmAndCrossClientCompositeRolesToRoleToken() {
         UserEntity user = new UserEntity();
         AuthorityEntity administrator = new AuthorityEntity(1L, "ROLE_ADMINISTRATOR");
@@ -237,10 +238,11 @@ class AuthorizationServerConfigTest {
                                 "orders-api",
                                 Set.of("roles")));
 
-        assertThat(claims.build().getClaims())
-                .containsEntry(
-                        "realm_access",
-                        Map.of("roles", List.of("ROLE_ADMINISTRATOR", "ROLE_AUDITOR")))
+        Map<String, Object> tokenClaims = claims.build().getClaims();
+        Map<String, Object> realmAccess = (Map<String, Object>) tokenClaims.get("realm_access");
+        assertThat((List<String>) realmAccess.get("roles"))
+                .containsExactlyInAnyOrder("ROLE_ADMINISTRATOR", "ROLE_AUDITOR");
+        assertThat(tokenClaims)
                 .containsEntry(
                         "resource_access",
                         Map.of(

@@ -74,6 +74,18 @@ class AdminLdapEndpointsIT {
         provider.put("editMode", "READ_ONLY");
         provider.put("importUsers", true);
         provider.put("trustEmail", false);
+        provider.put("syncRegistrations", false);
+        provider.put("fullSyncIntervalMinutes", 0);
+        provider.put("changedSyncIntervalMinutes", 0);
+        provider.put("vendor", "LDAP");
+        provider.put("authenticationType", "SIMPLE");
+        provider.put("startTls", false);
+        provider.put("trustStoreType", "JKS");
+        provider.put("connectionPooling", false);
+        provider.put("referral", "THROW");
+        provider.put("connectTimeoutMs", 5000);
+        provider.put("readTimeoutMs", 5000);
+        provider.put("batchSize", 500);
         return Map.of("providers", java.util.List.of(provider));
     }
 

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="025-add-ldap-synchronization" author="susimsek">
+        <addColumn tableName="ldap_federation_providers">
+            <column name="sync_registrations" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="full_sync_interval_minutes" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="changed_sync_interval_minutes" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="last_sync_at" type="timestamp"/>
+            <column name="last_sync_status" type="varchar(30)"/>
+            <column name="last_sync_error" type="varchar(2000)"/>
+            <column name="last_sync_imported" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="last_sync_updated" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

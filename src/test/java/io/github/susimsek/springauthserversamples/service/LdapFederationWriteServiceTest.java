@@ -16,6 +16,7 @@ import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.LdapFederationIdentityRepository;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -167,6 +168,68 @@ class LdapFederationWriteServiceTest {
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
                 .isEqualTo(ApiErrorCode.LDAP_WRITE_FAILED);
+    }
+
+    @Test
+    void registersLocalUsersInTheWritableSyncRegistrationProvider() {
+        LdapFederationProviderEntity provider = provider("WRITABLE");
+        provider.setSyncRegistrations(true);
+        when(settingsService.enabledProviders()).thenReturn(List.of(provider));
+        when(settingsService.configuration(provider, null)).thenReturn(configuration());
+        when(directoryClient.registerUser(
+                        any(LdapDirectoryClient.Configuration.class),
+                        eq("new-user"),
+                        eq("new@example.com"),
+                        eq("Old"),
+                        eq("User"),
+                        eq("password")))
+                .thenReturn("uid=new-user,ou=users");
+        UserEntity user = user("new-user", "new@example.com");
+
+        service().registerUser(user, "password");
+
+        verify(identityRepository).save(any(LdapFederationIdentityEntity.class));
+    }
+
+    @Test
+    void changesPasswordInWritableLdap() {
+        UserEntity user = user("ldap-user", "old@example.com");
+        LdapFederationProviderEntity provider = provider("WRITABLE");
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("external-id", "uid=ldap-user", provider, user);
+        when(identityRepository.findByUserUsername("ldap-user")).thenReturn(Optional.of(identity));
+        when(settingsService.configuration(provider, null)).thenReturn(configuration());
+        when(directoryClient.authenticate(
+                        any(LdapDirectoryClient.Configuration.class), eq("ldap-user"), eq("old")))
+                .thenReturn(
+                        new LdapDirectoryClient.LdapUser(
+                                "uid=ldap-user", "id", "ldap-user", "", "", ""));
+
+        assertThat(service().changePassword(user, "old", "new")).isTrue();
+        verify(directoryClient)
+                .updatePassword(
+                        any(LdapDirectoryClient.Configuration.class),
+                        eq("uid=ldap-user"),
+                        eq("new"));
+    }
+
+    @Test
+    void rejectsReadOnlyPasswordChangesAndKeepsLocalUsersLocal() {
+        UserEntity user = user("ldap-user", "old@example.com");
+        LdapFederationProviderEntity provider = provider("READ_ONLY");
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("external-id", "uid=ldap-user", provider, user);
+        when(identityRepository.findByUserUsername("ldap-user")).thenReturn(Optional.of(identity));
+
+        assertThat(catchThrowable(() -> service().changePassword(user, "old", "new")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.LDAP_READ_ONLY);
+
+        when(identityRepository.findByUserUsername("local-user")).thenReturn(Optional.empty());
+        assertThat(service().changePassword(user("local-user", "local@example.com"), "old", "new"))
+                .isFalse();
     }
 
     private LdapFederationWriteService service() {

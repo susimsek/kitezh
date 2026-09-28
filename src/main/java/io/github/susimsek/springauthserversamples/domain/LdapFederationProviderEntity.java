@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -74,4 +75,61 @@ public class LdapFederationProviderEntity extends AuditableEntity {
 
     @Column(name = "trust_email", nullable = false)
     private boolean trustEmail;
+
+    @Column(name = "sync_registrations", nullable = false)
+    private boolean syncRegistrations;
+
+    @Column(name = "full_sync_interval_minutes", nullable = false)
+    private int fullSyncIntervalMinutes;
+
+    @Column(name = "changed_sync_interval_minutes", nullable = false)
+    private int changedSyncIntervalMinutes;
+
+    @Column(name = "vendor", nullable = false, length = 30)
+    private String vendor = "LDAP";
+
+    @Column(name = "authentication_type", nullable = false, length = 30)
+    private String authenticationType = "SIMPLE";
+
+    @Column(name = "start_tls", nullable = false)
+    private boolean startTls;
+
+    @Column(name = "trust_store_path", length = 1000)
+    private String trustStorePath;
+
+    @Column(name = "trust_store_password_encrypted", length = 2000)
+    private String trustStorePasswordEncrypted;
+
+    @Column(name = "trust_store_type", nullable = false, length = 20)
+    private String trustStoreType = "JKS";
+
+    @Column(name = "connection_pooling", nullable = false)
+    private boolean connectionPooling;
+
+    @Column(name = "referral", nullable = false, length = 20)
+    private String referral = "THROW";
+
+    @Column(name = "connect_timeout_ms", nullable = false)
+    private int connectTimeoutMs = 5000;
+
+    @Column(name = "read_timeout_ms", nullable = false)
+    private int readTimeoutMs = 5000;
+
+    @Column(name = "batch_size", nullable = false)
+    private int batchSize = 500;
+
+    @Column(name = "last_sync_at")
+    private Instant lastSyncAt;
+
+    @Column(name = "last_sync_status", length = 30)
+    private String lastSyncStatus;
+
+    @Column(name = "last_sync_error", length = 2000)
+    private String lastSyncError;
+
+    @Column(name = "last_sync_imported", nullable = false)
+    private int lastSyncImported;
+
+    @Column(name = "last_sync_updated", nullable = false)
+    private int lastSyncUpdated;
 }
