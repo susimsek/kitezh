@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.springauthserversamples.security.LocalizedAuthenticationEntryPoint;
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
@@ -39,6 +40,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
@@ -241,7 +243,8 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         browserDependencies.loginCaptchaFilter(),
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class);
 
         if (socialDependencies.clientRegistrationRepository().getIfAvailable() != null) {
             http.oauth2Login(

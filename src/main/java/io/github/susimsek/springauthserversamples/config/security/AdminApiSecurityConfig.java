@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.config.security;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration(proxyBeanMethods = false)
 @SuppressWarnings("java:S112")
@@ -45,6 +47,7 @@ public class AdminApiSecurityConfig {
             HttpSecurity http, JwtDecoder adminApiJwtDecoder, DpopNonceService nonceService) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
+                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class)
                 .authorizeHttpRequests(
                         authorize ->
                                 authorize

@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.config.security;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +11,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration(proxyBeanMethods = false)
 @SuppressWarnings("java:S112")
@@ -37,6 +39,7 @@ public class AccountApiSecurityConfig {
             HttpSecurity http, JwtDecoder accountApiJwtDecoder, DpopNonceService nonceService) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/account/**", "/api/auth/localization/me", "/api/ciba/**")
+                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class)
                 .authorizeHttpRequests(
                         authorize -> authorize.anyRequest().hasAuthority("SCOPE_account-api"))
                 .oauth2ResourceServer(

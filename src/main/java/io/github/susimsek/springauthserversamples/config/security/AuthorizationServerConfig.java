@@ -5,6 +5,7 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
@@ -111,6 +112,7 @@ public class AuthorizationServerConfig {
                                         .requireExplicitSave(false))
                 .addFilterBefore(requiredActionAuthorizationFilter, AuthorizationFilter.class)
                 .addFilterBefore(mfaAuthorizationFilter, AuthorizationFilter.class)
+                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class)
                 .sessionManagement(
                         sessionManagement ->
                                 sessionManagement.requireExplicitAuthenticationStrategy(true))
