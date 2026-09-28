@@ -13,7 +13,7 @@ services:
       - key: SPRING_LIQUIBASE_DROP_FIRST
         value: "true"
       - key: GRAFANA_CLOUD_OTLP_ENABLED
-        value: "false"
+        value: "true"
       - key: GRAFANA_CLOUD_OTLP_AUTHORIZATION
         sync: false
       - key: GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT

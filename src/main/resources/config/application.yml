@@ -86,6 +86,10 @@ management:
       otlp:
         enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
   tracing:
+    export:
+      enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+      otlp:
+        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
     sampling:
       probability: ${GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY:1.0}
   otlp:
