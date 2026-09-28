@@ -29,7 +29,7 @@ This repository is a Spring Boot 4.1 + Java 25 sample application built around t
 2. [Requirements](#requirements)
 3. [Project Layout](#project-layout)
 4. [Configuration](#configuration)
-5. [Grafana Cloud Observability](#grafana-cloud-observability)
+5. [Observability](#observability)
 6. [Configuration and Profiles](#configuration-and-profiles)
 7. [RSA Signing Keys](#rsa-signing-keys)
 8. [Persistent User Sessions](#persistent-user-sessions)
@@ -161,36 +161,12 @@ Spring Security processes the username and password, so failed CAPTCHA requests 
 authentication provider. Tokens are generated at submit time for v3 so the backend can validate
 the expected action and score.
 
-## Grafana Cloud Observability
+## Observability
 
-The application can export metrics, traces, and Logback logs to Grafana Cloud over OTLP. Export is
-disabled by default, so local development does not send telemetry anywhere. Enable it by adding
-the following variables to `.env` or the Render environment:
-
-```dotenv
-MANAGEMENT_OPENTELEMETRY_ENABLED=true
-MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
-MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
-MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
-MANAGEMENT_TRACING_EXPORT_ENABLED=true
-MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=true
-MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED=true
-MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=true
-MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=https://<otlp-gateway>/otlp/v1/traces
-MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT=https://<otlp-gateway>/otlp/v1/logs
-MANAGEMENT_OTLP_METRICS_EXPORT_URL=https://<otlp-gateway>/otlp/v1/metrics
-MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
-OTEL_SERVICE_NAME=spring-authorization-server-samples
-```
-
-Create the `Authorization` value from the Grafana Cloud stack's instance ID and an API token with
-the required write permissions. Keep it in Render Secrets or `.env`; never commit it. The three
-signal endpoints are available in the Grafana Cloud stack's OpenTelemetry connection details.
-
-Grafana Cloud's free tier is suitable for this demo and includes metrics, logs, and traces with
-usage limits and 14-day retention. See the [Grafana Cloud Free tier](https://grafana.com/products/cloud/free-tier/)
-and [OTLP ingestion guide](https://grafana.com/docs/grafana-cloud/send-data/otlp/) for current limits
-and connection details.
+When enabled, the application exports metrics, traces, and Logback logs to Grafana Cloud over OTLP.
+Telemetry is disabled by default; configure the standard `MANAGEMENT_*` OTLP variables in Render or
+`.env` and keep authorization values out of source control. View the live demo data in
+[Grafana Cloud Explore](https://eagerlattice1653.grafana.net/explore).
 
 ## Configuration and Profiles
 
