@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
 import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.springauthserversamples.security.LocalizedAuthenticationEntryPoint;
@@ -113,7 +114,35 @@ public class SecurityConfig {
             HttpSecurity http,
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
+            SocialSecurityDependencies socialDependencies,
+            LoggingProperties loggingProperties) {
+        return defaultSecurityFilterChain(
+                http,
+                applicationProperties,
+                browserDependencies,
+                socialDependencies,
+                new ObservabilityMdcFilter(loggingProperties.getAccess()));
+    }
+
+    SecurityFilterChain defaultSecurityFilterChain(
+            HttpSecurity http,
+            ApplicationProperties applicationProperties,
+            BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies) {
+        return defaultSecurityFilterChain(
+                http,
+                applicationProperties,
+                browserDependencies,
+                socialDependencies,
+                new ObservabilityMdcFilter());
+    }
+
+    private SecurityFilterChain defaultSecurityFilterChain(
+            HttpSecurity http,
+            ApplicationProperties applicationProperties,
+            BrowserSecurityDependencies browserDependencies,
+            SocialSecurityDependencies socialDependencies,
+            ObservabilityMdcFilter observabilityMdcFilter) {
         http.authenticationManager(browserDependencies.formAuthenticationManager());
         http.securityContext(
                         securityContext ->
@@ -244,7 +273,7 @@ public class SecurityConfig {
                 .addFilterBefore(
                         browserDependencies.loginCaptchaFilter(),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class);
+                .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class);
 
         if (socialDependencies.clientRegistrationRepository().getIfAvailable() != null) {
             http.oauth2Login(

@@ -166,4 +166,117 @@ class DefaultClientScopesClientCredentialsConverterTest {
             SecurityContextHolder.clearContext();
         }
     }
+
+    @Test
+    void rejectsMalformedDpopProof() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .build();
+        OAuth2ClientAuthenticationToken authentication =
+                mock(OAuth2ClientAuthenticationToken.class);
+        when(authentication.getRegisteredClient()).thenReturn(client);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            HttpServletRequest request = mock(HttpServletRequest.class);
+            when(request.getHeader("DPoP")).thenReturn("malformed");
+
+            assertThatThrownBy(
+                            () ->
+                                    new DefaultClientScopesClientCredentialsConverter()
+                                            .convert(request))
+                    .isInstanceOf(
+                            org.springframework.security.oauth2.core.OAuth2AuthenticationException
+                                    .class)
+                    .hasMessageContaining("disallowed signature algorithm");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void requiresDpopForAuthorizationCodeJktPolicy() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.REQUIRE_DPOP_JKT,
+                                                        true))
+                                        .build())
+                        .build();
+        OAuth2ClientAuthenticationToken authentication =
+                mock(OAuth2ClientAuthenticationToken.class);
+        when(authentication.getRegisteredClient()).thenReturn(client);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            HttpServletRequest request = mock(HttpServletRequest.class);
+            when(request.getParameter("grant_type")).thenReturn("authorization_code");
+
+            assertThatThrownBy(
+                            () ->
+                                    new DefaultClientScopesClientCredentialsConverter()
+                                            .convert(request))
+                    .isInstanceOf(
+                            org.springframework.security.oauth2.core.OAuth2AuthenticationException
+                                    .class)
+                    .hasMessageContaining("DPoP proof is required");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void requiresDpopForPublicAuthorizationCodeRefreshPolicy() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .clientAuthenticationMethod(
+                                org.springframework.security.oauth2.core.ClientAuthenticationMethod
+                                        .NONE)
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .DPOP_REFRESH_TOKEN_ONLY,
+                                                        true))
+                                        .build())
+                        .build();
+        OAuth2ClientAuthenticationToken authentication =
+                mock(OAuth2ClientAuthenticationToken.class);
+        when(authentication.getRegisteredClient()).thenReturn(client);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            HttpServletRequest request = mock(HttpServletRequest.class);
+            when(request.getParameter("grant_type")).thenReturn("authorization_code");
+
+            assertThatThrownBy(
+                            () ->
+                                    new DefaultClientScopesClientCredentialsConverter()
+                                            .convert(request))
+                    .isInstanceOf(
+                            org.springframework.security.oauth2.core.OAuth2AuthenticationException
+                                    .class)
+                    .hasMessageContaining("DPoP proof is required");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void leavesRequestsWithoutClientAuthenticationToTheDelegate() {
+        SecurityContextHolder.clearContext();
+
+        Authentication converted =
+                new DefaultClientScopesClientCredentialsConverter()
+                        .convert(mock(HttpServletRequest.class));
+
+        assertThat(converted).isNull();
+    }
 }

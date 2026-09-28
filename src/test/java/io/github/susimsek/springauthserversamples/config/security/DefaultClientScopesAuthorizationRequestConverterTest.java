@@ -11,9 +11,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2PushedAuthorizationRequestAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext;
@@ -91,6 +93,8 @@ class DefaultClientScopesAuthorizationRequestConverterTest {
         assertThat(unchanged).isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationToken.class);
         assertThat(((OAuth2AuthorizationCodeRequestAuthenticationToken) unchanged).getScopes())
                 .containsExactly("openid");
+
+        assertThat(converter.convert(new MockHttpServletRequest())).isNull();
     }
 
     @Test
@@ -126,6 +130,85 @@ class DefaultClientScopesAuthorizationRequestConverterTest {
                 .isInstanceOf(
                         org.springframework.security.oauth2.server.authorization.authentication
                                 .OAuth2AuthorizationCodeRequestAuthenticationException.class);
+
+        MockHttpServletRequest malformed = request("client", "openid");
+        malformed.addParameter("dpop_jkt", "not-base64");
+        malformed.setQueryString(malformed.getQueryString() + "&dpop_jkt=not-base64");
+        assertThatThrownBy(() -> converter.convert(malformed))
+                .isInstanceOf(
+                        org.springframework.security.oauth2.server.authorization.authentication
+                                .OAuth2AuthorizationCodeRequestAuthenticationException.class);
+    }
+
+    @Test
+    void addsConfiguredDefaultScopesToPushedAuthorizationRequests() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .redirectUri("https://client.example/callback")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .scope("openid")
+                        .clientSettings(
+                                ClientScopeSettings.withAssignments(
+                                        ClientSettings.builder().build(),
+                                        java.util.Set.of("openid", "email"),
+                                        java.util.Set.of()))
+                        .build();
+        RegisteredClientRepository repository = mock(RegisteredClientRepository.class);
+        when(repository.findByClientId("client")).thenReturn(client);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/oauth2/par");
+        request.addParameter(OAuth2ParameterNames.CLIENT_ID, "client");
+        request.addParameter(OAuth2ParameterNames.RESPONSE_TYPE, "code");
+        request.addParameter(OAuth2ParameterNames.REDIRECT_URI, "https://client.example/callback");
+        request.addParameter(OAuth2ParameterNames.SCOPE, "openid");
+        request.addParameter("dpop_jkt", validDpopJkt());
+
+        Authentication authentication =
+                new DefaultClientScopesAuthorizationRequestConverter(repository).convert(request);
+
+        assertThat(authentication)
+                .isInstanceOf(OAuth2PushedAuthorizationRequestAuthenticationToken.class);
+        assertThat(
+                        ((OAuth2PushedAuthorizationRequestAuthenticationToken) authentication)
+                                .getScopes())
+                .containsExactlyInAnyOrder("openid", "email");
+    }
+
+    @Test
+    void leavesPushedRequestsWithoutARegisteredClientUntouched() {
+        RegisteredClientRepository repository = mock(RegisteredClientRepository.class);
+        when(repository.findByClientId("missing")).thenReturn(null);
+        MockHttpServletRequest request = pushedRequest("missing", "openid");
+
+        Authentication authentication =
+                new DefaultClientScopesAuthorizationRequestConverter(repository).convert(request);
+
+        assertThat(authentication)
+                .isInstanceOf(OAuth2PushedAuthorizationRequestAuthenticationToken.class);
+    }
+
+    @Test
+    void leavesPushedRequestsWithoutNewScopesUntouched() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .redirectUri("https://client.example/callback")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .scope("openid")
+                        .build();
+        RegisteredClientRepository repository = mock(RegisteredClientRepository.class);
+        when(repository.findByClientId("client")).thenReturn(client);
+
+        Authentication authentication =
+                new DefaultClientScopesAuthorizationRequestConverter(repository)
+                        .convert(pushedRequest("client", "openid"));
+
+        assertThat(authentication)
+                .isInstanceOf(OAuth2PushedAuthorizationRequestAuthenticationToken.class);
+        assertThat(
+                        ((OAuth2PushedAuthorizationRequestAuthenticationToken) authentication)
+                                .getScopes())
+                .containsExactly("openid");
     }
 
     @Test
@@ -177,6 +260,15 @@ class DefaultClientScopesAuthorizationRequestConverterTest {
                         + "&response_type=code&redirect_uri=https://client.example/callback&scope="
                         + scope
                         + "&state=state");
+        return request;
+    }
+
+    private static MockHttpServletRequest pushedRequest(String clientId, String scope) {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/oauth2/par");
+        request.addParameter(OAuth2ParameterNames.CLIENT_ID, clientId);
+        request.addParameter(OAuth2ParameterNames.RESPONSE_TYPE, "code");
+        request.addParameter(OAuth2ParameterNames.REDIRECT_URI, "https://client.example/callback");
+        request.addParameter(OAuth2ParameterNames.SCOPE, scope);
         return request;
     }
 

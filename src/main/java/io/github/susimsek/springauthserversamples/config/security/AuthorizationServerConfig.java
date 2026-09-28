@@ -5,6 +5,7 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
 import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
@@ -80,6 +81,14 @@ public class AuthorizationServerConfig {
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
 
+    record AuthorizationServerFilterDependencies(
+            RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
+            MfaAuthorizationFilter mfaAuthorizationFilter,
+            CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
+            SecurityContextRepository securityContextRepository,
+            ObservabilityMdcFilter observabilityMdcFilter) {}
+
     private final ApplicationProperties applicationProperties;
     private final AuthorizationEndpointErrorResponseHandler
             authorizationEndpointErrorResponseHandler;
@@ -96,7 +105,35 @@ public class AuthorizationServerConfig {
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             @Qualifier("authorizationServerSecurityContextRepository")
-                    SecurityContextRepository securityContextRepository) {
+                    SecurityContextRepository securityContextRepository,
+            LoggingProperties loggingProperties) {
+        return authorizationServerSecurityFilterChain(
+                http,
+                tokenGenerator,
+                registeredClientRepository,
+                new AuthorizationServerFilterDependencies(
+                        requiredActionAuthorizationFilter,
+                        mfaAuthorizationFilter,
+                        cibaAuthenticationProvider,
+                        socialProviderLogoutSuccessHandler,
+                        securityContextRepository,
+                        new ObservabilityMdcFilter(loggingProperties.getAccess())));
+    }
+
+    SecurityFilterChain authorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+            RegisteredClientRepository registeredClientRepository,
+            AuthorizationServerFilterDependencies dependencies) {
+        return buildAuthorizationServerSecurityFilterChain(
+                http, tokenGenerator, registeredClientRepository, dependencies);
+    }
+
+    private SecurityFilterChain buildAuthorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+            RegisteredClientRepository registeredClientRepository,
+            AuthorizationServerFilterDependencies dependencies) {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 new OAuth2AuthorizationServerConfigurer();
 
@@ -108,11 +145,13 @@ public class AuthorizationServerConfig {
                 .securityContext(
                         securityContext ->
                                 securityContext
-                                        .securityContextRepository(securityContextRepository)
+                                        .securityContextRepository(
+                                                dependencies.securityContextRepository())
                                         .requireExplicitSave(false))
-                .addFilterBefore(requiredActionAuthorizationFilter, AuthorizationFilter.class)
-                .addFilterBefore(mfaAuthorizationFilter, AuthorizationFilter.class)
-                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class)
+                .addFilterBefore(
+                        dependencies.requiredActionAuthorizationFilter(), AuthorizationFilter.class)
+                .addFilterBefore(dependencies.mfaAuthorizationFilter(), AuthorizationFilter.class)
+                .addFilterBefore(dependencies.observabilityMdcFilter(), AuthorizationFilter.class)
                 .sessionManagement(
                         sessionManagement ->
                                 sessionManagement.requireExplicitAuthenticationStrategy(true))
@@ -126,68 +165,29 @@ public class AuthorizationServerConfig {
                                                         metadataEndpoint
                                                                 .authorizationServerMetadataCustomizer(
                                                                         builder ->
-                                                                                builder.claim(
-                                                                                                "backchannel_authentication_endpoint",
-                                                                                                applicationProperties
-                                                                                                                .authorizationServer()
-                                                                                                                .issuer()
-                                                                                                        + "/oauth2/bc-authorize")
-                                                                                        .claim(
-                                                                                                "backchannel_token_delivery_modes_supported",
-                                                                                                List
-                                                                                                        .of(
-                                                                                                                "poll",
-                                                                                                                "ping",
-                                                                                                                "push"))
-                                                                                        .claim(
-                                                                                                "backchannel_authentication_request_signing_alg_values_supported",
-                                                                                                List
-                                                                                                        .of(
-                                                                                                                "RS256",
-                                                                                                                "ES256"))
-                                                                                        .claim(
-                                                                                                "backchannel_user_code_parameter",
-                                                                                                true)
-                                                                                        .grantType(
-                                                                                                AuthorizationGrantTypes
-                                                                                                        .CIBA)))
+                                                                                addCibaMetadata(
+                                                                                        builder,
+                                                                                        applicationProperties
+                                                                                                .authorizationServer()
+                                                                                                .issuer())))
                                         .oidc(
                                                 oidc ->
                                                         oidc.logoutEndpoint(
                                                                         logout ->
                                                                                 logout
                                                                                         .logoutResponseHandler(
-                                                                                                socialProviderLogoutSuccessHandler))
+                                                                                                dependencies
+                                                                                                        .socialProviderLogoutSuccessHandler()))
                                                                 .providerConfigurationEndpoint(
                                                                         providerConfigurationEndpoint ->
                                                                                 providerConfigurationEndpoint
                                                                                         .providerConfigurationCustomizer(
                                                                                                 builder ->
-                                                                                                        builder.claim(
-                                                                                                                        "backchannel_authentication_endpoint",
-                                                                                                                        applicationProperties
-                                                                                                                                        .authorizationServer()
-                                                                                                                                        .issuer()
-                                                                                                                                + "/oauth2/bc-authorize")
-                                                                                                                .claim(
-                                                                                                                        "backchannel_token_delivery_modes_supported",
-                                                                                                                        List
-                                                                                                                                .of(
-                                                                                                                                        "poll",
-                                                                                                                                        "ping",
-                                                                                                                                        "push"))
-                                                                                                                .claim(
-                                                                                                                        "backchannel_authentication_request_signing_alg_values_supported",
-                                                                                                                        List
-                                                                                                                                .of(
-                                                                                                                                        "RS256",
-                                                                                                                                        "ES256"))
-                                                                                                                .claim(
-                                                                                                                        "backchannel_user_code_parameter",
-                                                                                                                        true)
-                                                                                                                .grantType(
-                                                                                                                        AuthorizationGrantTypes
-                                                                                                                                .CIBA))))
+                                                                                                        addCibaMetadata(
+                                                                                                                builder,
+                                                                                                                applicationProperties
+                                                                                                                        .authorizationServer()
+                                                                                                                        .issuer()))))
                                         .authorizationEndpoint(
                                                 authorizationEndpoint ->
                                                         authorizationEndpoint
@@ -228,7 +228,8 @@ public class AuthorizationServerConfig {
                                                                                 converters.add(
                                                                                         new CibaAuthenticationGrantAuthenticationConverter()))
                                                                 .authenticationProvider(
-                                                                        cibaAuthenticationProvider)
+                                                                        dependencies
+                                                                                .cibaAuthenticationProvider())
                                                                 .accessTokenRequestConverter(
                                                                         new DefaultClientScopesClientCredentialsConverter())
                                                                 .errorResponseHandler(
@@ -273,6 +274,37 @@ public class AuthorizationServerConfig {
         MediaTypeRequestMatcher requestMatcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
         requestMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
         return requestMatcher;
+    }
+
+    static void addCibaMetadata(
+            org.springframework.security.oauth2.server.authorization
+                            .OAuth2AuthorizationServerMetadata.Builder
+                    builder,
+            String issuer) {
+        addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
+    }
+
+    static void addCibaMetadata(
+            org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration
+                            .Builder
+                    builder,
+            String issuer) {
+        addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
+    }
+
+    private static void addCibaMetadataClaims(
+            java.util.function.BiConsumer<String, Object> claimConsumer,
+            java.util.function.Consumer<String> grantTypeConsumer,
+            String issuer) {
+        claimConsumer.accept(
+                "backchannel_authentication_endpoint", issuer + "/oauth2/bc-authorize");
+        claimConsumer.accept(
+                "backchannel_token_delivery_modes_supported", List.of("poll", "ping", "push"));
+        claimConsumer.accept(
+                "backchannel_authentication_request_signing_alg_values_supported",
+                List.of("RS256", "ES256"));
+        claimConsumer.accept("backchannel_user_code_parameter", true);
+        grantTypeConsumer.accept(AuthorizationGrantTypes.CIBA);
     }
 
     @Bean

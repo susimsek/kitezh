@@ -1,13 +1,17 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nimbusds.jose.jwk.JWK;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
@@ -20,6 +24,8 @@ import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepos
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationEndpointErrorResponseHandler;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
@@ -42,19 +48,28 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwtEncodingException;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationServerMetadata;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -76,6 +91,45 @@ class AuthorizationServerConfigTest {
         AuthorizationServerSettings settings = config.authorizationServerSettings();
 
         assertThat(settings.getIssuer()).isEqualTo("https://issuer.example");
+    }
+
+    @Test
+    void addsCibaMetadataToAuthorizationServerDescriptors() {
+        OAuth2AuthorizationServerMetadata.Builder builder =
+                OAuth2AuthorizationServerMetadata.builder()
+                        .issuer("https://issuer.example")
+                        .authorizationEndpoint("https://issuer.example/oauth2/authorize")
+                        .tokenEndpoint("https://issuer.example/oauth2/token")
+                        .jwkSetUrl("https://issuer.example/oauth2/jwks")
+                        .responseType("code");
+
+        AuthorizationServerConfig.addCibaMetadata(builder, "https://issuer.example");
+
+        assertThat(builder.build().getClaims())
+                .containsEntry(
+                        "backchannel_authentication_endpoint",
+                        "https://issuer.example/oauth2/bc-authorize")
+                .containsEntry(
+                        "backchannel_token_delivery_modes_supported",
+                        List.of("poll", "ping", "push"))
+                .containsEntry(
+                        "backchannel_authentication_request_signing_alg_values_supported",
+                        List.of("RS256", "ES256"))
+                .containsEntry("backchannel_user_code_parameter", true)
+                .containsEntry("grant_types_supported", List.of(AuthorizationGrantTypes.CIBA));
+
+        OidcProviderConfiguration.Builder oidcBuilder =
+                OidcProviderConfiguration.builder()
+                        .issuer("https://issuer.example")
+                        .authorizationEndpoint("https://issuer.example/oauth2/authorize")
+                        .tokenEndpoint("https://issuer.example/oauth2/token")
+                        .jwkSetUrl("https://issuer.example/oauth2/jwks")
+                        .responseType("code")
+                        .subjectType("public")
+                        .idTokenSigningAlgorithm("RS256");
+        AuthorizationServerConfig.addCibaMetadata(oidcBuilder, "https://issuer.example");
+        assertThat(oidcBuilder.build().getClaims())
+                .containsEntry("backchannel_user_code_parameter", true);
     }
 
     @Test
@@ -116,14 +170,228 @@ class AuthorizationServerConfigTest {
                         httpSecurity(),
                         mock(OAuth2TokenGenerator.class),
                         mock(RegisteredClientRepository.class),
+                        new AuthorizationServerConfig.AuthorizationServerFilterDependencies(
+                                mock(RequiredActionAuthorizationFilter.class),
+                                mock(MfaAuthorizationFilter.class),
+                                mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                                mock(SocialProviderLogoutSuccessHandler.class),
+                                mock(SecurityContextRepository.class),
+                                new ObservabilityMdcFilter()));
+
+        assertThat(chain).isNotNull();
+        assertThat(chain.getFilters()).isNotEmpty();
+    }
+
+    @Test
+    void buildsAuthorizationServerSecurityFilterChainFromBeanDependencies() {
+        SecurityFilterChain chain =
+                config.authorizationServerSecurityFilterChain(
+                        httpSecurity(),
+                        mock(OAuth2TokenGenerator.class),
+                        mock(RegisteredClientRepository.class),
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
                         mock(CibaAuthenticationGrantAuthenticationProvider.class),
                         mock(SocialProviderLogoutSuccessHandler.class),
-                        mock(SecurityContextRepository.class));
+                        mock(SecurityContextRepository.class),
+                        new LoggingProperties());
 
         assertThat(chain).isNotNull();
-        assertThat(chain.getFilters()).isNotEmpty();
+    }
+
+    @Test
+    void bindsDpopProofThumbprintToAccessToken() throws Exception {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        JwtEncodingContext context =
+                dpopContext(
+                        RegisteredClient.withId("dpop-id")
+                                .clientId("dpop-client")
+                                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                                .redirectUri("https://client.example/callback")
+                                .build(),
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        proof);
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        assertThat((Map<String, Object>) context.getClaims().build().getClaim("cnf"))
+                .containsEntry("jkt", JWK.parse(jwk).computeThumbprint().toString());
+    }
+
+    @Test
+    void rejectsDpopProofWhenClientJktDoesNotMatch() {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("dpop-jkt-id")
+                        .clientId("dpop-jkt-client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(ClientSecuritySettings.REQUIRE_DPOP_JKT, true)
+                                        .build())
+                        .build();
+
+        var customizer =
+                config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class));
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        proof,
+                        OAuth2Authorization.withRegisteredClient(client)
+                                .id("authorization-id")
+                                .principalName("admin")
+                                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                                .attribute(
+                                        OAuth2AuthorizationRequest.class.getName(),
+                                        OAuth2AuthorizationRequest.authorizationCode()
+                                                .authorizationUri(
+                                                        "https://issuer.example/oauth2/authorize")
+                                                .clientId(client.getClientId())
+                                                .redirectUri("https://client.example/callback")
+                                                .additionalParameters(Map.of("dpop_jkt", "wrong"))
+                                                .build())
+                                .build());
+
+        assertThatThrownBy(() -> customizer.customize(context))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    @Test
+    void skipsDpopConfirmationForRefreshOnlyClientCredentials() {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("refresh-dpop-id")
+                        .clientId("refresh-dpop-client")
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(
+                                                ClientSecuritySettings.DPOP_REFRESH_TOKEN_ONLY,
+                                                true)
+                                        .build())
+                        .build();
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.REFRESH_TOKEN,
+                        proof);
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        context.getClaims().claim("sub", "admin");
+        assertThat(context.getClaims().build().getClaims()).doesNotContainKey("cnf");
+    }
+
+    @Test
+    void ignoresDpopProofWithoutJwkHeader() {
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("alg", "RS256"),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("dpop-no-jwk-id")
+                        .clientId("dpop-no-jwk-client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .build();
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        proof);
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        context.getClaims().claim("sub", "admin");
+        assertThat(context.getClaims().build().getClaims()).doesNotContainKey("cnf");
+    }
+
+    @Test
+    void rejectsMalformedDpopJwk() {
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", Map.of("kty", "oct")),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("dpop-malformed-id")
+                        .clientId("dpop-malformed-client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .build();
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        proof);
+        var customizer =
+                config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class));
+
+        assertThatThrownBy(() -> customizer.customize(context))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("thumbprint");
+    }
+
+    @Test
+    void rejectsJwtEncodingWhenNoPrivateSigningKeyExists() {
+        JWK publicKey = mock(JWK.class);
+        JwtEncoder encoder = config.jwtEncoder((selector, securityContext) -> List.of(publicKey));
+        JwtClaimsSet claims = JwtClaimsSet.builder().claim("sub", "admin").build();
+        JwtEncoderParameters parameters = JwtEncoderParameters.from(claims);
+
+        assertThatThrownBy(() -> encoder.encode(parameters))
+                .isInstanceOf(JwtEncodingException.class)
+                .hasRootCauseMessage("Expected private JWK but none available");
     }
 
     @Test
@@ -357,6 +625,65 @@ class AuthorizationServerConfigTest {
                     .containsKey("at_hash")
                     .containsKey("urn:openid:params:jwt:claim:rt_hash");
         }
+    }
+
+    @Test
+    void skipsCibaOptionalClaimsWhenGrantParametersAreAbsent() {
+        RegisteredClient client =
+                RegisteredClient.withId("ciba-empty-id")
+                        .clientId("ciba-empty-client")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .build();
+        CibaAuthenticationGrantAuthenticationToken grant =
+                new CibaAuthenticationGrantAuthenticationToken("auth-req-id", mock(), Map.of());
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(cibaJwtContext(claims, client, grant, SignatureAlgorithm.RS256));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry(
+                        CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_CLAIM, "auth-req-id")
+                .doesNotContainKeys("acr", "at_hash", "urn:openid:params:jwt:claim:rt_hash");
+    }
+
+    @Test
+    void acceptsDpopProofForAuthorizationWithoutJktRequirement() {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("dpop-client-credentials")
+                        .clientId("dpop-client-credentials")
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(ClientSecuritySettings.REQUIRE_DPOP_JKT, true)
+                                        .build())
+                        .build();
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.CLIENT_CREDENTIALS,
+                        proof);
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        assertThat(context.getClaims().build().getClaims()).containsKey("cnf");
     }
 
     @Test
@@ -883,6 +1210,37 @@ class AuthorizationServerConfigTest {
                 .tokenType(tokenType)
                 .authorizationGrantType(grantType)
                 .build();
+    }
+
+    private static JwtEncodingContext dpopContext(
+            RegisteredClient registeredClient,
+            OAuth2TokenType tokenType,
+            AuthorizationGrantType grantType,
+            Jwt proof) {
+        return dpopContext(registeredClient, tokenType, grantType, proof, null);
+    }
+
+    private static JwtEncodingContext dpopContext(
+            RegisteredClient registeredClient,
+            OAuth2TokenType tokenType,
+            AuthorizationGrantType grantType,
+            Jwt proof,
+            OAuth2Authorization authorization) {
+        UsernamePasswordAuthenticationToken principal =
+                new UsernamePasswordAuthenticationToken("admin", "n/a", List.of());
+        JwtEncodingContext.Builder builder =
+                JwtEncodingContext.with(
+                                JwsHeader.with(SignatureAlgorithm.RS256), JwtClaimsSet.builder())
+                        .registeredClient(registeredClient)
+                        .principal(principal)
+                        .authorizedScopes(Set.of())
+                        .tokenType(tokenType)
+                        .authorizationGrantType(grantType)
+                        .put(OAuth2TokenContext.DPOP_PROOF_KEY, proof);
+        if (authorization != null) {
+            builder.authorization(authorization);
+        }
+        return builder.build();
     }
 
     private static JwtEncodingContext jwtContextWithoutAuthorization(

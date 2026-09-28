@@ -1,8 +1,11 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.util.ReflectionTestUtils.invokeMethod;
 
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
 import io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService;
@@ -15,6 +18,46 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcLogoutAuthenticationToken;
 
 class SocialProviderLogoutSuccessHandlerTest {
+
+    @Test
+    void delegatesNonOidcLogoutAuthentication() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        Authentication authentication = mock(Authentication.class);
+
+        assertThatThrownBy(
+                        () ->
+                                new SocialProviderLogoutSuccessHandler(
+                                                mock(SocialProviderSettingsService.class))
+                                        .onAuthenticationSuccess(request, response, authentication))
+                .isInstanceOf(
+                        org.springframework.security.oauth2.core.OAuth2AuthenticationException
+                                .class);
+    }
+
+    @Test
+    void delegatesWhenNoProviderCredentialsAreStored() throws Exception {
+        SocialProviderSettingsService settings = mock(SocialProviderSettingsService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(settings.provider(null)).thenReturn(null);
+        when(request.getSession(false)).thenReturn(null);
+
+        OidcLogoutAuthenticationToken logout =
+                new OidcLogoutAuthenticationToken(
+                        "hint",
+                        UsernamePasswordAuthenticationToken.authenticated(
+                                "ada", null, java.util.List.of()),
+                        "account-console",
+                        null,
+                        "/account",
+                        null);
+
+        new SocialProviderLogoutSuccessHandler(settings)
+                .onAuthenticationSuccess(request, response, logout);
+
+        verify(response).sendRedirect((String) null);
+    }
 
     @Test
     void startsMicrosoftLogoutWithTheRegisteredPostLogoutUri() throws Exception {
@@ -62,7 +105,7 @@ class SocialProviderLogoutSuccessHandlerTest {
                         "id-token-hint",
                         principal,
                         "account-console",
-                        null,
+                        (String) null,
                         "http://localhost:9090/account/",
                         null);
         when(request.getSession(false)).thenReturn(session);
@@ -133,5 +176,63 @@ class SocialProviderLogoutSuccessHandlerTest {
                 .onAuthenticationSuccess(request, response, logout);
 
         verify(response).sendRedirect("https://accounts.google.com/Logout?continue=%2Faccount");
+    }
+
+    @Test
+    void returnsNoUpstreamLogoutWhenProviderEndpointIsUnavailable() {
+        SocialProviderSettingsService.ProviderCredentials credentials =
+                new SocialProviderSettingsService.ProviderCredentials(
+                        "unknown", "client", "secret");
+        OidcLogoutAuthenticationToken logout =
+                new OidcLogoutAuthenticationToken(
+                        "hint",
+                        UsernamePasswordAuthenticationToken.authenticated(
+                                "ada", null, java.util.List.of()),
+                        "account-console",
+                        null,
+                        " ",
+                        null);
+        SocialProviderLogoutEndpointResolver resolver =
+                mock(SocialProviderLogoutEndpointResolver.class);
+        when(resolver.resolve(credentials)).thenReturn(null);
+        SocialProviderLogoutSuccessHandler handler =
+                new SocialProviderLogoutSuccessHandler(
+                        mock(SocialProviderSettingsService.class), resolver);
+
+        assertThat((String) invokeMethod(handler, "upstreamLogout", credentials, logout)).isNull();
+    }
+
+    @Test
+    void buildsGenericUpstreamLogoutWithExistingQueryAndDefaultRedirect() {
+        SocialProviderSettingsService.ProviderCredentials credentials =
+                new SocialProviderSettingsService.ProviderCredentials("oidc", "client", "secret");
+        OidcLogoutAuthenticationToken logout =
+                new OidcLogoutAuthenticationToken(
+                        "hint",
+                        UsernamePasswordAuthenticationToken.authenticated(
+                                "ada", null, java.util.List.of()),
+                        "account-console",
+                        null,
+                        " ",
+                        null);
+        SocialProviderLogoutEndpointResolver resolver =
+                mock(SocialProviderLogoutEndpointResolver.class);
+        when(resolver.resolve(credentials)).thenReturn("https://issuer.example/logout?existing=1");
+        SocialProviderLogoutSuccessHandler handler =
+                new SocialProviderLogoutSuccessHandler(
+                        mock(SocialProviderSettingsService.class), resolver);
+
+        assertThat((String) invokeMethod(handler, "upstreamLogout", credentials, logout))
+                .isEqualTo(
+                        "https://issuer.example/logout?existing=1&post_logout_redirect_uri=%2F&id_token_hint=hint");
+        assertThat(
+                        (String)
+                                invokeMethod(
+                                        handler,
+                                        "appendParameter",
+                                        "https://issuer.example/logout?existing=1",
+                                        "state",
+                                        "a value"))
+                .isEqualTo("https://issuer.example/logout?existing=1&state=a+value");
     }
 }

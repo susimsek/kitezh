@@ -18,11 +18,11 @@ public abstract class DateAuditingEntity {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    protected Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    protected Instant updatedAt;
 
     protected DateAuditingEntity() {}
 }

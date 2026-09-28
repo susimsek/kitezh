@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.config.security;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
 import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
@@ -32,22 +33,32 @@ public class AdminApiSecurityConfig {
     SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
-            ApplicationProperties applicationProperties) {
+            ApplicationProperties applicationProperties,
+            LoggingProperties loggingProperties) {
         return adminApiSecurityFilterChain(
-                http, adminApiJwtDecoder, new DpopNonceService(applicationProperties.dpop()));
+                http,
+                adminApiJwtDecoder,
+                new DpopNonceService(applicationProperties.dpop()),
+                new ObservabilityMdcFilter(loggingProperties.getAccess()));
     }
 
     SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http, JwtDecoder adminApiJwtDecoder) {
         return adminApiSecurityFilterChain(
-                http, adminApiJwtDecoder, new DpopNonceService(new ApplicationProperties().dpop()));
+                http,
+                adminApiJwtDecoder,
+                new DpopNonceService(new ApplicationProperties().dpop()),
+                new ObservabilityMdcFilter());
     }
 
     private SecurityFilterChain adminApiSecurityFilterChain(
-            HttpSecurity http, JwtDecoder adminApiJwtDecoder, DpopNonceService nonceService) {
+            HttpSecurity http,
+            JwtDecoder adminApiJwtDecoder,
+            DpopNonceService nonceService,
+            ObservabilityMdcFilter observabilityMdcFilter) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
-                .addFilterBefore(new ObservabilityMdcFilter(), AuthorizationFilter.class)
+                .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class)
                 .authorizeHttpRequests(
                         authorize ->
                                 authorize

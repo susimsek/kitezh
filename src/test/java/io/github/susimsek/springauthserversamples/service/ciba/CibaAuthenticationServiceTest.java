@@ -79,6 +79,24 @@ class CibaAuthenticationServiceTest {
     }
 
     @Test
+    void supportsExplicitDeliveryAndRequestObjectOverloads() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setEnabled(true);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        CibaAuthenticationRequestEntity pingRequest =
+                service.create(client, "openid", "admin", null, null, "poll");
+        assertThat(pingRequest.getDeliveryMode()).isEqualTo("poll");
+
+        CibaAuthenticationRequestEntity requestObjectRequest =
+                service.create(
+                        client, "openid", "admin", null, null, null, null, "poll", null, null, null,
+                        null);
+        assertThat(requestObjectRequest.getDeliveryMode()).isEqualTo("poll");
+    }
+
+    @Test
     void createsAndValidatesUserCode() {
         UserEntity user = new UserEntity();
         user.setUsername("admin");
@@ -275,6 +293,12 @@ class CibaAuthenticationServiceTest {
         assertThat(denied.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.DENIED);
         assertThat(denied.getDeniedAt()).isNotNull();
         service.deny("denied", "admin");
+
+        CibaAuthenticationRequestEntity coded = request("admin", Instant.now().plusSeconds(60));
+        coded.setUserCode("K7P4M2Q9");
+        when(requestRepository.findByAuthReqIdForUpdate("coded")).thenReturn(Optional.of(coded));
+        service.deny("coded", "admin", "K7P4M2Q9");
+        assertThat(coded.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.DENIED);
     }
 
     @Test

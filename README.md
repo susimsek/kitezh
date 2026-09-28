@@ -168,6 +168,13 @@ Telemetry is disabled by default; configure the standard `MANAGEMENT_*` OTLP var
 `.env` and keep authorization values out of source control. View the live demo data in
 [Grafana Cloud Explore](https://eagerlattice1653.grafana.net/explore).
 
+Console and file logs are plain text by default. Set `LOGGING_STRUCTURED_FORMAT_CONSOLE` or
+`LOGGING_STRUCTURED_FORMAT_FILE` to `json` or `ecs` for structured output. HTTP access logging is
+enabled by default and can be configured with `APP_LOG_ACCESS_PATTERN` (`common`, `combined`, or
+`long`), `APP_LOG_ACCESS_EXCLUDE_PATHS`, `APP_LOG_ACCESS_MASKED_HEADERS`,
+`APP_LOG_ACCESS_MASKED_COOKIES`, and `APP_LOG_ACCESS_FILE_ENABLED`. Request bodies are never written
+to access logs.
+
 ## Configuration and Profiles
 
 Configuration lives under `src/main/resources/config`:
