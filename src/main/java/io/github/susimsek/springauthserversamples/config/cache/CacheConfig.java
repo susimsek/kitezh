@@ -24,6 +24,7 @@ import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.springauthserversamples.repository.AdminEventSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
+import io.github.susimsek.springauthserversamples.repository.CibaPolicyRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
 import io.github.susimsek.springauthserversamples.repository.EmailSettingsRepository;
@@ -37,6 +38,7 @@ import io.github.susimsek.springauthserversamples.repository.SocialProviderMappe
 import io.github.susimsek.springauthserversamples.repository.SocialProviderRepository;
 import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import java.util.List;
 import java.util.OptionalLong;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
@@ -62,7 +64,34 @@ public class CacheConfig {
     public CaffeineCacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCaffeine(buildCaffeineConfig(cacheProperties()));
+        // A static cache list lets Spring Boot's cache metrics auto-configuration bind
+        // every application cache before the first request creates a cache entry.
+        cacheManager.setCacheNames(cacheNames());
         return cacheManager;
+    }
+
+    private List<String> cacheNames() {
+        return List.of(
+                AdminEventSettingsRepository.ADMIN_EVENT_SETTINGS_BY_ID_CACHE,
+                AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                CibaPolicyRepository.CIBA_POLICY_BY_ID_CACHE,
+                ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
+                ClientScopeRepository.CLIENT_SCOPE_BY_NAME_CACHE,
+                EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE,
+                GroupRepository.DEFAULT_GROUPS_CACHE,
+                LocalizationMessageOverrideRepository.LOCALIZATION_MESSAGE_OVERRIDE_BY_KEY_CACHE,
+                LocalizationSettingsRepository.LOCALIZATION_SETTINGS_BY_ID_CACHE,
+                LoginSettingsRepository.LOGIN_SETTINGS_BY_ID_CACHE,
+                OAuth2KeyRepository.OAUTH2_KEYS_CACHE,
+                RequiredActionDefinitionRepository.ENABLED_REQUIRED_ACTIONS_CACHE,
+                SocialProviderMapperRepository.MAPPERS_BY_PROVIDER_ALIAS_CACHE,
+                SocialProviderRepository.SOCIAL_PROVIDER_BY_ALIAS_CACHE,
+                SocialProviderRepository.SOCIAL_PROVIDER_BY_REGISTRATION_ID_CACHE,
+                UserProfileAttributeDefinitionRepository.ALL_PROFILE_ATTRIBUTE_DEFINITIONS_CACHE,
+                UserProfileAttributeDefinitionRepository
+                        .ENABLED_PROFILE_ATTRIBUTE_DEFINITIONS_CACHE,
+                UserProfileAttributeDefinitionRepository.PROFILE_ATTRIBUTE_DEFINITION_BY_NAME_CACHE,
+                UserRepository.USER_BY_USERNAME_CACHE);
     }
 
     private ApplicationProperties.Caffeine cacheProperties() {

@@ -36,8 +36,10 @@ import io.github.susimsek.springauthserversamples.repository.SocialProviderMappe
 import io.github.susimsek.springauthserversamples.repository.SocialProviderRepository;
 import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
@@ -45,6 +47,8 @@ import org.hibernate.cache.jcache.ConfigSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.cache.autoconfigure.JCacheManagerCustomizer;
+import org.springframework.boot.cache.metrics.CacheMetricsRegistrar;
+import org.springframework.boot.cache.metrics.CaffeineCacheMeterBinderProvider;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.cache.Cache;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -73,10 +77,43 @@ class CacheConfigTest {
                 new CacheConfig(applicationProperties()).cacheManager();
 
         assertThat(cacheManager).isInstanceOf(CaffeineCacheManager.class);
-        Cache cache = cacheManager.getCache("users");
+        Cache cache = cacheManager.getCache(UserRepository.USER_BY_USERNAME_CACHE);
         assertThat(cache).isNotNull();
         cache.put("key", "value");
         assertThat(cache.get("key", String.class)).isEqualTo("value");
+    }
+
+    @Test
+    void bindsCaffeineCacheMetrics() {
+        org.springframework.cache.CacheManager cacheManager =
+                new CacheConfig(applicationProperties()).cacheManager();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        CacheMetricsRegistrar registrar =
+                new CacheMetricsRegistrar(
+                        registry, List.of(new CaffeineCacheMeterBinderProvider()));
+        Cache cache = cacheManager.getCache(UserRepository.USER_BY_USERNAME_CACHE);
+
+        assertThat(cache).isNotNull();
+        assertThat(registrar.bindCacheToRegistry(cache)).isTrue();
+
+        cache.get("missing");
+        cache.put("key", "value");
+        cache.get("key");
+
+        assertThat(
+                        registry.get("cache.gets")
+                                .tag("name", UserRepository.USER_BY_USERNAME_CACHE)
+                                .tag("result", "hit")
+                                .functionCounter()
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        registry.get("cache.gets")
+                                .tag("name", UserRepository.USER_BY_USERNAME_CACHE)
+                                .tag("result", "miss")
+                                .functionCounter()
+                                .count())
+                .isEqualTo(1);
     }
 
     @Test

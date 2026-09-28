@@ -168,6 +168,17 @@ Telemetry is disabled by default; configure the standard `MANAGEMENT_*` OTLP var
 `.env` and keep authorization values out of source control. View the live demo data in
 [Grafana Cloud Explore](https://eagerlattice1653.grafana.net/explore).
 
+The production profile also exposes Micrometer metrics at `/actuator/prometheus` for Prometheus
+scraping. Import the production dashboard from
+[`observability/grafana/spring-boot-production.json`](observability/grafana/spring-boot-production.json)
+and load the baseline alert rules from [`observability/prometheus/alerts.yml`](observability/prometheus/alerts.yml).
+The dashboard follows Keycloak's observability model: Prometheus collects the metrics and Grafana
+renders the dashboard. Production request histograms are enabled so P95 and P99 latency panels are
+available. Application Caffeine caches are pre-registered so hit, miss, eviction, size, and
+eviction-weight meters are published from startup. See
+[`observability/grafana/README.md`](observability/grafana/README.md) for the scrape configuration
+and import steps.
+
 Console and file logs are plain text by default. Set `LOGGING_STRUCTURED_FORMAT_CONSOLE` or
 `LOGGING_STRUCTURED_FORMAT_FILE` to `json` or `ecs` for structured output. HTTP access logging is
 enabled by default and can be configured with `APP_LOG_ACCESS_PATTERN` (`common`, `combined`, or

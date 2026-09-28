@@ -19,6 +19,16 @@ spring:
   liquibase:
     contexts: prod
 
+management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+      slo:
+        http.server.requests: 250ms,1s,5s
+
 app:
   social-login:
     encryption-key: demo-static-social-ciba-key-2026-change-me
