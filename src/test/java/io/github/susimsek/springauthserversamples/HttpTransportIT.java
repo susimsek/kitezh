@@ -38,6 +38,12 @@ class HttpTransportIT {
                 client.get().uri("/actuator/health/readiness").retrieve().body(String.class);
         assertThat(readiness).contains("\"status\":\"UP\"");
 
+        String metrics = client.get().uri("/actuator/metrics").retrieve().body(String.class);
+        assertThat(metrics).contains("\"names\"");
+
+        String prometheus = client.get().uri("/actuator/prometheus").retrieve().body(String.class);
+        assertThat(prometheus).contains("# HELP");
+
         JsonNode token =
                 client.post()
                         .uri("/oauth2/token")

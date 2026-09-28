@@ -204,6 +204,9 @@ public class SecurityConfig {
                                                 "/swagger-ui/**",
                                                 "/actuator/health",
                                                 "/actuator/health/**",
+                                                "/actuator/metrics",
+                                                "/actuator/metrics/**",
+                                                "/actuator/prometheus",
                                                 "/error")
                                         .permitAll()
                                         .anyRequest()

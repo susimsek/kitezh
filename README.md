@@ -371,6 +371,8 @@ Public infrastructure:
 - `/actuator/health`
 - `/actuator/health/liveness`
 - `/actuator/health/readiness`
+- `/actuator/metrics`
+- `/actuator/prometheus`
 
 Login and consent:
 
@@ -403,6 +405,11 @@ Health:
 - `GET /actuator/health`
 - `GET /actuator/health/liveness`
 - `GET /actuator/health/readiness`
+
+Metrics:
+
+- `GET /actuator/metrics`
+- `GET /actuator/prometheus`
 
 Framework endpoint families supported by Spring Security's Authorization Server:
 
