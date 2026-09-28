@@ -1244,6 +1244,8 @@ repository in Render with **New → Blueprint**, select the `main` branch, and a
 to manage the existing `spring-authorization-server-samples` service. Render prompts for the
 database URL, username, password, and public issuer because those values are marked `sync: false`.
 
+Live demo: [Render](https://spring-authorization-server-samples.onrender.com)
+
 Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
 Render Deploy Hook. A successful `main` image publish then calls the hook and starts a new Render
 deployment. Keep the hook URL only in GitHub Secrets.
