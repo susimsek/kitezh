@@ -10,6 +10,8 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      - key: SPRING_LIQUIBASE_DROP_FIRST
+        value: "true"
       - key: SERVER_PORT
         value: "10000"
       # Render prompts for these database values when the Blueprint is first created.
