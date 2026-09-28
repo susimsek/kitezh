@@ -158,6 +158,10 @@ jobs:
           # Keep the exporters in the native image; Render supplies the endpoints
           # and credentials at runtime.
           MANAGEMENT_OPENTELEMETRY_ENABLED: 'true'
+          MANAGEMENT_TRACING_EXPORT_ENABLED: 'true'
+          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: 'true'
+          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: 'true'
+          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'true'
         run: |
           ./mvnw -B -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
