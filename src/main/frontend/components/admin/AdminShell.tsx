@@ -27,12 +27,27 @@ export function AdminShell({ locale, dictionary, children }: Props) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const items: ReadonlyArray<readonly [string, string, IconName, boolean | undefined]> = [
     ["", dictionary.admin.nav.dashboard, "gaugeHigh", access?.isAdmin],
-    ["/clients", dictionary.admin.nav.clients, "addressCard", access?.viewClients],
-    ["/client-scopes", dictionary.admin.nav.clientScopes, "layerGroup", access?.viewClients],
+    [
+      "/clients",
+      dictionary.admin.nav.clients,
+      "addressCard",
+      access?.queryClients || access?.viewClients,
+    ],
+    [
+      "/client-scopes",
+      dictionary.admin.nav.clientScopes,
+      "layerGroup",
+      access?.queryClients || access?.viewClients,
+    ],
     ["/identity-providers", dictionary.admin.nav.identityProviders, "globe", access?.isAdmin],
-    ["/users", dictionary.admin.nav.users, "users", access?.viewUsers],
+    ["/users", dictionary.admin.nav.users, "users", access?.queryUsers || access?.viewUsers],
     ["/roles", dictionary.admin.nav.roles, "userShield", access?.viewRoles],
-    ["/groups", dictionary.admin.nav.groups, "layerGroup", access?.viewUsers],
+    [
+      "/groups",
+      dictionary.admin.nav.groups,
+      "layerGroup",
+      access?.queryGroups || access?.viewGroups || access?.viewUsers,
+    ],
     ["/sessions", dictionary.admin.nav.sessions, "laptop", access?.viewSessions],
     ["/consents", dictionary.admin.nav.consents, "shieldHalved", access?.viewConsents],
     ["/keys", dictionary.admin.nav.keys, "key", access?.viewKeys],

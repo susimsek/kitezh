@@ -13,6 +13,9 @@ public final class AuthoritiesConstants {
 
     public static final String USER_VIEWER = "ROLE_USER_VIEWER";
 
+    /** Keycloak {@code query-users} equivalent for user discovery. */
+    public static final String USER_QUERY = "ROLE_USER_QUERY";
+
     public static final String USER_MANAGER = "ROLE_USER_MANAGER";
 
     /** Keycloak realm-management {@code impersonation} equivalent. */
@@ -20,9 +23,15 @@ public final class AuthoritiesConstants {
 
     public static final String GROUP_VIEWER = "ROLE_GROUP_VIEWER";
 
+    /** Keycloak {@code query-groups} equivalent for group discovery. */
+    public static final String GROUP_QUERY = "ROLE_GROUP_QUERY";
+
     public static final String GROUP_MANAGER = "ROLE_GROUP_MANAGER";
 
     public static final String CLIENT_VIEWER = "ROLE_CLIENT_VIEWER";
+
+    /** Keycloak {@code query-clients} equivalent for client discovery. */
+    public static final String CLIENT_QUERY = "ROLE_CLIENT_QUERY";
 
     public static final String CLIENT_MANAGER = "ROLE_CLIENT_MANAGER";
 
