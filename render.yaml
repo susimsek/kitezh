@@ -12,17 +12,29 @@ services:
         value: prod
       - key: SPRING_LIQUIBASE_DROP_FIRST
         value: "true"
-      - key: GRAFANA_CLOUD_OTLP_ENABLED
+      - key: MANAGEMENT_OPENTELEMETRY_ENABLED
         value: "true"
-      - key: GRAFANA_CLOUD_OTLP_AUTHORIZATION
+      - key: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION
         sync: false
-      - key: GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT
+      - key: MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION
         sync: false
-      - key: GRAFANA_CLOUD_OTLP_TRACES_ENDPOINT
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION
         sync: false
-      - key: GRAFANA_CLOUD_OTLP_LOGS_ENDPOINT
+      - key: MANAGEMENT_TRACING_EXPORT_ENABLED
+        value: "true"
+      - key: MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED
+        value: "true"
+      - key: MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED
+        value: "true"
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED
+        value: "true"
+      - key: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
         sync: false
-      - key: GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY
+      - key: MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT
+        sync: false
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_URL
+        sync: false
+      - key: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
         value: "1.0"
       - key: OTEL_SERVICE_NAME
         value: spring-authorization-server-samples

@@ -153,6 +153,11 @@ jobs:
           upx --version
 
       - name: Build GraalVM native executable
+        env:
+          # Spring AOT evaluates conditional OTLP auto-configurations at build time.
+          # Keep the exporters in the native image; Render supplies the endpoints
+          # and credentials at runtime.
+          MANAGEMENT_OPENTELEMETRY_ENABLED: 'true'
         run: |
           ./mvnw -B -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \

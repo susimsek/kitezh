@@ -65,40 +65,40 @@ server:
 
 management:
   opentelemetry:
-    enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+    enabled: ${MANAGEMENT_OPENTELEMETRY_ENABLED:false}
     resource-attributes:
       service.name: ${OTEL_SERVICE_NAME:spring-authorization-server-samples}
       deployment.environment: ${SPRING_PROFILES_ACTIVE:dev}
     tracing:
       export:
         otlp:
-          endpoint: ${GRAFANA_CLOUD_OTLP_TRACES_ENDPOINT:}
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:}
           headers:
-            Authorization: ${GRAFANA_CLOUD_OTLP_AUTHORIZATION:}
+            Authorization: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
     logging:
       export:
         otlp:
-          endpoint: ${GRAFANA_CLOUD_OTLP_LOGS_ENDPOINT:}
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT:}
           headers:
-            Authorization: ${GRAFANA_CLOUD_OTLP_AUTHORIZATION:}
+            Authorization: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
   logging:
     export:
       otlp:
-        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+        enabled: ${MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED:false}
   tracing:
     export:
-      enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+      enabled: ${MANAGEMENT_TRACING_EXPORT_ENABLED:false}
       otlp:
-        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+        enabled: ${MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED:false}
     sampling:
-      probability: ${GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY:1.0}
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
   otlp:
     metrics:
       export:
-        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
-        url: ${GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT:}
+        enabled: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:false}
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:}
         headers:
-          Authorization: ${GRAFANA_CLOUD_OTLP_AUTHORIZATION:}
+          Authorization: ${MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION:}
   health:
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}

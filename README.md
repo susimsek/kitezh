@@ -168,12 +168,18 @@ disabled by default, so local development does not send telemetry anywhere. Enab
 the following variables to `.env` or the Render environment:
 
 ```dotenv
-GRAFANA_CLOUD_OTLP_ENABLED=true
-GRAFANA_CLOUD_OTLP_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
-GRAFANA_CLOUD_OTLP_METRICS_ENDPOINT=https://<otlp-gateway>/otlp/v1/metrics
-GRAFANA_CLOUD_OTLP_TRACES_ENDPOINT=https://<otlp-gateway>/otlp/v1/traces
-GRAFANA_CLOUD_OTLP_LOGS_ENDPOINT=https://<otlp-gateway>/otlp/v1/logs
-GRAFANA_CLOUD_TRACING_SAMPLING_PROBABILITY=1.0
+MANAGEMENT_OPENTELEMETRY_ENABLED=true
+MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
+MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
+MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION=Basic <base64-grafana-instance-id-and-token>
+MANAGEMENT_TRACING_EXPORT_ENABLED=true
+MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=true
+MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED=true
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=true
+MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=https://<otlp-gateway>/otlp/v1/traces
+MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT=https://<otlp-gateway>/otlp/v1/logs
+MANAGEMENT_OTLP_METRICS_EXPORT_URL=https://<otlp-gateway>/otlp/v1/metrics
+MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
 OTEL_SERVICE_NAME=spring-authorization-server-samples
 ```
 
