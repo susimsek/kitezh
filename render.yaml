@@ -12,8 +12,7 @@ services:
         value: prod
       - key: SERVER_PORT
         value: "10000"
-      # Render prompts for these values when the Blueprint is first created.
-      # They are intentionally not stored in the repository.
+      # Render prompts for these database values when the Blueprint is first created.
       - key: SPRING_DATASOURCE_URL
         sync: false
       - key: SPRING_DATASOURCE_USERNAME
@@ -21,4 +20,4 @@ services:
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
       - key: APP_AUTHORIZATION_SERVER_ISSUER
-        sync: false
+        value: https://spring-authorization-server-samples.onrender.com
