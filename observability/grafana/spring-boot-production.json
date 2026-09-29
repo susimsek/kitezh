@@ -812,6 +812,224 @@
       }
     },
     {
+      "id": 73,
+      "type": "row",
+      "title": "OAuth & Authentication",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 111
+      },
+      "panels": []
+    },
+    {
+      "id": 74,
+      "type": "timeseries",
+      "title": "Login outcomes",
+      "description": "Successful and failed local, social, and OAuth client authentication attempts.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 112
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"login\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "login {{outcome}}"
+        },
+        {
+          "expr": "sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"social_login\"}[5m]))",
+          "refId": "B",
+          "legendFormat": "social {{outcome}}"
+        },
+        {
+          "expr": "sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"client_login\"}[5m]))",
+          "refId": "C",
+          "legendFormat": "client {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 75,
+      "type": "timeseries",
+      "title": "Token grants by type",
+      "description": "Access, ID, and refresh token issuance grouped by OAuth grant type.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 112
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (grant_type,token_type) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=~\"token_issued|refresh_token\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{grant_type}} / {{token_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 76,
+      "type": "timeseries",
+      "title": "Logout outcomes",
+      "description": "OIDC logout completions, including upstream provider logout redirects.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 112
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"logout\"}[5m])) or vector(0))",
+          "refId": "A",
+          "legendFormat": "logout {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 77,
+      "type": "timeseries",
+      "title": "OAuth errors by code",
+      "description": "OAuth protocol errors grouped by bounded error code and grant type.",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 117
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (error,grant_type) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"oauth_error\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{error}} / {{grant_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 78,
+      "type": "timeseries",
+      "title": "Token activity by client",
+      "description": "Token activity by registered client; no user or token identifiers are exported.",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 117
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id,event) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=~\"token_issued|refresh_token\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} / {{event}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "id": 52,
       "type": "row",
       "title": "JVM Memory & GC",
@@ -2330,224 +2548,6 @@
           "sort": "desc"
         }
       }
-    },
-    {
-      "id": 73,
-      "type": "row",
-      "title": "OAuth & Authentication",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 111
-      },
-      "panels": []
-    },
-    {
-      "id": 74,
-      "type": "timeseries",
-      "title": "Login outcomes",
-      "description": "Successful and failed local, social, and OAuth client authentication attempts.",
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 0,
-        "y": 112
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"login\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "login {{outcome}}"
-        },
-        {
-          "expr": "sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"social_login\"}[5m]))",
-          "refId": "B",
-          "legendFormat": "social {{outcome}}"
-        },
-        {
-          "expr": "sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"client_login\"}[5m]))",
-          "refId": "C",
-          "legendFormat": "client {{outcome}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 75,
-      "type": "timeseries",
-      "title": "Token grants by type",
-      "description": "Access, ID, and refresh token issuance grouped by OAuth grant type.",
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 112
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (grant_type,token_type) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=~\"token_issued|refresh_token\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "{{grant_type}} / {{token_type}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 76,
-      "type": "timeseries",
-      "title": "Logout outcomes",
-      "description": "OIDC logout completions, including upstream provider logout redirects.",
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 16,
-        "y": 112
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "(sum by (outcome) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"logout\"}[5m])) or vector(0))",
-          "refId": "A",
-          "legendFormat": "logout {{outcome}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 77,
-      "type": "timeseries",
-      "title": "OAuth errors by code",
-      "description": "OAuth protocol errors grouped by bounded error code and grant type.",
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 117
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (error,grant_type) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=\"oauth_error\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "{{error}} / {{grant_type}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 78,
-      "type": "timeseries",
-      "title": "Token activity by client",
-      "description": "Token activity by registered client; no user or token identifiers are exported.",
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 12,
-        "y": 117
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (client_id,event) (rate(spring_authorization_server_events_total{job=~\"$job\",service_name=~\"$instance\",event=~\"token_issued|refresh_token\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "{{client_id}} / {{event}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
     }
   ],
   "refresh": "30s",
@@ -2657,7 +2657,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "Spring Authorization Server Samples / Production & Troubleshooting",
+  "title": "Spring Authorization Server",
   "uid": "spring-auth-prod",
   "version": 17,
   "weekStart": ""
