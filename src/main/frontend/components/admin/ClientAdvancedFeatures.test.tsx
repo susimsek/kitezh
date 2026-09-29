@@ -74,6 +74,57 @@ it("creates a protocol mapper and reloads the list", async () => {
   expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.mappers.saved);
 });
 
+it("uses the standard audience claim for an audience mapper", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "POST") {
+      return {
+        status: 200,
+        data: {
+          id: 2,
+          name: "Reports audience",
+          mapperType: "audience",
+          source: null,
+          claimName: "aud",
+          addToIdToken: false,
+          addToAccessToken: true,
+          value: "reports-api",
+          priority: 100,
+        },
+      } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<ClientMappers clientId="client-1" dictionary={en} />);
+  await screen.findByText(en.admin.clients.mappers.empty);
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.type), {
+    target: { value: "audience" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.name), {
+    target: { value: "Reports audience" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.value), {
+    target: { value: "reports-api" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({
+        method: "POST",
+        data: expect.objectContaining({
+          name: "Reports audience",
+          mapperType: "audience",
+          value: "reports-api",
+          addToAccessToken: true,
+        }),
+      }),
+    ),
+  );
+});
+
 it("evaluates requested scopes and renders the preview", async () => {
   const request = jest.mocked(adminRequest);
   request.mockResolvedValue({

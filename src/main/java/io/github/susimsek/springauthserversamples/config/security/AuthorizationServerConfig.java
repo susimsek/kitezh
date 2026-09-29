@@ -26,12 +26,16 @@ import io.github.susimsek.springauthserversamples.security.ClientSecuritySetting
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
+import io.github.susimsek.springauthserversamples.security.ProtocolMapperTypes;
 import io.github.susimsek.springauthserversamples.security.RotatingClientSecretAuthenticationProvider;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -536,6 +540,8 @@ public class AuthorizationServerConfig {
                 }
             }
         }
+        mappers.sort(
+                Comparator.comparingInt(TokenMapper::priority).thenComparing(TokenMapper::name));
         return mappers;
     }
 
@@ -572,10 +578,12 @@ public class AuthorizationServerConfig {
 
     private static TokenMapper toTokenMapper(ClientMapperEntity mapper) {
         return new TokenMapper(
-                mapper.getMapperType(),
+                ProtocolMapperTypes.canonicalize(mapper.getMapperType()),
                 mapper.getSource(),
                 mapper.getValue(),
                 mapper.getClaimName(),
+                mapper.getName(),
+                mapper.getPriority(),
                 mapper.isAddToIdToken(),
                 mapper.isAddToAccessToken());
     }
@@ -583,10 +591,12 @@ public class AuthorizationServerConfig {
     private static TokenMapper toTokenMapper(
             io.github.susimsek.springauthserversamples.domain.ClientScopeMapperEntity mapper) {
         return new TokenMapper(
-                mapper.getMapperType(),
+                ProtocolMapperTypes.canonicalize(mapper.getMapperType()),
                 mapper.getSource(),
                 mapper.getValue(),
                 mapper.getClaimName(),
+                mapper.getName(),
+                mapper.getPriority(),
                 mapper.isAddToIdToken(),
                 mapper.isAddToAccessToken());
     }
@@ -787,72 +797,142 @@ public class AuthorizationServerConfig {
                                 (idToken && mapper.addToIdToken())
                                         || (accessToken && mapper.addToAccessToken()))
                 .forEach(
-                        mapper -> {
-                            Object value =
-                                    switch (mapper.mapperType()) {
-                                        case "audience", "hardcoded-claim" -> mapper.value();
-                                        case "user-property" ->
-                                                tokenUser
-                                                        .map(
-                                                                accountUser ->
-                                                                        userProperty(
-                                                                                accountUser,
-                                                                                mapper.source()))
-                                                        .orElse(null);
-                                        case "user-attribute" ->
-                                                tokenUser
-                                                        .map(
-                                                                accountUser ->
-                                                                        userAttribute(
-                                                                                accountUser,
-                                                                                mapper.source(),
-                                                                                attributeRepository))
-                                                        .orElse(null);
-                                        case "group-membership" ->
-                                                tokenUser
-                                                        .map(
-                                                                accountUser ->
-                                                                        accountUser
-                                                                                .getGroups()
-                                                                                .stream()
-                                                                                .map(
-                                                                                        AuthorizationServerConfig
-                                                                                                ::groupPath)
-                                                                                .sorted()
-                                                                                .toList())
-                                                        .orElse(null);
-                                        case "client-role" ->
-                                                tokenUser
-                                                        .map(
-                                                                accountUser ->
-                                                                        roleScopeMappings
-                                                                                .filterClientRoles(
-                                                                                        EffectiveRoleService
-                                                                                                .effectiveClientRoleNames(
-                                                                                                        accountUser))
-                                                                                .getOrDefault(
-                                                                                        context.getRegisteredClient()
-                                                                                                .getClientId(),
-                                                                                        Set.of()))
-                                                        .orElse(null);
-                                        case "email" ->
-                                                tokenUser.map(UserEntity::getEmail).orElse(null);
-                                        case "full-name" ->
-                                                tokenUser
-                                                        .map(AuthorizationServerConfig::fullName)
-                                                        .orElse(null);
-                                        case "locale" ->
-                                                tokenUser
-                                                        .map(UserEntity::getPreferredLocale)
-                                                        .orElse(null);
-                                        case "username" ->
-                                                tokenUser.map(UserEntity::getUsername).orElse(null);
-                                        default -> null;
-                                    };
-                            if (value != null) {
-                                context.getClaims().claim(mapper.claimName(), value);
-                            }
-                        });
+                        mapper ->
+                                appendClientMapper(
+                                        context,
+                                        tokenUser,
+                                        mapper,
+                                        attributeRepository,
+                                        roleScopeMappings));
+    }
+
+    private static void appendClientMapper(
+            JwtEncodingContext context,
+            Optional<UserEntity> tokenUser,
+            TokenMapper mapper,
+            UserProfileAttributeRepository attributeRepository,
+            RoleScopeMappings roleScopeMappings) {
+        if (ProtocolMapperTypes.usesAudienceClaim(mapper.mapperType())) {
+            appendAudienceClaim(
+                    context, audienceValues(context, tokenUser, mapper, roleScopeMappings));
+            return;
+        }
+        Object value =
+                switch (mapper.mapperType()) {
+                    case ProtocolMapperTypes.HARDCODED_CLAIM -> mapper.value();
+                    case ProtocolMapperTypes.USER_PROPERTY ->
+                            tokenUser
+                                    .map(accountUser -> userProperty(accountUser, mapper.source()))
+                                    .orElse(null);
+                    case ProtocolMapperTypes.USER_ATTRIBUTE ->
+                            tokenUser
+                                    .map(
+                                            accountUser ->
+                                                    userAttribute(
+                                                            accountUser,
+                                                            mapper.source(),
+                                                            attributeRepository))
+                                    .orElse(null);
+                    case ProtocolMapperTypes.GROUP_MEMBERSHIP ->
+                            tokenUser.map(AuthorizationServerConfig::groupMemberships).orElse(null);
+                    case ProtocolMapperTypes.GROUP_ATTRIBUTE ->
+                            tokenUser
+                                    .map(
+                                            accountUser ->
+                                                    groupAttribute(accountUser, mapper.source()))
+                                    .orElse(null);
+                    case ProtocolMapperTypes.APPLICATION_ROLE ->
+                            tokenUser.map(EffectiveRoleService::effectiveRoleNames).orElse(null);
+                    case ProtocolMapperTypes.CLIENT_ROLE ->
+                            tokenUser
+                                    .map(
+                                            accountUser ->
+                                                    EffectiveRoleService.effectiveClientRoleNames(
+                                                                    accountUser)
+                                                            .getOrDefault(
+                                                                    context.getRegisteredClient()
+                                                                            .getClientId(),
+                                                                    Set.of()))
+                                    .orElse(null);
+                    case ProtocolMapperTypes.EMAIL ->
+                            tokenUser.map(UserEntity::getEmail).orElse(null);
+                    case ProtocolMapperTypes.FULL_NAME ->
+                            tokenUser.map(AuthorizationServerConfig::fullName).orElse(null);
+                    case ProtocolMapperTypes.LOCALE ->
+                            tokenUser.map(UserEntity::getPreferredLocale).orElse(null);
+                    case ProtocolMapperTypes.USERNAME ->
+                            tokenUser.map(UserEntity::getUsername).orElse(null);
+                    default -> null;
+                };
+        if (value != null) {
+            context.getClaims().claim(mapper.claimName(), value);
+        }
+    }
+
+    private static List<String> audienceValues(
+            JwtEncodingContext context,
+            Optional<UserEntity> tokenUser,
+            TokenMapper mapper,
+            RoleScopeMappings roleScopeMappings) {
+        if (ProtocolMapperTypes.AUDIENCE.equals(mapper.mapperType())) {
+            return mapper.value() == null || mapper.value().isBlank()
+                    ? List.of()
+                    : List.of(mapper.value());
+        }
+        if (tokenUser.isEmpty()) {
+            return List.of();
+        }
+        return roleScopeMappings
+                .filterClientRoles(EffectiveRoleService.effectiveClientRoleNames(tokenUser.get()))
+                .keySet()
+                .stream()
+                .filter(clientId -> !clientId.equals(context.getRegisteredClient().getClientId()))
+                .sorted()
+                .toList();
+    }
+
+    private static void appendAudienceClaim(JwtEncodingContext context, List<String> audiences) {
+        if (audiences.isEmpty()) {
+            return;
+        }
+        Set<String> merged = new LinkedHashSet<>();
+        Object existing = context.getClaims().build().getClaims().get("aud");
+        if (existing instanceof String audience) {
+            merged.add(audience);
+        } else if (existing instanceof Collection<?> values) {
+            values.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .forEach(merged::add);
+        }
+        merged.addAll(audiences);
+        context.getClaims().claim("aud", new ArrayList<>(merged));
+    }
+
+    private static List<String> groupMemberships(UserEntity user) {
+        return user.getGroups() == null
+                ? List.of()
+                : user.getGroups().stream()
+                        .map(AuthorizationServerConfig::groupPath)
+                        .sorted()
+                        .toList();
+    }
+
+    private static Object groupAttribute(UserEntity user, String source) {
+        if (source == null || source.isBlank() || user.getGroups() == null) {
+            return null;
+        }
+        List<String> values =
+                user.getGroups().stream()
+                        .filter(group -> group.getAttributes() != null)
+                        .flatMap(group -> group.getAttributes().stream())
+                        .filter(attribute -> source.equals(attribute.getName()))
+                        .map(
+                                io.github.susimsek.springauthserversamples.domain.GroupAttribute
+                                        ::getValue)
+                        .distinct()
+                        .toList();
+        return values.isEmpty() ? null : values.size() == 1 ? values.getFirst() : values;
     }
 
     private static String fullName(UserEntity user) {
@@ -914,6 +994,8 @@ public class AuthorizationServerConfig {
             String source,
             String value,
             String claimName,
+            String name,
+            int priority,
             boolean addToIdToken,
             boolean addToAccessToken) {}
 

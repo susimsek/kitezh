@@ -8,6 +8,7 @@ import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
@@ -55,6 +56,46 @@ class AdminClientScopeEvaluationServiceTest {
         assertThat(result.claims())
                 .containsEntry("client_claim", "client")
                 .containsEntry("scope_claim", "scope");
+    }
+
+    @Test
+    void mergesAudienceMappersIntoTheStandardAudienceClaim() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(
+                        List.of(
+                                mapper("first", "audience", null, "reports-api"),
+                                mapper("second", "audience", null, "billing-api")));
+
+        var result = service().evaluate("client-1", "unknown", null);
+
+        assertThat(result.claims()).containsEntry("aud", List.of("reports-api", "billing-api"));
+    }
+
+    @Test
+    void evaluatesUserPropertyMappersForTheSelectedSubject() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        ClientMapperEntity mapper =
+                mapper("username", "user-property", "preferred_username", "username");
+        mapper.setSource("username");
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setEmail("admin@example.com");
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(List.of(mapper));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        var result = service().evaluate("client-1", "openid", "admin");
+
+        assertThat(result.claims()).containsEntry("preferred_username", "admin");
     }
 
     private AdminClientScopeEvaluationService service() {

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "@/lib/form";
 import { z } from "zod";
 import { Button, Card, Form, Spinner, Table } from "react-bootstrap";
+import { useWatch } from "react-hook-form";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { adminRequest } from "@/lib/admin-api";
 import type { PageResponse } from "@/lib/api-types";
@@ -31,8 +32,11 @@ type Values = {
     | "user-property"
     | "user-attribute"
     | "group-membership"
+    | "group-attribute"
+    | "application-role"
     | "client-role"
     | "audience"
+    | "audience-resolve"
     | "hardcoded-claim"
     | "email"
     | "full-name"
@@ -75,8 +79,11 @@ export function ClientMappers({
         "user-property",
         "user-attribute",
         "group-membership",
+        "group-attribute",
+        "application-role",
         "client-role",
         "audience",
+        "audience-resolve",
         "hardcoded-claim",
         "email",
         "full-name",
@@ -84,15 +91,25 @@ export function ClientMappers({
         "username",
       ]),
       source: z.string().trim().max(200),
-      claimName: z.string().trim().min(1, dictionary.admin.common.validation.required).max(200),
+      claimName: z.string().trim().max(200),
       addToIdToken: z.boolean(),
       addToAccessToken: z.boolean(),
       value: z.string().trim().max(1000),
       priority: z.number().int().min(0).max(10000),
     })
     .superRefine((value, context) => {
-      if (["user-property", "user-attribute"].includes(value.mapperType) && !value.source) {
+      if (
+        ["user-property", "user-attribute", "group-attribute"].includes(value.mapperType) &&
+        !value.source
+      ) {
         context.addIssue({ code: "custom", path: ["source"], message: copy.sourceRequired });
+      }
+      if (!["audience", "audience-resolve"].includes(value.mapperType) && !value.claimName) {
+        context.addIssue({
+          code: "custom",
+          path: ["claimName"],
+          message: dictionary.admin.common.validation.required,
+        });
       }
       if (!value.addToIdToken && !value.addToAccessToken) {
         context.addIssue({
@@ -103,6 +120,7 @@ export function ClientMappers({
       }
     });
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -120,6 +138,7 @@ export function ClientMappers({
       priority: 100,
     },
   });
+  const selectedMapperType = useWatch({ control, name: "mapperType" });
 
   const load = () => {
     if (!accessToken) return;
@@ -192,8 +211,11 @@ export function ClientMappers({
                   <option value="user-property">user-property</option>
                   <option value="user-attribute">user-attribute</option>
                   <option value="group-membership">group-membership</option>
+                  <option value="group-attribute">group-attribute</option>
+                  <option value="application-role">application-role</option>
                   <option value="client-role">client-role</option>
                   <option value="audience">audience</option>
+                  <option value="audience-resolve">audience-resolve</option>
                   <option value="hardcoded-claim">hardcoded-claim</option>
                   <option value="email">email</option>
                   <option value="full-name">full-name</option>
@@ -204,7 +226,9 @@ export function ClientMappers({
               <Form.Group controlId="client-mapper-value">
                 <Form.Label>{copy.value}</Form.Label>
                 <Form.Control
-                  disabled={!canManage}
+                  disabled={
+                    !canManage || !["audience", "hardcoded-claim"].includes(selectedMapperType)
+                  }
                   isInvalid={Boolean(errors.value)}
                   {...register("value")}
                 />
@@ -227,7 +251,12 @@ export function ClientMappers({
               <Form.Group controlId="client-mapper-source">
                 <Form.Label>{copy.source}</Form.Label>
                 <Form.Control
-                  disabled={!canManage}
+                  disabled={
+                    !canManage ||
+                    !["user-property", "user-attribute", "group-attribute"].includes(
+                      selectedMapperType,
+                    )
+                  }
                   isInvalid={Boolean(errors.source)}
                   {...register("source")}
                 />
@@ -238,7 +267,9 @@ export function ClientMappers({
               <Form.Group controlId="client-mapper-claim-name">
                 <Form.Label>{copy.claimName}</Form.Label>
                 <Form.Control
-                  disabled={!canManage}
+                  disabled={
+                    !canManage || ["audience", "audience-resolve"].includes(selectedMapperType)
+                  }
                   isInvalid={Boolean(errors.claimName)}
                   {...register("claimName")}
                 />

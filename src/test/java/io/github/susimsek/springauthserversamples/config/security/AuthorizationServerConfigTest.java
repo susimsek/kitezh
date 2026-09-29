@@ -13,6 +13,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
 import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
@@ -20,9 +21,13 @@ import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
+import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
 import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
+import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationEndpointErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
@@ -193,6 +198,7 @@ class AuthorizationServerConfigTest {
                         httpSecurity(),
                         mock(OAuth2TokenGenerator.class),
                         mock(RegisteredClientRepository.class),
+                        mock(org.springframework.security.crypto.password.PasswordEncoder.class),
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
                         mock(CibaAuthenticationGrantAuthenticationProvider.class),
@@ -595,6 +601,53 @@ class AuthorizationServerConfigTest {
                 .containsEntry("email_verified", true)
                 .containsEntry("locale", "tr")
                 .doesNotContainKey("picture");
+    }
+
+    @Test
+    void appliesClientMappersInPriorityOrderAndMergesAudienceClaims() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        AuthorityEntity role = new AuthorityEntity();
+        role.setName("ROLE_REPORTS");
+        user.setAuthorities(Set.of(role));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
+        AuthorizationRepository authorizationRepository = mock(AuthorizationRepository.class);
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        ClientMapperEntity audience = mapper("audience", "audience", null, "reports-api", 0);
+        ClientMapperEntity low = mapper("low", "hardcoded-claim", "same", "low", 10);
+        ClientMapperEntity high = mapper("high", "hardcoded-claim", "same", "high", 20);
+        ClientMapperEntity roles = mapper("roles", "user-realm-role", "roles", null, 30);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(List.of(high, roles, low, audience));
+
+        JwtClaimsSet.Builder claims =
+                JwtClaimsSet.builder().claim("sub", "admin").claim("aud", "existing");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        avatarRepository,
+                        authorizationRepository,
+                        null,
+                        mapperRepository,
+                        mock(ClientScopeMapperRepository.class),
+                        mock(ServiceAccountRepository.class),
+                        mock(UserProfileAttributeRepository.class),
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "demo-client",
+                                Set.of("openid")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("same", "high")
+                .containsEntry("roles", Set.of("ROLE_REPORTS"))
+                .containsEntry("aud", List.of("existing", "reports-api"));
     }
 
     @Test
@@ -1211,6 +1264,18 @@ class AuthorizationServerConfigTest {
             String clientId,
             Set<String> scopes) {
         return jwtContext(claims, tokenType, grantType, clientId, scopes, null);
+    }
+
+    private static ClientMapperEntity mapper(
+            String name, String type, String claimName, String value, int priority) {
+        ClientMapperEntity mapper = new ClientMapperEntity();
+        mapper.setName(name);
+        mapper.setMapperType(type);
+        mapper.setClaimName(claimName);
+        mapper.setValue(value);
+        mapper.setPriority(priority);
+        mapper.setAddToAccessToken(true);
+        return mapper;
     }
 
     private static JwtEncodingContext jwtContext(

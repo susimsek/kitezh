@@ -7,9 +7,9 @@ import io.github.susimsek.springauthserversamples.dto.admin.AdminClientMapperReq
 import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.github.susimsek.springauthserversamples.security.ProtocolMapperTypes;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
@@ -130,10 +130,14 @@ public class AdminClientScopeMapperService {
             AdminClientMapperRequestDTO request) {
         mapper.setClientScope(scope);
         mapper.setName(request.name().trim());
-        mapper.setMapperType(request.mapperType().toLowerCase(Locale.ROOT));
+        String mapperType = ProtocolMapperTypes.canonicalize(request.mapperType());
+        mapper.setMapperType(mapperType);
         mapper.setSource(request.source() == null ? null : request.source().trim());
         mapper.setValue(request.value() == null ? null : request.value().trim());
-        mapper.setClaimName(request.claimName().trim());
+        mapper.setClaimName(
+                ProtocolMapperTypes.usesAudienceClaim(mapperType)
+                        ? "aud"
+                        : request.claimName().trim());
         mapper.setPriority(request.priority() == null ? 100 : request.priority());
         mapper.setAddToIdToken(request.addToIdToken());
         mapper.setAddToAccessToken(request.addToAccessToken());
@@ -144,20 +148,29 @@ public class AdminClientScopeMapperService {
             throw ApiException.badRequest(
                     ApiErrorCode.CLIENT_INVALID_REQUEST, "Request body is required");
         }
-        String type = request.mapperType().toLowerCase(Locale.ROOT);
-        boolean sourceRequired = "user-property".equals(type) || "user-attribute".equals(type);
-        if (sourceRequired && (request.source() == null || request.source().isBlank())) {
+        String type = ProtocolMapperTypes.canonicalize(request.mapperType());
+        if (!ProtocolMapperTypes.isSupported(type)) {
+            throw ApiException.badRequest(
+                    "mapperType", ApiErrorCode.CLIENT_INVALID_REQUEST, "Unsupported mapper type");
+        }
+        if (ProtocolMapperTypes.requiresSource(type)
+                && (request.source() == null || request.source().isBlank())) {
             throw ApiException.badRequest(
                     "source",
                     ApiErrorCode.CLIENT_MAPPER_SOURCE_REQUIRED,
                     "A source is required for this mapper type");
         }
-        boolean valueRequired = "hardcoded-claim".equals(type) || "audience".equals(type);
-        if (valueRequired && (request.value() == null || request.value().isBlank())) {
+        if (ProtocolMapperTypes.requiresValue(type)
+                && (request.value() == null || request.value().isBlank())) {
             throw ApiException.badRequest(
                     "value",
                     ApiErrorCode.CLIENT_MAPPER_SOURCE_REQUIRED,
                     "A value is required for this mapper type");
+        }
+        if (!ProtocolMapperTypes.usesAudienceClaim(type)
+                && (request.claimName() == null || request.claimName().isBlank())) {
+            throw ApiException.badRequest(
+                    "claimName", ApiErrorCode.CLIENT_INVALID_REQUEST, "A claim name is required");
         }
         if (!request.addToIdToken() && !request.addToAccessToken()) {
             throw ApiException.badRequest(

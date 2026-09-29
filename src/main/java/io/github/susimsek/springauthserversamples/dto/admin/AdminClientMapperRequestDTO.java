@@ -17,7 +17,8 @@ public record AdminClientMapperRequestDTO(
         @NotBlank
                 @Pattern(
                         regexp =
-                                "user-property|user-attribute|group-membership|client-role|audience|hardcoded-claim|email|full-name|locale|username")
+                                io.github.susimsek.springauthserversamples.security
+                                        .ProtocolMapperTypes.SUPPORTED_TYPES_REGEX)
                 @Schema(
                         description = "Allow-listed mapper type.",
                         example = "user-property",
@@ -30,12 +31,12 @@ public record AdminClientMapperRequestDTO(
                         nullable = true,
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
                 String source,
-        @NotBlank
-                @Size(max = 200)
+        @Size(max = 200)
                 @Schema(
                         description = "JWT claim name.",
                         example = "email",
-                        requiredMode = Schema.RequiredMode.REQUIRED)
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
                 String claimName,
         @Schema(
                         description = "Add the claim to ID tokens.",
