@@ -6,6 +6,7 @@ import io.github.susimsek.springauthserversamples.config.observability.Observabi
 import io.github.susimsek.springauthserversamples.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.springauthserversamples.security.LocalizedAuthenticationEntryPoint;
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
+import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -565,6 +566,15 @@ public class SecurityConfig {
     }
 
     @Bean
+    SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler(
+            io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService
+                    providerSettingsService,
+            SocialProviderLogoutEndpointResolver logoutEndpointResolver,
+            OAuth2ObservabilityMetrics metrics) {
+        return new SocialProviderLogoutSuccessHandler(
+                providerSettingsService, logoutEndpointResolver, metrics);
+    }
+
     SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler(
             io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService
                     providerSettingsService,

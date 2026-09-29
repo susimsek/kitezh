@@ -23,6 +23,7 @@ import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
+import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -342,6 +343,14 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
+    OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
+            JwtEncoder jwtEncoder,
+            OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer,
+            OAuth2ObservabilityMetrics metrics) {
+        return new ObservabilityOAuth2TokenGenerator(
+                tokenGenerator(jwtEncoder, jwtTokenCustomizer), metrics);
+    }
+
     OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
             JwtEncoder jwtEncoder, OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer) {
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
