@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="023-create-ciba-policy" author="susimsek">
+		<createTable tableName="ciba_policy">
+			<column name="id" type="bigint"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_ciba_policy"/></column>
+			<column name="request_lifespan_seconds" type="int" defaultValueNumeric="300"><constraints nullable="false"/></column>
+			<column name="polling_interval_seconds" type="int" defaultValueNumeric="5"><constraints nullable="false"/></column>
+			<column name="delivery_mode" type="varchar(10)" defaultValue="all"><constraints nullable="false"/></column>
+			<column name="user_verification" type="varchar(20)" defaultValue="preferred"><constraints nullable="false"/></column>
+			<column name="mfa_required" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="step_up_required" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="step_up_acr" type="varchar(100)"/>
+		</createTable>
+		<loadData encoding="UTF-8" file="db/data/ciba-policy.csv" separator=";" tableName="ciba_policy" usePreparedStatements="true">
+			<column header="id" type="numeric"/>
+			<column header="request_lifespan_seconds" type="numeric"/>
+			<column header="polling_interval_seconds" type="numeric"/>
+			<column header="delivery_mode" type="string"/>
+			<column header="user_verification" type="string"/>
+			<column header="mfa_required" type="boolean"/>
+			<column header="step_up_required" type="boolean"/>
+			<column header="step_up_acr" type="string"/>
+		</loadData>
+	</changeSet>
+</databaseChangeLog>

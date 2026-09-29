@@ -26,6 +26,44 @@
 			<column name="password" type="varchar(255)">
 				<constraints nullable="false"/>
 			</column>
+			<column name="password_changed_at" type="timestamp" defaultValueDate="${now}"/>
+			<column name="must_change_password" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="temporary_password" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="failed_login_count" type="bigint" defaultValueNumeric="0">
+				<constraints nullable="false"/>
+			</column>
+			<column name="last_failed_login_at" type="timestamp"/>
+			<column name="locked_until" type="timestamp"/>
+			<column name="temporary_lockout_count" type="bigint" defaultValueNumeric="0">
+				<constraints nullable="false"/>
+			</column>
+			<column name="permanently_locked" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="totp_last_used_counter" type="bigint"/>
+			<column name="totp_secret" type="varchar(64)"/>
+			<column name="totp_enabled" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="mfa_failed_attempt_count" type="bigint" defaultValueNumeric="0">
+				<constraints nullable="false"/>
+			</column>
+			<column name="mfa_permanently_locked" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="first_name" type="varchar(100)"/>
+			<column name="last_name" type="varchar(100)"/>
+			<column name="email" type="varchar(200)"/>
+			<column name="preferred_locale" type="varchar(10)"/>
+			<column name="picture_url" type="varchar(1000)"/>
+			<column name="pending_email" type="varchar(200)"/>
+			<column name="email_verified" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
 			<column name="enabled" type="boolean" defaultValueBoolean="true">
 				<constraints nullable="false"/>
 			</column>
@@ -62,6 +100,7 @@
 			<column name="name" type="varchar(50)">
 				<constraints nullable="false" unique="true" uniqueConstraintName="uk_authorities_name"/>
 			</column>
+			<column name="description" type="varchar(500)"/>
 		</createTable>
 	</changeSet>
 
@@ -102,8 +141,8 @@
 			separator=";"
 			tableName="authorities"
 			usePreparedStatements="true">
-			<column header="id" type="numeric"/>
 			<column header="name" type="string"/>
+			<column header="description" type="string"/>
 		</loadData>
 	</changeSet>
 
@@ -116,6 +155,9 @@
 			usePreparedStatements="true">
 			<column header="username" type="string"/>
 			<column header="password" type="string"/>
+			<column header="first_name" type="string"/>
+			<column header="last_name" type="string"/>
+			<column header="email" type="string"/>
 			<column header="enabled" type="boolean"/>
 			<column header="created_by" type="string"/>
 			<column header="last_modified_by" type="string"/>

@@ -23,6 +23,39 @@ env:
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
+  infrastructure-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Validate Docker Compose definitions
+        run: |
+          docker compose -f src/main/docker/services.yml config --quiet
+          docker compose -f src/main/docker/postgresql.yml config --quiet
+          docker compose -f src/main/docker/openldap.yml config --quiet
+          docker compose -f src/main/docker/app.yml config --quiet
+
+      - name: Validate Helm chart
+        run: |
+          diff -qr src/main/resources/db helm/spring-authorization-server-samples/db
+          helm lint helm/spring-authorization-server-samples
+          helm template spring-authorization-server-samples helm/spring-authorization-server-samples >/dev/null
+
+      - name: Validate Terraform configuration
+        run: |
+          terraform -chdir=terraform fmt -check
+          terraform -chdir=terraform init -backend=false -input=false
+          terraform -chdir=terraform validate
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -120,6 +153,15 @@ jobs:
           upx --version
 
       - name: Build GraalVM native executable
+        env:
+          # Spring AOT evaluates conditional OTLP auto-configurations at build time.
+          # Keep the exporters in the native image; Render supplies the endpoints
+          # and credentials at runtime.
+          MANAGEMENT_OPENTELEMETRY_ENABLED: 'true'
+          MANAGEMENT_TRACING_EXPORT_ENABLED: 'true'
+          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: 'true'
+          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: 'true'
+          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'true'
         run: |
           ./mvnw -B -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
@@ -136,6 +178,7 @@ jobs:
         run: |
           ./mvnw -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
+            -Djib-maven-plugin.architecture=amd64 \
             jib:build \
             -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
             -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
@@ -166,3 +209,28 @@ jobs:
               -H 'Content-Type: application/json' \
               --data-binary @- \
               "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
+
+  deploy-render:
+    name: Deploy to Render
+    needs:
+      - infrastructure-validation
+      - build
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+
+    steps:
+      - name: Skip Render deploy when hook is not configured
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' }}
+        run: echo "RENDER_DEPLOY_HOOK_URL is not configured; skipping Render deployment."
+
+      - name: Trigger Render deploy
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' }}
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            --request POST \
+            --get \
+            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
+            "${RENDER_DEPLOY_HOOK_URL}"

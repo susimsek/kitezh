@@ -29,6 +29,10 @@
     "allPublicMethods": true
   },
   {
+    "name": "liquibase.change.core.AddUniqueConstraintChange",
+    "allPublicMethods": true
+  },
+  {
     "name": "liquibase.change.core.CreateIndexChange",
     "allPublicMethods": true
   }

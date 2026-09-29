@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+	<changeSet id="018-create-social-provider-catalog" author="susimsek">
+		<createTable tableName="social_identity_providers">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_social_identity_providers"/></column>
+			<column name="registration_id" type="varchar(100)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_social_identity_providers_registration"/></column>
+			<column name="provider_type" type="varchar(50)"><constraints nullable="false"/></column>
+			<column name="display_name" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="alias" type="varchar(50)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_social_identity_providers_alias"/></column>
+			<column name="icon_key" type="varchar(40)"><constraints nullable="false"/></column>
+			<column name="short_state_parameter" type="boolean"><constraints nullable="false"/></column>
+			<column name="case_sensitive_username" type="boolean"><constraints nullable="false"/></column>
+			<column name="enabled" type="boolean"><constraints nullable="false"/></column>
+			<column name="hide_on_login" type="boolean"><constraints nullable="false"/></column>
+			<column name="account_linking_only" type="boolean"><constraints nullable="false"/></column>
+			<column name="trust_email" type="boolean"><constraints nullable="false"/></column>
+			<column name="mfa_required" type="boolean"><constraints nullable="false"/></column>
+			<column name="required_claims" type="varchar(500)"><constraints nullable="false"/></column>
+			<column name="store_tokens" type="boolean"><constraints nullable="false"/></column>
+			<column name="stored_tokens_readable" type="boolean"><constraints nullable="false"/></column>
+			<column name="gui_order" type="int"><constraints nullable="false"/></column>
+			<column name="show_in_account_console" type="varchar(20)"><constraints nullable="false"/></column>
+			<column name="sync_mode" type="varchar(20)" defaultValue="import"><constraints nullable="false"/></column>
+			<column name="client_id" type="varchar(500)"/>
+			<column name="client_secret_encrypted" type="varchar(2000)"/>
+			<column name="authorization_uri" type="varchar(1000)"/>
+			<column name="token_uri" type="varchar(1000)"/>
+			<column name="user_info_uri" type="varchar(1000)"/>
+			<column name="jwk_set_uri" type="varchar(1000)"/>
+			<column name="issuer_uri" type="varchar(1000)"/>
+			<column name="client_authentication_method" type="varchar(30)"><constraints nullable="false"/></column>
+			<column name="scopes" type="varchar(1000)"><constraints nullable="false"/></column>
+			<column name="user_name_attribute" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)" defaultValue="system"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+		</createTable>
+		<loadData encoding="UTF-8" file="db/data/social-identity-providers.csv" separator=";" tableName="social_identity_providers" usePreparedStatements="true">
+			<column header="id" type="string"/><column header="registration_id" type="string"/><column header="provider_type" type="string"/><column header="display_name" type="string"/><column header="alias" type="string"/><column header="icon_key" type="string"/><column header="short_state_parameter" type="boolean"/><column header="case_sensitive_username" type="boolean"/><column header="enabled" type="boolean"/><column header="hide_on_login" type="boolean"/><column header="account_linking_only" type="boolean"/><column header="trust_email" type="boolean"/><column header="mfa_required" type="boolean"/><column header="required_claims" type="string"/><column header="store_tokens" type="boolean"/><column header="stored_tokens_readable" type="boolean"/><column header="gui_order" type="numeric"/><column header="show_in_account_console" type="string"/><column header="sync_mode" type="string"/><column header="client_id" type="string"/><column header="client_secret_encrypted" type="string"/><column header="authorization_uri" type="string"/><column header="token_uri" type="string"/><column header="user_info_uri" type="string"/><column header="jwk_set_uri" type="string"/><column header="issuer_uri" type="string"/><column header="client_authentication_method" type="string"/><column header="scopes" type="string"/><column header="user_name_attribute" type="string"/><column header="created_by" type="string"/><column header="last_modified_by" type="string"/>
+		</loadData>
+	</changeSet>
+	<changeSet id="019-create-social-provider-mappers" author="susimsek">
+		<createTable tableName="social_provider_mappers">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_social_provider_mappers"/></column>
+			<column name="provider_alias" type="varchar(50)"><constraints nullable="false"/></column>
+			<column name="name" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="source_claim" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="target" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="mapper_type" type="varchar(40)"><constraints nullable="false"/></column>
+			<column name="sync_mode" type="varchar(20)"><constraints nullable="false"/></column>
+			<column name="add_to_id_token" type="boolean"><constraints nullable="false"/></column>
+			<column name="add_to_access_token" type="boolean"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)" defaultValue="system"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+		</createTable>
+		<addUniqueConstraint tableName="social_provider_mappers" columnNames="provider_alias,name" constraintName="uk_social_provider_mappers_provider_name"/>
+		<createIndex indexName="idx_social_provider_mappers_provider" tableName="social_provider_mappers"><column name="provider_alias"/></createIndex>
+		<loadData encoding="UTF-8" file="db/data/social-provider-mappers.csv" separator=";" tableName="social_provider_mappers" usePreparedStatements="true">
+			<column header="id" type="string"/><column header="provider_alias" type="string"/><column header="name" type="string"/><column header="source_claim" type="string"/><column header="target" type="string"/><column header="mapper_type" type="string"/><column header="sync_mode" type="string"/><column header="add_to_id_token" type="boolean"/><column header="add_to_access_token" type="boolean"/><column header="created_by" type="string"/><column header="last_modified_by" type="string"/>
+		</loadData>
+	</changeSet>
+</databaseChangeLog>

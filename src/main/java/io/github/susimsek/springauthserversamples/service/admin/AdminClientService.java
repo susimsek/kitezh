@@ -14,6 +14,7 @@ import io.github.susimsek.springauthserversamples.repository.AuthorizationReposi
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
@@ -485,6 +486,7 @@ public class AdminClientService {
                 "clientSecretGracePeriod",
                 "client secret grace period",
                 request.clientSecretGracePeriod());
+        validateCiba(request, grants);
     }
 
     private RegisteredClient save(RegisteredClient client) {
@@ -626,6 +628,17 @@ public class AdminClientService {
                             .ConfigurationSettingNames.Client.X509_CERTIFICATE_SUBJECT_DN,
                     request.x509CertificateSubjectDN());
         }
+        String cibaDeliveryMode = resolveCibaDeliveryMode(request);
+        values.put(ClientSecuritySettings.CIBA_DELIVERY_MODE, cibaDeliveryMode);
+        if (ClientSecuritySettings.CIBA_POLL.equals(cibaDeliveryMode)) {
+            values.remove(ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT);
+            values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+        } else {
+            values.put(
+                    ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
+                    request.cibaNotificationEndpoint());
+            values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+        }
         settings = ClientSettings.withSettings(values).build();
         if (existing == null
                 || existing.getClientSettings().getSetting(ClientScopeSettings.DEFAULT_SCOPES)
@@ -684,6 +697,35 @@ public class AdminClientService {
         return request.clientAuthenticationMethods().stream()
                 .map(ClientAuthenticationMethod::new)
                 .anyMatch(AdminClientService::isSecretMethod);
+    }
+
+    private static void validateCiba(AdminClientRequestDTO request, Set<String> grants) {
+        String mode = resolveCibaDeliveryMode(request);
+        if (!ClientSecuritySettings.CIBA_DELIVERY_MODES.contains(mode)) {
+            throw ApiException.badRequest(
+                    "cibaDeliveryMode",
+                    ApiErrorCode.CLIENT_INVALID_REQUEST,
+                    "CIBA delivery mode must be poll, ping, or push");
+        }
+        if (!ClientSecuritySettings.CIBA_POLL.equals(mode)
+                && !grants.contains(AuthorizationGrantTypes.CIBA)) {
+            throw ApiException.badRequest(
+                    AUTHORIZATION_GRANT_TYPES_FIELD,
+                    ApiErrorCode.CLIENT_INVALID_GRANT_TYPES,
+                    "Ping or push delivery requires the CIBA grant");
+        }
+        if (!ClientSecuritySettings.CIBA_POLL.equals(mode)) {
+            validateUri(
+                    "cibaNotificationEndpoint",
+                    "CIBA notification endpoint",
+                    request.cibaNotificationEndpoint());
+        }
+    }
+
+    private static String resolveCibaDeliveryMode(AdminClientRequestDTO request) {
+        return hasText(request.cibaDeliveryMode())
+                ? request.cibaDeliveryMode().trim().toLowerCase(java.util.Locale.ROOT)
+                : ClientSecuritySettings.CIBA_POLL;
     }
 
     private static boolean isSecretMethod(ClientAuthenticationMethod method) {

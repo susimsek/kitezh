@@ -37,4 +37,6 @@
 	<include file="db/changelog/changes/026-add-ldap-connection-options.xml"/>
 	<include file="db/changelog/changes/027-client-service-accounts-and-mappers.xml"/>
 	<include file="db/changelog/changes/028-client-scope-mappers-and-role-mappings.xml"/>
+	<include file="db/changelog/changes/022-create-ciba.xml"/>
+	<include file="db/changelog/changes/023-create-ciba-policy.xml"/>
 </databaseChangeLog>

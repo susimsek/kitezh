@@ -15,11 +15,11 @@ public abstract class AuditableEntity extends DateAuditingEntity {
 
     @CreatedBy
     @Column(name = "created_by", nullable = false, updatable = false, length = 100)
-    private String createdBy;
+    protected String createdBy;
 
     @LastModifiedBy
     @Column(name = "last_modified_by", length = 100)
-    private @Nullable String lastModifiedBy;
+    protected @Nullable String lastModifiedBy;
 
     protected AuditableEntity() {}
 }

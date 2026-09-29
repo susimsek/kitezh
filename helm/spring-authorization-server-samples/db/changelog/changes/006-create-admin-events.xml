@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="001-create-admin-events" author="susimsek">
+		<createTable tableName="admin_events">
+			<column name="id" type="char(36)">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_admin_events"/>
+			</column>
+			<column name="actor" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="action" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="target_type" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="target_id" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="occurred_at" type="timestamp" defaultValueComputed="${now}">
+				<constraints nullable="false"/>
+			</column>
+		</createTable>
+		<createIndex indexName="idx_admin_events_target" tableName="admin_events">
+			<column name="target_type"/>
+			<column name="target_id"/>
+			<column name="occurred_at" descending="true"/>
+		</createIndex>
+		<createIndex indexName="idx_admin_events_occurred_at" tableName="admin_events">
+			<column name="occurred_at" descending="true"/>
+		</createIndex>
+		<createIndex indexName="idx_admin_events_action_occurred_at" tableName="admin_events">
+			<column name="action"/>
+			<column name="occurred_at" descending="true"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

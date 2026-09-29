@@ -1,10 +1,11 @@
 package io.github.susimsek.springauthserversamples.security;
 
+import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.AuthenticationException;
@@ -15,11 +16,26 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class LocalizedOAuth2ErrorResponseHandler implements AuthenticationFailureHandler {
 
     private final OAuth2ErrorLocalizer errorLocalizer;
     private final OAuth2ErrorResponseWriter errorResponseWriter;
+    private final OAuth2ObservabilityMetrics metrics;
+
+    @Autowired
+    public LocalizedOAuth2ErrorResponseHandler(
+            OAuth2ErrorLocalizer errorLocalizer,
+            OAuth2ErrorResponseWriter errorResponseWriter,
+            OAuth2ObservabilityMetrics metrics) {
+        this.errorLocalizer = errorLocalizer;
+        this.errorResponseWriter = errorResponseWriter;
+        this.metrics = metrics;
+    }
+
+    public LocalizedOAuth2ErrorResponseHandler(
+            OAuth2ErrorLocalizer errorLocalizer, OAuth2ErrorResponseWriter errorResponseWriter) {
+        this(errorLocalizer, errorResponseWriter, OAuth2ObservabilityMetrics.noop());
+    }
 
     @Override
     public void onAuthenticationFailure(
@@ -28,6 +44,7 @@ public class LocalizedOAuth2ErrorResponseHandler implements AuthenticationFailur
             AuthenticationException exception)
             throws IOException, ServletException {
         OAuth2Error error = resolveError(exception, request);
+        metrics.recordOAuthError(request.getParameter("grant_type"), error.getErrorCode());
         if (OAuth2ErrorCodes.INVALID_CLIENT.equals(error.getErrorCode())) {
             response.addHeader(HttpHeaders.WWW_AUTHENTICATE, "Basic error=\"invalid_client\"");
         }

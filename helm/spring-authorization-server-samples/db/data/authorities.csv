@@ -1,3 +1,12 @@
-id;name
-1;ROLE_ADMIN
-2;ROLE_USER
+name;description
+ROLE_ADMIN;Full administrative access to the administration console.
+ROLE_USER;Basic access for authenticated users.
+ROLE_USER_VIEWER;View user accounts and user details.
+ROLE_USER_MANAGER;Manage user accounts and credentials.
+ROLE_GROUP_VIEWER;View group resources and group-scoped permissions.
+ROLE_GROUP_MANAGER;Manage group membership, mappings, and scoped resources.
+ROLE_CLIENT_VIEWER;View registered OAuth2 clients.
+ROLE_CLIENT_MANAGER;Manage registered OAuth2 clients.
+ROLE_EVENT_VIEWER;View administrative audit events.
+ROLE_EVENT_MANAGER;Manage administrative event access and configuration.
+ROLE_USER_IMPERSONATOR;Impersonate non-administrator users through controlled browser handoffs.

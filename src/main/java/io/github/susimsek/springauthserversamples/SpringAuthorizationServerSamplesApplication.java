@@ -2,6 +2,7 @@ package io.github.susimsek.springauthserversamples;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.config.aot.NativeRuntimeHints;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -11,7 +12,11 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
-@EnableConfigurationProperties({ApplicationProperties.class, SocialLoginProperties.class})
+@EnableConfigurationProperties({
+    ApplicationProperties.class,
+    SocialLoginProperties.class,
+    LoggingProperties.class
+})
 @ImportRuntimeHints(NativeRuntimeHints.class)
 @EnableAsync
 @EnableSpringDataWebSupport(

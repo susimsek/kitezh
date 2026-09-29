@@ -1,9 +1,12 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.springauthserversamples.security.LocalizedAuthenticationEntryPoint;
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
+import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -39,6 +42,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
@@ -111,8 +115,35 @@ public class SecurityConfig {
             HttpSecurity http,
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
+            SocialSecurityDependencies socialDependencies,
+            LoggingProperties loggingProperties) {
+        return defaultSecurityFilterChain(
+                http,
+                applicationProperties,
+                browserDependencies,
+                socialDependencies,
+                new ObservabilityMdcFilter(loggingProperties.getAccess()));
+    }
+
+    SecurityFilterChain defaultSecurityFilterChain(
+            HttpSecurity http,
+            ApplicationProperties applicationProperties,
+            BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies) {
-        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
+        return defaultSecurityFilterChain(
+                http,
+                applicationProperties,
+                browserDependencies,
+                socialDependencies,
+                new ObservabilityMdcFilter());
+    }
+
+    private SecurityFilterChain defaultSecurityFilterChain(
+            HttpSecurity http,
+            ApplicationProperties applicationProperties,
+            BrowserSecurityDependencies browserDependencies,
+            SocialSecurityDependencies socialDependencies,
+            ObservabilityMdcFilter observabilityMdcFilter) {
         http.authenticationManager(browserDependencies.formAuthenticationManager());
         http.securityContext(
                         securityContext ->
@@ -147,6 +178,8 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers("/api/auth/**")
                                         .permitAll()
+                                        .requestMatchers("/oauth2/bc-authorize")
+                                        .permitAll()
                                         .requestMatchers(
                                                 "/admin",
                                                 "/admin/**",
@@ -172,6 +205,9 @@ public class SecurityConfig {
                                                 "/swagger-ui/**",
                                                 "/actuator/health",
                                                 "/actuator/health/**",
+                                                "/actuator/metrics",
+                                                "/actuator/metrics/**",
+                                                "/actuator/prometheus",
                                                 "/error")
                                         .permitAll()
                                         .anyRequest()
@@ -240,7 +276,8 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         browserDependencies.loginCaptchaFilter(),
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class);
 
         if (socialDependencies.clientRegistrationRepository().getIfAvailable() != null) {
             http.oauth2Login(
@@ -270,6 +307,7 @@ public class SecurityConfig {
                                     .permitAll());
         }
 
+        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
         http.oauth2ResourceServer(
                 resourceServer ->
                         resourceServer
@@ -528,6 +566,15 @@ public class SecurityConfig {
     }
 
     @Bean
+    SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler(
+            io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService
+                    providerSettingsService,
+            SocialProviderLogoutEndpointResolver logoutEndpointResolver,
+            OAuth2ObservabilityMetrics metrics) {
+        return new SocialProviderLogoutSuccessHandler(
+                providerSettingsService, logoutEndpointResolver, metrics);
+    }
+
     SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler(
             io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService
                     providerSettingsService,

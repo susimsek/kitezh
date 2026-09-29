@@ -33,6 +33,16 @@ spring:
 server:
   port: 0
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+
 app:
   cache:
     caffeine:

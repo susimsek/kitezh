@@ -5,6 +5,8 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
@@ -19,6 +21,7 @@ import io.github.susimsek.springauthserversamples.repository.UserAvatarRepositor
 import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationEndpointErrorResponseHandler;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
@@ -26,6 +29,7 @@ import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier
 import io.github.susimsek.springauthserversamples.security.RotatingClientSecretAuthenticationProvider;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
+import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,6 +89,15 @@ public class AuthorizationServerConfig {
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
 
+    record AuthorizationServerFilterDependencies(
+            RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
+            MfaAuthorizationFilter mfaAuthorizationFilter,
+            PasswordEncoder passwordEncoder,
+            CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
+            SecurityContextRepository securityContextRepository,
+            ObservabilityMdcFilter observabilityMdcFilter) {}
+
     private final ApplicationProperties applicationProperties;
     private final AuthorizationEndpointErrorResponseHandler
             authorizationEndpointErrorResponseHandler;
@@ -99,9 +112,39 @@ public class AuthorizationServerConfig {
             PasswordEncoder passwordEncoder,
             RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
             MfaAuthorizationFilter mfaAuthorizationFilter,
+            CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             @Qualifier("authorizationServerSecurityContextRepository")
-                    SecurityContextRepository securityContextRepository) {
+                    SecurityContextRepository securityContextRepository,
+            LoggingProperties loggingProperties) {
+        return authorizationServerSecurityFilterChain(
+                http,
+                tokenGenerator,
+                registeredClientRepository,
+                new AuthorizationServerFilterDependencies(
+                        requiredActionAuthorizationFilter,
+                        mfaAuthorizationFilter,
+                        passwordEncoder,
+                        cibaAuthenticationProvider,
+                        socialProviderLogoutSuccessHandler,
+                        securityContextRepository,
+                        new ObservabilityMdcFilter(loggingProperties.getAccess())));
+    }
+
+    SecurityFilterChain authorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+            RegisteredClientRepository registeredClientRepository,
+            AuthorizationServerFilterDependencies dependencies) {
+        return buildAuthorizationServerSecurityFilterChain(
+                http, tokenGenerator, registeredClientRepository, dependencies);
+    }
+
+    private SecurityFilterChain buildAuthorizationServerSecurityFilterChain(
+            HttpSecurity http,
+            OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+            RegisteredClientRepository registeredClientRepository,
+            AuthorizationServerFilterDependencies dependencies) {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 new OAuth2AuthorizationServerConfigurer();
 
@@ -113,10 +156,13 @@ public class AuthorizationServerConfig {
                 .securityContext(
                         securityContext ->
                                 securityContext
-                                        .securityContextRepository(securityContextRepository)
+                                        .securityContextRepository(
+                                                dependencies.securityContextRepository())
                                         .requireExplicitSave(false))
-                .addFilterBefore(requiredActionAuthorizationFilter, AuthorizationFilter.class)
-                .addFilterBefore(mfaAuthorizationFilter, AuthorizationFilter.class)
+                .addFilterBefore(
+                        dependencies.requiredActionAuthorizationFilter(), AuthorizationFilter.class)
+                .addFilterBefore(dependencies.mfaAuthorizationFilter(), AuthorizationFilter.class)
+                .addFilterBefore(dependencies.observabilityMdcFilter(), AuthorizationFilter.class)
                 .sessionManagement(
                         sessionManagement ->
                                 sessionManagement.requireExplicitAuthenticationStrategy(true))
@@ -125,13 +171,34 @@ public class AuthorizationServerConfig {
                         authorizationServer ->
                                 authorizationServer
                                         .tokenGenerator(tokenGenerator)
+                                        .authorizationServerMetadataEndpoint(
+                                                metadataEndpoint ->
+                                                        metadataEndpoint
+                                                                .authorizationServerMetadataCustomizer(
+                                                                        builder ->
+                                                                                addCibaMetadata(
+                                                                                        builder,
+                                                                                        applicationProperties
+                                                                                                .authorizationServer()
+                                                                                                .issuer())))
                                         .oidc(
                                                 oidc ->
                                                         oidc.logoutEndpoint(
-                                                                logout ->
-                                                                        logout
-                                                                                .logoutResponseHandler(
-                                                                                        socialProviderLogoutSuccessHandler)))
+                                                                        logout ->
+                                                                                logout
+                                                                                        .logoutResponseHandler(
+                                                                                                dependencies
+                                                                                                        .socialProviderLogoutSuccessHandler()))
+                                                                .providerConfigurationEndpoint(
+                                                                        providerConfigurationEndpoint ->
+                                                                                providerConfigurationEndpoint
+                                                                                        .providerConfigurationCustomizer(
+                                                                                                builder ->
+                                                                                                        addCibaMetadata(
+                                                                                                                builder,
+                                                                                                                applicationProperties
+                                                                                                                        .authorizationServer()
+                                                                                                                        .issuer()))))
                                         .authorizationEndpoint(
                                                 authorizationEndpoint ->
                                                         authorizationEndpoint
@@ -149,7 +216,8 @@ public class AuthorizationServerConfig {
                                                                 .authenticationProvider(
                                                                         new RotatingClientSecretAuthenticationProvider(
                                                                                 registeredClientRepository,
-                                                                                passwordEncoder))
+                                                                                dependencies
+                                                                                        .passwordEncoder()))
                                                                 .authenticationProvider(
                                                                         new ConsolePublicClientAuthenticationProvider(
                                                                                 registeredClientRepository))
@@ -171,6 +239,13 @@ public class AuthorizationServerConfig {
                                         .tokenEndpoint(
                                                 tokenEndpoint ->
                                                         tokenEndpoint
+                                                                .accessTokenRequestConverters(
+                                                                        converters ->
+                                                                                converters.add(
+                                                                                        new CibaAuthenticationGrantAuthenticationConverter()))
+                                                                .authenticationProvider(
+                                                                        dependencies
+                                                                                .cibaAuthenticationProvider())
                                                                 .accessTokenRequestConverter(
                                                                         new DefaultClientScopesClientCredentialsConverter())
                                                                 .errorResponseHandler(
@@ -211,30 +286,41 @@ public class AuthorizationServerConfig {
         return http.build();
     }
 
-    SecurityFilterChain authorizationServerSecurityFilterChain(
-            HttpSecurity http,
-            OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
-            RegisteredClientRepository registeredClientRepository,
-            RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
-            MfaAuthorizationFilter mfaAuthorizationFilter,
-            SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
-            SecurityContextRepository securityContextRepository) {
-        return authorizationServerSecurityFilterChain(
-                http,
-                tokenGenerator,
-                registeredClientRepository,
-                org.springframework.security.crypto.factory.PasswordEncoderFactories
-                        .createDelegatingPasswordEncoder(),
-                requiredActionAuthorizationFilter,
-                mfaAuthorizationFilter,
-                socialProviderLogoutSuccessHandler,
-                securityContextRepository);
-    }
-
     private static MediaTypeRequestMatcher htmlRequestMatcher() {
         MediaTypeRequestMatcher requestMatcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
         requestMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
         return requestMatcher;
+    }
+
+    static void addCibaMetadata(
+            org.springframework.security.oauth2.server.authorization
+                            .OAuth2AuthorizationServerMetadata.Builder
+                    builder,
+            String issuer) {
+        addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
+    }
+
+    static void addCibaMetadata(
+            org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration
+                            .Builder
+                    builder,
+            String issuer) {
+        addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
+    }
+
+    private static void addCibaMetadataClaims(
+            java.util.function.BiConsumer<String, Object> claimConsumer,
+            java.util.function.Consumer<String> grantTypeConsumer,
+            String issuer) {
+        claimConsumer.accept(
+                "backchannel_authentication_endpoint", issuer + "/oauth2/bc-authorize");
+        claimConsumer.accept(
+                "backchannel_token_delivery_modes_supported", List.of("poll", "ping", "push"));
+        claimConsumer.accept(
+                "backchannel_authentication_request_signing_alg_values_supported",
+                List.of("RS256", "ES256"));
+        claimConsumer.accept("backchannel_user_code_parameter", true);
+        grantTypeConsumer.accept(AuthorizationGrantTypes.CIBA);
     }
 
     @Bean
@@ -272,6 +358,14 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
+    OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
+            JwtEncoder jwtEncoder,
+            OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer,
+            OAuth2ObservabilityMetrics metrics) {
+        return new ObservabilityOAuth2TokenGenerator(
+                tokenGenerator(jwtEncoder, jwtTokenCustomizer), metrics);
+    }
+
     OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
             JwtEncoder jwtEncoder, OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer) {
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
@@ -394,6 +488,7 @@ public class AuthorizationServerConfig {
                     roleScopeMappings);
             appendSessionIdClaim(context, authorizationRepository);
             appendDpopConfirmationClaim(context);
+            appendCibaAuthReqIdClaim(context);
         };
     }
 
@@ -880,12 +975,11 @@ public class AuthorizationServerConfig {
         }
         if (AuthorizationGrantType.REFRESH_TOKEN.equals(context.getAuthorizationGrantType())
                 && ClientSecuritySettings.requiresDpopForRefreshToken(context.getRegisteredClient())
-                && !ClientSecuritySettings.requiresDpopProof(context.getRegisteredClient())) {
-            if (!context.getRegisteredClient()
-                    .getClientAuthenticationMethods()
-                    .contains(ClientAuthenticationMethod.NONE)) {
-                return;
-            }
+                && !ClientSecuritySettings.requiresDpopProof(context.getRegisteredClient())
+                && !context.getRegisteredClient()
+                        .getClientAuthenticationMethods()
+                        .contains(ClientAuthenticationMethod.NONE)) {
+            return;
         }
         Object jwkHeader = dpopProof.getHeaders().get("jwk");
         if (!(jwkHeader instanceof Map<?, ?> jwkMap)) {
@@ -904,6 +998,74 @@ public class AuthorizationServerConfig {
             context.getClaims().claim("cnf", Map.of("jkt", thumbprint));
         } catch (ParseException | JOSEException exception) {
             throw new IllegalStateException("Unable to compute the DPoP key thumbprint", exception);
+        }
+    }
+
+    private static void appendCibaAuthReqIdClaim(JwtEncodingContext context) {
+        if (!AuthorizationGrantTypes.CIBA.equals(context.getAuthorizationGrantType().getValue())) {
+            return;
+        }
+        if (context.getAuthorizationGrant()
+                instanceof CibaAuthenticationGrantAuthenticationToken cibaGrant) {
+            context.getClaims()
+                    .claim(
+                            CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_CLAIM,
+                            cibaGrant.getAuthReqId());
+            Object acrValues =
+                    cibaGrant
+                            .getAdditionalParameters()
+                            .get(CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE);
+            if (acrValues instanceof String acr && !acr.isBlank()) {
+                context.getClaims().claim("acr", acr.trim().split("\\s+")[0]);
+            }
+            if (OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) {
+                addCibaTokenHash(
+                        context,
+                        cibaGrant,
+                        "at_hash",
+                        CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE);
+                addCibaTokenHash(
+                        context,
+                        cibaGrant,
+                        "urn:openid:params:jwt:claim:rt_hash",
+                        CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE);
+            }
+        }
+    }
+
+    private static void addCibaTokenHash(
+            JwtEncodingContext context,
+            CibaAuthenticationGrantAuthenticationToken grant,
+            String claimName,
+            String contextKey) {
+        Object token = grant.getAdditionalParameters().get(contextKey);
+        if (!(token instanceof String tokenValue) || tokenValue.isBlank()) {
+            return;
+        }
+        try {
+            String signatureAlgorithm = context.getJwsHeader().build().getAlgorithm().getName();
+            String digestAlgorithm;
+            if (signatureAlgorithm.endsWith("512")) {
+                digestAlgorithm = "SHA-512";
+            } else if (signatureAlgorithm.endsWith("384")) {
+                digestAlgorithm = "SHA-384";
+            } else {
+                digestAlgorithm = "SHA-256";
+            }
+            byte[] digest =
+                    java.security.MessageDigest.getInstance(digestAlgorithm)
+                            .digest(
+                                    tokenValue.getBytes(
+                                            java.nio.charset.StandardCharsets.US_ASCII));
+            context.getClaims()
+                    .claim(
+                            claimName,
+                            java.util.Base64.getUrlEncoder()
+                                    .withoutPadding()
+                                    .encodeToString(
+                                            java.util.Arrays.copyOf(digest, digest.length / 2)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("The token hash algorithm is not available", exception);
         }
     }
 
@@ -973,7 +1135,8 @@ public class AuthorizationServerConfig {
                 && (AuthorizationGrantType.AUTHORIZATION_CODE.equals(
                                 context.getAuthorizationGrantType())
                         || AuthorizationGrantType.REFRESH_TOKEN.equals(
-                                context.getAuthorizationGrantType()));
+                                context.getAuthorizationGrantType())
+                        || isCibaGrant(context));
     }
 
     private static boolean isUserEmailToken(JwtEncodingContext context) {
@@ -983,14 +1146,16 @@ public class AuthorizationServerConfig {
                 && (AuthorizationGrantType.AUTHORIZATION_CODE.equals(
                                 context.getAuthorizationGrantType())
                         || AuthorizationGrantType.REFRESH_TOKEN.equals(
-                                context.getAuthorizationGrantType()));
+                                context.getAuthorizationGrantType())
+                        || isCibaGrant(context));
     }
 
     private static boolean isUserLocaleToken(JwtEncodingContext context) {
         return (AuthorizationGrantType.AUTHORIZATION_CODE.equals(
                                 context.getAuthorizationGrantType())
                         || AuthorizationGrantType.REFRESH_TOKEN.equals(
-                                context.getAuthorizationGrantType()))
+                                context.getAuthorizationGrantType())
+                        || isCibaGrant(context))
                 && (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
                         || OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue()));
     }
@@ -999,7 +1164,8 @@ public class AuthorizationServerConfig {
         return (AuthorizationGrantType.AUTHORIZATION_CODE.equals(
                                 context.getAuthorizationGrantType())
                         || AuthorizationGrantType.REFRESH_TOKEN.equals(
-                                context.getAuthorizationGrantType()))
+                                context.getAuthorizationGrantType())
+                        || isCibaGrant(context))
                 && (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
                         || OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue()));
     }
@@ -1013,7 +1179,12 @@ public class AuthorizationServerConfig {
                         || AuthorizationGrantType.REFRESH_TOKEN.equals(
                                 context.getAuthorizationGrantType())
                         || AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
-                                context.getAuthorizationGrantType()));
+                                context.getAuthorizationGrantType())
+                        || isCibaGrant(context));
+    }
+
+    private static boolean isCibaGrant(JwtEncodingContext context) {
+        return AuthorizationGrantTypes.CIBA.equals(context.getAuthorizationGrantType().getValue());
     }
 
     private static String groupPath(GroupEntity group) {

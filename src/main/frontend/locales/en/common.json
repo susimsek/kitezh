@@ -688,7 +688,8 @@
         "sessions": "Sessions",
         "events": "Events",
         "userProfile": "User profile",
-        "localization": "Localization"
+        "localization": "Localization",
+        "cibaPolicy": "CIBA policy"
       }
     },
     "clients": {
@@ -858,7 +859,10 @@
       "secretError": "Client secret could not be regenerated.",
       "saved": "Client saved successfully.",
       "next": "Next",
-      "back": "Back"
+      "back": "Back",
+      "cibaDeliveryMode": "CIBA delivery mode",
+      "cibaDeliveryModeHelp": "Choose how the client receives the CIBA token response. Ping and push requests provide a fresh callback token per request.",
+      "cibaNotificationEndpoint": "CIBA notification endpoint"
     },
     "common": {
       "yes": "Yes",
@@ -1283,7 +1287,7 @@
       "requiredClaims": "Required claims",
       "storeTokens": "Store tokens",
       "storedTokensReadable": "Stored tokens readable",
-      "syncMode": "User synchronization mode",
+      "syncMode": "Sync mode",
       "syncModeLegacy": "Legacy",
       "syncModeImport": "Import (first login only)",
       "syncModeReadOnly": "Read only",
@@ -1293,7 +1297,6 @@
       "sourceClaim": "Source claim",
       "target": "Target",
       "mapperType": "Mapper type",
-      "syncMode": "Sync mode",
       "createMapper": "Create mapper",
       "editMapper": "Edit mapper",
       "mapperEmpty": "No mappers found.",
@@ -1302,6 +1305,37 @@
       "mapperError": "Mapper could not be saved.",
       "addToIdToken": "Add to ID token",
       "addToAccessToken": "Add to access token"
+    },
+    "ciba": {
+      "title": "CIBA policy",
+      "description": "Control request lifetime, polling, delivery and assurance requirements for Client-Initiated Backchannel Authentication.",
+      "loading": "Loading CIBA policy…",
+      "error": "CIBA policy could not be loaded or saved.",
+      "saved": "CIBA policy saved.",
+      "save": "Save CIBA policy",
+      "requestLifespan": "Request lifespan (seconds)",
+      "requestLifespanHint": "This is the default and maximum lifetime for a pending CIBA request.",
+      "pollingInterval": "Polling interval (seconds)",
+      "pollingIntervalHint": "Clients must wait at least this long between token polling attempts.",
+      "deliveryMode": "Allowed delivery mode",
+      "deliveryModeHint": "All allows each client to use its registered poll, ping or push mode.",
+      "deliveryModes": {
+        "all": "All registered modes",
+        "poll": "Poll",
+        "ping": "Ping",
+        "push": "Push"
+      },
+      "userVerification": "User verification",
+      "userVerificationHint": "Require, prefer or discourage a verified user factor before approval.",
+      "userVerificationModes": {
+        "required": "Required",
+        "preferred": "Preferred",
+        "discouraged": "Discouraged"
+      },
+      "mfaRequired": "Require MFA before approval",
+      "stepUpRequired": "Require step-up authentication before approval",
+      "stepUpAcr": "Step-up ACR",
+      "stepUpAcrHint": "Optional assurance context used when step-up authentication is required."
     }
   },
   "account": {
@@ -1399,6 +1433,24 @@
         "removeConfirm": "Remove this social account link?",
         "removeError": "The social account link could not be removed.",
         "error": "Connected accounts could not be loaded."
+      },
+      "ciba": {
+        "title": "Pending sign-in requests",
+        "help": "Review requests from applications and approve only the ones you recognize.",
+        "requestTitle": "Sign-in request",
+        "code": "Confirmation code",
+        "scopes": "Requested access",
+        "expires": "Expires",
+        "approve": "Approve",
+        "deny": "Deny",
+        "approved": "The sign-in request was approved.",
+        "denied": "The sign-in request was denied.",
+        "actionError": "The request could not be updated. It may have expired.",
+        "loadError": "Pending sign-in requests could not be loaded.",
+        "empty": "There are no pending sign-in requests.",
+        "mfaRequired": "MFA verification is required before approval.",
+        "stepUpRequired": "Additional verification is required before approval.",
+        "mfaAndStepUp": "MFA and additional verification are required before approval."
       },
       "policyTitle": "Password requirements",
       "policyMinLength": "At least 12 characters",

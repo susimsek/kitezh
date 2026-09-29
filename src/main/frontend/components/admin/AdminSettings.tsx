@@ -17,6 +17,7 @@ import EmailSettings from "./EmailSettings";
 import LoginSettings, { type LoginSettingsSection } from "./LoginSettings";
 import LdapFederationSettings from "./LdapFederationSettings";
 import AdminLocalizationSettings, { type LocalizationSection } from "./AdminLocalizationSettings";
+import AdminCibaPolicySettings from "./AdminCibaPolicySettings";
 
 const SETTINGS_SECTIONS = [
   "general",
@@ -27,6 +28,7 @@ const SETTINGS_SECTIONS = [
   "brute-force",
   "sessions",
   "events",
+  "ciba-policy",
   "user-profile",
   "localization",
 ] as const;
@@ -98,6 +100,11 @@ export default function AdminSettings({
       href: "/admin/settings/events",
     },
     {
+      key: "ciba-policy",
+      label: dictionary.admin.settings.sections.cibaPolicy,
+      href: "/admin/settings/ciba-policy",
+    },
+    {
       key: "user-profile",
       label: dictionary.admin.settings.sections.userProfile,
       href: "/admin/settings/user-profile",
@@ -138,6 +145,7 @@ export default function AdminSettings({
       {active === "general" ? <GeneralSettings /> : null}
       {active === "email" ? <EmailSettings embedded /> : null}
       {active === "events" ? <AdminEventSettings /> : null}
+      {active === "ciba-policy" ? <AdminCibaPolicySettings /> : null}
       {active === "user-profile" ? <AdminUserProfileSettings dictionary={dictionary} /> : null}
       {active === "localization" ? (
         <AdminLocalizationSettings
@@ -150,6 +158,7 @@ export default function AdminSettings({
       {active !== "general" &&
       active !== "email" &&
       active !== "events" &&
+      active !== "ciba-policy" &&
       active !== "user-profile" &&
       active !== "localization" &&
       active !== "user-federation" ? (

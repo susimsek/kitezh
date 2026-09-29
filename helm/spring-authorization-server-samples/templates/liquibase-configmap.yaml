@@ -16,4 +16,8 @@ data:
   {{ base $path }}: |-
 {{ $.Files.Get $path | indent 4 }}
 {{- end }}
+binaryData:
+{{- range $path, $_ := .Files.Glob "db/data/blob/*" }}
+  {{ base $path }}: {{ $.Files.Get $path | b64enc | quote }}
+{{- end }}
 {{- end }}

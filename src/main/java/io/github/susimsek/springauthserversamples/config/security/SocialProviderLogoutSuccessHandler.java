@@ -2,6 +2,7 @@ package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
 import io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService;
+import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +20,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
 
     private final SocialProviderSettingsService providerSettingsService;
     private final SocialProviderLogoutEndpointResolver logoutEndpointResolver;
+    private final OAuth2ObservabilityMetrics metrics;
     private final OidcLogoutAuthenticationSuccessHandler delegate =
             new OidcLogoutAuthenticationSuccessHandler();
     private final SecurityContextLogoutHandler securityContextLogoutHandler =
@@ -27,8 +29,16 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
     public SocialProviderLogoutSuccessHandler(
             SocialProviderSettingsService providerSettingsService,
             SocialProviderLogoutEndpointResolver logoutEndpointResolver) {
+        this(providerSettingsService, logoutEndpointResolver, OAuth2ObservabilityMetrics.noop());
+    }
+
+    public SocialProviderLogoutSuccessHandler(
+            SocialProviderSettingsService providerSettingsService,
+            SocialProviderLogoutEndpointResolver logoutEndpointResolver,
+            OAuth2ObservabilityMetrics metrics) {
         this.providerSettingsService = providerSettingsService;
         this.logoutEndpointResolver = logoutEndpointResolver;
+        this.metrics = metrics;
     }
 
     public SocialProviderLogoutSuccessHandler(
@@ -41,6 +51,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException, ServletException {
         if (!(authentication instanceof OidcLogoutAuthenticationToken logout)) {
+            metrics.recordLogout("success", null);
             delegate.onAuthenticationSuccess(request, response, authentication);
             return;
         }
@@ -53,6 +64,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
                 providerSettingsService.provider(provider);
         String upstreamLogout = credentials == null ? null : upstreamLogout(credentials, logout);
         if (upstreamLogout == null) {
+            metrics.recordLogout("success", provider);
             delegate.onAuthenticationSuccess(request, response, authentication);
             return;
         }
@@ -63,6 +75,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
             securityContextLogoutHandler.logout(
                     request, response, (Authentication) logout.getPrincipal());
         }
+        metrics.recordLogout("success", provider);
         response.sendRedirect(upstreamLogout);
     }
 

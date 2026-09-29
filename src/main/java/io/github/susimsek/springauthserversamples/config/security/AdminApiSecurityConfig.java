@@ -3,6 +3,8 @@ package io.github.susimsek.springauthserversamples.config.security;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
+import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
+import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration(proxyBeanMethods = false)
 @SuppressWarnings("java:S112")
@@ -30,21 +33,32 @@ public class AdminApiSecurityConfig {
     SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
-            ApplicationProperties applicationProperties) {
+            ApplicationProperties applicationProperties,
+            LoggingProperties loggingProperties) {
         return adminApiSecurityFilterChain(
-                http, adminApiJwtDecoder, new DpopNonceService(applicationProperties.dpop()));
+                http,
+                adminApiJwtDecoder,
+                new DpopNonceService(applicationProperties.dpop()),
+                new ObservabilityMdcFilter(loggingProperties.getAccess()));
     }
 
     SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http, JwtDecoder adminApiJwtDecoder) {
         return adminApiSecurityFilterChain(
-                http, adminApiJwtDecoder, new DpopNonceService(new ApplicationProperties().dpop()));
+                http,
+                adminApiJwtDecoder,
+                new DpopNonceService(new ApplicationProperties().dpop()),
+                new ObservabilityMdcFilter());
     }
 
     private SecurityFilterChain adminApiSecurityFilterChain(
-            HttpSecurity http, JwtDecoder adminApiJwtDecoder, DpopNonceService nonceService) {
+            HttpSecurity http,
+            JwtDecoder adminApiJwtDecoder,
+            DpopNonceService nonceService,
+            ObservabilityMdcFilter observabilityMdcFilter) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
+                .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class)
                 .authorizeHttpRequests(
                         authorize ->
                                 authorize

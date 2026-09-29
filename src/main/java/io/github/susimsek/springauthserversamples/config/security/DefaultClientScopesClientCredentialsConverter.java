@@ -105,7 +105,7 @@ public final class DefaultClientScopesClientCredentialsConverter
         String algorithm;
         try {
             algorithm = SignedJWT.parse(proof).getHeader().getAlgorithm().getName();
-        } catch (java.text.ParseException exception) {
+        } catch (java.text.ParseException _) {
             throw invalidDpopProof();
         }
         if (!ClientSecuritySettings.allowedDpopSigningAlgorithms(client).contains(algorithm)) {

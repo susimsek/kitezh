@@ -72,7 +72,9 @@ describe("AdminSettings", () => {
                     ? "social-login"
                     : key === "userFederation"
                       ? "user-federation"
-                      : key
+                      : key === "cibaPolicy"
+                        ? "ciba-policy"
+                        : key
             }`,
       );
     }

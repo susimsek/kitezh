@@ -28,6 +28,7 @@ public class AdminClientConfigurationValidator
                     AuthorizationGrantType.AUTHORIZATION_CODE.getValue(),
                     AuthorizationGrantType.REFRESH_TOKEN.getValue(),
                     AuthorizationGrantType.CLIENT_CREDENTIALS.getValue(),
+                    AuthorizationGrantTypes.CIBA,
                     AuthorizationGrantTypes.TOKEN_EXCHANGE);
 
     @Override

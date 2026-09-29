@@ -1,3 +1,8 @@
-username;password;enabled;created_by;last_modified_by
-admin;{bcrypt}$2a$10$dsEILtFz.VyZL6vXnj1Kg.GFczEdAJ9XlBI234j4ExulU3xub4zTe;true;system;system
-user;{bcrypt}$2a$10$X4IqH828fc4B.V4t7PtB7.n1eKxlSvCRB6BmntaXnxDCBtj23g6L6;true;system;system
+username;password;first_name;last_name;email;enabled;created_by;last_modified_by
+admin;{bcrypt}$2a$10$dsEILtFz.VyZL6vXnj1Kg.GFczEdAJ9XlBI234j4ExulU3xub4zTe;Yami;Yugi;yami.yugi@example.test;true;system;system
+user;{bcrypt}$2a$10$X4IqH828fc4B.V4t7PtB7.n1eKxlSvCRB6BmntaXnxDCBtj23g6L6;Seto;Kaiba;seto.kaiba@example.test;true;system;system
+user2;{bcrypt}$2a$10$Db289zFBOocNPXLjGe9eVeajhf3fhhU2UL88de.aBqHMwHCXJgPqG;Maximillion;Pegasus;maximillion.pegasus@example.test;true;system;system
+user3;{bcrypt}$2a$10$1cJy8j3cDgVEuPcEX2JNUekcVZtuYFN08vvWYMw6yU69/rz444LJC;Joey;Wheeler;joey.wheeler@example.test;true;system;system
+user4;{bcrypt}$2a$10$7d/QxI1pZmkksj/x16BCuOF87//XBgcPXqSikZsRUcLHxZSMp20E2;Yugi;Muto;yugi.muto@example.test;true;system;system
+user5;{bcrypt}$2a$10$KEMgRdY4alskOEyZ9UB5k.qm7Us/L1LtOJU5uboE6nd0YNPJHyg/a;Tea;Gardner;tea.gardner@example.test;true;system;system
+user6;{bcrypt}$2a$10$MBW5N30B0J1WY5IGTPkzKeFgKBt85tiie2ors5Ec2TLN3R3CV2XvG;Tristan;Taylor;tristan.taylor@example.test;true;system;system

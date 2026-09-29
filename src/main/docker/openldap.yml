@@ -1,0 +1,35 @@
+# Dev purpose only. DO NOT use in production.
+name: spring-authorization-server-samples-openldap
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    command:
+      - --copy-service
+    environment:
+      LDAP_ORGANISATION: Example
+      LDAP_DOMAIN: example.com
+      LDAP_ADMIN_PASSWORD: admin
+      LDAP_CONFIG_PASSWORD: config
+      LDAP_TLS: "false"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
+    ports:
+      - "127.0.0.1:1389:389"
+    volumes:
+      - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      # Uncomment these mounts together with the top-level volume declarations below
+      # when persistent LDAP data is needed.
+      # - openldap-data:/var/lib/ldap
+      # - openldap-config:/etc/ldap/slapd.d
+    healthcheck:
+      test: ['CMD-SHELL', 'ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin -b "dc=example,dc=com" -s base "(objectClass=*)" >/dev/null 2>&1']
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+# Persistence is intentionally disabled by default for this development fixture.
+# Uncomment this block together with the two service mounts above to persist LDAP data.
+# volumes:
+#   openldap-data:
+#   openldap-config:

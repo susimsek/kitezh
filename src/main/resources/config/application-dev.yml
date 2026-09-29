@@ -25,6 +25,8 @@ spring:
     cache: false
 
 app:
+  social-login:
+    encryption-key: demo-static-social-ciba-key-2026-change-me
   mail:
     base-url: http://localhost:9090
   cache:

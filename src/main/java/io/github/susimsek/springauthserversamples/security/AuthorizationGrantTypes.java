@@ -9,4 +9,7 @@ public final class AuthorizationGrantTypes {
 
     /** RFC 8693 OAuth 2.0 Token Exchange grant. */
     public static final String TOKEN_EXCHANGE = "urn:ietf:params:oauth:grant-type:token-exchange";
+
+    /** OpenID Connect Client-Initiated Backchannel Authentication grant. */
+    public static final String CIBA = "urn:openid:params:grant-type:ciba";
 }

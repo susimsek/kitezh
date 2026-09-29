@@ -1,0 +1,2 @@
+id;request_lifespan_seconds;polling_interval_seconds;delivery_mode;user_verification;mfa_required;step_up_required;step_up_acr
+1;300;5;all;preferred;false;false;

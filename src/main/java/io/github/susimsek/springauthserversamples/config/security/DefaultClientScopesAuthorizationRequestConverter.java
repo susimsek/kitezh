@@ -102,7 +102,7 @@ public final class DefaultClientScopesAuthorizationRequestConverter
     private static boolean isValidDpopJkt(String value) {
         try {
             return Base64.getUrlDecoder().decode(value).length == 32;
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
     }

@@ -1,0 +1,2 @@
+id;events_enabled;admin_events_enabled;admin_events_details_enabled;events_expiration_days
+1;true;true;true;0

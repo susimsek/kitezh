@@ -42,6 +42,10 @@ public class SocialLoginSecretCipher {
         }
     }
 
+    public boolean isConfigured() {
+        return properties.encryptionKey() != null && !properties.encryptionKey().isBlank();
+    }
+
     public String decrypt(String value) {
         if (value == null || value.isBlank()) {
             return "";

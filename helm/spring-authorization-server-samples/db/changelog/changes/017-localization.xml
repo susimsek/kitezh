@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="017-01-localization-message-sequence" author="susimsek">
+        <createSequence sequenceName="localization_message_override_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+    </changeSet>
+    <changeSet id="017-02-create-localization-settings" author="susimsek">
+        <createTable tableName="localization_settings">
+            <column name="id" type="bigint"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_localization_settings"/></column>
+            <column name="internationalization_enabled" type="boolean"><constraints nullable="false"/></column>
+            <column name="default_locale" type="varchar(10)"><constraints nullable="false"/></column>
+            <column name="supported_locales" type="varchar(500)"><constraints nullable="false"/></column>
+        </createTable>
+        <loadData encoding="UTF-8" file="db/data/localization-settings.csv" separator=";" tableName="localization_settings" usePreparedStatements="true">
+            <column header="id" type="numeric"/><column header="internationalization_enabled" type="boolean"/><column header="default_locale" type="string"/><column header="supported_locales" type="string"/>
+        </loadData>
+    </changeSet>
+    <changeSet id="017-03-create-localization-message-overrides" author="susimsek">
+        <createTable tableName="localization_message_overrides">
+            <column name="id" type="bigint" defaultValueSequenceNext="localization_message_override_seq"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_localization_message_overrides"/></column>
+            <column name="locale" type="varchar(10)"><constraints nullable="false"/></column>
+            <column name="bundle" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="message_key" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="message_value" type="varchar(4000)"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="localization_message_overrides" columnNames="locale,bundle,message_key" constraintName="uk_localization_message_override_locale_bundle_key"/>
+        <createIndex tableName="localization_message_overrides" indexName="idx_localization_message_override_locale_bundle"><column name="locale"/><column name="bundle"/></createIndex>
+    </changeSet>
+    <changeSet id="017-04-seed-localization-message-overrides" author="susimsek">
+        <loadData encoding="UTF-8" file="db/data/localization-message-overrides.csv" separator=";" tableName="localization_message_overrides" usePreparedStatements="true">
+            <column header="locale" type="string"/><column header="bundle" type="string"/><column header="message_key" type="string"/><column header="message_value" type="string"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

@@ -171,6 +171,10 @@ spec:
               - key: {{ base $path }}
                 path: data/{{ base $path }}
               {{- end }}
+              {{- range $path, $_ := .Files.Glob "db/data/blob/*" }}
+              - key: {{ base $path }}
+                path: data/blob/{{ base $path }}
+              {{- end }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

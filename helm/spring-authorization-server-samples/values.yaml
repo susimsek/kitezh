@@ -73,6 +73,18 @@ service:
   type: ClusterIP
   port: 9090
 
+# Optional Prometheus Operator integration. Enable this when the cluster runs
+# kube-prometheus-stack or another Prometheus Operator installation.
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /actuator/prometheus
+  scheme: http
+  labels: {}
+  annotations: {}
+
 probes:
   startup:
     enabled: false

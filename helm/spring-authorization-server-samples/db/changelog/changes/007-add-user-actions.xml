@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="010-01-add-email-verification" author="susimsek">
+		<addUniqueConstraint tableName="users" columnNames="email" constraintName="ux_users_email"/>
+	</changeSet>
+
+	<changeSet id="010-02-create-user-action-token" author="susimsek">
+		<createSequence sequenceName="user_action_token_seq" startValue="1" incrementBy="1"/>
+		<createTable tableName="user_action_token">
+			<column name="id" type="bigint">
+				<constraints primaryKey="true" nullable="false" primaryKeyName="pk_user_action_token"/>
+			</column>
+			<column name="user_id" type="bigint">
+				<constraints nullable="false"/>
+			</column>
+			<column name="action" type="varchar(32)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="token_hash" type="varchar(64)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="ux_user_action_token_hash"/>
+			</column>
+			<column name="email" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="credential_fingerprint" type="varchar(64)"><constraints nullable="false"/></column>
+			<column name="issued_at" type="timestamp">
+				<constraints nullable="false"/>
+			</column>
+			<column name="expires_at" type="timestamp">
+				<constraints nullable="false"/>
+			</column>
+			<column name="consumed_at" type="timestamp"/>
+		</createTable>
+		<addForeignKeyConstraint
+			baseTableName="user_action_token"
+			baseColumnNames="user_id"
+			constraintName="fk_user_action_token_user"
+			referencedTableName="users"
+			referencedColumnNames="id"
+			onDelete="CASCADE"/>
+		<createIndex tableName="user_action_token" indexName="ix_user_action_token_user_action">
+			<column name="user_id"/>
+			<column name="action"/>
+			<column name="issued_at" descending="true"/>
+		</createIndex>
+		<createIndex tableName="user_action_token" indexName="ix_user_action_token_active">
+			<column name="user_id"/>
+			<column name="action"/>
+			<column name="consumed_at"/>
+		</createIndex>
+	</changeSet>
+
+</databaseChangeLog>

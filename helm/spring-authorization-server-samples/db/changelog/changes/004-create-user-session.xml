@@ -36,6 +36,10 @@
 		<createIndex indexName="user_session_ix3" tableName="user_session">
 			<column name="principal_name"/>
 		</createIndex>
+		<createIndex indexName="user_session_ix4" tableName="user_session">
+			<column name="principal_name"/>
+			<column name="expiry_time"/>
+		</createIndex>
 	</changeSet>
 
 	<changeSet id="002-create-user-session-attributes-table" author="susimsek">

@@ -7,6 +7,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AdminEventSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
+import io.github.susimsek.springauthserversamples.domain.CibaPolicyEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.EmailSettingsEntity;
@@ -23,6 +24,7 @@ import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.springauthserversamples.repository.AdminEventSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
+import io.github.susimsek.springauthserversamples.repository.CibaPolicyRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
 import io.github.susimsek.springauthserversamples.repository.EmailSettingsRepository;
@@ -36,14 +38,19 @@ import io.github.susimsek.springauthserversamples.repository.SocialProviderMappe
 import io.github.susimsek.springauthserversamples.repository.SocialProviderRepository;
 import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.util.List;
 import java.util.OptionalLong;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.cache.jcache.ConfigSettings;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.cache.autoconfigure.JCacheManagerCustomizer;
+import org.springframework.boot.cache.metrics.CacheMetricsRegistrar;
+import org.springframework.boot.cache.metrics.CaffeineCacheMeterBinderProvider;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -61,7 +68,46 @@ public class CacheConfig {
     public CaffeineCacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCaffeine(buildCaffeineConfig(cacheProperties()));
+        cacheManager.setCacheNames(cacheNames());
         return cacheManager;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(CacheMetricsRegistrar.class)
+    public CacheMetricsRegistrar cacheMetricsRegistrar(
+            MeterRegistry registry, CaffeineCacheManager cacheManager) {
+        CacheMetricsRegistrar registrar =
+                new CacheMetricsRegistrar(
+                        registry, List.of(new CaffeineCacheMeterBinderProvider()));
+        cacheManager.getCacheNames().stream()
+                .map(cacheManager::getCache)
+                .filter(java.util.Objects::nonNull)
+                .forEach(registrar::bindCacheToRegistry);
+        return registrar;
+    }
+
+    private List<String> cacheNames() {
+        return List.of(
+                AdminEventSettingsRepository.ADMIN_EVENT_SETTINGS_BY_ID_CACHE,
+                AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                CibaPolicyRepository.CIBA_POLICY_BY_ID_CACHE,
+                ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
+                ClientScopeRepository.CLIENT_SCOPE_BY_NAME_CACHE,
+                EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE,
+                GroupRepository.DEFAULT_GROUPS_CACHE,
+                LocalizationMessageOverrideRepository.LOCALIZATION_MESSAGE_OVERRIDE_BY_KEY_CACHE,
+                LocalizationSettingsRepository.LOCALIZATION_SETTINGS_BY_ID_CACHE,
+                LoginSettingsRepository.LOGIN_SETTINGS_BY_ID_CACHE,
+                OAuth2KeyRepository.OAUTH2_KEYS_CACHE,
+                RequiredActionDefinitionRepository.ENABLED_REQUIRED_ACTIONS_CACHE,
+                SocialProviderMapperRepository.MAPPERS_BY_PROVIDER_ALIAS_CACHE,
+                SocialProviderRepository.SOCIAL_PROVIDER_BY_ALIAS_CACHE,
+                SocialProviderRepository.SOCIAL_PROVIDER_BY_REGISTRATION_ID_CACHE,
+                UserProfileAttributeDefinitionRepository.ALL_PROFILE_ATTRIBUTE_DEFINITIONS_CACHE,
+                UserProfileAttributeDefinitionRepository
+                        .ENABLED_PROFILE_ATTRIBUTE_DEFINITIONS_CACHE,
+                UserProfileAttributeDefinitionRepository.PROFILE_ATTRIBUTE_DEFINITION_BY_NAME_CACHE,
+                UserRepository.USER_BY_USERNAME_CACHE);
     }
 
     private ApplicationProperties.Caffeine cacheProperties() {
@@ -106,6 +152,7 @@ public class CacheConfig {
                 createCache(cacheManager, AuthorizationConsentEntity.class.getName());
                 createCache(cacheManager, ClientScopeEntity.class.getName());
                 createCache(cacheManager, ClientRoleEntity.class.getName());
+                createCache(cacheManager, CibaPolicyEntity.class.getName());
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".groups");
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".users");
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".compositeRoles");

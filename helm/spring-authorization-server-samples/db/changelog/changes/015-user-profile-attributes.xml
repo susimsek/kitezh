@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="015-01-user-profile-definition-sequence" author="susimsek">
+		<createSequence sequenceName="user_profile_attribute_definition_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+	</changeSet>
+
+	<changeSet id="015-02-user-profile-value-sequence" author="susimsek">
+		<createSequence sequenceName="user_profile_attribute_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+	</changeSet>
+
+	<changeSet id="015-03-create-user-profile-definitions" author="susimsek">
+		<createTable tableName="user_profile_attribute_definitions">
+			<column name="id" type="bigint" defaultValueSequenceNext="user_profile_attribute_definition_seq">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_profile_attribute_definitions"/>
+			</column>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="uk_user_profile_attribute_definitions_name"/>
+			</column>
+			<column name="display_name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="description" type="varchar(1000)"/>
+			<column name="attribute_type" type="varchar(20)"><constraints nullable="false"/></column>
+			<column name="required" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="multivalued" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="min_length" type="int"/>
+			<column name="max_length" type="int"/>
+			<column name="pattern" type="varchar(500)"/>
+			<column name="enabled" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
+			<column name="display_order" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="015-04-create-user-profile-values" author="susimsek">
+		<createTable tableName="user_profile_attributes">
+			<column name="id" type="bigint" defaultValueSequenceNext="user_profile_attribute_seq">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_profile_attributes"/>
+			</column>
+			<column name="user_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="definition_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="position" type="int"><constraints nullable="false"/></column>
+			<column name="attribute_value" type="varchar(2000)"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="user_profile_attributes" columnNames="user_id, definition_id, position" constraintName="uk_user_profile_attribute_position"/>
+		<addForeignKeyConstraint baseTableName="user_profile_attributes" baseColumnNames="user_id" constraintName="fk_user_profile_attributes_user" referencedTableName="users" referencedColumnNames="id" onDelete="CASCADE"/>
+		<addForeignKeyConstraint baseTableName="user_profile_attributes" baseColumnNames="definition_id" constraintName="fk_user_profile_attributes_definition" referencedTableName="user_profile_attribute_definitions" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex indexName="idx_user_profile_attributes_user" tableName="user_profile_attributes"><column name="user_id"/></createIndex>
+		<createIndex indexName="idx_user_profile_attributes_definition" tableName="user_profile_attributes"><column name="definition_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="015-05-seed-user-profile-definitions" author="susimsek">
+		<loadData encoding="UTF-8" file="db/data/user-profile-attributes.csv" separator=";" tableName="user_profile_attribute_definitions" usePreparedStatements="true">
+			<column header="name" type="string"/>
+			<column header="display_name" type="string"/>
+			<column header="description" type="string"/>
+			<column header="attribute_type" type="string"/>
+			<column header="required" type="boolean"/>
+			<column header="multivalued" type="boolean"/>
+			<column header="min_length" type="numeric"/>
+			<column header="max_length" type="numeric"/>
+			<column header="pattern" type="string"/>
+			<column header="enabled" type="boolean"/>
+			<column header="display_order" type="numeric"/>
+			<column header="created_by" type="string"/>
+			<column header="last_modified_by" type="string"/>
+		</loadData>
+	</changeSet>
+
+	<changeSet id="015-06-seed-user-profile-values" author="susimsek">
+		<loadData encoding="UTF-8" file="db/data/user-profile-values.csv" separator=";" tableName="user_profile_attributes" usePreparedStatements="true">
+			<column header="user_id" type="numeric"/>
+			<column header="definition_id" type="numeric"/>
+			<column header="position" type="numeric"/>
+			<column header="attribute_value" type="string"/>
+		</loadData>
+	</changeSet>
+
+</databaseChangeLog>

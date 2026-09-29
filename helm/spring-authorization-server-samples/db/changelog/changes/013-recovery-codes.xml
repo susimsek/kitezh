@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="013-01-recovery-code-sequence" author="susimsek">
+        <createSequence sequenceName="user_recovery_code_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+    </changeSet>
+    <changeSet id="013-02-recovery-code-table" author="susimsek">
+        <createTable tableName="user_recovery_code">
+            <column name="id" type="bigint" defaultValueSequenceNext="user_recovery_code_seq">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_recovery_code"/>
+            </column>
+            <column name="user_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code_index" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code_hash" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="used_at" type="timestamp"/>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="${now}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_modified_by" type="varchar(100)"/>
+            <column name="updated_at" type="timestamp" defaultValueComputed="${now}">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="user_recovery_code" baseColumnNames="user_id"
+                                 constraintName="fk_user_recovery_code_user" referencedTableName="users"
+                                 referencedColumnNames="id" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="user_recovery_code" columnNames="user_id, code_index"
+                             constraintName="uk_user_recovery_code_index"/>
+        <createIndex tableName="user_recovery_code" indexName="idx_user_recovery_code_user_unused_index">
+            <column name="user_id"/>
+            <column name="used_at"/>
+            <column name="code_index"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

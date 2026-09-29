@@ -63,14 +63,63 @@ server:
   port: 9090
   shutdown: graceful
 
+logging:
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:}
+      file: ${LOGGING_STRUCTURED_FORMAT_FILE:}
+    ecs:
+      service:
+        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:spring-authorization-server-samples}
+        environment: ${LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:dev}}
+
 management:
+  opentelemetry:
+    enabled: ${MANAGEMENT_OPENTELEMETRY_ENABLED:false}
+    resource-attributes:
+      service.name: ${OTEL_SERVICE_NAME:spring-authorization-server-samples}
+      deployment.environment: ${SPRING_PROFILES_ACTIVE:dev}
+    tracing:
+      export:
+        otlp:
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:}
+          headers:
+            Authorization: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
+    logging:
+      export:
+        otlp:
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT:}
+          headers:
+            Authorization: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
+  logging:
+    export:
+      otlp:
+        enabled: ${MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED:false}
+  tracing:
+    export:
+      enabled: ${MANAGEMENT_TRACING_EXPORT_ENABLED:false}
+      otlp:
+        enabled: ${MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED:false}
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    metrics:
+      export:
+        enabled: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:false}
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:}
+        headers:
+          Authorization: ${MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION:}
   health:
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
   endpoint:
     health:
       probes:
@@ -78,11 +127,30 @@ management:
       show-details: never
 
 app:
+  logging:
+    file-enabled: ${APP_LOG_FILE_ENABLED:false}
+    file-path: ${APP_LOG_FILE_PATH:logs/application.log}
+    syslog-enabled: ${APP_LOG_SYSLOG_ENABLED:false}
+    syslog-host: ${APP_LOG_SYSLOG_HOST:localhost}
+    syslog-port: ${APP_LOG_SYSLOG_PORT:514}
+    syslog-facility: ${APP_LOG_SYSLOG_FACILITY:USER}
+    syslog-output: ${APP_LOG_SYSLOG_OUTPUT:default}
+    syslog-json-format: ${APP_LOG_SYSLOG_JSON_FORMAT:default}
+    async-enabled: ${APP_LOG_ASYNC_ENABLED:true}
+    async-queue-size: ${APP_LOG_ASYNC_QUEUE_SIZE:512}
+    async-never-block: ${APP_LOG_ASYNC_NEVER_BLOCK:false}
+    access:
+      enabled: ${APP_LOG_ACCESS_ENABLED:true}
+      pattern: ${APP_LOG_ACCESS_PATTERN:common}
+      exclude-paths: ${APP_LOG_ACCESS_EXCLUDE_PATHS:}
+      masked-headers: ${APP_LOG_ACCESS_MASKED_HEADERS:Authorization,Cookie}
+      masked-cookies: ${APP_LOG_ACCESS_MASKED_COOKIES:SESSION}
+      file-enabled: ${APP_LOG_ACCESS_FILE_ENABLED:false}
+      file-path: ${APP_LOG_ACCESS_FILE_PATH:logs/application-access.log}
   session:
     cleanup-cron: "0 * * * * *"
   social-login:
     enabled: ${APP_SOCIAL_LOGIN_ENABLED:false}
-    encryption-key: ${SOCIAL_LOGIN_ENCRYPTION_KEY:}
     google:
       client-id: ${GOOGLE_CLIENT_ID:}
       client-secret: ${GOOGLE_CLIENT_SECRET:}

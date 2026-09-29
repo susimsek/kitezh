@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: spring-authorization-server-samples
+    runtime: image
+    plan: free
+    region: frankfurt
+    image:
+      url: docker.io/suayb/spring-authorization-server-samples:latest-native
+    healthCheckPath: /actuator/health/readiness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SPRING_LIQUIBASE_DROP_FIRST
+        value: "true"
+      - key: MANAGEMENT_OPENTELEMETRY_ENABLED
+        value: "true"
+      - key: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION
+        sync: false
+      - key: MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION
+        sync: false
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION
+        sync: false
+      - key: MANAGEMENT_TRACING_EXPORT_ENABLED
+        value: "true"
+      - key: MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED
+        value: "true"
+      - key: MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED
+        value: "true"
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED
+        value: "true"
+      - key: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+        sync: false
+      - key: MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT
+        sync: false
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_URL
+        sync: false
+      - key: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+        value: "1.0"
+      - key: OTEL_SERVICE_NAME
+        value: spring-authorization-server-samples
+      - key: SERVER_PORT
+        value: "10000"
+      # Render prompts for these database values when the Blueprint is first created.
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: APP_AUTHORIZATION_SERVER_ISSUER
+        value: https://spring-authorization-server-samples.onrender.com

@@ -1,0 +1,2 @@
+id;enabled;from_address;base_url;host;port;smtp_auth;starttls;ssl
+1;false;Spring Authorization Server <no-reply@localhost>;http://127.0.0.1:9090;localhost;1025;false;false;false
