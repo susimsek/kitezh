@@ -258,7 +258,7 @@
       },
       "targets": [
         {
-          "expr": "jvm_info{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_info{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "instant": true,
           "format": "table"
