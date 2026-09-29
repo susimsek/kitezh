@@ -19,6 +19,14 @@ public interface ClientRoleRepository extends JpaRepository<ClientRoleEntity, Lo
     Page<ClientRoleEntity> findByClientIdAndNameContainingIgnoreCase(
             @Param("clientId") String clientId, @Param("name") String name, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"client"})
+    @Query(
+            "select r from ClientRoleEntity r where lower(r.name) like"
+                    + " lower(concat('%', :query, '%')) or lower(r.client.clientId) like"
+                    + " lower(concat('%', :query, '%'))")
+    Page<ClientRoleEntity> findAllByNameOrClientIdContainingIgnoreCase(
+            @Param("query") String query, Pageable pageable);
+
     @EntityGraph(
             attributePaths = {
                 "client",

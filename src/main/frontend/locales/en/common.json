@@ -1161,6 +1161,10 @@
       "name": "Name",
       "displayName": "Display name",
       "description": "Description",
+      "builtIn": "Built-in scope",
+      "displayOnConsentScreen": "Show on consent screen",
+      "consentScreenText": "Consent screen text",
+      "includeInTokenScope": "Include in token scope claim",
       "groupMapperEnabled": "Include group membership claim",
       "groupClaimName": "Group claim name",
       "groupMapperFullPath": "Use full hierarchical group paths",
@@ -1170,6 +1174,7 @@
       "operationError": "The client scope operation could not be completed.",
       "deleteConfirm": "Delete this client scope?",
       "assignedDeleteError": "Assigned client scopes cannot be deleted.",
+      "protectedError": "Built-in client scopes cannot be changed or deleted.",
       "defaultScopes": "Assigned default scopes",
       "optionalScopes": "Assigned optional scopes",
       "availableScopes": "Available scopes",
@@ -1178,7 +1183,12 @@
       "addDefault": "Add as default",
       "addOptional": "Add as optional",
       "remove": "Remove",
-      "assignmentSaved": "Client scope assignments updated."
+      "assignmentSaved": "Client scope assignments updated.",
+      "roleMappings": "Role scope mappings",
+      "roleMappingsHelp": "Only selected roles are included when this scope is used for token role filtering.",
+      "applicationRoles": "Application roles",
+      "clientRoles": "Client roles",
+      "roleMappingsSaved": "Client scope role mappings updated."
     },
     "localization": {
       "title": "Localization settings",

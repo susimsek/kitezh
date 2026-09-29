@@ -49,11 +49,16 @@ type Values = {
 export function ClientMappers({
   clientId,
   dictionary,
+  baseUrl,
+  readOnly = false,
 }: {
   clientId: string;
   dictionary: Dictionary;
+  baseUrl?: string;
+  readOnly?: boolean;
 }) {
   const { access, accessToken } = useAdminAuth();
+  const canManage = Boolean(access?.manageClients && !readOnly);
   const copy = dictionary.admin.clients.mappers;
   const alerts = useConsoleAlerts();
   const [items, setItems] = useState<ClientMapper[]>([]);
@@ -62,6 +67,7 @@ export function ClientMappers({
   const [editing, setEditing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const resourceUrl = baseUrl ?? `/api/admin/clients/${encodeURIComponent(clientId)}/mappers`;
   const schema = z
     .object({
       name: z.string().trim().min(1, dictionary.admin.common.validation.required).max(100),
@@ -118,25 +124,22 @@ export function ClientMappers({
   const load = () => {
     if (!accessToken) return;
     adminRequest<PageResponse<ClientMapper>>(accessToken, {
-      url: `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
+      url: `${resourceUrl}?page=0&size=20&sort=name,asc`,
     })
       .then((response) => {
         if (response.status >= 300) throw new Error();
-        setItems(response.data.content);
+        setItems(response.data.content ?? []);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [accessToken, clientId]);
+  useEffect(load, [accessToken, resourceUrl]);
 
   const submit = async (values: Values) => {
-    if (!accessToken || !access?.manageClients) return;
+    if (!accessToken || !canManage) return;
     setSaving(true);
     const response = await adminRequest<ClientMapper>(accessToken, {
-      url:
-        editing === null
-          ? `/api/admin/clients/${encodeURIComponent(clientId)}/mappers`
-          : `/api/admin/clients/${encodeURIComponent(clientId)}/mappers/${editing}`,
+      url: editing === null ? resourceUrl : `${resourceUrl}/${editing}`,
       method: editing === null ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },
       data: values,
@@ -151,10 +154,10 @@ export function ClientMappers({
   };
 
   const remove = async (id: number) => {
-    if (!accessToken || !access?.manageClients) return;
+    if (!accessToken || !canManage) return;
     setDeleting(id);
     const response = await adminRequest(accessToken, {
-      url: `/api/admin/clients/${encodeURIComponent(clientId)}/mappers/${id}`,
+      url: `${resourceUrl}/${id}`,
       method: "DELETE",
     });
     setDeleting(null);
@@ -169,19 +172,23 @@ export function ClientMappers({
   if (error) return <ErrorState message={copy.loadError} />;
   return (
     <div className="d-grid gap-3">
-      {access?.manageClients && (
+      {canManage && (
         <Card className="admin-panel-card">
           <Card.Body>
             <h2 className="h5">{editing === null ? copy.create : copy.edit}</h2>
             <Form noValidate onSubmit={handleSubmit(submit)} className="d-grid gap-3">
               <Form.Group controlId="client-mapper-name">
                 <Form.Label>{copy.name}</Form.Label>
-                <Form.Control isInvalid={Boolean(errors.name)} {...register("name")} />
+                <Form.Control
+                  disabled={!canManage}
+                  isInvalid={Boolean(errors.name)}
+                  {...register("name")}
+                />
                 <Form.Control.Feedback type="invalid">{errors.name?.message}</Form.Control.Feedback>
               </Form.Group>
               <Form.Group controlId="client-mapper-type">
                 <Form.Label>{copy.type}</Form.Label>
-                <Form.Select {...register("mapperType")}>
+                <Form.Select disabled={!canManage} {...register("mapperType")}>
                   <option value="user-property">user-property</option>
                   <option value="user-attribute">user-attribute</option>
                   <option value="group-membership">group-membership</option>
@@ -196,7 +203,11 @@ export function ClientMappers({
               </Form.Group>
               <Form.Group controlId="client-mapper-value">
                 <Form.Label>{copy.value}</Form.Label>
-                <Form.Control isInvalid={Boolean(errors.value)} {...register("value")} />
+                <Form.Control
+                  disabled={!canManage}
+                  isInvalid={Boolean(errors.value)}
+                  {...register("value")}
+                />
                 <Form.Control.Feedback type="invalid">
                   {errors.value?.message}
                 </Form.Control.Feedback>
@@ -206,6 +217,7 @@ export function ClientMappers({
                 <Form.Control
                   type="number"
                   isInvalid={Boolean(errors.priority)}
+                  disabled={!canManage}
                   {...register("priority", { valueAsNumber: true })}
                 />
                 <Form.Control.Feedback type="invalid">
@@ -214,23 +226,37 @@ export function ClientMappers({
               </Form.Group>
               <Form.Group controlId="client-mapper-source">
                 <Form.Label>{copy.source}</Form.Label>
-                <Form.Control isInvalid={Boolean(errors.source)} {...register("source")} />
+                <Form.Control
+                  disabled={!canManage}
+                  isInvalid={Boolean(errors.source)}
+                  {...register("source")}
+                />
                 <Form.Control.Feedback type="invalid">
                   {errors.source?.message}
                 </Form.Control.Feedback>
               </Form.Group>
               <Form.Group controlId="client-mapper-claim-name">
                 <Form.Label>{copy.claimName}</Form.Label>
-                <Form.Control isInvalid={Boolean(errors.claimName)} {...register("claimName")} />
+                <Form.Control
+                  disabled={!canManage}
+                  isInvalid={Boolean(errors.claimName)}
+                  {...register("claimName")}
+                />
                 <Form.Control.Feedback type="invalid">
                   {errors.claimName?.message}
                 </Form.Control.Feedback>
               </Form.Group>
               <div className="d-flex gap-3">
-                <Form.Check type="switch" label={copy.idToken} {...register("addToIdToken")} />
+                <Form.Check
+                  disabled={!canManage}
+                  type="switch"
+                  label={copy.idToken}
+                  {...register("addToIdToken")}
+                />
                 <Form.Check
                   type="switch"
                   label={copy.accessToken}
+                  disabled={!canManage}
                   {...register("addToAccessToken")}
                 />
               </div>
@@ -238,7 +264,7 @@ export function ClientMappers({
                 <div className="invalid-feedback d-block">{errors.addToAccessToken.message}</div>
               )}
               <div className="d-flex gap-2">
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" disabled={saving || !canManage}>
                   {saving ? (
                     <Spinner animation="border" size="sm" className="me-2" />
                   ) : (
@@ -298,6 +324,7 @@ export function ClientMappers({
                       <Button
                         size="sm"
                         variant="secondary"
+                        disabled={!canManage}
                         onClick={() => {
                           setEditing(item.id);
                           reset({
@@ -315,7 +342,7 @@ export function ClientMappers({
                       <Button
                         size="sm"
                         variant="danger"
-                        disabled={deleting === item.id}
+                        disabled={!canManage || deleting === item.id}
                         onClick={() => void remove(item.id)}
                       >
                         {deleting === item.id ? (

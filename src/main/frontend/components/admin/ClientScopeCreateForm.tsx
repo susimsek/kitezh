@@ -19,6 +19,9 @@ type Values = {
   name: string;
   displayName: string;
   description: string;
+  displayOnConsentScreen: boolean;
+  consentScreenText: string;
+  includeInTokenScope: boolean;
   groupMapperEnabled: boolean;
   groupClaimName: string;
   groupMapperFullPath: boolean;
@@ -35,6 +38,9 @@ export function ClientScopeCreateForm({ dictionary }: { dictionary: Dictionary; 
     name: z.string().trim().min(1, common.validation.required).max(100, common.validation.max100),
     displayName: z.string().max(200, common.validation.max200),
     description: z.string().max(500, common.validation.max500),
+    displayOnConsentScreen: z.boolean(),
+    consentScreenText: z.string().max(200, common.validation.max200),
+    includeInTokenScope: z.boolean(),
     groupMapperEnabled: z.boolean(),
     groupClaimName: z
       .string()
@@ -55,6 +61,9 @@ export function ClientScopeCreateForm({ dictionary }: { dictionary: Dictionary; 
       name: "",
       displayName: "",
       description: "",
+      displayOnConsentScreen: false,
+      consentScreenText: "",
+      includeInTokenScope: true,
       groupMapperEnabled: false,
       groupClaimName: "groups",
       groupMapperFullPath: true,
@@ -130,6 +139,34 @@ export function ClientScopeCreateForm({ dictionary }: { dictionary: Dictionary; 
               {errors.description?.message}
             </Form.Control.Feedback>
           </Form.Group>
+          <Form.Group className="mb-3" controlId="client-scope-consent-screen-text">
+            <Form.Label>{copy.consentScreenText}</Form.Label>
+            <Form.Control
+              isInvalid={Boolean(errors.consentScreenText)}
+              maxLength={200}
+              disabled={!canManageClients}
+              {...register("consentScreenText")}
+            />
+            <Form.Control.Feedback type="invalid">
+              {errors.consentScreenText?.message}
+            </Form.Control.Feedback>
+          </Form.Group>
+          <Form.Check
+            className="mb-2"
+            type="switch"
+            id="client-scope-display-on-consent-screen"
+            label={copy.displayOnConsentScreen}
+            disabled={!canManageClients}
+            {...register("displayOnConsentScreen")}
+          />
+          <Form.Check
+            className="mb-3"
+            type="switch"
+            id="client-scope-include-in-token-scope"
+            label={copy.includeInTokenScope}
+            disabled={!canManageClients}
+            {...register("includeInTokenScope")}
+          />
           <Form.Group className="mb-3" controlId="client-scope-group-claim-name">
             <Form.Label>{copy.groupClaimName}</Form.Label>
             <Form.Control

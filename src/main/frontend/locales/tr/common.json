@@ -1161,6 +1161,10 @@
       "name": "Ad",
       "displayName": "Görünen ad",
       "description": "Açıklama",
+      "builtIn": "Yerleşik scope",
+      "displayOnConsentScreen": "Onay ekranında göster",
+      "consentScreenText": "Onay ekranı metni",
+      "includeInTokenScope": "Token scope claim’ine dahil et",
       "groupMapperEnabled": "Grup üyeliği claim’ini dahil et",
       "groupClaimName": "Grup claim adı",
       "groupMapperFullPath": "Tam hiyerarşik grup yollarını kullan",
@@ -1170,6 +1174,7 @@
       "operationError": "İstemci scope işlemi tamamlanamadı.",
       "deleteConfirm": "Bu istemci scope’u silinsin mi?",
       "assignedDeleteError": "Atanmış istemci scope’ları silinemez.",
+      "protectedError": "Yerleşik istemci scope’ları değiştirilemez veya silinemez.",
       "defaultScopes": "Atanmış varsayılan scope’lar",
       "optionalScopes": "Atanmış isteğe bağlı scope’lar",
       "availableScopes": "Kullanılabilir scope’lar",
@@ -1178,7 +1183,12 @@
       "addDefault": "Varsayılan olarak ekle",
       "addOptional": "İsteğe bağlı olarak ekle",
       "remove": "Kaldır",
-      "assignmentSaved": "İstemci scope atamaları güncellendi."
+      "assignmentSaved": "İstemci scope atamaları güncellendi.",
+      "roleMappings": "Rol scope eşlemeleri",
+      "roleMappingsHelp": "Bu scope token rol filtrelemesinde kullanıldığında yalnızca seçilen roller dahil edilir.",
+      "applicationRoles": "Uygulama rolleri",
+      "clientRoles": "İstemci rolleri",
+      "roleMappingsSaved": "İstemci scope rol eşlemeleri güncellendi."
     },
     "localization": {
       "title": "Yerelleştirme ayarları",

@@ -11,6 +11,7 @@ import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
 import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
 import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepository;
@@ -287,6 +288,7 @@ public class AuthorizationServerConfig {
             AuthorizationRepository authorizationRepository,
             ClientScopeRepository clientScopeRepository,
             ClientMapperRepository clientMapperRepository,
+            ClientScopeMapperRepository clientScopeMapperRepository,
             ServiceAccountRepository serviceAccountRepository,
             UserProfileAttributeRepository userProfileAttributeRepository,
             SocialIdentityRepository socialIdentityRepository,
@@ -297,6 +299,7 @@ public class AuthorizationServerConfig {
                 authorizationRepository,
                 clientScopeRepository,
                 clientMapperRepository,
+                clientScopeMapperRepository,
                 serviceAccountRepository,
                 userProfileAttributeRepository,
                 false,
@@ -312,6 +315,7 @@ public class AuthorizationServerConfig {
                 userRepository,
                 userAvatarRepository,
                 authorizationRepository,
+                null,
                 null,
                 null,
                 null,
@@ -336,6 +340,7 @@ public class AuthorizationServerConfig {
                 null,
                 null,
                 null,
+                null,
                 false,
                 socialIdentityRepository,
                 objectMapper);
@@ -347,6 +352,7 @@ public class AuthorizationServerConfig {
             AuthorizationRepository authorizationRepository,
             ClientScopeRepository clientScopeRepository,
             ClientMapperRepository clientMapperRepository,
+            ClientScopeMapperRepository clientScopeMapperRepository,
             ServiceAccountRepository serviceAccountRepository,
             UserProfileAttributeRepository userProfileAttributeRepository,
             boolean legacyAdminGroups,
@@ -355,7 +361,12 @@ public class AuthorizationServerConfig {
         return context -> {
             boolean adminAccessToken = isAdminAccessToken(context);
             List<ClientScopeEntity> groupMappers = groupMappers(context, clientScopeRepository);
-            List<ClientMapperEntity> clientMappers = clientMappers(context, clientMapperRepository);
+            List<TokenMapper> clientMappers =
+                    clientMappers(
+                            context,
+                            clientMapperRepository,
+                            clientScopeRepository,
+                            clientScopeMapperRepository);
             Optional<UserEntity> tokenUser =
                     tokenUser(
                             context,
@@ -371,10 +382,16 @@ public class AuthorizationServerConfig {
             appendUserClaims(context, tokenUser, userAvatarRepository, applicationProperties);
             appendNonceClaim(context);
             appendAdminClaims(context, tokenUser, legacyAdminGroups, adminAccessToken);
-            appendRealmRoleClaims(context, tokenUser);
+            RoleScopeMappings roleScopeMappings = roleScopeMappings(context, clientScopeRepository);
+            appendRealmRoleClaims(context, tokenUser, roleScopeMappings);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
-            appendClientRoleClaims(context, tokenUser);
-            appendClientMappers(context, tokenUser, clientMappers, userProfileAttributeRepository);
+            appendClientRoleClaims(context, tokenUser, roleScopeMappings);
+            appendClientMappers(
+                    context,
+                    tokenUser,
+                    clientMappers,
+                    userProfileAttributeRepository,
+                    roleScopeMappings);
             appendSessionIdClaim(context, authorizationRepository);
             appendDpopConfirmationClaim(context);
         };
@@ -394,12 +411,89 @@ public class AuthorizationServerConfig {
                         .toList();
     }
 
-    private static List<ClientMapperEntity> clientMappers(
-            JwtEncodingContext context, ClientMapperRepository repository) {
-        return repository == null || context.getRegisteredClient() == null
-                ? List.of()
-                : repository.findAllByClientIdOrderByPriorityAscNameAsc(
-                        context.getRegisteredClient().getId());
+    private static List<TokenMapper> clientMappers(
+            JwtEncodingContext context,
+            ClientMapperRepository clientMapperRepository,
+            ClientScopeRepository clientScopeRepository,
+            ClientScopeMapperRepository clientScopeMapperRepository) {
+        List<TokenMapper> mappers = new ArrayList<>();
+        if (clientMapperRepository != null && context.getRegisteredClient() != null) {
+            clientMapperRepository
+                    .findAllByClientIdOrderByPriorityAscNameAsc(
+                            context.getRegisteredClient().getId())
+                    .stream()
+                    .map(AuthorizationServerConfig::toTokenMapper)
+                    .forEach(mappers::add);
+        }
+        if (clientScopeRepository != null && clientScopeMapperRepository != null) {
+            Set<String> scopes = context.getAuthorizedScopes();
+            if (!scopes.isEmpty()) {
+                List<String> scopeIds =
+                        clientScopeRepository.findByNameIn(scopes).stream()
+                                .map(ClientScopeEntity::getId)
+                                .toList();
+                if (!scopeIds.isEmpty()) {
+                    clientScopeMapperRepository
+                            .findAllByClientScopeIdInOrderByPriorityAscNameAsc(scopeIds)
+                            .stream()
+                            .map(AuthorizationServerConfig::toTokenMapper)
+                            .forEach(mappers::add);
+                }
+            }
+        }
+        return mappers;
+    }
+
+    private static RoleScopeMappings roleScopeMappings(
+            JwtEncodingContext context, ClientScopeRepository repository) {
+        if (repository == null || context.getAuthorizedScopes().isEmpty()) {
+            return RoleScopeMappings.unconfigured();
+        }
+        List<ClientScopeEntity> scopes =
+                repository.findDetailedByNameIn(context.getAuthorizedScopes());
+        if (scopes.isEmpty()) {
+            return RoleScopeMappings.unconfigured();
+        }
+        Set<String> applicationRoles = new java.util.TreeSet<>();
+        Map<String, Set<String>> clientRoles = new java.util.TreeMap<>();
+        boolean configured = false;
+        for (ClientScopeEntity scope : scopes) {
+            var expanded =
+                    EffectiveRoleService.expandScopeRoles(
+                            scope.getApplicationRoles(), scope.getClientRoles());
+            configured |=
+                    !expanded.applicationRoles().isEmpty() || !expanded.clientRoles().isEmpty();
+            applicationRoles.addAll(expanded.applicationRoles());
+            expanded.clientRoles()
+                    .forEach(
+                            (clientId, roles) ->
+                                    clientRoles
+                                            .computeIfAbsent(
+                                                    clientId, ignored -> new java.util.TreeSet<>())
+                                            .addAll(roles));
+        }
+        return new RoleScopeMappings(configured, applicationRoles, clientRoles);
+    }
+
+    private static TokenMapper toTokenMapper(ClientMapperEntity mapper) {
+        return new TokenMapper(
+                mapper.getMapperType(),
+                mapper.getSource(),
+                mapper.getValue(),
+                mapper.getClaimName(),
+                mapper.isAddToIdToken(),
+                mapper.isAddToAccessToken());
+    }
+
+    private static TokenMapper toTokenMapper(
+            io.github.susimsek.springauthserversamples.domain.ClientScopeMapperEntity mapper) {
+        return new TokenMapper(
+                mapper.getMapperType(),
+                mapper.getSource(),
+                mapper.getValue(),
+                mapper.getClaimName(),
+                mapper.isAddToIdToken(),
+                mapper.isAddToAccessToken());
     }
 
     private static Optional<UserEntity> tokenUser(
@@ -407,7 +501,7 @@ public class AuthorizationServerConfig {
             UserRepository userRepository,
             boolean adminAccessToken,
             List<ClientScopeEntity> groupMappers,
-            List<ClientMapperEntity> clientMappers,
+            List<TokenMapper> clientMappers,
             ServiceAccountRepository serviceAccountRepository) {
         if (serviceAccountRepository != null
                 && context.getRegisteredClient() != null
@@ -561,12 +655,15 @@ public class AuthorizationServerConfig {
     }
 
     private static void appendClientRoleClaims(
-            JwtEncodingContext context, Optional<UserEntity> tokenUser) {
+            JwtEncodingContext context,
+            Optional<UserEntity> tokenUser,
+            RoleScopeMappings roleScopeMappings) {
         if (!isRoleToken(context) || tokenUser.isEmpty()) {
             return;
         }
         Map<String, Set<String>> roles =
                 EffectiveRoleService.effectiveClientRoleNames(tokenUser.get());
+        roles = roleScopeMappings.filterClientRoles(roles);
         if (roles.isEmpty()) {
             return;
         }
@@ -581,31 +678,31 @@ public class AuthorizationServerConfig {
     private static void appendClientMappers(
             JwtEncodingContext context,
             Optional<UserEntity> tokenUser,
-            List<ClientMapperEntity> mappers,
-            UserProfileAttributeRepository attributeRepository) {
+            List<TokenMapper> mappers,
+            UserProfileAttributeRepository attributeRepository,
+            RoleScopeMappings roleScopeMappings) {
         if (mappers.isEmpty()) {
             return;
         }
         boolean idToken = OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue());
         boolean accessToken = OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType());
-        UserEntity user = tokenUser.get();
         mappers.stream()
                 .filter(
                         mapper ->
-                                (idToken && mapper.isAddToIdToken())
-                                        || (accessToken && mapper.isAddToAccessToken()))
+                                (idToken && mapper.addToIdToken())
+                                        || (accessToken && mapper.addToAccessToken()))
                 .forEach(
                         mapper -> {
                             Object value =
-                                    switch (mapper.getMapperType()) {
-                                        case "audience", "hardcoded-claim" -> mapper.getValue();
+                                    switch (mapper.mapperType()) {
+                                        case "audience", "hardcoded-claim" -> mapper.value();
                                         case "user-property" ->
                                                 tokenUser
                                                         .map(
                                                                 accountUser ->
                                                                         userProperty(
                                                                                 accountUser,
-                                                                                mapper.getSource()))
+                                                                                mapper.source()))
                                                         .orElse(null);
                                         case "user-attribute" ->
                                                 tokenUser
@@ -613,7 +710,7 @@ public class AuthorizationServerConfig {
                                                                 accountUser ->
                                                                         userAttribute(
                                                                                 accountUser,
-                                                                                mapper.getSource(),
+                                                                                mapper.source(),
                                                                                 attributeRepository))
                                                         .orElse(null);
                                         case "group-membership" ->
@@ -633,9 +730,11 @@ public class AuthorizationServerConfig {
                                                 tokenUser
                                                         .map(
                                                                 accountUser ->
-                                                                        EffectiveRoleService
-                                                                                .effectiveClientRoleNames(
-                                                                                        accountUser)
+                                                                        roleScopeMappings
+                                                                                .filterClientRoles(
+                                                                                        EffectiveRoleService
+                                                                                                .effectiveClientRoleNames(
+                                                                                                        accountUser))
                                                                                 .getOrDefault(
                                                                                         context.getRegisteredClient()
                                                                                                 .getClientId(),
@@ -656,7 +755,7 @@ public class AuthorizationServerConfig {
                                         default -> null;
                                     };
                             if (value != null) {
-                                context.getClaims().claim(mapper.getClaimName(), value);
+                                context.getClaims().claim(mapper.claimName(), value);
                             }
                         });
     }
@@ -698,16 +797,66 @@ public class AuthorizationServerConfig {
     }
 
     private static void appendRealmRoleClaims(
-            JwtEncodingContext context, Optional<UserEntity> tokenUser) {
+            JwtEncodingContext context,
+            Optional<UserEntity> tokenUser,
+            RoleScopeMappings roleScopeMappings) {
         if (!isRoleToken(context)
                 || AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                         context.getAuthorizationGrantType())
                 || tokenUser.isEmpty()) {
             return;
         }
-        Set<String> roles = EffectiveRoleService.effectiveRoleNames(tokenUser.get());
+        Set<String> roles =
+                roleScopeMappings.filterApplicationRoles(
+                        EffectiveRoleService.effectiveRoleNames(tokenUser.get()));
         if (!roles.isEmpty()) {
             context.getClaims().claim("realm_access", Map.of(ROLES_SCOPE, new ArrayList<>(roles)));
+        }
+    }
+
+    private record TokenMapper(
+            String mapperType,
+            String source,
+            String value,
+            String claimName,
+            boolean addToIdToken,
+            boolean addToAccessToken) {}
+
+    private record RoleScopeMappings(
+            boolean configured,
+            Set<String> applicationRoles,
+            Map<String, Set<String>> clientRoles) {
+
+        private static RoleScopeMappings unconfigured() {
+            return new RoleScopeMappings(false, Set.of(), Map.of());
+        }
+
+        private Set<String> filterApplicationRoles(Set<String> roles) {
+            return configured
+                    ? roles.stream().filter(applicationRoles::contains).collect(Collectors.toSet())
+                    : roles;
+        }
+
+        private Map<String, Set<String>> filterClientRoles(Map<String, Set<String>> roles) {
+            if (!configured) {
+                return roles;
+            }
+            return roles.entrySet().stream()
+                    .map(
+                            entry ->
+                                    Map.entry(
+                                            entry.getKey(),
+                                            entry.getValue().stream()
+                                                    .filter(
+                                                            role ->
+                                                                    clientRoles
+                                                                            .getOrDefault(
+                                                                                    entry.getKey(),
+                                                                                    Set.of())
+                                                                            .contains(role))
+                                                    .collect(Collectors.toSet())))
+                    .filter(entry -> !entry.getValue().isEmpty())
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
     }
 

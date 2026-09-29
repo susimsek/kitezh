@@ -70,6 +70,22 @@ public final class EffectiveRoleService {
                                 entry -> Set.copyOf(new TreeSet<>(entry.getValue()))));
     }
 
+    /** Expands role composites configured on a client scope. */
+    public static ScopedRoles expandScopeRoles(
+            Set<AuthorityEntity> applicationRoles, Set<ClientRoleEntity> clientRoles) {
+        ExpandedRoles expanded =
+                expandRoles(
+                        applicationRoles == null ? Set.of() : applicationRoles,
+                        clientRoles == null ? Set.of() : clientRoles);
+        return new ScopedRoles(
+                immutableSorted(expanded.realmRoles()),
+                expanded.clientRoles().entrySet().stream()
+                        .collect(
+                                java.util.stream.Collectors.toUnmodifiableMap(
+                                        Map.Entry::getKey,
+                                        entry -> Set.copyOf(new TreeSet<>(entry.getValue())))));
+    }
+
     private static void addGroupClientRoles(Map<String, Set<String>> target, GroupEntity group) {
         Set<GroupEntity> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         GroupEntity current = group;
@@ -240,4 +256,6 @@ public final class EffectiveRoleService {
             List<GroupRoleMapping> groupMappings,
             Set<String> inheritedRoles,
             Set<String> effectiveRoles) {}
+
+    public record ScopedRoles(Set<String> applicationRoles, Map<String, Set<String>> clientRoles) {}
 }

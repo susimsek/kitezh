@@ -49,11 +49,14 @@ public enum ApiErrorCode {
             "client_redirect_uri_required",
             "At least one redirect URI is required for the authorization code grant."),
     CLIENT_SCOPE_ASSIGNED("client_scope_assigned", "Assigned client scopes cannot be deleted."),
+    CLIENT_SCOPE_PROTECTED("client_scope_protected", "Built-in client scopes cannot be changed."),
     CLIENT_SCOPE_ASSIGNMENT_OVERLAP(
             "client_scope_assignment_overlap", "A scope cannot be both default and optional."),
     CLIENT_SCOPE_DUPLICATE("client_scope_duplicate", "Client scope already exists."),
     CLIENT_SCOPE_INVALID_NAME("client_scope_invalid_name", "Client scope name is invalid."),
     CLIENT_SCOPE_UNKNOWN("client_scope_unknown", "One or more client scopes do not exist."),
+    CLIENT_SCOPE_ROLE_UNKNOWN(
+            "client_scope_role_unknown", "One or more client scope roles do not exist."),
     CLIENT_SECRET_REQUIRED(
             "client_secret_required",
             "A client secret must be generated before enabling secret authentication."),

@@ -94,6 +94,9 @@ public class AdminClientScopeService {
                         name,
                         trimToNull(request.displayName()),
                         trimToNull(request.description()),
+                        request.displayOnConsentScreenValue(),
+                        request.consentScreenTextValue(),
+                        request.includeInTokenScopeValue(),
                         request.groupMapperEnabledValue(),
                         request.groupClaimNameValue(),
                         request.groupMapperFullPathValue());
@@ -111,6 +114,7 @@ public class AdminClientScopeService {
             allEntries = true)
     public AdminClientScopeDTO update(String id, AdminClientScopeRequestDTO request) {
         ClientScopeEntity entity = required(id);
+        ensureMutable(entity);
         String name = normalizeName(request.name());
         clientScopeRepository
                 .findByName(name)
@@ -129,9 +133,12 @@ public class AdminClientScopeService {
                 name,
                 trimToNull(request.displayName()),
                 trimToNull(request.description()),
-                request.groupMapperEnabledValue(),
-                request.groupClaimNameValue(),
-                request.groupMapperFullPathValue(),
+                request.displayOnConsentScreenValue(entity.isDisplayOnConsentScreen()),
+                request.consentScreenTextValue(entity.getConsentScreenText()),
+                request.includeInTokenScopeValue(entity.isIncludeInTokenScope()),
+                request.groupMapperEnabledValue(entity.isGroupMapperEnabled()),
+                request.groupClaimNameValue(entity.getGroupClaimName()),
+                request.groupMapperFullPathValue(entity.isGroupMapperFullPath()),
                 entity);
         ClientScopeEntity saved = clientScopeRepository.save(entity);
         adminAuditEventService.record("client-scope.updated", CLIENT_SCOPE_TARGET, id);
@@ -142,6 +149,7 @@ public class AdminClientScopeService {
     @CacheEvict(cacheNames = ClientScopeRepository.CLIENT_SCOPE_BY_NAME_CACHE, allEntries = true)
     public void delete(String id) {
         ClientScopeEntity entity = required(id);
+        ensureMutable(entity);
         boolean assigned =
                 clientRepository.findAll().stream()
                         .anyMatch(
@@ -263,6 +271,14 @@ public class AdminClientScopeService {
         return clientScopeRepository
                 .findById(id)
                 .orElseThrow(() -> ApiException.notFound("Client scope not found"));
+    }
+
+    private static void ensureMutable(ClientScopeEntity entity) {
+        if (entity.isBuiltIn()) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.CLIENT_SCOPE_PROTECTED,
+                    "Built-in client scopes cannot be changed");
+        }
     }
 
     private static Set<String> normalized(Set<String> values) {

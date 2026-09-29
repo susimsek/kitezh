@@ -19,6 +19,10 @@ public interface AdminClientScopeMapper {
     @Mapping(target = "name", source = "name")
     @Mapping(target = "displayName", source = "displayName")
     @Mapping(target = "description", source = "description")
+    @Mapping(target = "builtIn", constant = "false")
+    @Mapping(target = "displayOnConsentScreen", source = "displayOnConsentScreen")
+    @Mapping(target = "consentScreenText", source = "consentScreenText")
+    @Mapping(target = "includeInTokenScope", source = "includeInTokenScope")
     @Mapping(target = "groupMapperEnabled", source = "groupMapperEnabled")
     @Mapping(target = "groupClaimName", source = "groupClaimName")
     @Mapping(target = "groupMapperFullPath", source = "groupMapperFullPath")
@@ -31,6 +35,9 @@ public interface AdminClientScopeMapper {
             String name,
             String displayName,
             String description,
+            boolean displayOnConsentScreen,
+            String consentScreenText,
+            boolean includeInTokenScope,
             boolean groupMapperEnabled,
             String groupClaimName,
             boolean groupMapperFullPath);
@@ -39,6 +46,9 @@ public interface AdminClientScopeMapper {
     @Mapping(target = "name", source = "name")
     @Mapping(target = "displayName", source = "displayName")
     @Mapping(target = "description", source = "description")
+    @Mapping(target = "displayOnConsentScreen", source = "displayOnConsentScreen")
+    @Mapping(target = "consentScreenText", source = "consentScreenText")
+    @Mapping(target = "includeInTokenScope", source = "includeInTokenScope")
     @Mapping(target = "groupMapperEnabled", source = "groupMapperEnabled")
     @Mapping(target = "groupClaimName", source = "groupClaimName")
     @Mapping(target = "groupMapperFullPath", source = "groupMapperFullPath")
@@ -46,6 +56,9 @@ public interface AdminClientScopeMapper {
             String name,
             String displayName,
             String description,
+            boolean displayOnConsentScreen,
+            String consentScreenText,
+            boolean includeInTokenScope,
             boolean groupMapperEnabled,
             String groupClaimName,
             boolean groupMapperFullPath,
