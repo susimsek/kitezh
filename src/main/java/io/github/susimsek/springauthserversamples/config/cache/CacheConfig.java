@@ -38,6 +38,7 @@ import io.github.susimsek.springauthserversamples.repository.SocialProviderMappe
 import io.github.susimsek.springauthserversamples.repository.SocialProviderRepository;
 import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.OptionalLong;
 import javax.cache.Cache;
@@ -45,8 +46,11 @@ import javax.cache.CacheManager;
 import javax.cache.Caching;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.cache.jcache.ConfigSettings;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.cache.autoconfigure.JCacheManagerCustomizer;
+import org.springframework.boot.cache.metrics.CacheMetricsRegistrar;
+import org.springframework.boot.cache.metrics.CaffeineCacheMeterBinderProvider;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -64,10 +68,22 @@ public class CacheConfig {
     public CaffeineCacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCaffeine(buildCaffeineConfig(cacheProperties()));
-        // A static cache list lets Spring Boot's cache metrics auto-configuration bind
-        // every application cache before the first request creates a cache entry.
         cacheManager.setCacheNames(cacheNames());
         return cacheManager;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(CacheMetricsRegistrar.class)
+    public CacheMetricsRegistrar cacheMetricsRegistrar(
+            MeterRegistry registry, CaffeineCacheManager cacheManager) {
+        CacheMetricsRegistrar registrar =
+                new CacheMetricsRegistrar(
+                        registry, List.of(new CaffeineCacheMeterBinderProvider()));
+        cacheManager.getCacheNames().stream()
+                .map(cacheManager::getCache)
+                .filter(java.util.Objects::nonNull)
+                .forEach(registrar::bindCacheToRegistry);
+        return registrar;
     }
 
     private List<String> cacheNames() {

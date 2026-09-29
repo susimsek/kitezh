@@ -117,6 +117,23 @@ class CacheConfigTest {
     }
 
     @Test
+    void bindsApplicationCacheMetricsAtStartup() {
+        CacheConfig configuration = new CacheConfig(applicationProperties());
+        CaffeineCacheManager cacheManager = configuration.cacheManager();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
+        configuration.cacheMetricsRegistrar(registry, cacheManager);
+
+        assertThat(
+                        registry.get("cache.gets")
+                                .tag("name", UserRepository.USER_BY_USERNAME_CACHE)
+                                .tag("result", "hit")
+                                .functionCounter()
+                                .count())
+                .isZero();
+    }
+
+    @Test
     void registersHibernateSecondLevelCacheRegions() {
         CacheConfig.HibernateSecondLevelCacheConfiguration configuration =
                 new CacheConfig.HibernateSecondLevelCacheConfiguration(applicationProperties());

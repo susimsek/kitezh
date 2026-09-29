@@ -22,15 +22,28 @@
   "links": [],
   "panels": [
     {
+      "id": 50,
+      "type": "row",
+      "title": "Overview / Quick facts",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
       "id": 1,
       "type": "stat",
       "title": "Service availability",
-      "description": "",
+      "description": "Shows 1 while a recent OTLP process metric exists; 0 when the application is unavailable.",
       "gridPos": {
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "datasource": {
         "type": "prometheus",
@@ -38,7 +51,7 @@
       },
       "targets": [
         {
-          "expr": "max(up{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "((count(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}) > bool 0) or vector(0))",
           "refId": "A"
         }
       ],
@@ -74,13 +87,13 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Scrape duration",
-      "description": "",
+      "title": "Telemetry freshness",
+      "description": "Age in seconds of the latest OTLP process metric sample. This replaces the Prometheus-only scrape duration metric.",
       "gridPos": {
         "h": 4,
         "w": 4,
         "x": 4,
-        "y": 0
+        "y": 1
       },
       "datasource": {
         "type": "prometheus",
@@ -88,7 +101,7 @@
       },
       "targets": [
         {
-          "expr": "max(scrape_duration_seconds{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "time() - max(timestamp(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}))",
           "refId": "A"
         }
       ],
@@ -110,15 +123,15 @@
       }
     },
     {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Request rate",
+      "id": 25,
+      "type": "stat",
+      "title": "Process uptime",
       "description": "",
       "gridPos": {
-        "h": 4,
-        "w": 8,
+        "h": 5,
+        "w": 4,
         "x": 8,
-        "y": 0
+        "y": 1
       },
       "datasource": {
         "type": "prometheus",
@@ -126,7 +139,183 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}) / 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Application ready time",
+      "description": "Time from process start until the application is ready.",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(application_ready_time_milliseconds{job=~\"$job\",instance=~\"$instance\"}) / 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 42,
+      "type": "stat",
+      "title": "Application started time",
+      "description": "Time from process start until the application context has started.",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(application_started_time_milliseconds{job=~\"$job\",instance=~\"$instance\"}) / 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 45,
+      "type": "table",
+      "title": "JVM runtime",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "jvm_info{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "type": "row",
+      "title": "HTTP & SLO",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Request rate",
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m]))",
           "refId": "A",
           "legendFormat": "requests/sec"
         }
@@ -156,8 +345,8 @@
       "gridPos": {
         "h": 4,
         "w": 8,
-        "x": 16,
-        "y": 0
+        "x": 8,
+        "y": 12
       },
       "datasource": {
         "type": "prometheus",
@@ -165,7 +354,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)",
+          "expr": "100 * sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1) or vector(0)",
           "refId": "A",
           "legendFormat": "5xx %"
         }
@@ -195,8 +384,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 0,
-        "y": 4
+        "x": 16,
+        "y": 12
       },
       "datasource": {
         "type": "prometheus",
@@ -204,7 +393,7 @@
       },
       "targets": [
         {
-          "expr": "1000 * sum(rate(http_server_requests_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)",
+          "expr": "sum(rate(http_server_requests_milliseconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)",
           "refId": "A",
           "legendFormat": "average"
         }
@@ -234,8 +423,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 8,
-        "y": 4
+        "x": 0,
+        "y": 17
       },
       "datasource": {
         "type": "prometheus",
@@ -243,7 +432,7 @@
       },
       "targets": [
         {
-          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m])))",
           "refId": "A",
           "legendFormat": "p95"
         }
@@ -273,8 +462,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 16,
-        "y": 4
+        "x": 8,
+        "y": 17
       },
       "datasource": {
         "type": "prometheus",
@@ -282,7 +471,7 @@
       },
       "targets": [
         {
-          "expr": "1000 * histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m])))",
           "refId": "A",
           "legendFormat": "p99"
         }
@@ -305,6 +494,263 @@
       }
     },
     {
+      "id": 19,
+      "type": "gauge",
+      "title": "Availability",
+      "description": "Availability based on the presence of the application OTLP process metric.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 16,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(avg_over_time((count(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}) > bool 0)[$__range:$__interval]) or vector(0))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 20,
+      "type": "gauge",
+      "title": "Responses below 250 ms",
+      "description": "Fraction of HTTP responses completed within 250 ms. Requires request histograms.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 22
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\",le=\"250\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 21,
+      "type": "gauge",
+      "title": "Server error responses",
+      "description": "Fraction of HTTP responses with a 5xx status in the selected time range.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 22
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Request volume",
+      "description": "Total HTTP requests observed in the selected time range.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 22
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 39,
+      "type": "timeseries",
+      "title": "HTTP in-flight requests",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 22
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum(http_server_requests_active_milliseconds_count{job=~\"$job\",instance=~\"$instance\"})",
+          "refId": "A",
+          "legendFormat": "in-flight"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 52,
+      "type": "row",
+      "title": "JVM Memory & GC",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "panels": []
+    },
+    {
       "id": 8,
       "type": "timeseries",
       "title": "JVM memory used",
@@ -313,7 +759,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 9
+        "y": 28
       },
       "datasource": {
         "type": "prometheus",
@@ -357,7 +803,7 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 9
+        "y": 28
       },
       "datasource": {
         "type": "prometheus",
@@ -388,6 +834,58 @@
       }
     },
     {
+      "id": 12,
+      "type": "timeseries",
+      "title": "GC overhead",
+      "description": "Fraction of JVM CPU time spent in garbage collection.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "100 * jvm_gc_overhead{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "A",
+          "legendFormat": "pause seconds/sec"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 54,
+      "type": "row",
+      "title": "JVM Runtime & Process",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "panels": []
+    },
+    {
       "id": 10,
       "type": "timeseries",
       "title": "Process CPU",
@@ -395,8 +893,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 16,
-        "y": 9
+        "x": 0,
+        "y": 34
       },
       "datasource": {
         "type": "prometheus",
@@ -432,6 +930,86 @@
       }
     },
     {
+      "id": 26,
+      "type": "stat",
+      "title": "System load (1m)",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 8,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "system_load_average_1m{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 27,
+      "type": "stat",
+      "title": "System CPU count",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 14,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "system_cpu_count{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
       "id": 11,
       "type": "timeseries",
       "title": "Live JVM threads",
@@ -440,7 +1018,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 14
+        "y": 39
       },
       "datasource": {
         "type": "prometheus",
@@ -448,12 +1026,12 @@
       },
       "targets": [
         {
-          "expr": "jvm_threads_live_threads{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_threads_live{job=~\"$job\",instance=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "live"
         },
         {
-          "expr": "jvm_threads_daemon_threads{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_threads_daemon{job=~\"$job\",instance=~\"$instance\"}",
           "refId": "B",
           "legendFormat": "daemon"
         }
@@ -476,15 +1054,14 @@
       }
     },
     {
-      "id": 12,
-      "type": "timeseries",
-      "title": "GC overhead",
-      "description": "Fraction of JVM CPU time spent in garbage collection.",
+      "id": 43,
+      "type": "stat",
+      "title": "JVM peak threads",
       "gridPos": {
         "h": 5,
-        "w": 8,
+        "w": 6,
         "x": 8,
-        "y": 14
+        "y": 39
       },
       "datasource": {
         "type": "prometheus",
@@ -492,14 +1069,53 @@
       },
       "targets": [
         {
-          "expr": "100 * jvm_gc_overhead{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A",
-          "legendFormat": "pause seconds/sec"
+          "expr": "jvm_threads_peak{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 44,
+      "type": "timeseries",
+      "title": "JVM threads started",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 14,
+        "y": 39
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "rate(jvm_threads_started_total{job=~\"$job\",instance=~\"$instance\"}[5m])",
+          "refId": "A",
+          "legendFormat": "threads/sec"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
           "decimals": 2
         }
       },
@@ -515,6 +1131,197 @@
       }
     },
     {
+      "id": 31,
+      "type": "timeseries",
+      "title": "JVM thread states",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"runnable\"})",
+          "refId": "A",
+          "legendFormat": "runnable"
+        },
+        {
+          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"waiting\"})",
+          "refId": "B",
+          "legendFormat": "waiting"
+        },
+        {
+          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"blocked\"})",
+          "refId": "C",
+          "legendFormat": "blocked"
+        },
+        {
+          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"timed-waiting\"})",
+          "refId": "D",
+          "legendFormat": "timed waiting"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "JVM classes",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 6,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "jvm_classes_loaded{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "A",
+          "legendFormat": "loaded"
+        },
+        {
+          "expr": "jvm_classes_unloaded_total{job=~\"$job\",instance=~\"$instance\"}",
+          "refId": "B",
+          "legendFormat": "unloaded total"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "Open file descriptors",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 14,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "100 * process_files_open{job=~\"$job\",instance=~\"$instance\"} / clamp_min(process_files_max{job=~\"$job\",instance=~\"$instance\"}, 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "Disk free",
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 49
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(disk_free_bytes{job=~\"$job\",instance=~\"$instance\"}) / clamp_min(sum(disk_total_bytes{job=~\"$job\",instance=~\"$instance\"}), 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 55,
+      "type": "row",
+      "title": "Database & Data Access",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "panels": []
+    },
+    {
       "id": 13,
       "type": "timeseries",
       "title": "Hikari active connections",
@@ -522,8 +1329,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 16,
-        "y": 14
+        "x": 0,
+        "y": 55
       },
       "datasource": {
         "type": "prometheus",
@@ -571,8 +1378,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 0,
-        "y": 19
+        "x": 8,
+        "y": 55
       },
       "datasource": {
         "type": "prometheus",
@@ -610,8 +1417,8 @@
       "gridPos": {
         "h": 5,
         "w": 8,
-        "x": 8,
-        "y": 19
+        "x": 16,
+        "y": 55
       },
       "datasource": {
         "type": "prometheus",
@@ -647,686 +1454,6 @@
       }
     },
     {
-      "id": 16,
-      "type": "timeseries",
-      "title": "JVM classes",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 16,
-        "y": 19
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "jvm_classes_loaded_classes{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A",
-          "legendFormat": "loaded"
-        },
-        {
-          "expr": "jvm_classes_unloaded_classes_total{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "B",
-          "legendFormat": "unloaded total"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 17,
-      "type": "text",
-      "title": "Production runbook",
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 24
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "### Recommended production checks\n\n- **Availability:** `up` must remain `1`; investigate readiness and deployment events when it drops.\n- **Errors:** alert when HTTP 5xx exceeds 2% for five minutes.\n- **Latency:** alert on P95/P99 only after enabling request histograms.\n- **Resources:** alert when heap exceeds 85%, process CPU exceeds 80%, or Hikari pending connections remain above zero.\n- **Telemetry:** use Grafana Explore for OTLP logs and traces; this dashboard is for Prometheus metrics.\n\nThe P95/P99 panels require `management.metrics.distribution.percentiles-histogram.http.server.requests=true`."
-      }
-    },
-    {
-      "id": 18,
-      "type": "row",
-      "title": "SLO metrics",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 29
-      },
-      "panels": []
-    },
-    {
-      "id": 19,
-      "type": "gauge",
-      "title": "Availability",
-      "description": "Fraction of the selected time range in which the Prometheus target was available.",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 30
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "avg_over_time((max(up{job=~\"$job\",instance=~\"$instance\"}) > 0)[$__range:$__interval])",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "max": 1,
-          "unit": "percentunit",
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 0.95
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      }
-    },
-    {
-      "id": 20,
-      "type": "gauge",
-      "title": "Responses below 250 ms",
-      "description": "Fraction of HTTP responses completed within 250 ms. Requires request histograms.",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 30
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\",le=\"0.25\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "max": 1,
-          "unit": "percentunit",
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 0.95
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      }
-    },
-    {
-      "id": 21,
-      "type": "gauge",
-      "title": "Server error responses",
-      "description": "Fraction of HTTP responses with a 5xx status in the selected time range.",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 30
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "max": 1,
-          "unit": "percentunit",
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 0.95
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      }
-    },
-    {
-      "id": 22,
-      "type": "stat",
-      "title": "Request volume",
-      "description": "Total HTTP requests observed in the selected time range.",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 30
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range]))",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 23,
-      "type": "row",
-      "title": "Runtime and platform",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 35
-      },
-      "panels": []
-    },
-    {
-      "id": 24,
-      "type": "stat",
-      "title": "Application ready time",
-      "description": "Time from process start until the application is ready.",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 36
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "application_ready_time_seconds{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 25,
-      "type": "stat",
-      "title": "Process uptime",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 36
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "process_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 26,
-      "type": "stat",
-      "title": "System load (1m)",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 36
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "system_load_average_1m{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 27,
-      "type": "stat",
-      "title": "System CPU count",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 36
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "system_cpu_count{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 28,
-      "type": "stat",
-      "title": "Open file descriptors",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 41
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "100 * process_files_open_files{job=~\"$job\",instance=~\"$instance\"} / clamp_min(process_files_max_files{job=~\"$job\",instance=~\"$instance\"}, 1)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 29,
-      "type": "stat",
-      "title": "Disk free",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 41
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "100 * sum(disk_free_bytes{job=~\"$job\",instance=~\"$instance\"}) / clamp_min(sum(disk_total_bytes{job=~\"$job\",instance=~\"$instance\"}), 1)",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 30,
-      "type": "timeseries",
-      "title": "JVM buffer memory",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 41
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum(jvm_buffer_memory_used_bytes{job=~\"$job\",instance=~\"$instance\"})",
-          "refId": "A",
-          "legendFormat": "used"
-        },
-        {
-          "expr": "sum(jvm_buffer_total_capacity_bytes{job=~\"$job\",instance=~\"$instance\"})",
-          "refId": "B",
-          "legendFormat": "capacity"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 31,
-      "type": "timeseries",
-      "title": "JVM thread states",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 41
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum(jvm_threads_states_threads{job=~\"$job\",instance=~\"$instance\",state=\"runnable\"})",
-          "refId": "A",
-          "legendFormat": "runnable"
-        },
-        {
-          "expr": "sum(jvm_threads_states_threads{job=~\"$job\",instance=~\"$instance\",state=\"waiting\"})",
-          "refId": "B",
-          "legendFormat": "waiting"
-        },
-        {
-          "expr": "sum(jvm_threads_states_threads{job=~\"$job\",instance=~\"$instance\",state=\"blocked\"})",
-          "refId": "C",
-          "legendFormat": "blocked"
-        },
-        {
-          "expr": "sum(jvm_threads_states_threads{job=~\"$job\",instance=~\"$instance\",state=\"timed-waiting\"})",
-          "refId": "D",
-          "legendFormat": "timed waiting"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 32,
-      "type": "row",
-      "title": "Security, persistence and logging",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 46
-      },
-      "panels": []
-    },
-    {
-      "id": 33,
-      "type": "timeseries",
-      "title": "Security authorization decisions",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 47
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (spring_security_authorization_decision) (rate(spring_security_authorizations_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "{{spring_security_authorization_decision}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
       "id": 34,
       "type": "timeseries",
       "title": "Spring Data repository rate",
@@ -1334,8 +1461,8 @@
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 6,
-        "y": 47
+        "x": 0,
+        "y": 60
       },
       "datasource": {
         "type": "prometheus",
@@ -1343,7 +1470,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(spring_data_repository_invocations_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum(rate(spring_data_repository_invocations_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m]))",
           "refId": "A",
           "legendFormat": "invocations/sec"
         }
@@ -1373,8 +1500,8 @@
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 12,
-        "y": 47
+        "x": 6,
+        "y": 60
       },
       "datasource": {
         "type": "prometheus",
@@ -1382,7 +1509,7 @@
       },
       "targets": [
         {
-          "expr": "1000 * sum(rate(spring_data_repository_invocations_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(spring_data_repository_invocations_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)",
+          "expr": "sum(rate(spring_data_repository_invocations_milliseconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(spring_data_repository_invocations_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)",
           "refId": "A",
           "legendFormat": "average"
         }
@@ -1405,15 +1532,28 @@
       }
     },
     {
-      "id": 36,
+      "id": 56,
+      "type": "row",
+      "title": "Security & Sessions",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
+      "panels": []
+    },
+    {
+      "id": 33,
       "type": "timeseries",
-      "title": "Logback events",
+      "title": "Security authorization decisions",
       "description": "",
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 18,
-        "y": 47
+        "x": 0,
+        "y": 66
       },
       "datasource": {
         "type": "prometheus",
@@ -1421,14 +1561,9 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(logback_events_total{job=~\"$job\",instance=~\"$instance\",level=\"error\"}[5m]))",
+          "expr": "sum by (spring_security_authorization_decision) (rate(spring_security_authorizations_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m]))",
           "refId": "A",
-          "legendFormat": "error"
-        },
-        {
-          "expr": "sum(rate(logback_events_total{job=~\"$job\",instance=~\"$instance\",level=\"warn\"}[5m]))",
-          "refId": "B",
-          "legendFormat": "warn"
+          "legendFormat": "{{spring_security_authorization_decision}}"
         }
       ],
       "fieldConfig": {
@@ -1456,8 +1591,8 @@
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 0,
-        "y": 52
+        "x": 6,
+        "y": 66
       },
       "datasource": {
         "type": "prometheus",
@@ -1496,8 +1631,8 @@
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 6,
-        "y": 52
+        "x": 12,
+        "y": 66
       },
       "datasource": {
         "type": "prometheus",
@@ -1529,106 +1664,28 @@
       }
     },
     {
-      "id": 39,
-      "type": "timeseries",
-      "title": "HTTP in-flight requests",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 52
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum(http_server_requests_active_seconds_count{job=~\"$job\",instance=~\"$instance\"})",
-          "refId": "A",
-          "legendFormat": "in-flight"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 40,
-      "type": "timeseries",
-      "title": "JVM compilation rate",
-      "description": "Rate of JVM JIT compilation time.",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 52
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "rate(jvm_compilation_time_ms_total{job=~\"$job\",instance=~\"$instance\"}[5m])",
-          "refId": "A",
-          "legendFormat": "ms/sec"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 41,
+      "id": 57,
       "type": "row",
-      "title": "Startup and JVM identity",
+      "title": "Logging",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 71
       },
       "panels": []
     },
     {
-      "id": 42,
-      "type": "stat",
-      "title": "Application started time",
-      "description": "Time from process start until the application context has started.",
+      "id": 36,
+      "type": "timeseries",
+      "title": "Logback events",
+      "description": "",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 58
+        "y": 72
       },
       "datasource": {
         "type": "prometheus",
@@ -1636,87 +1693,14 @@
       },
       "targets": [
         {
-          "expr": "application_started_time_seconds{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 2
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 43,
-      "type": "stat",
-      "title": "JVM peak threads",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 58
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "jvm_threads_peak_threads{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      }
-    },
-    {
-      "id": 44,
-      "type": "timeseries",
-      "title": "JVM threads started",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 58
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "rate(jvm_threads_started_threads_total{job=~\"$job\",instance=~\"$instance\"}[5m])",
+          "expr": "sum(rate(logback_events_total{job=~\"$job\",instance=~\"$instance\",level=\"error\"}[5m]))",
           "refId": "A",
-          "legendFormat": "threads/sec"
+          "legendFormat": "error"
+        },
+        {
+          "expr": "sum(rate(logback_events_total{job=~\"$job\",instance=~\"$instance\",level=\"warn\"}[5m]))",
+          "refId": "B",
+          "legendFormat": "warn"
         }
       ],
       "fieldConfig": {
@@ -1737,59 +1721,16 @@
       }
     },
     {
-      "id": 45,
-      "type": "table",
-      "title": "JVM runtime",
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 58
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "jvm_info{job=~\"$job\",instance=~\"$instance\"}",
-          "refId": "A",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
-      },
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": 46,
+      "id": 58,
       "type": "row",
-      "title": "Application caches",
+      "title": "Application Caches",
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 77
       },
-      "collapsed": false,
       "panels": []
     },
     {
@@ -1825,7 +1766,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 64
+        "y": 78
       },
       "targets": [
         {
@@ -1864,7 +1805,7 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 64
+        "y": 78
       },
       "targets": [
         {
@@ -1904,7 +1845,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 64
+        "y": 78
       },
       "targets": [
         {
@@ -2029,6 +1970,6 @@
   "timezone": "browser",
   "title": "Spring Authorization Server Samples / Production & Troubleshooting",
   "uid": "spring-auth-prod",
-  "version": 6,
+  "version": 11,
   "weekStart": ""
 }
