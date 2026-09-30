@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
+import io.github.susimsek.springauthserversamples.domain.UserAction;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminGroupDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminUserBulkAction;
@@ -884,17 +885,9 @@ class AdminUserServiceTest {
                 .isEqualTo("alice");
         service()
                 .executeActionsEmail(
-                        5L,
-                        io.github.susimsek.springauthserversamples.domain.UserAction.VERIFY_EMAIL,
-                        600L,
-                        Locale.ENGLISH,
-                        "administrator");
+                        5L, UserAction.VERIFY_EMAIL, 600L, Locale.ENGLISH, "administrator");
         verify(userActionService)
-                .executeActionsEmail(
-                        5L,
-                        io.github.susimsek.springauthserversamples.domain.UserAction.VERIFY_EMAIL,
-                        600L,
-                        Locale.ENGLISH);
+                .executeActionsEmail(5L, UserAction.VERIFY_EMAIL, 600L, Locale.ENGLISH);
     }
 
     @Test

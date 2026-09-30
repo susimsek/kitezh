@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.ImpersonationTicketEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminImpersonationDTO;
 import io.github.susimsek.springauthserversamples.mapper.AdminImpersonationMapper;
 import io.github.susimsek.springauthserversamples.mapper.AdminImpersonationTicketMapper;
 import io.github.susimsek.springauthserversamples.repository.ImpersonationTicketRepository;
@@ -62,8 +63,7 @@ class ImpersonationServiceTest {
         when(impersonationMapper.toDTO(anyString(), anyString(), anyString()))
                 .thenAnswer(
                         invocation ->
-                                new io.github.susimsek.springauthserversamples.dto.admin
-                                        .AdminImpersonationDTO(
+                                new AdminImpersonationDTO(
                                         invocation.getArgument(0),
                                         invocation.getArgument(1),
                                         invocation.getArgument(2)));
@@ -142,9 +142,7 @@ class ImpersonationServiceTest {
                         any(Instant.class)))
                 .thenReturn(new ImpersonationTicketEntity());
         when(impersonationMapper.toDTO(anyString(), anyString(), anyString()))
-                .thenReturn(
-                        new io.github.susimsek.springauthserversamples.dto.admin
-                                .AdminImpersonationDTO("/impersonation/accept", "alice", "ticket"));
+                .thenReturn(new AdminImpersonationDTO("/impersonation/accept", "alice", "ticket"));
 
         assertThat(service().issue(7L, authentication("operator", "ROLE_USER_IMPERSONATOR")))
                 .isNotNull();

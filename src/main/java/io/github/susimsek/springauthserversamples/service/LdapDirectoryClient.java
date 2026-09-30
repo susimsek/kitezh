@@ -1,5 +1,7 @@
 package io.github.susimsek.springauthserversamples.service;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Hashtable;
@@ -33,17 +35,31 @@ public class LdapDirectoryClient {
     private static final String SIMPLE_AUTHENTICATION = "simple";
 
     private final DirContextFactory contextFactory;
+    private final ObservationRegistry observationRegistry;
+
+    public LdapDirectoryClient() {
+        this(InitialDirContext::new, ObservationRegistry.NOOP);
+    }
 
     @Autowired
-    public LdapDirectoryClient() {
-        this(InitialDirContext::new);
+    public LdapDirectoryClient(ObservationRegistry observationRegistry) {
+        this(InitialDirContext::new, observationRegistry);
     }
 
     LdapDirectoryClient(DirContextFactory contextFactory) {
+        this(contextFactory, ObservationRegistry.NOOP);
+    }
+
+    LdapDirectoryClient(DirContextFactory contextFactory, ObservationRegistry observationRegistry) {
         this.contextFactory = contextFactory;
+        this.observationRegistry = observationRegistry;
     }
 
     public void testConnection(Configuration configuration) {
+        observe("test_connection", () -> testConnectionInternal(configuration));
+    }
+
+    private void testConnectionInternal(Configuration configuration) {
         DirContext context = null;
         try {
             context = open(configuration, false);
@@ -56,6 +72,12 @@ public class LdapDirectoryClient {
     }
 
     public LdapUser authenticate(Configuration configuration, String identifier, String password) {
+        return observe(
+                "authenticate", () -> authenticateInternal(configuration, identifier, password));
+    }
+
+    private LdapUser authenticateInternal(
+            Configuration configuration, String identifier, String password) {
         if (identifier == null || identifier.isBlank() || password == null) {
             throw new BadCredentialsException("LDAP authentication failed");
         }
@@ -95,6 +117,13 @@ public class LdapDirectoryClient {
 
     public void updateUser(
             Configuration configuration, String distinguishedName, Map<String, String> attributes) {
+        observe(
+                "update_user",
+                () -> updateUserInternal(configuration, distinguishedName, attributes));
+    }
+
+    private void updateUserInternal(
+            Configuration configuration, String distinguishedName, Map<String, String> attributes) {
         if (attributes == null || attributes.isEmpty()) {
             return;
         }
@@ -126,6 +155,20 @@ public class LdapDirectoryClient {
         } finally {
             close(context);
         }
+    }
+
+    private <T> T observe(String operation, java.util.function.Supplier<T> action) {
+        return Observation.createNotStarted("ldap.client", observationRegistry)
+                .contextualName("LDAP " + operation)
+                .lowCardinalityKeyValue("ldap.operation", operation)
+                .observe(action);
+    }
+
+    private void observe(String operation, Runnable action) {
+        Observation.createNotStarted("ldap.client", observationRegistry)
+                .contextualName("LDAP " + operation)
+                .lowCardinalityKeyValue("ldap.operation", operation)
+                .observe(action);
     }
 
     private static SearchResult findUser(

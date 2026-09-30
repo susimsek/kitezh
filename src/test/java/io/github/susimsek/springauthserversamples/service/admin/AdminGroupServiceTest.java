@@ -15,6 +15,7 @@ import io.github.susimsek.springauthserversamples.dto.admin.AdminGroupPermission
 import io.github.susimsek.springauthserversamples.dto.admin.AdminGroupPermissionsRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminGroupRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminGroupRolesRequestDTO;
+import io.github.susimsek.springauthserversamples.mapper.AdminGroupMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
 import io.github.susimsek.springauthserversamples.repository.GroupPermissionRepository;
 import io.github.susimsek.springauthserversamples.repository.GroupRepository;
@@ -514,8 +515,7 @@ class AdminGroupServiceTest {
                 userRepository,
                 userAccessInvalidationService,
                 adminAuditEventService,
-                org.mapstruct.factory.Mappers.getMapper(
-                        io.github.susimsek.springauthserversamples.mapper.AdminGroupMapper.class),
+                org.mapstruct.factory.Mappers.getMapper(AdminGroupMapper.class),
                 groupPermissionRepository);
     }
 

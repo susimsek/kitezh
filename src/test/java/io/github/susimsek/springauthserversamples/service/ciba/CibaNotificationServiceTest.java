@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import io.github.susimsek.springauthserversamples.config.http.HttpServiceClientFactory;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestEntity;
 import java.time.Instant;
@@ -26,7 +27,10 @@ class CibaNotificationServiceTest {
     void sendsPingAndPushNotifications() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        CibaNotificationService service = new CibaNotificationService(builder.build());
+        CibaNotificationService service =
+                new CibaNotificationService(
+                        HttpServiceClientFactory.create(
+                                CibaNotificationClient.class, builder.build()));
         CibaAuthenticationRequestEntity request = request("https://client.example/ciba", "token");
 
         server.expect(requestTo("https://client.example/ciba"))
@@ -49,7 +53,10 @@ class CibaNotificationServiceTest {
     void returnsFalseForInvalidConfigurationAndDeliveryFailures() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        CibaNotificationService service = new CibaNotificationService(builder.build());
+        CibaNotificationService service =
+                new CibaNotificationService(
+                        HttpServiceClientFactory.create(
+                                CibaNotificationClient.class, builder.build()));
 
         assertThat(service.notifyPing(request(null, "token"))).isFalse();
         assertThat(service.deliverPush(request("not a uri", "token"), Map.of())).isFalse();

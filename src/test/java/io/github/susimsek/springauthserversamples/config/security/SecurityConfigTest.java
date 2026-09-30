@@ -42,6 +42,7 @@ import org.springframework.security.web.webauthn.authentication.PublicKeyCredent
 import org.springframework.security.web.webauthn.authentication.WebAuthnAuthenticationFilter;
 import org.springframework.security.web.webauthn.management.WebAuthnRelyingPartyOperations;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestClient;
 
 class SecurityConfigTest {
 
@@ -65,7 +66,7 @@ class SecurityConfigTest {
     @Test
     void createsSecuritySupportBeansAndEmptySocialResolver() {
         assertThat(config.socialAuthorizedClientRepository()).isNotNull();
-        assertThat(config.socialTokenResponseClient()).isNotNull();
+        assertThat(config.socialTokenResponseClient(RestClient.builder())).isNotNull();
         assertThat(config.browserSecurityContextRepository()).isNotNull();
         assertThat(config.authorizationServerSecurityContextRepository()).isNotNull();
         assertThat(config.authenticationEventPublisher(mock())).isNotNull();

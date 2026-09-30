@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.springauthserversamples.config.http.HttpServiceClientFactory;
 import io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService.ProviderCredentials;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -32,7 +33,11 @@ class SocialProviderLogoutEndpointResolverTest {
         when(provider.issuerUri()).thenReturn("https://issuer.example");
         when(provider.providerType()).thenReturn("oidc");
 
-        assertThat(new SocialProviderLogoutEndpointResolver(restClient).resolve(provider))
+        assertThat(
+                        new SocialProviderLogoutEndpointResolver(
+                                        HttpServiceClientFactory.create(
+                                                OidcDiscoveryClient.class, restClient))
+                                .resolve(provider))
                 .isEqualTo("https://issuer.example/logout");
         server.verify();
     }
@@ -78,7 +83,11 @@ class SocialProviderLogoutEndpointResolverTest {
         ProviderCredentials provider = mock(ProviderCredentials.class);
         when(provider.issuerUri()).thenReturn("https://issuer.example/");
         when(provider.providerType()).thenReturn("google");
-        assertThat(new SocialProviderLogoutEndpointResolver(restClient).resolve(provider))
+        assertThat(
+                        new SocialProviderLogoutEndpointResolver(
+                                        HttpServiceClientFactory.create(
+                                                OidcDiscoveryClient.class, restClient))
+                                .resolve(provider))
                 .isEqualTo("https://accounts.google.com/Logout");
         server.verify();
     }

@@ -13,6 +13,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.UserAction;
 import io.github.susimsek.springauthserversamples.domain.UserActionTokenEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.mapper.AccountActionTokenMapper;
 import io.github.susimsek.springauthserversamples.repository.UserActionTokenRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.service.EmailSettingsService;
@@ -177,9 +178,7 @@ class UserActionServiceTest {
                         eventPublisher,
                         applicationProperties,
                         null,
-                        org.mapstruct.factory.Mappers.getMapper(
-                                io.github.susimsek.springauthserversamples.mapper
-                                        .AccountActionTokenMapper.class),
+                        org.mapstruct.factory.Mappers.getMapper(AccountActionTokenMapper.class),
                         loginSettingsService,
                         totpService);
         UserActionTokenEntity token =
@@ -557,9 +556,7 @@ class UserActionServiceTest {
                 eventPublisher,
                 applicationProperties,
                 emailSettingsService,
-                org.mapstruct.factory.Mappers.getMapper(
-                        io.github.susimsek.springauthserversamples.mapper.AccountActionTokenMapper
-                                .class),
+                org.mapstruct.factory.Mappers.getMapper(AccountActionTokenMapper.class),
                 loginSettingsService,
                 totpService);
     }

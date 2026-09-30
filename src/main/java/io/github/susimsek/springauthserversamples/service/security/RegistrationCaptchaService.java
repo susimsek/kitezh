@@ -1,19 +1,16 @@
 package io.github.susimsek.springauthserversamples.service.security;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.github.susimsek.springauthserversamples.dto.account.RegistrationCaptchaDTO;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.util.Locale;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClient;
 
 /** Verifies registration CAPTCHA tokens using the Google APIs used by Keycloak. */
 @Service
@@ -25,25 +22,48 @@ public class RegistrationCaptchaService {
 
     private final RegistrationCaptchaSettingsService settingsService;
     private final RegistrationCaptchaConfiguration fixedConfiguration;
-    private final RestClient restClient;
+    private final RegistrationCaptchaClient captchaClient;
 
     @Autowired
+    public RegistrationCaptchaService(
+            RegistrationCaptchaSettingsService settingsService,
+            RegistrationCaptchaClient captchaClient) {
+        this.settingsService = settingsService;
+        this.fixedConfiguration = null;
+        this.captchaClient = captchaClient;
+    }
+
     public RegistrationCaptchaService(RegistrationCaptchaSettingsService settingsService) {
-        this(settingsService, null, RestClient.builder().build());
+        this(settingsService, new DisabledRegistrationCaptchaClient());
     }
 
     RegistrationCaptchaService(
-            RegistrationCaptchaConfiguration configuration, RestClient restClient) {
-        this(null, configuration, restClient);
+            RegistrationCaptchaConfiguration configuration,
+            RegistrationCaptchaClient captchaClient) {
+        this(null, configuration, captchaClient);
+    }
+
+    private static final class DisabledRegistrationCaptchaClient
+            implements RegistrationCaptchaClient {
+
+        @Override
+        public StandardResponse verify(URI endpoint, MultiValueMap<String, String> form) {
+            return new StandardResponse(false, null, null);
+        }
+
+        @Override
+        public EnterpriseResponse assess(URI endpoint, EnterpriseRequest request) {
+            return new EnterpriseResponse(null, null, null);
+        }
     }
 
     private RegistrationCaptchaService(
             RegistrationCaptchaSettingsService settingsService,
             RegistrationCaptchaConfiguration fixedConfiguration,
-            RestClient restClient) {
+            RegistrationCaptchaClient captchaClient) {
         this.settingsService = settingsService;
         this.fixedConfiguration = fixedConfiguration;
-        this.restClient = restClient;
+        this.captchaClient = captchaClient;
     }
 
     public RegistrationCaptchaDTO publicSettings() {
@@ -109,14 +129,10 @@ public class RegistrationCaptchaService {
         if (request.getRemoteAddr() != null && !request.getRemoteAddr().isBlank()) {
             form.add("remoteip", request.getRemoteAddr());
         }
-        StandardResponse response =
-                restClient
-                        .post()
-                        .uri("https://www." + domain(config) + "/recaptcha/api/siteverify")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .body(form)
-                        .retrieve()
-                        .body(StandardResponse.class);
+        RegistrationCaptchaClient.StandardResponse response =
+                captchaClient.verify(
+                        URI.create("https://www." + domain(config) + "/recaptcha/api/siteverify"),
+                        form);
         if (response == null || !response.success()) {
             return false;
         }
@@ -130,31 +146,21 @@ public class RegistrationCaptchaService {
 
     private boolean verifyEnterprise(
             RegistrationCaptchaConfiguration config, String token, HttpServletRequest request) {
-        EnterpriseEvent event =
-                new EnterpriseEvent(
+        RegistrationCaptchaClient.EnterpriseEvent event =
+                new RegistrationCaptchaClient.EnterpriseEvent(
                         token,
                         config.siteKey().trim(),
                         request.getHeader("User-Agent"),
                         request.getRemoteAddr(),
                         action(config));
-        EnterpriseResponse response =
-                restClient
-                        .post()
-                        .uri(
-                                uriBuilder ->
-                                        uriBuilder
-                                                .scheme("https")
-                                                .host("recaptchaenterprise.googleapis.com")
-                                                .path("/v1/projects/{projectId}/assessments")
-                                                .queryParam("key", config.apiKey().trim())
-                                                .build(
-                                                        Map.of(
-                                                                "projectId",
-                                                                config.projectId().trim())))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(new EnterpriseRequest(event))
-                        .retrieve()
-                        .body(EnterpriseResponse.class);
+        RegistrationCaptchaClient.EnterpriseResponse response =
+                captchaClient.assess(
+                        URI.create(
+                                "https://recaptchaenterprise.googleapis.com/v1/projects/"
+                                        + config.projectId().trim()
+                                        + "/assessments?key="
+                                        + config.apiKey().trim()),
+                        new RegistrationCaptchaClient.EnterpriseRequest(event));
         if (response == null
                 || response.tokenProperties() == null
                 || response.riskAnalysis() == null
@@ -244,26 +250,4 @@ public class RegistrationCaptchaService {
                 ? fixedConfiguration
                 : settingsService.loginVerificationConfiguration();
     }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record StandardResponse(boolean success, Double score, String action) {}
-
-    private record EnterpriseRequest(EnterpriseEvent event) {}
-
-    private record EnterpriseEvent(
-            String token,
-            String siteKey,
-            String userAgent,
-            String userIpAddress,
-            String expectedAction) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record EnterpriseResponse(
-            TokenProperties tokenProperties, RiskAnalysis riskAnalysis, EnterpriseEvent event) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record TokenProperties(boolean valid, String action) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record RiskAnalysis(double score) {}
 }

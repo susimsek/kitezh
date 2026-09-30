@@ -6,6 +6,9 @@ import io.github.susimsek.springauthserversamples.config.observability.Observabi
 import io.github.susimsek.springauthserversamples.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.springauthserversamples.security.LocalizedAuthenticationEntryPoint;
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
+import io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService;
+import io.github.susimsek.springauthserversamples.service.SocialTokenService;
+import io.github.susimsek.springauthserversamples.service.account.MfaService;
 import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.net.URI;
 import java.security.SecureRandom;
@@ -57,6 +60,7 @@ import org.springframework.security.web.webauthn.authentication.PublicKeyCredent
 import org.springframework.security.web.webauthn.authentication.PublicKeyCredentialRequestOptionsRepository;
 import org.springframework.security.web.webauthn.authentication.WebAuthnAuthenticationFilter;
 import org.springframework.security.web.webauthn.management.WebAuthnRelyingPartyOperations;
+import org.springframework.web.client.RestClient;
 
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
@@ -421,9 +425,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
-            socialTokenResponseClient() {
-        return new RestClientAuthorizationCodeTokenResponseClient();
+    OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> socialTokenResponseClient(
+            RestClient.Builder restClientBuilder) {
+        RestClientAuthorizationCodeTokenResponseClient client =
+                new RestClientAuthorizationCodeTokenResponseClient();
+        client.setRestClient(restClientBuilder.build());
+        return client;
     }
 
     @Bean
@@ -532,15 +539,13 @@ public class SecurityConfig {
 
     @Bean
     SocialLoginAuthenticationSuccessHandler socialLoginAuthenticationSuccessHandler(
-            io.github.susimsek.springauthserversamples.service.SocialLoginService
-                    socialLoginService,
+            SocialLoginService socialLoginService,
             org.springframework.security.core.userdetails.UserDetailsService userDetailsService,
             @Qualifier("browserSecurityContextRepository")
                     SecurityContextRepository securityContextRepository,
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
-            io.github.susimsek.springauthserversamples.service.SocialTokenService
-                    socialTokenService,
-            io.github.susimsek.springauthserversamples.service.account.MfaService mfaService) {
+            SocialTokenService socialTokenService,
+            MfaService mfaService) {
         return new SocialLoginAuthenticationSuccessHandler(
                 socialLoginService,
                 userDetailsService,
@@ -567,8 +572,7 @@ public class SecurityConfig {
 
     @Bean
     SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler(
-            io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService
-                    providerSettingsService,
+            SocialProviderSettingsService providerSettingsService,
             SocialProviderLogoutEndpointResolver logoutEndpointResolver,
             OAuth2ObservabilityMetrics metrics) {
         return new SocialProviderLogoutSuccessHandler(
@@ -576,8 +580,7 @@ public class SecurityConfig {
     }
 
     SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler(
-            io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService
-                    providerSettingsService,
+            SocialProviderSettingsService providerSettingsService,
             SocialProviderLogoutEndpointResolver logoutEndpointResolver) {
         return new SocialProviderLogoutSuccessHandler(
                 providerSettingsService, logoutEndpointResolver);

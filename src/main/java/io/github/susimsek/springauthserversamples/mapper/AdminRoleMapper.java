@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.mapper;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDetailDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleUserDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
@@ -22,13 +23,12 @@ public interface AdminRoleMapper {
 
     AdminRoleUserDTO toUserDTO(UserEntity entity);
 
-    default io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDetailDTO toDetailDTO(
+    default AdminRoleDetailDTO toDetailDTO(
             String name,
             String description,
             long userCount,
             boolean protectedRole,
             Page<AdminRoleUserDTO> users) {
-        return new io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDetailDTO(
-                name, description, userCount, protectedRole, users);
+        return new AdminRoleDetailDTO(name, description, userCount, protectedRole, users);
     }
 }

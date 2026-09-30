@@ -8,6 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
+import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeAssignmentRequestDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeRequestDTO;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
@@ -83,8 +86,7 @@ class AdminClientScopeServiceTest {
         var result =
                 service()
                         .create(
-                                new io.github.susimsek.springauthserversamples.dto.admin
-                                        .AdminClientScopeRequestDTO(
+                                new AdminClientScopeRequestDTO(
                                         " billing ",
                                         " Billing ",
                                         " Description ",
@@ -105,8 +107,7 @@ class AdminClientScopeServiceTest {
                         () ->
                                 service()
                                         .create(
-                                                new io.github.susimsek.springauthserversamples.dto
-                                                        .admin.AdminClientScopeRequestDTO(
+                                                new AdminClientScopeRequestDTO(
                                                         "bad name", null, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Client scope name is invalid");
@@ -115,8 +116,7 @@ class AdminClientScopeServiceTest {
                         () ->
                                 service()
                                         .create(
-                                                new io.github.susimsek.springauthserversamples.dto
-                                                        .admin.AdminClientScopeRequestDTO(
+                                                new AdminClientScopeRequestDTO(
                                                         "billing", null, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Client scope already exists");
@@ -128,11 +128,7 @@ class AdminClientScopeServiceTest {
         when(clientScopeRepository.findById("scope-1")).thenReturn(Optional.of(entity));
         when(clientScopeRepository.findByName("new-scope")).thenReturn(Optional.empty());
         RegisteredClient client = registeredClient("old-scope");
-        when(clientRepository.findAll())
-                .thenReturn(
-                        List.of(
-                                new io.github.susimsek.springauthserversamples.domain
-                                        .RegisteredClientEntity()));
+        when(clientRepository.findAll()).thenReturn(List.of(new RegisteredClientEntity()));
         when(registeredClientMapper.toObject(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.same(mapperSupport)))
@@ -140,17 +136,14 @@ class AdminClientScopeServiceTest {
         when(registeredClientMapper.toEntity(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.same(mapperSupport)))
-                .thenReturn(
-                        new io.github.susimsek.springauthserversamples.domain
-                                .RegisteredClientEntity());
+                .thenReturn(new RegisteredClientEntity());
         when(clientScopeRepository.save(entity)).thenReturn(entity);
 
         var result =
                 service()
                         .update(
                                 "scope-1",
-                                new io.github.susimsek.springauthserversamples.dto.admin
-                                        .AdminClientScopeRequestDTO("new-scope", "New", null));
+                                new AdminClientScopeRequestDTO("new-scope", "New", null));
 
         assertThat(result.name()).isEqualTo("new-scope");
         verify(clientRepository).save(org.mockito.ArgumentMatchers.any());
@@ -168,8 +161,7 @@ class AdminClientScopeServiceTest {
                         service()
                                 .update(
                                         "scope-1",
-                                        new io.github.susimsek.springauthserversamples.dto.admin
-                                                .AdminClientScopeRequestDTO("billing", null, null)))
+                                        new AdminClientScopeRequestDTO("billing", null, null)))
                 .isNotNull();
         verify(clientRepository, never()).findAll();
     }
@@ -182,11 +174,7 @@ class AdminClientScopeServiceTest {
         service().delete("scope-1");
         verify(clientScopeRepository).delete(entity);
 
-        when(clientRepository.findAll())
-                .thenReturn(
-                        List.of(
-                                new io.github.susimsek.springauthserversamples.domain
-                                        .RegisteredClientEntity()));
+        when(clientRepository.findAll()).thenReturn(List.of(new RegisteredClientEntity()));
         when(mapperSupport.readCollection(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Set.of("billing"));
         assertThatThrownBy(() -> service().delete("scope-1"))
@@ -196,21 +184,15 @@ class AdminClientScopeServiceTest {
 
     @Test
     void validatesAssignmentsBeforePersisting() {
-        var overlap =
-                new io.github.susimsek.springauthserversamples.dto.admin
-                        .AdminClientScopeAssignmentRequestDTO(Set.of("openid"), Set.of("openid"));
+        var overlap = new AdminClientScopeAssignmentRequestDTO(Set.of("openid"), Set.of("openid"));
         assertThatThrownBy(() -> service().updateAssignments("client", overlap))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A scope cannot be both default and optional");
-        var empty =
-                new io.github.susimsek.springauthserversamples.dto.admin
-                        .AdminClientScopeAssignmentRequestDTO(Set.of(), Set.of());
+        var empty = new AdminClientScopeAssignmentRequestDTO(Set.of(), Set.of());
         assertThatThrownBy(() -> service().updateAssignments("client", empty))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("At least one client scope is required");
-        var unknown =
-                new io.github.susimsek.springauthserversamples.dto.admin
-                        .AdminClientScopeAssignmentRequestDTO(Set.of("openid"), Set.of());
+        var unknown = new AdminClientScopeAssignmentRequestDTO(Set.of("openid"), Set.of());
         when(clientScopeRepository.countByNameIn(Set.of("openid"))).thenReturn(0L);
         assertThatThrownBy(() -> service().updateAssignments("client", unknown))
                 .isInstanceOf(ApiException.class)
@@ -221,10 +203,7 @@ class AdminClientScopeServiceTest {
     void updatesClientScopeAssignmentsAndRejectsUnknownClient() {
         RegisteredClient client = registeredClient("openid");
         when(clientRepository.findById("client"))
-                .thenReturn(
-                        Optional.of(
-                                new io.github.susimsek.springauthserversamples.domain
-                                        .RegisteredClientEntity()));
+                .thenReturn(Optional.of(new RegisteredClientEntity()));
         when(registeredClientMapper.toObject(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.same(mapperSupport)))
@@ -235,16 +214,13 @@ class AdminClientScopeServiceTest {
         when(registeredClientMapper.toEntity(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.same(mapperSupport)))
-                .thenReturn(
-                        new io.github.susimsek.springauthserversamples.domain
-                                .RegisteredClientEntity());
+                .thenReturn(new RegisteredClientEntity());
 
         var result =
                 service()
                         .updateAssignments(
                                 "client",
-                                new io.github.susimsek.springauthserversamples.dto.admin
-                                        .AdminClientScopeAssignmentRequestDTO(
+                                new AdminClientScopeAssignmentRequestDTO(
                                         Set.of("openid"), Set.of("profile")));
 
         assertThat(result.defaultScopes()).containsExactly("openid");

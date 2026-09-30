@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
+import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeEntity;
 import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeType;
 import io.github.susimsek.springauthserversamples.dto.userprofile.UserProfileAttributeDefinitionRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.userprofile.UserProfileAttributeOrderRequestDTO;
@@ -578,10 +579,8 @@ class UserProfileServiceTest {
                                 7L))
                 .thenReturn(
                         List.of(
-                                new io.github.susimsek.springauthserversamples.domain
-                                        .UserProfileAttributeEntity(user, text, 0, "valid"),
-                                new io.github.susimsek.springauthserversamples.domain
-                                        .UserProfileAttributeEntity(
+                                new UserProfileAttributeEntity(user, text, 0, "valid"),
+                                new UserProfileAttributeEntity(
                                         user, unknownDefinition(), 0, "ignored")));
 
         service()

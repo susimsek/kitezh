@@ -28,6 +28,10 @@ spring:
     compose:
       lifecycle-management: start-only
       file: src/main/docker/services.yml
+  http:
+    clients:
+      connect-timeout: 2s
+      read-timeout: 5s
   jpa:
     open-in-view: false
     properties:

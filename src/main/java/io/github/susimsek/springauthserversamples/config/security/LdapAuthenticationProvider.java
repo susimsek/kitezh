@@ -1,5 +1,6 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.LdapFederationIdentityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.service.LdapAuthenticationService;
@@ -43,7 +44,7 @@ public class LdapAuthenticationProvider implements AuthenticationProvider {
                 && !isFederatedUser(identifier)) {
             return null;
         }
-        io.github.susimsek.springauthserversamples.domain.UserEntity user =
+        UserEntity user =
                 authenticationService.authenticate(
                         identifier, String.valueOf(authentication.getCredentials()));
         if (user == null) {

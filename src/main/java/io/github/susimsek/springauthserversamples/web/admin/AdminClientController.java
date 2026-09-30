@@ -15,6 +15,7 @@ import io.github.susimsek.springauthserversamples.service.admin.AdminClientScope
 import io.github.susimsek.springauthserversamples.service.admin.AdminClientService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminConsentService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminSessionService;
+import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.web.ApiController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -240,8 +241,7 @@ public class AdminClientController {
                             direction = org.springframework.data.domain.Sort.Direction.DESC)
                     Pageable pageable) {
         if (adminClientService.findById(id) == null) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.notFound(
-                    "Client not found");
+            throw ApiException.notFound("Client not found");
         }
         return adminAuditEventService.clientEvents(id, pageable);
     }

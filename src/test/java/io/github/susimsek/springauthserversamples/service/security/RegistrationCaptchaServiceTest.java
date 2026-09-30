@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import io.github.susimsek.springauthserversamples.config.http.HttpServiceClientFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -52,7 +53,8 @@ class RegistrationCaptchaServiceTest {
                                 false,
                                 0.7,
                                 false),
-                        restClient);
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClient));
         HttpServletRequest request = org.mockito.Mockito.mock(HttpServletRequest.class);
         org.mockito.Mockito.when(request.getRemoteAddr()).thenReturn("192.0.2.10");
 
@@ -90,7 +92,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        restClient);
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClient));
 
         assertThatThrownBy(
                         () ->
@@ -150,7 +153,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 true),
-                        restClient);
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClient));
         HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
         Mockito.when(request.getRemoteAddr()).thenReturn(" ");
 
@@ -184,7 +188,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        restClient);
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClient));
 
         assertThatThrownBy(
                         () ->
@@ -211,7 +216,8 @@ class RegistrationCaptchaServiceTest {
                                 false,
                                 0.7,
                                 false),
-                        errorBuilder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, errorBuilder.build()));
 
         assertThatThrownBy(
                         () ->
@@ -238,7 +244,8 @@ class RegistrationCaptchaServiceTest {
                                 false,
                                 0.7,
                                 false),
-                        restClientBuilder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClientBuilder.build()));
         HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
 
         assertThatThrownBy(() -> service.verifyOrThrow(null, request))
@@ -278,7 +285,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        standardBuilder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, standardBuilder.build()));
         assertThat(standardService.publicSettings().action()).isEqualTo("register");
         standardService.verifyOrThrow("token", Mockito.mock(HttpServletRequest.class));
         standardServer.verify();
@@ -308,7 +316,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        enterpriseBuilder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, enterpriseBuilder.build()));
 
         assertThatThrownBy(
                         () ->
@@ -342,7 +351,8 @@ class RegistrationCaptchaServiceTest {
                                 false,
                                 0.7,
                                 false),
-                        standardBuilder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, standardBuilder.build()));
         assertThatThrownBy(
                         () ->
                                 standardService.verifyOrThrow(
@@ -370,7 +380,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        v3Builder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, v3Builder.build()));
         assertThatThrownBy(
                         () ->
                                 v3Service.verifyOrThrow(
@@ -510,7 +521,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        restClient);
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClient));
 
         service.verifyOrThrow("token", Mockito.mock(HttpServletRequest.class));
 
@@ -597,7 +609,10 @@ class RegistrationCaptchaServiceTest {
 
     private static RegistrationCaptchaService service(
             RegistrationCaptchaConfiguration configuration) {
-        return new RegistrationCaptchaService(configuration, RestClient.builder().build());
+        return new RegistrationCaptchaService(
+                configuration,
+                HttpServiceClientFactory.create(
+                        RegistrationCaptchaClient.class, RestClient.builder().build()));
     }
 
     private static void assertEnterpriseFailure(String response) {
@@ -622,7 +637,8 @@ class RegistrationCaptchaServiceTest {
                                 true,
                                 0.7,
                                 false),
-                        builder.build());
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, builder.build()));
 
         assertThatThrownBy(
                         () ->

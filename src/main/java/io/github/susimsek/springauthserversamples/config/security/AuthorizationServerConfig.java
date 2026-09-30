@@ -9,6 +9,7 @@ import io.github.susimsek.springauthserversamples.config.observability.LoggingPr
 import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
+import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
@@ -739,9 +740,7 @@ public class AuthorizationServerConfig {
                         ? "id_token"
                         : "access_token";
         socialIdentityRepository.findAllByUserUsername(tokenUser.get().getUsername()).stream()
-                .map(
-                        io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity
-                                ::getMappedClaims)
+                .map(SocialIdentityEntity::getMappedClaims)
                 .filter(value -> value != null && !value.isBlank())
                 .forEach(
                         value -> {

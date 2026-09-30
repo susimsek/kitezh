@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleUserDTO;
@@ -227,8 +228,7 @@ class AdminRoleServiceTest {
         alice.setUsername("alice");
         alice.setEnabled(true);
         AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
-        io.github.susimsek.springauthserversamples.domain.GroupEntity group =
-                new io.github.susimsek.springauthserversamples.domain.GroupEntity();
+        GroupEntity group = new GroupEntity();
         group.setAuthorities(java.util.Set.of(role));
         alice.setGroups(java.util.Set.of(group));
         when(authorityRepository.existsByName("ROLE_AUDITOR")).thenReturn(true);

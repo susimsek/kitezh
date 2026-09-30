@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.dto.admin.AdminIdentityProviderDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminIdentityProviderRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminProviderMapperDTO;
 import io.github.susimsek.springauthserversamples.service.admin.AdminIdentityProviderService;
 import org.junit.jupiter.api.Test;
@@ -37,13 +38,7 @@ class AdminIdentityProviderControllerTest {
 
         assertThat(controller.findAll("goo", pageable)).isSameAs(providers);
         assertThat(controller.findById("google").getBody()).isSameAs(provider);
-        assertThat(
-                        controller
-                                .create(
-                                        mock(
-                                                io.github.susimsek.springauthserversamples.dto.admin
-                                                        .AdminIdentityProviderRequestDTO.class))
-                                .getStatusCode())
+        assertThat(controller.create(mock(AdminIdentityProviderRequestDTO.class)).getStatusCode())
                 .isEqualTo(HttpStatus.CREATED);
         assertThat(controller.update("google", null)).isSameAs(provider);
         assertThat(controller.delete("google").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);

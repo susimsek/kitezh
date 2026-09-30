@@ -17,6 +17,8 @@ import io.github.susimsek.springauthserversamples.service.UserProfileService;
 import io.github.susimsek.springauthserversamples.service.account.WebAuthnService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAvatarService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminUserService;
+import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
+import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.web.ApiController;
 import io.github.susimsek.springauthserversamples.web.admin.validation.CreateValidation;
 import io.github.susimsek.springauthserversamples.web.admin.validation.PasswordChangeValidation;
@@ -424,10 +426,8 @@ class AdminUserController {
             Locale locale,
             Authentication authentication) {
         if (actions == null || actions.size() != 1) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .ACTION_UNSUPPORTED,
-                    "Exactly one supported action is required");
+            throw ApiException.badRequest(
+                    ApiErrorCode.ACTION_UNSUPPORTED, "Exactly one supported action is required");
         }
         adminUserService.executeActionsEmail(
                 id, actions.iterator().next(), lifespan, locale, authentication.getName());

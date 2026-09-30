@@ -15,6 +15,7 @@ import io.github.susimsek.springauthserversamples.repository.AuthorityRepository
 import io.github.susimsek.springauthserversamples.repository.GroupPermissionRepository;
 import io.github.susimsek.springauthserversamples.repository.GroupRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
@@ -76,12 +77,8 @@ public class AdminGroupService {
         }
         UserEntity user = findUserByUsername(currentUsername);
         Set<String> roles = EffectiveRoleService.effectiveRoleNames(user);
-        if (roles.contains(
-                        io.github.susimsek.springauthserversamples.security.AuthoritiesConstants
-                                .ADMIN)
-                || roles.contains(
-                        io.github.susimsek.springauthserversamples.security.AuthoritiesConstants
-                                .USER_MANAGER)) {
+        if (roles.contains(AuthoritiesConstants.ADMIN)
+                || roles.contains(AuthoritiesConstants.USER_MANAGER)) {
             return findAllInternal(query, pageable);
         }
 
@@ -499,12 +496,8 @@ public class AdminGroupService {
         }
         UserEntity user = findUserByUsername(currentUsername);
         Set<String> roles = EffectiveRoleService.effectiveRoleNames(user);
-        if (roles.contains(
-                        io.github.susimsek.springauthserversamples.security.AuthoritiesConstants
-                                .ADMIN)
-                || roles.contains(
-                        io.github.susimsek.springauthserversamples.security.AuthoritiesConstants
-                                .USER_MANAGER)) {
+        if (roles.contains(AuthoritiesConstants.ADMIN)
+                || roles.contains(AuthoritiesConstants.USER_MANAGER)) {
             return;
         }
         if (!groupPermissionRepository.existsForUserAndGroups(

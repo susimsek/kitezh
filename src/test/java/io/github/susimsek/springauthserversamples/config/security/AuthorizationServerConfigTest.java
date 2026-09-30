@@ -28,6 +28,7 @@ import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTyp
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
+import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -429,10 +430,7 @@ class AuthorizationServerConfigTest {
                 .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"))
                 .containsEntry("locale", "tr")
                 .containsEntry("groups", List.of("/platform-administrators"))
-                .containsEntry(
-                        "sid",
-                        io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier
-                                .fromSessionId("browser-session"));
+                .containsEntry("sid", OidcSessionIdentifier.fromSessionId("browser-session"));
         verify(userRepository).findByUsername("admin");
         verify(avatarRepository).findVersionByUserId(42L);
     }
@@ -588,9 +586,7 @@ class AuthorizationServerConfigTest {
                         .clientId("ciba-client")
                         .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                         .authorizationGrantType(
-                                new AuthorizationGrantType(
-                                        io.github.susimsek.springauthserversamples.security
-                                                .AuthorizationGrantTypes.CIBA))
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
                         .scope("openid")
                         .build();
         OAuth2ClientAuthenticationToken clientPrincipal =
@@ -708,9 +704,7 @@ class AuthorizationServerConfigTest {
                         RegisteredClient.withId("ciba")
                                 .clientId("ciba")
                                 .authorizationGrantType(
-                                        new AuthorizationGrantType(
-                                                io.github.susimsek.springauthserversamples.security
-                                                        .AuthorizationGrantTypes.CIBA))
+                                        new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
                                 .build(),
                         new CibaAuthenticationGrantAuthenticationToken("req", mock(), Map.of()),
                         SignatureAlgorithm.RS256);
@@ -760,10 +754,7 @@ class AuthorizationServerConfigTest {
                 .principal(principal)
                 .authorizedScopes(Set.of("openid", "profile", "email", "roles"))
                 .tokenType(new OAuth2TokenType(OidcParameterNames.ID_TOKEN))
-                .authorizationGrantType(
-                        new AuthorizationGrantType(
-                                io.github.susimsek.springauthserversamples.security
-                                        .AuthorizationGrantTypes.CIBA))
+                .authorizationGrantType(new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
                 .authorizationGrant(grant)
                 .build();
     }
