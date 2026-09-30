@@ -4,10 +4,15 @@ import type { ConsoleKind, JwtPayload } from "@/lib/console-auth-types";
 
 export type AdminAccess = {
   isAdmin?: boolean;
+  queryClients?: boolean;
   viewClients: boolean;
   manageClients: boolean;
+  queryUsers?: boolean;
   viewUsers: boolean;
   manageUsers: boolean;
+  queryGroups?: boolean;
+  viewGroups?: boolean;
+  manageGroups?: boolean;
   impersonateUsers: boolean;
   viewRoles: boolean;
   manageRoles: boolean;

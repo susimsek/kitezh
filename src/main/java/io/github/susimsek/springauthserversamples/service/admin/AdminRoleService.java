@@ -1,19 +1,23 @@
 package io.github.susimsek.springauthserversamples.service.admin;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDetailDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleUserDTO;
 import io.github.susimsek.springauthserversamples.mapper.AdminRoleMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientRoleRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
 import org.mapstruct.factory.Mappers;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -23,16 +27,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class AdminRoleService {
 
     private static final String ROLE_NOT_FOUND = "Role not found";
+    private static final String CLIENT_ROLE_NOT_FOUND = "Client role not found";
 
     private final AuthorityRepository authorityRepository;
+    private final ClientRoleRepository clientRoleRepository;
     private final UserRepository userRepository;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminUserService adminUserService;
     private final AdminRoleMapper adminRoleMapper;
+    private final UserAccessInvalidationService userAccessInvalidationService;
 
     public AdminRoleService(
             AuthorityRepository authorityRepository,
@@ -40,11 +46,31 @@ public class AdminRoleService {
             AdminAuditEventService adminAuditEventService,
             AdminUserService adminUserService) {
         this(
+                null,
                 authorityRepository,
                 userRepository,
                 adminAuditEventService,
                 adminUserService,
-                Mappers.getMapper(AdminRoleMapper.class));
+                Mappers.getMapper(AdminRoleMapper.class),
+                null);
+    }
+
+    @Autowired
+    public AdminRoleService(
+            ClientRoleRepository clientRoleRepository,
+            AuthorityRepository authorityRepository,
+            UserRepository userRepository,
+            AdminAuditEventService adminAuditEventService,
+            AdminUserService adminUserService,
+            AdminRoleMapper adminRoleMapper,
+            UserAccessInvalidationService userAccessInvalidationService) {
+        this.authorityRepository = authorityRepository;
+        this.clientRoleRepository = clientRoleRepository;
+        this.userRepository = userRepository;
+        this.adminAuditEventService = adminAuditEventService;
+        this.adminUserService = adminUserService;
+        this.adminRoleMapper = adminRoleMapper;
+        this.userAccessInvalidationService = userAccessInvalidationService;
     }
 
     @Transactional(readOnly = true)
@@ -87,6 +113,27 @@ public class AdminRoleService {
     }
 
     @Transactional(readOnly = true)
+    public Page<AdminRoleDTO> availableComposites(String name, String query, Pageable pageable) {
+        roleRequired(name);
+        return authorityRepository
+                .findAvailableCompositeRoles(name, AdminSearch.normalize(query), pageable)
+                .map(adminRoleMapper::toDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminClientRoleDTO> availableClientComposites(
+            String name, String query, Pageable pageable) {
+        roleRequired(name);
+        if (clientRoleRepository == null) {
+            return Page.empty(pageable);
+        }
+        return clientRoleRepository
+                .findAvailableClientRolesForAuthorityComposite(
+                        name, AdminSearch.normalize(query), pageable)
+                .map(AdminRoleService::toClientRoleDTO);
+    }
+
+    @Transactional(readOnly = true)
     public AdminRoleDetailDTO role(String name, String query, Pageable pageable) {
         return roleInternal(name, query, null, pageable);
     }
@@ -107,6 +154,11 @@ public class AdminRoleService {
                 authorityRepository
                         .findByName(name)
                         .orElseThrow(() -> ApiException.notFound(ROLE_NOT_FOUND));
+        return roleInternal(role, query, enabled, pageable);
+    }
+
+    private AdminRoleDetailDTO roleInternal(
+            AuthorityEntity role, String query, Boolean enabled, Pageable pageable) {
         String normalizedQuery = AdminSearch.normalize(query);
         java.util.List<UserEntity> allUsers = userRepository.findAllWithEffectiveAuthorities();
         boolean loadedAllUsers = allUsers != null && !allUsers.isEmpty();
@@ -118,7 +170,7 @@ public class AdminRoleService {
                         .filter(
                                 user ->
                                         EffectiveRoleService.effectiveRoleNames(user)
-                                                .contains(name))
+                                                .contains(role.getName()))
                         .filter(user -> enabled == null || user.isEnabled() == enabled)
                         .filter(user -> matchesQuery(user, normalizedQuery))
                         .toList();
@@ -128,7 +180,7 @@ public class AdminRoleService {
             users =
                     userRepository
                             .findByAuthoritiesNameAndUsernameContainingIgnoreCase(
-                                    name, normalizedQuery, pageable)
+                                    role.getName(), normalizedQuery, pageable)
                             .map(adminRoleMapper::toUserDTO);
         } else {
             int start = (int) Math.min(pageable.getOffset(), effectiveUsers.size());
@@ -149,8 +201,117 @@ public class AdminRoleService {
                 role.getName(),
                 role.getDescription(),
                 userCount,
-                AuthoritiesConstants.ADMIN.equals(name) || AuthoritiesConstants.USER.equals(name),
-                users);
+                AuthoritiesConstants.ADMIN.equals(role.getName())
+                        || AuthoritiesConstants.USER.equals(role.getName()),
+                users,
+                role.getCompositeRoles().stream()
+                        .map(AuthorityEntity::getName)
+                        .sorted()
+                        .collect(
+                                java.util.stream.Collectors.toCollection(
+                                        java.util.LinkedHashSet::new)),
+                role.getCompositeClientRoles().stream()
+                        .map(AdminRoleService::toClientRoleDTO)
+                        .sorted(
+                                java.util.Comparator.comparing(AdminClientRoleDTO::clientId)
+                                        .thenComparing(AdminClientRoleDTO::name))
+                        .collect(
+                                java.util.stream.Collectors.toCollection(
+                                        java.util.LinkedHashSet::new)));
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = {
+                AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                UserRepository.USER_BY_USERNAME_CACHE
+            },
+            allEntries = true)
+    public AdminRoleDetailDTO addComposite(String name, String childName, Pageable pageable) {
+        List<AuthorityEntity> roles = authorityRepository.findAllWithCompositeRoles();
+        AuthorityEntity role = roleRequired(roles, name);
+        AuthorityEntity child = roleRequired(roles, childName);
+        if (role.equals(child) || EffectiveRoleService.reaches(child, role)) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.ROLE_COMPOSITE_CYCLE,
+                    "The role composite relationship would create a cycle");
+        }
+        if (role.getCompositeRoles().add(child)) {
+            child.getCompositeParents().add(role);
+            invalidateAllUsers();
+            adminAuditEventService.record("role.composite.added", "role", name);
+        }
+        return roleInternal(role, "", null, pageable);
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = {
+                AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                UserRepository.USER_BY_USERNAME_CACHE
+            },
+            allEntries = true)
+    public AdminRoleDetailDTO removeComposite(String name, String childName, Pageable pageable) {
+        AuthorityEntity role = roleRequired(name);
+        AuthorityEntity child = roleRequired(childName);
+        if (role.getCompositeRoles().remove(child)) {
+            child.getCompositeParents().remove(role);
+            invalidateAllUsers();
+            adminAuditEventService.record("role.composite.removed", "role", name);
+        }
+        return roleInternal(role, "", null, pageable);
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = {
+                AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                UserRepository.USER_BY_USERNAME_CACHE
+            },
+            allEntries = true)
+    public AdminRoleDetailDTO addClientComposite(String name, Long childRoleId, Pageable pageable) {
+        AuthorityEntity role = roleRequired(name);
+        if (clientRoleRepository == null) {
+            throw ApiException.notFound(CLIENT_ROLE_NOT_FOUND);
+        }
+        ClientRoleEntity child =
+                clientRoleRepository
+                        .findDetailedById(childRoleId)
+                        .orElseThrow(() -> ApiException.notFound(CLIENT_ROLE_NOT_FOUND));
+        if (EffectiveRoleService.reaches(child, role)) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.ROLE_COMPOSITE_CYCLE,
+                    "The role composite relationship would create a cycle");
+        }
+        if (role.getCompositeClientRoles().add(child)) {
+            invalidateAllUsers();
+            adminAuditEventService.record("role.composite-client.added", "role", name);
+        }
+        return roleInternal(role, "", null, pageable);
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = {
+                AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                UserRepository.USER_BY_USERNAME_CACHE
+            },
+            allEntries = true)
+    public AdminRoleDetailDTO removeClientComposite(
+            String name, Long childRoleId, Pageable pageable) {
+        AuthorityEntity role = roleRequired(name);
+        if (clientRoleRepository == null) {
+            throw ApiException.notFound(CLIENT_ROLE_NOT_FOUND);
+        }
+        ClientRoleEntity child =
+                clientRoleRepository
+                        .findDetailedById(childRoleId)
+                        .orElseThrow(() -> ApiException.notFound(CLIENT_ROLE_NOT_FOUND));
+        if (role.getCompositeClientRoles().remove(child)) {
+            invalidateAllUsers();
+            adminAuditEventService.record("role.composite-client.removed", "role", name);
+        }
+        return roleInternal(role, "", null, pageable);
     }
 
     @Transactional
@@ -222,6 +383,7 @@ public class AdminRoleService {
                     ApiErrorCode.ROLE_ASSIGNED, "Role is assigned to one or more users");
         }
         authorityRepository.delete(role);
+        invalidateAllUsers();
         adminAuditEventService.record("role.deleted", "role", name);
     }
 
@@ -240,6 +402,36 @@ public class AdminRoleService {
         }
         String value = description.strip();
         return value.isEmpty() ? null : value;
+    }
+
+    private AuthorityEntity roleRequired(String name) {
+        return authorityRepository
+                .findByName(name)
+                .orElseThrow(() -> ApiException.notFound(ROLE_NOT_FOUND));
+    }
+
+    private AuthorityEntity roleRequired(List<AuthorityEntity> roles, String name) {
+        return roles.stream()
+                .filter(role -> name.equals(role.getName()))
+                .findFirst()
+                .orElseThrow(() -> ApiException.notFound(ROLE_NOT_FOUND));
+    }
+
+    private static AdminClientRoleDTO toClientRoleDTO(ClientRoleEntity role) {
+        return new AdminClientRoleDTO(
+                role.getId(),
+                role.getClient().getClientId(),
+                role.getName(),
+                role.getDescription());
+    }
+
+    private void invalidateAllUsers() {
+        if (userAccessInvalidationService == null) {
+            return;
+        }
+        userRepository.findAll().stream()
+                .map(UserEntity::getUsername)
+                .forEach(userAccessInvalidationService::invalidate);
     }
 
     private static boolean matchesQuery(UserEntity user, String query) {

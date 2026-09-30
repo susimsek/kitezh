@@ -14,6 +14,11 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 public interface AdminClientMapper {
 
     default AdminClientDTO toDTO(RegisteredClient client) {
+        return toDTO(client, false, null);
+    }
+
+    default AdminClientDTO toDTO(
+            RegisteredClient client, boolean serviceAccountEnabled, String serviceAccountUsername) {
         return new AdminClientDTO(
                 client.getId(),
                 client.getClientId(),
@@ -40,7 +45,25 @@ public interface AdminClientMapper {
                 false,
                 client.getTokenSettings().getAuthorizationCodeTimeToLive(),
                 client.getTokenSettings().getAccessTokenTimeToLive(),
-                client.getTokenSettings().getRefreshTokenTimeToLive());
+                client.getTokenSettings().getRefreshTokenTimeToLive(),
+                serviceAccountEnabled,
+                serviceAccountUsername,
+                ClientSecuritySettings.isEnabled(client),
+                ClientSecuritySettings.stringSetting(client, ClientSecuritySettings.ROOT_URL),
+                ClientSecuritySettings.stringSetting(client, ClientSecuritySettings.HOME_URL),
+                ClientSecuritySettings.stringSetSetting(client, ClientSecuritySettings.WEB_ORIGINS),
+                ClientSecuritySettings.stringSetting(client, ClientSecuritySettings.ADMIN_URL),
+                ClientSecuritySettings.booleanSetting(
+                        client, ClientSecuritySettings.FRONT_CHANNEL_LOGOUT),
+                ClientSecuritySettings.booleanSetting(
+                        client, ClientSecuritySettings.BACK_CHANNEL_LOGOUT),
+                client.getClientSettings().getJwkSetUrl(),
+                client.getClientSettings().getTokenEndpointAuthenticationSigningAlgorithm() == null
+                        ? null
+                        : client.getClientSettings()
+                                .getTokenEndpointAuthenticationSigningAlgorithm()
+                                .getName(),
+                client.getClientSettings().getX509CertificateSubjectDN());
     }
 
     default AdminClientCreatedDTO toCreatedDTO(AdminClientDTO client, String clientSecret) {

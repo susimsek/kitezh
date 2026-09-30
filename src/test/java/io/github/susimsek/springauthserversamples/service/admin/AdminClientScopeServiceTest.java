@@ -102,6 +102,35 @@ class AdminClientScopeServiceTest {
     }
 
     @Test
+    void createsScopeWithMetadataDefaultsAndValues() {
+        when(clientScopeRepository.existsByName("billing")).thenReturn(false);
+        ClientScopeEntity saved = scope("scope-1", "billing");
+        when(clientScopeRepository.save(org.mockito.ArgumentMatchers.any())).thenReturn(saved);
+
+        service()
+                .create(
+                        new io.github.susimsek.springauthserversamples.dto.admin
+                                .AdminClientScopeRequestDTO(
+                                "billing",
+                                "Billing",
+                                "Billing access",
+                                true,
+                                "Billing consent",
+                                false,
+                                false,
+                                "groups",
+                                true));
+
+        var entityCaptor = ArgumentCaptor.forClass(ClientScopeEntity.class);
+        verify(clientScopeRepository).save(entityCaptor.capture());
+        ClientScopeEntity savedEntity = entityCaptor.getValue();
+        assertThat(savedEntity.isBuiltIn()).isFalse();
+        assertThat(savedEntity.isDisplayOnConsentScreen()).isTrue();
+        assertThat(savedEntity.getConsentScreenText()).isEqualTo("Billing consent");
+        assertThat(savedEntity.isIncludeInTokenScope()).isFalse();
+    }
+
+    @Test
     void rejectsInvalidAndDuplicateNames() {
         assertThatThrownBy(
                         () ->
@@ -180,6 +209,28 @@ class AdminClientScopeServiceTest {
         assertThatThrownBy(() -> service().delete("scope-1"))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Assigned client scopes cannot be deleted");
+    }
+
+    @Test
+    void protectsBuiltInScopesFromUpdateAndDelete() {
+        ClientScopeEntity entity = scope("scope-1", "openid");
+        entity.setBuiltIn(true);
+        when(clientScopeRepository.findById("scope-1")).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .update(
+                                                "scope-1",
+                                                new io.github.susimsek.springauthserversamples.dto
+                                                        .admin.AdminClientScopeRequestDTO(
+                                                        "openid", "OpenID", null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Built-in client scopes cannot be changed");
+        assertThatThrownBy(() -> service().delete("scope-1"))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Built-in client scopes cannot be changed");
+        verify(clientScopeRepository, never()).delete(entity);
     }
 
     @Test

@@ -143,10 +143,22 @@ class CacheConfigTest {
         assertThat(cacheManager.getCache(AdminEventSettingsEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorizationConsentEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorityEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(AuthorityEntity.class.getName() + ".compositeRoles"))
+                .isNotNull();
+        assertThat(cacheManager.getCache(AuthorityEntity.class.getName() + ".compositeParents"))
+                .isNotNull();
+        assertThat(cacheManager.getCache(AuthorityEntity.class.getName() + ".compositeClientRoles"))
+                .isNotNull();
         assertThat(cacheManager.getCache(ClientRoleEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(CibaPolicyEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".groups")).isNotNull();
         assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".users")).isNotNull();
+        assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".compositeRoles"))
+                .isNotNull();
+        assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".compositeParents"))
+                .isNotNull();
+        assertThat(cacheManager.getCache(ClientRoleEntity.class.getName() + ".compositeRealmRoles"))
+                .isNotNull();
         assertThat(cacheManager.getCache(EmailSettingsEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(GroupEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(GroupEntity.class.getName() + ".authorities")).isNotNull();

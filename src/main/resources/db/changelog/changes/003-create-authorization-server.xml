@@ -239,6 +239,10 @@
 			<column name="name" type="varchar(100)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_oauth2_client_scope_name"/></column>
 			<column name="display_name" type="varchar(200)"/>
 			<column name="description" type="varchar(500)"/>
+			<column name="built_in" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="display_on_consent_screen" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="consent_screen_text" type="varchar(200)"/>
+			<column name="include_in_token_scope" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
 			<column name="group_mapper_enabled" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
 			<column name="group_claim_name" type="varchar(100)" defaultValue="groups"><constraints nullable="false"/></column>
 			<column name="group_mapper_full_path" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
@@ -255,6 +259,10 @@
 			<column header="name" type="string"/>
 			<column header="display_name" type="string"/>
 			<column header="description" type="string"/>
+			<column header="built_in" type="boolean"/>
+			<column header="display_on_consent_screen" type="boolean"/>
+			<column header="consent_screen_text" type="string"/>
+			<column header="include_in_token_scope" type="boolean"/>
 			<column header="group_mapper_enabled" type="boolean"/>
 			<column header="group_claim_name" type="string"/>
 			<column header="group_mapper_full_path" type="boolean"/>

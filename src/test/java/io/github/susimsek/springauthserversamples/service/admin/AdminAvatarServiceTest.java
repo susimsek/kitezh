@@ -85,6 +85,31 @@ class AdminAvatarServiceTest {
     }
 
     @Test
+    void replacesExistingJpegAvatarWithoutRegeneratingItsPublicId() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(5L);
+        UserAvatarEntity existing = new UserAvatarEntity();
+        existing.setPublicId("existing-public-id");
+        existing.setUpdatedAt(Instant.parse("2026-08-20T12:00:00Z"));
+        when(adminUserService.requireManageableUser(5L, "admin")).thenReturn(user);
+        when(userAvatarRepository.findById(5L)).thenReturn(java.util.Optional.of(existing));
+        when(userAvatarRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var view =
+                service()
+                        .updateAvatar(
+                                5L,
+                                new MockMultipartFile(
+                                        "file", "avatar.jpg", "image/jpeg", image("jpg", 2, 2)),
+                                "admin");
+
+        assertThat(view.avatarUrl()).isEqualTo("/avatars/existing-public-id?v=1787227200000");
+        verify(userAvatarRepository).saveAndFlush(existing);
+        verify(adminAuditEventService).avatarUpdated(5L);
+    }
+
+    @Test
     void rejectsEmptyOversizedUnreadableAndOversizedDimensionAvatars() throws Exception {
         UserEntity user = new UserEntity();
         user.setId(5L);
@@ -164,6 +189,21 @@ class AdminAvatarServiceTest {
         verify(adminUserService).requireManageableUser(5L, "admin");
         verify(userAvatarRepository).deleteById(5L);
         verify(adminAuditEventService).avatarDeleted(5L);
+    }
+
+    @Test
+    void comparesAndDescribesAvatarPayloads() throws Exception {
+        Class<?> payloadType =
+                Class.forName(
+                        "io.github.susimsek.springauthserversamples.service.admin.AdminAvatarService$AvatarPayload");
+        var constructor = payloadType.getDeclaredConstructor(byte[].class, String.class);
+        constructor.setAccessible(true);
+        Object first = constructor.newInstance(new byte[] {1, 2}, "image/png");
+        Object equal = constructor.newInstance(new byte[] {1, 2}, "image/png");
+        Object different = constructor.newInstance(new byte[] {2}, "image/png");
+
+        assertThat(first).isEqualTo(equal).isNotEqualTo(different).hasSameHashCodeAs(equal);
+        assertThat(first.toString()).contains("image/png", "[1, 2]");
     }
 
     private AdminAvatarService service() {

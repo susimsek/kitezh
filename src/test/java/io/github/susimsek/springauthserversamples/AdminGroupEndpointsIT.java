@@ -178,6 +178,8 @@ class AdminGroupEndpointsIT {
 
     private static JwtRequestPostProcessor user() {
         return jwt().jwt(token -> token.subject("user"))
-                .authorities(new SimpleGrantedAuthority("ROLE_GROUP_VIEWER"));
+                .authorities(
+                        new SimpleGrantedAuthority("ROLE_GROUP_QUERY"),
+                        new SimpleGrantedAuthority("ROLE_GROUP_VIEWER"));
     }
 }

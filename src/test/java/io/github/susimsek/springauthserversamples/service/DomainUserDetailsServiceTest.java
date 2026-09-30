@@ -76,7 +76,7 @@ class DomainUserDetailsServiceTest {
 
         assertThatThrownBy(() -> service().loadUserByUsername("missing"))
                 .isInstanceOf(UsernameNotFoundException.class)
-                .hasMessage("User not found: missing");
+                .hasMessage("Invalid username or password");
     }
 
     private DomainUserDetailsService service() {

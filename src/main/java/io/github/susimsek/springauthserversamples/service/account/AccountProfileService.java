@@ -138,7 +138,10 @@ public class AccountProfileService {
     @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, key = "#username")
     public void changePassword(String username, String currentPassword, String newPassword) {
         UserEntity user = requireUser(username);
-        if (!passwordService.matchesCurrentPassword(currentPassword, user)) {
+        boolean ldapPasswordChanged =
+                ldapFederationWriteService.changePassword(user, currentPassword, newPassword);
+        if (!ldapPasswordChanged
+                && !passwordService.matchesCurrentPassword(currentPassword, user)) {
             throw ApiException.badRequest(
                     CURRENT_PASSWORD_FIELD,
                     ApiErrorCode.INVALID_CURRENT_PASSWORD,

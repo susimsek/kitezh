@@ -4,6 +4,7 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.instrumentation.jdbc.datasource.JdbcTelemetry;
 import io.opentelemetry.instrumentation.jdbc.datasource.OpenTelemetryDataSource;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -17,6 +18,8 @@ import org.springframework.lang.NonNull;
 @ConditionalOnClass(JdbcTelemetry.class)
 public class JdbcObservabilityConfiguration {
 
+    private JdbcObservabilityConfiguration() {}
+
     @Bean
     static BeanPostProcessor jdbcTelemetryDataSourcePostProcessor(
             ObjectProvider<OpenTelemetry> openTelemetryProvider) {
@@ -26,7 +29,7 @@ public class JdbcObservabilityConfiguration {
     private static final class JdbcTelemetryDataSourcePostProcessor implements BeanPostProcessor {
 
         private final ObjectProvider<OpenTelemetry> openTelemetryProvider;
-        private volatile JdbcTelemetry jdbcTelemetry;
+        private final AtomicReference<JdbcTelemetry> jdbcTelemetry = new AtomicReference<>();
 
         private JdbcTelemetryDataSourcePostProcessor(
                 ObjectProvider<OpenTelemetry> openTelemetryProvider) {
@@ -43,10 +46,10 @@ public class JdbcObservabilityConfiguration {
         }
 
         private JdbcTelemetry jdbcTelemetry() {
-            JdbcTelemetry value = jdbcTelemetry;
+            JdbcTelemetry value = jdbcTelemetry.get();
             if (value == null) {
                 synchronized (this) {
-                    value = jdbcTelemetry;
+                    value = jdbcTelemetry.get();
                     if (value == null) {
                         value =
                                 JdbcTelemetry.builder(
@@ -55,7 +58,7 @@ public class JdbcObservabilityConfiguration {
                                         .setQuerySanitizationEnabled(true)
                                         .setCaptureQueryParameters(false)
                                         .build();
-                        jdbcTelemetry = value;
+                        jdbcTelemetry.set(value);
                     }
                 }
             }

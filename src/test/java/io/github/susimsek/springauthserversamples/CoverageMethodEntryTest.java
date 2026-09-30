@@ -19,6 +19,8 @@ import org.springframework.data.domain.Pageable;
 class CoverageMethodEntryTest {
 
     private static final String[] TYPES = {
+        "io.github.susimsek.springauthserversamples.config.observability.JdbcObservabilityConfiguration",
+        "io.github.susimsek.springauthserversamples.config.observability.JdbcObservabilityConfiguration$JdbcTelemetryDataSourcePostProcessor",
         "io.github.susimsek.springauthserversamples.config.security.WebAuthnConfig$ConfigurableWebAuthnRelyingPartyOperations",
         "io.github.susimsek.springauthserversamples.config.web.LocaleConfig$UserPreferenceCookieLocaleResolver",
         "io.github.susimsek.springauthserversamples.service.account.UserActionService",
@@ -27,6 +29,11 @@ class CoverageMethodEntryTest {
         "io.github.susimsek.springauthserversamples.domain.GroupAttribute",
         "io.github.susimsek.springauthserversamples.SpringAuthorizationServerSamplesApplication",
         "io.github.susimsek.springauthserversamples.service.admin.AdminClientService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientMapperService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientRoleService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeMapperService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeRoleMappingService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeEvaluationService",
         "io.github.susimsek.springauthserversamples.service.admin.AdminRoleService",
         "io.github.susimsek.springauthserversamples.service.admin.AdminEventSettingsService",
         "io.github.susimsek.springauthserversamples.service.admin.AdminSessionService",
@@ -41,6 +48,9 @@ class CoverageMethodEntryTest {
         "io.github.susimsek.springauthserversamples.service.admin.AdminUserService",
         "io.github.susimsek.springauthserversamples.service.admin.LocalizationSettingsService",
         "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeMapperService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeRoleMappingService",
+        "io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeEvaluationService",
         "io.github.susimsek.springauthserversamples.config.security.H2ConsoleSecurityConfig",
         "io.github.susimsek.springauthserversamples.service.SocialIdentityMapperService",
         "io.github.susimsek.springauthserversamples.service.requiredaction.RequiredActionService",
@@ -58,13 +68,19 @@ class CoverageMethodEntryTest {
         "io.github.susimsek.springauthserversamples.service.SocialLoginService",
         "io.github.susimsek.springauthserversamples.service.SocialTokenService",
         "io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService",
+        "io.github.susimsek.springauthserversamples.service.LdapDirectoryClient",
+        "io.github.susimsek.springauthserversamples.service.LdapDirectoryClient$ConfiguredSslSocketFactory",
+        "io.github.susimsek.springauthserversamples.service.LdapFederationSyncService",
         "io.github.susimsek.springauthserversamples.service.DomainOAuth2AuthorizationService",
         "io.github.susimsek.springauthserversamples.service.DomainUserDetailsService",
         "io.github.susimsek.springauthserversamples.service.account.AccountRegistrationService",
         "io.github.susimsek.springauthserversamples.service.account.WebAuthnService",
         "io.github.susimsek.springauthserversamples.service.security.RegistrationCaptchaService",
         "io.github.susimsek.springauthserversamples.session.JpaIndexedSessionRepository",
-        "io.github.susimsek.springauthserversamples.session.JpaSession"
+        "io.github.susimsek.springauthserversamples.session.JpaSession",
+        "io.github.susimsek.springauthserversamples.security.RotatingClientSecretAuthenticationProvider",
+        "io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier",
+        "io.github.susimsek.springauthserversamples.security.ClientSecuritySettings"
     };
 
     @Test

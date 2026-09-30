@@ -105,8 +105,9 @@ class SocialTokenServiceTest {
     @Test
     void rejectsReadingTokensUnlessTheProviderAllowsIt() {
         when(providerSettingsService.provider("google")).thenReturn(credentials(true, false));
+        SocialTokenService service = service();
 
-        assertThatThrownBy(() -> service().read("ada", "google"))
+        assertThatThrownBy(() -> service.read("ada", "google"))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("not readable");
     }
@@ -142,22 +143,23 @@ class SocialTokenServiceTest {
 
     @Test
     void reportsMissingProviderIdentityAndCipherFailures() {
+        SocialTokenService service = service();
         when(socialIdentityRepository.findAllByUserUsernameAndProvider("ada", "google"))
                 .thenReturn(List.of());
-        assertThatThrownBy(() -> service().read("ada", "google"))
+        assertThatThrownBy(() -> service.read("ada", "google"))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("not linked");
 
         when(socialIdentityRepository.findAllByUserUsernameAndProvider("ada", "google"))
                 .thenReturn(List.of(identity));
         identity.setAccessTokenEncrypted(null);
-        assertThatThrownBy(() -> service().read("ada", "google"))
+        assertThatThrownBy(() -> service.read("ada", "google"))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("No stored token");
 
         identity.setAccessTokenEncrypted("broken");
         when(secretCipher.decrypt("broken")).thenThrow(new IllegalStateException("broken cipher"));
-        assertThatThrownBy(() -> service().read("ada", "google"))
+        assertThatThrownBy(() -> service.read("ada", "google"))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("could not be read");
     }

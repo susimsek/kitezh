@@ -40,13 +40,21 @@ type ClientScopeOption = {
 type FormState = {
   clientId: string;
   clientName: string;
+  enabled: boolean;
   clientAuthenticationMethods: (typeof METHODS)[number][];
   authorizationGrantTypes: (typeof GRANTS)[number][];
   redirectUris: string;
   postLogoutRedirectUris: string;
+  rootUrl: string;
+  homeUrl: string;
+  webOrigins: string;
+  adminUrl: string;
+  frontChannelLogout: boolean;
+  backchannelLogout: boolean;
   scopes: string;
   requireAuthorizationConsent: boolean;
   requireProofKey: boolean;
+  serviceAccountEnabled: boolean;
   requireDpop: boolean;
   requireDpopJkt: boolean;
   dpopRefreshTokenOnly: boolean;
@@ -56,18 +64,30 @@ type FormState = {
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
+  jwkSetUrl: string;
+  tokenEndpointAuthenticationSigningAlgorithm: string;
+  x509CertificateSubjectDN: string;
+  clientSecretGracePeriod: string;
 };
 
 const EMPTY: FormState = {
   clientId: "",
   clientName: "",
+  enabled: true,
   clientAuthenticationMethods: ["client_secret_basic"],
   authorizationGrantTypes: ["authorization_code", "refresh_token"],
   redirectUris: "",
   postLogoutRedirectUris: "",
+  rootUrl: "",
+  homeUrl: "",
+  webOrigins: "",
+  adminUrl: "",
+  frontChannelLogout: false,
+  backchannelLogout: false,
   scopes: "openid profile",
   requireAuthorizationConsent: true,
   requireProofKey: true,
+  serviceAccountEnabled: false,
   requireDpop: false,
   requireDpopJkt: false,
   dpopRefreshTokenOnly: false,
@@ -77,9 +97,19 @@ const EMPTY: FormState = {
   authorizationCodeTimeToLive: "PT5M",
   accessTokenTimeToLive: "PT5M",
   refreshTokenTimeToLive: "PT1H",
+  jwkSetUrl: "",
+  tokenEndpointAuthenticationSigningAlgorithm: "RS256",
+  x509CertificateSubjectDN: "",
+  clientSecretGracePeriod: "PT24H",
 };
 
-const METHODS = ["client_secret_basic", "client_secret_post", "none"] as const;
+const METHODS = [
+  "client_secret_basic",
+  "client_secret_post",
+  "private_key_jwt",
+  "tls_client_auth",
+  "none",
+] as const;
 const GRANTS = [
   "authorization_code",
   "refresh_token",
@@ -97,13 +127,23 @@ const CLIENT_FORM_STEP_FIELDS: (keyof FormState)[][] = [
     "requireAuthorizationConsent",
     "requireProofKey",
   ],
-  ["redirectUris", "postLogoutRedirectUris", "scopes"],
+  [
+    "redirectUris",
+    "postLogoutRedirectUris",
+    "rootUrl",
+    "homeUrl",
+    "webOrigins",
+    "adminUrl",
+    "jwkSetUrl",
+    "x509CertificateSubjectDN",
+  ],
 ];
 const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =>
   z
     .object({
       clientId: z.string().trim().min(1, validation.required).max(100, validation.max100),
       clientName: z.string().trim().min(1, validation.required).max(200, validation.max200),
+      enabled: z.boolean(),
       scopes: z.string().trim().min(1, validation.scope),
       clientAuthenticationMethods: z.array(z.enum(METHODS)).min(1, validation.selection),
       authorizationGrantTypes: z.array(z.enum(GRANTS)).min(1, validation.selection),
@@ -113,8 +153,17 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
       postLogoutRedirectUris: z
         .string()
         .refine((value) => lines(value).every(isValidAbsoluteUri), validation.uri),
+      rootUrl: z.string().refine((value) => !value || isValidAbsoluteUri(value), validation.uri),
+      homeUrl: z.string().refine((value) => !value || isValidAbsoluteUri(value), validation.uri),
+      webOrigins: z
+        .string()
+        .refine((value) => lines(value).every(isValidAbsoluteUri), validation.uri),
+      adminUrl: z.string().refine((value) => !value || isValidAbsoluteUri(value), validation.uri),
+      frontChannelLogout: z.boolean(),
+      backchannelLogout: z.boolean(),
       requireAuthorizationConsent: z.boolean(),
       requireProofKey: z.boolean(),
+      serviceAccountEnabled: z.boolean(),
       requireDpop: z.boolean(),
       requireDpopJkt: z.boolean(),
       dpopRefreshTokenOnly: z.boolean(),
@@ -124,6 +173,10 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
       authorizationCodeTimeToLive: z.string(),
       accessTokenTimeToLive: z.string(),
       refreshTokenTimeToLive: z.string(),
+      jwkSetUrl: z.string().refine((value) => !value || isValidAbsoluteUri(value), validation.uri),
+      tokenEndpointAuthenticationSigningAlgorithm: z.string(),
+      x509CertificateSubjectDN: z.string().max(500),
+      clientSecretGracePeriod: z.string(),
     })
     .superRefine((value, context) => {
       const authorizationCode = value.authorizationGrantTypes.includes("authorization_code");
@@ -311,15 +364,23 @@ export function ClientForm({
         reset({
           clientId: client.clientId,
           clientName: client.clientName,
+          enabled: client.enabled ?? true,
           clientAuthenticationMethods:
             client.clientAuthenticationMethods as FormState["clientAuthenticationMethods"],
           authorizationGrantTypes:
             client.authorizationGrantTypes as FormState["authorizationGrantTypes"],
           redirectUris: client.redirectUris.join("\n"),
           postLogoutRedirectUris: client.postLogoutRedirectUris.join("\n"),
+          rootUrl: client.rootUrl ?? "",
+          homeUrl: client.homeUrl ?? "",
+          webOrigins: (client.webOrigins ?? []).join("\n"),
+          adminUrl: client.adminUrl ?? "",
+          frontChannelLogout: client.frontChannelLogout ?? false,
+          backchannelLogout: client.backchannelLogout ?? false,
           scopes: client.scopes.join(" "),
           requireAuthorizationConsent: client.requireAuthorizationConsent,
           requireProofKey: client.requireProofKey,
+          serviceAccountEnabled: client.serviceAccountEnabled ?? false,
           requireDpop: client.requireDpop ?? false,
           requireDpopJkt: client.requireDpopJkt ?? false,
           dpopRefreshTokenOnly: client.dpopRefreshTokenOnly ?? false,
@@ -332,6 +393,11 @@ export function ClientForm({
           authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "PT5M",
           accessTokenTimeToLive: client.accessTokenTimeToLive ?? "PT5M",
           refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "PT1H",
+          jwkSetUrl: client.jwkSetUrl ?? "",
+          tokenEndpointAuthenticationSigningAlgorithm:
+            client.tokenEndpointAuthenticationSigningAlgorithm ?? "RS256",
+          x509CertificateSubjectDN: client.x509CertificateSubjectDN ?? "",
+          clientSecretGracePeriod: "PT24H",
         }),
       )
       .catch(() => setError(true))
@@ -374,6 +440,7 @@ export function ClientForm({
       ...values,
       redirectUris: lines(values.redirectUris),
       postLogoutRedirectUris: lines(values.postLogoutRedirectUris),
+      webOrigins: lines(values.webOrigins),
       scopes: words(values.scopes),
     };
 
@@ -541,6 +608,17 @@ export function ClientForm({
                   {errors.clientName?.message}
                 </Form.Control.Feedback>
               </Col>
+              <Col xs={12}>
+                <div className="admin-setting-row">
+                  <div>
+                    <div className="fw-semibold">{dictionary.admin.clients.enabled}</div>
+                    <div className="small text-body-secondary">
+                      {dictionary.admin.clients.enabledHelp}
+                    </div>
+                  </div>
+                  <Form.Check type="switch" disabled={!canManageClients} {...register("enabled")} />
+                </div>
+              </Col>
             </Row>
           </Card.Body>
         </Card>
@@ -579,6 +657,54 @@ export function ClientForm({
                   </div>
                 )}
               </Col>
+              {clientAuthenticationMethods.includes("private_key_jwt") && (
+                <Col xs={12}>
+                  <Row className="g-3">
+                    <Col md={8}>
+                      <Form.Label>{dictionary.admin.clients.jwkSetUrl}</Form.Label>
+                      <Form.Control
+                        isInvalid={Boolean(errors.jwkSetUrl)}
+                        {...register("jwkSetUrl")}
+                      />
+                      <Form.Control.Feedback type="invalid">
+                        {errors.jwkSetUrl?.message}
+                      </Form.Control.Feedback>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Label>{dictionary.admin.clients.signingAlgorithm}</Form.Label>
+                      <Form.Select {...register("tokenEndpointAuthenticationSigningAlgorithm")}>
+                        {[
+                          "RS256",
+                          "PS256",
+                          "ES256",
+                          "RS384",
+                          "PS384",
+                          "ES384",
+                          "RS512",
+                          "PS512",
+                          "ES512",
+                        ].map((algorithm) => (
+                          <option key={algorithm} value={algorithm}>
+                            {algorithm}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Col>
+                  </Row>
+                </Col>
+              )}
+              {clientAuthenticationMethods.includes("tls_client_auth") && (
+                <Col xs={12}>
+                  <Form.Label>{dictionary.admin.clients.certificateSubjectDN}</Form.Label>
+                  <Form.Control
+                    isInvalid={Boolean(errors.x509CertificateSubjectDN)}
+                    {...register("x509CertificateSubjectDN")}
+                  />
+                  <Form.Control.Feedback type="invalid">
+                    {errors.x509CertificateSubjectDN?.message}
+                  </Form.Control.Feedback>
+                </Col>
+              )}
               <Col lg={6}>
                 <Form.Label className="fw-semibold">{dictionary.admin.clients.grants}</Form.Label>
                 <div className="admin-choice-list">
@@ -598,6 +724,21 @@ export function ClientForm({
                     {errors.authorizationGrantTypes.message}
                   </div>
                 )}
+              </Col>
+              <Col md={6}>
+                <div className="admin-setting-row">
+                  <div className="fw-semibold">
+                    <HelpItem
+                      label={dictionary.admin.clients.serviceAccount}
+                      help={dictionary.admin.clients.serviceAccountHelp}
+                    />
+                  </div>
+                  <Form.Check
+                    type="switch"
+                    disabled={!canManageClients}
+                    {...register("serviceAccountEnabled")}
+                  />
+                </div>
               </Col>
               <Col md={6}>
                 <div className="admin-setting-row">
@@ -815,6 +956,53 @@ export function ClientForm({
                 <Form.Control.Feedback type="invalid">
                   {errors.postLogoutRedirectUris?.message}
                 </Form.Control.Feedback>
+              </Col>
+              <Col md={6}>
+                <Form.Label>{dictionary.admin.clients.rootUrl}</Form.Label>
+                <Form.Control isInvalid={Boolean(errors.rootUrl)} {...register("rootUrl")} />
+                <Form.Control.Feedback type="invalid">
+                  {errors.rootUrl?.message}
+                </Form.Control.Feedback>
+              </Col>
+              <Col md={6}>
+                <Form.Label>{dictionary.admin.clients.homeUrl}</Form.Label>
+                <Form.Control isInvalid={Boolean(errors.homeUrl)} {...register("homeUrl")} />
+                <Form.Control.Feedback type="invalid">
+                  {errors.homeUrl?.message}
+                </Form.Control.Feedback>
+              </Col>
+              <Col md={6}>
+                <Form.Label>{dictionary.admin.clients.adminUrl}</Form.Label>
+                <Form.Control isInvalid={Boolean(errors.adminUrl)} {...register("adminUrl")} />
+                <Form.Control.Feedback type="invalid">
+                  {errors.adminUrl?.message}
+                </Form.Control.Feedback>
+              </Col>
+              <Col md={6}>
+                <Form.Label>{dictionary.admin.clients.webOrigins}</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  isInvalid={Boolean(errors.webOrigins)}
+                  {...register("webOrigins")}
+                />
+                <Form.Control.Feedback type="invalid">
+                  {errors.webOrigins?.message}
+                </Form.Control.Feedback>
+              </Col>
+              <Col xs={12}>
+                <div className="d-flex gap-4">
+                  <Form.Check
+                    type="switch"
+                    label={dictionary.admin.clients.frontChannelLogout}
+                    {...register("frontChannelLogout")}
+                  />
+                  <Form.Check
+                    type="switch"
+                    label={dictionary.admin.clients.backchannelLogout}
+                    {...register("backchannelLogout")}
+                  />
+                </div>
               </Col>
               {mode === "create" && (
                 <Col xs={12}>

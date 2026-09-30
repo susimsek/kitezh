@@ -3,17 +3,25 @@ package io.github.susimsek.springauthserversamples.web.admin;
 import io.github.susimsek.springauthserversamples.config.openapi.OpenApiConfig;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientMapperDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientMapperRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeAssignmentRequestDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeEvaluationDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientSecretDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminConsentDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminEventDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminScopeAssignmentsDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminServiceAccountDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminServiceAccountRolesRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDTO;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
+import io.github.susimsek.springauthserversamples.service.admin.AdminClientMapperService;
+import io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeEvaluationService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminClientScopeService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminClientService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminConsentService;
+import io.github.susimsek.springauthserversamples.service.admin.AdminServiceAccountService;
 import io.github.susimsek.springauthserversamples.service.admin.AdminSessionService;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.web.ApiController;
@@ -24,7 +32,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -42,7 +50,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @ApiController
 @RequestMapping("/api/admin/clients")
-@RequiredArgsConstructor
 @Tag(
         name = "Admin - Clients",
         description = "Keycloak-style registered OAuth2/OIDC client management.")
@@ -50,10 +57,50 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminClientController {
 
     private final AdminClientService adminClientService;
+    private final AdminClientMapperService adminClientMapperService;
     private final AdminClientScopeService adminClientScopeService;
     private final AdminSessionService adminSessionService;
     private final AdminConsentService adminConsentService;
     private final AdminAuditEventService adminAuditEventService;
+    private final AdminClientScopeEvaluationService scopeEvaluationService;
+    private final AdminServiceAccountService serviceAccountService;
+
+    @Autowired
+    public AdminClientController(
+            AdminClientService adminClientService,
+            AdminClientMapperService adminClientMapperService,
+            AdminClientScopeService adminClientScopeService,
+            AdminSessionService adminSessionService,
+            AdminConsentService adminConsentService,
+            AdminAuditEventService adminAuditEventService,
+            AdminClientScopeEvaluationService scopeEvaluationService,
+            AdminServiceAccountService serviceAccountService) {
+        this.adminClientService = adminClientService;
+        this.adminClientMapperService = adminClientMapperService;
+        this.adminClientScopeService = adminClientScopeService;
+        this.adminSessionService = adminSessionService;
+        this.adminConsentService = adminConsentService;
+        this.adminAuditEventService = adminAuditEventService;
+        this.scopeEvaluationService = scopeEvaluationService;
+        this.serviceAccountService = serviceAccountService;
+    }
+
+    public AdminClientController(
+            AdminClientService adminClientService,
+            AdminClientScopeService adminClientScopeService,
+            AdminSessionService adminSessionService,
+            AdminConsentService adminConsentService,
+            AdminAuditEventService adminAuditEventService) {
+        this(
+                adminClientService,
+                null,
+                adminClientScopeService,
+                adminSessionService,
+                adminConsentService,
+                adminAuditEventService,
+                null,
+                null);
+    }
 
     @GetMapping
     @Operation(
@@ -151,6 +198,42 @@ public class AdminClientController {
         return new AdminClientSecretDTO(adminClientService.regenerateSecret(id));
     }
 
+    @GetMapping("/{id}/mappers")
+    @Operation(
+            summary = "List client mappers",
+            description = "Returns the allow-listed claim mappers configured for a client.")
+    @ApiResponse(responseCode = "200", description = "Paged client mappers returned.")
+    Page<AdminClientMapperDTO> mappers(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "") String q,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return adminClientMapperService.findAll(id, q, pageable);
+    }
+
+    @PostMapping("/{id}/mappers")
+    @Operation(summary = "Create client mapper")
+    AdminClientMapperDTO createMapper(
+            @PathVariable String id, @Valid @RequestBody AdminClientMapperRequestDTO request) {
+        return adminClientMapperService.create(id, request);
+    }
+
+    @PutMapping("/{id}/mappers/{mapperId}")
+    @Operation(summary = "Update client mapper")
+    AdminClientMapperDTO updateMapper(
+            @PathVariable String id,
+            @PathVariable Long mapperId,
+            @Valid @RequestBody AdminClientMapperRequestDTO request) {
+        return adminClientMapperService.update(mapperId, id, request);
+    }
+
+    @DeleteMapping("/{id}/mappers/{mapperId}")
+    @Operation(summary = "Delete client mapper")
+    @ApiResponse(responseCode = "204", description = "Client mapper deleted.")
+    ResponseEntity<Void> deleteMapper(@PathVariable String id, @PathVariable Long mapperId) {
+        adminClientMapperService.delete(mapperId, id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/scope-assignments")
     @Operation(
             summary = "Get client scope assignments",
@@ -164,6 +247,44 @@ public class AdminClientController {
                     @PathVariable
                     String id) {
         return adminClientScopeService.assignments(id);
+    }
+
+    @GetMapping("/{id}/scope-evaluation")
+    @Operation(
+            summary = "Evaluate client scopes",
+            description =
+                    "Previews effective scopes, mapped claims, and subject roles without issuing a"
+                            + " token.")
+    @ApiResponse(responseCode = "200", description = "Client scope evaluation returned.")
+    AdminClientScopeEvaluationDTO scopeEvaluation(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "") String scopes,
+            @RequestParam(defaultValue = "") String subject) {
+        if (scopeEvaluationService == null) {
+            throw io.github.susimsek.springauthserversamples.service.error.ApiException.notFound(
+                    "Scope evaluation is unavailable");
+        }
+        return scopeEvaluationService.evaluate(id, scopes, subject);
+    }
+
+    @GetMapping("/{id}/service-account")
+    @Operation(
+            summary = "Get client service account",
+            description = "Returns the service-account identity and assigned client roles.")
+    @ApiResponse(responseCode = "200", description = "Service account returned.")
+    AdminServiceAccountDTO serviceAccount(@PathVariable String id) {
+        return serviceAccountService.find(id);
+    }
+
+    @PutMapping("/{id}/service-account/roles")
+    @Operation(
+            summary = "Replace service-account roles",
+            description = "Replaces the client roles assigned to the service account.")
+    @ApiResponse(responseCode = "200", description = "Service-account roles updated.")
+    AdminServiceAccountDTO serviceAccountRoles(
+            @PathVariable String id,
+            @Valid @RequestBody AdminServiceAccountRolesRequestDTO request) {
+        return serviceAccountService.replaceRoles(id, request);
     }
 
     @PutMapping("/{id}/scope-assignments")

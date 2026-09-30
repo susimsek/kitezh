@@ -15,6 +15,8 @@ import { adminRequest } from "@/lib/admin-api";
 import { AdminActionIcon } from "./AdminActionIcon";
 import { AdminBreadcrumb } from "./AdminBreadcrumb";
 import { useAdminAuth } from "./AdminAuthProvider";
+import { ClientMappers } from "./ClientMappers";
+import { ClientScopeRoleMappings } from "./ClientScopeRoleMappings";
 import { ConfirmModal } from "./ConfirmModal";
 import { DetailLoadingState, ErrorState } from "./AsyncState";
 import { ViewHeader } from "./ViewHeader";
@@ -24,6 +26,10 @@ type ClientScope = {
   name: string;
   displayName: string | null;
   description: string | null;
+  builtIn: boolean;
+  displayOnConsentScreen: boolean;
+  consentScreenText: string | null;
+  includeInTokenScope: boolean;
   createdAt: string;
   updatedAt: string;
   groupMapperEnabled: boolean;
@@ -35,6 +41,9 @@ type Values = {
   name: string;
   displayName: string;
   description: string;
+  displayOnConsentScreen: boolean;
+  consentScreenText: string;
+  includeInTokenScope: boolean;
   groupMapperEnabled: boolean;
   groupClaimName: string;
   groupMapperFullPath: boolean;
@@ -62,6 +71,9 @@ export function ClientScopeDetail({
     name: z.string().trim().min(1, common.validation.required).max(100, common.validation.max100),
     displayName: z.string().max(200, common.validation.max200),
     description: z.string().max(500, common.validation.max500),
+    displayOnConsentScreen: z.boolean(),
+    consentScreenText: z.string().max(200, common.validation.max200),
+    includeInTokenScope: z.boolean(),
     groupMapperEnabled: z.boolean(),
     groupClaimName: z.string().trim().min(1, common.validation.required).max(100),
     groupMapperFullPath: z.boolean(),
@@ -78,6 +90,9 @@ export function ClientScopeDetail({
       name: "",
       displayName: "",
       description: "",
+      displayOnConsentScreen: false,
+      consentScreenText: "",
+      includeInTokenScope: true,
       groupMapperEnabled: false,
       groupClaimName: "groups",
       groupMapperFullPath: true,
@@ -97,6 +112,9 @@ export function ClientScopeDetail({
         name: response.data.name,
         displayName: response.data.displayName ?? "",
         description: response.data.description ?? "",
+        displayOnConsentScreen: response.data.displayOnConsentScreen,
+        consentScreenText: response.data.consentScreenText ?? "",
+        includeInTokenScope: response.data.includeInTokenScope,
         groupMapperEnabled: response.data.groupMapperEnabled,
         groupClaimName: response.data.groupClaimName,
         groupMapperFullPath: response.data.groupMapperFullPath,
@@ -115,7 +133,7 @@ export function ClientScopeDetail({
   }, [load]);
 
   const save = async (values: Values) => {
-    if (!access?.manageClients || !accessToken || !scope) return;
+    if (!access?.manageClients || !accessToken || !scope || scope.builtIn) return;
     const response = await adminRequest<ClientScope>(accessToken, {
       url: `/api/admin/client-scopes/${encodeURIComponent(scope.id)}`,
       method: "PUT",
@@ -130,6 +148,9 @@ export function ClientScopeDetail({
       name: response.data.name,
       displayName: response.data.displayName ?? "",
       description: response.data.description ?? "",
+      displayOnConsentScreen: response.data.displayOnConsentScreen,
+      consentScreenText: response.data.consentScreenText ?? "",
+      includeInTokenScope: response.data.includeInTokenScope,
       groupMapperEnabled: response.data.groupMapperEnabled,
       groupClaimName: response.data.groupClaimName,
       groupMapperFullPath: response.data.groupMapperFullPath,
@@ -138,14 +159,20 @@ export function ClientScopeDetail({
   };
 
   const remove = async () => {
-    if (!access?.manageClients || !accessToken || !scope) return;
+    if (!access?.manageClients || !accessToken || !scope || scope.builtIn) return;
     const response = await adminRequest(accessToken, {
       url: `/api/admin/client-scopes/${encodeURIComponent(scope.id)}`,
       method: "DELETE",
     });
     if (response.status >= 300) {
       setShowDelete(false);
-      alerts.addError(response.status === 400 ? copy.assignedDeleteError : copy.operationError);
+      alerts.addError(
+        response.status === 400
+          ? scope.builtIn
+            ? copy.protectedError
+            : copy.assignedDeleteError
+          : copy.operationError,
+      );
       return;
     }
     alerts.addAlert(copy.deleted);
@@ -166,7 +193,7 @@ export function ClientScopeDetail({
         title={scope.name}
         description={scope.displayName || copy.subtitle}
         actions={
-          access?.manageClients ? (
+          access?.manageClients && !scope.builtIn ? (
             <Button variant="danger" onClick={() => setShowDelete(true)}>
               <AdminActionIcon action="delete" />
               {copy.delete}
@@ -179,12 +206,20 @@ export function ClientScopeDetail({
           <Form id="client-scope-detail-form" noValidate onSubmit={handleSubmit(save)}>
             <Form.Group className="mb-3" controlId="client-scope-detail-name">
               <Form.Label>{copy.name}</Form.Label>
-              <Form.Control isInvalid={Boolean(errors.name)} {...register("name")} />
+              <Form.Control
+                disabled={scope.builtIn || !access?.manageClients}
+                isInvalid={Boolean(errors.name)}
+                {...register("name")}
+              />
               <Form.Control.Feedback type="invalid">{errors.name?.message}</Form.Control.Feedback>
             </Form.Group>
             <Form.Group className="mb-3" controlId="client-scope-detail-display-name">
               <Form.Label>{copy.displayName}</Form.Label>
-              <Form.Control isInvalid={Boolean(errors.displayName)} {...register("displayName")} />
+              <Form.Control
+                disabled={scope.builtIn || !access?.manageClients}
+                isInvalid={Boolean(errors.displayName)}
+                {...register("displayName")}
+              />
               <Form.Control.Feedback type="invalid">
                 {errors.displayName?.message}
               </Form.Control.Feedback>
@@ -193,6 +228,7 @@ export function ClientScopeDetail({
               <Form.Label>{copy.description}</Form.Label>
               <Form.Control
                 as="textarea"
+                disabled={scope.builtIn || !access?.manageClients}
                 isInvalid={Boolean(errors.description)}
                 rows={4}
                 {...register("description")}
@@ -201,10 +237,34 @@ export function ClientScopeDetail({
                 {errors.description?.message}
               </Form.Control.Feedback>
             </Form.Group>
+            <Form.Group className="mb-3" controlId="client-scope-detail-consent-screen-text">
+              <Form.Label>{copy.consentScreenText}</Form.Label>
+              <Form.Control
+                disabled={scope.builtIn || !access?.manageClients}
+                isInvalid={Boolean(errors.consentScreenText)}
+                maxLength={200}
+                {...register("consentScreenText")}
+              />
+              <Form.Control.Feedback type="invalid">
+                {errors.consentScreenText?.message}
+              </Form.Control.Feedback>
+            </Form.Group>
+            <Form.Check
+              className="mb-2"
+              disabled={scope.builtIn || !access?.manageClients}
+              label={copy.displayOnConsentScreen}
+              {...register("displayOnConsentScreen")}
+            />
+            <Form.Check
+              className="mb-4"
+              disabled={scope.builtIn || !access?.manageClients}
+              label={copy.includeInTokenScope}
+              {...register("includeInTokenScope")}
+            />
             <Form.Group className="mb-3" controlId="client-scope-detail-group-claim-name">
               <Form.Label>{copy.groupClaimName}</Form.Label>
               <Form.Control
-                disabled={!access?.manageClients}
+                disabled={scope.builtIn || !access?.manageClients}
                 isInvalid={Boolean(errors.groupClaimName)}
                 {...register("groupClaimName")}
               />
@@ -214,18 +274,21 @@ export function ClientScopeDetail({
             </Form.Group>
             <Form.Check
               className="mb-2"
-              disabled={!access?.manageClients}
+              disabled={scope.builtIn || !access?.manageClients}
               label={copy.groupMapperEnabled}
               {...register("groupMapperEnabled")}
             />
             <Form.Check
               className="mb-4"
-              disabled={!access?.manageClients}
+              disabled={scope.builtIn || !access?.manageClients}
               label={copy.groupMapperFullPath}
               {...register("groupMapperFullPath")}
             />
             <div className="admin-form-actions">
-              <Button disabled={isSubmitting || !access?.manageClients} type="submit">
+              <Button
+                disabled={isSubmitting || !access?.manageClients || scope.builtIn}
+                type="submit"
+              >
                 {isSubmitting ? (
                   <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
                 ) : (
@@ -243,6 +306,18 @@ export function ClientScopeDetail({
           </dl>
         </Card.Body>
       </Card>
+
+      <ClientMappers
+        baseUrl={`/api/admin/client-scopes/${encodeURIComponent(scope.id)}/mappers`}
+        clientId={scope.id}
+        dictionary={dictionary}
+        readOnly={scope.builtIn}
+      />
+      <ClientScopeRoleMappings
+        dictionary={dictionary}
+        readOnly={scope.builtIn}
+        scopeId={scope.id}
+      />
 
       <ConfirmModal
         cancelLabel={common.cancel}

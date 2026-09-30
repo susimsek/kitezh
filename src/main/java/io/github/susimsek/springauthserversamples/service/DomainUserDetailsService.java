@@ -48,7 +48,8 @@ public class DomainUserDetailsService implements UserDetailsService {
                                         .password(user.getPassword())
                                         .authorities(authorities(user))
                                         .disabled(
-                                                !user.isEnabled()
+                                                user.isServiceAccount()
+                                                        || !user.isEnabled()
                                                         || (loginSettingsService != null
                                                                 && loginSettingsService
                                                                         .isVerifyEmailEnabled()
@@ -57,7 +58,7 @@ public class DomainUserDetailsService implements UserDetailsService {
                                         .accountLocked(
                                                 accountLockService.isLocked(user, Instant.now()))
                                         .build())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("Invalid username or password"));
     }
 
     private static String[] authorities(UserEntity user) {

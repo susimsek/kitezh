@@ -128,7 +128,65 @@ public record AdminClientDTO(
                         example = "PT8H",
                         format = "duration",
                         requiredMode = Schema.RequiredMode.REQUIRED)
-                Duration refreshTokenTimeToLive) {
+                Duration refreshTokenTimeToLive,
+        @Schema(
+                        description = "Whether this client has a non-interactive service account.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean serviceAccountEnabled,
+        @Schema(
+                        description = "Service-account username, when enabled.",
+                        example = "service-account-reporting-client",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String serviceAccountUsername,
+        @Schema(
+                        description = "Whether the client is enabled.",
+                        example = "true",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean enabled,
+        @Schema(
+                        description = "Client base URL.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String rootUrl,
+        @Schema(
+                        description = "Client home URL.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String homeUrl,
+        @Schema(
+                        description = "Allowed browser origins.",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                Set<String> webOrigins,
+        @Schema(
+                        description = "Client administration URL.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String adminUrl,
+        @Schema(
+                        description = "Whether front-channel logout is enabled.",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean frontChannelLogout,
+        @Schema(
+                        description = "Whether back-channel logout is enabled.",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean backchannelLogout,
+        @Schema(
+                        description = "Client JWKS URL for private_key_jwt.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String jwkSetUrl,
+        @Schema(
+                        description = "Token endpoint authentication signing algorithm.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String tokenEndpointAuthenticationSigningAlgorithm,
+        @Schema(
+                        description = "Expected certificate subject DN for tls_client_auth.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String x509CertificateSubjectDN) {
 
     public AdminClientDTO(
             String id,
@@ -168,6 +226,18 @@ public record AdminClientDTO(
                 false,
                 authorizationCodeTimeToLive,
                 accessTokenTimeToLive,
-                refreshTokenTimeToLive);
+                refreshTokenTimeToLive,
+                false,
+                null,
+                true,
+                null,
+                null,
+                java.util.Set.of(),
+                null,
+                false,
+                false,
+                null,
+                null,
+                null);
     }
 }

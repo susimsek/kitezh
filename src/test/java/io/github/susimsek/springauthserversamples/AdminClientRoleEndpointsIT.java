@@ -156,6 +156,123 @@ class AdminClientRoleEndpointsIT {
         }
     }
 
+    @Test
+    void administratorCanManageCompositeClientRolesAndCyclesAreRejected() throws Exception {
+        String parentName = "it-composite-parent-" + UUID.randomUUID();
+        String childName = "it-composite-child-" + UUID.randomUUID();
+        Long parentId = null;
+        Long childId = null;
+        try {
+            parentId = createRole(parentName);
+            childId = createRole(childName);
+
+            mockMvc.perform(
+                            post(
+                                            "/api/admin/clients/demo-client/roles/{roleId}/composites/{childRoleId}",
+                                            parentId,
+                                            childId)
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.compositeRoles[0].name").value(childName));
+
+            mockMvc.perform(
+                            post(
+                                            "/api/admin/clients/demo-client/roles/{roleId}/composites/{childRoleId}",
+                                            childId,
+                                            parentId)
+                                    .with(admin()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("client_role_composite_cycle"));
+
+            mockMvc.perform(
+                            delete(
+                                            "/api/admin/clients/demo-client/roles/{roleId}/composites/{childRoleId}",
+                                            parentId,
+                                            childId)
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.compositeRoles").isEmpty());
+        } finally {
+            deleteRole(childId);
+            deleteRole(parentId);
+        }
+    }
+
+    @Test
+    void administratorCanManageCrossClientAndRealmCompositeRoles() throws Exception {
+        String parentName = "it-cross-scope-parent-" + UUID.randomUUID();
+        String childName = "it-cross-scope-child-" + UUID.randomUUID();
+        Long parentId = null;
+        Long childId = null;
+        try {
+            parentId = createRole("demo-client", parentName);
+            childId = createRole("admin-console", childName);
+
+            mockMvc.perform(
+                            get(
+                                            "/api/admin/clients/demo-client/roles/{roleId}/available-composites",
+                                            parentId)
+                                    .param("q", childName)
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].clientId").value("admin-console"));
+
+            mockMvc.perform(
+                            post(
+                                            "/api/admin/clients/demo-client/roles/{roleId}/composites/{childRoleId}",
+                                            parentId,
+                                            childId)
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.compositeRoles[0].clientId").value("admin-console"));
+
+            mockMvc.perform(
+                            post(
+                                            "/api/admin/clients/demo-client/roles/{roleId}/realm-composites/{childName}",
+                                            parentId,
+                                            "ROLE_USER")
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.compositeRealmRoles[0].name").value("ROLE_USER"));
+        } finally {
+            deleteRole("demo-client", parentId);
+            deleteRole("admin-console", childId);
+        }
+    }
+
+    private Long createRole(String name) throws Exception {
+        return createRole("demo-client", name);
+    }
+
+    private Long createRole(String clientId, String name) throws Exception {
+        String response =
+                mockMvc.perform(
+                                post("/api/admin/clients/{clientId}/roles", clientId)
+                                        .with(admin())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                objectMapper.writeValueAsString(
+                                                        Map.of("name", name))))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        return objectMapper.readTree(response).get("id").asLong();
+    }
+
+    private void deleteRole(Long roleId) throws Exception {
+        deleteRole("demo-client", roleId);
+    }
+
+    private void deleteRole(String clientId, Long roleId) throws Exception {
+        if (roleId != null) {
+            mockMvc.perform(
+                            delete("/api/admin/clients/{clientId}/roles/{roleId}", clientId, roleId)
+                                    .with(admin()))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
     private static JwtRequestPostProcessor admin() {
         return jwt().jwt(token -> token.subject("admin"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));

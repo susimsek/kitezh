@@ -311,7 +311,6 @@ public class SecurityConfig {
                                     .permitAll());
         }
 
-        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
         http.oauth2ResourceServer(
                 resourceServer ->
                         resourceServer
@@ -329,17 +328,23 @@ public class SecurityConfig {
                                                                     nonceService));
                                         })
                                 .protectedResourceMetadata(
-                                        metadata ->
-                                                metadata.protectedResourceMetadataCustomizer(
-                                                        builder ->
-                                                                builder.resource(issuer.toString())
-                                                                        .authorizationServer(
-                                                                                issuer.toString())
-                                                                        .claim(
-                                                                                "dpop_signing_alg_values_supported",
-                                                                                List.of(
-                                                                                        "RS256",
-                                                                                        "ES256")))));
+                                        metadata -> {
+                                            metadata.protectedResourceMetadataCustomizer(
+                                                    builder ->
+                                                            builder.resource(
+                                                                            applicationProperties
+                                                                                    .authorizationServer()
+                                                                                    .issuer())
+                                                                    .authorizationServer(
+                                                                            applicationProperties
+                                                                                    .authorizationServer()
+                                                                                    .issuer())
+                                                                    .claim(
+                                                                            "dpop_signing_alg_values_supported",
+                                                                            List.of(
+                                                                                    "RS256",
+                                                                                    "ES256")));
+                                        }));
 
         return http.build();
     }
@@ -403,10 +408,10 @@ public class SecurityConfig {
 
     private static WebAuthnSettings resolveWebAuthnSettings(
             ApplicationProperties applicationProperties) {
-        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
         ApplicationProperties.WebAuthn policy = applicationProperties.webAuthn();
         String configuredRpId = policy.rpId() == null ? "" : policy.rpId().trim();
         String configuredOrigins = policy.allowedOrigins() == null ? "" : policy.allowedOrigins();
+        URI issuer = URI.create(applicationProperties.authorizationServer().issuer());
         return new WebAuthnSettings(
                 configuredRpId.isBlank() ? issuer.getHost() : configuredRpId,
                 configuredOrigins.isBlank()

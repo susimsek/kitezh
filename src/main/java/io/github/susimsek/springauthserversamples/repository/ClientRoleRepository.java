@@ -1,5 +1,6 @@
 package io.github.susimsek.springauthserversamples.repository;
 
+import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,9 +19,51 @@ public interface ClientRoleRepository extends JpaRepository<ClientRoleEntity, Lo
     Page<ClientRoleEntity> findByClientIdAndNameContainingIgnoreCase(
             @Param("clientId") String clientId, @Param("name") String name, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"client", "users", "groups"})
+    @EntityGraph(attributePaths = {"client"})
+    @Query(
+            "select r from ClientRoleEntity r where lower(r.name) like"
+                    + " lower(concat('%', :query, '%')) or lower(r.client.clientId) like"
+                    + " lower(concat('%', :query, '%'))")
+    Page<ClientRoleEntity> findAllByNameOrClientIdContainingIgnoreCase(
+            @Param("query") String query, Pageable pageable);
+
+    @EntityGraph(
+            attributePaths = {
+                "client",
+                "users",
+                "groups",
+                "compositeRoles",
+                "compositeParents",
+                "compositeRealmRoles"
+            })
     @Query("select r from ClientRoleEntity r where r.id = :id")
     java.util.Optional<ClientRoleEntity> findDetailedById(@Param("id") Long id);
+
+    @Query(
+            "select r from ClientRoleEntity r where r.id <> :roleId and lower(r.name) like"
+                    + " lower(concat('%', :query, '%')) and not exists (select child.id from"
+                    + " ClientRoleEntity parent join parent.compositeRoles child where parent.id ="
+                    + " :roleId and child.id = r.id)")
+    Page<ClientRoleEntity> findAvailableCompositeRoles(
+            @Param("roleId") Long roleId, @Param("query") String query, Pageable pageable);
+
+    @Query(
+            "select r from AuthorityEntity r where lower(r.name) like"
+                    + " lower(concat('%', :query, '%')) and not exists (select child.id from"
+                    + " ClientRoleEntity parent join parent.compositeRealmRoles child where"
+                    + " parent.id = :roleId and child.id = r.id)")
+    Page<AuthorityEntity> findAvailableRealmCompositeRoles(
+            @Param("roleId") Long roleId, @Param("query") String query, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"client"})
+    @Query(
+            "select r from ClientRoleEntity r where (lower(r.name) like"
+                    + " lower(concat('%', :query, '%')) or lower(r.client.clientId) like"
+                    + " lower(concat('%', :query, '%'))) and not exists (select child.id from"
+                    + " AuthorityEntity parent join parent.compositeClientRoles child where"
+                    + " parent.name = :roleName and child.id = r.id)")
+    Page<ClientRoleEntity> findAvailableClientRolesForAuthorityComposite(
+            @Param("roleName") String roleName, @Param("query") String query, Pageable pageable);
 
     @Query(
             "select case when count(r) > 0 then true else false end "

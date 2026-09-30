@@ -30,7 +30,7 @@ class CoverageRemainingEntryTest {
                 new Object[] {null});
         invokeStatic(
                 "io.github.susimsek.springauthserversamples.service.admin.AdminClientService",
-                "lambda$validate$1",
+                "lambda$validateUrisAndDurations$1",
                 new Class<?>[] {String.class},
                 new Object[] {"value"});
         invokeStatic(

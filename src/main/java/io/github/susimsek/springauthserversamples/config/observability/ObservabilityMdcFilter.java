@@ -7,12 +7,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -269,12 +269,9 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     }
 
     private static Set<String> lowerCaseSet(List<String> values) {
-        Set<String> normalized = new HashSet<>();
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                normalized.add(value.trim().toLowerCase());
-            }
-        }
-        return normalized;
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(value -> value.trim().toLowerCase())
+                .collect(Collectors.toSet());
     }
 }

@@ -32,6 +32,8 @@ public interface GroupRepository extends JpaRepository<GroupEntity, Long> {
 
     boolean existsByName(String name);
 
+    Optional<GroupEntity> findByNameIgnoreCase(String name);
+
     boolean existsByParentId(Long parentId);
 
     @Cacheable(cacheNames = DEFAULT_GROUPS_CACHE)

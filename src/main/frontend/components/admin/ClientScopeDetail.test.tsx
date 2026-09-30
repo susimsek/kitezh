@@ -31,6 +31,10 @@ const scope = {
   name: "profile",
   displayName: "Profile",
   description: "Profile claims",
+  builtIn: false,
+  displayOnConsentScreen: false,
+  consentScreenText: null,
+  includeInTokenScope: true,
   createdAt: "2026-01-01T10:00:00Z",
   updatedAt: "2026-01-02T10:00:00Z",
   groupMapperEnabled: false,
@@ -38,18 +42,44 @@ const scope = {
   groupMapperFullPath: true,
 };
 
+function mockScopeRequests() {
+  mockAdminRequest.mockImplementation((_token, request) => {
+    const url = request.url ?? "";
+    if (request.method === "PUT" && url === "/api/admin/client-scopes/scope-1") {
+      return Promise.resolve({
+        status: 200,
+        data: { ...scope, displayName: "Updated profile" },
+      }) as never;
+    }
+    if (request.method === "DELETE" && url === "/api/admin/client-scopes/scope-1") {
+      return Promise.resolve({ status: 204, data: null }) as never;
+    }
+    if (url.endsWith("/mappers?page=0&size=20&sort=name,asc")) {
+      return Promise.resolve({ status: 200, data: { content: [] } }) as never;
+    }
+    if (url.endsWith("/role-mappings")) {
+      return Promise.resolve({
+        status: 200,
+        data: { applicationRoles: [], clientRoles: [] },
+      }) as never;
+    }
+    if (url.includes("/role-mappings/application-roles")) {
+      return Promise.resolve({ status: 200, data: { content: [] } }) as never;
+    }
+    if (url.includes("/role-mappings/client-roles")) {
+      return Promise.resolve({ status: 200, data: { content: [] } }) as never;
+    }
+    return Promise.resolve({ status: 200, data: scope }) as never;
+  });
+}
+
 describe("ClientScopeDetail", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it("loads a scope, links back to the list, and edits it inline", async () => {
-    mockAdminRequest
-      .mockResolvedValueOnce({ status: 200, data: scope } as never)
-      .mockResolvedValueOnce({
-        status: 200,
-        data: { ...scope, displayName: "Updated profile" },
-      } as never);
+    mockScopeRequests();
 
     render(<ClientScopeDetail dictionary={dictionary} id="scope-1" locale="en" />);
 
@@ -69,8 +99,8 @@ describe("ClientScopeDetail", () => {
       screen.getByRole("textbox", { name: dictionary.admin.clientScopes.groupClaimName }),
       { target: { value: "roles.groups" } },
     );
-    fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+    fireEvent.click(screen.getAllByRole("checkbox")[2]);
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.common.save })[0]);
 
     await waitFor(() =>
       expect(mockAdminRequest).toHaveBeenCalledWith("token", {
@@ -80,6 +110,9 @@ describe("ClientScopeDetail", () => {
           name: "profile",
           displayName: "Updated profile",
           description: "Profile claims",
+          displayOnConsentScreen: false,
+          consentScreenText: "",
+          includeInTokenScope: true,
           groupMapperEnabled: true,
           groupClaimName: "roles.groups",
           groupMapperFullPath: true,
@@ -89,9 +122,7 @@ describe("ClientScopeDetail", () => {
   });
 
   it("deletes the scope after confirmation", async () => {
-    mockAdminRequest
-      .mockResolvedValueOnce({ status: 200, data: scope } as never)
-      .mockResolvedValueOnce({ status: 204, data: null } as never);
+    mockScopeRequests();
 
     render(<ClientScopeDetail dictionary={dictionary} id="scope-1" locale="en" />);
     await screen.findByRole("heading", { name: "profile" });

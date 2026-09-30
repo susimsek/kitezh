@@ -8,14 +8,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRoleGroupDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRoleRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleUserDTO;
 import io.github.susimsek.springauthserversamples.mapper.AdminRoleMapper;
+import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRoleRepository;
 import io.github.susimsek.springauthserversamples.repository.GroupRepository;
@@ -37,6 +40,7 @@ class AdminClientRoleServiceTest {
 
     @Mock private ClientRepository clientRepository;
     @Mock private ClientRoleRepository clientRoleRepository;
+    @Mock private AuthorityRepository authorityRepository;
     @Mock private UserRepository userRepository;
     @Mock private GroupRepository groupRepository;
     @Mock private UserAccessInvalidationService invalidationService;
@@ -170,6 +174,87 @@ class AdminClientRoleServiceTest {
         assertThat(users.getContent()).containsExactly(new AdminRoleUserDTO(7L, "alice", false));
         assertThat(groups.getContent())
                 .containsExactly(new AdminClientRoleGroupDTO(8L, "Operations", "Operations"));
+    }
+
+    @Test
+    void listsAvailableClientAndRealmComposites() {
+        RegisteredClientEntity client = client("orders-client", "Orders");
+        ClientRoleEntity role = role(client, 12L, "orders.read");
+        ClientRoleEntity child = role(client, 13L, "orders.write");
+        AuthorityEntity realmRole = new AuthorityEntity(14L, "ROLE_AUDITOR");
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(clientRoleRepository.findDetailedById(12L)).thenReturn(Optional.of(role));
+        when(clientRoleRepository.findAvailableCompositeRoles(12L, "write", pageable))
+                .thenReturn(new PageImpl<>(List.of(child), pageable, 1));
+        when(clientRoleRepository.findAvailableRealmCompositeRoles(12L, "audit", pageable))
+                .thenReturn(new PageImpl<>(List.of(realmRole), pageable, 1));
+
+        assertThat(service().availableComposites("orders-client", 12L, " write ", pageable))
+                .extracting(AdminClientRoleDTO::name)
+                .containsExactly("orders.write");
+        assertThat(service().availableRealmComposites("orders-client", 12L, " audit ", pageable))
+                .extracting("name")
+                .containsExactly("ROLE_AUDITOR");
+    }
+
+    @Test
+    void addsAndRemovesClientComposite() {
+        RegisteredClientEntity client = client("orders-client", "Orders");
+        ClientRoleEntity parent = role(client, 12L, "orders.all");
+        ClientRoleEntity child = role(client, 13L, "orders.read");
+        when(clientRoleRepository.findDetailedById(12L)).thenReturn(Optional.of(parent));
+        when(clientRoleRepository.findDetailedById(13L)).thenReturn(Optional.of(child));
+        when(userRepository.findAll()).thenReturn(List.of());
+        stubDetailQueries(parent, 0L, List.of());
+        PageRequest pageable = PageRequest.of(0, 20);
+
+        service().addComposite("orders-client", 12L, 13L, pageable);
+        assertThat(parent.getCompositeRoles()).containsExactly(child);
+        assertThat(child.getCompositeParents()).containsExactly(parent);
+        verify(auditEventService).record("client-role.composite.added", "client-role", "12");
+
+        service().removeComposite("orders-client", 12L, 13L, pageable);
+        assertThat(parent.getCompositeRoles()).isEmpty();
+        assertThat(child.getCompositeParents()).isEmpty();
+        verify(auditEventService).record("client-role.composite.removed", "client-role", "12");
+    }
+
+    @Test
+    void rejectsClientCompositeCycleAndLeavesExistingCompositeUntouched() {
+        RegisteredClientEntity client = client("orders-client", "Orders");
+        ClientRoleEntity parent = role(client, 12L, "orders.all");
+        ClientRoleEntity child = role(client, 13L, "orders.read");
+        child.getCompositeRoles().add(parent);
+        when(clientRoleRepository.findDetailedById(12L)).thenReturn(Optional.of(parent));
+        when(clientRoleRepository.findDetailedById(13L)).thenReturn(Optional.of(child));
+        AdminClientRoleService service = service();
+        PageRequest pageable = PageRequest.of(0, 20);
+
+        assertThatThrownBy(() -> service.addComposite("orders-client", 12L, 13L, pageable))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The client role composite relationship would create a cycle");
+        assertThat(parent.getCompositeRoles()).isEmpty();
+    }
+
+    @Test
+    void addsAndRemovesRealmComposite() {
+        RegisteredClientEntity client = client("orders-client", "Orders");
+        ClientRoleEntity parent = role(client, 12L, "orders.all");
+        AuthorityEntity child = new AuthorityEntity(14L, "ROLE_AUDITOR");
+        when(clientRoleRepository.findDetailedById(12L)).thenReturn(Optional.of(parent));
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(child));
+        when(userRepository.findAll()).thenReturn(List.of());
+        stubDetailQueries(parent, 0L, List.of());
+        PageRequest pageable = PageRequest.of(0, 20);
+
+        service().addRealmComposite("orders-client", 12L, "ROLE_AUDITOR", pageable);
+        assertThat(parent.getCompositeRealmRoles()).containsExactly(child);
+        verify(auditEventService).record("client-role.composite-realm.added", "client-role", "12");
+
+        service().removeRealmComposite("orders-client", 12L, "ROLE_AUDITOR", pageable);
+        assertThat(parent.getCompositeRealmRoles()).isEmpty();
+        verify(auditEventService)
+                .record("client-role.composite-realm.removed", "client-role", "12");
     }
 
     @Test
@@ -416,6 +501,7 @@ class AdminClientRoleServiceTest {
         return new AdminClientRoleService(
                 clientRepository,
                 clientRoleRepository,
+                authorityRepository,
                 userRepository,
                 groupRepository,
                 invalidationService,

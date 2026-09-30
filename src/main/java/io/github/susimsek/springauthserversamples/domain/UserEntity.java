@@ -38,7 +38,7 @@ import org.hibernate.proxy.HibernateProxy;
 @NamedEntityGraph(
         name = "User.withEffectiveAuthorities",
         attributeNodes = {
-            @NamedAttributeNode("authorities"),
+            @NamedAttributeNode(value = "authorities", subgraph = "authorities"),
             @NamedAttributeNode("clientRoles"),
             @NamedAttributeNode(value = "groups", subgraph = "groups")
         },
@@ -46,10 +46,38 @@ import org.hibernate.proxy.HibernateProxy;
             @NamedSubgraph(
                     name = "groups",
                     attributeNodes = {
-                        @NamedAttributeNode("authorities"),
-                        @NamedAttributeNode(value = "clientRoles", subgraph = "clientRoles")
+                        @NamedAttributeNode(value = "authorities", subgraph = "groupAuthorities"),
+                        @NamedAttributeNode(value = "clientRoles", subgraph = "groupClientRoles")
                     }),
-            @NamedSubgraph(name = "clientRoles", attributeNodes = @NamedAttributeNode("client"))
+            @NamedSubgraph(
+                    name = "groupAuthorities",
+                    attributeNodes = {
+                        @NamedAttributeNode("compositeRoles"),
+                        @NamedAttributeNode("compositeClientRoles")
+                    }),
+            @NamedSubgraph(
+                    name = "groupClientRoles",
+                    attributeNodes = {
+                        @NamedAttributeNode("client"),
+                        @NamedAttributeNode("compositeRoles"),
+                        @NamedAttributeNode("compositeRealmRoles")
+                    }),
+            @NamedSubgraph(
+                    name = "authorities",
+                    attributeNodes = {
+                        @NamedAttributeNode("compositeRoles"),
+                        @NamedAttributeNode("compositeClientRoles")
+                    }),
+            @NamedSubgraph(
+                    name = "clientRoles",
+                    attributeNodes = {
+                        @NamedAttributeNode("client"),
+                        @NamedAttributeNode("compositeRoles"),
+                        @NamedAttributeNode("compositeRealmRoles")
+                    }),
+            @NamedSubgraph(
+                    name = "nestedClientRoles",
+                    attributeNodes = @NamedAttributeNode("compositeRoles"))
         })
 public class UserEntity extends AuditableEntity {
 
@@ -87,6 +115,9 @@ public class UserEntity extends AuditableEntity {
 
     @Column(name = "enabled", nullable = false)
     private boolean enabled;
+
+    @Column(name = "service_account", nullable = false)
+    private boolean serviceAccount;
 
     @Column(name = "password_changed_at")
     private Instant passwordChangedAt;

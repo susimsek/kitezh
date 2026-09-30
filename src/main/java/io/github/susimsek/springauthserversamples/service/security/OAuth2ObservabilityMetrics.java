@@ -30,7 +30,7 @@ public class OAuth2ObservabilityMetrics {
             @Nullable String error,
             @Nullable String clientId,
             @Nullable String provider) {
-        record(event, outcome, error, null, null, clientId, provider);
+        recordEvent(event, outcome, error, null, null, clientId, provider);
     }
 
     public void recordToken(
@@ -40,18 +40,18 @@ public class OAuth2ObservabilityMetrics {
             @Nullable String grantType,
             @Nullable String tokenType,
             @Nullable String clientId) {
-        record(event, outcome, error, grantType, tokenType, clientId, null);
+        recordEvent(event, outcome, error, grantType, tokenType, clientId, null);
     }
 
     public void recordOAuthError(@Nullable String grantType, String error) {
-        record("oauth_error", "failure", error, grantType, null, null, null);
+        recordEvent("oauth_error", "failure", error, grantType, null, null, null);
     }
 
     public void recordLogout(String outcome, @Nullable String provider) {
-        record("logout", outcome, null, null, null, null, provider);
+        recordEvent("logout", outcome, null, null, null, null, provider);
     }
 
-    void record(
+    void recordEvent(
             String event,
             String outcome,
             @Nullable String error,

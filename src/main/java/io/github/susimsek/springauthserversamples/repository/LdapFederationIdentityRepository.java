@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.repository;
 
 import io.github.susimsek.springauthserversamples.domain.LdapFederationIdentityEntity;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,6 +12,8 @@ public interface LdapFederationIdentityRepository
             String providerId, String externalId);
 
     Optional<LdapFederationIdentityEntity> findByUserUsername(String username);
+
+    List<LdapFederationIdentityEntity> findAllByProviderId(String providerId);
 
     boolean existsByProviderId(String providerId);
 }

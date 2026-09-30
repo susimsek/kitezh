@@ -28,6 +28,27 @@ public record AdminClientScopeDTO(
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
                 String description,
         @Schema(
+                        description = "Whether this is a protected built-in scope.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean builtIn,
+        @Schema(
+                        description = "Whether this scope is shown on the user consent screen.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean displayOnConsentScreen,
+        @Schema(
+                        description = "Optional consent-screen text for this scope.",
+                        example = "Access reporting data",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String consentScreenText,
+        @Schema(
+                        description = "Whether this scope is included in the token scope claim.",
+                        example = "true",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean includeInTokenScope,
+        @Schema(
                         description = "Creation time.",
                         example = "2026-09-04T08:30:00Z",
                         format = "date-time",
@@ -62,6 +83,19 @@ public record AdminClientScopeDTO(
             String description,
             Instant createdAt,
             Instant updatedAt) {
-        this(id, name, displayName, description, createdAt, updatedAt, false, "groups", true);
+        this(
+                id,
+                name,
+                displayName,
+                description,
+                false,
+                false,
+                null,
+                true,
+                createdAt,
+                updatedAt,
+                false,
+                "groups",
+                true);
     }
 }

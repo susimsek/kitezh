@@ -1,8 +1,8 @@
-id;name;display_name;description;group_mapper_enabled;group_claim_name;group_mapper_full_path;created_by;last_modified_by
-scope-openid;openid;OpenID;OpenID Connect identity scope.;false;groups;true;system;system
-scope-profile;profile;Profile;Basic user profile claims.;false;groups;true;system;system
-scope-user-read;user.read;User read;Read user information.;false;groups;true;system;system
-scope-user-write;user.write;User write;Update user information.;false;groups;true;system;system
-scope-admin-api;admin-api;Admin API;Access the administration API.;true;groups;true;system;system
-scope-account-api;account-api;Account API;Access the account API.;false;groups;true;system;system
-scope-email;email;Email;Email address and verification status.;false;groups;true;system;system
+id;name;display_name;description;built_in;display_on_consent_screen;consent_screen_text;include_in_token_scope;group_mapper_enabled;group_claim_name;group_mapper_full_path;created_by;last_modified_by
+scope-openid;openid;OpenID;OpenID Connect identity scope.;true;false;;true;false;groups;true;system;system
+scope-profile;profile;Profile;Basic user profile claims.;true;false;;true;false;groups;true;system;system
+scope-user-read;user.read;User read;Read user information.;true;false;;true;false;groups;true;system;system
+scope-user-write;user.write;User write;Update user information.;true;false;;true;false;groups;true;system;system
+scope-admin-api;admin-api;Admin API;Access the administration API.;true;false;;true;true;groups;true;system;system
+scope-account-api;account-api;Account API;Access the account API.;true;false;;true;false;groups;true;system;system
+scope-email;email;Email;Email address and verification status.;true;false;;true;false;groups;true;system;system

@@ -78,6 +78,8 @@ public class AdminGroupService {
         UserEntity user = findUserByUsername(currentUsername);
         Set<String> roles = EffectiveRoleService.effectiveRoleNames(user);
         if (roles.contains(AuthoritiesConstants.ADMIN)
+                || roles.contains(AuthoritiesConstants.GROUP_QUERY)
+                || roles.contains(AuthoritiesConstants.GROUP_MANAGER)
                 || roles.contains(AuthoritiesConstants.USER_MANAGER)) {
             return findAllInternal(query, pageable);
         }

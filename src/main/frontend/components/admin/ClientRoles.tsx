@@ -20,6 +20,7 @@ import { PaginationControls } from "./PaginationControls";
 import { useAdminTableState } from "./useAdminTableState";
 
 type ClientRole = { id: number; clientId: string; name: string; description: string | null };
+type RealmRole = { name: string; description: string | null };
 type RoleUser = { id: number; username: string; enabled: boolean };
 type RoleGroup = { id: number; name: string; path: string };
 type RoleDetail = {
@@ -28,6 +29,8 @@ type RoleDetail = {
   groups: PageResponse<RoleGroup>;
   userCount: number;
   groupCount: number;
+  compositeRoles?: ClientRole[];
+  compositeRealmRoles?: RealmRole[];
 };
 
 export function ClientRoles({
@@ -58,6 +61,12 @@ export function ClientRoles({
   const [groupQuery, setGroupQuery] = useState("");
   const [groupSuggestions, setGroupSuggestions] = useState<RoleGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<RoleGroup | null>(null);
+  const [compositeQuery, setCompositeQuery] = useState("");
+  const [compositeSuggestions, setCompositeSuggestions] = useState<ClientRole[]>([]);
+  const [selectedComposite, setSelectedComposite] = useState<ClientRole | null>(null);
+  const [realmCompositeQuery, setRealmCompositeQuery] = useState("");
+  const [realmCompositeSuggestions, setRealmCompositeSuggestions] = useState<RealmRole[]>([]);
+  const [selectedRealmComposite, setSelectedRealmComposite] = useState<RealmRole | null>(null);
   const { page, setPage, setSize, size } = useAdminTableState(10, false, "name,asc");
   const schema = z.object({
     name: z
@@ -154,6 +163,40 @@ export function ClientRoles({
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [accessToken, clientId, groupQuery, selected]);
+
+  useEffect(() => {
+    if (!accessToken || !selected || compositeQuery.trim().length < 2) {
+      const timeout = window.setTimeout(() => setCompositeSuggestions([]), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const timeout = window.setTimeout(() => {
+      adminRequest<PageResponse<ClientRole>>(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${selected.id}/available-composites?q=${encodeURIComponent(compositeQuery.trim())}&page=0&size=10&sort=name,asc`,
+      })
+        .then((response) =>
+          setCompositeSuggestions(response.status < 300 ? response.data.content : []),
+        )
+        .catch(() => setCompositeSuggestions([]));
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [accessToken, clientId, compositeQuery, selected]);
+
+  useEffect(() => {
+    if (!accessToken || !selected || realmCompositeQuery.trim().length < 2) {
+      const timeout = window.setTimeout(() => setRealmCompositeSuggestions([]), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const timeout = window.setTimeout(() => {
+      adminRequest<PageResponse<RealmRole>>(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${selected.id}/available-realm-composites?q=${encodeURIComponent(realmCompositeQuery.trim())}&page=0&size=10&sort=name,asc`,
+      })
+        .then((response) =>
+          setRealmCompositeSuggestions(response.status < 300 ? response.data.content : []),
+        )
+        .catch(() => setRealmCompositeSuggestions([]));
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [accessToken, clientId, realmCompositeQuery, selected]);
 
   const saveRole = async (values: z.infer<typeof schema>) => {
     if (!access?.manageClients || !accessToken) return;
@@ -272,6 +315,84 @@ export function ClientRoles({
       if (response.status >= 300) throw new Error();
       setDetail(response.data);
       alerts.addAlert(copy.groupAssignmentRemoved);
+    } catch {
+      alerts.addError(copy.operationError);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const assignComposite = async () => {
+    if (!access?.manageClients || !accessToken || !selected || !selectedComposite) return;
+    setSaving(true);
+    try {
+      const response = await adminRequest<RoleDetail>(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${selected.id}/composites/${selectedComposite.id}?page=0&size=10&sort=username,asc`,
+        method: "POST",
+      });
+      if (response.status >= 300) throw new Error();
+      setDetail(response.data);
+      setSelectedComposite(null);
+      setCompositeQuery("");
+      setCompositeSuggestions([]);
+      alerts.addAlert(copy.compositeSaved);
+    } catch {
+      alerts.addError(copy.operationError);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeComposite = async (composite: ClientRole) => {
+    if (!access?.manageClients || !accessToken || !selected) return;
+    setSaving(true);
+    try {
+      const response = await adminRequest<RoleDetail>(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${selected.id}/composites/${composite.id}?page=0&size=10&sort=username,asc`,
+        method: "DELETE",
+      });
+      if (response.status >= 300) throw new Error();
+      setDetail(response.data);
+      alerts.addAlert(copy.compositeRemoved);
+    } catch {
+      alerts.addError(copy.operationError);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const assignRealmComposite = async () => {
+    if (!access?.manageClients || !accessToken || !selected || !selectedRealmComposite) return;
+    setSaving(true);
+    try {
+      const response = await adminRequest<RoleDetail>(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${selected.id}/realm-composites/${encodeURIComponent(selectedRealmComposite.name)}?page=0&size=10&sort=username,asc`,
+        method: "POST",
+      });
+      if (response.status >= 300) throw new Error();
+      setDetail(response.data);
+      setSelectedRealmComposite(null);
+      setRealmCompositeQuery("");
+      setRealmCompositeSuggestions([]);
+      alerts.addAlert(copy.compositeSaved);
+    } catch {
+      alerts.addError(copy.operationError);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeRealmComposite = async (composite: RealmRole) => {
+    if (!access?.manageClients || !accessToken || !selected) return;
+    setSaving(true);
+    try {
+      const response = await adminRequest<RoleDetail>(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${selected.id}/realm-composites/${encodeURIComponent(composite.name)}?page=0&size=10&sort=username,asc`,
+        method: "DELETE",
+      });
+      if (response.status >= 300) throw new Error();
+      setDetail(response.data);
+      alerts.addAlert(copy.compositeRemoved);
     } catch {
       alerts.addError(copy.operationError);
     } finally {
@@ -441,7 +562,7 @@ export function ClientRoles({
       </DataTable>
 
       {detail && selected && (
-        <Card className="admin-panel-card">
+        <Card className="admin-panel-card admin-role-user-assignment-card">
           <Card.Body>
             <div className="d-flex flex-wrap justify-content-between gap-3 mb-3">
               <div>
@@ -473,7 +594,7 @@ export function ClientRoles({
                   }}
                 />
                 {suggestions.length > 0 && !selectedUser && (
-                  <div className="list-group position-absolute w-100 z-1">
+                  <div className="list-group admin-member-suggestions position-absolute w-100">
                     {suggestions.map((user) => (
                       <button
                         className="list-group-item list-group-item-action"
@@ -548,6 +669,177 @@ export function ClientRoles({
                 </Button>
               </div>
             )}
+            <div className="mb-4">
+              <div className="admin-detail-heading mb-3">
+                <div>
+                  <h4 className="h6 mb-1">{copy.compositeRoles}</h4>
+                  <p className="small text-body-secondary mb-0">{copy.compositeHelp}</p>
+                </div>
+              </div>
+              {access?.manageClients && (
+                <div className="position-relative">
+                  <Form.Label htmlFor="client-role-composite-search">
+                    {copy.assignComposite}
+                  </Form.Label>
+                  <Form.Control
+                    id="client-role-composite-search"
+                    value={selectedComposite?.name ?? compositeQuery}
+                    placeholder={copy.searchRolesPlaceholder}
+                    onChange={(event) => {
+                      setSelectedComposite(null);
+                      setCompositeQuery(event.target.value);
+                    }}
+                  />
+                  {compositeSuggestions.length > 0 && !selectedComposite && (
+                    <div className="list-group position-absolute w-100 z-1">
+                      {compositeSuggestions.map((role) => (
+                        <button
+                          className="list-group-item list-group-item-action"
+                          key={role.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedComposite(role);
+                            setCompositeSuggestions([]);
+                          }}
+                        >
+                          {role.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <Button
+                    className="mt-2"
+                    variant="primary"
+                    disabled={!selectedComposite || saving}
+                    onClick={() => void assignComposite()}
+                  >
+                    {saving ? (
+                      <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                    ) : (
+                      <AdminActionIcon action="add" />
+                    )}
+                    {copy.assign}
+                  </Button>
+                </div>
+              )}
+              {(detail.compositeRoles ?? []).length === 0 ? (
+                <div className="text-body-secondary small mt-3">{copy.noCompositeRoles}</div>
+              ) : (
+                <div className="d-grid gap-2 mt-3">
+                  {detail.compositeRoles?.map((composite) => (
+                    <div
+                      className="d-flex justify-content-between align-items-center border rounded p-2"
+                      key={composite.id}
+                    >
+                      <span className="font-monospace">{composite.name}</span>
+                      {access?.manageClients && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={saving}
+                          onClick={() => void removeComposite(composite)}
+                        >
+                          {saving ? (
+                            <Spinner
+                              animation="border"
+                              aria-hidden="true"
+                              className="me-2"
+                              size="sm"
+                            />
+                          ) : (
+                            <AdminActionIcon action="remove" />
+                          )}
+                          {copy.remove}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-top mt-4 pt-4">
+                <h4 className="h6">{copy.realmCompositeRoles}</h4>
+                {access?.manageClients && (
+                  <div className="position-relative">
+                    <Form.Label htmlFor="client-role-realm-composite-search">
+                      {copy.assignRealmComposite}
+                    </Form.Label>
+                    <Form.Control
+                      id="client-role-realm-composite-search"
+                      value={selectedRealmComposite?.name ?? realmCompositeQuery}
+                      placeholder={copy.searchRealmRolesPlaceholder}
+                      onChange={(event) => {
+                        setSelectedRealmComposite(null);
+                        setRealmCompositeQuery(event.target.value);
+                      }}
+                    />
+                    {realmCompositeSuggestions.length > 0 && !selectedRealmComposite && (
+                      <div className="list-group position-absolute w-100 z-1">
+                        {realmCompositeSuggestions.map((role) => (
+                          <button
+                            className="list-group-item list-group-item-action"
+                            key={role.name}
+                            type="button"
+                            onClick={() => {
+                              setSelectedRealmComposite(role);
+                              setRealmCompositeSuggestions([]);
+                            }}
+                          >
+                            {role.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <Button
+                      className="mt-2"
+                      variant="primary"
+                      disabled={!selectedRealmComposite || saving}
+                      onClick={() => void assignRealmComposite()}
+                    >
+                      {saving ? (
+                        <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                      ) : (
+                        <AdminActionIcon action="add" />
+                      )}
+                      {copy.assign}
+                    </Button>
+                  </div>
+                )}
+                {(detail.compositeRealmRoles ?? []).length === 0 ? (
+                  <div className="text-body-secondary small mt-3">{copy.noRealmCompositeRoles}</div>
+                ) : (
+                  <div className="d-grid gap-2 mt-3">
+                    {detail.compositeRealmRoles?.map((composite) => (
+                      <div
+                        className="d-flex justify-content-between align-items-center border rounded p-2"
+                        key={composite.name}
+                      >
+                        <span className="font-monospace">{composite.name}</span>
+                        {access?.manageClients && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={saving}
+                            onClick={() => void removeRealmComposite(composite)}
+                          >
+                            {saving ? (
+                              <Spinner
+                                animation="border"
+                                aria-hidden="true"
+                                className="me-2"
+                                size="sm"
+                              />
+                            ) : (
+                              <AdminActionIcon action="remove" />
+                            )}
+                            {copy.remove}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             <h4 className="h6">{copy.usersInRole}</h4>
             {detail.users.content.length === 0 ? (
               <div className="text-body-secondary small">{copy.noAssignedUsers}</div>

@@ -9,6 +9,16 @@ import { StoreProvider } from "@/store/StoreProvider";
 import { AdminShell } from "./AdminShell";
 
 const mockLogout = jest.fn().mockResolvedValue(undefined);
+const defaultAdminAccess = {
+  isAdmin: true,
+  viewClients: true,
+  viewUsers: true,
+  manageRoles: true,
+  viewSessions: true,
+  viewConsents: true,
+  viewKeys: true,
+};
+const mockAdminAccess = { ...defaultAdminAccess };
 
 jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
@@ -21,15 +31,7 @@ jest.mock("@/routing/Link", () => ({ children, href, ...props }: React.Component
 ));
 jest.mock("./AdminAuthProvider", () => ({
   useAdminAuth: () => ({
-    access: {
-      isAdmin: true,
-      viewClients: true,
-      viewUsers: true,
-      manageRoles: true,
-      viewSessions: true,
-      viewConsents: true,
-      viewKeys: true,
-    },
+    access: mockAdminAccess,
     idTokenParsed: { picture: "/avatars/admin?v=1" },
     logout: mockLogout,
     tokenParsed: null,
@@ -119,6 +121,7 @@ jest.mock("react-bootstrap", () => {
 describe("AdminShell", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.assign(mockAdminAccess, defaultAdminAccess);
   });
 
   it("renders permitted navigation and redirects after logout", async () => {
@@ -147,5 +150,53 @@ describe("AdminShell", () => {
       screen.getByRole("button", { name: dictionary.admin.common.closeNavigation }),
     ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.closeNavigation }));
+  });
+
+  it("uses query access for resource discovery navigation", () => {
+    Object.assign(mockAdminAccess, {
+      isAdmin: false,
+      viewClients: false,
+      viewUsers: false,
+      queryClients: true,
+      queryUsers: true,
+      queryGroups: true,
+      viewGroups: false,
+    });
+
+    render(
+      <StoreProvider>
+        <AdminShell locale="en" dictionary={dictionary}>
+          <div>Content</div>
+        </AdminShell>
+      </StoreProvider>,
+    );
+
+    expect(screen.getByText(dictionary.admin.nav.clients)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.nav.users)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.nav.groups)).toBeVisible();
+  });
+
+  it("keeps viewer navigation visible without query access", () => {
+    Object.assign(mockAdminAccess, {
+      isAdmin: false,
+      queryClients: false,
+      viewClients: true,
+      queryUsers: false,
+      viewUsers: true,
+      queryGroups: false,
+      viewGroups: true,
+    });
+
+    render(
+      <StoreProvider>
+        <AdminShell locale="en" dictionary={dictionary}>
+          <div>Content</div>
+        </AdminShell>
+      </StoreProvider>,
+    );
+
+    expect(screen.getByText(dictionary.admin.nav.clients)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.nav.users)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.nav.groups)).toBeVisible();
   });
 });

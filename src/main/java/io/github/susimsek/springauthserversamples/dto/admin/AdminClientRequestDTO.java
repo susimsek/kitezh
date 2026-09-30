@@ -142,7 +142,142 @@ public record AdminClientRequestDTO(
                         format = "duration",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 @PositiveDuration
-                Duration refreshTokenTimeToLive) {
+                Duration refreshTokenTimeToLive,
+        @Schema(
+                        description = "Whether this client has a non-interactive service account.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean serviceAccountEnabled,
+        @Schema(
+                        description = "Client-secret lifetime in ISO-8601 duration format.",
+                        example = "P90D",
+                        format = "duration",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                @PositiveDuration
+                Duration clientSecretTimeToLive,
+        @Schema(
+                        description = "Whether the client may participate in authorization flows.",
+                        example = "true",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Boolean enabled,
+        @Size(max = 1000)
+                @Schema(
+                        description = "Base URL used for client links.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String rootUrl,
+        @Size(max = 1000)
+                @Schema(
+                        description = "Client home URL.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String homeUrl,
+        @Schema(
+                        description = "Allowed browser origins.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Set<@AbsoluteUri String> webOrigins,
+        @Size(max = 1000)
+                @Schema(
+                        description = "Administration URL for the client.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String adminUrl,
+        @Schema(
+                        description = "Whether front-channel logout is enabled.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Boolean frontChannelLogout,
+        @Schema(
+                        description = "Whether back-channel logout is enabled.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Boolean backchannelLogout,
+        @Size(max = 1000)
+                @Schema(
+                        description = "Client JWKS URL for private_key_jwt.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String jwkSetUrl,
+        @Pattern(
+                        regexp = "RS256|RS384|RS512|PS256|PS384|PS512|ES256|ES384|ES512",
+                        message = "{app.api.problem.violation.selection}")
+                @Schema(
+                        description = "Token endpoint authentication signing algorithm.",
+                        example = "RS256",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String tokenEndpointAuthenticationSigningAlgorithm,
+        @Size(max = 500)
+                @Schema(
+                        description = "Expected certificate subject DN for tls_client_auth.",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String x509CertificateSubjectDN,
+        @PositiveDuration
+                @Schema(
+                        description =
+                                "Grace period during which the previous secret remains valid.",
+                        format = "duration",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Duration clientSecretGracePeriod) {
+
+    public AdminClientRequestDTO(
+            String clientId,
+            String clientName,
+            Set<String> clientAuthenticationMethods,
+            Set<String> authorizationGrantTypes,
+            Set<String> redirectUris,
+            Set<String> postLogoutRedirectUris,
+            Set<String> scopes,
+            boolean requireAuthorizationConsent,
+            boolean requireProofKey,
+            boolean requireDpop,
+            boolean requireDpopJkt,
+            boolean dpopRefreshTokenOnly,
+            Set<String> dpopSigningAlgorithms,
+            Duration authorizationCodeTimeToLive,
+            Duration accessTokenTimeToLive,
+            Duration refreshTokenTimeToLive,
+            boolean serviceAccountEnabled,
+            Duration clientSecretTimeToLive) {
+        this(
+                clientId,
+                clientName,
+                clientAuthenticationMethods,
+                authorizationGrantTypes,
+                redirectUris,
+                postLogoutRedirectUris,
+                scopes,
+                requireAuthorizationConsent,
+                requireProofKey,
+                requireDpop,
+                requireDpopJkt,
+                dpopRefreshTokenOnly,
+                dpopSigningAlgorithms,
+                null,
+                null,
+                null,
+                authorizationCodeTimeToLive,
+                accessTokenTimeToLive,
+                refreshTokenTimeToLive,
+                serviceAccountEnabled,
+                clientSecretTimeToLive,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
 
     public AdminClientRequestDTO(
             String clientId,
@@ -171,11 +306,10 @@ public record AdminClientRequestDTO(
                 false,
                 false,
                 java.util.Set.of("RS256", "ES256"),
-                "poll",
-                null,
-                null,
                 authorizationCodeTimeToLive,
                 accessTokenTimeToLive,
-                refreshTokenTimeToLive);
+                refreshTokenTimeToLive,
+                false,
+                null);
     }
 }

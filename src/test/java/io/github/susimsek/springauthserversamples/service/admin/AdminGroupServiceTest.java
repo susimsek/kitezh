@@ -216,7 +216,6 @@ class AdminGroupServiceTest {
 
     @Test
     void createsGroupWithAttributesAndDefaultGroupFlag() {
-        when(groupRepository.existsByName("finance")).thenReturn(false);
         when(groupRepository.save(org.mockito.ArgumentMatchers.any(GroupEntity.class)))
                 .thenAnswer(
                         invocation -> {
@@ -327,6 +326,37 @@ class AdminGroupServiceTest {
         assertThat(serviceWithPermissions().permissions(7L))
                 .extracting(AdminGroupPermissionDTO::username)
                 .containsExactly("alice");
+    }
+
+    @Test
+    void supportsScopedOverloadsForAdministrativeUsers() {
+        GroupEntity group = group(7L, "finance");
+        UserEntity administrator = user(3L, "administrator");
+        administrator.getAuthorities().add(authority("ROLE_ADMIN"));
+        when(groupRepository.findById(7L)).thenReturn(Optional.of(group));
+        when(userRepository.findByUsername("administrator")).thenReturn(Optional.of(administrator));
+        when(groupRepository.findByParentId(7L)).thenReturn(List.of());
+        when(userRepository.findAllByGroupsId(7L)).thenReturn(List.of());
+        when(userRepository.countByGroupsId(7L)).thenReturn(0L);
+        when(authorityRepository.findByNameIn(Set.of())).thenReturn(List.of());
+        when(userRepository.findByGroupsIdAndUsernameContainingIgnoreCase(
+                        7L, "", Pageable.ofSize(20)))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(userRepository.findAvailableGroupUsers(7L, "", Pageable.ofSize(20)))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(administrator));
+        when(groupRepository.existsByParentId(7L)).thenReturn(false);
+
+        AdminGroupService service = serviceWithPermissions();
+        service.update(7L, new AdminGroupRequestDTO("finance", null), "administrator");
+        service.updateRoles(7L, new AdminGroupRolesRequestDTO(Set.of()), "administrator");
+        service.users(7L, "", Pageable.ofSize(20), "administrator");
+        service.availableUsers(7L, "", Pageable.ofSize(20), "administrator");
+        service.addUser(7L, 3L, "administrator");
+        service.removeUser(7L, 3L, "administrator");
+        service.delete(7L, "administrator");
+
+        verify(groupRepository).delete(group);
     }
 
     @Test

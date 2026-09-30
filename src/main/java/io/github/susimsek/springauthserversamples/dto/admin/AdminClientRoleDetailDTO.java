@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.dto.admin;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 
 @Schema(name = "AdminClientRoleDetail", description = "Client role details and user mappings.")
@@ -24,4 +25,23 @@ public record AdminClientRoleDetailDTO(
                         description = "Number of groups assigned to the role.",
                         example = "1",
                         requiredMode = Schema.RequiredMode.REQUIRED)
-                long groupCount) {}
+                long groupCount,
+        @Schema(
+                        description = "Direct child roles included by this composite role.",
+                        example = "[\"invoice.read\"]",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                Set<AdminClientRoleDTO> compositeRoles,
+        @Schema(
+                        description = "Direct realm roles included by this composite role.",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                Set<AdminRoleDTO> compositeRealmRoles) {
+
+    public AdminClientRoleDetailDTO(
+            AdminClientRoleDTO role,
+            Page<AdminRoleUserDTO> users,
+            Page<AdminClientRoleGroupDTO> groups,
+            long userCount,
+            long groupCount) {
+        this(role, users, groups, userCount, groupCount, Set.of(), Set.of());
+    }
+}

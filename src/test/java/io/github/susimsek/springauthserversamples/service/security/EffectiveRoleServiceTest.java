@@ -40,6 +40,21 @@ class EffectiveRoleServiceTest {
     }
 
     @Test
+    void resolvesNestedRealmCompositeRolesForUsersAndGroups() {
+        AuthorityEntity viewer = authority(1L, "ROLE_VIEWER");
+        AuthorityEntity operator = authority(2L, "ROLE_OPERATOR");
+        AuthorityEntity administrator = authority(3L, "ROLE_ADMINISTRATOR");
+        operator.setCompositeRoles(Set.of(viewer));
+        administrator.setCompositeRoles(Set.of(operator));
+
+        UserEntity user = new UserEntity();
+        user.setAuthorities(Set.of(administrator));
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(user))
+                .containsExactlyInAnyOrder("ROLE_ADMINISTRATOR", "ROLE_OPERATOR", "ROLE_VIEWER");
+    }
+
+    @Test
     void resolvesClientRolesByClientAndIncludesParentGroupMappings() {
         RegisteredClientEntity client = new RegisteredClientEntity();
         client.setClientId("orders-api");
@@ -56,6 +71,150 @@ class EffectiveRoleServiceTest {
 
         assertThat(EffectiveRoleService.effectiveClientRoleNames(user))
                 .containsEntry("orders-api", Set.of("orders.read", "orders.write"));
+    }
+
+    @Test
+    void resolvesNestedClientCompositeRoles() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setClientId("orders-api");
+        ClientRoleEntity read = clientRole(client, "orders.read");
+        ClientRoleEntity write = clientRole(client, "orders.write");
+        ClientRoleEntity manage = clientRole(client, "orders.manage");
+        manage.setCompositeRoles(Set.of(read, write));
+
+        UserEntity user = new UserEntity();
+        user.setClientRoles(Set.of(manage));
+
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(user))
+                .containsEntry(
+                        "orders-api", Set.of("orders.manage", "orders.read", "orders.write"));
+    }
+
+    @Test
+    void resolvesCrossScopeCompositeRoles() {
+        RegisteredClientEntity ordersClient = new RegisteredClientEntity();
+        ordersClient.setClientId("orders-api");
+        AuthorityEntity administrator = authority(1L, "ROLE_ADMINISTRATOR");
+        ClientRoleEntity ordersRead = clientRole(ordersClient, "orders.read");
+        administrator.setCompositeClientRoles(Set.of(ordersRead));
+
+        UserEntity user = new UserEntity();
+        user.setAuthorities(Set.of(administrator));
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(user))
+                .containsExactly("ROLE_ADMINISTRATOR");
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(user))
+                .containsEntry("orders-api", Set.of("orders.read"));
+    }
+
+    @Test
+    void resolvesClientToRealmAndCrossClientCompositeRoles() {
+        RegisteredClientEntity ordersClient = new RegisteredClientEntity();
+        ordersClient.setClientId("orders-api");
+        RegisteredClientEntity billingClient = new RegisteredClientEntity();
+        billingClient.setClientId("billing-api");
+        ClientRoleEntity ordersManage = clientRole(ordersClient, "orders.manage");
+        ClientRoleEntity billingRead = clientRole(billingClient, "billing.read");
+        AuthorityEntity auditor = authority(1L, "ROLE_AUDITOR");
+        ordersManage.setCompositeRealmRoles(Set.of(auditor));
+        ordersManage.setCompositeRoles(Set.of(billingRead));
+
+        UserEntity user = new UserEntity();
+        user.setClientRoles(Set.of(ordersManage));
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(user)).containsExactly("ROLE_AUDITOR");
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(user))
+                .containsEntry("orders-api", Set.of("orders.manage"))
+                .containsEntry("billing-api", Set.of("billing.read"));
+    }
+
+    @Test
+    void detectsAReachableCompositeRole() {
+        AuthorityEntity parent = authority(1L, "ROLE_PARENT");
+        AuthorityEntity child = authority(2L, "ROLE_CHILD");
+        parent.setCompositeRoles(Set.of(child));
+
+        assertThat(EffectiveRoleService.reaches(parent, child)).isTrue();
+        assertThat(EffectiveRoleService.reaches(child, parent)).isFalse();
+    }
+
+    @Test
+    void detectsReachableCrossScopeCompositeRoles() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setClientId("orders-api");
+        AuthorityEntity realmRole = authority(1L, "ROLE_PARENT");
+        ClientRoleEntity clientRole = clientRole(client, "orders.read");
+        realmRole.setCompositeClientRoles(Set.of(clientRole));
+
+        assertThat(EffectiveRoleService.reaches(realmRole, clientRole)).isTrue();
+        assertThat(EffectiveRoleService.reaches(clientRole, realmRole)).isFalse();
+
+        clientRole.setCompositeRealmRoles(Set.of(realmRole));
+
+        assertThat(EffectiveRoleService.reaches(clientRole, realmRole)).isTrue();
+    }
+
+    @Test
+    void handlesNullRoleCollectionsAndCyclesSafely() {
+        UserEntity empty = new UserEntity();
+        empty.setAuthorities(null);
+        empty.setClientRoles(null);
+        empty.setGroups(null);
+
+        assertThat(EffectiveRoleService.resolve(empty).effectiveRoles()).isEmpty();
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(empty)).isEmpty();
+        assertThat(EffectiveRoleService.expandScopeRoles(null, null).applicationRoles()).isEmpty();
+        assertThat(EffectiveRoleService.reaches((AuthorityEntity) null, (AuthorityEntity) null))
+                .isFalse();
+
+        AuthorityEntity first = authority(1L, "ROLE_FIRST");
+        AuthorityEntity second = authority(2L, "ROLE_SECOND");
+        first.setCompositeRoles(Set.of(second));
+        second.setCompositeRoles(Set.of(first));
+        GroupEntity group = new GroupEntity();
+        group.setName("cycle");
+        group.setParent(group);
+        group.setAuthorities(Set.of(first));
+        UserEntity cyclic = new UserEntity();
+        cyclic.setAuthorities(Set.of());
+        cyclic.setGroups(Set.of(group));
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(cyclic))
+                .containsExactlyInAnyOrder("ROLE_FIRST", "ROLE_SECOND");
+    }
+
+    @Test
+    void detectsClientRoleToClientRoleReachability() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setClientId("orders-api");
+        ClientRoleEntity parent = clientRole(client, "orders.manage");
+        ClientRoleEntity child = clientRole(client, "orders.read");
+        parent.setCompositeRoles(Set.of(child));
+
+        assertThat(EffectiveRoleService.reaches(parent, child)).isTrue();
+        assertThat(EffectiveRoleService.reaches(child, parent)).isFalse();
+    }
+
+    @Test
+    void ignoresIncompleteRolesAndNullCompositeEntries() {
+        AuthorityEntity unnamedAuthority = authority(9L, "ROLE_SAFE");
+        java.util.Set<AuthorityEntity> authorities = new java.util.LinkedHashSet<>();
+        authorities.add(unnamedAuthority);
+        ClientRoleEntity incompleteClientRole = new ClientRoleEntity(null, null, null);
+        java.util.Set<ClientRoleEntity> clientRoles = new java.util.LinkedHashSet<>();
+        clientRoles.add(incompleteClientRole);
+        clientRoles.add(null);
+
+        UserEntity user = new UserEntity();
+        user.setAuthorities(authorities);
+        user.setClientRoles(clientRoles);
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(user)).containsExactly("ROLE_SAFE");
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(user)).isEmpty();
+        assertThat(EffectiveRoleService.expandScopeRoles(authorities, clientRoles))
+                .extracting(EffectiveRoleService.ScopedRoles::applicationRoles)
+                .isEqualTo(Set.of("ROLE_SAFE"));
+        assertThat(EffectiveRoleService.reaches(unnamedAuthority, incompleteClientRole)).isFalse();
     }
 
     private static GroupEntity group(Long id, String name, String role) {

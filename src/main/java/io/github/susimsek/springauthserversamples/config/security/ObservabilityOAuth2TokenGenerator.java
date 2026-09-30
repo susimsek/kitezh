@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
+import java.util.Optional;
 import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -11,6 +12,8 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 
 /** Records token grant outcomes without exposing token values or user identifiers. */
 final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OAuth2Token> {
+
+    private static final String TOKEN_GENERATION_FAILED = "token_generation_failed";
 
     private final OAuth2TokenGenerator<OAuth2Token> delegate;
     private final OAuth2ObservabilityMetrics metrics;
@@ -24,14 +27,8 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
     @Override
     @Nullable
     public OAuth2Token generate(OAuth2TokenContext context) {
-        String grantType =
-                context.getAuthorizationGrantType() == null
-                        ? null
-                        : context.getAuthorizationGrantType().getValue();
-        String clientId =
-                context.getRegisteredClient() == null
-                        ? null
-                        : context.getRegisteredClient().getClientId();
+        String grantType = context.getAuthorizationGrantType().getValue();
+        String clientId = clientId(context);
         try {
             OAuth2Token token = delegate.generate(context);
             if (token != null) {
@@ -48,7 +45,7 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
             metrics.recordToken(
                     event(null, grantType),
                     "failure",
-                    error(),
+                    TOKEN_GENERATION_FAILED,
                     grantType,
                     tokenType(null, context),
                     clientId);
@@ -64,6 +61,16 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
         return "token_issued";
     }
 
+    @Nullable
+    private static String clientId(OAuth2TokenContext context) {
+        return Optional.ofNullable(context.getRegisteredClient())
+                .map(
+                        org.springframework.security.oauth2.server.authorization.client
+                                        .RegisteredClient
+                                ::getClientId)
+                .orElse(null);
+    }
+
     private static String tokenType(@Nullable OAuth2Token token, OAuth2TokenContext context) {
         if (token instanceof OAuth2AccessToken) {
             return "access_token";
@@ -71,10 +78,6 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
         if (token instanceof OAuth2RefreshToken) {
             return "refresh_token";
         }
-        return context.getTokenType() == null ? null : context.getTokenType().getValue();
-    }
-
-    private static String error() {
-        return "token_generation_failed";
+        return context.getTokenType().getValue();
     }
 }

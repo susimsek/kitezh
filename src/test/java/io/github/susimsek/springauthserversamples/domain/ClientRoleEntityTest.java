@@ -25,6 +25,8 @@ class ClientRoleEntityTest {
         assertThat(role.getDescription()).isEqualTo("Read orders");
         assertThat(role.getUsers()).isEmpty();
         assertThat(role.getGroups()).isEmpty();
+        assertThat(role.getCompositeRoles()).isEmpty();
+        assertThat(role.getCompositeParents()).isEmpty();
         assertThat(role)
                 .isEqualTo(role)
                 .isEqualTo(same)

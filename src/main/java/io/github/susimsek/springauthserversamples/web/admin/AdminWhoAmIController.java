@@ -43,6 +43,13 @@ public class AdminWhoAmIController {
                 Map.ofEntries(
                         Map.entry("isAdmin", hasAny(authorities, AuthoritiesConstants.ADMIN)),
                         Map.entry(
+                                "queryClients",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.CLIENT_QUERY,
+                                        AuthoritiesConstants.CLIENT_MANAGER)),
+                        Map.entry(
                                 "viewClients",
                                 hasAny(
                                         authorities,
@@ -56,11 +63,42 @@ public class AdminWhoAmIController {
                                         AuthoritiesConstants.ADMIN,
                                         AuthoritiesConstants.CLIENT_MANAGER)),
                         Map.entry(
+                                "queryUsers",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.USER_QUERY,
+                                        AuthoritiesConstants.USER_MANAGER)),
+                        Map.entry(
                                 "viewUsers",
                                 hasAny(
                                         authorities,
                                         AuthoritiesConstants.ADMIN,
                                         AuthoritiesConstants.USER_VIEWER,
+                                        AuthoritiesConstants.USER_MANAGER)),
+                        Map.entry(
+                                "queryGroups",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.GROUP_QUERY,
+                                        AuthoritiesConstants.GROUP_MANAGER,
+                                        AuthoritiesConstants.USER_MANAGER)),
+                        Map.entry(
+                                "viewGroups",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.GROUP_VIEWER,
+                                        AuthoritiesConstants.GROUP_MANAGER,
+                                        AuthoritiesConstants.USER_VIEWER,
+                                        AuthoritiesConstants.USER_MANAGER)),
+                        Map.entry(
+                                "manageGroups",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.GROUP_MANAGER,
                                         AuthoritiesConstants.USER_MANAGER)),
                         Map.entry(
                                 "manageUsers",

@@ -2,6 +2,7 @@ package io.github.susimsek.springauthserversamples.config.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,16 +13,27 @@ import com.nimbusds.jose.jwk.JWK;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.config.observability.LoggingProperties;
 import io.github.susimsek.springauthserversamples.config.observability.ObservabilityMdcFilter;
+import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientScopeMapperEntity;
+import io.github.susimsek.springauthserversamples.domain.GroupAttribute;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
+import io.github.susimsek.springauthserversamples.domain.ServiceAccountEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
+import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
+import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
 import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
+import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationEndpointErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
@@ -29,6 +41,7 @@ import io.github.susimsek.springauthserversamples.security.ClientSecuritySetting
 import io.github.susimsek.springauthserversamples.security.LocalizedOAuth2ErrorResponseHandler;
 import io.github.susimsek.springauthserversamples.security.OAuth2KeyJwkSource;
 import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier;
+import io.github.susimsek.springauthserversamples.security.ProtocolMapperTypes;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -174,6 +187,9 @@ class AuthorizationServerConfigTest {
                         new AuthorizationServerConfig.AuthorizationServerFilterDependencies(
                                 mock(RequiredActionAuthorizationFilter.class),
                                 mock(MfaAuthorizationFilter.class),
+                                mock(
+                                        org.springframework.security.crypto.password.PasswordEncoder
+                                                .class),
                                 mock(CibaAuthenticationGrantAuthenticationProvider.class),
                                 mock(SocialProviderLogoutSuccessHandler.class),
                                 mock(SecurityContextRepository.class),
@@ -190,6 +206,7 @@ class AuthorizationServerConfigTest {
                         httpSecurity(),
                         mock(OAuth2TokenGenerator.class),
                         mock(RegisteredClientRepository.class),
+                        mock(org.springframework.security.crypto.password.PasswordEncoder.class),
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
                         mock(CibaAuthenticationGrantAuthenticationProvider.class),
@@ -475,6 +492,86 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    void usesTheDatabaseServiceAccountForClientCredentialsTokens() {
+        UserEntity serviceUser = new UserEntity();
+        serviceUser.setUsername("service-account-api");
+        serviceUser.setServiceAccount(true);
+        ServiceAccountEntity account = new ServiceAccountEntity("client-id", serviceUser);
+        ServiceAccountRepository serviceAccountRepository = mock(ServiceAccountRepository.class);
+        when(serviceAccountRepository.findByClientId("client-id")).thenReturn(Optional.of(account));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("service-account-api"))
+                .thenReturn(Optional.of(serviceUser));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "client-id");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        null,
+                        null,
+                        serviceAccountRepository,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContextWithoutAuthorization(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.CLIENT_CREDENTIALS,
+                                "api",
+                                Set.of()));
+
+        assertThat(claims.build().getSubject()).isEqualTo("service-account-api");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void addsRealmAndCrossClientCompositeRolesToRoleToken() {
+        AuthorityEntity administrator = new AuthorityEntity(1L, "ROLE_ADMINISTRATOR");
+        RegisteredClientEntity ordersClient = new RegisteredClientEntity();
+        ordersClient.setClientId("orders-api");
+        ClientRoleEntity ordersRead = new ClientRoleEntity(ordersClient, "orders.read", null);
+        administrator.setCompositeClientRoles(Set.of(ordersRead));
+        AuthorityEntity auditor = new AuthorityEntity(2L, "ROLE_AUDITOR");
+        RegisteredClientEntity billingClient = new RegisteredClientEntity();
+        billingClient.setClientId("billing-api");
+        ClientRoleEntity billingManage =
+                new ClientRoleEntity(billingClient, "billing.manage", null);
+        billingManage.setCompositeRealmRoles(Set.of(auditor));
+        UserEntity user = new UserEntity();
+        user.setAuthorities(Set.of(administrator));
+        user.setClientRoles(Set.of(billingManage));
+
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
+        AuthorizationRepository authorizationRepository = mock(AuthorizationRepository.class);
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(userRepository, avatarRepository, authorizationRepository)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "orders-api",
+                                Set.of("roles")));
+
+        Map<String, Object> tokenClaims = claims.build().getClaims();
+        Map<String, Object> realmAccess = (Map<String, Object>) tokenClaims.get("realm_access");
+        assertThat((List<String>) realmAccess.get("roles"))
+                .containsExactlyInAnyOrder("ROLE_ADMINISTRATOR", "ROLE_AUDITOR");
+        assertThat(tokenClaims)
+                .containsEntry(
+                        "resource_access",
+                        Map.of(
+                                "billing-api", Map.of("roles", List.of("billing.manage")),
+                                "orders-api", Map.of("roles", List.of("orders.read"))));
+    }
+
+    @Test
     void doesNotQueryAvatarForTokensOutsideUserProfileFlows() {
         UserRepository userRepository = mock(UserRepository.class);
         final UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
@@ -544,6 +641,504 @@ class AuthorizationServerConfigTest {
                 .containsEntry("email_verified", true)
                 .containsEntry("locale", "tr")
                 .doesNotContainKey("picture");
+    }
+
+    @Test
+    void appliesClientMappersInPriorityOrderAndMergesAudienceClaims() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        AuthorityEntity role = new AuthorityEntity();
+        role.setName("ROLE_REPORTS");
+        user.setAuthorities(Set.of(role));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        UserAvatarRepository avatarRepository = mock(UserAvatarRepository.class);
+        AuthorizationRepository authorizationRepository = mock(AuthorizationRepository.class);
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        ClientMapperEntity audience = mapper("audience", "audience", null, "reports-api", 0);
+        ClientMapperEntity low = mapper("low", "hardcoded-claim", "same", "low", 10);
+        ClientMapperEntity high = mapper("high", "hardcoded-claim", "same", "high", 20);
+        ClientMapperEntity roles = mapper("roles", "user-realm-role", "roles", null, 30);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(List.of(high, roles, low, audience));
+
+        JwtClaimsSet.Builder claims =
+                JwtClaimsSet.builder().claim("sub", "admin").claim("aud", "existing");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        avatarRepository,
+                        authorizationRepository,
+                        null,
+                        mapperRepository,
+                        mock(ClientScopeMapperRepository.class),
+                        mock(ServiceAccountRepository.class),
+                        mock(UserProfileAttributeRepository.class),
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "demo-client",
+                                Set.of("openid")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("same", "high")
+                .containsEntry("roles", Set.of("ROLE_REPORTS"))
+                .containsEntry("aud", List.of("existing", "reports-api"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapsAllConfiguredClientMapperTypes() {
+        UserEntity user = new UserEntity();
+        user.setId(42L);
+        user.setUsername("admin");
+        user.setFirstName("Ada");
+        user.setLastName("Lovelace");
+        user.setEmail("ada@example.test");
+        user.setPreferredLocale("tr");
+        GroupEntity group = new GroupEntity();
+        group.setName("engineering");
+        group.setAttributes(Set.of(new GroupAttribute("department", "platform")));
+        user.setGroups(Set.of(group));
+        AuthorityEntity realmRole = new AuthorityEntity();
+        realmRole.setName("ROLE_REPORTS");
+        RegisteredClientEntity ordersClient = new RegisteredClientEntity();
+        ordersClient.setClientId("orders-api");
+        ClientRoleEntity ordersRole = new ClientRoleEntity(ordersClient, "orders.read", null);
+        RegisteredClientEntity currentClient = new RegisteredClientEntity();
+        currentClient.setClientId("demo-client");
+        ClientRoleEntity currentRole = new ClientRoleEntity(currentClient, "demo.read", null);
+        user.setAuthorities(Set.of(realmRole));
+        user.setClientRoles(Set.of(ordersRole, currentRole));
+
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        UserProfileAttributeDefinitionEntity definition =
+                new UserProfileAttributeDefinitionEntity();
+        definition.setName("departmentCode");
+        UserProfileAttributeRepository attributeRepository =
+                mock(UserProfileAttributeRepository.class);
+        when(attributeRepository
+                        .findAllByUserIdOrderByDefinitionDisplayOrderAscDefinitionNameAscPositionAsc(
+                                42L))
+                .thenReturn(
+                        List.of(new UserProfileAttributeEntity(user, definition, 0, "PLATFORM")));
+
+        ClientScopeEntity scope = new ClientScopeEntity();
+        scope.setId("mapper-scope-id");
+        scope.setName("mapper-scope");
+        AuthorityEntity scopedRealmRole = new AuthorityEntity();
+        scopedRealmRole.setName("ROLE_REPORTS");
+        scope.setApplicationRoles(Set.of(scopedRealmRole));
+        ClientRoleEntity scopedOrdersRole = new ClientRoleEntity(ordersClient, "orders.read", null);
+        scope.setClientRoles(Set.of(scopedOrdersRole));
+        ClientScopeRepository scopeRepository = mock(ClientScopeRepository.class);
+        when(scopeRepository.findByNameIn(Set.of("mapper-scope"))).thenReturn(List.of(scope));
+        when(scopeRepository.findDetailedByNameIn(Set.of("mapper-scope")))
+                .thenReturn(List.of(scope));
+
+        ClientMapperEntity firstName =
+                mapper("first-name", ProtocolMapperTypes.USER_PROPERTY, "firstName", null, 1);
+        firstName.setSource("firstName");
+        ClientMapperEntity customAttribute =
+                mapper(
+                        "custom-attribute",
+                        ProtocolMapperTypes.USER_ATTRIBUTE,
+                        "departmentCode",
+                        null,
+                        2);
+        customAttribute.setSource("departmentCode");
+        ClientMapperEntity groupAttribute =
+                mapper(
+                        "group-attribute",
+                        ProtocolMapperTypes.GROUP_ATTRIBUTE,
+                        "department",
+                        null,
+                        4);
+        groupAttribute.setSource("department");
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(
+                        List.of(
+                                firstName,
+                                customAttribute,
+                                mapper(
+                                        "groups",
+                                        ProtocolMapperTypes.GROUP_MEMBERSHIP,
+                                        "groups",
+                                        null,
+                                        3),
+                                groupAttribute,
+                                mapper(
+                                        "application-role",
+                                        ProtocolMapperTypes.APPLICATION_ROLE,
+                                        "applicationRole",
+                                        null,
+                                        5),
+                                mapper(
+                                        "client-role",
+                                        ProtocolMapperTypes.CLIENT_ROLE,
+                                        "clientRole",
+                                        null,
+                                        6),
+                                mapper("email", ProtocolMapperTypes.EMAIL, "mappedEmail", null, 7),
+                                mapper(
+                                        "full-name",
+                                        ProtocolMapperTypes.FULL_NAME,
+                                        "fullName",
+                                        null,
+                                        8),
+                                mapper(
+                                        "locale",
+                                        ProtocolMapperTypes.LOCALE,
+                                        "mappedLocale",
+                                        null,
+                                        9),
+                                mapper(
+                                        "username",
+                                        ProtocolMapperTypes.USERNAME,
+                                        "mappedUsername",
+                                        null,
+                                        10),
+                                mapper(
+                                        "audience-resolve",
+                                        ProtocolMapperTypes.AUDIENCE_RESOLVE,
+                                        null,
+                                        null,
+                                        11)));
+
+        ClientScopeMapperEntity scopeMapper = new ClientScopeMapperEntity();
+        scopeMapper.setName("scoped-hardcoded");
+        scopeMapper.setMapperType(ProtocolMapperTypes.HARDCODED_CLAIM);
+        scopeMapper.setClaimName("scopedClaim");
+        scopeMapper.setValue("scoped");
+        scopeMapper.setPriority(12);
+        ClientScopeMapperRepository scopeMapperRepository = mock(ClientScopeMapperRepository.class);
+        when(scopeMapperRepository.findAllByClientScopeIdInOrderByPriorityAscNameAsc(
+                        List.of("mapper-scope-id")))
+                .thenReturn(List.of(scopeMapper));
+
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        scopeRepository,
+                        mapperRepository,
+                        scopeMapperRepository,
+                        mock(ServiceAccountRepository.class),
+                        attributeRepository,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "demo-client",
+                                Set.of("mapper-scope")));
+
+        Map<String, Object> mapped = claims.build().getClaims();
+        assertThat(mapped)
+                .containsEntry("firstName", "Ada")
+                .containsEntry("departmentCode", "PLATFORM")
+                .containsEntry("groups", List.of("/engineering"))
+                .containsEntry("department", "platform")
+                .containsEntry("mappedEmail", "ada@example.test")
+                .containsEntry("fullName", "Ada Lovelace")
+                .containsEntry("mappedLocale", "tr")
+                .containsEntry("mappedUsername", "admin")
+                .containsEntry("scopedClaim", "scoped")
+                .containsEntry("aud", List.of("orders-api"));
+        assertThat((Set<String>) mapped.get("applicationRole")).contains("ROLE_REPORTS");
+        assertThat((Set<String>) mapped.get("clientRole")).contains("demo.read");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void handlesEmptyAndUnsupportedClientMapperValues() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setGroups(null);
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        ClientMapperEntity unknownProperty =
+                mapper("unknown-property", ProtocolMapperTypes.USER_PROPERTY, "unknown", null, 3);
+        unknownProperty.setSource("unknown");
+        ClientMapperEntity blankAttribute =
+                mapper("blank-attribute", ProtocolMapperTypes.USER_ATTRIBUTE, "attribute", null, 4);
+        blankAttribute.setSource(" ");
+        ClientMapperEntity groups =
+                mapper("groups", ProtocolMapperTypes.GROUP_MEMBERSHIP, "groups", null, 5);
+        ClientMapperEntity groupAttribute =
+                mapper(
+                        "group-attribute",
+                        ProtocolMapperTypes.GROUP_ATTRIBUTE,
+                        "attribute",
+                        null,
+                        6);
+        groupAttribute.setSource(null);
+        ClientMapperEntity applicationRole =
+                mapper("application-role", ProtocolMapperTypes.APPLICATION_ROLE, "roles", null, 7);
+        ClientMapperEntity clientRole =
+                mapper("client-role", ProtocolMapperTypes.CLIENT_ROLE, "clientRoles", null, 8);
+        ClientMapperEntity unsupported =
+                mapper("unsupported", "unsupported", "unsupported", null, 9);
+        ClientMapperEntity nonBlankAudience =
+                mapper("audience", ProtocolMapperTypes.AUDIENCE, null, "orders-api", 1);
+        ClientMapperEntity blankAudience =
+                mapper("blank-audience", ProtocolMapperTypes.AUDIENCE, null, " ", 2);
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(
+                        List.of(
+                                nonBlankAudience,
+                                blankAudience,
+                                unknownProperty,
+                                blankAttribute,
+                                groups,
+                                groupAttribute,
+                                applicationRole,
+                                clientRole,
+                                unsupported));
+        ClientScopeRepository scopeRepository = mock(ClientScopeRepository.class);
+        when(scopeRepository.findByNameIn(Set.of("scope"))).thenReturn(List.of());
+        JwtClaimsSet.Builder claims =
+                JwtClaimsSet.builder().claim("sub", "admin").claim("aud", List.of("existing", 42));
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        scopeRepository,
+                        mapperRepository,
+                        mock(ClientScopeMapperRepository.class),
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "demo-client",
+                                Set.of("scope")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("aud", List.of("existing", "orders-api"))
+                .containsEntry("groups", List.of())
+                .containsEntry("roles", Set.of())
+                .containsEntry("clientRoles", Set.of())
+                .doesNotContainKeys("unknown", "attribute", "unsupported");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapsUserPropertyVariantsAndMultipleAttributeValues() {
+        UserEntity user = new UserEntity();
+        user.setId(42L);
+        user.setUsername("admin");
+        user.setFirstName("Ada");
+        user.setLastName("Lovelace");
+        user.setEmail("ada@example.test");
+        user.setPreferredLocale("tr");
+        GroupEntity group = new GroupEntity();
+        group.setName("engineering");
+        group.setAttributes(
+                Set.of(
+                        new GroupAttribute("department", "platform"),
+                        new GroupAttribute("department", "security")));
+        user.setGroups(Set.of(group));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        UserProfileAttributeDefinitionEntity definition =
+                new UserProfileAttributeDefinitionEntity();
+        definition.setName("departmentCode");
+        UserProfileAttributeRepository attributeRepository =
+                mock(UserProfileAttributeRepository.class);
+        when(attributeRepository
+                        .findAllByUserIdOrderByDefinitionDisplayOrderAscDefinitionNameAscPositionAsc(
+                                42L))
+                .thenReturn(
+                        List.of(
+                                new UserProfileAttributeEntity(user, definition, 0, "PLATFORM"),
+                                new UserProfileAttributeEntity(user, definition, 1, "SECURITY")));
+
+        List<ClientMapperEntity> mappers = new java.util.ArrayList<>();
+        for (String source : List.of("username", "lastName", "email", "preferredLocale")) {
+            ClientMapperEntity mapper =
+                    mapper(source, ProtocolMapperTypes.USER_PROPERTY, source, null, mappers.size());
+            mapper.setSource(source);
+            mappers.add(mapper);
+        }
+        ClientMapperEntity customAttribute =
+                mapper("profile-attribute", ProtocolMapperTypes.USER_ATTRIBUTE, "codes", null, 4);
+        customAttribute.setSource("departmentCode");
+        mappers.add(customAttribute);
+        ClientMapperEntity groupAttribute =
+                mapper(
+                        "group-attribute",
+                        ProtocolMapperTypes.GROUP_ATTRIBUTE,
+                        "departments",
+                        null,
+                        5);
+        groupAttribute.setSource("department");
+        mappers.add(groupAttribute);
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(mappers);
+
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        mapperRepository,
+                        null,
+                        null,
+                        attributeRepository,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of()));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("username", "admin")
+                .containsEntry("lastName", "Lovelace")
+                .containsEntry("email", "ada@example.test")
+                .containsEntry("preferredLocale", "tr")
+                .containsEntry("codes", List.of("PLATFORM", "SECURITY"));
+        assertThat((List<String>) claims.build().getClaims().get("departments"))
+                .containsExactlyInAnyOrder("platform", "security");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void filtersRealmAndClientRolesUsingConfiguredScopeMappings() {
+        AuthorityEntity allowedRealmRole = new AuthorityEntity();
+        allowedRealmRole.setName("ROLE_ALLOWED");
+        AuthorityEntity deniedRealmRole = new AuthorityEntity();
+        deniedRealmRole.setName("ROLE_DENIED");
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setClientId("client-id");
+        ClientRoleEntity allowedClientRole = new ClientRoleEntity(client, "read", null);
+        ClientRoleEntity deniedClientRole = new ClientRoleEntity(client, "write", null);
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setAuthorities(Set.of(allowedRealmRole, deniedRealmRole));
+        user.setClientRoles(Set.of(allowedClientRole, deniedClientRole));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        ClientScopeEntity scope = new ClientScopeEntity();
+        AuthorityEntity scopedRealmRole = new AuthorityEntity();
+        scopedRealmRole.setName("ROLE_ALLOWED");
+        scope.setApplicationRoles(Set.of(scopedRealmRole));
+        scope.setClientRoles(Set.of(new ClientRoleEntity(client, "read", null)));
+        ClientScopeRepository scopeRepository = mock(ClientScopeRepository.class);
+        when(scopeRepository.findByNameIn(anySet())).thenReturn(List.of(scope));
+        when(scopeRepository.findDetailedByNameIn(anySet())).thenReturn(List.of(scope));
+
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        scopeRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of("roles", "scope")));
+
+        Map<String, Object> tokenClaims = claims.build().getClaims();
+        assertThat((Map<String, Object>) tokenClaims.get("realm_access"))
+                .containsEntry("roles", List.of("ROLE_ALLOWED"));
+        assertThat((Map<String, Object>) tokenClaims.get("resource_access"))
+                .containsEntry("client-id", Map.of("roles", List.of("read")));
+    }
+
+    @Test
+    void appliesClientMappersOnlyToTheirConfiguredTokenTypes() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        ClientMapperEntity idOnly =
+                mapper("id-only", ProtocolMapperTypes.HARDCODED_CLAIM, "idClaim", "id", 1);
+        idOnly.setAddToIdToken(true);
+        idOnly.setAddToAccessToken(false);
+        ClientMapperEntity accessOnly =
+                mapper(
+                        "access-only",
+                        ProtocolMapperTypes.HARDCODED_CLAIM,
+                        "accessClaim",
+                        "access",
+                        2);
+        accessOnly.setAddToIdToken(false);
+        ClientMapperEntity neither =
+                mapper("neither", ProtocolMapperTypes.HARDCODED_CLAIM, "neither", "no", 3);
+        neither.setAddToIdToken(false);
+        neither.setAddToAccessToken(false);
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(List.of(idOnly, accessOnly, neither));
+        var customizer =
+                config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        mapperRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+
+        JwtClaimsSet.Builder idClaims = JwtClaimsSet.builder().claim("sub", "admin");
+        customizer.customize(
+                jwtContext(
+                        idClaims,
+                        new OAuth2TokenType(OidcParameterNames.ID_TOKEN),
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        "client-id",
+                        Set.of()));
+        assertThat(idClaims.build().getClaims())
+                .containsEntry("idClaim", "id")
+                .doesNotContainKeys("accessClaim", "neither");
+
+        JwtClaimsSet.Builder accessClaims = JwtClaimsSet.builder().claim("sub", "admin");
+        customizer.customize(
+                jwtContext(
+                        accessClaims,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        "client-id",
+                        Set.of()));
+        assertThat(accessClaims.build().getClaims())
+                .containsEntry("accessClaim", "access")
+                .doesNotContainKeys("idClaim", "neither");
     }
 
     @Test
@@ -1201,6 +1796,18 @@ class AuthorizationServerConfigTest {
                 .tokenType(tokenType)
                 .authorizationGrantType(grantType)
                 .build();
+    }
+
+    private static ClientMapperEntity mapper(
+            String name, String type, String claimName, String value, int priority) {
+        ClientMapperEntity mapper = new ClientMapperEntity();
+        mapper.setName(name);
+        mapper.setMapperType(type);
+        mapper.setClaimName(claimName);
+        mapper.setValue(value);
+        mapper.setPriority(priority);
+        mapper.setAddToAccessToken(true);
+        return mapper;
     }
 
     private static JwtEncodingContext dpopContext(

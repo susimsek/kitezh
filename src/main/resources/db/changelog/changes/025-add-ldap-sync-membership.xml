@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="026-add-ldap-sync-membership" author="susimsek">
+        <createTable tableName="ldap_federation_identity_groups">
+            <column name="identity_id" type="bigint"><constraints nullable="false"/></column>
+            <column name="group_name" type="varchar(100)"><constraints nullable="false"/></column>
+        </createTable>
+        <addPrimaryKey tableName="ldap_federation_identity_groups" columnNames="identity_id, group_name" constraintName="pk_ldap_sync_groups"/>
+        <addForeignKeyConstraint baseTableName="ldap_federation_identity_groups" baseColumnNames="identity_id" constraintName="fk_ldap_sync_groups_identity" referencedTableName="ldap_federation_identities" referencedColumnNames="id" onDelete="CASCADE"/>
+        <createTable tableName="ldap_federation_identity_roles">
+            <column name="identity_id" type="bigint"><constraints nullable="false"/></column>
+            <column name="role_name" type="varchar(200)"><constraints nullable="false"/></column>
+        </createTable>
+        <addPrimaryKey tableName="ldap_federation_identity_roles" columnNames="identity_id, role_name" constraintName="pk_ldap_sync_roles"/>
+        <addForeignKeyConstraint baseTableName="ldap_federation_identity_roles" baseColumnNames="identity_id" constraintName="fk_ldap_sync_roles_identity" referencedTableName="ldap_federation_identities" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+</databaseChangeLog>

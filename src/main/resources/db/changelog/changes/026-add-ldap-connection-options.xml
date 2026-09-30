@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="026-add-ldap-connection-options" author="susimsek">
+        <addColumn tableName="ldap_federation_providers">
+            <column name="vendor" type="varchar(30)" defaultValue="LDAP"><constraints nullable="false"/></column>
+            <column name="authentication_type" type="varchar(30)" defaultValue="SIMPLE"><constraints nullable="false"/></column>
+            <column name="start_tls" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="trust_store_path" type="varchar(1000)"/>
+            <column name="trust_store_password_encrypted" type="varchar(2000)"/>
+            <column name="trust_store_type" type="varchar(20)" defaultValue="JKS"><constraints nullable="false"/></column>
+            <column name="connection_pooling" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="referral" type="varchar(20)" defaultValue="THROW"><constraints nullable="false"/></column>
+            <column name="connect_timeout_ms" type="int" defaultValueNumeric="5000"><constraints nullable="false"/></column>
+            <column name="read_timeout_ms" type="int" defaultValueNumeric="5000"><constraints nullable="false"/></column>
+            <column name="batch_size" type="int" defaultValueNumeric="500"><constraints nullable="false"/></column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

@@ -28,6 +28,7 @@ export type ClientScope = {
   name: string;
   displayName: string | null;
   description: string | null;
+  builtIn: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -119,7 +120,13 @@ export function ClientScopesTable({ dictionary }: { dictionary: Dictionary }) {
     });
     setDeleting(null);
     if (response.status >= 300) {
-      addError(response.status === 400 ? copy.assignedDeleteError : copy.operationError);
+      addError(
+        response.status === 400
+          ? deleting.builtIn
+            ? copy.protectedError
+            : copy.assignedDeleteError
+          : copy.operationError,
+      );
       return;
     }
     addAlert(copy.deleted);
@@ -219,6 +226,9 @@ export function ClientScopesTable({ dictionary }: { dictionary: Dictionary }) {
                 >
                   {scope.name}
                 </Link>
+                {scope.builtIn && (
+                  <span className="badge text-bg-secondary ms-2">{copy.builtIn}</span>
+                )}
               </td>
               <td>{scope.displayName || "—"}</td>
               <td className="text-body-secondary">{scope.description || "—"}</td>
@@ -232,20 +242,28 @@ export function ClientScopesTable({ dictionary }: { dictionary: Dictionary }) {
                       <AdminActionIcon action="view" />
                       {dictionary.admin.resources.details}
                     </Dropdown.Item>
-                    <Dropdown.Divider />
-                    <button className="dropdown-item" type="button" onClick={() => openEdit(scope)}>
-                      <AdminActionIcon action="edit" />
-                      {copy.edit}
-                    </button>
-                    <div className="dropdown-divider" />
-                    <button
-                      className="dropdown-item text-danger"
-                      type="button"
-                      onClick={() => setDeleting(scope)}
-                    >
-                      <AdminActionIcon action="delete" />
-                      {copy.delete}
-                    </button>
+                    {!scope.builtIn && (
+                      <>
+                        <Dropdown.Divider />
+                        <button
+                          className="dropdown-item"
+                          type="button"
+                          onClick={() => openEdit(scope)}
+                        >
+                          <AdminActionIcon action="edit" />
+                          {copy.edit}
+                        </button>
+                        <div className="dropdown-divider" />
+                        <button
+                          className="dropdown-item text-danger"
+                          type="button"
+                          onClick={() => setDeleting(scope)}
+                        >
+                          <AdminActionIcon action="delete" />
+                          {copy.delete}
+                        </button>
+                      </>
+                    )}
                   </RowActions>
                 )}
               </td>

@@ -3,11 +3,14 @@ package io.github.susimsek.springauthserversamples.service.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
+import io.github.susimsek.springauthserversamples.domain.ServiceAccountEntity;
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRequestDTO;
@@ -16,9 +19,14 @@ import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationConsentRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
+import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepository;
+import io.github.susimsek.springauthserversamples.repository.UserRepository;
+import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
+import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,6 +52,8 @@ class AdminClientServiceTest {
     @Mock private AuthorizationServerMapperSupport mapperSupport;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AdminAuditEventService adminAuditEventService;
+    @Mock private ServiceAccountRepository serviceAccountRepository;
+    @Mock private UserRepository userRepository;
 
     @Test
     void createsSecretClientWithDefaultsAndAuditEvent() {
@@ -109,6 +119,28 @@ class AdminClientServiceTest {
                 service().findAll("  QUERY  ", Pageable.unpaged()).getContent().getFirst();
 
         assertThat(result.clientId()).isEqualTo("query-client");
+    }
+
+    @Test
+    void findAllIncludesServiceAccountStatusAndUsername() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        entity.setId("client-id");
+        UserEntity serviceUser = new UserEntity();
+        serviceUser.setUsername("service-account-query-client");
+        ServiceAccountEntity account = new ServiceAccountEntity("client-id", serviceUser);
+        when(clientRepository.findByClientIdContainingIgnoreCaseOrClientNameContainingIgnoreCase(
+                        "", "", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(entity)));
+        when(serviceAccountRepository.findAllByClientIdIn(List.of("client-id")))
+                .thenReturn(List.of(account));
+        RegisteredClient client = registeredClient("client-id", "query-client");
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
+
+        AdminClientDTO result =
+                serviceWithAccounts().findAll("", Pageable.unpaged()).getContent().getFirst();
+
+        assertThat(result.serviceAccountEnabled()).isTrue();
+        assertThat(result.serviceAccountUsername()).isEqualTo("service-account-query-client");
     }
 
     @Test
@@ -203,6 +235,80 @@ class AdminClientServiceTest {
     }
 
     @Test
+    void regeneratesSecretWithMissingAndConfiguredGracePeriods() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient withoutSecret =
+                RegisteredClient.from(registeredClient("client-id", "service-client"))
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.CLIENT_ENABLED,
+                                                        true,
+                                                        ClientSecuritySettings.PREVIOUS_SECRET,
+                                                        "old-secret",
+                                                        ClientSecuritySettings
+                                                                .PREVIOUS_SECRET_EXPIRES_AT,
+                                                        "old-expiry"))
+                                        .build())
+                        .build();
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(withoutSecret);
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+
+        service().regenerateSecret("client-id");
+
+        assertThat(savedClient.get().getClientSettings().getSettings())
+                .doesNotContainKeys(
+                        ClientSecuritySettings.PREVIOUS_SECRET,
+                        ClientSecuritySettings.PREVIOUS_SECRET_EXPIRES_AT);
+
+        RegisteredClient withNumericGrace =
+                RegisteredClient.from(registeredClient("client-id", "service-client"))
+                        .clientSecret("old-encoded-secret")
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .SECRET_GRACE_PERIOD_SECONDS,
+                                                        3600L))
+                                        .build())
+                        .build();
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(withNumericGrace);
+        service().regenerateSecret("client-id");
+        assertThat(
+                        (Object)
+                                savedClient
+                                        .get()
+                                        .getClientSettings()
+                                        .getSetting(ClientSecuritySettings.PREVIOUS_SECRET))
+                .isEqualTo("old-encoded-secret");
+
+        RegisteredClient withInvalidGrace =
+                RegisteredClient.from(withNumericGrace)
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .SECRET_GRACE_PERIOD_SECONDS,
+                                                        "invalid"))
+                                        .build())
+                        .build();
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(withInvalidGrace);
+        service().regenerateSecret("client-id");
+        assertThat(
+                        (Object)
+                                savedClient
+                                        .get()
+                                        .getClientSettings()
+                                        .getSetting(ClientSecuritySettings.PREVIOUS_SECRET))
+                .isEqualTo("old-encoded-secret");
+    }
+
+    @Test
     void rejectsPublicClientsWithoutPkce() {
         assertThatThrownBy(() -> service().create(publicClientRequest(false)))
                 .isInstanceOf(ApiException.class)
@@ -219,7 +325,7 @@ class AdminClientServiceTest {
                                                         "service-client",
                                                         "Service Client",
                                                         Set.of("client_secret_basic"),
-                                                        Set.of("authorization_code"),
+                                                        Set.of("client_credentials"),
                                                         Set.of(" "),
                                                         Set.of(),
                                                         Set.of("openid"),
@@ -596,6 +702,257 @@ class AdminClientServiceTest {
                 .hasMessage("The administration console client cannot be changed");
     }
 
+    @Test
+    void validatesPrivateKeyJwtTlsAndServiceAccountRules() {
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("private_key_jwt"),
+                                                        Set.of("client_credentials"),
+                                                        "poll",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        false)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A JWKS URL is required for private_key_jwt");
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("private_key_jwt"),
+                                                        Set.of("client_credentials"),
+                                                        "poll",
+                                                        "https://example.test/jwks",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        false)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A signing algorithm is required for private_key_jwt");
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("tls_client_auth"),
+                                                        Set.of("client_credentials"),
+                                                        "poll",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        false)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A certificate subject DN is required for tls_client_auth");
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("client_secret_basic"),
+                                                        Set.of("refresh_token"),
+                                                        "poll",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        true)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A service account requires the client_credentials grant");
+    }
+
+    @Test
+    void createsClientWithAdvancedSecurityAndCibaSettings() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        when(clientRepository.existsByClientId("advanced-client")).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+
+        AdminClientCreatedDTO created =
+                service()
+                        .create(
+                                advancedRequest(
+                                        Set.of("client_secret_basic"),
+                                        Set.of("client_credentials", AuthorizationGrantTypes.CIBA),
+                                        " ping ",
+                                        "https://example.test/jwks",
+                                        "RS256",
+                                        "CN=client",
+                                        Duration.ofMinutes(30),
+                                        false));
+
+        RegisteredClient saved = savedClient.get();
+        assertThat(created.clientSecret()).hasSize(64);
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(ClientSecuritySettings.CIBA_DELIVERY_MODE))
+                .isEqualTo("ping");
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(
+                                                ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT))
+                .isEqualTo("https://example.test/ciba");
+        assertThat(saved.getClientSettings().isRequireProofKey()).isFalse();
+        assertThat((Object) saved.getClientSettings().getSetting(ClientSecuritySettings.ROOT_URL))
+                .isEqualTo("https://example.test");
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(ClientSecuritySettings.WEB_ORIGINS))
+                .isEqualTo(Set.of("https://example.test"));
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(
+                                                ClientSecuritySettings.SECRET_GRACE_PERIOD_SECONDS))
+                .isEqualTo(1800L);
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(
+                                                org.springframework.security.oauth2.server
+                                                        .authorization.settings
+                                                        .ConfigurationSettingNames.Client
+                                                        .JWK_SET_URL))
+                .isEqualTo("https://example.test/jwks");
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(
+                                                org.springframework.security.oauth2.server
+                                                        .authorization.settings
+                                                        .ConfigurationSettingNames.Client
+                                                        .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM))
+                .isEqualTo(org.springframework.security.oauth2.jose.jws.SignatureAlgorithm.RS256);
+    }
+
+    @Test
+    void rejectsInvalidCibaConfiguration() {
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("client_secret_basic"),
+                                                        Set.of("client_credentials"),
+                                                        "invalid",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        false)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("CIBA delivery mode must be poll, ping, or push");
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("client_secret_basic"),
+                                                        Set.of("client_credentials"),
+                                                        "push",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        false)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Ping or push delivery requires the CIBA grant");
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                advancedRequest(
+                                                        Set.of("client_secret_basic"),
+                                                        Set.of(
+                                                                "client_credentials",
+                                                                AuthorizationGrantTypes.CIBA),
+                                                        "push",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        false,
+                                                        null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Empty CIBA notification endpoint is not allowed");
+    }
+
+    @Test
+    void managesServiceAccountLifecycleAndUsername() {
+        wireSaveMapper();
+        when(clientRepository.existsByClientId("advanced-client")).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+        AtomicReference<UserEntity> savedUser = new AtomicReference<>();
+        when(userRepository.save(any(UserEntity.class)))
+                .thenAnswer(
+                        invocation -> {
+                            UserEntity user = invocation.getArgument(0);
+                            savedUser.set(user);
+                            return user;
+                        });
+
+        serviceWithAccounts()
+                .create(
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                null,
+                                null,
+                                true));
+
+        verify(userRepository).save(any(UserEntity.class));
+        verify(serviceAccountRepository).save(any(ServiceAccountEntity.class));
+        UserEntity serviceUser = savedUser.get();
+        assertThat(serviceUser.getUsername()).isEqualTo("service-account-advanced-client");
+        assertThat(serviceUser.isServiceAccount()).isTrue();
+
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient existing =
+                RegisteredClient.from(registeredClient("client-id", "advanced-client"))
+                        .clientSecret("encoded-secret")
+                        .build();
+        ServiceAccountEntity account = new ServiceAccountEntity("client-id", serviceUser);
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(existing);
+        when(serviceAccountRepository.findByClientId("client-id")).thenReturn(Optional.of(account));
+
+        serviceWithAccounts()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                null,
+                                null,
+                                true));
+
+        assertThat(serviceUser.getUsername()).isEqualTo("service-account-advanced-client");
+        verify(userRepository, atLeastOnce()).save(serviceUser);
+
+        serviceWithAccounts().delete("client-id");
+
+        verify(serviceAccountRepository).delete(account);
+        verify(userRepository).delete(serviceUser);
+    }
+
     private AdminClientService service() {
         return new AdminClientService(
                 clientRepository,
@@ -605,6 +962,19 @@ class AdminClientServiceTest {
                 mapperSupport,
                 passwordEncoder,
                 adminAuditEventService);
+    }
+
+    private AdminClientService serviceWithAccounts() {
+        return new AdminClientService(
+                clientRepository,
+                authorizationRepository,
+                authorizationConsentRepository,
+                registeredClientMapper,
+                mapperSupport,
+                passwordEncoder,
+                adminAuditEventService,
+                serviceAccountRepository,
+                userRepository);
     }
 
     private AtomicReference<RegisteredClient> wireSaveMapper() {
@@ -710,5 +1080,71 @@ class AdminClientServiceTest {
                 null,
                 null,
                 null);
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled) {
+        return advancedRequest(
+                methods,
+                grants,
+                cibaMode,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod,
+                serviceAccountEnabled,
+                cibaMode.equalsIgnoreCase("poll") ? null : "https://example.test/ciba");
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled,
+            String cibaNotificationEndpoint) {
+        return new AdminClientRequestDTO(
+                "advanced-client",
+                "Advanced client",
+                methods,
+                grants,
+                Set.of(),
+                Set.of(),
+                Set.of("openid"),
+                false,
+                false,
+                true,
+                true,
+                true,
+                Set.of("RS256"),
+                cibaMode,
+                cibaNotificationEndpoint,
+                null,
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(5),
+                Duration.ofHours(1),
+                serviceAccountEnabled,
+                Duration.ofDays(90),
+                true,
+                "https://example.test",
+                "https://example.test/home",
+                Set.of("https://example.test"),
+                "https://example.test/admin",
+                true,
+                false,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod);
     }
 }

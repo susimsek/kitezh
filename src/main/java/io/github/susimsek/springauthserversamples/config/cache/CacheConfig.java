@@ -155,6 +155,10 @@ public class CacheConfig {
                 createCache(cacheManager, CibaPolicyEntity.class.getName());
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".groups");
                 createCache(cacheManager, ClientRoleEntity.class.getName() + ".users");
+                createCache(cacheManager, ClientRoleEntity.class.getName() + ".compositeRoles");
+                createCache(cacheManager, ClientRoleEntity.class.getName() + ".compositeParents");
+                createCache(
+                        cacheManager, ClientRoleEntity.class.getName() + ".compositeRealmRoles");
                 createCache(cacheManager, EmailSettingsEntity.class.getName());
                 createCache(cacheManager, GroupEntity.class.getName());
                 createCache(cacheManager, GroupEntity.class.getName() + ".authorities");
@@ -170,6 +174,10 @@ public class CacheConfig {
                         cacheManager,
                         LocalizationSettingsRepository.LOCALIZATION_SETTINGS_BY_ID_CACHE);
                 createCache(cacheManager, AuthorityEntity.class.getName());
+                createCache(cacheManager, AuthorityEntity.class.getName() + ".compositeRoles");
+                createCache(cacheManager, AuthorityEntity.class.getName() + ".compositeParents");
+                createCache(
+                        cacheManager, AuthorityEntity.class.getName() + ".compositeClientRoles");
                 createCache(cacheManager, OAuth2KeyEntity.class.getName());
                 createCache(cacheManager, RegisteredClientEntity.class.getName());
                 createCache(cacheManager, UserEntity.class.getName());
