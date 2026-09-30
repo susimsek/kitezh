@@ -82,6 +82,9 @@
 			<column name="name" value="roles"/>
 			<column name="display_name" value="Roles"/>
 			<column name="description" value="Client-scoped roles in the resource_access claim."/>
+			<column name="built_in" valueBoolean="true"/>
+			<column name="display_on_consent_screen" valueBoolean="false"/>
+			<column name="include_in_token_scope" valueBoolean="true"/>
 			<column name="group_mapper_enabled" valueBoolean="false"/>
 			<column name="group_claim_name" value="groups"/>
 			<column name="group_mapper_full_path" valueBoolean="true"/>

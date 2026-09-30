@@ -10,3 +10,6 @@ ROLE_CLIENT_MANAGER;Manage registered OAuth2 clients.
 ROLE_EVENT_VIEWER;View administrative audit events.
 ROLE_EVENT_MANAGER;Manage administrative event access and configuration.
 ROLE_USER_IMPERSONATOR;Impersonate non-administrator users through controlled browser handoffs.
+ROLE_USER_QUERY;Discover and search user accounts.
+ROLE_GROUP_QUERY;Discover and search groups.
+ROLE_CLIENT_QUERY;Discover and search registered OAuth2 clients.
