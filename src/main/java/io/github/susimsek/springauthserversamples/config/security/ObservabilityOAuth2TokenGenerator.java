@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
+import java.util.Optional;
 import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -62,8 +63,12 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
 
     @Nullable
     private static String clientId(OAuth2TokenContext context) {
-        var registeredClient = context.getRegisteredClient();
-        return registeredClient == null ? null : registeredClient.getClientId();
+        return Optional.ofNullable(context.getRegisteredClient())
+                .map(
+                        org.springframework.security.oauth2.server.authorization.client
+                                        .RegisteredClient
+                                ::getClientId)
+                .orElse(null);
     }
 
     private static String tokenType(@Nullable OAuth2Token token, OAuth2TokenContext context) {

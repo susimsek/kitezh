@@ -13,14 +13,22 @@ import io.github.susimsek.springauthserversamples.domain.GroupAttribute;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
+import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeEntity;
+import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
+import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
+import io.github.susimsek.springauthserversamples.repository.UserProfileAttributeRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 
 class AdminClientScopeEvaluationServiceTest {
 
@@ -162,6 +170,186 @@ class AdminClientScopeEvaluationServiceTest {
                 .containsKey("roles")
                 .containsKey("client-roles")
                 .containsEntry("aud", List.of("reports-api", "other-client"));
+    }
+
+    @Test
+    void rejectsMissingClientsAndHandlesBlankEvaluationInputs() {
+        when(clientRepository.findById("missing")).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service().evaluate("missing", "openid", "admin"))
+                .isInstanceOf(
+                        io.github.susimsek.springauthserversamples.service.error.ApiException.class)
+                .hasMessage("Client not found");
+
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        ClientMapperEntity blankAudience = mapper("blank-audience", "audience", "", " ");
+        ClientMapperEntity unknown = mapper("unknown", "unsupported", "", "value");
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(List.of(blankAudience, unknown));
+
+        var result = service().evaluate("client-1", " ", " ");
+
+        assertThat(result.effectiveScopes()).isEmpty();
+        assertThat(result.claims()).isEmpty();
+        assertThat(result.mappedClaims()).containsExactly("");
+    }
+
+    @Test
+    void omitsAudienceForMissingSubjectAndReturnsMultivaluedAttributes() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        ClientMapperEntity audience = mapper("resolve", "audience-resolve", "aud", null);
+        ClientMapperEntity custom = mapper("custom", "user-attribute", "custom", null);
+        custom.setSource("custom");
+        ClientMapperEntity groups = mapper("groups", "group-membership", "groups", null);
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(List.of(audience, custom, groups));
+
+        var result = service().evaluate("client-1", "openid", null);
+
+        assertThat(result.claims()).isEmpty();
+        assertThat(result.roles()).isEmpty();
+    }
+
+    @Test
+    void appliesConfiguredDefaultScopesAndFiltersScopedClientRoles() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid profile");
+        UserEntity user = new UserEntity();
+        user.setId(7L);
+        user.setUsername("admin");
+        RegisteredClientEntity otherClient = new RegisteredClientEntity();
+        otherClient.setClientId("orders-api");
+        user.getClientRoles().add(new ClientRoleEntity(otherClient, "orders.read", null));
+
+        ClientScopeEntity scope = new ClientScopeEntity();
+        scope.setId("profile-scope");
+        scope.setName("profile");
+        RegisteredClient registeredClient =
+                RegisteredClient.withId("client-1")
+                        .clientId("demo-client")
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(
+                                                ClientScopeSettings.DEFAULT_SCOPES,
+                                                "profile,missing")
+                                        .build())
+                        .build();
+        RegisteredClientMapper registeredClientMapper = mock(RegisteredClientMapper.class);
+        AuthorizationServerMapperSupport mapperSupport =
+                mock(AuthorizationServerMapperSupport.class);
+        when(registeredClientMapper.toObject(client, mapperSupport)).thenReturn(registeredClient);
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(List.of(mapper("profile", "hardcoded-claim", "profile", "active")));
+        when(scopeRepository.findByNameIn(java.util.Set.of("profile"))).thenReturn(List.of(scope));
+        when(scopeMapperRepository.findAllByClientScopeIdInOrderByPriorityAscNameAsc(
+                        List.of("profile-scope")))
+                .thenReturn(List.of());
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        UserProfileAttributeRepository attributeRepository =
+                mock(UserProfileAttributeRepository.class);
+        AdminClientScopeEvaluationService service =
+                new AdminClientScopeEvaluationService(
+                        clientRepository,
+                        mapperRepository,
+                        scopeRepository,
+                        scopeMapperRepository,
+                        userRepository,
+                        attributeRepository,
+                        registeredClientMapper,
+                        mapperSupport);
+
+        var result = service.evaluate("client-1", "", "admin");
+
+        assertThat(result.requestedScopes()).isEmpty();
+        assertThat(result.effectiveScopes()).containsExactly("profile");
+        assertThat(result.claims()).containsEntry("profile", "active");
+        assertThat(result.roles()).isEmpty();
+    }
+
+    @Test
+    void evaluatesMultiValuedAttributesAndScopedClientRoles() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid scope");
+        UserEntity user = new UserEntity();
+        user.setId(7L);
+        user.setUsername("admin");
+        RegisteredClientEntity currentClient = new RegisteredClientEntity();
+        currentClient.setClientId("demo-client");
+        RegisteredClientEntity otherClient = new RegisteredClientEntity();
+        otherClient.setClientId("orders-api");
+        user.getClientRoles().add(new ClientRoleEntity(currentClient, "demo.read", null));
+        user.getClientRoles().add(new ClientRoleEntity(otherClient, "orders.read", null));
+        GroupEntity group = new GroupEntity();
+        group.setName("operations");
+        group.getAttributes().add(new GroupAttribute("department", "platform"));
+        group.getAttributes().add(new GroupAttribute("department", "engineering"));
+        user.getGroups().add(group);
+
+        ClientScopeEntity scope = new ClientScopeEntity();
+        scope.setId("scope-1");
+        scope.setName("scope");
+        ClientRoleEntity scopedDemo = new ClientRoleEntity(currentClient, "demo.read", null);
+        ClientRoleEntity scopedOrders = new ClientRoleEntity(otherClient, "orders.read", null);
+        scope.setClientRoles(java.util.Set.of(scopedDemo, scopedOrders));
+        UserProfileAttributeDefinitionEntity definition =
+                new UserProfileAttributeDefinitionEntity();
+        definition.setName("departmentCode");
+        UserProfileAttributeRepository attributeRepository =
+                mock(UserProfileAttributeRepository.class);
+        when(attributeRepository
+                        .findAllByUserIdOrderByDefinitionDisplayOrderAscDefinitionNameAscPositionAsc(
+                                7L))
+                .thenReturn(
+                        List.of(
+                                new UserProfileAttributeEntity(user, definition, 0, "one"),
+                                new UserProfileAttributeEntity(user, definition, 1, "two")));
+        ClientMapperEntity custom = mapper("custom", "user-attribute", "custom", null);
+        custom.setSource("departmentCode");
+        ClientMapperEntity groupAttribute =
+                mapperWithSource("group", "group-attribute", "group", "department");
+        ClientMapperEntity audience = mapper("audience", "audience-resolve", "aud", null);
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(List.of(custom, groupAttribute, audience));
+        when(scopeRepository.findByNameIn(java.util.Set.of("scope"))).thenReturn(List.of(scope));
+        when(scopeMapperRepository.findAllByClientScopeIdInOrderByPriorityAscNameAsc(
+                        List.of("scope-1")))
+                .thenReturn(List.of());
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        var result =
+                new AdminClientScopeEvaluationService(
+                                clientRepository,
+                                mapperRepository,
+                                scopeRepository,
+                                scopeMapperRepository,
+                                userRepository,
+                                attributeRepository,
+                                null,
+                                null)
+                        .evaluate("client-1", "scope", "admin");
+
+        assertThat(result.claims())
+                .containsEntry("custom", List.of("one", "two"))
+                .containsEntry("group", List.of("engineering", "platform"))
+                .containsEntry("aud", List.of("orders-api"));
+        assertThat(result.roles()).containsExactly("demo.read");
     }
 
     private AdminClientScopeEvaluationService service() {

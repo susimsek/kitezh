@@ -193,6 +193,30 @@ class AdminRoleServiceTest {
     }
 
     @Test
+    void sortsEffectiveRoleUsersByEverySupportedProperty() {
+        AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
+        UserEntity alice = user(10L, "alice", true, "alice@example.com");
+        alice.setFirstName("Alice");
+        alice.setLastName("Example");
+        alice.getAuthorities().add(role);
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(role));
+        when(userRepository.findAllWithEffectiveAuthorities()).thenReturn(List.of(alice));
+
+        var pageable =
+                org.springframework.data.domain.PageRequest.of(
+                        0,
+                        20,
+                        org.springframework.data.domain.Sort.by(
+                                org.springframework.data.domain.Sort.Order.desc("email"),
+                                org.springframework.data.domain.Sort.Order.asc("firstName"),
+                                org.springframework.data.domain.Sort.Order.asc("lastName"),
+                                org.springframework.data.domain.Sort.Order.asc("enabled"),
+                                org.springframework.data.domain.Sort.Order.asc("username")));
+
+        assertThat(service().role("ROLE_AUDITOR", "", pageable).users().getContent()).hasSize(1);
+    }
+
+    @Test
     void searchesOnlyUsersNotAlreadyAssignedToRole() {
         UserEntity bob = new UserEntity();
         bob.setId(11L);
@@ -225,6 +249,7 @@ class AdminRoleServiceTest {
         assertThat(service().availableUsers("ROLE_AUDITOR", "", pageable).getTotalElements())
                 .isEqualTo(1);
         assertThat(service().role("ROLE_AUDITOR", "", pageable).userCount()).isEqualTo(1L);
+        assertThat(service().role("ROLE_AUDITOR", pageable).userCount()).isEqualTo(1L);
     }
 
     @Test
@@ -349,6 +374,60 @@ class AdminRoleServiceTest {
                 .containsExactly(new AdminRoleDTO("ROLE_REPORTS"));
         assertThat(service.availableClientComposites("ROLE_AUDITOR", " read ", pageable))
                 .hasSize(1);
+    }
+
+    @Test
+    void returnsNoClientCompositesWhenUsingTheLegacyConstructor() {
+        when(authorityRepository.findByName("ROLE_AUDITOR"))
+                .thenReturn(Optional.of(authority(4L, "ROLE_AUDITOR")));
+
+        assertThat(service().availableClientComposites("ROLE_AUDITOR", "", PageRequest.of(0, 20)))
+                .isEmpty();
+    }
+
+    @Test
+    void rejectsRealmAndClientCompositeCyclesAndMissingClientRoles() {
+        AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
+        AuthorityEntity child = authority(5L, "ROLE_REPORTS");
+        child.getCompositeRoles().add(role);
+        when(authorityRepository.findAllWithCompositeRoles()).thenReturn(List.of(role, child));
+
+        assertThatThrownBy(
+                        () ->
+                                extendedService()
+                                        .addComposite(
+                                                "ROLE_AUDITOR",
+                                                "ROLE_REPORTS",
+                                                PageRequest.of(0, 20)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The role composite relationship would create a cycle");
+
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(role));
+        when(clientRoleRepository.findDetailedById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(
+                        () ->
+                                extendedService()
+                                        .addClientComposite(
+                                                "ROLE_AUDITOR", 99L, PageRequest.of(0, 20)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Client role not found");
+    }
+
+    @Test
+    void handlesDuplicateAndMissingCompositeRemovalsWithoutAudit() {
+        AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
+        AuthorityEntity child = authority(5L, "ROLE_REPORTS");
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(role));
+        when(authorityRepository.findByName("ROLE_REPORTS")).thenReturn(Optional.of(child));
+        when(authorityRepository.findAllWithCompositeRoles()).thenReturn(List.of(role, child));
+        stubRoleDetailQueries(role, 0L);
+        PageRequest pageable = PageRequest.of(0, 20);
+
+        extendedService().removeComposite("ROLE_AUDITOR", "ROLE_REPORTS", pageable);
+        extendedService().addComposite("ROLE_AUDITOR", "ROLE_REPORTS", pageable);
+        extendedService().addComposite("ROLE_AUDITOR", "ROLE_REPORTS", pageable);
+
+        verify(adminAuditEventService).record("role.composite.added", "role", "ROLE_AUDITOR");
     }
 
     @Test

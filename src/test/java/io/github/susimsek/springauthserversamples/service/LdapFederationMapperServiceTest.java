@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -251,6 +252,175 @@ class LdapFederationMapperServiceTest {
         assertThat(user.isMustChangePassword()).isTrue();
     }
 
+    @Test
+    void mapsRemainingBuiltInAttributesAndHardcodedValues() {
+        UserEntity user = user();
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(
+                        List.of(
+                                mapperWithUserAttribute(
+                                        "uid", "username", LdapFederationMapperType.USER_ATTRIBUTE),
+                                mapperWithUserAttribute(
+                                        "mail", "email", LdapFederationMapperType.USER_ATTRIBUTE),
+                                mapperWithUserAttribute(
+                                        "givenName",
+                                        "first_name",
+                                        LdapFederationMapperType.USER_ATTRIBUTE),
+                                mapperWithUserAttribute(
+                                        "sn", "lastname", LdapFederationMapperType.USER_ATTRIBUTE),
+                                mapperWithUserAttribute(
+                                        "verified",
+                                        "email_verified",
+                                        LdapFederationMapperType.USER_ATTRIBUTE),
+                                mapperWithUserAttribute(
+                                        "change",
+                                        "must_change_password",
+                                        LdapFederationMapperType.USER_ATTRIBUTE),
+                                hardcodedAttribute("email", " hardcoded@example.com ")));
+        LdapDirectoryClient.LdapUser external =
+                new LdapDirectoryClient.LdapUser(
+                        "uid=alice",
+                        "external-id",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example",
+                        Map.of(
+                                "uid", List.of("alice"),
+                                "mail", List.of("alice@example.com"),
+                                "givenName", List.of("Alice"),
+                                "sn", List.of("Example"),
+                                "verified", List.of("true"),
+                                "change", List.of("true")));
+
+        service.apply(provider, configuration, external, user);
+
+        assertThat(user.getUsername()).isEqualTo("alice");
+        assertThat(user.getEmail()).isEqualTo("hardcoded@example.com");
+        assertThat(user.getFirstName()).isEqualTo("Alice");
+        assertThat(user.getLastName()).isEqualTo("Example");
+        assertThat(user.isEmailVerified()).isTrue();
+        assertThat(user.isMustChangePassword()).isTrue();
+    }
+
+    @Test
+    void ignoresUnmatchedRolesAndMissingCustomDefinitions() {
+        UserEntity user = user();
+        user.setId(42L);
+        LdapFederationMapperEntity roleMapper =
+                mapperWithTarget("missing", LdapFederationMapperType.ROLE, "ROLE_ADMIN");
+        roleMapper.setLdapAttribute("memberOf");
+        roleMapper.setGroupSearchBase(null);
+        LdapFederationMapperEntity custom =
+                mapperWithUserAttribute(
+                        "department", "unknownAttribute", LdapFederationMapperType.USER_ATTRIBUTE);
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(List.of(roleMapper, custom));
+        when(profileDefinitionRepository.findByNameIgnoreCase("unknownAttribute"))
+                .thenReturn(Optional.empty());
+
+        service.apply(
+                provider,
+                configuration,
+                new LdapDirectoryClient.LdapUser(
+                        "uid=alice",
+                        "external-id",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example",
+                        Map.of("memberOf", List.of("ROLE_USER"), "department", List.of(" "))),
+                user);
+
+        assertThat(user.getAuthorities()).isEmpty();
+        verify(profileAttributeRepository, never()).deleteAllByUserIdAndDefinitionId(42L, null);
+    }
+
+    @Test
+    void handlesEmptyMapperValuesDirectRoleMatchesAndMissingOptionalAttributes() {
+        LdapFederationMapperEntity directRole =
+                mapperWithTarget("direct", LdapFederationMapperType.ROLE, "ROLE_ADMIN");
+        directRole.setLdapAttribute("memberOf");
+        LdapFederationMapperEntity missingAttribute =
+                mapperWithUserAttribute("missing", null, LdapFederationMapperType.USER_ATTRIBUTE);
+        LdapFederationMapperEntity emptyCustom =
+                mapperWithUserAttribute(
+                        "custom", "customAttribute", LdapFederationMapperType.USER_ATTRIBUTE);
+        LdapFederationMapperEntity onePartName = mapper("name", LdapFederationMapperType.FULL_NAME);
+        LdapFederationMapperEntity account =
+                mapper("account", LdapFederationMapperType.MSAD_USER_ACCOUNT);
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(
+                        List.of(directRole, missingAttribute, emptyCustom, onePartName, account));
+        when(authorityRepository.findByName("ROLE_ADMIN"))
+                .thenReturn(Optional.of(authority("ROLE_ADMIN")));
+        when(authorityRepository.findByName(AuthoritiesConstants.USER))
+                .thenReturn(Optional.of(authority(AuthoritiesConstants.USER)));
+        UserEntity user = user();
+
+        service.apply(
+                provider,
+                configuration,
+                new LdapDirectoryClient.LdapUser(
+                        "uid=alice",
+                        "external-id",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example",
+                        Map.of(
+                                "memberOf",
+                                List.of("ROLE_ADMIN"),
+                                "cn",
+                                List.of("Alice"),
+                                "custom",
+                                List.of(" "))),
+                user);
+
+        assertThat(user.getAuthorities())
+                .extracting(AuthorityEntity::getName)
+                .containsExactlyInAnyOrder("ROLE_ADMIN", AuthoritiesConstants.USER);
+        assertThat(user.getFirstName()).isEqualTo("Alice");
+        assertThat(user.getLastName()).isNull();
+        assertThat(user.isEnabled()).isFalse();
+        verify(profileDefinitionRepository, never()).findByNameIgnoreCase("customAttribute");
+    }
+
+    @Test
+    void ignoresIncompleteCustomAttributesAndOptionalGroupIdentity() {
+        LdapFederationMapperEntity missingAttribute =
+                mapperWithUserAttribute(
+                        "department", "customAttribute", LdapFederationMapperType.USER_ATTRIBUTE);
+        LdapFederationMapperEntity blankRole =
+                mapperWithTarget("blank", LdapFederationMapperType.HARDCODED_ROLE, " ");
+        LdapFederationMapperEntity blankHardcoded = hardcodedAttribute(" ", null);
+        LdapFederationMapperEntity groupMapper = mapper("groups", LdapFederationMapperType.GROUP);
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(List.of(missingAttribute, blankRole, blankHardcoded, groupMapper));
+        GroupEntity group = group("engineering");
+        when(directoryClient.findGroups(
+                        any(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of("engineering"));
+        when(groupRepository.findByNameIgnoreCase("engineering")).thenReturn(Optional.of(group));
+        UserEntity user = user();
+
+        service.apply(
+                provider,
+                configuration,
+                new LdapDirectoryClient.LdapUser(
+                        "uid=alice",
+                        "id",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example",
+                        Map.of("department", List.of("platform"))),
+                user);
+
+        assertThat(user.getGroups()).containsExactly(group);
+        verify(profileAttributeRepository, times(0)).save(any());
+    }
+
     private static UserEntity user() {
         UserEntity user = new UserEntity();
         user.setAuthorities(new java.util.HashSet<>());
@@ -279,6 +449,15 @@ class LdapFederationMapperServiceTest {
         LdapFederationMapperEntity mapper = mapper(ldapAttribute, type);
         mapper.setLdapAttribute(ldapAttribute);
         mapper.setUserAttribute(userAttribute);
+        return mapper;
+    }
+
+    private static LdapFederationMapperEntity hardcodedAttribute(
+            String userAttribute, String value) {
+        LdapFederationMapperEntity mapper =
+                mapper(userAttribute, LdapFederationMapperType.HARDCODED_ATTRIBUTE);
+        mapper.setUserAttribute(userAttribute);
+        mapper.setHardcodedValue(value);
         return mapper;
     }
 

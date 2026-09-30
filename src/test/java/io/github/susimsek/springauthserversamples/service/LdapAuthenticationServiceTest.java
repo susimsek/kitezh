@@ -327,6 +327,46 @@ class LdapAuthenticationServiceTest {
     }
 
     @Test
+    void truncatesTheFallbackUsernameWhenAFullLengthCandidateAlreadyExists() {
+        String longUsername = "a".repeat(100);
+        when(userRepository.findForAuthentication(longUsername))
+                .thenReturn(Optional.of(new UserEntity()));
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(
+                        new LdapDirectoryClient.LdapUser(
+                                "CN=Alice,OU=Users,DC=example,DC=com",
+                                "object-id",
+                                longUsername,
+                                "alice@example.com",
+                                "Alice",
+                                "Example"));
+
+        UserEntity user = service.authenticate("alice", "directory-password");
+
+        assertThat(user.getUsername()).hasSize(100).startsWith("ldap_");
+    }
+
+    @Test
+    void buildsTransientFallbackIdentityWithoutUsernameOrExternalId() {
+        provider.setImportUsers(false);
+        when(authorityRepository.findByName(AuthoritiesConstants.USER))
+                .thenReturn(Optional.empty());
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(
+                        new LdapDirectoryClient.LdapUser(
+                                "CN=Alice,OU=Users,DC=example,DC=com", null, " ", " ", " ", null));
+
+        UserEntity user = service.authenticate("alice", "directory-password");
+
+        assertThat(user.getUsername())
+                .isEqualTo(
+                        "Corporate AD_"
+                                + Integer.toHexString(
+                                        "CN=Alice,OU=Users,DC=example,DC=com".hashCode()));
+        assertThat(user.getAuthorities()).isEmpty();
+    }
+
+    @Test
     void keepsTheCurrentEmailWhenDirectoryEmailBelongsToAnotherUser() {
         UserEntity existing = new UserEntity();
         existing.setId(1L);
@@ -346,6 +386,65 @@ class LdapAuthenticationServiceTest {
         service.authenticate("alice", "directory-password");
 
         assertThat(existing.getEmail()).isEqualTo("old@example.com");
+    }
+
+    @Test
+    void rejectsDisabledActiveDirectoryUsersAfterSynchronization() {
+        provider.setVendor("ACTIVE_DIRECTORY");
+        UserEntity existing = new UserEntity();
+        existing.setUsername("alice");
+        existing.setEnabled(false);
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("object-id", "old-dn", provider, existing);
+        when(identityRepository.findByProviderIdAndExternalId("provider-id", "object-id"))
+                .thenReturn(Optional.of(identity));
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(externalUser("object-id"));
+
+        assertThatThrownBy(() -> service.authenticate("alice", "directory-password"))
+                .isInstanceOf(
+                        org.springframework.security.authentication.BadCredentialsException.class)
+                .hasMessage("LDAP account is disabled");
+    }
+
+    @Test
+    void synchronizesExistingAndSkipsDisabledProviders() {
+        UserEntity existing = new UserEntity();
+        existing.setUsername("alice");
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("object-id", "old-dn", provider, existing);
+        when(identityRepository.findByProviderIdAndExternalId("provider-id", "object-id"))
+                .thenReturn(Optional.of(identity));
+
+        assertThat(service.synchronizeUser(provider, externalUser("object-id"))).isFalse();
+
+        provider.setImportUsers(false);
+        assertThat(service.synchronizeUser(provider, externalUser("object-id"))).isFalse();
+    }
+
+    @Test
+    void invokesConfiguredMappersForImportedUsers() {
+        LdapFederationMapperService mapperService = mock(LdapFederationMapperService.class);
+        service =
+                new LdapAuthenticationService(
+                        settingsService,
+                        directoryClient,
+                        identityRepository,
+                        userRepository,
+                        authorityRepository,
+                        mapperService);
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(externalUser("object-id"));
+
+        service.authenticate("alice", "directory-password");
+
+        verify(mapperService)
+                .apply(
+                        org.mockito.ArgumentMatchers.eq(provider),
+                        org.mockito.ArgumentMatchers.eq(configuration),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
     }
 
     private static LdapDirectoryClient.LdapUser externalUser(String externalId) {

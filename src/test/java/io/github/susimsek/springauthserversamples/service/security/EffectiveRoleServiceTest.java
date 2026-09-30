@@ -154,6 +154,69 @@ class EffectiveRoleServiceTest {
         assertThat(EffectiveRoleService.reaches(clientRole, realmRole)).isTrue();
     }
 
+    @Test
+    void handlesNullRoleCollectionsAndCyclesSafely() {
+        UserEntity empty = new UserEntity();
+        empty.setAuthorities(null);
+        empty.setClientRoles(null);
+        empty.setGroups(null);
+
+        assertThat(EffectiveRoleService.resolve(empty).effectiveRoles()).isEmpty();
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(empty)).isEmpty();
+        assertThat(EffectiveRoleService.expandScopeRoles(null, null).applicationRoles()).isEmpty();
+        assertThat(EffectiveRoleService.reaches((AuthorityEntity) null, (AuthorityEntity) null))
+                .isFalse();
+
+        AuthorityEntity first = authority(1L, "ROLE_FIRST");
+        AuthorityEntity second = authority(2L, "ROLE_SECOND");
+        first.setCompositeRoles(Set.of(second));
+        second.setCompositeRoles(Set.of(first));
+        GroupEntity group = new GroupEntity();
+        group.setName("cycle");
+        group.setParent(group);
+        group.setAuthorities(Set.of(first));
+        UserEntity cyclic = new UserEntity();
+        cyclic.setAuthorities(Set.of());
+        cyclic.setGroups(Set.of(group));
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(cyclic))
+                .containsExactlyInAnyOrder("ROLE_FIRST", "ROLE_SECOND");
+    }
+
+    @Test
+    void detectsClientRoleToClientRoleReachability() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setClientId("orders-api");
+        ClientRoleEntity parent = clientRole(client, "orders.manage");
+        ClientRoleEntity child = clientRole(client, "orders.read");
+        parent.setCompositeRoles(Set.of(child));
+
+        assertThat(EffectiveRoleService.reaches(parent, child)).isTrue();
+        assertThat(EffectiveRoleService.reaches(child, parent)).isFalse();
+    }
+
+    @Test
+    void ignoresIncompleteRolesAndNullCompositeEntries() {
+        AuthorityEntity unnamedAuthority = authority(9L, "ROLE_SAFE");
+        java.util.Set<AuthorityEntity> authorities = new java.util.LinkedHashSet<>();
+        authorities.add(unnamedAuthority);
+        ClientRoleEntity incompleteClientRole = new ClientRoleEntity(null, null, null);
+        java.util.Set<ClientRoleEntity> clientRoles = new java.util.LinkedHashSet<>();
+        clientRoles.add(incompleteClientRole);
+        clientRoles.add(null);
+
+        UserEntity user = new UserEntity();
+        user.setAuthorities(authorities);
+        user.setClientRoles(clientRoles);
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(user)).containsExactly("ROLE_SAFE");
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(user)).isEmpty();
+        assertThat(EffectiveRoleService.expandScopeRoles(authorities, clientRoles))
+                .extracting(EffectiveRoleService.ScopedRoles::applicationRoles)
+                .isEqualTo(Set.of("ROLE_SAFE"));
+        assertThat(EffectiveRoleService.reaches(unnamedAuthority, incompleteClientRole)).isFalse();
+    }
+
     private static GroupEntity group(Long id, String name, String role) {
         GroupEntity group = new GroupEntity();
         group.setId(id);
