@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.web;
 
 import io.github.susimsek.springauthserversamples.config.openapi.OpenApiConfig;
+import io.github.susimsek.springauthserversamples.domain.UserAvatarEntity;
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -119,18 +120,13 @@ public class AvatarController {
     }
 
     private static ResponseEntity<byte[]> avatarResponse(
-            String id,
-            String ifNoneMatch,
-            io.github.susimsek.springauthserversamples.domain.UserAvatarEntity avatar) {
+            String id, String ifNoneMatch, UserAvatarEntity avatar) {
         CacheControl cacheControl = CacheControl.noCache().cachePrivate();
         return avatarResponse(id, ifNoneMatch, avatar, cacheControl);
     }
 
     private static ResponseEntity<byte[]> avatarResponse(
-            String id,
-            String ifNoneMatch,
-            io.github.susimsek.springauthserversamples.domain.UserAvatarEntity avatar,
-            CacheControl cacheControl) {
+            String id, String ifNoneMatch, UserAvatarEntity avatar, CacheControl cacheControl) {
         String etag = "\"avatar-" + id + "-" + avatar.getUpdatedAt().toEpochMilli() + "\"";
         if (ifNoneMatch != null && ifNoneMatch.contains(etag)) {
             return ResponseEntity.status(304).eTag(etag).cacheControl(cacheControl).build();

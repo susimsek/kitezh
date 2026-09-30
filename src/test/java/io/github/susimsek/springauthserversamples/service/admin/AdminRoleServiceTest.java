@@ -8,10 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
+import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminRoleUserDTO;
+import io.github.susimsek.springauthserversamples.mapper.AdminRoleMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
+import io.github.susimsek.springauthserversamples.repository.ClientRoleRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
@@ -33,6 +37,9 @@ class AdminRoleServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private AdminAuditEventService adminAuditEventService;
     @Mock private AdminUserService adminUserService;
+    @Mock private ClientRoleRepository clientRoleRepository;
+    @Mock private UserAccessInvalidationService userAccessInvalidationService;
+    @Mock private AdminRoleMapper adminRoleMapper;
 
     @Test
     void rolesReturnsMappedPage() {
@@ -227,8 +234,7 @@ class AdminRoleServiceTest {
         alice.setUsername("alice");
         alice.setEnabled(true);
         AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
-        io.github.susimsek.springauthserversamples.domain.GroupEntity group =
-                new io.github.susimsek.springauthserversamples.domain.GroupEntity();
+        GroupEntity group = new GroupEntity();
         group.setAuthorities(java.util.Set.of(role));
         alice.setGroups(java.util.Set.of(group));
         when(authorityRepository.existsByName("ROLE_AUDITOR")).thenReturn(true);
@@ -318,9 +324,83 @@ class AdminRoleServiceTest {
         verify(adminAuditEventService).record("role.user.removed", "role", "ROLE_AUDITOR");
     }
 
+    @Test
+    void listsAvailableRealmAndClientComposites() {
+        AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
+        AuthorityEntity child = authority(5L, "ROLE_REPORTS");
+        ClientRoleEntity clientRole =
+                new ClientRoleEntity(
+                        new io.github.susimsek.springauthserversamples.domain
+                                .RegisteredClientEntity(),
+                        "reports.read",
+                        null);
+        clientRole.setId(9L);
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(role));
+        when(authorityRepository.findAvailableCompositeRoles("ROLE_AUDITOR", "report", pageable))
+                .thenReturn(new PageImpl<>(List.of(child), pageable, 1));
+        when(clientRoleRepository.findAvailableClientRolesForAuthorityComposite(
+                        "ROLE_AUDITOR", "read", pageable))
+                .thenReturn(new PageImpl<>(List.of(clientRole), pageable, 1));
+        when(adminRoleMapper.toDTO(child)).thenReturn(new AdminRoleDTO("ROLE_REPORTS"));
+
+        AdminRoleService service = extendedService();
+        assertThat(service.availableComposites("ROLE_AUDITOR", " report ", pageable).getContent())
+                .containsExactly(new AdminRoleDTO("ROLE_REPORTS"));
+        assertThat(service.availableClientComposites("ROLE_AUDITOR", " read ", pageable))
+                .hasSize(1);
+    }
+
+    @Test
+    void addsAndRemovesRealmAndClientComposites() {
+        AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
+        AuthorityEntity child = authority(5L, "ROLE_REPORTS");
+        var client = new io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity();
+        client.setClientId("orders-client");
+        ClientRoleEntity clientRole = new ClientRoleEntity(client, "reports.read", null);
+        clientRole.setId(9L);
+        when(authorityRepository.findAllWithCompositeRoles()).thenReturn(List.of(role, child));
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(role));
+        when(authorityRepository.findByName("ROLE_REPORTS")).thenReturn(Optional.of(child));
+        when(clientRoleRepository.findDetailedById(9L)).thenReturn(Optional.of(clientRole));
+        when(userRepository.findAll()).thenReturn(List.of());
+        stubRoleDetailQueries(role, 0L);
+        PageRequest pageable = PageRequest.of(0, 20);
+        AdminRoleService service = extendedService();
+
+        service.addComposite("ROLE_AUDITOR", "ROLE_REPORTS", pageable);
+        assertThat(role.getCompositeRoles()).containsExactly(child);
+        service.removeComposite("ROLE_AUDITOR", "ROLE_REPORTS", pageable);
+        assertThat(role.getCompositeRoles()).isEmpty();
+        service.addClientComposite("ROLE_AUDITOR", 9L, pageable);
+        assertThat(role.getCompositeClientRoles()).containsExactly(clientRole);
+        service.removeClientComposite("ROLE_AUDITOR", 9L, pageable);
+        assertThat(role.getCompositeClientRoles()).isEmpty();
+    }
+
     private AdminRoleService service() {
         return new AdminRoleService(
                 authorityRepository, userRepository, adminAuditEventService, adminUserService);
+    }
+
+    private AdminRoleService extendedService() {
+        return new AdminRoleService(
+                clientRoleRepository,
+                authorityRepository,
+                userRepository,
+                adminAuditEventService,
+                adminUserService,
+                adminRoleMapper,
+                userAccessInvalidationService);
+    }
+
+    private void stubRoleDetailQueries(AuthorityEntity role, long count) {
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(userRepository.findAllWithEffectiveAuthorities()).thenReturn(List.of());
+        when(userRepository.findByAuthoritiesNameAndUsernameContainingIgnoreCase(
+                        role.getName(), "", pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, count));
+        when(userRepository.countByAuthoritiesId(role.getId())).thenReturn(count);
     }
 
     private static AuthorityEntity authority(Long id, String name) {

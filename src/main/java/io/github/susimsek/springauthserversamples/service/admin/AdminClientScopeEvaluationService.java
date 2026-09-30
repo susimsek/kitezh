@@ -299,7 +299,7 @@ public class AdminClientScopeEvaluationService {
                                                 .UserProfileAttributeEntity
                                         ::getValue)
                         .toList();
-        return values.isEmpty() ? null : values.size() == 1 ? values.getFirst() : values;
+        return singleOrList(values);
     }
 
     private static List<String> groupMemberships(UserEntity user) {
@@ -325,7 +325,17 @@ public class AdminClientScopeEvaluationService {
                                         ::getValue)
                         .distinct()
                         .toList();
-        return values.isEmpty() ? null : values.size() == 1 ? values.getFirst() : values;
+        return singleOrList(values);
+    }
+
+    private static Object singleOrList(List<String> values) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        if (values.size() == 1) {
+            return values.getFirst();
+        }
+        return values;
     }
 
     private static String fullName(UserEntity user) {

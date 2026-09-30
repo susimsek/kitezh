@@ -3,16 +3,11 @@ package io.github.susimsek.springauthserversamples.service.ciba;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestEntity;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 /** Delivers CIBA ping notifications and push token responses to registered client endpoints. */
 @Service
@@ -20,33 +15,26 @@ public class CibaNotificationService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CibaNotificationService.class);
 
-    private final RestClient restClient;
+    private final CibaNotificationClient notificationClient;
     private final SocialLoginSecretCipher tokenCipher;
 
     public CibaNotificationService() {
-        this(null, buildRestClient());
+        this(null, (endpoint, authorization, body) -> {});
     }
 
     @Autowired
-    public CibaNotificationService(SocialLoginSecretCipher tokenCipher) {
-        this(tokenCipher, buildRestClient());
-    }
-
-    private CibaNotificationService(SocialLoginSecretCipher tokenCipher, RestClient restClient) {
+    public CibaNotificationService(
+            SocialLoginSecretCipher tokenCipher, CibaNotificationClient notificationClient) {
         this.tokenCipher = tokenCipher;
-        this.restClient = restClient;
+        this.notificationClient = notificationClient;
     }
 
-    private static RestClient buildRestClient() {
-        JdkClientHttpRequestFactory requestFactory =
-                new JdkClientHttpRequestFactory(
-                        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
-        requestFactory.setReadTimeout(Duration.ofSeconds(5));
-        return RestClient.builder().requestFactory(requestFactory).build();
+    public CibaNotificationService(SocialLoginSecretCipher tokenCipher) {
+        this(tokenCipher, (endpoint, authorization, body) -> {});
     }
 
-    CibaNotificationService(RestClient restClient) {
-        this(null, restClient);
+    CibaNotificationService(CibaNotificationClient notificationClient) {
+        this(null, notificationClient);
     }
 
     /** Sends the CIBA ping notification. */
@@ -56,14 +44,10 @@ public class CibaNotificationService {
         }
         try {
             String notificationToken = notificationToken(request);
-            restClient
-                    .post()
-                    .uri(request.getNotificationEndpoint())
-                    .headers(headers -> headers.setBearerAuth(notificationToken))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("auth_req_id", request.getAuthReqId()))
-                    .retrieve()
-                    .toBodilessEntity();
+            notificationClient.sendNotification(
+                    URI.create(request.getNotificationEndpoint()),
+                    "Bearer " + notificationToken,
+                    Map.of("auth_req_id", request.getAuthReqId()));
             return true;
         } catch (RuntimeException exception) {
             LOGGER.warn(
@@ -82,14 +66,10 @@ public class CibaNotificationService {
         }
         try {
             String notificationToken = notificationToken(request);
-            restClient
-                    .post()
-                    .uri(request.getNotificationEndpoint())
-                    .headers(headers -> headers.setBearerAuth(notificationToken))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(tokenResponse)
-                    .retrieve()
-                    .toBodilessEntity();
+            notificationClient.sendNotification(
+                    URI.create(request.getNotificationEndpoint()),
+                    "Bearer " + notificationToken,
+                    tokenResponse);
             return true;
         } catch (RuntimeException exception) {
             LOGGER.warn(

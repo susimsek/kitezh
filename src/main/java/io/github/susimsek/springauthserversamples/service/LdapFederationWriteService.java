@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class LdapFederationWriteService {
 
+    private static final String WRITABLE = "WRITABLE";
+    private static final String UNSYNCED = "UNSYNCED";
+
     private final LdapFederationIdentityRepository identityRepository;
     private final LdapFederationSettingsService settingsService;
     private final LdapDirectoryClient directoryClient;
@@ -42,7 +45,7 @@ public class LdapFederationWriteService {
     public void registerUser(UserEntity user, String password) {
         settingsService.enabledProviders().stream()
                 .filter(LdapFederationProviderEntity::isSyncRegistrations)
-                .filter(provider -> "WRITABLE".equals(provider.getEditMode()))
+                .filter(provider -> WRITABLE.equals(provider.getEditMode()))
                 .findFirst()
                 .ifPresent(
                         provider -> {
@@ -64,11 +67,11 @@ public class LdapFederationWriteService {
     public boolean changePassword(UserEntity user, String currentPassword, String newPassword) {
         LdapFederationIdentityEntity identity =
                 identityRepository.findByUserUsername(user.getUsername()).orElse(null);
-        if (identity == null || "UNSYNCED".equals(identity.getProvider().getEditMode())) {
+        if (identity == null || UNSYNCED.equals(identity.getProvider().getEditMode())) {
             return false;
         }
         LdapFederationProviderEntity provider = identity.getProvider();
-        if (!"WRITABLE".equals(provider.getEditMode())) {
+        if (!WRITABLE.equals(provider.getEditMode())) {
             throw ApiException.forbidden(
                     ApiErrorCode.LDAP_READ_ONLY, "The LDAP password is read-only");
         }
@@ -82,7 +85,7 @@ public class LdapFederationWriteService {
                     identity.getDistinguishedName(),
                     newPassword);
             return true;
-        } catch (BadCredentialsException exception) {
+        } catch (BadCredentialsException _) {
             throw ApiException.badRequest(
                     "currentPassword",
                     ApiErrorCode.INVALID_CURRENT_PASSWORD,
@@ -103,7 +106,7 @@ public class LdapFederationWriteService {
             String lastName) {
         UserEntity user = identity.getUser();
         LdapFederationProviderEntity provider = identity.getProvider();
-        if ("UNSYNCED".equals(provider.getEditMode())) {
+        if (UNSYNCED.equals(provider.getEditMode())) {
             return;
         }
         if (!Objects.equals(user.getUsername(), requestedUsername)) {
@@ -118,7 +121,7 @@ public class LdapFederationWriteService {
         if (changes.isEmpty()) {
             return;
         }
-        if (!"WRITABLE".equals(provider.getEditMode())) {
+        if (!WRITABLE.equals(provider.getEditMode())) {
             throw ApiException.forbidden(
                     ApiErrorCode.LDAP_READ_ONLY, "The LDAP profile is read-only");
         }

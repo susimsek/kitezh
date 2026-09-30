@@ -311,14 +311,16 @@ public class AdminClientService {
             return;
         }
         ServiceAccountEntity existing = serviceAccount(client.getId());
-        if (enabled && existing == null) {
-            UserEntity saved = userRepository.save(serviceAccountUser(client.getClientId()));
-            serviceAccountRepository.save(new ServiceAccountEntity(client.getId(), saved));
-        } else if (enabled && existing != null) {
-            UserEntity user = existing.getUser();
-            user.setUsername(serviceAccountUsername(client.getClientId()));
-            userRepository.save(user);
-        } else if (!enabled && existing != null) {
+        if (enabled) {
+            if (existing == null) {
+                UserEntity saved = userRepository.save(serviceAccountUser(client.getClientId()));
+                serviceAccountRepository.save(new ServiceAccountEntity(client.getId(), saved));
+            } else {
+                UserEntity user = existing.getUser();
+                user.setUsername(serviceAccountUsername(client.getClientId()));
+                userRepository.save(user);
+            }
+        } else if (existing != null) {
             serviceAccountRepository.delete(existing);
             userRepository.delete(existing.getUser());
         }
@@ -363,6 +365,12 @@ public class AdminClientService {
             throw ApiException.badRequest(
                     ApiErrorCode.CLIENT_INVALID_REQUEST, "Request body is required");
         }
+        validateRequiredFields(request);
+        validateMethodAndGrantRules(request);
+        validateUrisAndDurations(request);
+    }
+
+    private static void validateRequiredFields(AdminClientRequestDTO request) {
         if (!hasText(request.clientId())) {
             throw ApiException.badRequest(
                     CLIENT_ID_FIELD,
@@ -390,7 +398,9 @@ public class AdminClientService {
                 "scopes",
                 ApiErrorCode.CLIENT_INVALID_SCOPES,
                 "At least one scope is required");
+    }
 
+    private static void validateMethodAndGrantRules(AdminClientRequestDTO request) {
         Set<String> methods = request.clientAuthenticationMethods();
         Set<String> grants = request.authorizationGrantTypes();
         Set<String> redirectUris = nullSafe(request.redirectUris());
@@ -437,20 +447,6 @@ public class AdminClientService {
                     ApiErrorCode.CLIENT_INVALID_GRANT_TYPES,
                     "A service account requires the client_credentials grant");
         }
-        if (methods.contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue())) {
-            if (!hasText(request.jwkSetUrl())) {
-                throw ApiException.badRequest(
-                        "jwkSetUrl",
-                        ApiErrorCode.CLIENT_INVALID_URI,
-                        "A JWKS URL is required for private_key_jwt");
-            }
-            if (!hasText(request.tokenEndpointAuthenticationSigningAlgorithm())) {
-                throw ApiException.badRequest(
-                        "tokenEndpointAuthenticationSigningAlgorithm",
-                        ApiErrorCode.CLIENT_INVALID_AUTHENTICATION_METHODS,
-                        "A signing algorithm is required for private_key_jwt");
-            }
-        }
         if (methods.contains(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue())
                 && !hasText(request.x509CertificateSubjectDN())) {
             throw ApiException.badRequest(
@@ -458,7 +454,29 @@ public class AdminClientService {
                     ApiErrorCode.CLIENT_INVALID_AUTHENTICATION_METHODS,
                     "A certificate subject DN is required for tls_client_auth");
         }
+        validatePrivateKeyJwt(request, methods);
+    }
 
+    private static void validatePrivateKeyJwt(AdminClientRequestDTO request, Set<String> methods) {
+        if (!methods.contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue())) {
+            return;
+        }
+        if (!hasText(request.jwkSetUrl())) {
+            throw ApiException.badRequest(
+                    "jwkSetUrl",
+                    ApiErrorCode.CLIENT_INVALID_URI,
+                    "A JWKS URL is required for private_key_jwt");
+        }
+        if (!hasText(request.tokenEndpointAuthenticationSigningAlgorithm())) {
+            throw ApiException.badRequest(
+                    "tokenEndpointAuthenticationSigningAlgorithm",
+                    ApiErrorCode.CLIENT_INVALID_AUTHENTICATION_METHODS,
+                    "A signing algorithm is required for private_key_jwt");
+        }
+    }
+
+    private static void validateUrisAndDurations(AdminClientRequestDTO request) {
+        Set<String> redirectUris = nullSafe(request.redirectUris());
         redirectUris.forEach(uri -> validateUri("redirectUris", "redirect URI", uri));
         nullSafe(request.postLogoutRedirectUris())
                 .forEach(
@@ -486,7 +504,7 @@ public class AdminClientService {
                 "clientSecretGracePeriod",
                 "client secret grace period",
                 request.clientSecretGracePeriod());
-        validateCiba(request, grants);
+        validateCiba(request, request.authorizationGrantTypes());
     }
 
     private RegisteredClient save(RegisteredClient client) {
@@ -551,17 +569,28 @@ public class AdminClientService {
 
     private static ClientSettings buildClientSettings(
             AdminClientRequestDTO request, RegisteredClient existing) {
+        ClientSettings settings = initialClientSettings(request, existing);
+        var values = new HashMap<>(settings.getSettings());
+        applyBaseClientSettings(values, request, existing);
+        applyOptionalClientSettings(values, request, existing);
+        settings = ClientSettings.withSettings(values).build();
+        return withDefaultScopes(settings, request, existing);
+    }
+
+    private static ClientSettings initialClientSettings(
+            AdminClientRequestDTO request, RegisteredClient existing) {
         ClientSettings.Builder builder =
                 existing == null
                         ? ClientSettings.builder()
                         : ClientSettings.withSettings(
                                 new HashMap<>(existing.getClientSettings().getSettings()));
+        return builder.requireAuthorizationConsent(request.requireAuthorizationConsent())
+                .requireProofKey(request.requireProofKey())
+                .build();
+    }
 
-        ClientSettings settings =
-                builder.requireAuthorizationConsent(request.requireAuthorizationConsent())
-                        .requireProofKey(request.requireProofKey())
-                        .build();
-        var values = new HashMap<>(settings.getSettings());
+    private static void applyBaseClientSettings(
+            Map<String, Object> values, AdminClientRequestDTO request, RegisteredClient existing) {
         values.put(ClientSecuritySettings.REQUIRE_DPOP_PROOF, request.requireDpop());
         values.put(ClientSecuritySettings.REQUIRE_DPOP_JKT, request.requireDpopJkt());
         values.put(ClientSecuritySettings.DPOP_REFRESH_TOKEN_ONLY, request.dpopRefreshTokenOnly());
@@ -571,6 +600,18 @@ public class AdminClientService {
                     ClientSecuritySettings.CLIENT_ENABLED,
                     request.enabled() == null || request.enabled());
         }
+    }
+
+    private static void applyOptionalClientSettings(
+            Map<String, Object> values, AdminClientRequestDTO request, RegisteredClient existing) {
+        applyOptionalUrls(values, request, existing);
+        applyOptionalLogoutSettings(values, request);
+        applyOptionalAuthenticationSettings(values, request, existing);
+        applyCibaSettings(values, request);
+    }
+
+    private static void applyOptionalUrls(
+            Map<String, Object> values, AdminClientRequestDTO request, RegisteredClient existing) {
         if (request.rootUrl() != null) {
             putOrRemove(values, ClientSecuritySettings.ROOT_URL, request.rootUrl());
         }
@@ -587,12 +628,20 @@ public class AdminClientService {
         } else {
             values.put(ClientSecuritySettings.WEB_ORIGINS, request.webOrigins());
         }
+    }
+
+    private static void applyOptionalLogoutSettings(
+            Map<String, Object> values, AdminClientRequestDTO request) {
         if (request.frontChannelLogout() != null) {
             values.put(ClientSecuritySettings.FRONT_CHANNEL_LOGOUT, request.frontChannelLogout());
         }
         if (request.backchannelLogout() != null) {
             values.put(ClientSecuritySettings.BACK_CHANNEL_LOGOUT, request.backchannelLogout());
         }
+    }
+
+    private static void applyOptionalAuthenticationSettings(
+            Map<String, Object> values, AdminClientRequestDTO request, RegisteredClient existing) {
         if (request.jwkSetUrl() != null) {
             putOrRemove(
                     values,
@@ -628,6 +677,10 @@ public class AdminClientService {
                             .ConfigurationSettingNames.Client.X509_CERTIFICATE_SUBJECT_DN,
                     request.x509CertificateSubjectDN());
         }
+    }
+
+    private static void applyCibaSettings(
+            Map<String, Object> values, AdminClientRequestDTO request) {
         String cibaDeliveryMode = resolveCibaDeliveryMode(request);
         values.put(ClientSecuritySettings.CIBA_DELIVERY_MODE, cibaDeliveryMode);
         if (ClientSecuritySettings.CIBA_POLL.equals(cibaDeliveryMode)) {
@@ -639,7 +692,10 @@ public class AdminClientService {
                     request.cibaNotificationEndpoint());
             values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
         }
-        settings = ClientSettings.withSettings(values).build();
+    }
+
+    private static ClientSettings withDefaultScopes(
+            ClientSettings settings, AdminClientRequestDTO request, RegisteredClient existing) {
         if (existing == null
                 || existing.getClientSettings().getSetting(ClientScopeSettings.DEFAULT_SCOPES)
                         == null) {
@@ -752,7 +808,7 @@ public class AdminClientService {
                     return Duration.ofSeconds(seconds);
                 }
             } catch (NumberFormatException _) {
-                // Use the safe default for legacy or malformed settings.
+                return DEFAULT_SECRET_GRACE_PERIOD;
             }
         }
         return DEFAULT_SECRET_GRACE_PERIOD;

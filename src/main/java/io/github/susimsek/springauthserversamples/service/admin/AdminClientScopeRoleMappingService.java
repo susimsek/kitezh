@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.service.admin;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientRoleDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeRoleMappingDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeRoleMappingRequestDTO;
@@ -109,7 +110,7 @@ public class AdminClientScopeRoleMappingService {
 
     private void invalidateUsers() {
         userRepository.findAll().stream()
-                .map(user -> user.getUsername())
+                .map(UserEntity::getUsername)
                 .forEach(userAccessInvalidationService::invalidate);
     }
 

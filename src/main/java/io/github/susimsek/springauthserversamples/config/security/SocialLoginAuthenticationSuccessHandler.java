@@ -2,6 +2,8 @@ package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.service.SocialAccountLinkRequiredException;
 import io.github.susimsek.springauthserversamples.service.SocialLoginService;
+import io.github.susimsek.springauthserversamples.service.SocialTokenService;
+import io.github.susimsek.springauthserversamples.service.account.MfaService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,14 +36,12 @@ import org.springframework.security.web.savedrequest.SavedRequest;
 
 public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
 
-    private final io.github.susimsek.springauthserversamples.service.SocialLoginService
-            socialLoginService;
+    private final SocialLoginService socialLoginService;
     private final UserDetailsService userDetailsService;
     private final SecurityContextRepository securityContextRepository;
     private final OAuth2AuthorizedClientRepository authorizedClientRepository;
-    private final io.github.susimsek.springauthserversamples.service.SocialTokenService
-            socialTokenService;
-    private final io.github.susimsek.springauthserversamples.service.account.MfaService mfaService;
+    private final SocialTokenService socialTokenService;
+    private final MfaService mfaService;
     private final AuthenticationFailureHandler failureHandler =
             new SimpleUrlAuthenticationFailureHandler("/login?error");
     private final AuthenticationFailureHandler accountLinkFailureHandler =
@@ -53,9 +53,8 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             UserDetailsService userDetailsService,
             SecurityContextRepository securityContextRepository,
             OAuth2AuthorizedClientRepository authorizedClientRepository,
-            io.github.susimsek.springauthserversamples.service.SocialTokenService
-                    socialTokenService,
-            io.github.susimsek.springauthserversamples.service.account.MfaService mfaService) {
+            SocialTokenService socialTokenService,
+            MfaService mfaService) {
         this.socialLoginService = socialLoginService;
         this.userDetailsService = userDetailsService;
         this.securityContextRepository = securityContextRepository;
@@ -69,8 +68,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             UserDetailsService userDetailsService,
             SecurityContextRepository securityContextRepository,
             OAuth2AuthorizedClientRepository authorizedClientRepository,
-            io.github.susimsek.springauthserversamples.service.SocialTokenService
-                    socialTokenService) {
+            SocialTokenService socialTokenService) {
         this(
                 socialLoginService,
                 userDetailsService,

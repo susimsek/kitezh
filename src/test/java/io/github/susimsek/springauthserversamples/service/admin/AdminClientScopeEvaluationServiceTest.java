@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
+import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeMapperEntity;
+import io.github.susimsek.springauthserversamples.domain.GroupAttribute;
+import io.github.susimsek.springauthserversamples.domain.GroupEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
@@ -98,6 +102,68 @@ class AdminClientScopeEvaluationServiceTest {
         assertThat(result.claims()).containsEntry("preferred_username", "admin");
     }
 
+    @Test
+    void evaluatesUserAndGroupMapperTypes() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        UserEntity user = new UserEntity();
+        user.setId(7L);
+        user.setUsername("admin");
+        user.setFirstName("Ada");
+        user.setLastName("Lovelace");
+        user.setEmail("ada@example.com");
+        user.setPreferredLocale("tr");
+        user.getAuthorities().add(new AuthorityEntity(1L, "ROLE_USER"));
+        RegisteredClientEntity otherClient = new RegisteredClientEntity();
+        otherClient.setId("other");
+        otherClient.setClientId("other-client");
+        ClientRoleEntity otherRole = new ClientRoleEntity(otherClient, "reports.read", null);
+        otherRole.setId(2L);
+        user.getClientRoles().add(otherRole);
+        GroupEntity group = new GroupEntity();
+        group.setName("Operations");
+        group.getAttributes().add(new GroupAttribute("department", "engineering"));
+        user.getGroups().add(group);
+        List<ClientMapperEntity> mappers =
+                List.of(
+                        mapper("hardcoded", "hardcoded-claim", "hardcoded", "value"),
+                        mapper("audience", "audience", "audience", "reports-api"),
+                        mapper("audience-resolve", "audience-resolve", "audience", null),
+                        mapperWithSource("first", "user-property", "first", "firstName"),
+                        mapperWithSource("last", "user-property", "last", "lastName"),
+                        mapper("email", "email", "mail", null),
+                        mapper("full", "full-name", "full", null),
+                        mapper("locale", "locale", "locale", null),
+                        mapper("username", "username", "user", null),
+                        mapper("groups", "group-membership", "groups", null),
+                        mapperWithSource(
+                                "group-attribute", "group-attribute", "department", "department"),
+                        mapper("roles", "application-role", "roles", null),
+                        mapper("client-roles", "client-role", "client-roles", null));
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(mappers);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        var result = service().evaluate("client-1", "openid", "admin");
+
+        assertThat(result.claims())
+                .containsEntry("hardcoded", "value")
+                .containsEntry("first", "Ada")
+                .containsEntry("last", "Lovelace")
+                .containsEntry("mail", "ada@example.com")
+                .containsEntry("full", "Ada Lovelace")
+                .containsEntry("locale", "tr")
+                .containsEntry("user", "admin")
+                .containsEntry("groups", List.of("/Operations"))
+                .containsEntry("department", "engineering")
+                .containsKey("roles")
+                .containsKey("client-roles")
+                .containsEntry("aud", List.of("reports-api", "other-client"));
+    }
+
     private AdminClientScopeEvaluationService service() {
         return new AdminClientScopeEvaluationService(
                 clientRepository,
@@ -114,6 +180,13 @@ class AdminClientScopeEvaluationServiceTest {
         mapper.setMapperType(type);
         mapper.setClaimName(claimName);
         mapper.setValue(value);
+        return mapper;
+    }
+
+    private static ClientMapperEntity mapperWithSource(
+            String name, String type, String claimName, String source) {
+        ClientMapperEntity mapper = mapper(name, type, claimName, null);
+        mapper.setSource(source);
         return mapper;
     }
 

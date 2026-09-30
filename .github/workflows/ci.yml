@@ -29,13 +29,13 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
 
       - name: Validate Docker Compose definitions
         run: |
@@ -62,10 +62,10 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up GraalVM
-        uses: graalvm/setup-graalvm@v1
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
           java-version: '25'
           distribution: graalvm-community
@@ -74,7 +74,7 @@ jobs:
           native-image-musl: 'true'
 
       - name: Set up Node.js and pnpm
-        uses: pnpm/setup@v1
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Set up Snyk CLI
         if: ${{ env.SNYK_TOKEN != '' }}
-        uses: snyk/actions/setup@v1
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1
 
       - name: Verify Snyk CLI
         if: ${{ env.SNYK_TOKEN != '' }}
@@ -143,7 +143,7 @@ jobs:
         run: |
           UPX_VERSION=5.1.0
           UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
-          curl -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
+          curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
           tar -xJf "${UPX_ARCHIVE}"
           mkdir -p "${RUNNER_TEMP}/bin"
           mv "upx-${UPX_VERSION}-amd64_linux/upx" "${RUNNER_TEMP}/bin/upx"
@@ -182,7 +182,7 @@ jobs:
             jib:build \
             -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
             -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
-            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
+            -Djib.to.auth.password="${DOCKERHUB_TOKEN}" # NOSONAR - value is supplied by a GitHub Actions secret
 
       - name: Update Docker Hub description
         if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}

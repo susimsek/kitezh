@@ -368,11 +368,9 @@ public class AdminClientRoleService {
     }
 
     private ClientRoleEntity clientRoleRequired(Long roleId) {
-        ClientRoleEntity role =
-                clientRoleRepository
-                        .findDetailedById(roleId)
-                        .orElseThrow(() -> ApiException.notFound("Client role not found"));
-        return role;
+        return clientRoleRepository
+                .findDetailedById(roleId)
+                .orElseThrow(() -> ApiException.notFound("Client role not found"));
     }
 
     private UserEntity userRequired(Long userId) {

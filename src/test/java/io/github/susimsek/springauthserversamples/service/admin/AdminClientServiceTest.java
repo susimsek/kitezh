@@ -280,8 +280,7 @@ class AdminClientServiceTest {
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                         .scope("openid")
                         .clientSettings(
-                                io.github.susimsek.springauthserversamples.service.admin
-                                        .ClientScopeSettings.withAssignments(
+                                ClientScopeSettings.withAssignments(
                                         org.springframework.security.oauth2.server.authorization
                                                 .settings.ClientSettings.builder()
                                                 .build(),

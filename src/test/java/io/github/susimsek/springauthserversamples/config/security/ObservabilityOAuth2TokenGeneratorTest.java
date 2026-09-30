@@ -66,13 +66,12 @@ class ObservabilityOAuth2TokenGeneratorTest {
                 .thenReturn(AuthorizationGrantType.CLIENT_CREDENTIALS);
         when(context.getTokenType()).thenReturn(new OAuth2TokenType("custom"));
 
-        assertThatThrownBy(
-                        () ->
-                                generator(
-                                                ctx -> {
-                                                    throw new IllegalStateException("failed");
-                                                })
-                                        .generate(context))
+        ObservabilityOAuth2TokenGenerator failingGenerator =
+                generator(
+                        ctx -> {
+                            throw new IllegalStateException("failed");
+                        });
+        assertThatThrownBy(() -> failingGenerator.generate(context))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(

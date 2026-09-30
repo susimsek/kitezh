@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AdminClientMapperService {
 
+    private static final String CLIENT_TARGET = "client";
+
     private final ClientMapperRepository mapperRepository;
     private final ClientRepository clientRepository;
     private final AdminAuditEventService auditEventService;
@@ -45,7 +47,7 @@ public class AdminClientMapperService {
         ClientMapperEntity mapper = new ClientMapperEntity();
         apply(mapper, client, request);
         ClientMapperEntity saved = mapperRepository.save(mapper);
-        auditEventService.record("client.mapper.created", "client", client.getId());
+        auditEventService.record("client.mapper.created", CLIENT_TARGET, client.getId());
         return toDTO(saved);
     }
 
@@ -64,7 +66,7 @@ public class AdminClientMapperService {
         }
         apply(mapper, client, request);
         ClientMapperEntity saved = mapperRepository.save(mapper);
-        auditEventService.record("client.mapper.updated", "client", client.getId());
+        auditEventService.record("client.mapper.updated", CLIENT_TARGET, client.getId());
         return toDTO(saved);
     }
 
@@ -73,7 +75,7 @@ public class AdminClientMapperService {
         RegisteredClientEntity client = requireClient(clientId);
         ClientMapperEntity mapper = mapperRequired(id, client.getId());
         mapperRepository.delete(mapper);
-        auditEventService.record("client.mapper.deleted", "client", client.getId());
+        auditEventService.record("client.mapper.deleted", CLIENT_TARGET, client.getId());
     }
 
     private RegisteredClientEntity requireClient(String clientId) {

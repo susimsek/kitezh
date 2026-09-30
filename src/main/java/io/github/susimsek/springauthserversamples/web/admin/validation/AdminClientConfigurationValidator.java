@@ -41,54 +41,88 @@ public class AdminClientConfigurationValidator
 
         Set<String> methods = request.clientAuthenticationMethods();
         Set<String> grants = request.authorizationGrantTypes();
-        boolean valid = true;
         context.disableDefaultConstraintViolation();
+        boolean valid = validateMethods(methods, context);
+        valid &= validateGrants(methods, grants, context);
+        valid &= validateAuthenticationRequirements(request, methods, context);
+        valid &= validateAuthorizationCode(request, methods, grants, context);
+        return valid;
+    }
 
-        if (!ALLOWED_METHODS.containsAll(methods)
-                || (methods.contains(ClientAuthenticationMethod.NONE.getValue())
-                        && methods.size() > 1)) {
-            valid = false;
-            violation(context, CLIENT_AUTHENTICATION_METHODS_FIELD, SELECTION_MESSAGE);
+    private static boolean validateMethods(
+            Set<String> methods, ConstraintValidatorContext context) {
+        if (ALLOWED_METHODS.containsAll(methods)
+                && (!methods.contains(ClientAuthenticationMethod.NONE.getValue())
+                        || methods.size() == 1)) {
+            return true;
         }
-        if (!ALLOWED_GRANTS.containsAll(grants)
-                || (methods.contains(ClientAuthenticationMethod.NONE.getValue())
-                        && grants.contains(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()))) {
-            valid = false;
-            violation(context, AUTHORIZATION_GRANT_TYPES_FIELD, SELECTION_MESSAGE);
+        violation(context, CLIENT_AUTHENTICATION_METHODS_FIELD, SELECTION_MESSAGE);
+        return false;
+    }
+
+    private static boolean validateGrants(
+            Set<String> methods, Set<String> grants, ConstraintValidatorContext context) {
+        if (ALLOWED_GRANTS.containsAll(grants)
+                && (!methods.contains(ClientAuthenticationMethod.NONE.getValue())
+                        || !grants.contains(
+                                AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()))) {
+            return true;
         }
+        violation(context, AUTHORIZATION_GRANT_TYPES_FIELD, SELECTION_MESSAGE);
+        return false;
+    }
+
+    private static boolean validateAuthenticationRequirements(
+            AdminClientRequestDTO request,
+            Set<String> methods,
+            ConstraintValidatorContext context) {
+        boolean valid = true;
         if (methods.contains(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue())
-                && (request.jwkSetUrl() == null
-                        || request.jwkSetUrl().isBlank()
-                        || request.tokenEndpointAuthenticationSigningAlgorithm() == null
-                        || request.tokenEndpointAuthenticationSigningAlgorithm().isBlank())) {
-            valid = false;
+                && !hasPrivateKeyJwtSettings(request)) {
             violation(context, CLIENT_AUTHENTICATION_METHODS_FIELD, SELECTION_MESSAGE);
+            valid = false;
         }
         if (methods.contains(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue())
-                && (request.x509CertificateSubjectDN() == null
-                        || request.x509CertificateSubjectDN().isBlank())) {
-            valid = false;
+                && isBlank(request.x509CertificateSubjectDN())) {
             violation(context, CLIENT_AUTHENTICATION_METHODS_FIELD, SELECTION_MESSAGE);
+            valid = false;
         }
+        return valid;
+    }
 
+    private static boolean validateAuthorizationCode(
+            AdminClientRequestDTO request,
+            Set<String> methods,
+            Set<String> grants,
+            ConstraintValidatorContext context) {
         boolean authorizationCode =
                 grants.contains(AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
+        boolean valid = true;
         if (authorizationCode
                 && (request.redirectUris() == null || request.redirectUris().isEmpty())) {
-            valid = false;
             violation(context, "redirectUris", "{app.api.problem.violation.required}");
+            valid = false;
         }
         if (methods.contains(ClientAuthenticationMethod.NONE.getValue())
                 && authorizationCode
                 && !request.requireProofKey()) {
-            valid = false;
             violation(context, AUTHORIZATION_GRANT_TYPES_FIELD, SELECTION_MESSAGE);
+            valid = false;
         }
         if (request.requireProofKey() && !authorizationCode) {
-            valid = false;
             violation(context, AUTHORIZATION_GRANT_TYPES_FIELD, SELECTION_MESSAGE);
+            valid = false;
         }
         return valid;
+    }
+
+    private static boolean hasPrivateKeyJwtSettings(AdminClientRequestDTO request) {
+        return !isBlank(request.jwkSetUrl())
+                && !isBlank(request.tokenEndpointAuthenticationSigningAlgorithm());
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private static void violation(

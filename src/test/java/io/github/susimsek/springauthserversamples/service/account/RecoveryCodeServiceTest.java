@@ -10,6 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.RecoveryCodeEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.LoginSettingsRepository;
@@ -84,7 +85,7 @@ class RecoveryCodeServiceTest {
     void reportsStatusAndWarningThresholdForTotpUsers() {
         UserEntity user = user();
         user.setTotpEnabled(true);
-        var settings = new io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity();
+        var settings = new LoginSettingsEntity();
         settings.setRecoveryCodeWarningThreshold(4);
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
         when(loginSettingsRepository.findById(1L)).thenReturn(Optional.of(settings));

@@ -4,12 +4,12 @@ import io.github.susimsek.springauthserversamples.domain.SocialProviderMapperEnt
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.SocialProviderMapperRepository;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -246,13 +246,12 @@ public class SocialIdentityMapperService {
             value = map.get(part);
         }
         if (value instanceof Iterable<?> iterable) {
-            List<String> result = new ArrayList<>();
-            for (Object item : iterable) {
-                if (item != null && !String.valueOf(item).isBlank()) {
-                    result.add(String.valueOf(item).trim());
-                }
-            }
-            return result;
+            return StreamSupport.stream(iterable.spliterator(), false)
+                    .filter(Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(item -> !item.isBlank())
+                    .toList();
         }
         String scalar = value == null ? "" : String.valueOf(value).trim();
         return scalar.isBlank() ? List.of() : List.of(scalar);

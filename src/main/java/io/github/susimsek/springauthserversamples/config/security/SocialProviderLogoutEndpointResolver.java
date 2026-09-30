@@ -2,35 +2,27 @@ package io.github.susimsek.springauthserversamples.config.security;
 
 import io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService.ProviderCredentials;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
 /** Resolves the browser logout endpoint exposed by the linked identity provider. */
 @Component
 public class SocialProviderLogoutEndpointResolver {
 
     private static final String OPENID_CONFIGURATION = "/.well-known/openid-configuration";
-    private final RestClient restClient;
+    private final OidcDiscoveryClient discoveryClient;
     private final ConcurrentMap<String, String> discoveredEndpoints = new ConcurrentHashMap<>();
 
-    @Autowired
     public SocialProviderLogoutEndpointResolver() {
-        JdkClientHttpRequestFactory requestFactory =
-                new JdkClientHttpRequestFactory(
-                        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
-        requestFactory.setReadTimeout(Duration.ofSeconds(2));
-        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+        this(endpoint -> Map.of());
     }
 
-    SocialProviderLogoutEndpointResolver(RestClient restClient) {
-        this.restClient = restClient;
+    @Autowired
+    public SocialProviderLogoutEndpointResolver(OidcDiscoveryClient discoveryClient) {
+        this.discoveryClient = discoveryClient;
     }
 
     public String resolve(ProviderCredentials provider) {
@@ -65,7 +57,6 @@ public class SocialProviderLogoutEndpointResolver {
         return discovered;
     }
 
-    @SuppressWarnings("unchecked")
     private String fetchDiscovery(String issuer) {
         try {
             URI issuerUri = URI.create(issuer);
@@ -75,8 +66,7 @@ public class SocialProviderLogoutEndpointResolver {
             String metadataUri =
                     issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
             metadataUri += OPENID_CONFIGURATION;
-            Map<String, Object> metadata =
-                    restClient.get().uri(metadataUri).retrieve().body(Map.class);
+            Map<String, Object> metadata = discoveryClient.discover(URI.create(metadataUri));
             if (metadata == null) {
                 return null;
             }

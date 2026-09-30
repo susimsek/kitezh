@@ -56,14 +56,11 @@ class AdminClientScopeRoleMappingServiceTest {
     void rejectsUnknownApplicationRole() {
         when(scopeRepository.findDetailedById("scope-1")).thenReturn(Optional.of(scope()));
         when(authorityRepository.findByNameIn(Set.of("ROLE_MISSING"))).thenReturn(List.of());
+        AdminClientScopeRoleMappingService service = service();
+        AdminClientScopeRoleMappingRequestDTO request =
+                new AdminClientScopeRoleMappingRequestDTO(Set.of("ROLE_MISSING"), Set.of());
 
-        assertThatThrownBy(
-                        () ->
-                                service()
-                                        .update(
-                                                "scope-1",
-                                                new AdminClientScopeRoleMappingRequestDTO(
-                                                        Set.of("ROLE_MISSING"), Set.of())))
+        assertThatThrownBy(() -> service.update("scope-1", request))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("One or more application roles do not exist");
     }
@@ -73,14 +70,11 @@ class AdminClientScopeRoleMappingServiceTest {
         ClientScopeEntity scope = scope();
         scope.setBuiltIn(true);
         when(scopeRepository.findDetailedById("scope-1")).thenReturn(Optional.of(scope));
+        AdminClientScopeRoleMappingService service = service();
+        AdminClientScopeRoleMappingRequestDTO request =
+                new AdminClientScopeRoleMappingRequestDTO(Set.of(), Set.of());
 
-        assertThatThrownBy(
-                        () ->
-                                service()
-                                        .update(
-                                                "scope-1",
-                                                new AdminClientScopeRoleMappingRequestDTO(
-                                                        Set.of(), Set.of())))
+        assertThatThrownBy(() -> service.update("scope-1", request))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Built-in client scopes cannot be changed");
     }

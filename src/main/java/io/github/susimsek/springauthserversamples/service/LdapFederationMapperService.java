@@ -79,6 +79,7 @@ public class LdapFederationMapperService {
             case ROLE -> applyRoleMapper(configuration, external, user, mapper, identity);
             case GROUP -> applyGroupMapper(configuration, external, user, mapper, identity);
             case MSAD_USER_ACCOUNT -> applyMsadAccount(user, external);
+            default -> throw new IllegalArgumentException("Unsupported LDAP mapper type: " + type);
         }
     }
 
@@ -151,7 +152,7 @@ public class LdapFederationMapperService {
         if (accountControl != null) {
             try {
                 user.setEnabled((Integer.parseInt(accountControl) & 0x2) == 0);
-            } catch (NumberFormatException exception) {
+            } catch (NumberFormatException _) {
                 user.setEnabled(false);
             }
         }

@@ -1,5 +1,7 @@
 package io.github.susimsek.springauthserversamples.service;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
@@ -51,26 +53,42 @@ public class LdapDirectoryClient {
     private static final String LDAP_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
     private static final String SIMPLE_AUTHENTICATION = "simple";
     private static final String KERBEROS_AUTHENTICATION = "GSSAPI";
+    private static final String KERBEROS = "KERBEROS";
+    private static final String ACTIVE_DIRECTORY = "ACTIVE_DIRECTORY";
     private static final DateTimeFormatter LDAP_GENERALIZED_TIME =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
     private static final ThreadLocal<SSLSocketFactory> CONFIGURED_SOCKET_FACTORY =
             new ThreadLocal<>();
 
     private final DirContextFactory contextFactory;
+    private final ObservationRegistry observationRegistry;
+
+    public LdapDirectoryClient() {
+        this(environment -> new InitialLdapContext(environment, null), ObservationRegistry.NOOP);
+    }
 
     @Autowired
-    public LdapDirectoryClient() {
-        this((environment) -> new InitialLdapContext(environment, null));
+    public LdapDirectoryClient(ObservationRegistry observationRegistry) {
+        this(environment -> new InitialLdapContext(environment, null), observationRegistry);
     }
 
     LdapDirectoryClient(DirContextFactory contextFactory) {
+        this(contextFactory, ObservationRegistry.NOOP);
+    }
+
+    LdapDirectoryClient(DirContextFactory contextFactory, ObservationRegistry observationRegistry) {
         this.contextFactory = contextFactory;
+        this.observationRegistry = observationRegistry;
     }
 
     public void testConnection(Configuration configuration) {
+        observe("test_connection", () -> testConnectionInternal(configuration));
+    }
+
+    private void testConnectionInternal(Configuration configuration) {
         DirContext context = null;
         try {
-            context = open(configuration, false);
+            context = open(configuration);
             // Opening the context verifies the service bind and the connection.
         } catch (NamingException exception) {
             throw new IllegalArgumentException("LDAP connection test failed", exception);
@@ -80,13 +98,19 @@ public class LdapDirectoryClient {
     }
 
     public LdapUser authenticate(Configuration configuration, String identifier, String password) {
+        return observe(
+                "authenticate", () -> authenticateInternal(configuration, identifier, password));
+    }
+
+    private LdapUser authenticateInternal(
+            Configuration configuration, String identifier, String password) {
         if (identifier == null || identifier.isBlank() || password == null) {
             throw new BadCredentialsException("LDAP authentication failed");
         }
         SearchResult result;
         DirContext context = null;
         try {
-            context = open(configuration, false);
+            context = open(configuration);
             result = findUser(context, configuration, identifier);
         } catch (NamingException exception) {
             throw new IllegalStateException("LDAP user search failed", exception);
@@ -113,12 +137,19 @@ public class LdapDirectoryClient {
 
     public void updateUser(
             Configuration configuration, String distinguishedName, Map<String, String> attributes) {
+        observe(
+                "update_user",
+                () -> updateUserInternal(configuration, distinguishedName, attributes));
+    }
+
+    private void updateUserInternal(
+            Configuration configuration, String distinguishedName, Map<String, String> attributes) {
         if (attributes == null || attributes.isEmpty()) {
             return;
         }
         DirContext context = null;
         try {
-            context = open(configuration, false);
+            context = open(configuration);
             ModificationItem[] changes =
                     attributes.entrySet().stream()
                             .map(
@@ -146,16 +177,30 @@ public class LdapDirectoryClient {
         }
     }
 
+    private <T> T observe(String operation, java.util.function.Supplier<T> action) {
+        return Observation.createNotStarted("ldap.client", observationRegistry)
+                .contextualName("LDAP " + operation)
+                .lowCardinalityKeyValue("ldap.operation", operation)
+                .observe(action);
+    }
+
+    private void observe(String operation, Runnable action) {
+        Observation.createNotStarted("ldap.client", observationRegistry)
+                .contextualName("LDAP " + operation)
+                .lowCardinalityKeyValue("ldap.operation", operation)
+                .observe(action);
+    }
+
     public void updatePassword(
             Configuration configuration, String distinguishedName, String password) {
         requireSecureActiveDirectoryPasswordTransport(configuration);
         String attributeName =
-                "ACTIVE_DIRECTORY".equals(configuration.vendor()) ? "unicodePwd" : "userPassword";
+                ACTIVE_DIRECTORY.equals(configuration.vendor()) ? "unicodePwd" : "userPassword";
         DirContext context = null;
         try {
-            context = open(configuration, false);
+            context = open(configuration);
             BasicAttribute attribute = new BasicAttribute(attributeName);
-            if ("ACTIVE_DIRECTORY".equals(configuration.vendor())) {
+            if (ACTIVE_DIRECTORY.equals(configuration.vendor())) {
                 attribute.add(
                         ('"' + password + '"')
                                 .getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
@@ -184,9 +229,7 @@ public class LdapDirectoryClient {
         requireSecureActiveDirectoryPasswordTransport(configuration);
         DirContext context = null;
         try {
-            context = open(configuration, false);
-            String rdn = attribute(configuration.rdnAttribute()) + "=" + escapeDn(username);
-            String distinguishedName = rdn + "," + configuration.usersDn();
+            context = open(configuration);
             javax.naming.directory.BasicAttributes attributes =
                     new javax.naming.directory.BasicAttributes(true);
             BasicAttribute objectClasses = new BasicAttribute("objectClass");
@@ -200,7 +243,7 @@ public class LdapDirectoryClient {
             addAttribute(attributes, configuration.emailAttribute(), email);
             addAttribute(attributes, configuration.firstNameAttribute(), firstName);
             addAttribute(attributes, configuration.lastNameAttribute(), lastName);
-            if ("ACTIVE_DIRECTORY".equals(configuration.vendor())) {
+            if (ACTIVE_DIRECTORY.equals(configuration.vendor())) {
                 addBinaryAttribute(
                         attributes,
                         "unicodePwd",
@@ -210,6 +253,8 @@ public class LdapDirectoryClient {
             } else {
                 addAttribute(attributes, "userPassword", password);
             }
+            String rdn = attribute(configuration.rdnAttribute()) + "=" + escapeDn(username);
+            String distinguishedName = rdn + "," + configuration.usersDn();
             context.createSubcontext(distinguishedName, attributes).close();
             return distinguishedName;
         } catch (NamingException exception) {
@@ -226,7 +271,7 @@ public class LdapDirectoryClient {
     public List<LdapUser> searchUsers(Configuration configuration, Instant changedSince) {
         DirContext context = null;
         try {
-            context = open(configuration, false);
+            context = open(configuration);
             SearchControls controls = new SearchControls();
             controls.setSearchScope(searchScope(configuration.searchScope()));
             controls.setCountLimit(configuration.batchSize());
@@ -234,15 +279,9 @@ public class LdapDirectoryClient {
             if (changedSince != null) {
                 filter = changedUsersFilter(filter, changedSince);
             }
-            List<LdapUser> users = new ArrayList<>();
-            for (SearchResult result : searchUsers(context, configuration, filter, controls)) {
-                users.add(
-                        toUser(
-                                result,
-                                configuration,
-                                distinguishedName(result, configuration.usersDn())));
-            }
-            return users;
+            return searchUsers(context, configuration, filter, controls).stream()
+                    .map(result -> toUser(result, configuration))
+                    .toList();
         } catch (NamingException exception) {
             throw new IllegalStateException("LDAP user synchronization search failed", exception);
         } finally {
@@ -322,7 +361,7 @@ public class LdapDirectoryClient {
         }
         DirContext context = null;
         try {
-            context = open(configuration, false);
+            context = open(configuration);
             SearchControls controls = new SearchControls();
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
             controls.setCountLimit(configuration.batchSize());
@@ -431,6 +470,15 @@ public class LdapDirectoryClient {
                 .replace(")", "\\29");
     }
 
+    private static LdapUser toUser(SearchResult result, Configuration configuration) {
+        try {
+            return toUser(
+                    result, configuration, distinguishedName(result, configuration.usersDn()));
+        } catch (NamingException exception) {
+            throw new IllegalStateException("LDAP user mapping failed", exception);
+        }
+    }
+
     private static LdapUser toUser(
             SearchResult result, Configuration configuration, String distinguishedName)
             throws NamingException {
@@ -483,18 +531,18 @@ public class LdapDirectoryClient {
         }
     }
 
-    private DirContext open(Configuration configuration, boolean user) throws NamingException {
+    private DirContext open(Configuration configuration) throws NamingException {
         Hashtable<String, Object> environment = baseEnvironment(configuration);
         String principal = configuration.bindDn();
         String password = configuration.bindPassword();
         if (principal != null && !principal.isBlank()) {
             environment.put(
                     Context.SECURITY_AUTHENTICATION,
-                    "KERBEROS".equals(configuration.authenticationType())
+                    KERBEROS.equals(configuration.authenticationType())
                             ? KERBEROS_AUTHENTICATION
                             : SIMPLE_AUTHENTICATION);
             environment.put(Context.SECURITY_PRINCIPAL, principal);
-            if (!"KERBEROS".equals(configuration.authenticationType())) {
+            if (!KERBEROS.equals(configuration.authenticationType())) {
                 environment.put(Context.SECURITY_CREDENTIALS, password == null ? "" : password);
             }
         }
@@ -512,11 +560,11 @@ public class LdapDirectoryClient {
         Hashtable<String, Object> environment = baseEnvironment(configuration);
         environment.put(
                 Context.SECURITY_AUTHENTICATION,
-                "KERBEROS".equals(configuration.authenticationType())
+                KERBEROS.equals(configuration.authenticationType())
                         ? KERBEROS_AUTHENTICATION
                         : SIMPLE_AUTHENTICATION);
         environment.put(Context.SECURITY_PRINCIPAL, userDn);
-        if (!"KERBEROS".equals(configuration.authenticationType())) {
+        if (!KERBEROS.equals(configuration.authenticationType())) {
             environment.put(Context.SECURITY_CREDENTIALS, password);
         }
         try {
@@ -649,7 +697,7 @@ public class LdapDirectoryClient {
     }
 
     private static void requireSecureActiveDirectoryPasswordTransport(Configuration configuration) {
-        if ("ACTIVE_DIRECTORY".equals(configuration.vendor())
+        if (ACTIVE_DIRECTORY.equals(configuration.vendor())
                 && !configuration.startTls()
                 && !configuration.connectionUrl().regionMatches(true, 0, "ldaps://", 0, 8)) {
             throw new IllegalArgumentException(

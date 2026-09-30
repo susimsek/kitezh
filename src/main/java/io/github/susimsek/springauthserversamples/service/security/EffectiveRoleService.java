@@ -21,9 +21,6 @@ public final class EffectiveRoleService {
     private EffectiveRoleService() {}
 
     public static EffectiveRoles resolve(UserEntity user) {
-        Set<String> assigned = roleNames(user.getAuthorities());
-        Set<String> assignedEffective =
-                expandRoles(user.getAuthorities(), user.getClientRoles()).realmRoles();
         List<GroupRoleMapping> mappings = new ArrayList<>();
         Set<String> groupRoles = new LinkedHashSet<>();
         if (user.getGroups() != null) {
@@ -37,10 +34,13 @@ public final class EffectiveRoleService {
                                         new GroupRoleMapping(group.getId(), path(group), roles));
                             });
         }
+        Set<String> assignedEffective =
+                expandRoles(user.getAuthorities(), user.getClientRoles()).realmRoles();
         Set<String> inherited = new LinkedHashSet<>(groupRoles);
         inherited.removeAll(assignedEffective);
         Set<String> effective = new LinkedHashSet<>(assignedEffective);
         effective.addAll(groupRoles);
+        Set<String> assigned = roleNames(user.getAuthorities());
         return new EffectiveRoles(
                 immutableSorted(assigned),
                 List.copyOf(mappings),
@@ -123,10 +123,6 @@ public final class EffectiveRoleService {
         return authorities.stream()
                 .map(AuthorityEntity::getName)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private static Set<String> expandAuthorityRoleNames(Set<AuthorityEntity> authorities) {
-        return expandRoles(authorities, Set.of()).realmRoles();
     }
 
     private static ExpandedRoles expandRoles(

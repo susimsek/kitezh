@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminRoleService {
 
     private static final String ROLE_NOT_FOUND = "Role not found";
+    private static final String CLIENT_ROLE_NOT_FOUND = "Client role not found";
 
     private final AuthorityRepository authorityRepository;
     private final ClientRoleRepository clientRoleRepository;
@@ -271,12 +272,12 @@ public class AdminRoleService {
     public AdminRoleDetailDTO addClientComposite(String name, Long childRoleId, Pageable pageable) {
         AuthorityEntity role = roleRequired(name);
         if (clientRoleRepository == null) {
-            throw ApiException.notFound("Client role not found");
+            throw ApiException.notFound(CLIENT_ROLE_NOT_FOUND);
         }
         ClientRoleEntity child =
                 clientRoleRepository
                         .findDetailedById(childRoleId)
-                        .orElseThrow(() -> ApiException.notFound("Client role not found"));
+                        .orElseThrow(() -> ApiException.notFound(CLIENT_ROLE_NOT_FOUND));
         if (EffectiveRoleService.reaches(child, role)) {
             throw ApiException.badRequest(
                     ApiErrorCode.ROLE_COMPOSITE_CYCLE,
@@ -300,12 +301,12 @@ public class AdminRoleService {
             String name, Long childRoleId, Pageable pageable) {
         AuthorityEntity role = roleRequired(name);
         if (clientRoleRepository == null) {
-            throw ApiException.notFound("Client role not found");
+            throw ApiException.notFound(CLIENT_ROLE_NOT_FOUND);
         }
         ClientRoleEntity child =
                 clientRoleRepository
                         .findDetailedById(childRoleId)
-                        .orElseThrow(() -> ApiException.notFound("Client role not found"));
+                        .orElseThrow(() -> ApiException.notFound(CLIENT_ROLE_NOT_FOUND));
         if (role.getCompositeClientRoles().remove(child)) {
             invalidateAllUsers();
             adminAuditEventService.record("role.composite-client.removed", "role", name);

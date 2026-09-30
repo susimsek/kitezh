@@ -10,6 +10,7 @@ import io.github.susimsek.springauthserversamples.config.observability.Observabi
 import io.github.susimsek.springauthserversamples.domain.ClientMapperEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.GroupEntity;
+import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientMapperRepository;
@@ -92,6 +93,7 @@ public class AuthorizationServerConfig {
 
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
+    private static final String EMAIL_CLAIM = "email";
 
     record AuthorizationServerFilterDependencies(
             RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
@@ -101,6 +103,19 @@ public class AuthorizationServerConfig {
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             SecurityContextRepository securityContextRepository,
             ObservabilityMdcFilter observabilityMdcFilter) {}
+
+    record JwtTokenCustomizerDependencies(
+            UserRepository userRepository,
+            UserAvatarRepository userAvatarRepository,
+            AuthorizationRepository authorizationRepository,
+            ClientScopeRepository clientScopeRepository,
+            ClientMapperRepository clientMapperRepository,
+            ClientScopeMapperRepository clientScopeMapperRepository,
+            ServiceAccountRepository serviceAccountRepository,
+            UserProfileAttributeRepository userProfileAttributeRepository,
+            boolean legacyAdminGroups,
+            SocialIdentityRepository socialIdentityRepository,
+            ObjectMapper objectMapper) {}
 
     private final ApplicationProperties applicationProperties;
     private final AuthorizationEndpointErrorResponseHandler
@@ -121,7 +136,7 @@ public class AuthorizationServerConfig {
             @Qualifier("authorizationServerSecurityContextRepository")
                     SecurityContextRepository securityContextRepository,
             LoggingProperties loggingProperties) {
-        return authorizationServerSecurityFilterChain(
+        return buildAuthorizationServerSecurityFilterChain(
                 http,
                 tokenGenerator,
                 registeredClientRepository,
@@ -392,17 +407,18 @@ public class AuthorizationServerConfig {
             SocialIdentityRepository socialIdentityRepository,
             ObjectMapper objectMapper) {
         return jwtTokenCustomizer(
-                userRepository,
-                userAvatarRepository,
-                authorizationRepository,
-                clientScopeRepository,
-                clientMapperRepository,
-                clientScopeMapperRepository,
-                serviceAccountRepository,
-                userProfileAttributeRepository,
-                false,
-                socialIdentityRepository,
-                objectMapper);
+                new JwtTokenCustomizerDependencies(
+                        userRepository,
+                        userAvatarRepository,
+                        authorizationRepository,
+                        clientScopeRepository,
+                        clientMapperRepository,
+                        clientScopeMapperRepository,
+                        serviceAccountRepository,
+                        userProfileAttributeRepository,
+                        false,
+                        socialIdentityRepository,
+                        objectMapper));
     }
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
@@ -410,17 +426,18 @@ public class AuthorizationServerConfig {
             UserAvatarRepository userAvatarRepository,
             AuthorizationRepository authorizationRepository) {
         return jwtTokenCustomizer(
-                userRepository,
-                userAvatarRepository,
-                authorizationRepository,
-                null,
-                null,
-                null,
-                null,
-                null,
-                true,
-                null,
-                null);
+                new JwtTokenCustomizerDependencies(
+                        userRepository,
+                        userAvatarRepository,
+                        authorizationRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true,
+                        null,
+                        null));
     }
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
@@ -431,56 +448,57 @@ public class AuthorizationServerConfig {
             SocialIdentityRepository socialIdentityRepository,
             ObjectMapper objectMapper) {
         return jwtTokenCustomizer(
-                userRepository,
-                userAvatarRepository,
-                authorizationRepository,
-                clientScopeRepository,
-                null,
-                null,
-                null,
-                null,
-                false,
-                socialIdentityRepository,
-                objectMapper);
+                new JwtTokenCustomizerDependencies(
+                        userRepository,
+                        userAvatarRepository,
+                        authorizationRepository,
+                        clientScopeRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        false,
+                        socialIdentityRepository,
+                        objectMapper));
     }
 
     private OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
-            UserRepository userRepository,
-            UserAvatarRepository userAvatarRepository,
-            AuthorizationRepository authorizationRepository,
-            ClientScopeRepository clientScopeRepository,
-            ClientMapperRepository clientMapperRepository,
-            ClientScopeMapperRepository clientScopeMapperRepository,
-            ServiceAccountRepository serviceAccountRepository,
-            UserProfileAttributeRepository userProfileAttributeRepository,
-            boolean legacyAdminGroups,
-            SocialIdentityRepository socialIdentityRepository,
-            ObjectMapper objectMapper) {
+            JwtTokenCustomizerDependencies dependencies) {
         return context -> {
             boolean adminAccessToken = isAdminAccessToken(context);
-            List<ClientScopeEntity> groupMappers = groupMappers(context, clientScopeRepository);
+            List<ClientScopeEntity> groupMappers =
+                    groupMappers(context, dependencies.clientScopeRepository());
             List<TokenMapper> clientMappers =
-                    clientMappers(
-                            context,
-                            clientMapperRepository,
-                            clientScopeRepository,
-                            clientScopeMapperRepository);
+                    dependencies.clientMapperRepository() == null
+                            ? List.of()
+                            : clientMappers(
+                                    context,
+                                    dependencies.clientMapperRepository(),
+                                    dependencies.clientScopeRepository(),
+                                    dependencies.clientScopeMapperRepository());
             Optional<UserEntity> tokenUser =
                     tokenUser(
                             context,
-                            userRepository,
+                            dependencies.userRepository(),
                             adminAccessToken,
                             groupMappers,
                             clientMappers,
-                            serviceAccountRepository);
+                            dependencies.serviceAccountRepository());
             tokenUser
                     .filter(UserEntity::isServiceAccount)
                     .ifPresent(user -> context.getClaims().subject(user.getUsername()));
-            appendMappedClaims(context, tokenUser, socialIdentityRepository, objectMapper);
-            appendUserClaims(context, tokenUser, userAvatarRepository, applicationProperties);
+            appendMappedClaims(
+                    context,
+                    tokenUser,
+                    dependencies.socialIdentityRepository(),
+                    dependencies.objectMapper());
+            appendUserClaims(
+                    context, tokenUser, dependencies.userAvatarRepository(), applicationProperties);
             appendNonceClaim(context);
-            appendAdminClaims(context, tokenUser, legacyAdminGroups, adminAccessToken);
-            RoleScopeMappings roleScopeMappings = roleScopeMappings(context, clientScopeRepository);
+            appendAdminClaims(
+                    context, tokenUser, dependencies.legacyAdminGroups(), adminAccessToken);
+            RoleScopeMappings roleScopeMappings =
+                    roleScopeMappings(context, dependencies.clientScopeRepository());
             appendRealmRoleClaims(context, tokenUser, roleScopeMappings);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
             appendClientRoleClaims(context, tokenUser, roleScopeMappings);
@@ -488,9 +506,9 @@ public class AuthorizationServerConfig {
                     context,
                     tokenUser,
                     clientMappers,
-                    userProfileAttributeRepository,
+                    dependencies.userProfileAttributeRepository(),
                     roleScopeMappings);
-            appendSessionIdClaim(context, authorizationRepository);
+            appendSessionIdClaim(context, dependencies.authorizationRepository());
             appendDpopConfirmationClaim(context);
             appendCibaAuthReqIdClaim(context);
         };
@@ -516,28 +534,25 @@ public class AuthorizationServerConfig {
             ClientScopeRepository clientScopeRepository,
             ClientScopeMapperRepository clientScopeMapperRepository) {
         List<TokenMapper> mappers = new ArrayList<>();
-        if (clientMapperRepository != null && context.getRegisteredClient() != null) {
-            clientMapperRepository
-                    .findAllByClientIdOrderByPriorityAscNameAsc(
-                            context.getRegisteredClient().getId())
-                    .stream()
-                    .map(AuthorizationServerConfig::toTokenMapper)
-                    .forEach(mappers::add);
-        }
-        if (clientScopeRepository != null && clientScopeMapperRepository != null) {
-            Set<String> scopes = context.getAuthorizedScopes();
-            if (!scopes.isEmpty()) {
-                List<String> scopeIds =
-                        clientScopeRepository.findByNameIn(scopes).stream()
-                                .map(ClientScopeEntity::getId)
-                                .toList();
-                if (!scopeIds.isEmpty()) {
-                    clientScopeMapperRepository
-                            .findAllByClientScopeIdInOrderByPriorityAscNameAsc(scopeIds)
-                            .stream()
-                            .map(AuthorizationServerConfig::toTokenMapper)
-                            .forEach(mappers::add);
-                }
+        clientMapperRepository
+                .findAllByClientIdOrderByPriorityAscNameAsc(context.getRegisteredClient().getId())
+                .stream()
+                .map(AuthorizationServerConfig::toTokenMapper)
+                .forEach(mappers::add);
+        Set<String> scopes = context.getAuthorizedScopes();
+        if (clientScopeRepository != null
+                && clientScopeMapperRepository != null
+                && !scopes.isEmpty()) {
+            List<String> scopeIds =
+                    clientScopeRepository.findByNameIn(scopes).stream()
+                            .map(ClientScopeEntity::getId)
+                            .toList();
+            if (!scopeIds.isEmpty()) {
+                clientScopeMapperRepository
+                        .findAllByClientScopeIdInOrderByPriorityAscNameAsc(scopeIds)
+                        .stream()
+                        .map(AuthorizationServerConfig::toTokenMapper)
+                        .forEach(mappers::add);
             }
         }
         mappers.sort(
@@ -609,7 +624,6 @@ public class AuthorizationServerConfig {
             List<TokenMapper> clientMappers,
             ServiceAccountRepository serviceAccountRepository) {
         if (serviceAccountRepository != null
-                && context.getRegisteredClient() != null
                 && AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                         context.getAuthorizationGrantType())) {
             Optional<UserEntity> serviceAccount =
@@ -673,7 +687,7 @@ public class AuthorizationServerConfig {
             tokenUser.ifPresent(
                     user -> {
                         if (user.getEmail() != null) {
-                            context.getClaims().claim("email", user.getEmail());
+                            context.getClaims().claim(EMAIL_CLAIM, user.getEmail());
                             context.getClaims().claim("email_verified", user.isEmailVerified());
                         }
                     });
@@ -932,7 +946,7 @@ public class AuthorizationServerConfig {
                                         ::getValue)
                         .distinct()
                         .toList();
-        return values.isEmpty() ? null : values.size() == 1 ? values.getFirst() : values;
+        return singleOrList(values);
     }
 
     private static String fullName(UserEntity user) {
@@ -946,7 +960,7 @@ public class AuthorizationServerConfig {
             case "username" -> user.getUsername();
             case "firstName" -> user.getFirstName();
             case "lastName" -> user.getLastName();
-            case "email" -> user.getEmail();
+            case EMAIL_CLAIM -> user.getEmail();
             case "preferredLocale" -> user.getPreferredLocale();
             default -> null;
         };
@@ -968,7 +982,17 @@ public class AuthorizationServerConfig {
                                                 .UserProfileAttributeEntity
                                         ::getValue)
                         .toList();
-        return values.isEmpty() ? null : values.size() == 1 ? values.getFirst() : values;
+        return singleOrList(values);
+    }
+
+    private static Object singleOrList(List<String> values) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        if (values.size() == 1) {
+            return values.getFirst();
+        }
+        return values;
     }
 
     private static void appendRealmRoleClaims(
@@ -1187,9 +1211,7 @@ public class AuthorizationServerConfig {
                         ? "id_token"
                         : "access_token";
         socialIdentityRepository.findAllByUserUsername(tokenUser.get().getUsername()).stream()
-                .map(
-                        io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity
-                                ::getMappedClaims)
+                .map(SocialIdentityEntity::getMappedClaims)
                 .filter(value -> value != null && !value.isBlank())
                 .forEach(
                         value -> {
@@ -1222,7 +1244,7 @@ public class AuthorizationServerConfig {
     }
 
     private static boolean isUserEmailToken(JwtEncodingContext context) {
-        return context.getAuthorizedScopes().contains("email")
+        return context.getAuthorizedScopes().contains(EMAIL_CLAIM)
                 && (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
                         || OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue()))
                 && (AuthorizationGrantType.AUTHORIZATION_CODE.equals(

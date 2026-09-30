@@ -9,6 +9,8 @@ import io.github.susimsek.springauthserversamples.dto.admin.WebAuthnPolicyDTO;
 import io.github.susimsek.springauthserversamples.mapper.LoginSettingsMapper;
 import io.github.susimsek.springauthserversamples.repository.LoginSettingsRepository;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
+import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
+import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.session.JpaIndexedSessionRepository;
 import java.time.Duration;
 import java.util.Locale;
@@ -274,43 +276,30 @@ public class LoginSettingsService {
         validateWebAuthnPolicy(request.webauthnPasswordlessPolicy(), "WebAuthn passwordless");
         String resetMode = request.passwordResetOtpMode().toLowerCase(Locale.ROOT);
         if (!java.util.Set.of("none", "if-configured", REQUIRED).contains(resetMode)) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .INVALID_REQUEST,
-                    "Password-reset OTP mode is invalid");
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST, "Password-reset OTP mode is invalid");
         }
         if (REQUIRED.equals(resetMode) && !request.otpEnabled()) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .INVALID_REQUEST,
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST,
                     "Password-reset OTP cannot be required when OTP is disabled");
         }
         if (request.otpRequired() && !request.otpEnabled()) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .INVALID_REQUEST,
-                    "OTP cannot be required when it is disabled");
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST, "OTP cannot be required when it is disabled");
         }
         if (request.otpIssuer() == null || request.otpIssuer().isBlank()) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .INVALID_REQUEST,
-                    "OTP issuer is required");
+            throw ApiException.badRequest(ApiErrorCode.INVALID_REQUEST, "OTP issuer is required");
         }
         String algorithm = request.otpAlgorithm();
         if (algorithm == null
                 || !java.util.Set.of("SHA1", "SHA256", "SHA512")
                         .contains(algorithm.toUpperCase(Locale.ROOT))) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .INVALID_REQUEST,
-                    "OTP algorithm is invalid");
+            throw ApiException.badRequest(ApiErrorCode.INVALID_REQUEST, "OTP algorithm is invalid");
         }
         if (request.otpDigits() != 6 && request.otpDigits() != 8) {
-            throw io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                    io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                            .INVALID_REQUEST,
-                    "OTP digits must be 6 or 8");
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST, "OTP digits must be 6 or 8");
         }
     }
 
@@ -403,11 +392,7 @@ public class LoginSettingsService {
                         .toList();
     }
 
-    private static io.github.susimsek.springauthserversamples.service.error.ApiException
-            invalidWebAuthn(String message) {
-        return io.github.susimsek.springauthserversamples.service.error.ApiException.badRequest(
-                io.github.susimsek.springauthserversamples.service.error.ApiErrorCode
-                        .INVALID_REQUEST,
-                message);
+    private static ApiException invalidWebAuthn(String message) {
+        return ApiException.badRequest(ApiErrorCode.INVALID_REQUEST, message);
     }
 }

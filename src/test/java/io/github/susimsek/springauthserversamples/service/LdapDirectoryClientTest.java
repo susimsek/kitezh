@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -404,7 +405,7 @@ class LdapDirectoryClientTest {
     }
 
     @Test
-    void configuresAdvancedConnectionOptions() throws NamingException {
+    void configuresAdvancedConnectionOptions() {
         DirContext context = mock(DirContext.class);
         List<Hashtable<String, Object>> environments = new ArrayList<>();
         LdapDirectoryClient client =
@@ -451,7 +452,7 @@ class LdapDirectoryClientTest {
                 .isEqualTo("\"secret\"".getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
         verify(context).createSubcontext(anyString(), any(Attributes.class));
         verify(created).close();
-        verify(context, org.mockito.Mockito.times(2)).close();
+        verify(context, times(2)).close();
     }
 
     @Test

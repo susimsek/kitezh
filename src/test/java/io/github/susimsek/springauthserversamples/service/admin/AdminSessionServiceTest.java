@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorizationEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.domain.UserSessionEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminAuthorizationDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDTO;
@@ -228,9 +229,8 @@ class AdminSessionServiceTest {
         return session;
     }
 
-    private static io.github.susimsek.springauthserversamples.domain.UserEntity userWithUsername(
-            String username) {
-        var user = new io.github.susimsek.springauthserversamples.domain.UserEntity();
+    private static UserEntity userWithUsername(String username) {
+        var user = new UserEntity();
         user.setUsername(username);
         return user;
     }

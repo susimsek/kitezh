@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.dto.account.AccountAvatarDTO;
+import io.github.susimsek.springauthserversamples.dto.account.AccountDeleteRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountPasswordRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountProfileRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.account.MfaCodeRequestDTO;
@@ -125,11 +126,7 @@ class AccountControllerDelegationTest {
         controller.webAuthnCredential(authentication, "credential-1");
         controller.updateWebAuthnCredential(authentication, "credential-1", labelRequest);
         controller.deleteWebAuthnCredential(authentication, "credential-1");
-        controller.deleteAccount(
-                authentication,
-                mock(
-                        io.github.susimsek.springauthserversamples.dto.account
-                                .AccountDeleteRequestDTO.class));
+        controller.deleteAccount(authentication, mock(AccountDeleteRequestDTO.class));
 
         verify(profileService).profile("alice");
         verify(profileService).updateProfile(eq("alice"), eq(profileRequest), any());

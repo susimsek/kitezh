@@ -18,6 +18,8 @@ import org.springframework.security.web.authentication.logout.SecurityContextLog
 /** Starts an upstream broker logout when the provider exposes a browser logout endpoint. */
 public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccessHandler {
 
+    private static final String SUCCESS = "success";
+
     private final SocialProviderSettingsService providerSettingsService;
     private final SocialProviderLogoutEndpointResolver logoutEndpointResolver;
     private final OAuth2ObservabilityMetrics metrics;
@@ -51,7 +53,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException, ServletException {
         if (!(authentication instanceof OidcLogoutAuthenticationToken logout)) {
-            metrics.recordLogout("success", null);
+            metrics.recordLogout(SUCCESS, null);
             delegate.onAuthenticationSuccess(request, response, authentication);
             return;
         }
@@ -64,7 +66,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
                 providerSettingsService.provider(provider);
         String upstreamLogout = credentials == null ? null : upstreamLogout(credentials, logout);
         if (upstreamLogout == null) {
-            metrics.recordLogout("success", provider);
+            metrics.recordLogout(SUCCESS, provider);
             delegate.onAuthenticationSuccess(request, response, authentication);
             return;
         }
@@ -75,7 +77,7 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
             securityContextLogoutHandler.logout(
                     request, response, (Authentication) logout.getPrincipal());
         }
-        metrics.recordLogout("success", provider);
+        metrics.recordLogout(SUCCESS, provider);
         response.sendRedirect(upstreamLogout);
     }
 

@@ -24,24 +24,14 @@ public class OAuth2AuthenticationMetricsEvents {
         Authentication authentication = event.getAuthentication();
         String provider = provider(authentication);
         String eventName = eventName(authentication);
-        String clientId =
-                authentication instanceof OAuth2ClientAuthenticationToken token
-                        ? token.getRegisteredClient() == null
-                                ? null
-                                : token.getRegisteredClient().getClientId()
-                        : null;
+        String clientId = clientId(authentication);
         metrics.recordAuthentication(eventName, "success", null, clientId, provider);
     }
 
     @EventListener
     public void onFailure(AbstractAuthenticationFailureEvent event) {
         Authentication authentication = event.getAuthentication();
-        String clientId =
-                authentication instanceof OAuth2ClientAuthenticationToken token
-                        ? token.getRegisteredClient() == null
-                                ? null
-                                : token.getRegisteredClient().getClientId()
-                        : null;
+        String clientId = clientId(authentication);
         metrics.recordAuthentication(
                 eventName(authentication),
                 "failure",
@@ -58,6 +48,16 @@ public class OAuth2AuthenticationMetricsEvents {
             return "social_login";
         }
         return "login";
+    }
+
+    private static String clientId(Authentication authentication) {
+        if (!(authentication instanceof OAuth2ClientAuthenticationToken token)) {
+            return null;
+        }
+        if (token.getRegisteredClient() == null) {
+            return null;
+        }
+        return token.getRegisteredClient().getClientId();
     }
 
     private static String provider(Authentication authentication) {

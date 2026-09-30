@@ -47,9 +47,7 @@ public class WebAuthnService {
     @Transactional(readOnly = true)
     public Page<WebAuthnCredentialDTO> credentials(String username, Pageable pageable) {
         UserEntity user = user(username);
-        Bytes userHandle =
-                io.github.susimsek.springauthserversamples.config.security
-                        .WebAuthnUserEntityRepository.userHandle(user.getId());
+        Bytes userHandle = WebAuthnUserEntityRepository.userHandle(user.getId());
         List<WebAuthnCredentialDTO> credentials =
                 credentialRepository.findByUserId(userHandle).stream()
                         .sorted(Comparator.comparing(CredentialRecord::getCreated).reversed())
@@ -82,9 +80,7 @@ public class WebAuthnService {
     public boolean hasCredential(String username) {
         UserEntity user = user(username);
         return !credentialRepository
-                .findByUserId(
-                        io.github.susimsek.springauthserversamples.config.security
-                                .WebAuthnUserEntityRepository.userHandle(user.getId()))
+                .findByUserId(WebAuthnUserEntityRepository.userHandle(user.getId()))
                 .isEmpty();
     }
 
@@ -112,8 +108,7 @@ public class WebAuthnService {
         if (record == null
                 || !Objects.equals(
                         record.getUserEntityUserId(),
-                        io.github.susimsek.springauthserversamples.config.security
-                                .WebAuthnUserEntityRepository.userHandle(user.getId()))) {
+                        WebAuthnUserEntityRepository.userHandle(user.getId()))) {
             throw ApiException.notFound(PASSKEY_NOT_FOUND);
         }
         credentialRepository.save(
@@ -137,8 +132,7 @@ public class WebAuthnService {
         if (record == null
                 || !Objects.equals(
                         record.getUserEntityUserId(),
-                        io.github.susimsek.springauthserversamples.config.security
-                                .WebAuthnUserEntityRepository.userHandle(user.getId()))) {
+                        WebAuthnUserEntityRepository.userHandle(user.getId()))) {
             throw ApiException.notFound(PASSKEY_NOT_FOUND);
         }
         credentialRepository.delete(id);

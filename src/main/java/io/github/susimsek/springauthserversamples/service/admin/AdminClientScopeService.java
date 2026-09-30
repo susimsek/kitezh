@@ -90,16 +90,17 @@ public class AdminClientScopeService {
         }
         ClientScopeEntity entity =
                 adminClientScopeMapper.toEntity(
-                        UUID.randomUUID().toString(),
-                        name,
-                        trimToNull(request.displayName()),
-                        trimToNull(request.description()),
-                        request.displayOnConsentScreenValue(),
-                        request.consentScreenTextValue(),
-                        request.includeInTokenScopeValue(),
-                        request.groupMapperEnabledValue(),
-                        request.groupClaimNameValue(),
-                        request.groupMapperFullPathValue());
+                        new AdminClientScopeMapper.MappingData(
+                                UUID.randomUUID().toString(),
+                                name,
+                                trimToNull(request.displayName()),
+                                trimToNull(request.description()),
+                                request.displayOnConsentScreenValue(),
+                                request.consentScreenTextValue(),
+                                request.includeInTokenScopeValue(),
+                                request.groupMapperEnabledValue(),
+                                request.groupClaimNameValue(),
+                                request.groupMapperFullPathValue()));
         ClientScopeEntity saved = clientScopeRepository.save(entity);
         adminAuditEventService.record("client-scope.created", CLIENT_SCOPE_TARGET, saved.getId());
         return adminClientScopeMapper.toDTO(saved);
@@ -130,15 +131,17 @@ public class AdminClientScopeService {
             renameAssignedScope(entity.getName(), name);
         }
         adminClientScopeMapper.update(
-                name,
-                trimToNull(request.displayName()),
-                trimToNull(request.description()),
-                request.displayOnConsentScreenValue(entity.isDisplayOnConsentScreen()),
-                request.consentScreenTextValue(entity.getConsentScreenText()),
-                request.includeInTokenScopeValue(entity.isIncludeInTokenScope()),
-                request.groupMapperEnabledValue(entity.isGroupMapperEnabled()),
-                request.groupClaimNameValue(entity.getGroupClaimName()),
-                request.groupMapperFullPathValue(entity.isGroupMapperFullPath()),
+                new AdminClientScopeMapper.MappingData(
+                        null,
+                        name,
+                        trimToNull(request.displayName()),
+                        trimToNull(request.description()),
+                        request.displayOnConsentScreenValue(entity.isDisplayOnConsentScreen()),
+                        request.consentScreenTextValue(entity.getConsentScreenText()),
+                        request.includeInTokenScopeValue(entity.isIncludeInTokenScope()),
+                        request.groupMapperEnabledValue(entity.isGroupMapperEnabled()),
+                        request.groupClaimNameValue(entity.getGroupClaimName()),
+                        request.groupMapperFullPathValue(entity.isGroupMapperFullPath())),
                 entity);
         ClientScopeEntity saved = clientScopeRepository.save(entity);
         adminAuditEventService.record("client-scope.updated", CLIENT_SCOPE_TARGET, id);

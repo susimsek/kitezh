@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.service;
 
 import io.github.susimsek.springauthserversamples.config.security.ReloadableClientRegistrationRepository;
+import io.github.susimsek.springauthserversamples.config.security.SocialLoginConfig;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginProperties;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
@@ -102,8 +103,7 @@ public class SocialProviderSettingsService {
                 clientRegistrationRepository.getIfAvailable();
         if (clientRegistration != null) {
             clientRegistration.replace(
-                    io.github.susimsek.springauthserversamples.config.security.SocialLoginConfig
-                            .registrations(configuredProvidersInternal()));
+                    SocialLoginConfig.registrations(configuredProvidersInternal()));
         }
     }
 

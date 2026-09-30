@@ -14,6 +14,18 @@ import org.mapstruct.MappingTarget;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface AdminClientScopeMapper {
 
+    record MappingData(
+            String id,
+            String name,
+            String displayName,
+            String description,
+            boolean displayOnConsentScreen,
+            String consentScreenText,
+            boolean includeInTokenScope,
+            boolean groupMapperEnabled,
+            String groupClaimName,
+            boolean groupMapperFullPath) {}
+
     @Mapping(target = "id", source = "id")
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "name", source = "name")
@@ -30,17 +42,7 @@ public interface AdminClientScopeMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "lastModifiedBy", ignore = true)
-    ClientScopeEntity toEntity(
-            String id,
-            String name,
-            String displayName,
-            String description,
-            boolean displayOnConsentScreen,
-            String consentScreenText,
-            boolean includeInTokenScope,
-            boolean groupMapperEnabled,
-            String groupClaimName,
-            boolean groupMapperFullPath);
+    ClientScopeEntity toEntity(MappingData source);
 
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "name", source = "name")
@@ -52,17 +54,7 @@ public interface AdminClientScopeMapper {
     @Mapping(target = "groupMapperEnabled", source = "groupMapperEnabled")
     @Mapping(target = "groupClaimName", source = "groupClaimName")
     @Mapping(target = "groupMapperFullPath", source = "groupMapperFullPath")
-    void update(
-            String name,
-            String displayName,
-            String description,
-            boolean displayOnConsentScreen,
-            String consentScreenText,
-            boolean includeInTokenScope,
-            boolean groupMapperEnabled,
-            String groupClaimName,
-            boolean groupMapperFullPath,
-            @MappingTarget ClientScopeEntity target);
+    void update(MappingData source, @MappingTarget ClientScopeEntity target);
 
     AdminClientScopeDTO toDTO(ClientScopeEntity entity);
 

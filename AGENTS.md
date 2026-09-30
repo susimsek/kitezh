@@ -321,6 +321,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Centralized domain exception handling is currently minimal compared to the original gRPC sample.
 - Keep default messages in `messages.properties`; add Turkish translations in `messages_tr.properties`.
 - Avoid adding custom exception layers unless they serve application-specific behavior that Spring Authorization Server does not already provide.
+- In Java source, use imports and simple class names for application types. Keep fully qualified names only where a string value, logger/configuration key, reflection metadata, or another framework contract explicitly requires the name.
 
 ### Transaction Management
 

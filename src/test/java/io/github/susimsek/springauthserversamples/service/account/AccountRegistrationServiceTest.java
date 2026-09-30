@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.UserAction;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
@@ -182,10 +183,7 @@ class AccountRegistrationServiceTest {
         service().register(" bob ", null, null, " ", "password", "password", null);
 
         verify(userActionService)
-                .sendForCurrentUser(
-                        "bob",
-                        io.github.susimsek.springauthserversamples.domain.UserAction.VERIFY_EMAIL,
-                        Locale.ENGLISH);
+                .sendForCurrentUser("bob", UserAction.VERIFY_EMAIL, Locale.ENGLISH);
     }
 
     @Test

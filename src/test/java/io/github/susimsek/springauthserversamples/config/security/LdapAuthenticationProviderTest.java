@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
+import io.github.susimsek.springauthserversamples.domain.LdapFederationIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.LdapFederationIdentityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
@@ -72,11 +73,7 @@ class LdapAuthenticationProviderTest {
         when(userRepository.findForAuthenticationByIdentifier("ldap-user"))
                 .thenReturn(Optional.of(user));
         when(identityRepository.findByUserUsername("ldap-user"))
-                .thenReturn(
-                        Optional.of(
-                                mock(
-                                        io.github.susimsek.springauthserversamples.domain
-                                                .LdapFederationIdentityEntity.class)));
+                .thenReturn(Optional.of(mock(LdapFederationIdentityEntity.class)));
         LdapAuthenticationProvider provider =
                 new LdapAuthenticationProvider(
                         mock(LdapAuthenticationService.class), userRepository, identityRepository);
@@ -99,11 +96,7 @@ class LdapAuthenticationProviderTest {
         when(userRepository.findForAuthenticationByIdentifier("ldap-user"))
                 .thenReturn(Optional.of(localUser));
         when(identityRepository.findByUserUsername("ldap-user"))
-                .thenReturn(
-                        Optional.of(
-                                mock(
-                                        io.github.susimsek.springauthserversamples.domain
-                                                .LdapFederationIdentityEntity.class)));
+                .thenReturn(Optional.of(mock(LdapFederationIdentityEntity.class)));
         LdapAuthenticationService authenticationService = mock(LdapAuthenticationService.class);
         when(authenticationService.authenticate("ldap-user", "password")).thenReturn(localUser);
 

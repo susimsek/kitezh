@@ -2,6 +2,7 @@ package io.github.susimsek.springauthserversamples.service.admin;
 
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeMapperEntity;
+import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientMapperDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientMapperRequestDTO;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeMapperRepository;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AdminClientScopeMapperService {
+
+    private static final String CLIENT_SCOPE_TARGET = "client-scope";
 
     private final ClientScopeMapperRepository mapperRepository;
     private final ClientScopeRepository clientScopeRepository;
@@ -56,7 +59,7 @@ public class AdminClientScopeMapperService {
         ClientScopeMapperEntity mapper = new ClientScopeMapperEntity();
         apply(mapper, scope, request);
         ClientScopeMapperEntity saved = mapperRepository.save(mapper);
-        auditEventService.record("client-scope.mapper.created", "client-scope", scopeId);
+        auditEventService.record("client-scope.mapper.created", CLIENT_SCOPE_TARGET, scopeId);
         invalidateUsers();
         return toDTO(saved);
     }
@@ -83,7 +86,7 @@ public class AdminClientScopeMapperService {
         }
         apply(mapper, scope, request);
         ClientScopeMapperEntity saved = mapperRepository.save(mapper);
-        auditEventService.record("client-scope.mapper.updated", "client-scope", scopeId);
+        auditEventService.record("client-scope.mapper.updated", CLIENT_SCOPE_TARGET, scopeId);
         invalidateUsers();
         return toDTO(saved);
     }
@@ -99,7 +102,7 @@ public class AdminClientScopeMapperService {
         ClientScopeEntity scope = requireScope(scopeId);
         ensureMutable(scope);
         mapperRepository.delete(mapperRequired(id, scopeId));
-        auditEventService.record("client-scope.mapper.deleted", "client-scope", scopeId);
+        auditEventService.record("client-scope.mapper.deleted", CLIENT_SCOPE_TARGET, scopeId);
         invalidateUsers();
     }
 
@@ -182,7 +185,7 @@ public class AdminClientScopeMapperService {
 
     private void invalidateUsers() {
         userRepository.findAll().stream()
-                .map(user -> user.getUsername())
+                .map(UserEntity::getUsername)
                 .forEach(userAccessInvalidationService::invalidate);
     }
 

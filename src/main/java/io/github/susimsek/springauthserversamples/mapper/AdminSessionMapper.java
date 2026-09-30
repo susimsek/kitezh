@@ -5,6 +5,7 @@ import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.UserSessionEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminAuthorizationDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDTO;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDetailDTO;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -42,12 +43,11 @@ public interface AdminSessionMapper {
                 authorization.getRefreshTokenExpiresAt());
     }
 
-    default io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDetailDTO toDetailDTO(
+    default AdminSessionDetailDTO toDetailDTO(
             UserSessionEntity session,
             Map<String, Long> counts,
             List<AdminAuthorizationDTO> authorizations) {
-        return new io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDetailDTO(
-                toDTO(session, counts), authorizations);
+        return new AdminSessionDetailDTO(toDTO(session, counts), authorizations);
     }
 
     default List<String> splitScopes(String scopes) {

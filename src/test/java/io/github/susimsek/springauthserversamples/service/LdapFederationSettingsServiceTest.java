@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.LdapFederationProviderEntity;
+import io.github.susimsek.springauthserversamples.dto.admin.AdminLdapConnectionTestRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminLdapProviderRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminLdapProvidersRequestDTO;
 import io.github.susimsek.springauthserversamples.repository.LdapFederationProviderRepository;
@@ -49,9 +50,7 @@ class LdapFederationSettingsServiceTest {
     void testsAProviderUsingTheSubmittedPassword() {
         LdapFederationSettingsService service = service();
 
-        service.test(
-                new io.github.susimsek.springauthserversamples.dto.admin
-                        .AdminLdapConnectionTestRequestDTO(request(null)));
+        service.test(new AdminLdapConnectionTestRequestDTO(request(null)));
 
         verify(directoryClient).testConnection(any(LdapDirectoryClient.Configuration.class));
     }
@@ -163,10 +162,7 @@ class LdapFederationSettingsServiceTest {
         LdapFederationProviderEntity existing = provider("provider-id", "Corporate AD", 10);
         when(repository.findById("provider-id")).thenReturn(Optional.of(existing));
 
-        service()
-                .test(
-                        new io.github.susimsek.springauthserversamples.dto.admin
-                                .AdminLdapConnectionTestRequestDTO(request("provider-id")));
+        service().test(new AdminLdapConnectionTestRequestDTO(request("provider-id")));
 
         verify(directoryClient).testConnection(any(LdapDirectoryClient.Configuration.class));
         verify(repository, never()).save(any());
@@ -220,10 +216,8 @@ class LdapFederationSettingsServiceTest {
     void rejectsTestsForAnUnknownExistingProvider() {
         when(repository.findById("missing")).thenReturn(Optional.empty());
         LdapFederationSettingsService service = service();
-        io.github.susimsek.springauthserversamples.dto.admin.AdminLdapConnectionTestRequestDTO
-                request =
-                        new io.github.susimsek.springauthserversamples.dto.admin
-                                .AdminLdapConnectionTestRequestDTO(request("missing"));
+        AdminLdapConnectionTestRequestDTO request =
+                new AdminLdapConnectionTestRequestDTO(request("missing"));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.test(request))
                 .isInstanceOf(IllegalArgumentException.class)

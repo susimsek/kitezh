@@ -6,6 +6,7 @@ import static org.springframework.test.util.ReflectionTestUtils.invokeMethod;
 
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestEntity;
+import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminCibaPolicyDTO;
 import io.github.susimsek.springauthserversamples.repository.CibaAuthenticationRequestRepository;
@@ -117,30 +118,19 @@ class CibaAuthenticationServicePrivateTest {
     void coversRequestExpiryAndActionabilityBranches() {
         CibaAuthenticationRequestEntity request = new CibaAuthenticationRequestEntity();
         request.setExpiresAt(Instant.now().minusSeconds(1));
-        request.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .PENDING);
+        request.setStatus(CibaAuthenticationRequestStatus.PENDING);
         assertThat((Object) invokeMethod(service, "expireIfNecessary", request, Instant.now()))
                 .isNull();
-        assertThat(request.getStatus())
-                .isEqualTo(
-                        io.github.susimsek.springauthserversamples.domain
-                                .CibaAuthenticationRequestStatus.EXPIRED);
+        assertThat(request.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.EXPIRED);
 
-        request.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .CONSUMED);
+        request.setStatus(CibaAuthenticationRequestStatus.CONSUMED);
         request.setExpiresAt(Instant.now().plusSeconds(60));
         assertThat((Object) invokeMethod(service, "expireIfNecessary", request, Instant.now()))
                 .isNull();
-        request.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .PENDING);
+        request.setStatus(CibaAuthenticationRequestStatus.PENDING);
         assertThat(invokeStatic("ensureActionable", request, "message")).isNull();
 
-        request.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .EXPIRED);
+        request.setStatus(CibaAuthenticationRequestStatus.EXPIRED);
         assertThat(invokeStatic("ensureActionable", request, "message"))
                 .isInstanceOf(CibaProtocolException.class);
         request.setPrincipalName("admin");
@@ -351,9 +341,7 @@ class CibaAuthenticationServicePrivateTest {
         CibaAuthenticationRequestEntity protectedRequest = new CibaAuthenticationRequestEntity();
         protectedRequest.setPrincipalName("admin");
         protectedRequest.setExpiresAt(Instant.now().plusSeconds(60));
-        protectedRequest.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .PENDING);
+        protectedRequest.setStatus(CibaAuthenticationRequestStatus.PENDING);
         protectedRequest.setStepUpRequired(true);
         Mockito.when(requestRepository.findByAuthReqIdForUpdate("protected"))
                 .thenReturn(Optional.of(protectedRequest));
@@ -373,9 +361,7 @@ class CibaAuthenticationServicePrivateTest {
         assertThatThrownBy(() -> invokeMethod(service, "resolveUserCode", (Object) null))
                 .isInstanceOf(CibaProtocolException.class);
         CibaAuthenticationRequestEntity consumed = new CibaAuthenticationRequestEntity();
-        consumed.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .CONSUMED);
+        consumed.setStatus(CibaAuthenticationRequestStatus.CONSUMED);
         assertThat(invokeStatic("ensureActionable", consumed, "message"))
                 .isInstanceOf(CibaProtocolException.class);
 
@@ -391,9 +377,7 @@ class CibaAuthenticationServicePrivateTest {
 
         CibaAuthenticationRequestEntity consumedExpired = new CibaAuthenticationRequestEntity();
         consumedExpired.setExpiresAt(Instant.now().minusSeconds(1));
-        consumedExpired.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .CONSUMED);
+        consumedExpired.setStatus(CibaAuthenticationRequestStatus.CONSUMED);
         assertThat(
                         (Object)
                                 invokeMethod(
@@ -404,9 +388,7 @@ class CibaAuthenticationServicePrivateTest {
                 .isNull();
         CibaAuthenticationRequestEntity alreadyExpired = new CibaAuthenticationRequestEntity();
         alreadyExpired.setExpiresAt(Instant.now().minusSeconds(1));
-        alreadyExpired.setStatus(
-                io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestStatus
-                        .EXPIRED);
+        alreadyExpired.setStatus(CibaAuthenticationRequestStatus.EXPIRED);
         assertThat(
                         (Object)
                                 invokeMethod(

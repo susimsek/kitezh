@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -159,6 +160,11 @@ class LdapFederationMapperServiceTest {
                                         "enabled",
                                         LdapFederationMapperType.USER_ATTRIBUTE),
                                 roleMapper));
+        AuthorityEntity createdRole = authority("ROLE_ADMIN");
+        when(authorityRepository.findByName("ROLE_ADMIN")).thenReturn(Optional.empty());
+        when(authorityRepository.save(any(AuthorityEntity.class))).thenReturn(createdRole);
+        when(authorityRepository.findByName(AuthoritiesConstants.USER))
+                .thenReturn(Optional.of(authority(AuthoritiesConstants.USER)));
         LdapFederationIdentityEntity identity =
                 new LdapFederationIdentityEntity("external-id", "uid=alice", provider, user);
         LdapDirectoryClient.LdapUser external =
@@ -174,11 +180,6 @@ class LdapFederationMapperServiceTest {
                                 "department", List.of("Engineering", "Platform"),
                                 "active", List.of("true"),
                                 "memberOf", List.of("ROLE_ADMIN")));
-        AuthorityEntity createdRole = authority("ROLE_ADMIN");
-        when(authorityRepository.findByName("ROLE_ADMIN")).thenReturn(Optional.empty());
-        when(authorityRepository.save(any(AuthorityEntity.class))).thenReturn(createdRole);
-        when(authorityRepository.findByName(AuthoritiesConstants.USER))
-                .thenReturn(Optional.of(authority(AuthoritiesConstants.USER)));
 
         service.apply(provider, configuration, external, user, identity);
 
@@ -186,14 +187,12 @@ class LdapFederationMapperServiceTest {
         assertThat(user.isEnabled()).isTrue();
         assertThat(identity.getSyncedRoleNames()).containsExactly("ROLE_ADMIN");
         verify(profileAttributeRepository).deleteAllByUserIdAndDefinitionId(42L, 7L);
-        verify(profileAttributeRepository, org.mockito.Mockito.times(2)).save(any());
+        verify(profileAttributeRepository, times(2)).save(any());
     }
 
     @Test
     void mapsRoleFromGroupAndCreatesGroupWhenItDoesNotExist() {
         UserEntity user = user();
-        LdapFederationIdentityEntity identity =
-                new LdapFederationIdentityEntity("external-id", "uid=alice", provider, user);
         LdapFederationMapperEntity roleMapper =
                 mapperWithTarget(
                         "engineering-role", LdapFederationMapperType.ROLE, "ROLE_ENGINEER");
@@ -211,7 +210,8 @@ class LdapFederationMapperServiceTest {
         when(authorityRepository.findByName("ROLE_ENGINEER")).thenReturn(Optional.of(role));
         when(authorityRepository.findByName(AuthoritiesConstants.USER))
                 .thenReturn(Optional.of(authority(AuthoritiesConstants.USER)));
-
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("external-id", "uid=alice", provider, user);
         service.apply(provider, configuration, external(), user, identity);
 
         assertThat(user.getGroups()).containsExactly(created);

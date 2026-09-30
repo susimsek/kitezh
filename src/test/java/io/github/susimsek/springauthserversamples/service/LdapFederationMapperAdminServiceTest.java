@@ -77,8 +77,8 @@ class LdapFederationMapperAdminServiceTest {
         when(providerRepository.findById("provider-id")).thenReturn(Optional.of(provider()));
         when(mapperRepository.existsByProviderIdAndNameIgnoreCase("provider-id", "Department"))
                 .thenReturn(true);
-
-        assertThatThrownBy(() -> service.save("provider-id", request(null)))
+        AdminLdapMapperRequestDTO duplicateRequest = request(null);
+        assertThatThrownBy(() -> service.save("provider-id", duplicateRequest))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("LDAP mapper names must be unique per provider");
 

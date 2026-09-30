@@ -163,12 +163,7 @@ public class LdapAuthenticationService {
         String externalId = normalize(external.externalId());
         user.setUsername(
                 username == null
-                        ? provider.getName()
-                                + "_"
-                                + (externalId == null
-                                        ? Integer.toHexString(
-                                                external.distinguishedName().hashCode())
-                                        : externalId)
+                        ? provider.getName() + "_" + fallbackExternalId(external, externalId)
                         : username);
         user.setFirstName(normalize(external.firstName()));
         user.setLastName(normalize(external.lastName()));
@@ -182,6 +177,14 @@ public class LdapAuthenticationService {
                                 user.setAuthorities(new HashSet<>(java.util.Set.of(authority))));
         applyMappers(provider, external, user, null);
         return user;
+    }
+
+    private static String fallbackExternalId(
+            LdapDirectoryClient.LdapUser external, String externalId) {
+        if (externalId != null) {
+            return externalId;
+        }
+        return Integer.toHexString(external.distinguishedName().hashCode());
     }
 
     private void applyMappers(

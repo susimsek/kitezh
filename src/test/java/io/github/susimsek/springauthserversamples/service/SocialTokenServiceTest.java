@@ -12,6 +12,7 @@ import io.github.susimsek.springauthserversamples.config.security.SocialLoginSec
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepository;
+import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,10 +105,10 @@ class SocialTokenServiceTest {
     @Test
     void rejectsReadingTokensUnlessTheProviderAllowsIt() {
         when(providerSettingsService.provider("google")).thenReturn(credentials(true, false));
+        SocialTokenService service = service();
 
-        assertThatThrownBy(() -> service().read("ada", "google"))
-                .isInstanceOf(
-                        io.github.susimsek.springauthserversamples.service.error.ApiException.class)
+        assertThatThrownBy(() -> service.read("ada", "google"))
+                .isInstanceOf(ApiException.class)
                 .hasMessageContaining("not readable");
     }
 
@@ -142,26 +143,24 @@ class SocialTokenServiceTest {
 
     @Test
     void reportsMissingProviderIdentityAndCipherFailures() {
+        SocialTokenService service = service();
         when(socialIdentityRepository.findAllByUserUsernameAndProvider("ada", "google"))
                 .thenReturn(List.of());
-        assertThatThrownBy(() -> service().read("ada", "google"))
-                .isInstanceOf(
-                        io.github.susimsek.springauthserversamples.service.error.ApiException.class)
+        assertThatThrownBy(() -> service.read("ada", "google"))
+                .isInstanceOf(ApiException.class)
                 .hasMessageContaining("not linked");
 
         when(socialIdentityRepository.findAllByUserUsernameAndProvider("ada", "google"))
                 .thenReturn(List.of(identity));
         identity.setAccessTokenEncrypted(null);
-        assertThatThrownBy(() -> service().read("ada", "google"))
-                .isInstanceOf(
-                        io.github.susimsek.springauthserversamples.service.error.ApiException.class)
+        assertThatThrownBy(() -> service.read("ada", "google"))
+                .isInstanceOf(ApiException.class)
                 .hasMessageContaining("No stored token");
 
         identity.setAccessTokenEncrypted("broken");
         when(secretCipher.decrypt("broken")).thenThrow(new IllegalStateException("broken cipher"));
-        assertThatThrownBy(() -> service().read("ada", "google"))
-                .isInstanceOf(
-                        io.github.susimsek.springauthserversamples.service.error.ApiException.class)
+        assertThatThrownBy(() -> service.read("ada", "google"))
+                .isInstanceOf(ApiException.class)
                 .hasMessageContaining("could not be read");
     }
 

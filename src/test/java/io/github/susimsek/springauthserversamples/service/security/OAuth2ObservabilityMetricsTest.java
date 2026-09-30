@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.service.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,10 @@ class OAuth2ObservabilityMetricsTest {
 
     @Test
     void doesNotFailWhenNoRegistryIsAvailable() {
-        OAuth2ObservabilityMetrics.noop().recordOAuthError("client_credentials", "invalid_client");
+        assertThatCode(
+                        () ->
+                                OAuth2ObservabilityMetrics.noop()
+                                        .recordOAuthError("client_credentials", "invalid_client"))
+                .doesNotThrowAnyException();
     }
 }
