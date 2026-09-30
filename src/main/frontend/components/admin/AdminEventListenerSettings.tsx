@@ -114,9 +114,7 @@ export default function AdminEventListenerSettings() {
     try {
       const response = await adminRequest<Provider>(accessToken, {
         method: editingId ? "PUT" : "POST",
-        url: editingId
-          ? `/api/admin/event-listeners/${editingId}`
-          : "/api/admin/event-listeners",
+        url: editingId ? `/api/admin/event-listeners/${editingId}` : "/api/admin/event-listeners",
         data: { ...form, providerType: "WEBHOOK" },
       });
       if (response.status >= 300) throw new Error();
@@ -236,15 +234,27 @@ export default function AdminEventListenerSettings() {
                     </td>
                     <td>{provider.eventTypes.join(", ")}</td>
                     <td className="text-end">
-                      <Button size="sm" variant="outline-secondary" onClick={() => void loadDeliveries(provider.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        onClick={() => void loadDeliveries(provider.id)}
+                      >
                         <ActionIcon action="view" /> {copy.listenerDeliveries}
                       </Button>{" "}
                       {access?.manageEvents && (
                         <>
-                          <Button size="sm" variant="outline-secondary" onClick={() => edit(provider)}>
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => edit(provider)}
+                          >
                             <ActionIcon action="edit" />
                           </Button>{" "}
-                          <Button size="sm" variant="outline-danger" onClick={() => setDeletingId(provider.id)}>
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            onClick={() => setDeletingId(provider.id)}
+                          >
                             <ActionIcon action="delete" />
                           </Button>
                         </>
@@ -263,36 +273,81 @@ export default function AdminEventListenerSettings() {
             <div className="row g-3">
               <Form.Group className="col-md-6" controlId="event-listener-name">
                 <Form.Label>{copy.listenerName}</Form.Label>
-                <Form.Control required maxLength={100} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+                <Form.Control
+                  required
+                  maxLength={100}
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                />
               </Form.Group>
               <Form.Group className="col-md-6" controlId="event-listener-endpoint">
                 <Form.Label>{copy.listenerEndpoint}</Form.Label>
-                <Form.Control required type="url" placeholder="https://example.test/events" value={form.endpointUrl} onChange={(event) => setForm({ ...form, endpointUrl: event.target.value })} />
+                <Form.Control
+                  required
+                  type="url"
+                  placeholder="https://example.test/events"
+                  value={form.endpointUrl}
+                  onChange={(event) => setForm({ ...form, endpointUrl: event.target.value })}
+                />
                 <Form.Text>{copy.listenerHttpsHint}</Form.Text>
               </Form.Group>
               <Form.Group className="col-md-3" controlId="event-listener-attempts">
                 <Form.Label>{copy.listenerMaxAttempts}</Form.Label>
-                <Form.Control required type="number" min={1} max={10} value={form.maxAttempts} onChange={(event) => setForm({ ...form, maxAttempts: Number(event.target.value) })} />
+                <Form.Control
+                  required
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={form.maxAttempts}
+                  onChange={(event) =>
+                    setForm({ ...form, maxAttempts: Number(event.target.value) })
+                  }
+                />
               </Form.Group>
               <Form.Group className="col-md-3" controlId="event-listener-backoff">
                 <Form.Label>{copy.listenerBackoff}</Form.Label>
-                <Form.Control required type="number" min={1} max={86400} value={form.backoffSeconds} onChange={(event) => setForm({ ...form, backoffSeconds: Number(event.target.value) })} />
+                <Form.Control
+                  required
+                  type="number"
+                  min={1}
+                  max={86400}
+                  value={form.backoffSeconds}
+                  onChange={(event) =>
+                    setForm({ ...form, backoffSeconds: Number(event.target.value) })
+                  }
+                />
               </Form.Group>
               <div className="col-md-6">
                 <Form.Label>{copy.listenerEvents}</Form.Label>
                 <div>
                   {(["USER_EVENT", "ADMIN_EVENT"] as EventType[]).map((eventType) => (
-                    <Form.Check key={eventType} inline type="checkbox" label={eventType} checked={form.eventTypes.includes(eventType)} onChange={(event) => toggleEventType(eventType, event.target.checked)} />
+                    <Form.Check
+                      key={eventType}
+                      inline
+                      type="checkbox"
+                      label={eventType}
+                      checked={form.eventTypes.includes(eventType)}
+                      onChange={(event) => toggleEventType(eventType, event.target.checked)}
+                    />
                   ))}
                 </div>
               </div>
               <div className="col-12">
-                <Form.Check type="switch" label={copy.listenerEnabled} checked={form.enabled} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} />
+                <Form.Check
+                  type="switch"
+                  label={copy.listenerEnabled}
+                  checked={form.enabled}
+                  onChange={(event) => setForm({ ...form, enabled: event.target.checked })}
+                />
               </div>
             </div>
             <div className="admin-form-actions mt-4">
               <Button disabled={saving || form.eventTypes.length === 0} type="submit">
-                {saving ? <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" /> : <AdminActionIcon action="save" />}
+                {saving ? (
+                  <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                ) : (
+                  <AdminActionIcon action="save" />
+                )}
                 {copy.listenerSave}
               </Button>
             </div>
@@ -302,13 +357,69 @@ export default function AdminEventListenerSettings() {
           <div className="border-top pt-4 mt-4">
             <h3 className="h6">{copy.listenerDeliveryHistory}</h3>
             <Table responsive size="sm">
-              <thead><tr><th>{copy.listenerDeliveryEvent}</th><th>{copy.listenerDeliveryStatus}</th><th>{copy.listenerDeliveryAttempts}</th><th>{copy.listenerDeliveryError}</th><th /></tr></thead>
-              <tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td>{delivery.eventType}</td><td><Badge bg={delivery.status === "SUCCEEDED" ? "success" : delivery.status === "FAILED" ? "danger" : "warning"}>{delivery.status}</Badge></td><td>{delivery.attempts}</td><td>{delivery.lastError || "—"}</td><td className="text-end">{access?.manageEvents && delivery.status !== "SUCCEEDED" && <Button size="sm" disabled={retryingId === delivery.id} onClick={() => void retry(delivery.id)}>{retryingId === delivery.id && <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />}{copy.listenerRetry}</Button>}</td></tr>)}</tbody>
+              <thead>
+                <tr>
+                  <th>{copy.listenerDeliveryEvent}</th>
+                  <th>{copy.listenerDeliveryStatus}</th>
+                  <th>{copy.listenerDeliveryAttempts}</th>
+                  <th>{copy.listenerDeliveryError}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {deliveries.map((delivery) => (
+                  <tr key={delivery.id}>
+                    <td>{delivery.eventType}</td>
+                    <td>
+                      <Badge
+                        bg={
+                          delivery.status === "SUCCEEDED"
+                            ? "success"
+                            : delivery.status === "FAILED"
+                              ? "danger"
+                              : "warning"
+                        }
+                      >
+                        {delivery.status}
+                      </Badge>
+                    </td>
+                    <td>{delivery.attempts}</td>
+                    <td>{delivery.lastError || "—"}</td>
+                    <td className="text-end">
+                      {access?.manageEvents && delivery.status !== "SUCCEEDED" && (
+                        <Button
+                          size="sm"
+                          disabled={retryingId === delivery.id}
+                          onClick={() => void retry(delivery.id)}
+                        >
+                          {retryingId === delivery.id && (
+                            <Spinner
+                              animation="border"
+                              aria-hidden="true"
+                              className="me-2"
+                              size="sm"
+                            />
+                          )}
+                          {copy.listenerRetry}
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </Table>
           </div>
         )}
       </Card.Body>
-      <ConfirmModal show={deletingId !== null} message={copy.listenerDeleteMessage} cancelLabel={dictionary.admin.common.cancel} confirmLabel={copy.listenerDelete} busy={false} onCancel={() => setDeletingId(null)} onConfirm={() => void remove()} />
+      <ConfirmModal
+        show={deletingId !== null}
+        message={copy.listenerDeleteMessage}
+        cancelLabel={dictionary.admin.common.cancel}
+        confirmLabel={copy.listenerDelete}
+        busy={false}
+        onCancel={() => setDeletingId(null)}
+        onConfirm={() => void remove()}
+      />
     </Card>
   );
 }

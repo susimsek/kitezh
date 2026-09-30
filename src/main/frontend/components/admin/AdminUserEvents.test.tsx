@@ -63,8 +63,12 @@ describe("AdminUserEvents", () => {
         : ({ status: 200, data: { content: [], totalElements: 0, totalPages: 0 } } as never),
     );
     render(<AdminUserEvents />);
-    fireEvent.click(await screen.findByRole("button", { name: dictionary.admin.events.userClearAll }));
-    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.events.userClearAll })[1]);
+    fireEvent.click(
+      await screen.findByRole("button", { name: dictionary.admin.events.userClearAll }),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: dictionary.admin.events.userClearAll })[1],
+    );
     await waitFor(() =>
       expect(mockAdminRequest).toHaveBeenCalledWith("token", {
         method: "DELETE",

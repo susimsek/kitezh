@@ -19,7 +19,10 @@ describe("AdminEventListenerSettings", () => {
       if (config.method === "POST") {
         return Promise.resolve({ status: 200, data: {} }) as never;
       }
-      return Promise.resolve({ status: 200, data: { content: [], totalElements: 0, totalPages: 0 } }) as never;
+      return Promise.resolve({
+        status: 200,
+        data: { content: [], totalElements: 0, totalPages: 0 },
+      }) as never;
     });
   });
 

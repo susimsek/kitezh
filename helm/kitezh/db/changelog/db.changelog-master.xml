@@ -43,4 +43,7 @@
 	<include file="db/changelog/changes/030-branding-settings.xml"/>
 	<include file="db/changelog/changes/030-create-saml-provider-config.xml"/>
 	<include file="db/changelog/changes/031-create-social-identity-mapping-state.xml"/>
+	<include file="db/changelog/changes/024-create-user-events.xml"/>
+	<include file="db/changelog/changes/025-create-event-listeners.xml"/>
+	<include file="db/changelog/changes/026-admin-event-request-context.xml"/>
 </databaseChangeLog>

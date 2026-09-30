@@ -188,17 +188,84 @@ export default function AdminEventSettings() {
           <h2 className="h5 mb-2">{copy.userSettingsTitle}</h2>
           <p className="text-body-secondary mb-4">{copy.userSettingsDescription}</p>
           {userSettingsError && <Alert variant="danger">{copy.userSettingsError}</Alert>}
-          {!userSettings ? <div role="status">{copy.loading}</div> : (
-            <Form noValidate onSubmit={(event) => { event.preventDefault(); void saveUserSettings(); }}>
-              <Form.Check type="switch" disabled={!access?.manageEvents} label={copy.userEventsEnabled} checked={userSettings.eventsEnabled} onChange={(event) => setUserSettings({ ...userSettings, eventsEnabled: event.target.checked })} />
+          {!userSettings ? (
+            <div role="status">{copy.loading}</div>
+          ) : (
+            <Form
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveUserSettings();
+              }}
+            >
+              <Form.Check
+                type="switch"
+                disabled={!access?.manageEvents}
+                label={copy.userEventsEnabled}
+                checked={userSettings.eventsEnabled}
+                onChange={(event) =>
+                  setUserSettings({ ...userSettings, eventsEnabled: event.target.checked })
+                }
+              />
               <fieldset className="mt-4" disabled={!access?.manageEvents}>
                 <legend className="h6">{copy.userEventTypes}</legend>
                 <Form.Text className="d-block mb-2">{copy.userEventTypesHint}</Form.Text>
-                <Form.Check type="checkbox" label={copy.loginSuccess} checked={userSettings.eventTypes.includes("LOGIN_SUCCESS")} onChange={(event) => setUserSettings({ ...userSettings, eventTypes: event.target.checked ? [...userSettings.eventTypes, "LOGIN_SUCCESS"] : userSettings.eventTypes.filter((type) => type !== "LOGIN_SUCCESS") })} />
-                <Form.Check type="checkbox" label={copy.loginFailure} checked={userSettings.eventTypes.includes("LOGIN_FAILURE")} onChange={(event) => setUserSettings({ ...userSettings, eventTypes: event.target.checked ? [...userSettings.eventTypes, "LOGIN_FAILURE"] : userSettings.eventTypes.filter((type) => type !== "LOGIN_FAILURE") })} />
+                <Form.Check
+                  type="checkbox"
+                  label={copy.loginSuccess}
+                  checked={userSettings.eventTypes.includes("LOGIN_SUCCESS")}
+                  onChange={(event) =>
+                    setUserSettings({
+                      ...userSettings,
+                      eventTypes: event.target.checked
+                        ? [...userSettings.eventTypes, "LOGIN_SUCCESS"]
+                        : userSettings.eventTypes.filter((type) => type !== "LOGIN_SUCCESS"),
+                    })
+                  }
+                />
+                <Form.Check
+                  type="checkbox"
+                  label={copy.loginFailure}
+                  checked={userSettings.eventTypes.includes("LOGIN_FAILURE")}
+                  onChange={(event) =>
+                    setUserSettings({
+                      ...userSettings,
+                      eventTypes: event.target.checked
+                        ? [...userSettings.eventTypes, "LOGIN_FAILURE"]
+                        : userSettings.eventTypes.filter((type) => type !== "LOGIN_FAILURE"),
+                    })
+                  }
+                />
               </fieldset>
-              <Form.Group className="mt-3" controlId="user-event-retention-days"><Form.Label>{copy.eventsExpirationDays}</Form.Label><Form.Control type="number" min={0} max={3650} disabled={!access?.manageEvents} value={userSettings.eventsExpirationDays} onChange={(event) => setUserSettings({ ...userSettings, eventsExpirationDays: Number(event.target.value) })} /><Form.Text>{copy.eventsExpirationHint}</Form.Text></Form.Group>
-              {access?.manageEvents && <div className="admin-form-actions mt-4"><Button disabled={userSaving} type="submit">{userSaving ? <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" /> : <AdminActionIcon action="save" />}{copy.saveUserSettings}</Button></div>}
+              <Form.Group className="mt-3" controlId="user-event-retention-days">
+                <Form.Label>{copy.eventsExpirationDays}</Form.Label>
+                <Form.Control
+                  type="number"
+                  min={0}
+                  max={3650}
+                  disabled={!access?.manageEvents}
+                  value={userSettings.eventsExpirationDays}
+                  onChange={(event) =>
+                    setUserSettings({
+                      ...userSettings,
+                      eventsExpirationDays: Number(event.target.value),
+                    })
+                  }
+                />
+                <Form.Text>{copy.eventsExpirationHint}</Form.Text>
+              </Form.Group>
+              {access?.manageEvents && (
+                <div className="admin-form-actions mt-4">
+                  <Button disabled={userSaving} type="submit">
+                    {userSaving ? (
+                      <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                    ) : (
+                      <AdminActionIcon action="save" />
+                    )}
+                    {copy.saveUserSettings}
+                  </Button>
+                </div>
+              )}
             </Form>
           )}
         </Card.Body>
