@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** Configures optional log handlers and asynchronous logging. */
+/** Configures optional log handlers, asynchronous logging, and HTTP client diagnostics. */
 @ConfigurationProperties(prefix = "app.logging")
 @Getter
 @Setter
@@ -23,7 +23,17 @@ public class LoggingProperties {
     private boolean asyncEnabled = true;
     private int asyncQueueSize = 512;
     private boolean asyncNeverBlock;
+    private HttpClient httpClient = new HttpClient();
     private Access access = new Access();
+
+    @Getter
+    @Setter
+    public static class HttpClient {
+
+        private boolean enabled;
+        private boolean includeHeaders;
+        private List<String> maskedHeaders = new ArrayList<>(List.of("Authorization", "Cookie"));
+    }
 
     @Getter
     @Setter

@@ -148,6 +148,10 @@ app:
     async-enabled: ${APP_LOG_ASYNC_ENABLED:true}
     async-queue-size: ${APP_LOG_ASYNC_QUEUE_SIZE:512}
     async-never-block: ${APP_LOG_ASYNC_NEVER_BLOCK:false}
+    http-client:
+      enabled: ${APP_LOG_HTTP_CLIENT_ENABLED:false}
+      include-headers: ${APP_LOG_HTTP_CLIENT_INCLUDE_HEADERS:false}
+      masked-headers: ${APP_LOG_HTTP_CLIENT_MASKED_HEADERS:Authorization,Cookie,Set-Cookie}
     access:
       enabled: ${APP_LOG_ACCESS_ENABLED:true}
       pattern: ${APP_LOG_ACCESS_PATTERN:common}

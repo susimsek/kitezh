@@ -184,7 +184,14 @@ Console and file logs are plain text by default. Set `LOGGING_STRUCTURED_FORMAT_
 enabled by default and can be configured with `APP_LOG_ACCESS_PATTERN` (`common`, `combined`, or
 `long`), `APP_LOG_ACCESS_EXCLUDE_PATHS`, `APP_LOG_ACCESS_MASKED_HEADERS`,
 `APP_LOG_ACCESS_MASKED_COOKIES`, and `APP_LOG_ACCESS_FILE_ENABLED`. Request bodies are never written
-to access logs.
+to access logs. Outgoing HTTP request metadata is disabled by default. For temporary diagnostics,
+set `APP_LOG_HTTP_CLIENT_ENABLED=true`; this logs method, redacted URI, status, duration, and
+exceptions through the shared RestClient builder. Request and response bodies are never logged.
+Set `APP_LOG_HTTP_CLIENT_INCLUDE_HEADERS=true` only for local debugging; configured sensitive headers
+remain masked. Access records carry `direction=inbound` and `type=request`; outgoing client
+records carry `direction=outbound` and `type=request` or `type=response`, with
+`outcome=failure` for failed calls. With structured logs enabled, these are queryable fields in
+Grafana, for example `{service_name="spring-authorization-server-samples"} | json | direction="outbound"`.
 
 ## Configuration and Profiles
 

@@ -35,6 +35,9 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private static final String IP_ADDRESS = "ipAddress";
     private static final String TRACE_ID = "traceId";
     private static final String SPAN_ID = "spanId";
+    private static final String DIRECTION = "direction";
+    private static final String INBOUND = "inbound";
+    private static final String TYPE = "type";
     private static final String MASKED_VALUE = "***";
 
     private static final String[] MDC_KEYS = {
@@ -172,14 +175,16 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
 
     private void logAccess(HttpServletRequest request, long startedAt, int status) {
         LoggingProperties.Access access = accessProperties;
+        long durationMillis = durationMillis(startedAt);
         String common =
                 String.format(
-                        "HTTP access method=%s uri=%s status=%d ipAddress=%s durationMs=%d",
+                        "HTTP access direction=inbound method=%s uri=%s status=%d ipAddress=%s"
+                                + " durationMs=%d",
                         request.getMethod(),
                         request.getRequestURI(),
                         status,
                         request.getRemoteAddr(),
-                        (System.nanoTime() - startedAt) / 1_000_000);
+                        durationMillis);
         String pattern = access.getPattern().toLowerCase();
         if ("combined".equals(pattern) || "long".equals(pattern)) {
             common +=
@@ -191,7 +196,21 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
             common += " headers=" + headers(request, maskedHeaders);
             common += " cookies=" + cookies(request, maskedCookies);
         }
-        ACCESS_LOG.info(common);
+        ACCESS_LOG
+                .atInfo()
+                .addKeyValue(DIRECTION, INBOUND)
+                .addKeyValue(TYPE, "request")
+                .addKeyValue("origin", "remote")
+                .addKeyValue("http.method", request.getMethod())
+                .addKeyValue("http.target", request.getRequestURI())
+                .addKeyValue("http.status_code", status)
+                .addKeyValue("http.client_ip", request.getRemoteAddr())
+                .addKeyValue("http.duration_ms", durationMillis)
+                .log(common);
+    }
+
+    private static long durationMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private static Map<String, String> headers(

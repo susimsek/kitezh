@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.util.ReflectionTestUtils.invokeMethod;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.TraceFlags;
@@ -14,7 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -28,9 +33,22 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 class ObservabilityMdcFilterTest {
 
     private final ObservabilityMdcFilter filter = new ObservabilityMdcFilter();
+    private final Logger accessLogger =
+            (Logger)
+                    LoggerFactory.getLogger(
+                            "io.github.susimsek.springauthserversamples.http.access");
+    private final ListAppender<ILoggingEvent> accessAppender = new ListAppender<>();
+
+    @BeforeEach
+    void captureAccessLogs() {
+        accessAppender.start();
+        accessLogger.addAppender(accessAppender);
+    }
 
     @AfterEach
     void clearContext() {
+        accessLogger.detachAppender(accessAppender);
+        accessAppender.stop();
         SecurityContextHolder.clearContext();
         MDC.clear();
     }
@@ -137,6 +155,27 @@ class ObservabilityMdcFilterTest {
         combinedFilter.doFilterInternal(request, new MockHttpServletResponse(), (req, res) -> {});
 
         assertThat(MDC.get("clientId")).isNull();
+    }
+
+    @Test
+    void marksAccessLogsAsInboundStructuredEvents() throws Exception {
+        filter.doFilterInternal(
+                new MockHttpServletRequest("GET", "/inbound"),
+                new MockHttpServletResponse(),
+                (req, res) -> {});
+
+        assertThat(accessAppender.list)
+                .singleElement()
+                .satisfies(
+                        event -> {
+                            assertThat(event.getFormattedMessage()).contains("direction=inbound");
+                            assertThat(event.getKeyValuePairs())
+                                    .anySatisfy(
+                                            pair -> {
+                                                assertThat(pair.key).isEqualTo("type");
+                                                assertThat(pair.value).isEqualTo("request");
+                                            });
+                        });
     }
 
     @Test
