@@ -159,21 +159,37 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void marksAccessLogsAsInboundStructuredEvents() throws Exception {
-        filter.doFilterInternal(
-                new MockHttpServletRequest("GET", "/inbound"),
-                new MockHttpServletResponse(),
-                (req, res) -> {});
+        LoggingProperties.Access access = new LoggingProperties.Access();
+        access.setPattern("long");
+        ObservabilityMdcFilter longFilter = new ObservabilityMdcFilter(access);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        response.setHeader("X-Response", "visible");
+        response.addHeader("Set-Cookie", "SESSION=secret-cookie");
+        longFilter.doFilterInternal(
+                new MockHttpServletRequest("GET", "/inbound"), response, (req, res) -> {});
 
         assertThat(accessAppender.list)
                 .singleElement()
                 .satisfies(
                         event -> {
                             assertThat(event.getFormattedMessage()).contains("direction=inbound");
+                            assertThat(event.getFormattedMessage())
+                                    .contains("X-Response=visible")
+                                    .contains("Set-Cookie=***");
                             assertThat(event.getKeyValuePairs())
                                     .anySatisfy(
                                             pair -> {
                                                 assertThat(pair.key).isEqualTo("type");
                                                 assertThat(pair.value).isEqualTo("request");
+                                            });
+                            assertThat(event.getKeyValuePairs())
+                                    .anySatisfy(
+                                            pair -> {
+                                                assertThat(pair.key)
+                                                        .isEqualTo("http.response_headers");
+                                                assertThat(pair.value.toString())
+                                                        .contains("X-Response=visible")
+                                                        .contains("Set-Cookie=***");
                                             });
                         });
     }

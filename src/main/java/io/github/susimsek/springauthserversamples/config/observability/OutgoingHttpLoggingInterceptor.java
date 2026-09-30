@@ -50,20 +50,7 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
             ClientHttpResponse response = execution.execute(request, body);
             int status = response.getStatusCode().value();
             long durationMillis = elapsedMillis(startedAt);
-            LOGGER.atInfo()
-                    .addKeyValue(DIRECTION, OUTBOUND)
-                    .addKeyValue(TYPE, "response")
-                    .addKeyValue("origin", "remote")
-                    .addKeyValue("http.method", request.getMethod())
-                    .addKeyValue("http.target", target)
-                    .addKeyValue("http.status_code", status)
-                    .addKeyValue("http.duration_ms", durationMillis)
-                    .log(
-                            "HTTP client response method={} uri={} status={} durationMs={}",
-                            request.getMethod(),
-                            target,
-                            status,
-                            durationMillis);
+            logResponse(request, target, response, status, durationMillis);
             return response;
         } catch (IOException | RuntimeException exception) {
             long durationMillis = elapsedMillis(startedAt);
@@ -83,6 +70,43 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                             durationMillis,
                             exception.getClass().getSimpleName());
             throw exception;
+        }
+    }
+
+    private void logResponse(
+            HttpRequest request,
+            String target,
+            ClientHttpResponse response,
+            int status,
+            long durationMillis)
+            throws IOException {
+        var log =
+                LOGGER.atInfo()
+                        .addKeyValue(DIRECTION, OUTBOUND)
+                        .addKeyValue(TYPE, "response")
+                        .addKeyValue("origin", "remote")
+                        .addKeyValue("http.method", request.getMethod())
+                        .addKeyValue("http.target", target)
+                        .addKeyValue("http.status_code", status)
+                        .addKeyValue("http.duration_ms", durationMillis);
+        if (includeHeaders) {
+            String headers = maskedHeaders(response.getHeaders());
+            log.addKeyValue("http.response_headers", headers)
+                    .log(
+                            "HTTP client response method={} uri={} status={} durationMs={}"
+                                    + " headers={}",
+                            request.getMethod(),
+                            target,
+                            status,
+                            durationMillis,
+                            headers);
+        } else {
+            log.log(
+                    "HTTP client response method={} uri={} status={} durationMs={}",
+                    request.getMethod(),
+                    target,
+                    status,
+                    durationMillis);
         }
     }
 

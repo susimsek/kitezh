@@ -53,10 +53,13 @@ class OutgoingHttpLoggingInterceptorTest {
                         HttpMethod.POST, URI.create("https://idp.example/token?code=secret"));
         request.getHeaders().setBearerAuth("token");
 
+        MockClientHttpResponse response = new MockClientHttpResponse(new byte[0], 200);
+        response.getHeaders().add("X-Response", "visible");
+        response.getHeaders().add("Set-Cookie", "secret-cookie");
         interceptor.intercept(
                 request,
                 "client_secret=secret".getBytes(),
-                (ignoredRequest, ignoredBody) -> new MockClientHttpResponse(new byte[0], 200));
+                (ignoredRequest, ignoredBody) -> response);
 
         assertThat(appender.list).hasSize(2);
         assertThat(appender.list.get(0).getFormattedMessage())
@@ -79,7 +82,17 @@ class OutgoingHttpLoggingInterceptorTest {
                         });
         assertThat(appender.list.get(1).getFormattedMessage())
                 .contains("HTTP client response")
-                .contains("status=200");
+                .contains("status=200")
+                .contains("X-Response=[visible]")
+                .contains("Set-Cookie=***");
+        assertThat(appender.list.get(1).getKeyValuePairs())
+                .anySatisfy(
+                        pair -> {
+                            assertThat(pair.key).isEqualTo("http.response_headers");
+                            assertThat(pair.value.toString())
+                                    .contains("X-Response=[visible]")
+                                    .contains("Set-Cookie=***");
+                        });
     }
 
     @Test

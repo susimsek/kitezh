@@ -187,8 +187,8 @@ enabled by default and can be configured with `APP_LOG_ACCESS_PATTERN` (`common`
 to access logs. Outgoing HTTP request metadata is disabled by default. For temporary diagnostics,
 set `APP_LOG_HTTP_CLIENT_ENABLED=true`; this logs method, redacted URI, status, duration, and
 exceptions through the shared RestClient builder. Request and response bodies are never logged.
-Set `APP_LOG_HTTP_CLIENT_INCLUDE_HEADERS=true` only for local debugging; configured sensitive headers
-remain masked. Access records carry `direction=inbound` and `type=request`; outgoing client
+Set `APP_LOG_HTTP_CLIENT_INCLUDE_HEADERS=true` only for local debugging to include masked request and
+response headers. Access records carry `direction=inbound` and `type=request`; outgoing client
 records carry `direction=outbound` and `type=request` or `type=response`, with
 `outcome=failure` for failed calls. With structured logs enabled, these are queryable fields in
 Grafana, for example `{service_name="spring-authorization-server-samples"} | json | direction="outbound"`.

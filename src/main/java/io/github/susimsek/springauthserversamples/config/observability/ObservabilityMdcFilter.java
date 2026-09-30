@@ -39,6 +39,8 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private static final String INBOUND = "inbound";
     private static final String TYPE = "type";
     private static final String MASKED_VALUE = "***";
+    private static final Set<String> ALWAYS_MASKED_HEADERS =
+            Set.of("authorization", "cookie", "set-cookie", "proxy-authorization");
 
     private static final String[] MDC_KEYS = {
         CLIENT_ID, USER_ID, SESSION_ID, IP_ADDRESS, TRACE_ID, SPAN_ID
@@ -55,7 +57,8 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
 
     public ObservabilityMdcFilter(LoggingProperties.Access accessProperties) {
         this.accessProperties = accessProperties;
-        this.maskedHeaders = lowerCaseSet(accessProperties.getMaskedHeaders());
+        this.maskedHeaders = new HashSet<>(lowerCaseSet(accessProperties.getMaskedHeaders()));
+        this.maskedHeaders.addAll(ALWAYS_MASKED_HEADERS);
         this.maskedCookies = lowerCaseSet(accessProperties.getMaskedCookies());
         this.excludedPaths =
                 accessProperties.getExcludePaths().stream().map(Pattern::compile).toList();
@@ -82,7 +85,7 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
             throw exception;
         } finally {
             if (accessProperties.isEnabled() && !excluded(request.getRequestURI())) {
-                logAccess(request, startedAt, failed[0] ? 500 : response.getStatus());
+                logAccess(request, response, startedAt, failed[0] ? 500 : response.getStatus());
             }
             restore(previousValues);
         }
@@ -173,7 +176,8 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                 });
     }
 
-    private void logAccess(HttpServletRequest request, long startedAt, int status) {
+    private void logAccess(
+            HttpServletRequest request, HttpServletResponse response, long startedAt, int status) {
         LoggingProperties.Access access = accessProperties;
         long durationMillis = durationMillis(startedAt);
         String common =
@@ -195,18 +199,23 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
         if ("long".equals(pattern)) {
             common += " headers=" + headers(request, maskedHeaders);
             common += " cookies=" + cookies(request, maskedCookies);
+            common += " responseHeaders=" + responseHeaders(response, maskedHeaders);
         }
-        ACCESS_LOG
-                .atInfo()
-                .addKeyValue(DIRECTION, INBOUND)
-                .addKeyValue(TYPE, "request")
-                .addKeyValue("origin", "remote")
-                .addKeyValue("http.method", request.getMethod())
-                .addKeyValue("http.target", request.getRequestURI())
-                .addKeyValue("http.status_code", status)
-                .addKeyValue("http.client_ip", request.getRemoteAddr())
-                .addKeyValue("http.duration_ms", durationMillis)
-                .log(common);
+        var log =
+                ACCESS_LOG
+                        .atInfo()
+                        .addKeyValue(DIRECTION, INBOUND)
+                        .addKeyValue(TYPE, "request")
+                        .addKeyValue("origin", "remote")
+                        .addKeyValue("http.method", request.getMethod())
+                        .addKeyValue("http.target", request.getRequestURI())
+                        .addKeyValue("http.status_code", status)
+                        .addKeyValue("http.client_ip", request.getRemoteAddr())
+                        .addKeyValue("http.duration_ms", durationMillis);
+        if ("long".equals(pattern)) {
+            log.addKeyValue("http.response_headers", responseHeaders(response, maskedHeaders));
+        }
+        log.log(common);
     }
 
     private static long durationMillis(long startedAt) {
@@ -226,6 +235,19 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                                 ? MASKED_VALUE
                                 : request.getHeader(name));
             }
+        }
+        return values;
+    }
+
+    private static Map<String, String> responseHeaders(
+            HttpServletResponse response, Set<String> headersToMask) {
+        Map<String, String> values = new LinkedHashMap<>();
+        for (String name : response.getHeaderNames()) {
+            values.put(
+                    name,
+                    headersToMask.contains(name.toLowerCase())
+                            ? MASKED_VALUE
+                            : String.join(", ", response.getHeaders(name)));
         }
         return values;
     }
