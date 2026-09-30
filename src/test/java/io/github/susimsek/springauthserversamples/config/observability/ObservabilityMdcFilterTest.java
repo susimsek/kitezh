@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -143,24 +144,34 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void logsCombinedRequestDetailsAndFallsBackToRequestClientId() throws Exception {
-        LoggingProperties.Access access = new LoggingProperties.Access();
-        access.setPattern("combined");
+        LoggingProperties.Server access = new LoggingProperties.Server();
+        access.setLevel(HttpLoggingLevel.HEADERS);
         final ObservabilityMdcFilter combinedFilter = new ObservabilityMdcFilter(access);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/combined");
         request.setRemoteAddr("203.0.113.10");
         request.setParameter("clientId", "legacy-client");
+        request.setQueryString("code=secret&view=summary");
         request.addHeader("User-Agent", "test-agent");
         request.addHeader("Referer", "https://example.test");
 
         combinedFilter.doFilterInternal(request, new MockHttpServletResponse(), (req, res) -> {});
 
         assertThat(MDC.get("clientId")).isNull();
+        assertThat(accessAppender.list)
+                .singleElement()
+                .satisfies(
+                        event ->
+                                assertThat(event.getFormattedMessage())
+                                        .contains("/combined?code=***&view=summary")
+                                        .doesNotContain("code=secret")
+                                        .doesNotContain("userAgent=")
+                                        .doesNotContain("referer="));
     }
 
     @Test
     void marksAccessLogsAsInboundStructuredEvents() throws Exception {
-        LoggingProperties.Access access = new LoggingProperties.Access();
-        access.setPattern("long");
+        LoggingProperties.Server access = new LoggingProperties.Server();
+        access.setLevel(HttpLoggingLevel.HEADERS);
         ObservabilityMdcFilter longFilter = new ObservabilityMdcFilter(access);
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setHeader("X-Response", "visible");
@@ -196,11 +207,12 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void logsLongRequestDetailsWithMaskedHeadersAndCookies() throws Exception {
-        LoggingProperties.Access access = new LoggingProperties.Access();
-        access.setPattern("long");
-        access.setMaskedHeaders(List.of("X-Secret"));
-        access.setMaskedCookies(List.of("session"));
-        final ObservabilityMdcFilter longFilter = new ObservabilityMdcFilter(access);
+        LoggingProperties.Server access = new LoggingProperties.Server();
+        access.setLevel(HttpLoggingLevel.HEADERS);
+        LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
+        obfuscate.setHeaders(List.of("X-Secret"));
+        obfuscate.setCookies(List.of("session"));
+        final ObservabilityMdcFilter longFilter = new ObservabilityMdcFilter(access, obfuscate);
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/long");
         request.addHeader("X-Secret", "hidden");
         request.addHeader("X-Public", "visible");
@@ -209,6 +221,39 @@ class ObservabilityMdcFilterTest {
         longFilter.doFilterInternal(request, new MockHttpServletResponse(), (req, res) -> {});
 
         assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
+    @Test
+    void logsMaskedRequestAndResponseBodiesOnlyAtFullLevel() throws Exception {
+        LoggingProperties properties = new LoggingProperties();
+        properties.getServer().setLevel(HttpLoggingLevel.FULL);
+        properties.setMaxBodyBytes(1024);
+        ObservabilityMdcFilter fullFilter = new ObservabilityMdcFilter(properties);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/body");
+        request.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        request.setContent("{\"password\":\"secret\",\"name\":\"visible\"}".getBytes());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+        fullFilter.doFilterInternal(
+                request,
+                response,
+                (servletRequest, servletResponse) -> {
+                    servletRequest.getInputStream().readAllBytes();
+                    servletResponse.getWriter().write("{\"access_token\":\"token\",\"ok\":true}");
+                });
+
+        assertThat(response.getContentAsString())
+                .isEqualTo("{\"access_token\":\"token\",\"ok\":true}");
+        assertThat(accessAppender.list)
+                .singleElement()
+                .satisfies(
+                        event ->
+                                assertThat(event.getFormattedMessage())
+                                        .contains(
+                                                "requestBody={\"password\":\"***\",\"name\":\"visible\"}")
+                                        .contains(
+                                                "responseBody={\"access_token\":\"***\",\"ok\":true}"));
     }
 
     @Test
@@ -237,7 +282,7 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void skipsExcludedAndDisabledAccessLogs() throws Exception {
-        LoggingProperties.Access excluded = new LoggingProperties.Access();
+        LoggingProperties.Server excluded = new LoggingProperties.Server();
         excluded.setExcludePaths(List.of("/health"));
         ObservabilityMdcFilter excludedFilter = new ObservabilityMdcFilter(excluded);
         excludedFilter.doFilterInternal(
@@ -245,7 +290,7 @@ class ObservabilityMdcFilterTest {
                 new MockHttpServletResponse(),
                 (req, res) -> {});
 
-        LoggingProperties.Access disabled = new LoggingProperties.Access();
+        LoggingProperties.Server disabled = new LoggingProperties.Server();
         disabled.setEnabled(false);
         ObservabilityMdcFilter disabledFilter = new ObservabilityMdcFilter(disabled);
         disabledFilter.doFilterInternal(
@@ -287,8 +332,8 @@ class ObservabilityMdcFilterTest {
         invokeMethod(filter, "restore", Map.of("clientId", "restored"));
         assertThat(MDC.get("clientId")).isEqualTo("restored");
 
-        LoggingProperties.Access access = new LoggingProperties.Access();
-        access.setPattern("long");
+        LoggingProperties.Server access = new LoggingProperties.Server();
+        access.setLevel(HttpLoggingLevel.HEADERS);
         new ObservabilityMdcFilter(access)
                 .doFilterInternal(
                         new MockHttpServletRequest("GET", "/without-cookies"),

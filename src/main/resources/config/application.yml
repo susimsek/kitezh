@@ -148,18 +148,23 @@ app:
     async-enabled: ${APP_LOG_ASYNC_ENABLED:true}
     async-queue-size: ${APP_LOG_ASYNC_QUEUE_SIZE:512}
     async-never-block: ${APP_LOG_ASYNC_NEVER_BLOCK:false}
-    http-client:
-      enabled: ${APP_LOG_HTTP_CLIENT_ENABLED:false}
-      include-headers: ${APP_LOG_HTTP_CLIENT_INCLUDE_HEADERS:false}
-      masked-headers: ${APP_LOG_HTTP_CLIENT_MASKED_HEADERS:Authorization,Cookie,Set-Cookie}
-    access:
-      enabled: ${APP_LOG_ACCESS_ENABLED:true}
-      pattern: ${APP_LOG_ACCESS_PATTERN:common}
-      exclude-paths: ${APP_LOG_ACCESS_EXCLUDE_PATHS:}
-      masked-headers: ${APP_LOG_ACCESS_MASKED_HEADERS:Authorization,Cookie}
-      masked-cookies: ${APP_LOG_ACCESS_MASKED_COOKIES:SESSION}
-      file-enabled: ${APP_LOG_ACCESS_FILE_ENABLED:false}
-      file-path: ${APP_LOG_ACCESS_FILE_PATH:logs/application-access.log}
+    max-body-bytes: ${APP_LOG_MAX_BODY_BYTES:8192}
+    obfuscate:
+      replacement: ${APP_LOG_OBFUSCATE_REPLACEMENT:***}
+      headers: ${APP_LOG_OBFUSCATE_HEADERS:Authorization,Cookie,Set-Cookie,Proxy-Authorization,DPoP,X-Api-Key}
+      body-fields: ${APP_LOG_OBFUSCATE_BODY_FIELDS:access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,saml_response,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
+      parameters: ${APP_LOG_OBFUSCATE_PARAMETERS:access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
+      cookies: ${APP_LOG_OBFUSCATE_COOKIES:SESSION}
+    client:
+      enabled: ${APP_LOG_CLIENT_ENABLED:false}
+      level: ${APP_LOG_CLIENT_LEVEL:BASIC}
+      exclude-paths: ${APP_LOG_CLIENT_EXCLUDE_PATHS:}
+    server:
+      enabled: ${APP_LOG_SERVER_ENABLED:true}
+      level: ${APP_LOG_SERVER_LEVEL:BASIC}
+      exclude-paths: ${APP_LOG_SERVER_EXCLUDE_PATHS:}
+      file-enabled: ${APP_LOG_SERVER_FILE_ENABLED:false}
+      file-path: ${APP_LOG_SERVER_FILE_PATH:logs/application-access.log}
   session:
     cleanup-cron: "0 * * * * *"
   social-login:

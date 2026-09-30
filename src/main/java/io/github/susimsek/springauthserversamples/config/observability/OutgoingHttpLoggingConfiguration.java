@@ -10,11 +10,13 @@ public class OutgoingHttpLoggingConfiguration {
 
     @Bean
     RestClientCustomizer outgoingHttpLoggingCustomizer(LoggingProperties properties) {
-        LoggingProperties.HttpClient httpClient = properties.getHttpClient();
-        if (!httpClient.isEnabled()) {
+        LoggingProperties.HttpClient client = properties.getClient();
+        if (!client.isEnabled()) {
             return builder -> {};
         }
-        OutgoingHttpLoggingInterceptor interceptor = new OutgoingHttpLoggingInterceptor(httpClient);
+        OutgoingHttpLoggingInterceptor interceptor =
+                new OutgoingHttpLoggingInterceptor(
+                        client, properties.getObfuscate(), properties.getMaxBodyBytes());
         return builder -> builder.requestInterceptor(interceptor);
     }
 }
