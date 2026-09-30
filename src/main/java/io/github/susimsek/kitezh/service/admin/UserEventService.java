@@ -39,11 +39,16 @@ public class UserEventService {
 
     @Transactional
     public void record(UserEventType type, String username, String ipAddress) {
-        record(type, username, null, ipAddress);
+        recordInternal(type, username, null, ipAddress);
     }
 
     @Transactional
     public void record(UserEventType type, String username, String clientId, String ipAddress) {
+        recordInternal(type, username, clientId, ipAddress);
+    }
+
+    private void recordInternal(
+            UserEventType type, String username, String clientId, String ipAddress) {
         var settings = settings();
         if (!settings.isEventsEnabled() || !settings.getEventTypes().contains(type)) {
             return;

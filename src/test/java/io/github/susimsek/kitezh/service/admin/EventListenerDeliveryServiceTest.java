@@ -53,6 +53,20 @@ class EventListenerDeliveryServiceTest {
     }
 
     @Test
+    void redactsNestedSensitivePayloadFieldsAndPreservesBlankValues() {
+        String payload =
+                "{\"nested\":{\"apiSecret\":\"secret-value\"},"
+                        + "\"items\":[{\"refreshToken\":\"token-value\"}]}";
+
+        assertThat(EventListenerDeliveryService.sanitizePayload(payload))
+                .contains("\"apiSecret\":\"[REDACTED]\"")
+                .contains("\"refreshToken\":\"[REDACTED]\"")
+                .doesNotContain("secret-value", "token-value");
+        assertThat(EventListenerDeliveryService.sanitizePayload(null)).isNull();
+        assertThat(EventListenerDeliveryService.sanitizePayload(" ")).isEqualTo(" ");
+    }
+
+    @Test
     void rejectsNonHttpsAndPrivateEndpointsEvenWhenHttpIsEnabled() {
         assertThat(EventListenerDeliveryService.isAllowedEndpoint("http://example.com", false))
                 .isFalse();

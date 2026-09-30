@@ -169,11 +169,7 @@ public class EventListenerDeliveryService {
     }
 
     static String sanitizePayload(String payload) {
-        String redacted =
-                payload.replaceAll(
-                        "(?i)(\\\"[^\\\"]*(?:password|secret|token|authorization|credential)[^\\\"]*\\\"\\s*:\\s*\\\")[^\\\"]*(\\\")",
-                        "$1[REDACTED]$2");
-        return redacted.length() > 10000 ? redacted.substring(0, 10000) : redacted;
+        return SensitiveDataRedactor.sanitize(payload, 10_000);
     }
 
     static boolean isAllowedEndpoint(String value) {

@@ -30,9 +30,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class AdminAuditEventService {
 
     private static final int MAX_DETAILS_LENGTH = 2_000;
-    private static final java.util.regex.Pattern SENSITIVE_DETAIL_VALUE =
-            java.util.regex.Pattern.compile(
-                    "(?i)(\\\"[^\\\"]*(?:password|secret|token|authorization|credential)[^\\\"]*\\\"\\s*:\\s*\\\")[^\\\"]*(\\\")");
+    private static final String ACTION = "action";
+    private static final String TARGET_TYPE = "targetType";
+    private static final String TARGET_ID = "targetId";
+    private static final String ACTOR = "actor";
+    private static final String CLIENT_ID = "clientId";
+    private static final String IP_ADDRESS = "ipAddress";
 
     private final AdminEventRepository adminEventRepository;
     private final AdminEventMapper adminEventMapper;
@@ -110,17 +113,17 @@ public class AdminAuditEventService {
                             .ADMIN_EVENT,
                     eventId,
                     Map.of(
-                            "action",
+                            ACTION,
                             action,
-                            "targetType",
+                            TARGET_TYPE,
                             targetType,
-                            "targetId",
+                            TARGET_ID,
                             targetId,
-                            "actor",
+                            ACTOR,
                             actor,
-                            "clientId",
+                            CLIENT_ID,
                             currentClientId() == null ? "" : currentClientId(),
-                            "ipAddress",
+                            IP_ADDRESS,
                             currentIpAddress() == null ? "" : currentIpAddress()));
         }
     }
@@ -136,10 +139,7 @@ public class AdminAuditEventService {
         if (details == null || details.isBlank()) {
             return details;
         }
-        String redacted = SENSITIVE_DETAIL_VALUE.matcher(details).replaceAll("$1[REDACTED]$2");
-        return redacted.length() <= MAX_DETAILS_LENGTH
-                ? redacted
-                : redacted.substring(0, MAX_DETAILS_LENGTH);
+        return SensitiveDataRedactor.sanitize(details, MAX_DETAILS_LENGTH);
     }
 
     @Transactional
@@ -213,10 +213,10 @@ public class AdminAuditEventService {
                         cb.and(
                                 predicate,
                                 cb.or(
-                                        cb.like(cb.lower(root.get("actor")), like),
-                                        cb.like(cb.lower(root.get("action")), like),
-                                        cb.like(cb.lower(root.get("targetType")), like),
-                                        cb.like(cb.lower(root.get("targetId")), like)));
+                                        cb.like(cb.lower(root.get(ACTOR)), like),
+                                        cb.like(cb.lower(root.get(ACTION)), like),
+                                        cb.like(cb.lower(root.get(TARGET_TYPE)), like),
+                                        cb.like(cb.lower(root.get(TARGET_ID)), like)));
             }
             return addFilters(
                     predicate,
@@ -246,22 +246,22 @@ public class AdminAuditEventService {
             Instant from,
             Instant to) {
         if (action != null && !action.isBlank()) {
-            predicate = cb.and(predicate, cb.equal(root.get("action"), action));
+            predicate = cb.and(predicate, cb.equal(root.get(ACTION), action));
         }
         if (targetType != null && !targetType.isBlank()) {
-            predicate = cb.and(predicate, cb.equal(root.get("targetType"), targetType));
+            predicate = cb.and(predicate, cb.equal(root.get(TARGET_TYPE), targetType));
         }
         if (targetId != null && !targetId.isBlank()) {
-            predicate = cb.and(predicate, cb.equal(root.get("targetId"), targetId));
+            predicate = cb.and(predicate, cb.equal(root.get(TARGET_ID), targetId));
         }
         if (actorFilter != null && !actorFilter.isBlank()) {
-            predicate = cb.and(predicate, cb.equal(root.get("actor"), actorFilter));
+            predicate = cb.and(predicate, cb.equal(root.get(ACTOR), actorFilter));
         }
         if (clientId != null && !clientId.isBlank()) {
-            predicate = cb.and(predicate, cb.equal(root.get("clientId"), clientId));
+            predicate = cb.and(predicate, cb.equal(root.get(CLIENT_ID), clientId));
         }
         if (ipAddress != null && !ipAddress.isBlank()) {
-            predicate = cb.and(predicate, cb.equal(root.get("ipAddress"), ipAddress));
+            predicate = cb.and(predicate, cb.equal(root.get(IP_ADDRESS), ipAddress));
         }
         if (from != null) {
             predicate = cb.and(predicate, cb.greaterThanOrEqualTo(root.get("occurredAt"), from));
