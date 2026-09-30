@@ -227,12 +227,10 @@ class AdminClientRoleServiceTest {
         child.getCompositeRoles().add(parent);
         when(clientRoleRepository.findDetailedById(12L)).thenReturn(Optional.of(parent));
         when(clientRoleRepository.findDetailedById(13L)).thenReturn(Optional.of(child));
+        AdminClientRoleService service = service();
+        PageRequest pageable = PageRequest.of(0, 20);
 
-        assertThatThrownBy(
-                        () ->
-                                service()
-                                        .addComposite(
-                                                "orders-client", 12L, 13L, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> service.addComposite("orders-client", 12L, 13L, pageable))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("The client role composite relationship would create a cycle");
         assertThat(parent.getCompositeRoles()).isEmpty();

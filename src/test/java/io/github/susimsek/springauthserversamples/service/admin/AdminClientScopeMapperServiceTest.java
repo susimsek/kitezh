@@ -120,31 +120,19 @@ class AdminClientScopeMapperServiceTest {
     void rejectsInvalidScopeMapperRequests() {
         when(clientScopeRepository.findById("scope-1")).thenReturn(Optional.of(scope()));
         AdminClientScopeMapperService service = service();
+        AdminClientMapperRequestDTO unsupported =
+                new AdminClientMapperRequestDTO("x", "unknown", null, null, true, false, "x", 1);
+        AdminClientMapperRequestDTO missingSource =
+                new AdminClientMapperRequestDTO(
+                        "x", "user-attribute", "", "claim", true, false, "x", 1);
 
         assertThatThrownBy(() -> service.create("scope-1", null))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Request body is required");
-        assertThatThrownBy(
-                        () ->
-                                service.create(
-                                        "scope-1",
-                                        new AdminClientMapperRequestDTO(
-                                                "x", "unknown", null, null, true, false, "x", 1)))
+        assertThatThrownBy(() -> service.create("scope-1", unsupported))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Unsupported mapper type");
-        assertThatThrownBy(
-                        () ->
-                                service.create(
-                                        "scope-1",
-                                        new AdminClientMapperRequestDTO(
-                                                "x",
-                                                "user-attribute",
-                                                "",
-                                                "claim",
-                                                true,
-                                                false,
-                                                "x",
-                                                1)))
+        assertThatThrownBy(() -> service.create("scope-1", missingSource))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A source is required for this mapper type");
     }

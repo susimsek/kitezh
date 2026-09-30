@@ -192,7 +192,6 @@ class LdapFederationMapperServiceTest {
 
     @Test
     void mapsRoleFromGroupAndCreatesGroupWhenItDoesNotExist() {
-        UserEntity user = user();
         LdapFederationMapperEntity roleMapper =
                 mapperWithTarget(
                         "engineering-role", LdapFederationMapperType.ROLE, "ROLE_ENGINEER");
@@ -210,6 +209,7 @@ class LdapFederationMapperServiceTest {
         when(authorityRepository.findByName("ROLE_ENGINEER")).thenReturn(Optional.of(role));
         when(authorityRepository.findByName(AuthoritiesConstants.USER))
                 .thenReturn(Optional.of(authority(AuthoritiesConstants.USER)));
+        UserEntity user = user();
         LdapFederationIdentityEntity identity =
                 new LdapFederationIdentityEntity("external-id", "uid=alice", provider, user);
         service.apply(provider, configuration, external(), user, identity);

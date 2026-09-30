@@ -95,46 +95,25 @@ class AdminClientMapperServiceTest {
     void rejectsInvalidMapperRequests() {
         when(clientRepository.findById("client-1")).thenReturn(Optional.of(client()));
         AdminClientMapperService service = service();
+        AdminClientMapperRequestDTO unsupported =
+                new AdminClientMapperRequestDTO("x", "unknown", null, null, true, false, "x", 1);
+        AdminClientMapperRequestDTO missingSource =
+                new AdminClientMapperRequestDTO(
+                        "x", "user-attribute", "", null, true, false, "x", 1);
+        AdminClientMapperRequestDTO missingValue =
+                new AdminClientMapperRequestDTO(
+                        "x", "hardcoded-claim", null, "claim", true, false, "", 1);
 
         assertThatThrownBy(() -> service.create("client-1", null))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Request body is required");
-        assertThatThrownBy(
-                        () ->
-                                service.create(
-                                        "client-1",
-                                        new AdminClientMapperRequestDTO(
-                                                "x", "unknown", null, null, true, false, "x", 1)))
+        assertThatThrownBy(() -> service.create("client-1", unsupported))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Unsupported mapper type");
-        assertThatThrownBy(
-                        () ->
-                                service.create(
-                                        "client-1",
-                                        new AdminClientMapperRequestDTO(
-                                                "x",
-                                                "user-attribute",
-                                                "",
-                                                null,
-                                                true,
-                                                false,
-                                                "x",
-                                                1)))
+        assertThatThrownBy(() -> service.create("client-1", missingSource))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A source is required for this mapper type");
-        assertThatThrownBy(
-                        () ->
-                                service.create(
-                                        "client-1",
-                                        new AdminClientMapperRequestDTO(
-                                                "x",
-                                                "hardcoded-claim",
-                                                null,
-                                                "claim",
-                                                true,
-                                                false,
-                                                "",
-                                                1)))
+        assertThatThrownBy(() -> service.create("client-1", missingValue))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A value is required for this mapper type");
     }

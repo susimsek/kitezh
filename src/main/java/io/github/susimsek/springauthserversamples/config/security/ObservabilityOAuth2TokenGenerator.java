@@ -26,10 +26,7 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
     @Override
     @Nullable
     public OAuth2Token generate(OAuth2TokenContext context) {
-        String grantType =
-                context.getAuthorizationGrantType() == null
-                        ? null
-                        : context.getAuthorizationGrantType().getValue();
+        String grantType = context.getAuthorizationGrantType().getValue();
         String clientId = clientId(context);
         try {
             OAuth2Token token = delegate.generate(context);
@@ -76,6 +73,6 @@ final class ObservabilityOAuth2TokenGenerator implements OAuth2TokenGenerator<OA
         if (token instanceof OAuth2RefreshToken) {
             return "refresh_token";
         }
-        return context.getTokenType() == null ? null : context.getTokenType().getValue();
+        return context.getTokenType().getValue();
     }
 }

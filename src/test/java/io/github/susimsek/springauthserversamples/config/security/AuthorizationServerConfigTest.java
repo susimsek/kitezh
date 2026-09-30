@@ -1257,18 +1257,6 @@ class AuthorizationServerConfigTest {
         return jwtContext(claims, tokenType, grantType, clientId, scopes, null);
     }
 
-    private static ClientMapperEntity mapper(
-            String name, String type, String claimName, String value, int priority) {
-        ClientMapperEntity mapper = new ClientMapperEntity();
-        mapper.setName(name);
-        mapper.setMapperType(type);
-        mapper.setClaimName(claimName);
-        mapper.setValue(value);
-        mapper.setPriority(priority);
-        mapper.setAddToAccessToken(true);
-        return mapper;
-    }
-
     private static JwtEncodingContext jwtContext(
             JwtClaimsSet.Builder claims,
             OAuth2TokenType tokenType,
@@ -1315,6 +1303,18 @@ class AuthorizationServerConfigTest {
                 .tokenType(tokenType)
                 .authorizationGrantType(grantType)
                 .build();
+    }
+
+    private static ClientMapperEntity mapper(
+            String name, String type, String claimName, String value, int priority) {
+        ClientMapperEntity mapper = new ClientMapperEntity();
+        mapper.setName(name);
+        mapper.setMapperType(type);
+        mapper.setClaimName(claimName);
+        mapper.setValue(value);
+        mapper.setPriority(priority);
+        mapper.setAddToAccessToken(true);
+        return mapper;
     }
 
     private static JwtEncodingContext dpopContext(
