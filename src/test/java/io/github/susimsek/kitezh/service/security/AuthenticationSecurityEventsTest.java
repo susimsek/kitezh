@@ -3,6 +3,8 @@ package io.github.susimsek.kitezh.service.security;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import io.github.susimsek.kitezh.domain.UserEventType;
+import io.github.susimsek.kitezh.service.admin.UserEventService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -19,8 +21,10 @@ class AuthenticationSecurityEventsTest {
 
     private final AccountLockService accountLockService = mock(AccountLockService.class);
     private final LoginRateLimitService loginRateLimitService = mock(LoginRateLimitService.class);
+    private final UserEventService userEventService = mock(UserEventService.class);
     private final AuthenticationSecurityEvents events =
-            new AuthenticationSecurityEvents(accountLockService, loginRateLimitService);
+            new AuthenticationSecurityEvents(
+                    accountLockService, loginRateLimitService, userEventService);
 
     @AfterEach
     void clearRequest() {
@@ -31,6 +35,7 @@ class AuthenticationSecurityEventsTest {
     void recordsSuccessWithStringPrincipalAndRequestAddress() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("192.0.2.10");
+        request.setParameter("client_id", "admin-console");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
         Authentication authentication =
                 UsernamePasswordAuthenticationToken.authenticated("alice", "", java.util.List.of());
@@ -39,6 +44,8 @@ class AuthenticationSecurityEventsTest {
 
         verify(accountLockService).recordSuccess("alice");
         verify(loginRateLimitService).clear("alice", "192.0.2.10");
+        verify(userEventService)
+                .record(UserEventType.LOGIN_SUCCESS, "alice", "admin-console", "192.0.2.10");
     }
 
     @Test
@@ -60,5 +67,7 @@ class AuthenticationSecurityEventsTest {
         events.onFailure(failure);
 
         verify(accountLockService).recordFailure(authentication.getName(), "unknown");
+        verify(userEventService)
+                .record(UserEventType.LOGIN_FAILURE, authentication.getName(), null, "unknown");
     }
 }

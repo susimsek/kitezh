@@ -22,6 +22,7 @@ import io.github.susimsek.kitezh.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.domain.UserEventSettingsEntity;
 import io.github.susimsek.kitezh.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.kitezh.repository.AdminEventSettingsRepository;
 import io.github.susimsek.kitezh.repository.AuthorityRepository;
@@ -216,6 +217,9 @@ class CacheConfigTest {
         assertThat(cacheManager.getCache(UserEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(UserEntity.class.getName() + ".authorities")).isNotNull();
         assertThat(cacheManager.getCache(UserEntity.class.getName() + ".groups")).isNotNull();
+        assertThat(cacheManager.getCache(UserEventSettingsEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(UserEventSettingsEntity.class.getName() + ".eventTypes"))
+                .isNotNull();
         assertThat(cacheManager.getCache(UserProfileAttributeDefinitionEntity.class.getName()))
                 .isNotNull();
         assertThat(cacheManager.getCache(ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE))

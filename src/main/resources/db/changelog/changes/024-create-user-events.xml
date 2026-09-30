@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="024-01-create-user-events" author="susimsek">
+        <createTable tableName="user_event_settings">
+            <column name="id" type="bigint">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_event_settings"/>
+            </column>
+            <column name="events_enabled" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="events_expiration_days" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createTable tableName="user_event_settings_types">
+            <column name="settings_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_user_event_settings_types_settings" references="user_event_settings(id)"/>
+            </column>
+            <column name="event_type" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="user_event_settings_types" columnNames="settings_id,event_type" constraintName="uk_user_event_settings_types"/>
+        <loadData encoding="UTF-8" file="db/data/user-event-settings.csv" separator=";" tableName="user_event_settings" usePreparedStatements="true">
+            <column header="id" type="numeric"/>
+            <column header="events_enabled" type="boolean"/>
+            <column header="events_expiration_days" type="numeric"/>
+        </loadData>
+        <loadData encoding="UTF-8" file="db/data/user-event-settings-types.csv" separator=";" tableName="user_event_settings_types" usePreparedStatements="true">
+            <column header="settings_id" type="numeric"/>
+            <column header="event_type" type="string"/>
+        </loadData>
+        <createTable tableName="user_events">
+            <column name="id" type="varchar(36)">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_events"/>
+            </column>
+            <column name="user_id" type="bigint"/>
+            <column name="username" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_id" type="varchar(100)"/>
+            <column name="ip_address" type="varchar(45)"/>
+            <column name="occurred_at" type="timestamp" defaultValueComputed="${now}">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex indexName="idx_user_events_occurred_at" tableName="user_events">
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_user_events_user_occurred_at" tableName="user_events">
+            <column name="user_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_user_events_type_occurred_at" tableName="user_events">
+            <column name="type"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_user_events_client_occurred_at" tableName="user_events">
+            <column name="client_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_user_events_ip_occurred_at" tableName="user_events">
+            <column name="ip_address"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

@@ -23,6 +23,7 @@ import io.github.susimsek.kitezh.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.domain.UserEventSettingsEntity;
 import io.github.susimsek.kitezh.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.kitezh.repository.AdminEventSettingsRepository;
 import io.github.susimsek.kitezh.repository.AuthorityRepository;
@@ -216,6 +217,8 @@ public class CacheConfig {
                 createCache(cacheManager, UserEntity.class.getName() + ".authorities");
                 createCache(cacheManager, UserEntity.class.getName() + ".groups");
                 createCache(cacheManager, UserEntity.class.getName() + ".clientRoles");
+                createCache(cacheManager, UserEventSettingsEntity.class.getName());
+                createCache(cacheManager, UserEventSettingsEntity.class.getName() + ".eventTypes");
                 createCache(cacheManager, GroupEntity.class.getName() + ".clientRoles");
                 createCache(cacheManager, UserProfileAttributeDefinitionEntity.class.getName());
                 createCache(cacheManager, RequiredActionDefinitionEntity.class.getName());

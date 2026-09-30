@@ -13,6 +13,8 @@ public interface AdminEventMapper {
     AdminEventEntity toEntity(
             String id,
             String actor,
+            String clientId,
+            String ipAddress,
             String action,
             String targetType,
             String targetId,

@@ -89,18 +89,28 @@ public class AdminApiSecurityConfig {
                                         .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/api/admin/users/*/events",
+                                                "/api/admin/users/*/user-events",
                                                 "/api/admin/clients/*/events",
                                                 "/api/admin/events",
-                                                "/api/admin/events/config")
+                                                "/api/admin/events/*",
+                                                "/api/admin/events/config",
+                                                "/api/admin/user-events",
+                                                "/api/admin/user-events/*")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_VIEWER,
                                                 AuthoritiesConstants.EVENT_MANAGER)
-                                        .requestMatchers(HttpMethod.DELETE, "/api/admin/events")
+                                        .requestMatchers(
+                                                HttpMethod.DELETE,
+                                                "/api/admin/events",
+                                                "/api/admin/user-events")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_MANAGER)
-                                        .requestMatchers(HttpMethod.PUT, "/api/admin/events/config")
+                                        .requestMatchers(
+                                                HttpMethod.PUT,
+                                                "/api/admin/events/config",
+                                                "/api/admin/user-events/config")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_MANAGER)
@@ -116,6 +126,22 @@ public class AdminApiSecurityConfig {
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.CLIENT_VIEWER,
                                                 AuthoritiesConstants.CLIENT_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/api/admin/event-listeners/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.EVENT_VIEWER,
+                                                AuthoritiesConstants.EVENT_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/api/admin/event-listeners/deliveries/*/retry")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.EVENT_MANAGER)
+                                        .requestMatchers("/api/admin/event-listeners/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.EVENT_MANAGER)
                                         .requestMatchers("/api/admin/client-scopes/**")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,

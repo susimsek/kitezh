@@ -186,6 +186,10 @@ app:
   dpop:
     nonce-required: ${APP_DPOP_NONCE_REQUIRED:false}
     nonce-ttl: ${APP_DPOP_NONCE_TTL:PT5M}
+  events:
+    listener:
+      allow-http: ${APP_EVENTS_LISTENER_ALLOW_HTTP:false}
+      retry-delay-ms: ${APP_EVENTS_LISTENER_RETRY_DELAY_MS:30000}
   web-authn:
     rp-name: Kitezh
     rp-id: ""
