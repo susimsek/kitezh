@@ -347,10 +347,11 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void ignoresBlankRequestIdentifiersAndAnonymousAuthentication() throws Exception {
-        LoggingProperties.Access access = new LoggingProperties.Access();
-        access.setMaskedHeaders(java.util.Arrays.asList(null, " ", "X-Secret"));
-        access.setMaskedCookies(java.util.Arrays.asList(null, " ", "SESSION"));
-        ObservabilityMdcFilter configuredFilter = new ObservabilityMdcFilter(access);
+        LoggingProperties.Server server = new LoggingProperties.Server();
+        LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
+        obfuscate.setHeaders(java.util.Arrays.asList(null, " ", "X-Secret"));
+        obfuscate.setCookies(java.util.Arrays.asList(null, " ", "SESSION"));
+        ObservabilityMdcFilter configuredFilter = new ObservabilityMdcFilter(server, obfuscate);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/anonymous");
         request.setParameter("client_id", " ");
         request.setParameter("clientId", "");
