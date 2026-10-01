@@ -7,15 +7,12 @@ import org.junit.jupiter.api.Test;
 class AdminClientScopeRequestDTOTest {
 
     @Test
-    void appliesDefaultAndFallbackValues() {
+    void appliesDefaultAndConfiguredValues() {
         AdminClientScopeRequestDTO defaults =
                 new AdminClientScopeRequestDTO("scope", "Display", "Description");
         AdminClientScopeRequestDTO configured =
                 new AdminClientScopeRequestDTO(
                         "scope", "Display", "Description", true, " teams ", false);
-        AdminClientScopeRequestDTO nullable =
-                new AdminClientScopeRequestDTO(
-                        "scope", null, null, null, null, null, null, null, null);
 
         assertThat(defaults.groupMapperEnabledValue()).isFalse();
         assertThat(defaults.groupMapperEnabledValue(true)).isFalse();
@@ -36,6 +33,13 @@ class AdminClientScopeRequestDTOTest {
         assertThat(configured.groupMapperFullPathValue(true)).isFalse();
         assertThat(configured.groupClaimNameValue()).isEqualTo("teams");
         assertThat(configured.groupClaimNameValue("fallback")).isEqualTo("teams");
+    }
+
+    @Test
+    void appliesNullableAndBlankFallbackValues() {
+        AdminClientScopeRequestDTO nullable =
+                new AdminClientScopeRequestDTO(
+                        "scope", null, null, null, null, null, null, null, null);
 
         assertThat(nullable.groupMapperEnabledValue(true)).isTrue();
         assertThat(nullable.groupMapperFullPathValue(false)).isFalse();

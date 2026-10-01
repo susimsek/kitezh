@@ -25,11 +25,16 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
     private static final String DIRECTION = "direction";
     private static final String OUTBOUND = "outbound";
     private static final String TYPE = "type";
+    private static final String AUTHORIZATION = "authorization";
+    private static final String RESPONSE = "response";
+    private static final String ORIGIN = "origin";
+    private static final String HTTP_METHOD = "http.method";
+    private static final String HTTP_TARGET = "http.target";
     private static final Logger LOGGER =
             LoggerFactory.getLogger("io.github.susimsek.springauthserversamples.http.client");
     private static final Set<String> ALWAYS_MASKED_HEADERS =
             Set.of(
-                    "authorization",
+                    AUTHORIZATION,
                     "cookie",
                     "set-cookie",
                     "proxy-authorization",
@@ -42,7 +47,7 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                     "id_token",
                     "client_secret",
                     "password",
-                    "authorization",
+                    AUTHORIZATION,
                     "cookie",
                     "token",
                     "secret",
@@ -53,7 +58,7 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                     "code",
                     "code_verifier",
                     "captchatoken",
-                    "response",
+                    RESPONSE,
                     "sitekey",
                     "apikey",
                     "auth_req_id",
@@ -72,7 +77,7 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                     "client_secret",
                     "client_assertion",
                     "password",
-                    "authorization",
+                    AUTHORIZATION,
                     "token",
                     "secret",
                     "api_key",
@@ -89,7 +94,7 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                     "login_hint_token",
                     "user_code",
                     "captchatoken",
-                    "response",
+                    RESPONSE,
                     "key");
 
     private final HttpLoggingLevel level;
@@ -164,11 +169,11 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
             long durationMillis = elapsedMillis(startedAt);
             LOGGER.atWarn()
                     .addKeyValue(DIRECTION, OUTBOUND)
-                    .addKeyValue(TYPE, "response")
-                    .addKeyValue("origin", "remote")
+                    .addKeyValue(TYPE, RESPONSE)
+                    .addKeyValue(ORIGIN, "remote")
                     .addKeyValue("outcome", "failure")
-                    .addKeyValue("http.method", request.getMethod())
-                    .addKeyValue("http.target", target)
+                    .addKeyValue(HTTP_METHOD, request.getMethod())
+                    .addKeyValue(HTTP_TARGET, target)
                     .addKeyValue("http.duration_ms", durationMillis)
                     .addKeyValue("exception.type", exception.getClass().getSimpleName())
                     .log(
@@ -194,10 +199,10 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
         var log =
                 LOGGER.atInfo()
                         .addKeyValue(DIRECTION, OUTBOUND)
-                        .addKeyValue(TYPE, "response")
-                        .addKeyValue("origin", "remote")
-                        .addKeyValue("http.method", request.getMethod())
-                        .addKeyValue("http.target", target)
+                        .addKeyValue(TYPE, RESPONSE)
+                        .addKeyValue(ORIGIN, "remote")
+                        .addKeyValue(HTTP_METHOD, request.getMethod())
+                        .addKeyValue(HTTP_TARGET, target)
                         .addKeyValue("http.status_code", status)
                         .addKeyValue("http.duration_ms", durationMillis);
         String headers = null;
@@ -254,9 +259,9 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                 LOGGER.atInfo()
                         .addKeyValue(DIRECTION, OUTBOUND)
                         .addKeyValue(TYPE, "request")
-                        .addKeyValue("origin", "local")
-                        .addKeyValue("http.method", request.getMethod())
-                        .addKeyValue("http.target", target);
+                        .addKeyValue(ORIGIN, "local")
+                        .addKeyValue(HTTP_METHOD, request.getMethod())
+                        .addKeyValue(HTTP_TARGET, target);
         if (includeHeaders) {
             log.addKeyValue("http.headers", headers);
         }
@@ -369,7 +374,7 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
     private static String decode(String value) {
         try {
             return URLDecoder.decode(value, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException _) {
             return value;
         }
     }

@@ -144,11 +144,11 @@ class DomainOAuth2AuthorizationServiceTest {
         assertThat(entity.getAttributes()).isEqualTo("updated");
         verify(mapperSupport).writeMap(anyMap());
 
-        Instant startedAt = Instant.parse("2026-01-01T00:00:00Z");
         AuthorizationEntity stored = entity();
         stored.setAuthorizedScopes("openid,offline_access");
         stored.setAttributes("stored");
         when(authorizationRepository.findByToken("token")).thenReturn(Optional.of(stored));
+        Instant startedAt = Instant.parse("2026-01-01T00:00:00Z");
         when(mapperSupport.readMap("stored"))
                 .thenReturn(Map.of(OfflineAccessSettings.SESSION_STARTED_AT, startedAt.toString()));
         when(offlineAccessPolicyService.revoked(startedAt)).thenReturn(true);
