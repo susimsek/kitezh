@@ -19,6 +19,10 @@ spring:
   liquibase:
     contexts: prod
 
+server:
+  compression:
+    enabled: true
+
 management:
   metrics:
     distribution:
