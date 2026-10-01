@@ -217,6 +217,21 @@ class EffectiveRoleServiceTest {
         assertThat(EffectiveRoleService.reaches(unnamedAuthority, incompleteClientRole)).isFalse();
     }
 
+    @Test
+    void handlesEmptyCompositeCollectionsAndIdentityMatches() {
+        AuthorityEntity authority = authority(10L, "ROLE_EMPTY");
+        authority.setCompositeRoles(null);
+        authority.setCompositeClientRoles(null);
+        ClientRoleEntity clientRole = clientRole(null, "client-role");
+        clientRole.setCompositeRoles(null);
+        clientRole.setCompositeRealmRoles(null);
+
+        assertThat(EffectiveRoleService.reaches(authority, authority)).isTrue();
+        assertThat(EffectiveRoleService.reaches(clientRole, clientRole)).isTrue();
+        assertThat(EffectiveRoleService.reaches(authority, clientRole)).isFalse();
+        assertThat(EffectiveRoleService.reaches(clientRole, authority)).isFalse();
+    }
+
     private static GroupEntity group(Long id, String name, String role) {
         GroupEntity group = new GroupEntity();
         group.setId(id);

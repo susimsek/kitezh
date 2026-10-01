@@ -39,6 +39,7 @@ app:
       maximum-size: 1000
   authorization-server:
     issuer: ${APP_AUTHORIZATION_SERVER_ISSUER:https://spring-authorization-server-samples.local}
+    offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
 
 logging:
   level:

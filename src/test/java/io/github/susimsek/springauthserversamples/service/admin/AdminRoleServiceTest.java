@@ -290,6 +290,14 @@ class AdminRoleServiceTest {
         assertThat(result.users().getContent())
                 .containsExactly(new AdminRoleUserDTO(10L, "alice", true));
         assertThat(result.userCount()).isEqualTo(1L);
+
+        assertThat(
+                        service()
+                                .role("ROLE_AUDITOR", "", false, PageRequest.of(0, 10))
+                                .users()
+                                .getContent())
+                .extracting(AdminRoleUserDTO::username)
+                .containsExactly("bob");
     }
 
     @Test
@@ -327,6 +335,49 @@ class AdminRoleServiceTest {
                                                         Sort.Order.desc("lastName")))))
                 .extracting(AdminRoleUserDTO::username)
                 .containsExactly("alice", "bob");
+    }
+
+    @Test
+    void evaluatesNullUserFieldsAndEveryInMemorySortValue() {
+        UserEntity alice = user(10L, "alice", true, "alice@example.com");
+        alice.setFirstName("Alice");
+        alice.setLastName("Zephyr");
+        UserEntity incomplete = user(11L, "charlie", true, null);
+        incomplete.setFirstName(null);
+        incomplete.setLastName(null);
+        when(authorityRepository.existsByName("ROLE_AUDITOR")).thenReturn(true);
+        when(userRepository.findAllWithEffectiveAuthorities())
+                .thenReturn(List.of(alice, incomplete));
+
+        for (String property : List.of("email", "firstName", "lastName", "enabled", "unknown")) {
+            assertThat(
+                            service()
+                                    .availableUsers(
+                                            "ROLE_AUDITOR",
+                                            "alice",
+                                            PageRequest.of(
+                                                    0, 10, Sort.by(Sort.Order.asc(property)))))
+                    .extracting(AdminRoleUserDTO::username)
+                    .containsExactly("alice");
+        }
+        assertThat(
+                        service()
+                                .availableUsers(
+                                        "ROLE_AUDITOR",
+                                        "missing",
+                                        PageRequest.of(0, 10, Sort.by(Sort.Order.asc("username")))))
+                .isEmpty();
+
+        for (String property : List.of("email", "firstName", "lastName", "enabled", "unknown")) {
+            assertThat(
+                            service()
+                                    .availableUsers(
+                                            "ROLE_AUDITOR",
+                                            "",
+                                            PageRequest.of(
+                                                    0, 10, Sort.by(Sort.Order.asc(property)))))
+                    .hasSize(2);
+        }
     }
 
     @Test
@@ -414,6 +465,102 @@ class AdminRoleServiceTest {
     }
 
     @Test
+    void rejectsSelfCompositeCyclesAndClientCompositeCycles() {
+        AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
+        when(authorityRepository.findAllWithCompositeRoles()).thenReturn(List.of(role));
+
+        assertThatThrownBy(
+                        () ->
+                                extendedService()
+                                        .addComposite(
+                                                "ROLE_AUDITOR",
+                                                "ROLE_AUDITOR",
+                                                PageRequest.of(0, 20)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The role composite relationship would create a cycle");
+
+        var client = new io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity();
+        ClientRoleEntity clientRole = new ClientRoleEntity(client, "reports.read", null);
+        clientRole.setId(9L);
+        clientRole.getCompositeRealmRoles().add(role);
+        when(authorityRepository.findByName("ROLE_AUDITOR")).thenReturn(Optional.of(role));
+        when(clientRoleRepository.findDetailedById(9L)).thenReturn(Optional.of(clientRole));
+
+        assertThatThrownBy(
+                        () ->
+                                extendedService()
+                                        .addClientComposite(
+                                                "ROLE_AUDITOR", 9L, PageRequest.of(0, 20)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The role composite relationship would create a cycle");
+    }
+
+    @Test
+    void searchesAssignedUsersByProfileFieldsAndMarksBuiltInRolesProtected() {
+        AuthorityEntity role = authority(1L, AuthoritiesConstants.ADMIN);
+        UserEntity firstNameMatch = user(10L, "firstuser", true, "first@example.com");
+        firstNameMatch.setFirstName("Alice");
+        firstNameMatch.setAuthorities(java.util.Set.of(role));
+        UserEntity lastNameMatch = user(11L, "lastuser", true, "last@example.com");
+        lastNameMatch.setLastName("Builder");
+        lastNameMatch.setAuthorities(java.util.Set.of(role));
+        when(authorityRepository.findByName(AuthoritiesConstants.ADMIN))
+                .thenReturn(Optional.of(role));
+        when(userRepository.findAllWithEffectiveAuthorities())
+                .thenReturn(List.of(firstNameMatch, lastNameMatch));
+        when(adminRoleMapper.toUserDTO(any(UserEntity.class)))
+                .thenAnswer(
+                        invocation -> {
+                            UserEntity user = invocation.getArgument(0);
+                            return new AdminRoleUserDTO(
+                                    user.getId(), user.getUsername(), user.isEnabled());
+                        });
+        when(adminRoleMapper.toDetailDTO(
+                        any(), any(), any(Long.class), any(Boolean.class), any(), any(), any()))
+                .thenAnswer(
+                        invocation ->
+                                new io.github.susimsek.springauthserversamples.dto.admin
+                                        .AdminRoleDetailDTO(
+                                        invocation.getArgument(0),
+                                        invocation.getArgument(1),
+                                        invocation.getArgument(2),
+                                        invocation.getArgument(3),
+                                        invocation.getArgument(4),
+                                        invocation.getArgument(5),
+                                        invocation.getArgument(6)));
+
+        assertThat(
+                        extendedService()
+                                .role(AuthoritiesConstants.ADMIN, "alice", PageRequest.of(0, 20))
+                                .users()
+                                .getContent())
+                .extracting(AdminRoleUserDTO::username)
+                .containsExactly("firstuser");
+        assertThat(
+                        extendedService()
+                                .role(AuthoritiesConstants.ADMIN, "builder", PageRequest.of(0, 20))
+                                .users()
+                                .getContent())
+                .extracting(AdminRoleUserDTO::username)
+                .containsExactly("lastuser");
+    }
+
+    @Test
+    void marksTheUserRoleAsProtected() {
+        AuthorityEntity role = authority(2L, AuthoritiesConstants.USER);
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(authorityRepository.findByName(AuthoritiesConstants.USER))
+                .thenReturn(Optional.of(role));
+        when(userRepository.findAllWithEffectiveAuthorities()).thenReturn(List.of());
+        when(userRepository.findByAuthoritiesNameAndUsernameContainingIgnoreCase(
+                        AuthoritiesConstants.USER, "", pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+        when(userRepository.countByAuthoritiesId(2L)).thenReturn(0L);
+
+        assertThat(service().role(AuthoritiesConstants.USER, pageable).protectedRole()).isTrue();
+    }
+
+    @Test
     void handlesDuplicateAndMissingCompositeRemovalsWithoutAudit() {
         AuthorityEntity role = authority(4L, "ROLE_AUDITOR");
         AuthorityEntity child = authority(5L, "ROLE_REPORTS");
@@ -453,8 +600,32 @@ class AdminRoleServiceTest {
         assertThat(role.getCompositeRoles()).isEmpty();
         service.addClientComposite("ROLE_AUDITOR", 9L, pageable);
         assertThat(role.getCompositeClientRoles()).containsExactly(clientRole);
+        service.addClientComposite("ROLE_AUDITOR", 9L, pageable);
         service.removeClientComposite("ROLE_AUDITOR", 9L, pageable);
         assertThat(role.getCompositeClientRoles()).isEmpty();
+        service.removeClientComposite("ROLE_AUDITOR", 9L, pageable);
+        service.addClientComposite("ROLE_AUDITOR", 9L, pageable);
+    }
+
+    @Test
+    void rejectsClientCompositeOperationsWithTheLegacyConstructor() {
+        when(authorityRepository.findByName("ROLE_AUDITOR"))
+                .thenReturn(Optional.of(authority(4L, "ROLE_AUDITOR")));
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .addClientComposite(
+                                                "ROLE_AUDITOR", 9L, PageRequest.of(0, 20)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Client role not found");
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .removeClientComposite(
+                                                "ROLE_AUDITOR", 9L, PageRequest.of(0, 20)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Client role not found");
     }
 
     private AdminRoleService service() {

@@ -125,6 +125,13 @@ describe("admin login", () => {
     });
   };
 
+  beforeEach(() => {
+    cy.visit("/");
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    cy.setCookie("locale", "en");
+  });
+
   it("signs in from /admin and keeps the URL clean after reload", () => {
     cy.intercept("GET", "/account/avatar").as("privateAvatar");
     cy.intercept("POST", "/oauth2/token").as("tokenExchange");

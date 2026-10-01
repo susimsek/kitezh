@@ -352,6 +352,150 @@ class AdminClientScopeEvaluationServiceTest {
         assertThat(result.roles()).containsExactly("demo.read");
     }
 
+    @Test
+    void handlesSingleAttributesAndScopeFilteredAudienceValues() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid scope");
+        UserEntity user = new UserEntity();
+        user.setId(7L);
+        user.setUsername("admin");
+        user.setGroups(null);
+        RegisteredClientEntity otherClient = new RegisteredClientEntity();
+        otherClient.setClientId("orders-api");
+        user.getClientRoles().add(new ClientRoleEntity(otherClient, "orders.read", null));
+
+        ClientMapperEntity attribute = mapper("attribute", "user-attribute", "code", null);
+        attribute.setSource("departmentCode");
+        ClientMapperEntity unknownProperty = mapper("unknown", "user-property", "unknown", null);
+        unknownProperty.setSource("unknown");
+        ClientMapperEntity groups = mapper("groups", "group-membership", "groups", null);
+        ClientMapperEntity blankGroupAttribute =
+                mapper("group-attribute", "group-attribute", "department", null);
+        blankGroupAttribute.setSource(" ");
+        ClientMapperEntity audience = mapper("audience", "audience-resolve", "aud", null);
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(
+                        List.of(audience, attribute, unknownProperty, groups, blankGroupAttribute));
+        ClientScopeEntity scope = new ClientScopeEntity();
+        scope.setId("scope-1");
+        scope.setName("scope");
+        when(scopeRepository.findByNameIn(java.util.Set.of("scope"))).thenReturn(List.of(scope));
+        when(scopeMapperRepository.findAllByClientScopeIdInOrderByPriorityAscNameAsc(
+                        List.of("scope-1")))
+                .thenReturn(List.of());
+        UserProfileAttributeDefinitionEntity definition =
+                new UserProfileAttributeDefinitionEntity();
+        definition.setName("departmentCode");
+        UserProfileAttributeRepository attributeRepository =
+                mock(UserProfileAttributeRepository.class);
+        when(attributeRepository
+                        .findAllByUserIdOrderByDefinitionDisplayOrderAscDefinitionNameAscPositionAsc(
+                                7L))
+                .thenReturn(List.of(new UserProfileAttributeEntity(user, definition, 0, "HR-01")));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        var result =
+                new AdminClientScopeEvaluationService(
+                                clientRepository,
+                                mapperRepository,
+                                scopeRepository,
+                                scopeMapperRepository,
+                                userRepository,
+                                attributeRepository,
+                                null,
+                                null)
+                        .evaluate("client-1", "scope", "admin");
+
+        assertThat(result.claims())
+                .containsEntry("code", "HR-01")
+                .containsEntry("groups", List.of())
+                .doesNotContainKeys("aud", "unknown", "department");
+    }
+
+    @Test
+    void mergesExistingStringAudienceAndBuildsParentGroupPath() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setFirstName("Ada");
+        user.setLastName(" ");
+        GroupEntity parent = new GroupEntity();
+        parent.setName("Platform");
+        GroupEntity child = new GroupEntity();
+        child.setName("Operations");
+        child.setParent(parent);
+        child.getAttributes().add(new GroupAttribute("department", "engineering"));
+        user.setGroups(java.util.Set.of(child));
+        ClientMapperEntity existingAudience =
+                mapper("existing-audience", "hardcoded-claim", "aud", "existing");
+        ClientMapperEntity audience = mapper("audience", "audience", "aud", "reports-api");
+        ClientMapperEntity fullName = mapper("full-name", "full-name", "full", null);
+        ClientMapperEntity groups = mapper("groups", "group-membership", "groups", null);
+        ClientMapperEntity department =
+                mapperWithSource("department", "group-attribute", "department", "department");
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(List.of(existingAudience, audience, fullName, groups, department));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        var result = service().evaluate("client-1", "openid", "admin");
+
+        assertThat(result.claims())
+                .containsEntry("aud", List.of("existing", "reports-api"))
+                .containsEntry("full", "Ada")
+                .containsEntry("groups", List.of("/Platform/Operations"))
+                .containsEntry("department", "engineering");
+    }
+
+    @Test
+    void mapsRemainingUserPropertiesAndStopsCyclicGroupPaths() {
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-1");
+        client.setClientId("demo-client");
+        client.setScopes("openid");
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setEmail("ada@example.com");
+        user.setPreferredLocale("tr");
+        GroupEntity cyclicGroup = new GroupEntity();
+        cyclicGroup.setName("Loop");
+        cyclicGroup.setParent(cyclicGroup);
+        cyclicGroup.setAttributes(null);
+        user.setGroups(java.util.Set.of(cyclicGroup));
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-1"))
+                .thenReturn(
+                        List.of(
+                                mapperWithSource(
+                                        "username", "user-property", "username", "username"),
+                                mapperWithSource("email", "user-property", "email", "email"),
+                                mapperWithSource(
+                                        "locale", "user-property", "locale", "preferredLocale"),
+                                mapperWithSource("unknown", "user-property", "unknown", "unknown"),
+                                mapper("groups", "group-membership", "groups", null),
+                                mapperWithSource(
+                                        "department",
+                                        "group-attribute",
+                                        "department",
+                                        "department")));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        var result = service().evaluate("client-1", "openid", "admin");
+
+        assertThat(result.claims())
+                .containsEntry("username", "admin")
+                .containsEntry("email", "ada@example.com")
+                .containsEntry("locale", "tr")
+                .containsEntry("groups", List.of("/Loop"))
+                .doesNotContainKeys("unknown", "department");
+    }
+
     private AdminClientScopeEvaluationService service() {
         return new AdminClientScopeEvaluationService(
                 clientRepository,

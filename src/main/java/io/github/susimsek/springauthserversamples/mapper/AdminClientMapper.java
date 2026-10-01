@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.mapper;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientDTO;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
+import io.github.susimsek.springauthserversamples.security.OfflineAccessSettings;
 import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
@@ -63,7 +64,21 @@ public interface AdminClientMapper {
                         : client.getClientSettings()
                                 .getTokenEndpointAuthenticationSigningAlgorithm()
                                 .getName(),
-                client.getClientSettings().getX509CertificateSubjectDN());
+                client.getClientSettings().getX509CertificateSubjectDN(),
+                durationSetting(client, OfflineAccessSettings.OFFLINE_SESSION_IDLE),
+                durationSetting(client, OfflineAccessSettings.OFFLINE_SESSION_MAX));
+    }
+
+    private static java.time.Duration durationSetting(RegisteredClient client, String key) {
+        Object value = client.getTokenSettings().getSettings().get(key);
+        if (value instanceof String string) {
+            try {
+                return java.time.Duration.parse(string);
+            } catch (RuntimeException _) {
+                return null;
+            }
+        }
+        return null;
     }
 
     default AdminClientCreatedDTO toCreatedDTO(AdminClientDTO client, String clientSecret) {

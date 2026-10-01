@@ -15,6 +15,7 @@ import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminBreadcrumb } from "@/components/admin/AdminBreadcrumb";
 import { AdminResources } from "@/components/admin/AdminResources";
+import AdminOfflineSessions from "@/components/admin/AdminOfflineSessions";
 import { ClientsTable } from "@/components/admin/ClientsTable";
 import { ClientForm } from "@/components/admin/ClientForm";
 import { ClientEntityRoute } from "@/components/admin/ClientEntityRoute";
@@ -334,6 +335,7 @@ export function AppRoutes() {
             <AdminResources resource="sessions" copy={dictionary.admin.resources} locale={locale} />
           }
         />
+        <Route path="offline-sessions" element={<AdminOfflineSessions />} />
         <Route
           path="keys"
           element={

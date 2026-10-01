@@ -18,7 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -241,5 +243,30 @@ class ObservabilityMdcFilterTest {
                         (servletRequest, servletResponse) -> {});
 
         assertThat(MDC.get("clientId")).isEqualTo("restored");
+    }
+
+    @Test
+    void ignoresBlankRequestIdentifiersAndAnonymousAuthentication() throws Exception {
+        LoggingProperties.Access access = new LoggingProperties.Access();
+        access.setMaskedHeaders(java.util.Arrays.asList(null, " ", "X-Secret"));
+        access.setMaskedCookies(java.util.Arrays.asList(null, " ", "SESSION"));
+        ObservabilityMdcFilter configuredFilter = new ObservabilityMdcFilter(access);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/anonymous");
+        request.setParameter("client_id", " ");
+        request.setParameter("clientId", "");
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new AnonymousAuthenticationToken(
+                                "key",
+                                "anonymous",
+                                List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+
+        AtomicReference<Map<String, String>> observed = new AtomicReference<>();
+        configuredFilter.doFilterInternal(
+                request,
+                new MockHttpServletResponse(),
+                (servletRequest, servletResponse) -> observed.set(MDC.getCopyOfContextMap()));
+
+        assertThat(observed.get()).doesNotContainKeys("clientId", "userId", "sessionId");
     }
 }

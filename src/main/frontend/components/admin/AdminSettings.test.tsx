@@ -74,7 +74,9 @@ describe("AdminSettings", () => {
                       ? "user-federation"
                       : key === "cibaPolicy"
                         ? "ciba-policy"
-                        : key
+                        : key === "offlineAccess"
+                          ? "offline-access"
+                          : key
             }`,
       );
     }

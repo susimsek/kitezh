@@ -36,6 +36,7 @@ app:
       maximum-size: 100
   authorization-server:
     issuer: http://localhost:9090
+    offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
 
 logging:
   level:

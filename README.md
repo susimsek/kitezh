@@ -660,6 +660,15 @@ Behavior:
 - the client re-authenticates with Basic auth
 - a new access token is issued
 - refresh token reuse and rotation behavior depends on the stored `token_settings`
+- `offline_access` is optional and is never added as an implicit default scope
+- an authorization that explicitly requests `offline_access` is kept outside the browser session,
+  so its rotated refresh token remains usable after browser logout until the configured offline
+  session idle timeout (`APP_OFFLINE_SESSION_IDLE`, default `P30D`)
+- administrators can configure the global offline-session idle timeout and optional absolute
+  lifetime from **Admin → Settings → Offline access**, revoke all offline sessions, and revoke
+  individual offline sessions from **Admin → Offline sessions**
+- client administrators can override the global idle and absolute lifetimes per OAuth client;
+  users can review and revoke their own offline sessions from the Account Console
 
 ### Token Introspection
 

@@ -2,6 +2,8 @@ package io.github.susimsek.springauthserversamples.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
@@ -77,6 +80,49 @@ class DomainUserDetailsServiceTest {
         assertThatThrownBy(() -> service().loadUserByUsername("missing"))
                 .isInstanceOf(UsernameNotFoundException.class)
                 .hasMessage("Invalid username or password");
+    }
+
+    @Test
+    void loadsByEmailAndDisablesUnverifiedLockedServiceAccounts() {
+        LoginSettingsService loginSettingsService = mock(LoginSettingsService.class);
+        UserEntity account = user(true, AuthoritiesConstants.USER);
+        account.setEmail("admin@example.com");
+        account.setEmailVerified(false);
+        when(loginSettingsService.isLoginWithEmailEnabled()).thenReturn(true);
+        when(loginSettingsService.isVerifyEmailEnabled()).thenReturn(true);
+        when(userRepository.findForAuthenticationByIdentifier("admin@example.com"))
+                .thenReturn(Optional.of(account));
+        when(accountLockService.isLocked(any(UserEntity.class), any())).thenReturn(true);
+
+        UserDetails userDetails =
+                new DomainUserDetailsService(
+                                userRepository, accountLockService, loginSettingsService)
+                        .loadUserByUsername("admin@example.com");
+
+        assertThat(userDetails)
+                .extracting(UserDetails::isEnabled, UserDetails::isAccountNonLocked)
+                .containsExactly(false, false);
+    }
+
+    @Test
+    void keepsVerifiedEmailUserEnabledWhenNotLocked() {
+        LoginSettingsService loginSettingsService = mock(LoginSettingsService.class);
+        UserEntity account = user(true, AuthoritiesConstants.USER);
+        account.setEmail("admin@example.com");
+        account.setEmailVerified(true);
+        when(loginSettingsService.isLoginWithEmailEnabled()).thenReturn(true);
+        when(loginSettingsService.isVerifyEmailEnabled()).thenReturn(true);
+        when(userRepository.findForAuthenticationByIdentifier("admin@example.com"))
+                .thenReturn(Optional.of(account));
+        when(accountLockService.isLocked(any(UserEntity.class), any())).thenReturn(false);
+
+        UserDetails userDetails =
+                new DomainUserDetailsService(
+                                userRepository, accountLockService, loginSettingsService)
+                        .loadUserByUsername("admin@example.com");
+
+        assertThat(userDetails.isEnabled()).isTrue();
+        assertThat(userDetails.isAccountNonLocked()).isTrue();
     }
 
     private DomainUserDetailsService service() {

@@ -257,6 +257,17 @@ public class AdminApiSecurityConfig {
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.USER_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/api/admin/offline-sessions")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.USER_VIEWER,
+                                                AuthoritiesConstants.USER_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.DELETE, "/api/admin/offline-sessions/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.USER_MANAGER)
                                         .requestMatchers("/api/admin/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN))
                 .oauth2ResourceServer(

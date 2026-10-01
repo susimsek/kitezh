@@ -4,8 +4,14 @@ import io.github.susimsek.springauthserversamples.domain.AuthorizationEntity;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationMapper;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
+import io.github.susimsek.springauthserversamples.security.OfflineAccessSettings;
+import io.github.susimsek.springauthserversamples.service.admin.OfflineAccessPolicyService;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
@@ -21,26 +27,56 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationService {
+
+    private static final String OFFLINE_ACCESS_SCOPE = "offline_access";
 
     private final AuthorizationRepository authorizationRepository;
     private final RegisteredClientRepository registeredClientRepository;
     private final AuthorizationMapper authorizationMapper;
     private final AuthorizationServerMapperSupport mapperSupport;
+    private final OfflineAccessPolicyService offlineAccessPolicyService;
+
+    public DomainOAuth2AuthorizationService(
+            AuthorizationRepository authorizationRepository,
+            RegisteredClientRepository registeredClientRepository,
+            AuthorizationMapper authorizationMapper,
+            AuthorizationServerMapperSupport mapperSupport) {
+        this(
+                authorizationRepository,
+                registeredClientRepository,
+                authorizationMapper,
+                mapperSupport,
+                null);
+    }
 
     @Override
     @Transactional
     public void save(OAuth2Authorization authorization) {
         AuthorizationEntity entity = authorizationMapper.toEntity(authorization, mapperSupport);
-        String sessionId = currentSessionId();
-        if (sessionId != null) {
-            entity.setSessionId(sessionId);
+        if (isOfflineAuthorization(authorization)) {
+            // Offline authorizations survive browser logout, just like Keycloak offline
+            // sessions. User/client revocation still removes the persisted authorization.
+            entity.setSessionId(null);
+            Map<String, Object> attributes = new HashMap<>();
+            Map<String, Object> existingAttributes = mapperSupport.readMap(entity.getAttributes());
+            if (existingAttributes != null) {
+                attributes.putAll(existingAttributes);
+            }
+            attributes.putIfAbsent(
+                    OfflineAccessSettings.SESSION_STARTED_AT, Instant.now().toString());
+            entity.setAttributes(mapperSupport.writeMap(attributes));
         } else {
-            authorizationRepository
-                    .findById(authorization.getId())
-                    .map(AuthorizationEntity::getSessionId)
-                    .ifPresent(entity::setSessionId);
+            String sessionId = currentSessionId();
+            if (sessionId != null) {
+                entity.setSessionId(sessionId);
+            } else {
+                authorizationRepository
+                        .findById(authorization.getId())
+                        .map(AuthorizationEntity::getSessionId)
+                        .ifPresent(entity::setSessionId);
+            }
         }
         authorizationRepository.save(entity);
     }
@@ -67,7 +103,26 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
                         ? authorizationRepository.findByToken(token)
                         : findByTokenType(token, tokenType);
 
-        return authorization.map(this::toObject).orElse(null);
+        return authorization.filter(this::isUsable).map(this::toObject).orElse(null);
+    }
+
+    private boolean isUsable(AuthorizationEntity entity) {
+        if (offlineAccessPolicyService == null || !isOfflineAuthorization(entity)) {
+            return true;
+        }
+        Map<String, Object> attributes = mapperSupport.readMap(entity.getAttributes());
+        Object startedAt =
+                attributes == null
+                        ? null
+                        : attributes.get(OfflineAccessSettings.SESSION_STARTED_AT);
+        if (startedAt instanceof String value) {
+            try {
+                return !offlineAccessPolicyService.revoked(Instant.parse(value));
+            } catch (RuntimeException _) {
+                return true;
+            }
+        }
+        return true;
     }
 
     private Optional<AuthorizationEntity> findByTokenType(String token, OAuth2TokenType tokenType) {
@@ -97,6 +152,16 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
                     "Registered client not found: " + entity.getRegisteredClientId());
         }
         return authorizationMapper.toObject(entity, registeredClient, mapperSupport);
+    }
+
+    private static boolean isOfflineAuthorization(OAuth2Authorization authorization) {
+        return authorization.getAuthorizedScopes().contains(OFFLINE_ACCESS_SCOPE);
+    }
+
+    private static boolean isOfflineAuthorization(AuthorizationEntity authorization) {
+        return authorization.getAuthorizedScopes() != null
+                && java.util.Arrays.stream(authorization.getAuthorizedScopes().split(","))
+                        .anyMatch(OFFLINE_ACCESS_SCOPE::equals);
     }
 
     private static String currentSessionId() {

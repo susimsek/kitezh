@@ -254,6 +254,7 @@
       "roles": "Roles",
       "groups": "Groups",
       "sessions": "Sessions",
+      "offlineSessions": "Offline sessions",
       "consents": "Consents",
       "keys": "Keys",
       "events": "Events",
@@ -689,8 +690,26 @@
         "events": "Events",
         "userProfile": "User profile",
         "localization": "Localization",
-        "cibaPolicy": "CIBA policy"
+        "cibaPolicy": "CIBA policy",
+        "offlineAccess": "Offline access"
       }
+    },
+    "offlineAccess": {
+      "title": "Offline access policy",
+      "description": "Control the idle and absolute lifetime of refresh tokens issued with offline access.",
+      "idleTimeout": "Idle timeout",
+      "maxLimited": "Enforce an absolute maximum lifetime",
+      "maxLifespan": "Maximum lifetime",
+      "durationHint": "Use an ISO-8601 duration such as P30D or PT1H.",
+      "save": "Save",
+      "saved": "Offline access policy saved.",
+      "revokeAllTitle": "Revoke all offline tokens",
+      "revokeAllHelp": "Every existing offline session will require a new explicit grant.",
+      "revokeAll": "Revoke all",
+      "revokeAllConfirm": "Revoke every offline access token now?",
+      "revoked": "All offline access tokens were revoked.",
+      "loading": "Loading…",
+      "error": "Offline access policy could not be loaded or saved."
     },
     "clients": {
       "title": "Clients",
@@ -862,7 +881,10 @@
       "back": "Back",
       "cibaDeliveryMode": "CIBA delivery mode",
       "cibaDeliveryModeHelp": "Choose how the client receives the CIBA token response. Ping and push requests provide a fresh callback token per request.",
-      "cibaNotificationEndpoint": "CIBA notification endpoint"
+      "cibaNotificationEndpoint": "CIBA notification endpoint",
+      "offlineSessionIdle": "Offline session idle override",
+      "offlineSessionMax": "Offline session max override",
+      "offlineSessionHelp": "Optional ISO-8601 duration override, such as P30D."
     },
     "common": {
       "yes": "Yes",
@@ -1013,6 +1035,7 @@
       "sessionActions": "Session actions",
       "users": "Users",
       "sessions": "Sessions",
+      "offlineSessions": "Offline sessions",
       "consents": "Consents",
       "keys": "Keys",
       "description": "Manage authorization server resources.",
@@ -1028,6 +1051,11 @@
       "signOutAllConfirm": "Sign out all sessions for this user?",
       "revoke": "Revoke",
       "revokeConfirm": "Revoke this authorization consent?",
+      "offlineSessionsDescription": "Manage refresh-token sessions that remain valid after browser sign-out.",
+      "offlineBadge": "Offline access",
+      "offlineNoExpiry": "No expiry",
+      "offlineRevokeConfirm": "Revoke this offline session?",
+      "offlineRevoked": "Offline session revoked.",
       "username": "Username",
       "email": "Email",
       "emailVerified": "Email verified",
@@ -1548,7 +1576,17 @@
       "revoke": "Revoke access",
       "grantedAt": "Granted at",
       "updatedAt": "Last updated",
-      "revokeConfirm": "Revoke this application's access?"
+      "revokeConfirm": "Revoke this application's access?",
+      "offlineTitle": "Offline sessions",
+      "offlineHelp": "Review refresh-token sessions that remain valid after browser sign-out.",
+      "offlineEmpty": "No offline sessions found.",
+      "offlineIssued": "Issued",
+      "offlineExpires": "Expires",
+      "offlineNoExpiry": "No expiry",
+      "offlineBadge": "Offline access",
+      "offlineRevoke": "Revoke token",
+      "offlineRevokeConfirm": "Revoke this offline session?",
+      "offlineRevoked": "Offline session revoked."
     }
   }
 }

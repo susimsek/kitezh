@@ -654,10 +654,6 @@ public class AdminUserService {
                 user, avatarUrl == null || avatarUrl.isBlank() ? user.getPictureUrl() : avatarUrl);
     }
 
-    private AdminGroupDTO groupView(GroupEntity group) {
-        return groupView(group, userRepository.countByGroupsId(group.getId()));
-    }
-
     private AdminGroupDTO groupView(GroupEntity group, long userCount) {
         return adminGroupMapper.toDTO(group, userCount);
     }

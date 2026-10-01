@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.observation.ObservationRegistry;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,6 +45,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 class LdapDirectoryClientTest {
+
+    @Test
+    void exposesDefaultAndObservationRegistryConstructors() {
+        assertThat(new LdapDirectoryClient()).isNotNull();
+        assertThat(new LdapDirectoryClient(ObservationRegistry.NOOP)).isNotNull();
+    }
 
     @Test
     void rejectsNonLdapConnectionUrlsBeforeOpeningAContext() {
@@ -559,6 +566,28 @@ class LdapDirectoryClientTest {
     }
 
     @Test
+    void searchesOnlyUsersChangedSinceTheRequestedInstant() throws NamingException {
+        LdapContext context = mock(LdapContext.class);
+        NamingEnumeration<SearchResult> searchResults = results(false, null);
+        when(context.search(
+                        anyString(), anyString(), any(Object[].class), any(SearchControls.class)))
+                .thenReturn(searchResults);
+        when(context.getResponseControls()).thenReturn(null);
+        LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
+
+        client.searchUsers(
+                advancedConfiguration("LDAP", "ldap://directory.example.com:389", false),
+                Instant.parse("2026-01-02T03:04:05Z"));
+
+        verify(context)
+                .search(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.contains("modifyTimestamp>=20260102030405Z"),
+                        any(Object[].class),
+                        any(SearchControls.class));
+    }
+
+    @Test
     void rejectsUnsupportedSearchScopes() throws NamingException {
         DirContext context = mock(DirContext.class);
         LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
@@ -643,6 +672,41 @@ class LdapDirectoryClientTest {
     }
 
     @Test
+    void skipsGroupsWhenTheObjectClassIsMissingAndHandlesMissingGroupAttributes()
+            throws NamingException {
+        SearchResult result = mock(SearchResult.class);
+        when(result.getAttributes()).thenReturn(new BasicAttributes(true));
+        @SuppressWarnings("unchecked")
+        NamingEnumeration<SearchResult> searchResults = mock(NamingEnumeration.class);
+        when(searchResults.hasMore()).thenReturn(true, false);
+        when(searchResults.next()).thenReturn(result);
+        DirContext context = mock(DirContext.class);
+        when(context.search(
+                        anyString(), anyString(), any(Object[].class), any(SearchControls.class)))
+                .thenReturn(searchResults);
+        LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
+
+        assertThat(
+                        client.findGroups(
+                                configuration("SUBTREE"),
+                                "uid=alice",
+                                "ou=groups,dc=example,dc=com",
+                                null,
+                                "cn",
+                                "member"))
+                .isEmpty();
+        assertThat(
+                        client.findGroups(
+                                configuration("SUBTREE"),
+                                "uid=alice",
+                                "ou=groups,dc=example,dc=com",
+                                "groupOfNames",
+                                "cn",
+                                "member"))
+                .isEmpty();
+    }
+
+    @Test
     void skipsBlankGroupNamesAndWrapsGroupSearchFailures() throws NamingException {
         SearchResult blankResult = mock(SearchResult.class);
         Attributes blankAttributes = new BasicAttributes(true);
@@ -700,6 +764,21 @@ class LdapDirectoryClientTest {
         client.updateUser(configuration("SUBTREE"), "uid=alice", Map.of());
 
         assertThat(openedContexts).hasValue(0);
+    }
+
+    @Test
+    void removesAnAttributeWhenItsUpdateValueIsNull() throws NamingException {
+        DirContext context = mock(DirContext.class);
+        LdapDirectoryClient client = new LdapDirectoryClient(environment -> context);
+        Map<String, String> changes = new LinkedHashMap<>();
+        changes.put("mail", null);
+
+        client.updateUser(configuration("SUBTREE"), "uid=alice", changes);
+
+        ArgumentCaptor<ModificationItem[]> captor =
+                ArgumentCaptor.forClass(ModificationItem[].class);
+        verify(context).modifyAttributes(eq("uid=alice"), captor.capture());
+        assertThat(captor.getValue()[0].getModificationOp()).isEqualTo(DirContext.REMOVE_ATTRIBUTE);
     }
 
     @Test
@@ -897,6 +976,41 @@ class LdapDirectoryClientTest {
         assertThatThrownBy(() -> client.testConnection(ldapsStartTls))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("StartTLS requires an ldap:// URL");
+    }
+
+    @Test
+    void usesAnEmptyPasswordForAnonymousConfiguredServiceBind() {
+        DirContext context = mock(DirContext.class);
+        List<Hashtable<String, Object>> environments = new ArrayList<>();
+        LdapDirectoryClient client =
+                new LdapDirectoryClient(
+                        environment -> {
+                            environments.add(environment);
+                            return context;
+                        });
+        LdapDirectoryClient.Configuration configuration =
+                new LdapDirectoryClient.Configuration(
+                        "ldap://directory.example.com:389",
+                        "cn=admin,dc=example,dc=com",
+                        null,
+                        "ou=users,dc=example,dc=com",
+                        "uid",
+                        "entryUUID",
+                        "mail",
+                        "givenName",
+                        "sn",
+                        "uid",
+                        "inetOrgPerson",
+                        "SUBTREE");
+
+        client.testConnection(configuration);
+
+        assertThat(environments)
+                .singleElement()
+                .satisfies(
+                        environment ->
+                                assertThat((Map<String, Object>) environment)
+                                        .containsEntry("java.naming.security.credentials", ""));
     }
 
     @Test

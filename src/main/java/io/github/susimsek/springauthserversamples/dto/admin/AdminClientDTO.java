@@ -186,7 +186,19 @@ public record AdminClientDTO(
                         description = "Expected certificate subject DN for tls_client_auth.",
                         nullable = true,
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                String x509CertificateSubjectDN) {
+                String x509CertificateSubjectDN,
+        @Schema(
+                        description = "Client override for offline session idle lifetime.",
+                        format = "duration",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Duration offlineSessionIdle,
+        @Schema(
+                        description = "Client override for offline session maximum lifetime.",
+                        format = "duration",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Duration offlineSessionMax) {
 
     public AdminClientDTO(
             String id,
@@ -236,6 +248,8 @@ public record AdminClientDTO(
                 null,
                 false,
                 false,
+                null,
+                null,
                 null,
                 null,
                 null);

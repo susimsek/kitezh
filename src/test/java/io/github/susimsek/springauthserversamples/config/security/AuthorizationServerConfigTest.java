@@ -413,6 +413,15 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    void acceptsPrivateSigningKeyFromJwkSource() {
+        JWK privateKey = mock(JWK.class);
+        when(privateKey.isPrivate()).thenReturn(true);
+        JwtEncoder encoder = config.jwtEncoder((selector, securityContext) -> List.of(privateKey));
+
+        assertThat(encoder).isNotNull();
+    }
+
+    @Test
     void addsProfilePictureAndAdminRolesToAccessToken() {
         UserEntity user = new UserEntity();
         user.setId(42L);
@@ -492,6 +501,28 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    void omitsClientRolesWhenTheUserHasNoEffectiveClientRoles() {
+        UserEntity user = new UserEntity();
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "orders-api",
+                                Set.of("roles")));
+
+        assertThat(claims.build().getClaims()).doesNotContainKey("resource_access");
+    }
+
+    @Test
     void usesTheDatabaseServiceAccountForClientCredentialsTokens() {
         UserEntity serviceUser = new UserEntity();
         serviceUser.setUsername("service-account-api");
@@ -524,6 +555,38 @@ class AuthorizationServerConfigTest {
                                 Set.of()));
 
         assertThat(claims.build().getSubject()).isEqualTo("service-account-api");
+    }
+
+    @Test
+    void fallsBackToTheAuthenticatedUserWhenClientCredentialsHasNoServiceAccount() {
+        ServiceAccountRepository serviceAccountRepository = mock(ServiceAccountRepository.class);
+        when(serviceAccountRepository.findByClientId("client-id")).thenReturn(Optional.empty());
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        null,
+                        null,
+                        serviceAccountRepository,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContextWithoutAuthorization(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.CLIENT_CREDENTIALS,
+                                "api",
+                                Set.of("roles")));
+
+        assertThat(claims.build().getClaims()).doesNotContainKey("resource_access");
     }
 
     @Test
@@ -611,6 +674,59 @@ class AuthorizationServerConfigTest {
 
         assertThat(claims.build().getClaims())
                 .containsEntry(OidcParameterNames.NONCE, "nonce-value");
+    }
+
+    @Test
+    void skipsNonceWhenAuthorizationRequestIsMissingOrBlank() {
+        RegisteredClient client =
+                RegisteredClient.withId("nonce-client")
+                        .clientId("nonce-client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .build();
+        OAuth2Authorization authorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .id("nonce-authorization")
+                        .principalName("admin")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .build();
+        JwtClaimsSet.Builder missingRequestClaims = JwtClaimsSet.builder().claim("sub", "admin");
+        JwtEncodingContext missingRequest =
+                JwtEncodingContext.with(
+                                JwsHeader.with(SignatureAlgorithm.RS256), missingRequestClaims)
+                        .registeredClient(client)
+                        .authorization(authorization)
+                        .principal(new UsernamePasswordAuthenticationToken("admin", "n/a"))
+                        .authorizedScopes(Set.of("openid"))
+                        .tokenType(new OAuth2TokenType(OidcParameterNames.ID_TOKEN))
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .build();
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(missingRequest);
+
+        assertThat(missingRequestClaims.build().getClaims())
+                .doesNotContainKey(OidcParameterNames.NONCE);
+
+        JwtClaimsSet.Builder blankNonceClaims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                blankNonceClaims,
+                                new OAuth2TokenType(OidcParameterNames.ID_TOKEN),
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "account-console",
+                                Set.of("openid"),
+                                " "));
+
+        assertThat(blankNonceClaims.build().getClaims())
+                .doesNotContainKey(OidcParameterNames.NONCE);
     }
 
     @Test
@@ -1243,6 +1359,211 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    void skipsBlankCibaAcrAndTokenHashesForAccessTokens() {
+        RegisteredClient client =
+                RegisteredClient.withId("ciba-blank-id")
+                        .clientId("ciba-blank-client")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .build();
+        CibaAuthenticationGrantAuthenticationToken grant =
+                new CibaAuthenticationGrantAuthenticationToken(
+                        "auth-req-id",
+                        mock(),
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                "  "));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        JwtEncodingContext.with(JwsHeader.with(SignatureAlgorithm.RS256), claims)
+                                .registeredClient(client)
+                                .principal(
+                                        new UsernamePasswordAuthenticationToken(
+                                                "admin", "n/a", List.of()))
+                                .authorizedScopes(Set.of("openid"))
+                                .tokenType(OAuth2TokenType.ACCESS_TOKEN)
+                                .authorizationGrantType(
+                                        new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                                .authorizationGrant(grant)
+                                .build());
+
+        assertThat(claims.build().getClaims())
+                .containsEntry(
+                        CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_CLAIM, "auth-req-id")
+                .doesNotContainKeys("acr", "at_hash", "urn:openid:params:jwt:claim:rt_hash");
+    }
+
+    @Test
+    void skipsDpopBindingWhenConfidentialRefreshOnlyProofIsConfigured() {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("refresh-only-id")
+                        .clientId("refresh-only-client")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(
+                                                ClientSecuritySettings.DPOP_REFRESH_TOKEN_ONLY,
+                                                true)
+                                        .build())
+                        .build();
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.REFRESH_TOKEN,
+                        proof);
+        context.getClaims().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        assertThat(context.getClaims().build().getClaims()).doesNotContainKey("cnf");
+    }
+
+    @Test
+    void mapsAccessTokenSocialClaims() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        SocialIdentityEntity identity = new SocialIdentityEntity();
+        identity.setMappedClaims("{\"access_token\":{\"tenant\":\"acme\"}}");
+        SocialIdentityRepository socialIdentityRepository = mock(SocialIdentityRepository.class);
+        when(socialIdentityRepository.findAllByUserUsername("admin")).thenReturn(List.of(identity));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        socialIdentityRepository,
+                        new ObjectMapper())
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "account-console",
+                                Set.of("openid")));
+
+        assertThat(claims.build().getClaims()).containsEntry("tenant", "acme");
+    }
+
+    @Test
+    void mapsParentGroupPathAndPartialFullName() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setFirstName("Ada");
+        user.setLastName(" ");
+        GroupEntity parent = new GroupEntity();
+        parent.setName("Platform");
+        GroupEntity child = new GroupEntity();
+        child.setName("Operations");
+        child.setParent(parent);
+        user.setGroups(Set.of(child));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(
+                        List.of(
+                                mapper(
+                                        "groups",
+                                        ProtocolMapperTypes.GROUP_MEMBERSHIP,
+                                        "groups",
+                                        null,
+                                        1),
+                                mapper(
+                                        "full-name",
+                                        ProtocolMapperTypes.FULL_NAME,
+                                        "fullName",
+                                        null,
+                                        2)));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        mapperRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of("openid")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("groups", List.of("/Platform/Operations"))
+                .containsEntry("fullName", "Ada");
+    }
+
+    @Test
+    void keepsApplicationRolesWhenScopeRoleMappingIsUnconfigured() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        user.setAuthorities(Set.of(new AuthorityEntity(1L, "ROLE_USER")));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        ClientScopeEntity scope = new ClientScopeEntity();
+        scope.setName("roles");
+        ClientScopeRepository scopeRepository = mock(ClientScopeRepository.class);
+        when(scopeRepository.findByNameIn(Set.of("roles"))).thenReturn(List.of());
+        when(scopeRepository.findDetailedByNameIn(Set.of("roles"))).thenReturn(List.of(scope));
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(List.of());
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        scopeRepository,
+                        mapperRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of("roles")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("realm_access", Map.of("roles", List.of("ROLE_USER")));
+    }
+
+    @Test
     void acceptsDpopProofForAuthorizationWithoutJktRequirement() {
         Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
         Jwt proof =
@@ -1739,6 +2060,191 @@ class AuthorizationServerConfigTest {
                                 Set.of()));
 
         assertThat(adminClaims.build().getClaims()).containsEntry("roles", List.of());
+    }
+
+    @Test
+    void skipsScopeMappersWhenAuthorizedScopesAreEmptyOrUnmapped() {
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(List.of());
+        ClientScopeRepository scopeRepository = mock(ClientScopeRepository.class);
+        ClientScopeMapperRepository scopeMapperRepository = mock(ClientScopeMapperRepository.class);
+        when(scopeRepository.findByNameIn(Set.of("missing"))).thenReturn(List.of());
+        UserRepository userRepository = mock(UserRepository.class);
+        JwtClaimsSet.Builder emptyScopes = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        scopeRepository,
+                        mapperRepository,
+                        scopeMapperRepository,
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                emptyScopes,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of()));
+
+        JwtClaimsSet.Builder unmappedScope = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        scopeRepository,
+                        mapperRepository,
+                        scopeMapperRepository,
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                unmappedScope,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of("missing")));
+
+        verify(scopeMapperRepository, never())
+                .findAllByClientScopeIdInOrderByPriorityAscNameAsc(ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void bindsDpopProofWhenRefreshRequiresProofAndClientAuthenticationIsPublic() {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("refresh-proof-id")
+                        .clientId("refresh-proof-client")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(
+                                                ClientSecuritySettings.DPOP_REFRESH_TOKEN_ONLY,
+                                                true)
+                                        .setting(ClientSecuritySettings.REQUIRE_DPOP_PROOF, true)
+                                        .build())
+                        .build();
+
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.REFRESH_TOKEN,
+                        proof);
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        assertThat(context.getClaims().build().getClaims()).containsKey("cnf");
+    }
+
+    @Test
+    void rejectsDpopProofWhenAuthorizationRequestDoesNotContainExpectedJkt() {
+        Map<String, Object> jwk = Map.of("kty", "oct", "k", "c2VjcmV0");
+        Jwt proof =
+                new Jwt(
+                        "proof",
+                        Instant.now().minusSeconds(1),
+                        Instant.now().plusSeconds(60),
+                        Map.of("jwk", jwk),
+                        Map.of("htm", "GET"));
+        RegisteredClient client =
+                RegisteredClient.withId("missing-jkt-id")
+                        .clientId("missing-jkt-client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("http://localhost/callback")
+                        .clientSettings(
+                                ClientSettings.builder()
+                                        .setting(ClientSecuritySettings.REQUIRE_DPOP_JKT, true)
+                                        .build())
+                        .build();
+        OAuth2Authorization authorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .id("authorization-id")
+                        .principalName("admin")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .build();
+        JwtEncodingContext context =
+                dpopContext(
+                        client,
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        proof,
+                        authorization);
+        var customizer =
+                config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class));
+
+        assertThatThrownBy(() -> customizer.customize(context))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    @Test
+    void handlesNullGroupAttributesAndNullUserPropertySources() {
+        UserEntity user = new UserEntity();
+        user.setUsername("admin");
+        GroupEntity group = new GroupEntity();
+        group.setName("engineering");
+        group.setAttributes(null);
+        user.setGroups(Set.of(group));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        ClientMapperEntity nullProperty =
+                mapper("null-property", ProtocolMapperTypes.USER_PROPERTY, "nullProperty", null, 1);
+        nullProperty.setSource(null);
+        ClientMapperEntity missingGroupAttribute =
+                mapper(
+                        "missing-group-attribute",
+                        ProtocolMapperTypes.GROUP_ATTRIBUTE,
+                        "missingGroupAttribute",
+                        null,
+                        2);
+        missingGroupAttribute.setSource("department");
+        ClientMapperRepository mapperRepository = mock(ClientMapperRepository.class);
+        when(mapperRepository.findAllByClientIdOrderByPriorityAscNameAsc("client-id"))
+                .thenReturn(List.of(nullProperty, missingGroupAttribute));
+
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        mapperRepository,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "client-id",
+                                Set.of()));
+
+        assertThat(claims.build().getClaims())
+                .doesNotContainKeys("nullProperty", "missingGroupAttribute");
     }
 
     private static JwtEncodingContext jwtContext(

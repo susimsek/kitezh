@@ -4,6 +4,8 @@ import io.github.susimsek.springauthserversamples.domain.AuthorizationEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -73,6 +75,12 @@ public interface AuthorizationRepository extends JpaRepository<AuthorizationEnti
 
     long deleteByPrincipalNameAndRegisteredClientId(
             String principalName, String registeredClientId);
+
+    Page<AuthorizationEntity> findAllBySessionIdIsNullAndRefreshTokenValueIsNotNull(
+            Pageable pageable);
+
+    Page<AuthorizationEntity> findAllByPrincipalNameAndSessionIdIsNullAndRefreshTokenValueIsNotNull(
+            String principalName, Pageable pageable);
 
     interface SessionAuthorizationCount {
         String getSessionId();

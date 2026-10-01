@@ -3,10 +3,11 @@ package io.github.susimsek.springauthserversamples;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 
@@ -17,8 +18,7 @@ class HttpTransportIT {
 
     @LocalServerPort private int port;
 
-    @Value("${app.authorization-server.issuer}")
-    private String configuredIssuer;
+    @Autowired private AuthorizationServerSettings authorizationServerSettings;
 
     @Test
     void liveHttpExposesDiscoveryReadinessAndClientCredentialsLifecycle() {
@@ -30,7 +30,8 @@ class HttpTransportIT {
                         .retrieve()
                         .body(JsonNode.class);
         assertThat(discovery).isNotNull();
-        assertThat(discovery.path("issuer").asText()).isEqualTo(configuredIssuer);
+        assertThat(discovery.path("issuer").asText())
+                .isEqualTo(authorizationServerSettings.getIssuer());
         assertThat(discovery.path("token_endpoint").asText()).endsWith("/oauth2/token");
         assertThat(discovery.path("jwks_uri").asText()).endsWith("/oauth2/jwks");
 

@@ -279,4 +279,60 @@ class DefaultClientScopesClientCredentialsConverterTest {
 
         assertThat(converted).isNull();
     }
+
+    @Test
+    void acceptsAValidDpopProofWhenItsAlgorithmIsAllowed() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .DPOP_SIGNING_ALGORITHMS,
+                                                        Set.of("ES256")))
+                                        .build())
+                        .build();
+        OAuth2ClientAuthenticationToken authentication =
+                mock(OAuth2ClientAuthenticationToken.class);
+        when(authentication.getRegisteredClient()).thenReturn(client);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            HttpServletRequest request = mock(HttpServletRequest.class);
+            when(request.getHeader("DPoP")).thenReturn("eyJhbGciOiJFUzI1NiJ9.e30.c2ln");
+
+            assertThat(new DefaultClientScopesClientCredentialsConverter().convert(request))
+                    .isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void ignoresDpopValidationWithoutARegisteredClient() {
+        OAuth2ClientAuthenticationToken authentication =
+                mock(OAuth2ClientAuthenticationToken.class);
+        when(authentication.getRegisteredClient()).thenReturn(null);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            HttpServletRequest request = mock(HttpServletRequest.class);
+            when(request.getHeader("DPoP")).thenReturn("malformed");
+
+            assertThat(new DefaultClientScopesClientCredentialsConverter().convert(request))
+                    .isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void ignoresMissingDpopProofWhenClientAuthenticationIsNotPresent() {
+        SecurityContextHolder.clearContext();
+
+        assertThat(
+                        new DefaultClientScopesClientCredentialsConverter()
+                                .convert(mock(HttpServletRequest.class)))
+                .isNull();
+    }
 }

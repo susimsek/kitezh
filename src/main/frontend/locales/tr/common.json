@@ -254,6 +254,7 @@
       "roles": "Roller",
       "groups": "Gruplar",
       "sessions": "Oturumlar",
+      "offlineSessions": "Çevrimdışı oturumlar",
       "consents": "İzinler",
       "keys": "Anahtarlar",
       "events": "Olaylar",
@@ -689,8 +690,26 @@
         "events": "Olaylar",
         "userProfile": "Kullanıcı profili",
         "localization": "Yerelleştirme",
-        "cibaPolicy": "CIBA politikası"
+        "cibaPolicy": "CIBA politikası",
+        "offlineAccess": "Çevrimdışı erişim"
       }
+    },
+    "offlineAccess": {
+      "title": "Çevrimdışı erişim politikası",
+      "description": "Çevrimdışı erişim ile verilen refresh token’ların boşta kalma ve azami ömrünü yönetin.",
+      "idleTimeout": "Boşta kalma süresi",
+      "maxLimited": "Mutlak azami ömrü uygula",
+      "maxLifespan": "Azami ömür",
+      "durationHint": "P30D veya PT1H gibi ISO-8601 süresi kullanın.",
+      "save": "Kaydet",
+      "saved": "Çevrimdışı erişim politikası kaydedildi.",
+      "revokeAllTitle": "Tüm çevrimdışı belirteçleri iptal et",
+      "revokeAllHelp": "Mevcut tüm çevrimdışı oturumlar yeni bir açık izin gerektirir.",
+      "revokeAll": "Tümünü iptal et",
+      "revokeAllConfirm": "Tüm çevrimdışı erişim belirteçleri şimdi iptal edilsin mi?",
+      "revoked": "Tüm çevrimdışı erişim belirteçleri iptal edildi.",
+      "loading": "Yükleniyor…",
+      "error": "Çevrimdışı erişim politikası yüklenemedi veya kaydedilemedi."
     },
     "clients": {
       "title": "İstemciler",
@@ -862,7 +881,10 @@
       "back": "Geri",
       "cibaDeliveryMode": "CIBA teslim yöntemi",
       "cibaDeliveryModeHelp": "İstemcinin CIBA token yanıtını nasıl alacağını seçin. Ping ve push istekleri her istekte yeni bir callback tokenı gönderir.",
-      "cibaNotificationEndpoint": "CIBA bildirim endpoint’i"
+      "cibaNotificationEndpoint": "CIBA bildirim endpoint’i",
+      "offlineSessionIdle": "Çevrimdışı oturum boşta kalma override’ı",
+      "offlineSessionMax": "Çevrimdışı oturum azami ömür override’ı",
+      "offlineSessionHelp": "P30D gibi isteğe bağlı ISO-8601 süresi kullanın."
     },
     "common": {
       "yes": "Evet",
@@ -1013,6 +1035,7 @@
       "sessionActions": "Oturum işlemleri",
       "users": "Kullanıcılar",
       "sessions": "Oturumlar",
+      "offlineSessions": "Çevrimdışı oturumlar",
       "consents": "İzinler",
       "keys": "Anahtarlar",
       "description": "Authorization Server kaynaklarını yönetin.",
@@ -1028,6 +1051,11 @@
       "signOutAllConfirm": "Bu kullanıcının tüm oturumları kapatılsın mı?",
       "revoke": "İptal et",
       "revokeConfirm": "Bu yetkilendirme izni iptal edilsin mi?",
+      "offlineSessionsDescription": "Tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
+      "offlineBadge": "Çevrimdışı erişim",
+      "offlineNoExpiry": "Süresiz",
+      "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?",
+      "offlineRevoked": "Çevrimdışı oturum iptal edildi.",
       "username": "Kullanıcı adı",
       "email": "E-posta",
       "emailVerified": "E-posta doğrulandı",
@@ -1152,7 +1180,11 @@
       "no": "Hayır",
       "passkeyDeleteConfirm": "Bu kullanıcının geçiş anahtarı kaldırılsın mı? Bu anahtarla artık giriş yapamaz.",
       "save": "Kaydet",
-      "loading": "Yükleniyor…"
+      "loading": "Yükleniyor…",
+      "offlineSessionsDescription": "Kullanıcıların tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
+      "offlineBadge": "Çevrimdışı erişim",
+      "offlineNoExpiry": "Süresiz",
+      "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?"
     },
     "placeholder": "Bu yönetim bölümü sonraki geliştirme adımı için hazır.",
     "clientScopes": {
@@ -1548,7 +1580,17 @@
       "revoke": "Erişimi iptal et",
       "grantedAt": "İzin zamanı",
       "updatedAt": "Son güncelleme",
-      "revokeConfirm": "Bu uygulamanın erişimi iptal edilsin mi?"
+      "revokeConfirm": "Bu uygulamanın erişimi iptal edilsin mi?",
+      "offlineTitle": "Çevrimdışı oturumlar",
+      "offlineHelp": "Tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını inceleyin.",
+      "offlineEmpty": "Çevrimdışı oturum bulunamadı.",
+      "offlineIssued": "Verilme",
+      "offlineExpires": "Bitiş",
+      "offlineNoExpiry": "Süresiz",
+      "offlineBadge": "Çevrimdışı erişim",
+      "offlineRevoke": "Belirteci iptal et",
+      "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?",
+      "offlineRevoked": "Çevrimdışı oturum iptal edildi."
     }
   }
 }

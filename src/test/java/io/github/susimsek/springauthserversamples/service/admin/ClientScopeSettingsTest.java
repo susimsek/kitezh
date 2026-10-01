@@ -45,6 +45,20 @@ class ClientScopeSettingsTest {
     }
 
     @Test
+    void doesNotGrantOfflineAccessAsAnImplicitDefaultScope() {
+        RegisteredClient client =
+                RegisteredClient.withId("id")
+                        .clientId("client")
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri("https://client.example/callback")
+                        .scope("openid")
+                        .scope("offline_access")
+                        .build();
+
+        assertThat(ClientScopeSettings.defaultScopes(client)).containsExactly("openid");
+    }
+
+    @Test
     void ignoresBlankAndUnsupportedSettingsAndWritesSortedValues() {
         ClientSettings settings =
                 ClientSettings.withSettings(

@@ -49,6 +49,7 @@ export function AdminShell({ locale, dictionary, children }: Props) {
       access?.queryGroups || access?.viewGroups || access?.viewUsers,
     ],
     ["/sessions", dictionary.admin.nav.sessions, "laptop", access?.viewSessions],
+    ["/offline-sessions", dictionary.admin.nav.offlineSessions, "clock", access?.viewConsents],
     ["/consents", dictionary.admin.nav.consents, "shieldHalved", access?.viewConsents],
     ["/keys", dictionary.admin.nav.keys, "key", access?.viewKeys],
     ["/events", dictionary.admin.nav.events, "clockRotateLeft", access?.viewEvents],

@@ -78,6 +78,22 @@ class AdminGroupServiceTest {
     }
 
     @Test
+    void groupQueryRolesBypassScopedFiltering() {
+        Pageable pageable = Pageable.ofSize(20);
+        when(groupRepository.findByNameContainingIgnoreCase("", pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+        UserEntity operator = user(3L, "operator");
+        when(userRepository.findByUsername("operator")).thenReturn(Optional.of(operator));
+
+        for (String roleName :
+                List.of("ROLE_GROUP_QUERY", "ROLE_GROUP_MANAGER", "ROLE_USER_MANAGER")) {
+            operator.setAuthorities(Set.of(authority(roleName)));
+
+            assertThat(serviceWithPermissions().findAll("", pageable, "operator")).isEmpty();
+        }
+    }
+
+    @Test
     void findsGroupByIdAndMapsItsMemberCount() {
         GroupEntity finance = group(7L, "finance");
         when(groupRepository.findById(7L)).thenReturn(Optional.of(finance));
@@ -140,8 +156,10 @@ class AdminGroupServiceTest {
     @Test
     void updatesGroupAndInvalidatesMembersInItsTree() {
         GroupEntity group = group(7L, "finance");
+        GroupEntity newParent = group(8L, "parent");
         UserEntity alice = user(3L, "alice");
         when(groupRepository.findById(7L)).thenReturn(Optional.of(group));
+        when(groupRepository.findById(8L)).thenReturn(Optional.of(newParent));
         when(groupRepository.existsByName("operations")).thenReturn(false);
         when(userRepository.findAllByGroupsId(7L)).thenReturn(List.of(alice));
         when(groupRepository.findByParentId(7L)).thenReturn(List.of());
@@ -152,7 +170,7 @@ class AdminGroupServiceTest {
                         .update(
                                 7L,
                                 new AdminGroupRequestDTO(
-                                        "operations", null, java.util.Map.of(), false));
+                                        "operations", 8L, java.util.Map.of(), false));
 
         assertThat(result.name()).isEqualTo("operations");
         verify(userAccessInvalidationService).invalidate("alice");
@@ -272,6 +290,28 @@ class AdminGroupServiceTest {
         var result = serviceWithPermissions().findAll("", Pageable.ofSize(20), "operator");
 
         assertThat(result.getContent()).extracting("name").containsExactly("finance", "operations");
+        assertThat(
+                        serviceWithPermissions()
+                                .findAll("finance", Pageable.ofSize(20), "operator")
+                                .getContent())
+                .extracting("name")
+                .containsExactly("finance");
+    }
+
+    @Test
+    void ignoresCyclicParentPathsAndNonMatchingScopedGroups() {
+        GroupEntity first = group(7L, "finance");
+        GroupEntity second = group(8L, "operations");
+        first.setParent(second);
+        second.setParent(first);
+        UserEntity operator = user(3L, "operator");
+        when(userRepository.findByUsername("operator")).thenReturn(Optional.of(operator));
+        when(groupPermissionRepository.findGroupIdsByUserIdAndPermissions(3L, GroupPermission.ALL))
+                .thenReturn(Set.of(99L));
+        when(groupRepository.findAll()).thenReturn(List.of(first, second));
+
+        assertThat(serviceWithPermissions().findAll("missing", Pageable.ofSize(20), "operator"))
+                .isEmpty();
     }
 
     @Test

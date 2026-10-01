@@ -241,6 +241,93 @@ class AdminClientConfigurationValidatorTest {
     }
 
     @Test
+    void validatesPrivateKeyAndTlsAuthenticationSettings() {
+        ConstraintContextFixture privateKeyContext = new ConstraintContextFixture();
+        AdminClientRequestDTO privateKeyRequest =
+                request(
+                        Set.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue()),
+                        Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()),
+                        Set.of(),
+                        false);
+        assertThat(validator.isValid(privateKeyRequest, privateKeyContext.context)).isFalse();
+
+        ConstraintContextFixture validPrivateKeyContext = new ConstraintContextFixture();
+        AdminClientRequestDTO validPrivateKeyRequest =
+                new AdminClientRequestDTO(
+                        "client",
+                        "Client",
+                        Set.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue()),
+                        Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()),
+                        Set.of(),
+                        Set.of(),
+                        Set.of("openid"),
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        Set.of("RS256"),
+                        null,
+                        null,
+                        null,
+                        Duration.ofMinutes(5),
+                        Duration.ofMinutes(5),
+                        Duration.ofHours(1),
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "https://example.test/jwks",
+                        "RS256",
+                        null,
+                        null);
+        assertThat(validator.isValid(validPrivateKeyRequest, validPrivateKeyContext.context))
+                .isTrue();
+
+        ConstraintContextFixture tlsContext = new ConstraintContextFixture();
+        AdminClientRequestDTO tlsRequest =
+                new AdminClientRequestDTO(
+                        "client",
+                        "Client",
+                        Set.of(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue()),
+                        Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()),
+                        Set.of(),
+                        Set.of(),
+                        Set.of("openid"),
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        Set.of("RS256"),
+                        null,
+                        null,
+                        null,
+                        Duration.ofMinutes(5),
+                        Duration.ofMinutes(5),
+                        Duration.ofHours(1),
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+        assertThat(validator.isValid(tlsRequest, tlsContext.context)).isFalse();
+    }
+
+    @Test
     void reportsEveryApplicableViolation() {
         ConstraintContextFixture context = new ConstraintContextFixture();
 
