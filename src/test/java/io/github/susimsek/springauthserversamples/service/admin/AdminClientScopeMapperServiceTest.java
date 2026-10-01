@@ -117,6 +117,51 @@ class AdminClientScopeMapperServiceTest {
     }
 
     @Test
+    void handlesBlankSearchAndDuplicateUpdates() {
+        ClientScopeEntity scope = scope();
+        ClientScopeMapperEntity mapper = mapper(scope, 4L);
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(clientScopeRepository.findById("scope-1")).thenReturn(Optional.of(scope));
+        when(mapperRepository.findByClientScopeIdAndNameContainingIgnoreCase(
+                        "scope-1", "", pageable))
+                .thenReturn(new PageImpl<>(java.util.List.of(), pageable, 0));
+        when(mapperRepository.findById(4L)).thenReturn(Optional.of(mapper));
+        when(mapperRepository.existsByClientScopeIdAndNameIgnoreCaseAndIdNot(
+                        "scope-1", "email", 4L))
+                .thenReturn(true);
+
+        AdminClientScopeMapperService service = service();
+        assertThat(service.findAll("scope-1", null, pageable).getContent()).isEmpty();
+        AdminClientMapperRequestDTO duplicateRequest =
+                new AdminClientMapperRequestDTO(
+                        "email", "user-property", "email", "email", true, true, null, 1);
+        assertThatThrownBy(() -> service.update("scope-1", 4L, duplicateRequest))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Client mapper name is already registered");
+    }
+
+    @Test
+    void rejectsMapperFromAnotherScopeAndMissingScope() {
+        ClientScopeEntity scope = scope();
+        ClientScopeEntity otherScope = new ClientScopeEntity();
+        otherScope.setId("other-scope");
+        ClientScopeMapperEntity mapper = mapper(otherScope, 4L);
+        when(clientScopeRepository.findById("scope-1")).thenReturn(Optional.of(scope));
+        when(mapperRepository.findById(4L)).thenReturn(Optional.of(mapper));
+        AdminClientScopeMapperService service = service();
+
+        assertThatThrownBy(() -> service.delete("scope-1", 4L))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Client scope mapper not found");
+
+        when(clientScopeRepository.findById("missing")).thenReturn(Optional.empty());
+        var missingScopePage = PageRequest.of(0, 20);
+        assertThatThrownBy(() -> service.findAll("missing", "", missingScopePage))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Client scope not found");
+    }
+
+    @Test
     void rejectsInvalidScopeMapperRequests() {
         when(clientScopeRepository.findById("scope-1")).thenReturn(Optional.of(scope()));
         AdminClientScopeMapperService service = service();
@@ -125,6 +170,12 @@ class AdminClientScopeMapperServiceTest {
         AdminClientMapperRequestDTO missingSource =
                 new AdminClientMapperRequestDTO(
                         "x", "user-attribute", "", "claim", true, false, "x", 1);
+        AdminClientMapperRequestDTO missingValue =
+                new AdminClientMapperRequestDTO(
+                        "x", "hardcoded-claim", null, "claim", true, false, null, 1);
+        AdminClientMapperRequestDTO missingClaim =
+                new AdminClientMapperRequestDTO(
+                        "x", "user-property", "username", " ", true, false, null, 1);
 
         assertThatThrownBy(() -> service.create("scope-1", null))
                 .isInstanceOf(ApiException.class)
@@ -135,6 +186,12 @@ class AdminClientScopeMapperServiceTest {
         assertThatThrownBy(() -> service.create("scope-1", missingSource))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A source is required for this mapper type");
+        assertThatThrownBy(() -> service.create("scope-1", missingValue))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A value is required for this mapper type");
+        assertThatThrownBy(() -> service.create("scope-1", missingClaim))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A claim name is required");
     }
 
     private AdminClientScopeMapperService service() {

@@ -15,6 +15,7 @@ import io.github.susimsek.springauthserversamples.domain.LocalizationMessageOver
 import io.github.susimsek.springauthserversamples.domain.LocalizationSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.OAuth2KeyEntity;
+import io.github.susimsek.springauthserversamples.domain.OfflineAccessPolicyEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialProviderEntity;
@@ -177,6 +178,7 @@ class CacheConfigTest {
                                 LocalizationSettingsRepository.LOCALIZATION_SETTINGS_BY_ID_CACHE))
                 .isNotNull();
         assertThat(cacheManager.getCache(OAuth2KeyEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OfflineAccessPolicyEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(RegisteredClientEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(RequiredActionDefinitionEntity.class.getName()))
                 .isNotNull();

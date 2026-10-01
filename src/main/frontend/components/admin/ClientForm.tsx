@@ -28,6 +28,8 @@ type Detail = AdminClient & {
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
+  offlineSessionIdle: string;
+  offlineSessionMax: string;
 };
 
 type ClientScopeOption = {
@@ -64,6 +66,8 @@ type FormState = {
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
+  offlineSessionIdle: string;
+  offlineSessionMax: string;
   jwkSetUrl: string;
   tokenEndpointAuthenticationSigningAlgorithm: string;
   x509CertificateSubjectDN: string;
@@ -97,6 +101,8 @@ const EMPTY: FormState = {
   authorizationCodeTimeToLive: "PT5M",
   accessTokenTimeToLive: "PT5M",
   refreshTokenTimeToLive: "PT1H",
+  offlineSessionIdle: "",
+  offlineSessionMax: "",
   jwkSetUrl: "",
   tokenEndpointAuthenticationSigningAlgorithm: "RS256",
   x509CertificateSubjectDN: "",
@@ -173,6 +179,8 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
       authorizationCodeTimeToLive: z.string(),
       accessTokenTimeToLive: z.string(),
       refreshTokenTimeToLive: z.string(),
+      offlineSessionIdle: z.string(),
+      offlineSessionMax: z.string(),
       jwkSetUrl: z.string().refine((value) => !value || isValidAbsoluteUri(value), validation.uri),
       tokenEndpointAuthenticationSigningAlgorithm: z.string(),
       x509CertificateSubjectDN: z.string().max(500),
@@ -393,6 +401,8 @@ export function ClientForm({
           authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "PT5M",
           accessTokenTimeToLive: client.accessTokenTimeToLive ?? "PT5M",
           refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "PT1H",
+          offlineSessionIdle: client.offlineSessionIdle ?? "",
+          offlineSessionMax: client.offlineSessionMax ?? "",
           jwkSetUrl: client.jwkSetUrl ?? "",
           tokenEndpointAuthenticationSigningAlgorithm:
             client.tokenEndpointAuthenticationSigningAlgorithm ?? "RS256",
@@ -442,6 +452,8 @@ export function ClientForm({
       postLogoutRedirectUris: lines(values.postLogoutRedirectUris),
       webOrigins: lines(values.webOrigins),
       scopes: words(values.scopes),
+      offlineSessionIdle: values.offlineSessionIdle.trim() || null,
+      offlineSessionMax: values.offlineSessionMax.trim() || null,
     };
 
     const url =
@@ -910,6 +922,32 @@ export function ClientForm({
                   </Col>
                 </>
               )}
+              <Col md={6}>
+                <Form.Label>{dictionary.admin.clients.offlineSessionIdle}</Form.Label>
+                <Form.Control
+                  disabled={!canManageClients}
+                  placeholder="P30D"
+                  isInvalid={Boolean(errors.offlineSessionIdle)}
+                  {...register("offlineSessionIdle")}
+                />
+                <Form.Control.Feedback type="invalid">
+                  {errors.offlineSessionIdle?.message}
+                </Form.Control.Feedback>
+                <Form.Text>{dictionary.admin.clients.offlineSessionHelp}</Form.Text>
+              </Col>
+              <Col md={6}>
+                <Form.Label>{dictionary.admin.clients.offlineSessionMax}</Form.Label>
+                <Form.Control
+                  disabled={!canManageClients}
+                  placeholder="P180D"
+                  isInvalid={Boolean(errors.offlineSessionMax)}
+                  {...register("offlineSessionMax")}
+                />
+                <Form.Control.Feedback type="invalid">
+                  {errors.offlineSessionMax?.message}
+                </Form.Control.Feedback>
+                <Form.Text>{dictionary.admin.clients.offlineSessionHelp}</Form.Text>
+              </Col>
             </Row>
           </Card.Body>
         </Card>

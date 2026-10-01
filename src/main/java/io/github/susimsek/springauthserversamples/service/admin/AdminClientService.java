@@ -16,6 +16,7 @@ import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepos
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
+import io.github.susimsek.springauthserversamples.security.OfflineAccessSettings;
 import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.net.URI;
@@ -499,6 +500,18 @@ public class AdminClientService {
         validatePositiveDuration(
                 "refreshTokenTimeToLive", "refresh token TTL", request.refreshTokenTimeToLive());
         validatePositiveDuration(
+                "offlineSessionIdle", "offline session idle", request.offlineSessionIdle());
+        validatePositiveDuration(
+                "offlineSessionMax", "offline session max", request.offlineSessionMax());
+        if (request.offlineSessionIdle() != null
+                && request.offlineSessionMax() != null
+                && request.offlineSessionMax().compareTo(request.offlineSessionIdle()) < 0) {
+            throw ApiException.badRequest(
+                    "offlineSessionMax",
+                    ApiErrorCode.CLIENT_INVALID_REQUEST,
+                    "Offline session max must be greater than or equal to idle timeout");
+        }
+        validatePositiveDuration(
                 "clientSecretTimeToLive", "client secret TTL", request.clientSecretTimeToLive());
         validatePositiveDuration(
                 "clientSecretGracePeriod",
@@ -735,10 +748,25 @@ public class AdminClientService {
                                 ? null
                                 : existing.getTokenSettings().getRefreshTokenTimeToLive());
 
-        return builder.authorizationCodeTimeToLive(authorizationCodeTtl)
+        Map<String, Object> settings = new HashMap<>(builder.build().getSettings());
+        applyOptionalOfflineSetting(
+                settings, OfflineAccessSettings.OFFLINE_SESSION_IDLE, request.offlineSessionIdle());
+        applyOptionalOfflineSetting(
+                settings, OfflineAccessSettings.OFFLINE_SESSION_MAX, request.offlineSessionMax());
+        return TokenSettings.withSettings(settings)
+                .authorizationCodeTimeToLive(authorizationCodeTtl)
                 .accessTokenTimeToLive(accessTokenTtl)
                 .refreshTokenTimeToLive(refreshTokenTtl)
                 .build();
+    }
+
+    private static void applyOptionalOfflineSetting(
+            Map<String, Object> settings, String key, Duration value) {
+        if (value == null) {
+            settings.remove(key);
+        } else {
+            settings.put(key, value.toString());
+        }
     }
 
     private static Duration resolveTtl(

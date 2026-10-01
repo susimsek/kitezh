@@ -223,7 +223,21 @@ public record AdminClientRequestDTO(
                         format = "duration",
                         nullable = true,
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                Duration clientSecretGracePeriod) {
+                Duration clientSecretGracePeriod,
+        @PositiveDuration
+                @Schema(
+                        description = "Client override for offline session idle lifetime.",
+                        format = "duration",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Duration offlineSessionIdle,
+        @PositiveDuration
+                @Schema(
+                        description = "Client override for offline session maximum lifetime.",
+                        format = "duration",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Duration offlineSessionMax) {
 
     public AdminClientRequestDTO(
             String clientId,
@@ -276,6 +290,8 @@ public record AdminClientRequestDTO(
                 null,
                 null,
                 null,
+                null,
+                null,
                 null);
     }
 
@@ -310,6 +326,76 @@ public record AdminClientRequestDTO(
                 accessTokenTimeToLive,
                 refreshTokenTimeToLive,
                 false,
+                null);
+    }
+
+    public AdminClientRequestDTO(
+            String clientId,
+            String clientName,
+            Set<String> clientAuthenticationMethods,
+            Set<String> authorizationGrantTypes,
+            Set<String> redirectUris,
+            Set<String> postLogoutRedirectUris,
+            Set<String> scopes,
+            boolean requireAuthorizationConsent,
+            boolean requireProofKey,
+            boolean requireDpop,
+            boolean requireDpopJkt,
+            boolean dpopRefreshTokenOnly,
+            Set<String> dpopSigningAlgorithms,
+            String cibaDeliveryMode,
+            String cibaNotificationEndpoint,
+            String cibaClientNotificationToken,
+            Duration authorizationCodeTimeToLive,
+            Duration accessTokenTimeToLive,
+            Duration refreshTokenTimeToLive,
+            boolean serviceAccountEnabled,
+            Duration clientSecretTimeToLive,
+            Boolean enabled,
+            String rootUrl,
+            String homeUrl,
+            Set<String> webOrigins,
+            String adminUrl,
+            Boolean frontChannelLogout,
+            Boolean backchannelLogout,
+            String jwkSetUrl,
+            String tokenEndpointAuthenticationSigningAlgorithm,
+            String x509CertificateSubjectDN,
+            Duration clientSecretGracePeriod) {
+        this(
+                clientId,
+                clientName,
+                clientAuthenticationMethods,
+                authorizationGrantTypes,
+                redirectUris,
+                postLogoutRedirectUris,
+                scopes,
+                requireAuthorizationConsent,
+                requireProofKey,
+                requireDpop,
+                requireDpopJkt,
+                dpopRefreshTokenOnly,
+                dpopSigningAlgorithms,
+                cibaDeliveryMode,
+                cibaNotificationEndpoint,
+                cibaClientNotificationToken,
+                authorizationCodeTimeToLive,
+                accessTokenTimeToLive,
+                refreshTokenTimeToLive,
+                serviceAccountEnabled,
+                clientSecretTimeToLive,
+                enabled,
+                rootUrl,
+                homeUrl,
+                webOrigins,
+                adminUrl,
+                frontChannelLogout,
+                backchannelLogout,
+                jwkSetUrl,
+                tokenEndpointAuthenticationSigningAlgorithm,
+                x509CertificateSubjectDN,
+                clientSecretGracePeriod,
+                null,
                 null);
     }
 }

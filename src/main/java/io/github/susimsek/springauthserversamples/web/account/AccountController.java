@@ -4,6 +4,7 @@ import io.github.susimsek.springauthserversamples.config.openapi.OpenApiConfig;
 import io.github.susimsek.springauthserversamples.dto.account.AccountApplicationDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountAvatarDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountDeleteRequestDTO;
+import io.github.susimsek.springauthserversamples.dto.account.AccountOfflineSessionDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountPasswordRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountProfileDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountProfileRequestDTO;
@@ -421,6 +422,33 @@ public class AccountController {
                     @PathVariable
                     String clientId) {
         accountApplicationService.revokeApplication(authentication.getName(), clientId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/offline-sessions")
+    @Operation(
+            summary = "List offline sessions",
+            description =
+                    "Returns offline refresh-token sessions owned by the authenticated account.")
+    @ApiResponse(responseCode = "200", description = "Paged offline sessions returned.")
+    Page<AccountOfflineSessionDTO> offlineSessions(
+            Authentication authentication,
+            @PageableDefault(
+                            size = 20,
+                            sort = "refreshTokenIssuedAt",
+                            direction = org.springframework.data.domain.Sort.Direction.DESC)
+                    Pageable pageable) {
+        return accountApplicationService.offlineSessions(authentication.getName(), pageable);
+    }
+
+    @DeleteMapping("/offline-sessions/{id}")
+    @Operation(
+            summary = "Revoke offline session",
+            description = "Revokes one offline refresh-token session.")
+    @ApiResponse(responseCode = "204", description = "Offline session revoked.")
+    ResponseEntity<Void> revokeOfflineSession(
+            Authentication authentication, @PathVariable String id) {
+        accountApplicationService.revokeOfflineSession(authentication.getName(), id);
         return ResponseEntity.noContent().build();
     }
 }

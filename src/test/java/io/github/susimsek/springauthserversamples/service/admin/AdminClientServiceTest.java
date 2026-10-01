@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
@@ -23,6 +25,7 @@ import io.github.susimsek.springauthserversamples.repository.ServiceAccountRepos
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthorizationGrantTypes;
 import io.github.susimsek.springauthserversamples.security.ClientSecuritySettings;
+import io.github.susimsek.springauthserversamples.security.OfflineAccessSettings;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.time.Duration;
 import java.util.List;
@@ -107,6 +110,21 @@ class AdminClientServiceTest {
     }
 
     @Test
+    void deletesClientWithoutAnExistingServiceAccount() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient client = registeredClient("client-id", "sample-client");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
+        when(serviceAccountRepository.findByClientId("client-id")).thenReturn(Optional.empty());
+
+        serviceWithAccounts().delete("client-id");
+
+        verify(clientRepository).deleteById("client-id");
+        verify(serviceAccountRepository).findByClientId("client-id");
+        verify(userRepository, never()).delete(any(UserEntity.class));
+    }
+
+    @Test
     void findAllNormalizesQueryAndMapsResults() {
         RegisteredClientEntity entity = new RegisteredClientEntity();
         RegisteredClient client = registeredClient("client-id", "query-client");
@@ -144,10 +162,73 @@ class AdminClientServiceTest {
     }
 
     @Test
+    void handlesEmptyClientPagesAndClientsWithoutServiceAccounts() {
+        when(clientRepository.findByClientIdContainingIgnoreCaseOrClientNameContainingIgnoreCase(
+                        "", "", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThat(serviceWithAccounts().findAll(null, Pageable.unpaged())).isEmpty();
+        verifyNoInteractions(serviceAccountRepository);
+
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        entity.setId("client-id");
+        RegisteredClient client = registeredClient("client-id", "query-client");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
+        when(serviceAccountRepository.findByClientId("client-id")).thenReturn(Optional.empty());
+
+        AdminClientDTO result = serviceWithAccounts().findById("client-id");
+
+        assertThat(result.serviceAccountEnabled()).isFalse();
+        assertThat(result.serviceAccountUsername()).isNull();
+    }
+
+    @Test
+    void findsClientsWithMissingServiceAccountEntries() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        entity.setId("client-id");
+        RegisteredClient client = registeredClient("client-id", "query-client");
+        when(clientRepository.findByClientIdContainingIgnoreCaseOrClientNameContainingIgnoreCase(
+                        "", "", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(entity)));
+        when(serviceAccountRepository.findAllByClientIdIn(List.of("client-id")))
+                .thenReturn(List.of());
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
+
+        AdminClientDTO result =
+                serviceWithAccounts().findAll(null, Pageable.unpaged()).getContent().getFirst();
+
+        assertThat(result.serviceAccountEnabled()).isFalse();
+        assertThat(result.serviceAccountUsername()).isNull();
+    }
+
+    @Test
     void findByIdReturnsNullWhenClientMissing() {
         when(clientRepository.findById("missing")).thenReturn(Optional.empty());
 
         assertThat(service().findById("missing")).isNull();
+    }
+
+    @Test
+    void createsClientWithPostLogoutUriAndSecretPostAuthentication() {
+        wireSaveMapper();
+        when(clientRepository.existsByClientId("id")).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+
+        service().create(requestWithPostLogout("https://example.test/logout"));
+        service()
+                .create(
+                        advancedRequest(
+                                Set.of("client_secret_post"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false));
+
+        verify(passwordEncoder, atLeastOnce()).encode(any());
     }
 
     @Test
@@ -286,6 +367,20 @@ class AdminClientServiceTest {
                                         .getSetting(ClientSecuritySettings.PREVIOUS_SECRET))
                 .isEqualTo("old-encoded-secret");
 
+        RegisteredClient withZeroGrace =
+                RegisteredClient.from(withNumericGrace)
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .SECRET_GRACE_PERIOD_SECONDS,
+                                                        0L))
+                                        .build())
+                        .build();
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(withZeroGrace);
+        service().regenerateSecret("client-id");
+
         RegisteredClient withInvalidGrace =
                 RegisteredClient.from(withNumericGrace)
                         .clientSettings(
@@ -298,6 +393,27 @@ class AdminClientServiceTest {
                                         .build())
                         .build();
         when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(withInvalidGrace);
+        service().regenerateSecret("client-id");
+        assertThat(
+                        (Object)
+                                savedClient
+                                        .get()
+                                        .getClientSettings()
+                                        .getSetting(ClientSecuritySettings.PREVIOUS_SECRET))
+                .isEqualTo("old-encoded-secret");
+
+        RegisteredClient withStringGrace =
+                RegisteredClient.from(withNumericGrace)
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .SECRET_GRACE_PERIOD_SECONDS,
+                                                        "7200"))
+                                        .build())
+                        .build();
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(withStringGrace);
         service().regenerateSecret("client-id");
         assertThat(
                         (Object)
@@ -736,6 +852,20 @@ class AdminClientServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A signing algorithm is required for private_key_jwt");
 
+        wireSaveMapper();
+        when(clientRepository.existsByClientId("advanced-client")).thenReturn(false);
+        service()
+                .create(
+                        advancedRequest(
+                                Set.of("private_key_jwt"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                "https://example.test/jwks",
+                                "UNKNOWN",
+                                null,
+                                null,
+                                false));
+
         assertThatThrownBy(
                         () ->
                                 service()
@@ -833,6 +963,239 @@ class AdminClientServiceTest {
                                                         .ConfigurationSettingNames.Client
                                                         .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM))
                 .isEqualTo(org.springframework.security.oauth2.jose.jws.SignatureAlgorithm.RS256);
+    }
+
+    @Test
+    void createsPrivateKeyJwtClientAndStoresOfflineSettings() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        when(clientRepository.existsByClientId("advanced-client")).thenReturn(false);
+
+        service()
+                .create(
+                        advancedRequest(
+                                Set.of("private_key_jwt"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                "https://example.test/jwks",
+                                "RS256",
+                                null,
+                                null,
+                                false));
+
+        RegisteredClient saved = savedClient.get();
+        assertThat(saved.getClientSecret()).isNull();
+        assertThat((Object) saved.getClientSettings().getSetting("settings.client.jwk-set-url"))
+                .isEqualTo("https://example.test/jwks");
+    }
+
+    @Test
+    void createsTlsClientWithCertificateSubject() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        when(clientRepository.existsByClientId("advanced-client")).thenReturn(false);
+
+        service()
+                .create(
+                        advancedRequest(
+                                Set.of("tls_client_auth"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                "CN=client",
+                                null,
+                                false));
+
+        assertThat(
+                        (Object)
+                                savedClient
+                                        .get()
+                                        .getClientSettings()
+                                        .getSetting(
+                                                org.springframework.security.oauth2.server
+                                                        .authorization.settings
+                                                        .ConfigurationSettingNames.Client
+                                                        .X509_CERTIFICATE_SUBJECT_DN))
+                .isEqualTo("CN=client");
+        assertThat(savedClient.get().getClientSecret()).isNull();
+    }
+
+    @Test
+    void removesOptionalClientSettingsWhenUpdateReceivesBlankValues() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient existing =
+                RegisteredClient.from(registeredClient("client-id", "service-client"))
+                        .clientSecret("encoded-secret")
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.ROOT_URL,
+                                                        "https://old.example",
+                                                        ClientSecuritySettings.HOME_URL,
+                                                        "https://old.example/home",
+                                                        ClientSecuritySettings.ADMIN_URL,
+                                                        "https://old.example/admin",
+                                                        ClientSecuritySettings.WEB_ORIGINS,
+                                                        Set.of("https://old.example"),
+                                                        ClientSecuritySettings
+                                                                .SECRET_GRACE_PERIOD_SECONDS,
+                                                        3600L,
+                                                        org.springframework.security.oauth2.server
+                                                                .authorization.settings
+                                                                .ConfigurationSettingNames.Client
+                                                                .JWK_SET_URL,
+                                                        "https://old.example/jwks",
+                                                        org.springframework.security.oauth2.server
+                                                                .authorization.settings
+                                                                .ConfigurationSettingNames.Client
+                                                                .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM,
+                                                        org.springframework.security.oauth2.jose.jws
+                                                                .SignatureAlgorithm.RS256,
+                                                        org.springframework.security.oauth2.server
+                                                                .authorization.settings
+                                                                .ConfigurationSettingNames.Client
+                                                                .X509_CERTIFICATE_SUBJECT_DN,
+                                                        "CN=old"))
+                                        .build())
+                        .tokenSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .TokenSettings.withSettings(
+                                                Map.of(
+                                                        OfflineAccessSettings.OFFLINE_SESSION_IDLE,
+                                                        "PT1H",
+                                                        OfflineAccessSettings.OFFLINE_SESSION_MAX,
+                                                        "PT2H"))
+                                        .authorizationCodeTimeToLive(Duration.ofMinutes(5))
+                                        .accessTokenTimeToLive(Duration.ofMinutes(5))
+                                        .refreshTokenTimeToLive(Duration.ofHours(1))
+                                        .build())
+                        .build();
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(existing);
+
+        service()
+                .update(
+                        "client-id",
+                        new AdminClientRequestDTO(
+                                "service-client",
+                                "Service Client",
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials"),
+                                Set.of(),
+                                Set.of(),
+                                Set.of("openid"),
+                                false,
+                                false,
+                                false,
+                                false,
+                                false,
+                                Set.of("RS256"),
+                                "poll",
+                                null,
+                                null,
+                                Duration.ofMinutes(5),
+                                Duration.ofMinutes(5),
+                                Duration.ofHours(1),
+                                false,
+                                null,
+                                false,
+                                " ",
+                                " ",
+                                null,
+                                " ",
+                                null,
+                                null,
+                                " ",
+                                null,
+                                " ",
+                                null));
+
+        RegisteredClient saved = savedClient.get();
+        assertThat((Object) saved.getClientSettings().getSetting(ClientSecuritySettings.ROOT_URL))
+                .isNull();
+        assertThat((Object) saved.getClientSettings().getSetting(ClientSecuritySettings.HOME_URL))
+                .isNull();
+        assertThat((Object) saved.getClientSettings().getSetting(ClientSecuritySettings.ADMIN_URL))
+                .isNull();
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(ClientSecuritySettings.WEB_ORIGINS))
+                .isEqualTo(Set.of("https://old.example"));
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(
+                                                org.springframework.security.oauth2.server
+                                                        .authorization.settings
+                                                        .ConfigurationSettingNames.Client
+                                                        .JWK_SET_URL))
+                .isNull();
+        assertThat(
+                        (Object)
+                                saved.getClientSettings()
+                                        .getSetting(
+                                                org.springframework.security.oauth2.server
+                                                        .authorization.settings
+                                                        .ConfigurationSettingNames.Client
+                                                        .X509_CERTIFICATE_SUBJECT_DN))
+                .isNull();
+        assertThat(
+                        (Object)
+                                saved.getTokenSettings()
+                                        .getSetting(OfflineAccessSettings.OFFLINE_SESSION_IDLE))
+                .isNull();
+        assertThat(
+                        (Object)
+                                saved.getTokenSettings()
+                                        .getSetting(OfflineAccessSettings.OFFLINE_SESSION_MAX))
+                .isNull();
+    }
+
+    @Test
+    void rejectsOfflineMaximumShorterThanIdleLifetime() {
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                new AdminClientRequestDTO(
+                                                        "offline-client",
+                                                        "Offline Client",
+                                                        Set.of("client_secret_basic"),
+                                                        Set.of("client_credentials"),
+                                                        Set.of(),
+                                                        Set.of(),
+                                                        Set.of("openid"),
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        Set.of("RS256"),
+                                                        "poll",
+                                                        null,
+                                                        null,
+                                                        Duration.ofMinutes(5),
+                                                        Duration.ofMinutes(5),
+                                                        Duration.ofHours(1),
+                                                        false,
+                                                        Duration.ofDays(90),
+                                                        true,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        Duration.ofDays(10),
+                                                        Duration.ofDays(1))))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Offline session max must be greater than or equal to idle timeout");
     }
 
     @Test
@@ -947,10 +1310,26 @@ class AdminClientServiceTest {
         assertThat(serviceUser.getUsername()).isEqualTo("service-account-advanced-client");
         verify(userRepository, atLeastOnce()).save(serviceUser);
 
+        serviceWithAccounts()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false));
+
+        verify(serviceAccountRepository, times(1)).delete(account);
+        verify(userRepository, times(1)).delete(serviceUser);
+
         serviceWithAccounts().delete("client-id");
 
-        verify(serviceAccountRepository).delete(account);
-        verify(userRepository).delete(serviceUser);
+        verify(serviceAccountRepository, times(2)).delete(account);
+        verify(userRepository, times(2)).delete(serviceUser);
     }
 
     private AdminClientService service() {

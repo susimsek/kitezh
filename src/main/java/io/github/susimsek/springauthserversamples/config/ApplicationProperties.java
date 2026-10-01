@@ -16,6 +16,8 @@ public record ApplicationProperties(
         @DefaultValue RegistrationCaptcha registrationCaptcha,
         @DefaultValue DPoP dpop) {
 
+    private static final String DEFAULT_ISSUER = "http://127.0.0.1:9090";
+
     @ConstructorBinding
     public ApplicationProperties(
             Cache cache,
@@ -28,7 +30,8 @@ public record ApplicationProperties(
             DPoP dpop) {
         this.cache = cache;
         this.session = session;
-        this.authorizationServer = authorizationServer;
+        this.authorizationServer =
+                authorizationServer == null ? new AuthorizationServer() : authorizationServer;
         this.mail = mail;
         this.security = security;
         this.webAuthn = webAuthn == null ? new WebAuthn() : webAuthn;
@@ -41,11 +44,8 @@ public record ApplicationProperties(
         this(
                 new Cache(new Caffeine(Duration.ofHours(1), 500, 1000)),
                 new Session("0 * * * * *"),
-                new AuthorizationServer("http://127.0.0.1:9090"),
-                new Mail(
-                        false,
-                        "Spring Authorization Server <no-reply@localhost>",
-                        "http://127.0.0.1:9090"),
+                new AuthorizationServer(DEFAULT_ISSUER),
+                new Mail(false, "Spring Authorization Server <no-reply@localhost>", DEFAULT_ISSUER),
                 new Security(),
                 new WebAuthn(),
                 new RegistrationCaptcha(),
@@ -110,7 +110,18 @@ public record ApplicationProperties(
 
     public record Session(@DefaultValue("0 * * * * *") String cleanupCron) {}
 
-    public record AuthorizationServer(@DefaultValue("http://127.0.0.1:9090") String issuer) {}
+    public record AuthorizationServer(
+            @DefaultValue("http://127.0.0.1:9090") String issuer,
+            @DefaultValue("P30D") Duration offlineSessionIdle) {
+
+        public AuthorizationServer(String issuer) {
+            this(issuer, Duration.ofDays(30));
+        }
+
+        public AuthorizationServer() {
+            this(DEFAULT_ISSUER, Duration.ofDays(30));
+        }
+    }
 
     public record WebAuthn(
             @DefaultValue("Spring Authorization Server Samples") String rpName,

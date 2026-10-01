@@ -389,6 +389,28 @@ class LdapAuthenticationServiceTest {
     }
 
     @Test
+    void updatesAnExistingIdentityWhenItsDirectoryEmailChanges() {
+        provider.setTrustEmail(true);
+        UserEntity existing = new UserEntity();
+        existing.setId(1L);
+        existing.setUsername("alice");
+        existing.setEmail("old@example.com");
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("object-id", "old-dn", provider, existing);
+        when(identityRepository.findByProviderIdAndExternalId("provider-id", "object-id"))
+                .thenReturn(Optional.of(identity));
+        when(userRepository.findByEmailIgnoreCase("alice@example.com"))
+                .thenReturn(Optional.empty());
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(externalUser("object-id"));
+
+        service.authenticate("alice", "directory-password");
+
+        assertThat(existing.getEmail()).isEqualTo("alice@example.com");
+        assertThat(existing.isEmailVerified()).isTrue();
+    }
+
+    @Test
     void rejectsDisabledActiveDirectoryUsersAfterSynchronization() {
         provider.setVendor("ACTIVE_DIRECTORY");
         UserEntity existing = new UserEntity();
@@ -420,6 +442,95 @@ class LdapAuthenticationServiceTest {
 
         provider.setImportUsers(false);
         assertThat(service.synchronizeUser(provider, externalUser("object-id"))).isFalse();
+    }
+
+    @Test
+    void reportsNewSynchronizationAndUsesDistinguishedNameFallbackId() {
+        when(identityRepository.findByProviderIdAndExternalId(
+                        "provider-id", "CN=Alice,OU=Users,DC=example,DC=com"))
+                .thenReturn(Optional.empty());
+        LdapDirectoryClient.LdapUser external =
+                new LdapDirectoryClient.LdapUser(
+                        "CN=Alice,OU=Users,DC=example,DC=com",
+                        " ",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example");
+
+        assertThat(service.synchronizeUser(provider, external)).isTrue();
+    }
+
+    @Test
+    void handlesTrustEmailWithMissingEmailAndNonActiveDirectoryDisabledUsers() {
+        provider.setImportUsers(false);
+        provider.setTrustEmail(true);
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(
+                        new LdapDirectoryClient.LdapUser(
+                                "CN=Alice,OU=Users,DC=example,DC=com",
+                                "object-id",
+                                "alice",
+                                null,
+                                "Alice",
+                                "Example"));
+
+        UserEntity user = service.authenticate("alice", "directory-password");
+
+        assertThat(user.isEmailVerified()).isFalse();
+
+        provider.setVendor("LDAP");
+        user.setEnabled(false);
+        assertThat(service.authenticate("alice", "directory-password"))
+                .isNotNull()
+                .isNotSameAs(user);
+    }
+
+    @Test
+    void coversTransientFallbackAndSameUserEmailCandidate() {
+        provider.setImportUsers(false);
+        provider.setTrustEmail(true);
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(externalUser("object-id"));
+
+        UserEntity transientUser = service.authenticate("alice", "directory-password");
+
+        assertThat(transientUser.getUsername()).isEqualTo("alice");
+        assertThat(transientUser.isEmailVerified()).isTrue();
+
+        UserEntity existing = new UserEntity();
+        existing.setId(1L);
+        existing.setUsername("alice");
+        existing.setEmail("old@example.com");
+        LdapFederationIdentityEntity identity =
+                new LdapFederationIdentityEntity("object-id", "old-dn", provider, existing);
+        provider.setImportUsers(true);
+        when(identityRepository.findByProviderIdAndExternalId("provider-id", "object-id"))
+                .thenReturn(Optional.of(identity));
+        when(userRepository.findByEmailIgnoreCase("alice@example.com"))
+                .thenReturn(Optional.of(existing));
+
+        service.authenticate("alice", "directory-password");
+
+        assertThat(existing.getEmail()).isEqualTo("alice@example.com");
+    }
+
+    @Test
+    void usesExternalIdWhenBuildingTransientFallbackUsername() {
+        provider.setImportUsers(false);
+        when(directoryClient.authenticate(configuration, "alice", "directory-password"))
+                .thenReturn(
+                        new LdapDirectoryClient.LdapUser(
+                                "CN=Alice,OU=Users,DC=example,DC=com",
+                                "external-id",
+                                " ",
+                                " ",
+                                " ",
+                                " "));
+
+        UserEntity user = service.authenticate("alice", "directory-password");
+
+        assertThat(user.getUsername()).isEqualTo("Corporate AD_external-id");
     }
 
     @Test

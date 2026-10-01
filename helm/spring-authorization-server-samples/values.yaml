@@ -49,6 +49,7 @@ spring:
 app:
   authorizationServer:
     issuer: https://spring-authorization-server-samples.local
+    offlineSessionIdle: P30D
 
 existingSecret:
   enabled: false

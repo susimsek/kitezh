@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.dto.account.AccountAvatarDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountDeleteRequestDTO;
+import io.github.susimsek.springauthserversamples.dto.account.AccountOfflineSessionDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountPasswordRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.account.AccountProfileRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.account.MfaCodeRequestDTO;
@@ -133,5 +134,33 @@ class AccountControllerDelegationTest {
         verify(userProfileService).saveAttributes("alice", attributesRequest.attributes(), "alice");
         verify(sessionService).deleteSession("alice", "session-1");
         verify(webAuthnService).delete("alice", "credential-1");
+    }
+
+    @Test
+    void delegatesOfflineSessionEndpoints() {
+        final var controller =
+                new AccountController(
+                        profileService,
+                        userProfileService,
+                        sessionService,
+                        applicationService,
+                        avatarService,
+                        deletionService,
+                        mfaService,
+                        recoveryCodeService,
+                        webAuthnService);
+        final Authentication authentication =
+                UsernamePasswordAuthenticationToken.authenticated(
+                        "alice", "ignored", java.util.List.of());
+        final var pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+        final var sessions = org.springframework.data.domain.Page.<AccountOfflineSessionDTO>empty();
+        when(applicationService.offlineSessions("alice", pageable)).thenReturn(sessions);
+
+        assertThat(controller.offlineSessions(authentication, pageable)).isSameAs(sessions);
+        assertThat(controller.revokeOfflineSession(authentication, "auth-1").getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        verify(applicationService).offlineSessions("alice", pageable);
+        verify(applicationService).revokeOfflineSession("alice", "auth-1");
     }
 }

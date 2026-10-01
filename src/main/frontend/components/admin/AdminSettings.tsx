@@ -18,6 +18,7 @@ import LoginSettings, { type LoginSettingsSection } from "./LoginSettings";
 import LdapFederationSettings from "./LdapFederationSettings";
 import AdminLocalizationSettings, { type LocalizationSection } from "./AdminLocalizationSettings";
 import AdminCibaPolicySettings from "./AdminCibaPolicySettings";
+import AdminOfflineAccessSettings from "./AdminOfflineAccessSettings";
 
 const SETTINGS_SECTIONS = [
   "general",
@@ -29,6 +30,7 @@ const SETTINGS_SECTIONS = [
   "sessions",
   "events",
   "ciba-policy",
+  "offline-access",
   "user-profile",
   "localization",
 ] as const;
@@ -105,6 +107,11 @@ export default function AdminSettings({
       href: "/admin/settings/ciba-policy",
     },
     {
+      key: "offline-access",
+      label: dictionary.admin.settings.sections.offlineAccess,
+      href: "/admin/settings/offline-access",
+    },
+    {
       key: "user-profile",
       label: dictionary.admin.settings.sections.userProfile,
       href: "/admin/settings/user-profile",
@@ -146,6 +153,7 @@ export default function AdminSettings({
       {active === "email" ? <EmailSettings embedded /> : null}
       {active === "events" ? <AdminEventSettings /> : null}
       {active === "ciba-policy" ? <AdminCibaPolicySettings /> : null}
+      {active === "offline-access" ? <AdminOfflineAccessSettings /> : null}
       {active === "user-profile" ? <AdminUserProfileSettings dictionary={dictionary} /> : null}
       {active === "localization" ? (
         <AdminLocalizationSettings
@@ -159,6 +167,7 @@ export default function AdminSettings({
       active !== "email" &&
       active !== "events" &&
       active !== "ciba-policy" &&
+      active !== "offline-access" &&
       active !== "user-profile" &&
       active !== "localization" &&
       active !== "user-federation" ? (

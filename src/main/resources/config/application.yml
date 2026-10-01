@@ -185,6 +185,7 @@ app:
       client-secret: ${MICROSOFT_CLIENT_SECRET:}
   authorization-server:
     issuer: https://spring-authorization-server-samples.local
+    offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
   dpop:
     nonce-required: ${APP_DPOP_NONCE_REQUIRED:false}
     nonce-ttl: ${APP_DPOP_NONCE_TTL:PT5M}

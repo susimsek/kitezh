@@ -2,6 +2,13 @@ describe("account console", () => {
   type StoredTokens = { accessToken: string };
   type ApplicationPage = { content: Array<{ clientId: string }> };
 
+  beforeEach(() => {
+    cy.visit("/");
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    cy.setCookie("locale", "en");
+  });
+
   const storedAccountTokens = () =>
     cy.window().then((window) => {
       const stored = window.localStorage.getItem("AUTH_CONSOLE_TOKEN:account");
@@ -25,7 +32,7 @@ describe("account console", () => {
 
   const signOut = () => {
     cy.get(".console-user-toggle").click();
-    cy.contains(".console-user-menu .dropdown-item", /Sign out|Çıkış/).click();
+    cy.contains(".console-user-menu .dropdown-item", /Sign out|Oturumu kapat|Çıkış/).click();
     cy.get('input[name="username"]', { timeout: 20_000 }).should("be.visible");
   };
 
@@ -95,13 +102,21 @@ describe("account console", () => {
     cy.location("search").should("eq", "");
     cy.location("hash").should("eq", "");
     cy.get(".account-sidebar", { timeout: 20_000 }).should("be.visible");
-    cy.get("#account-username").should("have.value", "admin");
+    cy.get("#account-profile-username").should("have.value", "admin");
 
-    cy.get("#account-email").clear().type("not-an-email").blur();
-    cy.get("#account-email").should("have.class", "is-invalid");
-    cy.get("#account-email").clear().type("admin@example.test");
-    cy.get("#account-first-name").clear().type("Admin");
-    cy.get("#account-last-name").clear().type("User");
+    cy.get("#account-profile-email")
+      .invoke("val")
+      .then((originalEmail) => {
+        cy.get("#account-profile-email").clear().type("not-an-email").blur();
+        cy.get("#account-profile-email").should("have.class", "is-invalid");
+        cy.get("#account-profile-email")
+          .clear()
+          .type(String(originalEmail))
+          .blur()
+          .should("not.have.class", "is-invalid");
+      });
+    cy.get("#account-profile-firstName").clear().type("Admin");
+    cy.get("#account-profile-lastName").clear().type("User");
     cy.get('[data-cy="save-profile"]').click();
     cy.wait("@updateProfile").its("response.statusCode").should("eq", 200);
     cy.get('[data-cy="save-profile"]').should("be.disabled");
@@ -151,8 +166,14 @@ describe("account console", () => {
 
   it("updates and removes the account avatar", () => {
     cy.intercept("GET", "/api/account/profile/avatar").as("avatar");
-    cy.intercept("PUT", "/api/account/profile/avatar").as("updateAvatar");
-    cy.intercept("DELETE", "/api/account/profile/avatar").as("deleteAvatar");
+    cy.intercept("PUT", "/api/account/profile/avatar", {
+      statusCode: 200,
+      body: { avatarUrl: "/avatars/e2e-avatar?v=1" },
+    }).as("updateAvatar");
+    cy.intercept("DELETE", "/api/account/profile/avatar", {
+      statusCode: 204,
+      body: null,
+    }).as("deleteAvatar");
     signInAccount();
     cy.wait("@avatar").its("response.statusCode").should("eq", 200);
 
@@ -178,10 +199,10 @@ describe("account console", () => {
 
     cy.get('[data-cy="session-row"]:not(.current)')
       .should("have.length", 1)
-      .contains("button", /Sign out|Çıkış/)
+      .contains("button", /Sign out|Oturumu kapat|Çıkış/)
       .click();
     cy.get(".modal")
-      .contains("button", /Sign out|Çıkış/)
+      .contains("button", /Sign out|Oturumu kapat|Çıkış/)
       .click();
     cy.wait("@deleteSession").its("response.statusCode").should("eq", 204);
     cy.get('[data-cy="session-row"]', { timeout: 20_000 }).should("have.length", 1);

@@ -268,6 +268,11 @@ class UserActionServiceTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(exception -> ((ApiException) exception).getErrorCode())
                 .isEqualTo(ApiErrorCode.INVALID_PASSWORD);
+        String tooLongPassword = "x".repeat(129);
+        assertThatThrownBy(() -> service.resetPassword("raw-token", tooLongPassword))
+                .isInstanceOf(ApiException.class)
+                .extracting(exception -> ((ApiException) exception).getErrorCode())
+                .isEqualTo(ApiErrorCode.INVALID_PASSWORD);
 
         when(applicationProperties.mail())
                 .thenReturn(
@@ -514,6 +519,9 @@ class UserActionServiceTest {
         assertThatThrownBy(() -> service.resetPassword("raw-token", "valid-password", null))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("The OTP code is invalid");
+        assertThatThrownBy(() -> service.resetPassword("raw-token", "valid-password", " "))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The OTP code is invalid");
 
         when(loginSettingsService.otpAlgorithm()).thenReturn("SHA1");
         when(loginSettingsService.otpDigits()).thenReturn(6);
@@ -522,6 +530,11 @@ class UserActionServiceTest {
         token.getUser().setTotpLastUsedCounter(42L);
         when(totpService.matchingCounter("SECRET", "123456", "SHA1", 6, 30, 1))
                 .thenReturn(OptionalLong.of(42));
+        assertThatThrownBy(() -> service.resetPassword("raw-token", "valid-password", "123456"))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The OTP code is invalid");
+
+        service = serviceWith(null, loginSettingsService, null);
         assertThatThrownBy(() -> service.resetPassword("raw-token", "valid-password", "123456"))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("The OTP code is invalid");

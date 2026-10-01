@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="029-create-offline-access-policy" author="susimsek">
+        <createTable tableName="offline_access_policy">
+            <column name="id" type="bigint"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_offline_access_policy"/></column>
+            <column name="idle_timeout_seconds" type="bigint"><constraints nullable="false"/></column>
+            <column name="max_lifespan_seconds" type="bigint"/>
+            <column name="max_limited" type="boolean"><constraints nullable="false"/></column>
+            <column name="revoked_before" type="timestamp"/>
+        </createTable>
+        <loadData encoding="UTF-8" file="db/data/offline-access-policy.csv" separator=";" tableName="offline_access_policy" usePreparedStatements="true">
+            <column header="id" type="numeric"/>
+            <column header="idle_timeout_seconds" type="numeric"/>
+            <column header="max_lifespan_seconds" type="numeric"/>
+            <column header="max_limited" type="boolean"/>
+            <column header="revoked_before" type="date"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

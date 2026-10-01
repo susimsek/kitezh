@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentId;
+import io.github.susimsek.springauthserversamples.domain.AuthorizationEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationConsentRepository;
@@ -78,6 +79,71 @@ class AccountApplicationServiceTest {
     void rejectsUnknownConsent() {
         assertThatThrownBy(() -> service().revokeApplication("alice", "missing"))
                 .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void mapsOfflineSessionsInBatches() {
+        AuthorizationEntity session = offlineSession("auth-1", "client-id", "alice");
+        RegisteredClientEntity client = new RegisteredClientEntity();
+        client.setId("client-id");
+        client.setClientName("Client One");
+        when(authorizationRepository
+                        .findAllByPrincipalNameAndSessionIdIsNullAndRefreshTokenValueIsNotNull(
+                                "alice", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(session)));
+        when(clientRepository.findAllById(List.of("client-id"))).thenReturn(List.of(client));
+
+        var result = service().offlineSessions("alice", Pageable.unpaged()).getContent();
+
+        assertThat(result)
+                .singleElement()
+                .satisfies(item -> assertThat(item.clientName()).isEqualTo("Client One"));
+    }
+
+    @Test
+    void fallsBackToClientIdAndRevokesOwnedOfflineSession() {
+        AuthorizationEntity session = offlineSession("auth-1", "missing-client", "alice");
+        when(authorizationRepository
+                        .findAllByPrincipalNameAndSessionIdIsNullAndRefreshTokenValueIsNotNull(
+                                "alice", Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(session)));
+        when(clientRepository.findAllById(List.of("missing-client"))).thenReturn(List.of());
+
+        assertThat(service().offlineSessions("alice", Pageable.unpaged()).getContent())
+                .singleElement()
+                .extracting(item -> item.clientName())
+                .isEqualTo("missing-client");
+
+        when(authorizationRepository.findById("auth-1")).thenReturn(java.util.Optional.of(session));
+        service().revokeOfflineSession("alice", "auth-1");
+
+        verify(authorizationRepository).delete(session);
+        verify(auditEventService)
+                .record("account.offline-session.revoked", "offline-session", "auth-1");
+    }
+
+    @Test
+    void rejectsOtherUsersAndBrowserSessions() {
+        AuthorizationEntity otherUser = offlineSession("auth-1", "client-id", "bob");
+        when(authorizationRepository.findById("auth-1"))
+                .thenReturn(java.util.Optional.of(otherUser));
+
+        assertThatThrownBy(() -> service().revokeOfflineSession("alice", "auth-1"))
+                .isInstanceOf(ApiException.class);
+
+        otherUser.setPrincipalName("alice");
+        otherUser.setSessionId("browser-session");
+        assertThatThrownBy(() -> service().revokeOfflineSession("alice", "auth-1"))
+                .isInstanceOf(ApiException.class);
+    }
+
+    private static AuthorizationEntity offlineSession(String id, String clientId, String username) {
+        AuthorizationEntity session = new AuthorizationEntity();
+        session.setId(id);
+        session.setRegisteredClientId(clientId);
+        session.setPrincipalName(username);
+        session.setRefreshTokenValue("refresh-token");
+        return session;
     }
 
     private AccountApplicationService service() {

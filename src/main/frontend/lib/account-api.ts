@@ -41,6 +41,14 @@ export type AccountSession = {
   clients: Array<{ clientId: string; clientName: string }>;
 };
 
+export type AccountOfflineSession = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  issuedAt: string;
+  expiresAt: string | null;
+};
+
 export type CibaPendingRequest = {
   authReqId: string;
   userCode: string;

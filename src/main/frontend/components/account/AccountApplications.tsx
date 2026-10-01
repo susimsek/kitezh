@@ -15,6 +15,7 @@ import { useConsoleAlerts } from "@/components/auth/ConsoleAlerts";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon } from "@/components/shared/Icon";
 import { useAccountAuth } from "./AccountAuthProvider";
+import { AccountOfflineSessions } from "./AccountOfflineSessions";
 
 export function AccountApplications({ dictionary }: { dictionary: Dictionary }) {
   const formatDateTime = useDateTimeFormatter();
@@ -163,6 +164,7 @@ export function AccountApplications({ dictionary }: { dictionary: Dictionary }) 
         }}
         show={pending !== null}
       />
+      <AccountOfflineSessions dictionary={dictionary} />
     </>
   );
 }

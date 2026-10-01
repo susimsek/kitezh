@@ -30,6 +30,7 @@ import io.github.susimsek.springauthserversamples.security.OidcSessionIdentifier
 import io.github.susimsek.springauthserversamples.security.ProtocolMapperTypes;
 import io.github.susimsek.springauthserversamples.security.RotatingClientSecretAuthenticationProvider;
 import io.github.susimsek.springauthserversamples.service.OAuth2KeyService;
+import io.github.susimsek.springauthserversamples.service.admin.OfflineAccessPolicyService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import io.github.susimsek.springauthserversamples.service.security.OAuth2ObservabilityMetrics;
 import java.text.ParseException;
@@ -380,18 +381,41 @@ public class AuthorizationServerConfig {
     OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
             JwtEncoder jwtEncoder,
             OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer,
-            OAuth2ObservabilityMetrics metrics) {
+            OAuth2ObservabilityMetrics metrics,
+            OfflineAccessPolicyService offlineAccessPolicyService) {
         return new ObservabilityOAuth2TokenGenerator(
-                tokenGenerator(jwtEncoder, jwtTokenCustomizer), metrics);
+                tokenGenerator(
+                        jwtEncoder,
+                        jwtTokenCustomizer,
+                        applicationProperties.authorizationServer().offlineSessionIdle(),
+                        offlineAccessPolicyService),
+                metrics);
     }
 
     OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
             JwtEncoder jwtEncoder, OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer) {
+        return tokenGenerator(jwtEncoder, jwtTokenCustomizer, java.time.Duration.ofDays(30));
+    }
+
+    OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
+            JwtEncoder jwtEncoder,
+            OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer,
+            java.time.Duration offlineSessionIdle) {
+        return tokenGenerator(jwtEncoder, jwtTokenCustomizer, offlineSessionIdle, null);
+    }
+
+    OAuth2TokenGenerator<OAuth2Token> tokenGenerator(
+            JwtEncoder jwtEncoder,
+            OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer,
+            java.time.Duration offlineSessionIdle,
+            OfflineAccessPolicyService offlineAccessPolicyService) {
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
         jwtGenerator.setJwtCustomizer(jwtTokenCustomizer);
 
         return new DelegatingOAuth2TokenGenerator(
-                jwtGenerator, new OAuth2AccessTokenGenerator(), new ConsoleRefreshTokenGenerator());
+                jwtGenerator,
+                new OAuth2AccessTokenGenerator(),
+                new ConsoleRefreshTokenGenerator(offlineSessionIdle, offlineAccessPolicyService));
     }
 
     @Bean

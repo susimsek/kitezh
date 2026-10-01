@@ -16,6 +16,7 @@ import io.github.susimsek.springauthserversamples.domain.LocalizationMessageOver
 import io.github.susimsek.springauthserversamples.domain.LocalizationSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.OAuth2KeyEntity;
+import io.github.susimsek.springauthserversamples.domain.OfflineAccessPolicyEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialProviderEntity;
@@ -33,6 +34,7 @@ import io.github.susimsek.springauthserversamples.repository.LocalizationMessage
 import io.github.susimsek.springauthserversamples.repository.LocalizationSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.LoginSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.OAuth2KeyRepository;
+import io.github.susimsek.springauthserversamples.repository.OfflineAccessPolicyRepository;
 import io.github.susimsek.springauthserversamples.repository.RequiredActionDefinitionRepository;
 import io.github.susimsek.springauthserversamples.repository.SocialProviderMapperRepository;
 import io.github.susimsek.springauthserversamples.repository.SocialProviderRepository;
@@ -91,6 +93,7 @@ public class CacheConfig {
                 AdminEventSettingsRepository.ADMIN_EVENT_SETTINGS_BY_ID_CACHE,
                 AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
                 CibaPolicyRepository.CIBA_POLICY_BY_ID_CACHE,
+                OfflineAccessPolicyRepository.OFFLINE_ACCESS_POLICY_BY_ID_CACHE,
                 ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
                 ClientScopeRepository.CLIENT_SCOPE_BY_NAME_CACHE,
                 EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE,
@@ -179,6 +182,7 @@ public class CacheConfig {
                 createCache(
                         cacheManager, AuthorityEntity.class.getName() + ".compositeClientRoles");
                 createCache(cacheManager, OAuth2KeyEntity.class.getName());
+                createCache(cacheManager, OfflineAccessPolicyEntity.class.getName());
                 createCache(cacheManager, RegisteredClientEntity.class.getName());
                 createCache(cacheManager, UserEntity.class.getName());
                 createCache(cacheManager, UserEntity.class.getName() + ".authorities");

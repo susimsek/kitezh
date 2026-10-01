@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -164,6 +165,52 @@ class LdapFederationSyncServiceTest {
                                         "missing", LdapFederationSyncService.SyncMode.FULL))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("LDAP provider not found");
+    }
+
+    @Test
+    void schedulesOnlyProvidersThatAreDueAndSelectsFullModeWhenIntervalElapsed() {
+        LdapFederationProviderEntity notDue = provider(true);
+        notDue.setId("not-due");
+        notDue.setLastSyncAt(Instant.now());
+        LdapFederationProviderEntity full = provider(true);
+        full.setId("full");
+        full.setLastSyncAt(Instant.now().minusSeconds(120));
+        full.setFullSyncIntervalMinutes(1);
+        full.setChangedSyncIntervalMinutes(1);
+        when(providerRepository.findAllByEnabledTrueOrderByPriorityAscNameAsc())
+                .thenReturn(List.of(notDue, full));
+        when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(transactionStatus);
+        when(providerRepository.findById("full")).thenReturn(Optional.of(full));
+        LdapDirectoryClient.Configuration configuration =
+                mock(LdapDirectoryClient.Configuration.class);
+        when(settingsService.configuration(full, null)).thenReturn(configuration);
+        when(directoryClient.searchUsers(configuration, null)).thenReturn(List.of());
+        doNothing().when(transactionManager).commit(transactionStatus);
+
+        service.synchronizeScheduledProviders();
+
+        verify(directoryClient).searchUsers(configuration, null);
+        verify(providerRepository, never()).findById("not-due");
+    }
+
+    @Test
+    void reportsExceptionTypeWhenSynchronizationFailureHasNoMessage() {
+        LdapFederationProviderEntity provider = provider(true);
+        LdapDirectoryClient.Configuration configuration =
+                mock(LdapDirectoryClient.Configuration.class);
+        when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(transactionStatus);
+        when(providerRepository.findById("provider-id")).thenReturn(Optional.of(provider));
+        when(settingsService.configuration(provider, null)).thenReturn(configuration);
+        when(directoryClient.searchUsers(configuration, null))
+                .thenThrow(new IllegalStateException());
+        doNothing().when(transactionManager).commit(transactionStatus);
+
+        LdapFederationSyncService.SyncResult result =
+                service.synchronize("provider-id", LdapFederationSyncService.SyncMode.FULL);
+
+        assertThat(result.error()).isEqualTo("IllegalStateException");
     }
 
     private static LdapFederationProviderEntity provider(boolean importUsers) {

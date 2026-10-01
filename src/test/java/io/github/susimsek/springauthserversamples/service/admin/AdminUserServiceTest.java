@@ -484,6 +484,19 @@ class AdminUserServiceTest {
     }
 
     @Test
+    void changesPasswordPermanentlyWhenTemporaryFlagIsFalse() {
+        UserEntity target = user(5L, "alice", AuthoritiesConstants.USER);
+        UserEntity administrator = user(6L, "administrator", AuthoritiesConstants.ADMIN);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(target));
+        when(userRepository.findByUsername("administrator")).thenReturn(Optional.of(administrator));
+
+        service().changePassword(5L, "new-password", false, "administrator");
+
+        verify(passwordService).changePassword(target, "new-password");
+        verify(userAccessInvalidationService).invalidate("alice");
+    }
+
+    @Test
     void userManagerCannotDisableAnAdministrator() {
         UserEntity administrator = user(5L, "administrator", AuthoritiesConstants.ADMIN);
         UserEntity manager = user(6L, "manager", "ROLE_USER_MANAGER");
@@ -867,6 +880,22 @@ class AdminUserServiceTest {
         verify(userRepository, times(2)).delete(any(UserEntity.class));
         verify(userAccessInvalidationService, org.mockito.Mockito.atLeast(4))
                 .invalidate(any(String.class));
+    }
+
+    @Test
+    void disablesOneOfSeveralSelectedAdministrators() {
+        UserEntity selected = user(1L, "alice", AuthoritiesConstants.ADMIN);
+        UserEntity remaining = user(2L, "bob", AuthoritiesConstants.ADMIN);
+        when(userRepository.findAllByIdIn(List.of(1L))).thenReturn(List.of(selected));
+        when(userRepository.findByUsername("administrator"))
+                .thenReturn(Optional.of(user(3L, "administrator", AuthoritiesConstants.ADMIN)));
+        when(userRepository.findAllWithEffectiveAuthorities())
+                .thenReturn(List.of(selected, remaining));
+
+        service().bulkOperate(List.of(1L), AdminUserBulkAction.DISABLE, "administrator");
+
+        verify(userAccessInvalidationService).invalidate("alice");
+        assertThat(selected.isEnabled()).isFalse();
     }
 
     @Test

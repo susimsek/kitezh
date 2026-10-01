@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
@@ -419,6 +420,101 @@ class LdapFederationMapperServiceTest {
 
         assertThat(user.getGroups()).containsExactly(group);
         verify(profileAttributeRepository, times(0)).save(any());
+    }
+
+    @Test
+    void handlesUnmatchedGroupRolesAndPersistsNonBlankCustomValues() {
+        UserEntity user = user();
+        user.setId(42L);
+        LdapFederationMapperEntity roleMapper =
+                mapperWithTarget("group-role", LdapFederationMapperType.ROLE, "ROLE_ADMIN");
+        roleMapper.setLdapAttribute("memberOf");
+        LdapFederationMapperEntity customMapper =
+                mapperWithUserAttribute(
+                        "department", "department", LdapFederationMapperType.USER_ATTRIBUTE);
+        UserProfileAttributeDefinitionEntity definition =
+                new UserProfileAttributeDefinitionEntity();
+        definition.setId(7L);
+        definition.setName("department");
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(List.of(roleMapper, customMapper));
+        when(directoryClient.findGroups(
+                        any(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of("ROLE_USER"));
+        when(profileDefinitionRepository.findByNameIgnoreCase("department"))
+                .thenReturn(Optional.of(definition));
+
+        service.apply(
+                provider,
+                configuration,
+                new LdapDirectoryClient.LdapUser(
+                        "uid=alice",
+                        "external-id",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example",
+                        Map.of(
+                                "memberOf",
+                                List.of("ROLE_USER"),
+                                "department",
+                                List.of("Engineering", " ", "Platform"))),
+                user);
+
+        assertThat(user.getAuthorities()).isEmpty();
+        verify(profileAttributeRepository).deleteAllByUserIdAndDefinitionId(42L, 7L);
+        verify(profileAttributeRepository, times(2)).save(any());
+    }
+
+    @Test
+    void skipsEmptyOptionalMapperValuesForTransientUsers() {
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(
+                        List.of(
+                                mapper("name", LdapFederationMapperType.FULL_NAME),
+                                mapper("account", LdapFederationMapperType.MSAD_USER_ACCOUNT),
+                                mapperWithUserAttribute(
+                                        "custom",
+                                        "custom",
+                                        LdapFederationMapperType.USER_ATTRIBUTE)));
+        UserEntity user = user();
+
+        service.apply(
+                provider,
+                configuration,
+                new LdapDirectoryClient.LdapUser(
+                        "uid=alice",
+                        "external-id",
+                        "alice",
+                        "alice@example.com",
+                        "Alice",
+                        "Example",
+                        Map.of()),
+                user);
+
+        assertThat(user.getFirstName()).isNull();
+        assertThat(user.getLastName()).isNull();
+        verifyNoInteractions(profileDefinitionRepository);
+    }
+
+    @Test
+    void createsRoleWithoutAddingMissingDefaultAuthority() {
+        LdapFederationMapperEntity roleMapper =
+                mapperWithTarget("role", LdapFederationMapperType.HARDCODED_ROLE, " ROLE_ADMIN ");
+        when(mapperRepository.findAllByProviderIdAndEnabledTrueOrderByNameAsc(provider.getId()))
+                .thenReturn(List.of(roleMapper));
+        when(authorityRepository.findByName("ROLE_ADMIN")).thenReturn(Optional.empty());
+        when(authorityRepository.save(any(AuthorityEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(authorityRepository.findByName(AuthoritiesConstants.USER))
+                .thenReturn(Optional.empty());
+        UserEntity user = user();
+
+        service.apply(provider, configuration, external(), user);
+
+        assertThat(user.getAuthorities())
+                .extracting(AuthorityEntity::getName)
+                .containsExactly("ROLE_ADMIN");
     }
 
     private static UserEntity user() {

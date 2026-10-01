@@ -12,6 +12,7 @@ public final class ClientScopeSettings {
 
     public static final String DEFAULT_SCOPES = "settings.client.default-client-scopes";
     public static final String OPTIONAL_SCOPES = "settings.client.optional-client-scopes";
+    public static final String OFFLINE_ACCESS = "offline_access";
 
     private ClientScopeSettings() {}
 
@@ -19,9 +20,9 @@ public final class ClientScopeSettings {
         Set<String> configured = read(client.getClientSettings(), DEFAULT_SCOPES);
         if (!configured.isEmpty()
                 || client.getClientSettings().getSetting(DEFAULT_SCOPES) != null) {
-            return configured;
+            return withoutImplicitOfflineAccess(configured);
         }
-        return new LinkedHashSet<>(client.getScopes());
+        return withoutImplicitOfflineAccess(client.getScopes());
     }
 
     public static Set<String> optionalScopes(RegisteredClient client) {
@@ -47,6 +48,12 @@ public final class ClientScopeSettings {
         }
         return Arrays.stream(StringUtils.commaDelimitedListToStringArray(text))
                 .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static Set<String> withoutImplicitOfflineAccess(Set<String> scopes) {
+        return scopes.stream()
+                .filter(scope -> !OFFLINE_ACCESS.equals(scope))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }
