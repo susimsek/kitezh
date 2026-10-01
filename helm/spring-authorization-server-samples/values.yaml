@@ -36,6 +36,10 @@ fullnameOverride: ""
 
 containerPort: 9090
 
+# Keep actuator, health, and Prometheus endpoints on a cluster-internal port.
+management:
+  port: 9091
+
 spring:
   profiles:
     active: prod
@@ -81,6 +85,7 @@ serviceMonitor:
   namespace: ""
   interval: 30s
   scrapeTimeout: 10s
+  port: management
   path: /actuator/prometheus
   scheme: http
   labels: {}

@@ -11,5 +11,9 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ .Values.management.port }}
+      targetPort: management
+      protocol: TCP
+      name: management
   selector:
     {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 4 }}

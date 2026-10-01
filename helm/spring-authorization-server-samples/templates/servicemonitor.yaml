@@ -18,7 +18,7 @@ spec:
     matchLabels:
       {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 6 }}
   endpoints:
-    - port: http
+    - port: {{ .Values.serviceMonitor.port | quote }}
       path: {{ .Values.serviceMonitor.path | quote }}
       interval: {{ .Values.serviceMonitor.interval | quote }}
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | quote }}
