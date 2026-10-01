@@ -20,6 +20,8 @@ This repo is a Java 25 + Spring Boot 4.1 sample application for the Authorizatio
 ## Agent MCP Usage Guidelines
 
 - Use Context7 when library/API documentation is needed for Spring Boot, Spring Security 7 Authorization Server, Spring Data JPA, Hibernate, Liquibase, Maven plugins, Helm, Terraform, or related setup/configuration details.
+- Use the official Grafana MCP server (`mcp-grafana`) for Grafana Cloud observability work, including dashboards, metrics, logs, traces, and alerts. Connect it to the configured Grafana Cloud stack through `GRAFANA_URL` and a Viewer-scoped `GRAFANA_SERVICE_ACCOUNT_TOKEN`.
+- Keep Grafana MCP credentials in the local Codex or environment configuration only; never commit service-account tokens or other Grafana credentials to this repository, Docker Compose files, Helm values, or documentation.
 - Prefer official documentation or primary sources for framework behavior.
 
 ## Quick Reference
