@@ -136,7 +136,6 @@ The most relevant environment variables are:
 | `SPRING_LIQUIBASE_ENABLED` | `true` | Enable Liquibase migrations |
 | `SPRING_LIQUIBASE_DROP_FIRST` | `false` | Drop database objects before migration; use only for disposable demos |
 | `APP_AUTHORIZATION_SERVER_ISSUER` | `https://spring-authorization-server-samples.local` | Public OAuth2/OIDC issuer |
-| `APP_SOCIAL_LOGIN_ENABLED` | `false` | Enable configured social providers |
 | `APP_DPOP_NONCE_REQUIRED` | `false` | Require DPoP nonce validation |
 | `MANAGEMENT_OPENTELEMETRY_ENABLED` | `false` | Enable OpenTelemetry resource/export configuration |
 | `MANAGEMENT_TRACING_EXPORT_ENABLED` | `false` | Enable trace export |
@@ -152,19 +151,7 @@ Keep OTLP authorization headers and database credentials in deployment secrets. 
 
 ### Social login
 
-Social login is disabled by default. Enable it and supply the provider credentials when needed:
-
-```text
-APP_SOCIAL_LOGIN_ENABLED=true
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-LINKEDIN_CLIENT_ID=...
-LINKEDIN_CLIENT_SECRET=...
-MICROSOFT_CLIENT_ID=...
-MICROSOFT_CLIENT_SECRET=...
-```
+Social providers are configured from **Administration → Settings → Login**. The provider enablement, Client ID, and Client Secret are stored in the database; secrets are encrypted before persistence. Keep `SOCIAL_LOGIN_ENCRYPTION_KEY` stable across restarts and deployments. Provider credentials are intentionally not read from application YAML or environment variables.
 
 The callback URI is `https://<public-host>/login/oauth2/code/{registrationId}`. Register the exact callback URI with each provider.
 

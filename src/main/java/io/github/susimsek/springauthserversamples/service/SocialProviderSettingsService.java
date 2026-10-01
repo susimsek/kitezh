@@ -2,7 +2,6 @@ package io.github.susimsek.springauthserversamples.service;
 
 import io.github.susimsek.springauthserversamples.config.security.ReloadableClientRegistrationRepository;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginConfig;
-import io.github.susimsek.springauthserversamples.config.security.SocialLoginProperties;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
@@ -47,7 +46,6 @@ public class SocialProviderSettingsService {
     private final LoginSettingsRepository repository;
     private final SocialIdentityRepository socialIdentityRepository;
     private final SocialProviderRepository socialProviderRepository;
-    private final SocialLoginProperties properties;
     private final SocialLoginSecretCipher secretCipher;
     private final ObjectProvider<ReloadableClientRegistrationRepository>
             clientRegistrationRepository;
@@ -92,10 +90,6 @@ public class SocialProviderSettingsService {
                 .or(() -> socialProviderRepository.findByAliasIgnoreCase(value))
                 .map(entity -> SocialProviderSyncMode.from(entity.getSyncMode()).value())
                 .orElse(null);
-    }
-
-    public boolean isEnabled() {
-        return properties.enabled();
     }
 
     public void refreshClientRegistrations() {
@@ -258,19 +252,13 @@ public class SocialProviderSettingsService {
     }
 
     private ProviderCredentials credentials(String provider, LoginSettingsEntity settings) {
-        SocialLoginProperties.Provider configured = configuredProperties(provider);
-        String clientId = firstNonBlank(storedClientId(provider, settings), configured.clientId());
-        String clientSecret = storedSecret(provider, settings);
-        if (clientSecret.isBlank()) {
-            clientSecret = configured.clientSecret();
-        }
         return new ProviderCredentials(
                 provider,
                 firstNonBlank(storedAlias(provider, settings), provider),
                 capitalize(provider),
                 provider,
-                clientId,
-                clientSecret,
+                storedClientId(provider, settings),
+                storedSecret(provider, settings),
                 enabled(provider, settings),
                 hideOnLogin(provider, settings),
                 accountLinkingOnly(provider, settings),
@@ -452,16 +440,6 @@ public class SocialProviderSettingsService {
             case LINKEDIN -> settings.getLinkedinShowInAccountConsole();
             case MICROSOFT -> settings.getMicrosoftShowInAccountConsole();
             default -> ALWAYS;
-        };
-    }
-
-    private SocialLoginProperties.Provider configuredProperties(String provider) {
-        return switch (provider) {
-            case GOOGLE -> properties.google();
-            case GITHUB -> properties.github();
-            case LINKEDIN -> properties.linkedin();
-            case MICROSOFT -> properties.microsoft();
-            default -> throw new IllegalArgumentException("Unsupported social provider");
         };
     }
 

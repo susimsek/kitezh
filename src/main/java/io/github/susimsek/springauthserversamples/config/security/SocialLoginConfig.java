@@ -4,7 +4,6 @@ import io.github.susimsek.springauthserversamples.service.SocialProviderSettings
 import io.github.susimsek.springauthserversamples.service.SocialProviderSettingsService.ProviderCredentials;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
@@ -38,7 +37,6 @@ public class SocialLoginConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "app.social-login.enabled", havingValue = "true")
     ReloadableClientRegistrationRepository socialClientRegistrationRepository(
             SocialProviderSettingsService providerSettingsService) {
         return new ReloadableClientRegistrationRepository(

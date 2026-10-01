@@ -23,10 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @TestPropertySource(
-        properties = {
-            "app.social-login.encryption-key=integration-test-social-login-key",
-            "app.social-login.enabled=true"
-        })
+        properties = {"app.social-login.encryption-key=integration-test-social-login-key"})
 class AdminLifecycleEndpointsIT {
 
     @Autowired private MockMvc mockMvc;

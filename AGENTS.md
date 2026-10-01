@@ -349,7 +349,7 @@ curl http://localhost:9090/actuator/health/readiness
 
 ### Social login
 
-- Social login is implemented with Spring Security OAuth2 Client and is disabled by default. Enable it with `APP_SOCIAL_LOGIN_ENABLED=true` and provide provider credentials through `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET`, or `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`.
+- Social login is implemented with Spring Security OAuth2 Client. Provider enablement, Client IDs, and Client Secrets are managed from the Administration Console and persisted in the database, matching Keycloak’s identity-provider model. Do not add provider credential fallbacks to application YAML or environment variables. Keep `SOCIAL_LOGIN_ENCRYPTION_KEY` stable across restarts and deployments so encrypted provider secrets remain readable.
 - Supported registrations are `google`, `github`, `linkedin`, and `microsoft`. Their callback URI is `http://localhost:9090/login/oauth2/code/{registrationId}` in local development; each provider application must register its exact callback URI.
 - The login page obtains configured registrations from `GET /api/auth/social-providers` and starts the standard `/oauth2/authorization/{registrationId}` flow. It must keep the existing label, disable duplicate clicks, and show an inline spinner while redirecting.
 - A successful provider response is converted into a local session authentication. `SocialLoginService` stores a unique `(provider, subject)` link in `social_identities`, creates the local `UserEntity` on first login, and assigns only `ROLE_USER`. The local username is a deterministic provider/subject-derived value; provider email and profile names are imported when present.

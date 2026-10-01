@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.config.security.ReloadableClientRegistrationRepository;
-import io.github.susimsek.springauthserversamples.config.security.SocialLoginProperties;
 import io.github.susimsek.springauthserversamples.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
@@ -33,7 +32,6 @@ class SocialProviderSettingsServiceTest {
             mock(SocialIdentityRepository.class);
     private final SocialProviderRepository providerRepository =
             mock(SocialProviderRepository.class);
-    private final SocialLoginProperties properties = new SocialLoginProperties();
     private final SocialLoginSecretCipher secretCipher = mock(SocialLoginSecretCipher.class);
     private final ObjectProvider<ReloadableClientRegistrationRepository> registrations =
             mock(ObjectProvider.class);
@@ -52,7 +50,6 @@ class SocialProviderSettingsServiceTest {
                         repository,
                         identityRepository,
                         providerRepository,
-                        properties,
                         secretCipher,
                         registrations,
                         auditEventService);
@@ -60,11 +57,11 @@ class SocialProviderSettingsServiceTest {
 
     @Test
     void exposesProviderDefaultsAndLookupModes() {
-        properties.setEnabled(true);
-        properties.google().setClientId("google-id");
-        properties.google().setClientSecret("google-secret");
+        settings.setGoogleLoginEnabled(true);
+        settings.setGoogleClientId("google-id");
+        settings.setGoogleClientSecretEncrypted("encrypted-google-secret");
+        when(secretCipher.decrypt("encrypted-google-secret")).thenReturn("google-secret");
 
-        assertThat(service.isEnabled()).isTrue();
         assertThat(service.adminSettings()).hasSize(4);
         assertThat(service.configuredProviders())
                 .singleElement()
@@ -105,7 +102,6 @@ class SocialProviderSettingsServiceTest {
 
     @Test
     void reportsDisabledStateAndFailsWhenSettingsAreMissing() {
-        assertThat(service.isEnabled()).isFalse();
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.adminSettings())
@@ -156,8 +152,10 @@ class SocialProviderSettingsServiceTest {
         ReloadableClientRegistrationRepository reloadable =
                 mock(ReloadableClientRegistrationRepository.class);
         when(registrations.getIfAvailable()).thenReturn(reloadable);
-        properties.google().setClientId("id");
-        properties.google().setClientSecret("secret");
+        settings.setGoogleLoginEnabled(true);
+        settings.setGoogleClientId("id");
+        settings.setGoogleClientSecretEncrypted("encrypted-secret");
+        when(secretCipher.decrypt("encrypted-secret")).thenReturn("secret");
 
         service.refreshClientRegistrations();
 
@@ -285,9 +283,7 @@ class SocialProviderSettingsServiceTest {
     }
 
     @Test
-    void fallsBackToLegacyCredentialsWhenStoredProviderClientIdIsBlank() {
-        properties.google().setClientId("legacy-google-id");
-        properties.google().setClientSecret("legacy-google-secret");
+    void doesNotFallBackToYamlCredentialsWhenStoredProviderClientIdIsBlank() {
         SocialProviderEntity provider = new SocialProviderEntity();
         provider.setRegistrationId("google");
         provider.setAlias("workspace-google");
@@ -303,8 +299,8 @@ class SocialProviderSettingsServiceTest {
         SocialProviderSettingsService.ProviderCredentials credentials =
                 service.provider("workspace-google");
 
-        assertThat(credentials.clientId()).isEqualTo("legacy-google-id");
-        assertThat(credentials.clientSecret()).isEqualTo("legacy-google-secret");
+        assertThat(credentials.clientId()).isBlank();
+        assertThat(credentials.clientSecret()).isBlank();
         assertThat(credentials.alias()).isEqualTo("workspace-google");
     }
 

@@ -11,7 +11,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.susimsek.springauthserversamples.config.security.SocialLoginProperties;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
@@ -45,7 +44,6 @@ class SocialLoginServiceTest {
     @org.junit.jupiter.api.BeforeEach
     void enableSocialProviders() {
         lenient().when(loginSettingsService.isSocialProviderEnabled(anyString())).thenReturn(true);
-        lenient().when(socialProviderSettingsService.isEnabled()).thenReturn(true);
     }
 
     @Mock private UserRepository userRepository;
@@ -497,36 +495,6 @@ class SocialLoginServiceTest {
     }
 
     @Test
-    void listsAllConfiguredProviders() {
-        SocialLoginProperties properties = new SocialLoginProperties();
-        properties.google().setClientId("google-id");
-        properties.google().setClientSecret("google-secret");
-        properties.github().setClientId("github-id");
-        properties.github().setClientSecret("github-secret");
-        properties.linkedin().setClientId("linkedin-id");
-        properties.linkedin().setClientSecret("linkedin-secret");
-        properties.microsoft().setClientId("microsoft-id");
-        properties.microsoft().setClientSecret("microsoft-secret");
-
-        assertThat(service().configuredProviders(properties))
-                .containsExactly("github", "google", "linkedin", "microsoft");
-    }
-
-    @Test
-    void excludesDisabledConfiguredProvider() {
-        SocialLoginProperties properties = new SocialLoginProperties();
-        properties.google().setClientId("google-id");
-        properties.google().setClientSecret("google-secret");
-        properties.github().setClientId("github-id");
-        properties.github().setClientSecret("github-secret");
-        properties.linkedin().setClientId("linkedin-id");
-        properties.linkedin().setClientSecret("linkedin-secret");
-        when(loginSettingsService.isSocialProviderEnabled("github")).thenReturn(false);
-
-        assertThat(service().configuredProviders(properties)).containsExactly("google", "linkedin");
-    }
-
-    @Test
     void excludesDisabledProviderFromStoredConfiguration() {
         when(socialProviderSettingsService.configuredProviders())
                 .thenReturn(
@@ -540,7 +508,6 @@ class SocialLoginServiceTest {
                                 new SocialProviderSettingsService.ProviderCredentials(
                                         "microsoft", "microsoft-id", "microsoft-secret")));
         when(loginSettingsService.isSocialProviderEnabled("github")).thenReturn(false);
-
         assertThat(service().configuredProviders())
                 .containsExactly("google", "linkedin", "microsoft");
     }
@@ -554,21 +521,56 @@ class SocialLoginServiceTest {
                                         "google", "google-id", "google-secret"),
                                 new SocialProviderSettingsService.ProviderCredentials(
                                         "microsoft", "", "")));
-        when(loginSettingsService.isSocialProviderEnabled(anyString())).thenReturn(true);
-
         assertThat(service().availableProviders())
                 .extracting(provider -> provider.provider() + ":" + provider.configured())
                 .containsExactly("google:true", "microsoft:false");
     }
 
     @Test
-    void hidesProvidersWhenSocialLoginIsGloballyDisabled() {
-        when(socialProviderSettingsService.isEnabled()).thenReturn(false);
+    void hidesProvidersWhenProviderIsDisabled() {
         when(socialProviderSettingsService.effectiveProviders())
                 .thenReturn(
                         java.util.List.of(
                                 new SocialProviderSettingsService.ProviderCredentials(
-                                        "google", "google-id", "google-secret")));
+                                        "google",
+                                        "google",
+                                        "Google",
+                                        "google",
+                                        "google-id",
+                                        "google-secret",
+                                        false,
+                                        false,
+                                        false,
+                                        false,
+                                        false,
+                                        "sub",
+                                        false,
+                                        false,
+                                        0,
+                                        "always",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        "client_secret_basic",
+                                        "openid",
+                                        "sub",
+                                        "google",
+                                        false,
+                                        false)));
+        when(socialProviderSettingsService.provider("google"))
+                .thenReturn(
+                        new SocialProviderSettingsService.ProviderCredentials(
+                                "google",
+                                "google",
+                                "google-id",
+                                "google-secret",
+                                false,
+                                false,
+                                false,
+                                0,
+                                "always"));
 
         assertThat(service().availableProviders()).isEmpty();
     }
@@ -595,12 +597,31 @@ class SocialLoginServiceTest {
                 .thenReturn(
                         java.util.List.of(
                                 new SocialProviderSettingsService.ProviderCredentials(
-                                        "github", "github-id", "github-secret")));
+                                        "github",
+                                        "github",
+                                        "github-id",
+                                        "github-secret",
+                                        false,
+                                        false,
+                                        false,
+                                        0,
+                                        "always")));
         UserEntity user = new UserEntity();
         user.setUsername("ada");
         when(socialIdentityRepository.findAllByUserUsername("ada"))
                 .thenReturn(java.util.List.of(new SocialIdentityEntity("github", "123", user)));
-        when(loginSettingsService.isSocialProviderEnabled("github")).thenReturn(false);
+        when(socialProviderSettingsService.provider("github"))
+                .thenReturn(
+                        new SocialProviderSettingsService.ProviderCredentials(
+                                "github",
+                                "github",
+                                "github-id",
+                                "github-secret",
+                                false,
+                                false,
+                                false,
+                                0,
+                                "always"));
 
         assertThat(service().socialLinks("ada"))
                 .extracting(
@@ -617,7 +638,18 @@ class SocialLoginServiceTest {
 
     @Test
     void rejectsAuthenticationWhenProviderWasDisabledAfterLoginPageLoad() {
-        when(loginSettingsService.isSocialProviderEnabled("google")).thenReturn(false);
+        when(socialProviderSettingsService.provider("google"))
+                .thenReturn(
+                        new SocialProviderSettingsService.ProviderCredentials(
+                                "google",
+                                "google",
+                                "google-id",
+                                "google-secret",
+                                false,
+                                false,
+                                false,
+                                0,
+                                "always"));
 
         assertThatThrownBy(() -> service().findOrCreate(authentication()))
                 .isInstanceOf(
@@ -730,7 +762,7 @@ class SocialLoginServiceTest {
     @Test
     void handlesGlobalProviderDisablementAndNullProviderNames() {
         assertThat(service().isProviderEnabled(null)).isFalse();
-        when(socialProviderSettingsService.isEnabled()).thenReturn(false);
+        when(loginSettingsService.isSocialProviderEnabled("google")).thenReturn(false);
 
         assertThat(service().isProviderEnabled("google")).isFalse();
         assertThat(service().isProviderLoginAllowed("google")).isFalse();
@@ -974,7 +1006,7 @@ class SocialLoginServiceTest {
 
     @Test
     void rejectsLinksForDisabledUnknownOrAlreadyLinkedAccounts() {
-        when(socialProviderSettingsService.isEnabled()).thenReturn(false);
+        when(loginSettingsService.isSocialProviderEnabled("github")).thenReturn(false);
         assertThatThrownBy(
                         () ->
                                 service()
@@ -984,10 +1016,10 @@ class SocialLoginServiceTest {
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .hasMessageContaining("disabled");
 
-        when(socialProviderSettingsService.isEnabled()).thenReturn(true);
         assertThatThrownBy(() -> service().unlink("ada", "unsupported"))
                 .isInstanceOf(ApiException.class);
 
+        when(loginSettingsService.isSocialProviderEnabled("github")).thenReturn(true);
         UserEntity another = new UserEntity();
         another.setId(99L);
         UserEntity existing = new UserEntity();

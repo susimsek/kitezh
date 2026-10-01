@@ -169,20 +169,6 @@ app:
       file-path: ${APP_LOG_SERVER_FILE_PATH:logs/application-access.log}
   session:
     cleanup-cron: "0 * * * * *"
-  social-login:
-    enabled: ${APP_SOCIAL_LOGIN_ENABLED:false}
-    google:
-      client-id: ${GOOGLE_CLIENT_ID:}
-      client-secret: ${GOOGLE_CLIENT_SECRET:}
-    github:
-      client-id: ${GITHUB_CLIENT_ID:}
-      client-secret: ${GITHUB_CLIENT_SECRET:}
-    linkedin:
-      client-id: ${LINKEDIN_CLIENT_ID:}
-      client-secret: ${LINKEDIN_CLIENT_SECRET:}
-    microsoft:
-      client-id: ${MICROSOFT_CLIENT_ID:}
-      client-secret: ${MICROSOFT_CLIENT_SECRET:}
   authorization-server:
     issuer: https://spring-authorization-server-samples.local
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}

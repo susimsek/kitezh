@@ -1,6 +1,5 @@
 package io.github.susimsek.springauthserversamples.service;
 
-import io.github.susimsek.springauthserversamples.config.security.SocialLoginProperties;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
@@ -211,23 +210,6 @@ public class SocialLoginService {
                 username + ":" + normalizedProvider);
     }
 
-    public List<String> configuredProviders(SocialLoginProperties properties) {
-        return java.util.stream.Stream.of(
-                        new ProviderConfiguration("google", properties.google()),
-                        new ProviderConfiguration("github", properties.github()),
-                        new ProviderConfiguration(LINKEDIN, properties.linkedin()),
-                        new ProviderConfiguration("microsoft", properties.microsoft()))
-                .filter(
-                        configuration ->
-                                configuration.provider().configured()
-                                        && socialProviderSettingsService.isEnabled()
-                                        && loginSettingsService.isSocialProviderEnabled(
-                                                configuration.registrationId()))
-                .map(ProviderConfiguration::registrationId)
-                .sorted()
-                .toList();
-    }
-
     public List<String> configuredProviders() {
         return socialProviderSettingsService.configuredProviders().stream()
                 .map(SocialProviderSettingsService.ProviderCredentials::registrationId)
@@ -277,12 +259,11 @@ public class SocialLoginService {
     public boolean isProviderEnabled(String provider) {
         SocialProviderSettingsService.ProviderCredentials configuredProvider =
                 socialProviderSettingsService.provider(provider);
-        return socialProviderSettingsService.isEnabled()
-                && (configuredProvider != null
-                        ? configuredProvider.enabled()
-                        : provider != null
-                                && loginSettingsService.isSocialProviderEnabled(
-                                        provider.toLowerCase(Locale.ROOT)));
+        return configuredProvider != null
+                ? configuredProvider.enabled()
+                : provider != null
+                        && loginSettingsService.isSocialProviderEnabled(
+                                provider.toLowerCase(Locale.ROOT));
     }
 
     public boolean requiresShortStateParameter(String provider) {
@@ -347,9 +328,6 @@ public class SocialLoginService {
             default -> true;
         };
     }
-
-    private record ProviderConfiguration(
-            String registrationId, SocialLoginProperties.Provider provider) {}
 
     private UserEntity link(String username, String provider, String subject) {
         UserEntity user =
