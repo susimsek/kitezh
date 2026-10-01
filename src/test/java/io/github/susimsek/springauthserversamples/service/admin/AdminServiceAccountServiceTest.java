@@ -36,17 +36,18 @@ class AdminServiceAccountServiceTest {
         ServiceAccountEntity account = new ServiceAccountEntity("client-1", user);
         when(serviceAccountRepository.findByClientId("client-1")).thenReturn(Optional.of(account));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        AdminServiceAccountService service = service();
 
-        assertThat(service().find("client-1").username()).isEqualTo("service-account");
+        assertThat(service.find("client-1").username()).isEqualTo("service-account");
 
         when(serviceAccountRepository.findByClientId("missing")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service().find("missing"))
+        assertThatThrownBy(() -> service.find("missing"))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Service account not found");
 
         when(serviceAccountRepository.findByClientId("client-2")).thenReturn(Optional.of(account));
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service().find("client-2"))
+        assertThatThrownBy(() -> service.find("client-2"))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Service account user not found");
     }
@@ -59,11 +60,11 @@ class AdminServiceAccountServiceTest {
         when(serviceAccountRepository.findByClientId("client-1")).thenReturn(Optional.of(account));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(clientRoleRepository.findAllById(Set.of(10L))).thenReturn(List.of(role));
+        AdminServiceAccountService service = service();
 
         var result =
-                service()
-                        .replaceRoles(
-                                "client-1", new AdminServiceAccountRolesRequestDTO(Set.of(10L)));
+                service.replaceRoles(
+                        "client-1", new AdminServiceAccountRolesRequestDTO(Set.of(10L)));
 
         assertThat(result.roles()).containsExactly("read");
         assertThat(result.roleIds()).containsExactly(10L);
@@ -76,11 +77,9 @@ class AdminServiceAccountServiceTest {
         when(clientRoleRepository.findAllById(Set.of(11L))).thenReturn(List.of(foreignRole));
         assertThatThrownBy(
                         () ->
-                                service()
-                                        .replaceRoles(
-                                                "client-1",
-                                                new AdminServiceAccountRolesRequestDTO(
-                                                        Set.of(11L))))
+                                service.replaceRoles(
+                                        "client-1",
+                                        new AdminServiceAccountRolesRequestDTO(Set.of(11L))))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("All roles must belong to this client");
     }

@@ -80,7 +80,7 @@ final class HttpLogBodySanitizer {
             JsonNode root = JSON_MAPPER.readTree(content);
             maskJsonNode(root, replacement, maskedFields);
             return JSON_MAPPER.writeValueAsString(root);
-        } catch (JacksonException exception) {
+        } catch (JacksonException _) {
             return maskText(content, replacement, maskedFields);
         }
     }

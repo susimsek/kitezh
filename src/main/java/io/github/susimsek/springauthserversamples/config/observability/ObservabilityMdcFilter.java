@@ -47,8 +47,9 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private static final String DIRECTION = "direction";
     private static final String INBOUND = "inbound";
     private static final String TYPE = "type";
+    private static final String AUTHORIZATION = "authorization";
     private static final Set<String> ALWAYS_MASKED_HEADERS =
-            Set.of("authorization", "cookie", "set-cookie", "proxy-authorization");
+            Set.of(AUTHORIZATION, "cookie", "set-cookie", "proxy-authorization");
     private static final Set<String> ALWAYS_MASKED_BODY_FIELDS =
             Set.of(
                     "access_token",
@@ -56,7 +57,7 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                     "id_token",
                     "client_secret",
                     "password",
-                    "authorization",
+                    AUTHORIZATION,
                     "cookie",
                     "token",
                     "secret",
@@ -86,7 +87,7 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                     "client_secret",
                     "client_assertion",
                     "password",
-                    "authorization",
+                    AUTHORIZATION,
                     "token",
                     "secret",
                     "api_key",
@@ -158,7 +159,8 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
         ContentCachingResponseWrapper responseWrapper =
                 includeBody ? new ContentCachingResponseWrapper(response) : null;
         HttpServletRequest requestToFilter = requestWrapper == null ? request : requestWrapper;
-        HttpServletResponse responseToFilter = responseWrapper == null ? response : responseWrapper;
+        final HttpServletResponse responseToFilter =
+                responseWrapper == null ? response : responseWrapper;
         final Map<String, String> previousValues = captureCurrentValues();
         final long startedAt = System.nanoTime();
         final boolean[] failed = {false};
@@ -369,6 +371,7 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                 headers.setContentType(MediaType.parseMediaType(contentType));
             } catch (IllegalArgumentException _) {
                 // An invalid content type cannot be safely classified as text.
+                return headers;
             }
         }
         return headers;
@@ -405,7 +408,7 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private static String decode(String value) {
         try {
             return URLDecoder.decode(value, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException _) {
             return value;
         }
     }

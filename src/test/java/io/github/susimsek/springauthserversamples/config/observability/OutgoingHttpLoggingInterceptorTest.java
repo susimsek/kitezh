@@ -50,8 +50,6 @@ class OutgoingHttpLoggingInterceptorTest {
         properties.setLevel(HttpLoggingLevel.HEADERS);
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
         obfuscate.setHeaders(List.of("X-Secret"));
-        OutgoingHttpLoggingInterceptor interceptor =
-                new OutgoingHttpLoggingInterceptor(properties, obfuscate);
         MockClientHttpRequest request =
                 new MockClientHttpRequest(
                         HttpMethod.POST, URI.create("https://idp.example/token?code=secret"));
@@ -60,6 +58,8 @@ class OutgoingHttpLoggingInterceptorTest {
         MockClientHttpResponse response = new MockClientHttpResponse(new byte[0], 200);
         response.getHeaders().add("X-Response", "visible");
         response.getHeaders().add("Set-Cookie", "secret-cookie");
+        OutgoingHttpLoggingInterceptor interceptor =
+                new OutgoingHttpLoggingInterceptor(properties, obfuscate);
         interceptor.intercept(
                 request,
                 "client_secret=secret".getBytes(),

@@ -230,12 +230,12 @@ class ObservabilityMdcFilterTest {
         LoggingProperties properties = new LoggingProperties();
         properties.getServer().setLevel(HttpLoggingLevel.FULL);
         properties.setMaxBodyBytes(1024);
-        ObservabilityMdcFilter fullFilter = new ObservabilityMdcFilter(properties);
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/body");
         request.setContentType(MediaType.APPLICATION_JSON_VALUE);
         request.setContent("{\"password\":\"secret\",\"name\":\"visible\"}".getBytes());
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        ObservabilityMdcFilter fullFilter = new ObservabilityMdcFilter(properties);
 
         fullFilter.doFilterInternal(
                 request,
@@ -347,11 +347,9 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void ignoresBlankRequestIdentifiersAndAnonymousAuthentication() throws Exception {
-        LoggingProperties.Server server = new LoggingProperties.Server();
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
         obfuscate.setHeaders(java.util.Arrays.asList(null, " ", "X-Secret"));
         obfuscate.setCookies(java.util.Arrays.asList(null, " ", "SESSION"));
-        ObservabilityMdcFilter configuredFilter = new ObservabilityMdcFilter(server, obfuscate);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/anonymous");
         request.setParameter("client_id", " ");
         request.setParameter("clientId", "");
@@ -363,6 +361,8 @@ class ObservabilityMdcFilterTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
 
         AtomicReference<Map<String, String>> observed = new AtomicReference<>();
+        LoggingProperties.Server server = new LoggingProperties.Server();
+        ObservabilityMdcFilter configuredFilter = new ObservabilityMdcFilter(server, obfuscate);
         configuredFilter.doFilterInternal(
                 request,
                 new MockHttpServletResponse(),
