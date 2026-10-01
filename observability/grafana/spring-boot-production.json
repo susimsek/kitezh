@@ -51,7 +51,7 @@
       },
       "targets": [
         {
-          "expr": "((count(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}) > bool 0) or (count(process_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}) > bool 0) or vector(0))",
+          "expr": "((count(process_uptime_milliseconds{job=~\"$job\",service_name=~\"$instance\"}) > bool 0) or (count(process_uptime_seconds{job=~\"$job\",service_name=~\"$instance\"}) > bool 0) or vector(0))",
           "refId": "A"
         }
       ],
@@ -101,7 +101,7 @@
       },
       "targets": [
         {
-          "expr": "(time() - max(timestamp(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}))) or (time() - max(timestamp(process_uptime_seconds{job=~\"$job\",instance=~\"$instance\"})))",
+          "expr": "(time() - max(timestamp(process_uptime_milliseconds{job=~\"$job\",service_name=~\"$instance\"}))) or (time() - max(timestamp(process_uptime_seconds{job=~\"$job\",service_name=~\"$instance\"})))",
           "refId": "A"
         }
       ],
@@ -139,7 +139,7 @@
       },
       "targets": [
         {
-          "expr": "((process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}) / 1000) or process_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "((process_uptime_milliseconds{job=~\"$job\",service_name=~\"$instance\"}) / 1000) or process_uptime_seconds{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -179,7 +179,7 @@
       },
       "targets": [
         {
-          "expr": "((application_ready_time_milliseconds{job=~\"$job\",instance=~\"$instance\"}) / 1000) or application_ready_time_seconds{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "((application_ready_time_milliseconds{job=~\"$job\",service_name=~\"$instance\"}) / 1000) or application_ready_time_seconds{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -219,7 +219,7 @@
       },
       "targets": [
         {
-          "expr": "((application_started_time_milliseconds{job=~\"$job\",instance=~\"$instance\"}) / 1000) or application_started_time_seconds{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "((application_started_time_milliseconds{job=~\"$job\",service_name=~\"$instance\"}) / 1000) or application_started_time_seconds{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -315,7 +315,7 @@
       },
       "targets": [
         {
-          "expr": "(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])))",
           "refId": "A",
           "legendFormat": "requests/sec",
           "exemplar": true
@@ -355,7 +355,7 @@
       },
       "targets": [
         {
-          "expr": "((100 * sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or (100 * sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or vector(0))",
+          "expr": "((100 * sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)) or (100 * sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)) or vector(0))",
           "refId": "A",
           "legendFormat": "5xx %",
           "exemplar": true
@@ -395,7 +395,7 @@
       },
       "targets": [
         {
-          "expr": "((sum(rate(http_server_requests_milliseconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or (1000 * sum(rate(http_server_requests_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)))",
+          "expr": "((sum(rate(http_server_requests_milliseconds_sum{job=~\"$job\",service_name=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)) or (1000 * sum(rate(http_server_requests_seconds_sum{job=~\"$job\",service_name=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)))",
           "refId": "A",
           "legendFormat": "average",
           "exemplar": true
@@ -435,7 +435,7 @@
       },
       "targets": [
         {
-          "expr": "(histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))) or 1000 * histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))))",
+          "expr": "(histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",service_name=~\"$instance\"}[5m]))) or 1000 * histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",service_name=~\"$instance\"}[5m]))))",
           "refId": "A",
           "legendFormat": "p95",
           "exemplar": true
@@ -475,7 +475,7 @@
       },
       "targets": [
         {
-          "expr": "(histogram_quantile(0.99, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))) or 1000 * histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))))",
+          "expr": "(histogram_quantile(0.99, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",service_name=~\"$instance\"}[5m]))) or 1000 * histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",service_name=~\"$instance\"}[5m]))))",
           "refId": "A",
           "legendFormat": "p99",
           "exemplar": true
@@ -501,8 +501,8 @@
     {
       "id": 19,
       "type": "gauge",
-      "title": "HTTP availability",
-      "description": "Availability based on the presence of the application OTLP process metric.",
+      "title": "Telemetry availability",
+      "description": "Availability based on the presence of the application OTLP process metric; use Prometheus scrape availability below for the Kubernetes scrape SLI.",
       "gridPos": {
         "h": 5,
         "w": 6,
@@ -515,7 +515,7 @@
       },
       "targets": [
         {
-          "expr": "((avg_over_time((count(process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"}) > bool 0)[$__range:$__interval])) or (avg_over_time((count(process_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}) > bool 0)[$__range:$__interval])) or vector(0))",
+          "expr": "((avg_over_time((count(process_uptime_milliseconds{job=~\"$job\",service_name=~\"$instance\"}) > bool 0)[$__range:$__interval])) or (avg_over_time((count(process_uptime_seconds{job=~\"$job\",service_name=~\"$instance\"}) > bool 0)[$__range:$__interval])) or vector(0))",
           "refId": "A"
         }
       ],
@@ -570,7 +570,7 @@
       },
       "targets": [
         {
-          "expr": "((sum(rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\",le=\"250\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)) or (sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\",le=\"0.25\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)))",
+          "expr": "((sum(rate(http_server_requests_milliseconds_bucket{job=~\"$job\",service_name=~\"$instance\",le=\"250\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[$__range])), 1)) or (sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",service_name=~\"$instance\",le=\"0.25\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[$__range])), 1)))",
           "refId": "A",
           "exemplar": true
         }
@@ -612,8 +612,8 @@
     {
       "id": 21,
       "type": "gauge",
-      "title": "Server error rate",
-      "description": "Fraction of HTTP responses with a 5xx status in the selected time range.",
+      "title": "Server error rate (all routes)",
+      "description": "Fraction of all HTTP responses with a 5xx status in the selected time range. The authentication SLO below isolates authentication endpoints.",
       "gridPos": {
         "h": 5,
         "w": 6,
@@ -626,7 +626,7 @@
       },
       "targets": [
         {
-          "expr": "((sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)) or (sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)) or vector(0))",
+          "expr": "((sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[$__range])), 1)) or (sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[$__range])), 1)) or vector(0))",
           "refId": "A",
           "exemplar": true
         }
@@ -641,12 +641,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
               },
               {
-                "color": "green",
-                "value": 0.95
+                "color": "red",
+                "value": 0.001
               }
             ]
           }
@@ -682,7 +682,7 @@
       },
       "targets": [
         {
-          "expr": "(sum(increase(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])) or sum(increase(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])))",
+          "expr": "(sum(increase(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[$__range])) or sum(increase(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[$__range])))",
           "refId": "A",
           "exemplar": true
         }
@@ -723,7 +723,7 @@
       },
       "targets": [
         {
-          "expr": "(sum(http_server_requests_active_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}) or sum(http_server_requests_active_seconds_count{job=~\"$job\",instance=~\"$instance\"}))",
+          "expr": "(sum(http_server_requests_active_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}) or sum(http_server_requests_active_seconds_count{job=~\"$job\",service_name=~\"$instance\"}))",
           "refId": "A",
           "legendFormat": "in-flight"
         }
@@ -761,7 +761,7 @@
       },
       "targets": [
         {
-          "expr": "(sum by (uri,method,status,outcome) (rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum by (uri,method,status,outcome) (rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "(sum by (uri,method,status,outcome) (rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])) or sum by (uri,method,status,outcome) (rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])))",
           "refId": "A",
           "instant": true,
           "format": "table"
@@ -797,7 +797,7 @@
       },
       "targets": [
         {
-          "expr": "(sum by (status,outcome) (rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"4..|5..\"}[5m])) or sum by (status,outcome) (rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"4..|5..\"}[5m])))",
+          "expr": "(sum by (status,outcome) (rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",status=~\"4..|5..\"}[5m])) or sum by (status,outcome) (rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",status=~\"4..|5..\"}[5m])))",
           "refId": "A",
           "legendFormat": "{{status}} {{outcome}}",
           "exemplar": true
@@ -829,7 +829,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 111
+        "y": 120
       },
       "panels": []
     },
@@ -842,7 +842,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 112
+        "y": 121
       },
       "datasource": {
         "type": "prometheus",
@@ -891,7 +891,7 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 112
+        "y": 121
       },
       "datasource": {
         "type": "prometheus",
@@ -930,7 +930,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 112
+        "y": 121
       },
       "datasource": {
         "type": "prometheus",
@@ -969,7 +969,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 117
+        "y": 126
       },
       "datasource": {
         "type": "prometheus",
@@ -1008,7 +1008,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 117
+        "y": 126
       },
       "datasource": {
         "type": "prometheus",
@@ -1039,6 +1039,247 @@
       }
     },
     {
+      "id": 83,
+      "type": "row",
+      "title": "SLI / SLO & Scrape Health",
+      "description": "30-day authentication service-level indicators. Prometheus scrape availability requires a ServiceMonitor or another Prometheus scrape target.",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 79,
+      "type": "gauge",
+      "title": "Prometheus scrape availability",
+      "description": "30-day availability of Prometheus scrape targets. Target: 99.9%. This is populated when the service is scraped by Prometheus/ServiceMonitor.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time((max(up{job=~\"$job\"}) > bool 0)[30d:5m])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.999
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 80,
+      "type": "gauge",
+      "title": "Authentication latency SLI",
+      "description": "30-day fraction of login, authorize, token, introspection, revoke, and logout requests completed within 250 ms. Target: 95%.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "((sum(rate(http_server_requests_milliseconds_bucket{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\",le=\"250\"}[30d])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\"}[30d])), 1)) or (sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\",le=\"0.25\"}[30d])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\"}[30d])), 1)))",
+          "refId": "A",
+          "exemplar": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 81,
+      "type": "gauge",
+      "title": "Authentication server-error SLI",
+      "description": "30-day fraction of authentication requests returning SERVER_ERROR. Target: below 0.1%.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "((sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\",outcome=\"SERVER_ERROR\"}[30d])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\"}[30d])), 1)) or (sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\",outcome=\"SERVER_ERROR\"}[30d])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\"}[30d])), 1)))",
+          "refId": "A",
+          "exemplar": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 82,
+      "type": "gauge",
+      "title": "Authentication error budget remaining",
+      "description": "Remaining 30-day error budget for authentication server errors, based on a 0.1% target.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "clamp_min(1 - (((sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\",outcome=\"SERVER_ERROR\"}[30d])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\"}[30d])), 1)) or (sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\",outcome=\"SERVER_ERROR\"}[30d])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\",uri=~\"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke\"}[30d])), 1))) / 0.001), 0)",
+          "refId": "A",
+          "exemplar": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
       "id": 52,
       "type": "row",
       "title": "JVM Memory & GC",
@@ -1047,7 +1288,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 49
       },
       "panels": []
     },
@@ -1060,7 +1301,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 41
+        "y": 50
       },
       "datasource": {
         "type": "prometheus",
@@ -1068,17 +1309,17 @@
       },
       "targets": [
         {
-          "expr": "sum(jvm_memory_used_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "A",
           "legendFormat": "used"
         },
         {
-          "expr": "sum(jvm_memory_committed_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_committed_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "B",
           "legendFormat": "committed"
         },
         {
-          "expr": "sum(jvm_memory_max_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_max_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "C",
           "legendFormat": "max"
         }
@@ -1109,7 +1350,7 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 41
+        "y": 50
       },
       "datasource": {
         "type": "prometheus",
@@ -1117,7 +1358,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(jvm_memory_used_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"}), 1)",
+          "expr": "100 * sum(jvm_memory_used_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"}), 1)",
           "refId": "A",
           "legendFormat": "heap %"
         }
@@ -1148,7 +1389,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 41
+        "y": 50
       },
       "datasource": {
         "type": "prometheus",
@@ -1156,7 +1397,7 @@
       },
       "targets": [
         {
-          "expr": "100 * jvm_gc_overhead{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "100 * jvm_gc_overhead{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "pause seconds/sec"
         }
@@ -1187,7 +1428,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 55
       },
       "panels": []
     },
@@ -1200,7 +1441,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 47
+        "y": 56
       },
       "datasource": {
         "type": "prometheus",
@@ -1208,12 +1449,12 @@
       },
       "targets": [
         {
-          "expr": "100 * process_cpu_usage{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "100 * process_cpu_usage{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "process %"
         },
         {
-          "expr": "100 * system_cpu_usage{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "100 * system_cpu_usage{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "B",
           "legendFormat": "system %"
         }
@@ -1244,7 +1485,7 @@
         "h": 5,
         "w": 6,
         "x": 8,
-        "y": 47
+        "y": 56
       },
       "datasource": {
         "type": "prometheus",
@@ -1252,7 +1493,7 @@
       },
       "targets": [
         {
-          "expr": "system_load_average_1m{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "system_load_average_1m{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -1284,7 +1525,7 @@
         "h": 5,
         "w": 6,
         "x": 14,
-        "y": 47
+        "y": 56
       },
       "datasource": {
         "type": "prometheus",
@@ -1292,7 +1533,7 @@
       },
       "targets": [
         {
-          "expr": "system_cpu_count{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "system_cpu_count{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -1324,7 +1565,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 52
+        "y": 61
       },
       "datasource": {
         "type": "prometheus",
@@ -1332,12 +1573,12 @@
       },
       "targets": [
         {
-          "expr": "jvm_threads_live{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_threads_live{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "live"
         },
         {
-          "expr": "jvm_threads_daemon{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_threads_daemon{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "B",
           "legendFormat": "daemon"
         }
@@ -1367,7 +1608,7 @@
         "h": 5,
         "w": 6,
         "x": 8,
-        "y": 52
+        "y": 61
       },
       "datasource": {
         "type": "prometheus",
@@ -1375,7 +1616,7 @@
       },
       "targets": [
         {
-          "expr": "jvm_threads_peak{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_threads_peak{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -1406,7 +1647,7 @@
         "h": 5,
         "w": 6,
         "x": 14,
-        "y": 52
+        "y": 61
       },
       "datasource": {
         "type": "prometheus",
@@ -1414,7 +1655,7 @@
       },
       "targets": [
         {
-          "expr": "rate(jvm_threads_started_total{job=~\"$job\",instance=~\"$instance\"}[5m])",
+          "expr": "rate(jvm_threads_started_total{job=~\"$job\",service_name=~\"$instance\"}[5m])",
           "refId": "A",
           "legendFormat": "threads/sec"
         }
@@ -1445,7 +1686,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 57
+        "y": 66
       },
       "datasource": {
         "type": "prometheus",
@@ -1453,22 +1694,22 @@
       },
       "targets": [
         {
-          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"runnable\"})",
+          "expr": "sum(jvm_threads_states{job=~\"$job\",service_name=~\"$instance\",state=\"runnable\"})",
           "refId": "A",
           "legendFormat": "runnable"
         },
         {
-          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"waiting\"})",
+          "expr": "sum(jvm_threads_states{job=~\"$job\",service_name=~\"$instance\",state=\"waiting\"})",
           "refId": "B",
           "legendFormat": "waiting"
         },
         {
-          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"blocked\"})",
+          "expr": "sum(jvm_threads_states{job=~\"$job\",service_name=~\"$instance\",state=\"blocked\"})",
           "refId": "C",
           "legendFormat": "blocked"
         },
         {
-          "expr": "sum(jvm_threads_states{job=~\"$job\",instance=~\"$instance\",state=\"timed-waiting\"})",
+          "expr": "sum(jvm_threads_states{job=~\"$job\",service_name=~\"$instance\",state=\"timed-waiting\"})",
           "refId": "D",
           "legendFormat": "timed waiting"
         }
@@ -1499,7 +1740,7 @@
         "h": 5,
         "w": 8,
         "x": 6,
-        "y": 57
+        "y": 66
       },
       "datasource": {
         "type": "prometheus",
@@ -1507,12 +1748,12 @@
       },
       "targets": [
         {
-          "expr": "jvm_classes_loaded{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_classes_loaded{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "loaded"
         },
         {
-          "expr": "jvm_classes_unloaded_total{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jvm_classes_unloaded_total{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "B",
           "legendFormat": "unloaded total"
         }
@@ -1543,7 +1784,7 @@
         "h": 5,
         "w": 6,
         "x": 14,
-        "y": 57
+        "y": 66
       },
       "datasource": {
         "type": "prometheus",
@@ -1551,7 +1792,7 @@
       },
       "targets": [
         {
-          "expr": "100 * process_files_open{job=~\"$job\",instance=~\"$instance\"} / clamp_min(process_files_max{job=~\"$job\",instance=~\"$instance\"}, 1)",
+          "expr": "100 * process_files_open{job=~\"$job\",service_name=~\"$instance\"} / clamp_min(process_files_max{job=~\"$job\",service_name=~\"$instance\"}, 1)",
           "refId": "A"
         }
       ],
@@ -1583,7 +1824,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 62
+        "y": 71
       },
       "datasource": {
         "type": "prometheus",
@@ -1591,7 +1832,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(disk_free_bytes{job=~\"$job\",instance=~\"$instance\"}) / clamp_min(sum(disk_total_bytes{job=~\"$job\",instance=~\"$instance\"}), 1)",
+          "expr": "100 * sum(disk_free_bytes{job=~\"$job\",service_name=~\"$instance\"}) / clamp_min(sum(disk_total_bytes{job=~\"$job\",service_name=~\"$instance\"}), 1)",
           "refId": "A"
         }
       ],
@@ -1623,7 +1864,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 67
+        "y": 76
       },
       "panels": []
     },
@@ -1636,7 +1877,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 68
+        "y": 77
       },
       "datasource": {
         "type": "prometheus",
@@ -1644,17 +1885,17 @@
       },
       "targets": [
         {
-          "expr": "hikaricp_connections_active{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "hikaricp_connections_active{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "active"
         },
         {
-          "expr": "hikaricp_connections_max{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "hikaricp_connections_max{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "B",
           "legendFormat": "max"
         },
         {
-          "expr": "hikaricp_connections_pending{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "hikaricp_connections_pending{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "C",
           "legendFormat": "pending"
         }
@@ -1685,7 +1926,7 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 68
+        "y": 77
       },
       "datasource": {
         "type": "prometheus",
@@ -1693,7 +1934,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(hikaricp_connections_timeout_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum(rate(hikaricp_connections_timeout_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "A",
           "legendFormat": "timeouts/sec"
         }
@@ -1724,7 +1965,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 68
+        "y": 77
       },
       "datasource": {
         "type": "prometheus",
@@ -1732,12 +1973,12 @@
       },
       "targets": [
         {
-          "expr": "jdbc_connections_active{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jdbc_connections_active{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "active"
         },
         {
-          "expr": "jdbc_connections_max{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "jdbc_connections_max{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "B",
           "legendFormat": "max"
         }
@@ -1768,7 +2009,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 73
+        "y": 82
       },
       "datasource": {
         "type": "prometheus",
@@ -1776,7 +2017,7 @@
       },
       "targets": [
         {
-          "expr": "(sum(rate(spring_data_repository_invocations_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum(rate(spring_data_repository_invocations_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "(sum(rate(spring_data_repository_invocations_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])) or sum(rate(spring_data_repository_invocations_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])))",
           "refId": "A",
           "legendFormat": "invocations/sec"
         }
@@ -1807,7 +2048,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 73
+        "y": 82
       },
       "datasource": {
         "type": "prometheus",
@@ -1815,7 +2056,7 @@
       },
       "targets": [
         {
-          "expr": "((sum(rate(spring_data_repository_invocations_milliseconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(spring_data_repository_invocations_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or (1000 * sum(rate(spring_data_repository_invocations_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(spring_data_repository_invocations_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)))",
+          "expr": "((sum(rate(spring_data_repository_invocations_milliseconds_sum{job=~\"$job\",service_name=~\"$instance\"}[5m])) / clamp_min(sum(rate(spring_data_repository_invocations_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)) or (1000 * sum(rate(spring_data_repository_invocations_seconds_sum{job=~\"$job\",service_name=~\"$instance\"}[5m])) / clamp_min(sum(rate(spring_data_repository_invocations_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)))",
           "refId": "A",
           "legendFormat": "average"
         }
@@ -1846,7 +2087,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 73
+        "y": 82
       },
       "datasource": {
         "type": "prometheus",
@@ -1854,17 +2095,17 @@
       },
       "targets": [
         {
-          "expr": "hikaricp_connections_pending{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "hikaricp_connections_pending{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A",
           "legendFormat": "pending"
         },
         {
-          "expr": "(sum by (instance) (rate(hikaricp_connections_acquire_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum by (instance) (rate(hikaricp_connections_acquire_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "(sum by (service_name) (rate(hikaricp_connections_acquire_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])) or sum by (service_name) (rate(hikaricp_connections_acquire_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])))",
           "refId": "B",
           "legendFormat": "acquired/sec"
         },
         {
-          "expr": "((sum by (instance) (rate(hikaricp_connections_acquire_milliseconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum by (instance) (rate(hikaricp_connections_acquire_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or 1000 * (sum by (instance) (rate(hikaricp_connections_acquire_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum by (instance) (rate(hikaricp_connections_acquire_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)))",
+          "expr": "((sum by (service_name) (rate(hikaricp_connections_acquire_milliseconds_sum{job=~\"$job\",service_name=~\"$instance\"}[5m])) / clamp_min(sum by (service_name) (rate(hikaricp_connections_acquire_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)) or 1000 * (sum by (service_name) (rate(hikaricp_connections_acquire_seconds_sum{job=~\"$job\",service_name=~\"$instance\"}[5m])) / clamp_min(sum by (service_name) (rate(hikaricp_connections_acquire_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)))",
           "refId": "C",
           "legendFormat": "acquire wait avg"
         }
@@ -1895,7 +2136,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 87
       },
       "panels": []
     },
@@ -1903,12 +2144,12 @@
       "id": 66,
       "type": "stat",
       "title": "Active instances",
-      "description": "Number of application instances currently publishing process uptime.",
+      "description": "Number of application services currently publishing process uptime.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 79
+        "y": 88
       },
       "datasource": {
         "type": "prometheus",
@@ -1916,7 +2157,7 @@
       },
       "targets": [
         {
-          "expr": "(count(count by (instance) (process_uptime_milliseconds{job=~\"$job\",instance=~\"$instance\"})) or count(count by (instance) (process_uptime_seconds{job=~\"$job\",instance=~\"$instance\"})))",
+          "expr": "(count(count by (service_name) (process_uptime_milliseconds{job=~\"$job\",service_name=~\"$instance\"})) or count(count by (service_name) (process_uptime_seconds{job=~\"$job\",service_name=~\"$instance\"})))",
           "refId": "A"
         }
       ],
@@ -1943,13 +2184,13 @@
     {
       "id": 67,
       "type": "timeseries",
-      "title": "Request rate by instance",
-      "description": "Request rate for each application instance or Kubernetes pod target.",
+      "title": "Request rate by service",
+      "description": "Request rate for each application service or Kubernetes pod target.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 79
+        "y": 88
       },
       "datasource": {
         "type": "prometheus",
@@ -1957,9 +2198,9 @@
       },
       "targets": [
         {
-          "expr": "(sum by (instance) (rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum by (instance) (rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "(sum by (service_name) (rate(http_server_requests_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])) or sum by (service_name) (rate(http_server_requests_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])))",
           "refId": "A",
-          "legendFormat": "{{instance}}",
+          "legendFormat": "{{service_name}}",
           "exemplar": true
         }
       ],
@@ -1983,13 +2224,13 @@
     {
       "id": 68,
       "type": "timeseries",
-      "title": "Heap memory by instance",
-      "description": "Heap memory used, committed, and maximum values by instance or Kubernetes pod target.",
+      "title": "Heap memory by service",
+      "description": "Heap memory used, committed, and maximum values by service or Kubernetes pod target.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 79
+        "y": 88
       },
       "datasource": {
         "type": "prometheus",
@@ -1997,19 +2238,19 @@
       },
       "targets": [
         {
-          "expr": "sum by (instance) (jvm_memory_used_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"})",
+          "expr": "sum by (service_name) (jvm_memory_used_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "A",
-          "legendFormat": "{{instance}} used"
+          "legendFormat": "{{service_name}} used"
         },
         {
-          "expr": "sum by (instance) (jvm_memory_committed_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"})",
+          "expr": "sum by (service_name) (jvm_memory_committed_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "B",
-          "legendFormat": "{{instance}} committed"
+          "legendFormat": "{{service_name}} committed"
         },
         {
-          "expr": "sum by (instance) (jvm_memory_max_bytes{job=~\"$job\",instance=~\"$instance\",area=\"heap\"})",
+          "expr": "sum by (service_name) (jvm_memory_max_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "C",
-          "legendFormat": "{{instance}} max"
+          "legendFormat": "{{service_name}} max"
         }
       ],
       "fieldConfig": {
@@ -2032,13 +2273,13 @@
     {
       "id": 69,
       "type": "timeseries",
-      "title": "Database connections by instance",
+      "title": "Database connections by service",
       "description": "Active and pending database connections per application instance.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 79
+        "y": 88
       },
       "datasource": {
         "type": "prometheus",
@@ -2046,14 +2287,14 @@
       },
       "targets": [
         {
-          "expr": "max by (instance) (hikaricp_connections_active{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "max by (service_name) (hikaricp_connections_active{job=~\"$job\",service_name=~\"$instance\"})",
           "refId": "A",
-          "legendFormat": "{{instance}} active"
+          "legendFormat": "{{service_name}} active"
         },
         {
-          "expr": "max by (instance) (hikaricp_connections_pending{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "max by (service_name) (hikaricp_connections_pending{job=~\"$job\",service_name=~\"$instance\"})",
           "refId": "B",
-          "legendFormat": "{{instance}} pending"
+          "legendFormat": "{{service_name}} pending"
         }
       ],
       "fieldConfig": {
@@ -2082,7 +2323,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 93
       },
       "panels": []
     },
@@ -2095,7 +2336,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 85
+        "y": 94
       },
       "datasource": {
         "type": "prometheus",
@@ -2103,7 +2344,7 @@
       },
       "targets": [
         {
-          "expr": "(sum by (spring_security_authorization_decision) (rate(spring_security_authorizations_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum by (spring_security_authorization_decision) (rate(spring_security_authorizations_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
+          "expr": "(sum by (spring_security_authorization_decision) (rate(spring_security_authorizations_milliseconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])) or sum by (spring_security_authorization_decision) (rate(spring_security_authorizations_seconds_count{job=~\"$job\",service_name=~\"$instance\"}[5m])))",
           "refId": "A",
           "legendFormat": "{{spring_security_authorization_decision}}"
         }
@@ -2134,7 +2375,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 85
+        "y": 94
       },
       "datasource": {
         "type": "prometheus",
@@ -2142,7 +2383,7 @@
       },
       "targets": [
         {
-          "expr": "tomcat_sessions_active_current{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "tomcat_sessions_active_current{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -2174,7 +2415,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 85
+        "y": 94
       },
       "datasource": {
         "type": "prometheus",
@@ -2182,7 +2423,7 @@
       },
       "targets": [
         {
-          "expr": "tomcat_sessions_active_max{job=~\"$job\",instance=~\"$instance\"}",
+          "expr": "tomcat_sessions_active_max{job=~\"$job\",service_name=~\"$instance\"}",
           "refId": "A"
         }
       ],
@@ -2214,7 +2455,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 90
+        "y": 99
       },
       "panels": []
     },
@@ -2227,7 +2468,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 91
+        "y": 100
       },
       "datasource": {
         "type": "prometheus",
@@ -2235,12 +2476,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(logback_events_total{job=~\"$job\",instance=~\"$instance\",level=\"error\"}[5m]))",
+          "expr": "sum(rate(logback_events_total{job=~\"$job\",service_name=~\"$instance\",level=\"error\"}[5m]))",
           "refId": "A",
           "legendFormat": "error"
         },
         {
-          "expr": "sum(rate(logback_events_total{job=~\"$job\",instance=~\"$instance\",level=\"warn\"}[5m]))",
+          "expr": "sum(rate(logback_events_total{job=~\"$job\",service_name=~\"$instance\",level=\"warn\"}[5m]))",
           "refId": "B",
           "legendFormat": "warn"
         }
@@ -2271,7 +2512,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 96
+        "y": 105
       },
       "panels": []
     },
@@ -2308,11 +2549,11 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 97
+        "y": 106
       },
       "targets": [
         {
-          "expr": "100 * sum(rate(cache_gets_total{job=~\"$job\",instance=~\"$instance\",result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)",
+          "expr": "100 * sum(rate(cache_gets_total{job=~\"$job\",service_name=~\"$instance\",result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=~\"$job\",service_name=~\"$instance\"}[5m])), 1)",
           "refId": "A"
         }
       ]
@@ -2347,11 +2588,11 @@
         "h": 5,
         "w": 8,
         "x": 8,
-        "y": 97
+        "y": 106
       },
       "targets": [
         {
-          "expr": "sum by (result) (rate(cache_gets_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (result) (rate(cache_gets_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{result}}/sec"
         }
@@ -2387,16 +2628,16 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 97
+        "y": 106
       },
       "targets": [
         {
-          "expr": "sum(rate(cache_evictions_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum(rate(cache_evictions_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "A",
           "legendFormat": "evictions/sec"
         },
         {
-          "expr": "sum(cache_size{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "sum(cache_size{job=~\"$job\",service_name=~\"$instance\"})",
           "refId": "B",
           "legendFormat": "entries"
         }
@@ -2410,7 +2651,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 102
+        "y": 111
       },
       "datasource": {
         "type": "prometheus",
@@ -2418,31 +2659,31 @@
       },
       "targets": [
         {
-          "expr": "sum by (name,result) (rate(cache_gets_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (name,result) (rate(cache_gets_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "A",
           "instant": true,
           "format": "table"
         },
         {
-          "expr": "sum by (name) (rate(cache_puts_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (name) (rate(cache_puts_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "B",
           "instant": true,
           "format": "table"
         },
         {
-          "expr": "sum by (name) (rate(cache_evictions_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (name) (rate(cache_evictions_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "C",
           "instant": true,
           "format": "table"
         },
         {
-          "expr": "sum by (name) (cache_size{job=~\"$job\",instance=~\"$instance\"})",
+          "expr": "sum by (name) (cache_size{job=~\"$job\",service_name=~\"$instance\"})",
           "refId": "D",
           "instant": true,
           "format": "table"
         },
         {
-          "expr": "sum by (name) (rate(cache_removals_total{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (name) (rate(cache_removals_total{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "E",
           "instant": true,
           "format": "table"
@@ -2470,7 +2711,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 41
       },
       "datasource": {
         "type": "prometheus",
@@ -2478,7 +2719,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))",
+          "expr": "sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",service_name=~\"$instance\"}[5m]))",
           "refId": "A",
           "format": "heatmap",
           "exemplar": true
@@ -2522,7 +2763,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 73
+        "y": 82
       },
       "datasource": {
         "type": "prometheus",
@@ -2530,12 +2771,12 @@
       },
       "targets": [
         {
-          "expr": "100 * hikaricp_connections_active{job=~\"$job\",instance=~\"$instance\"} / clamp_min(hikaricp_connections_max{job=~\"$job\",instance=~\"$instance\"}, 1)",
+          "expr": "100 * hikaricp_connections_active{job=~\"$job\",service_name=~\"$instance\"} / clamp_min(hikaricp_connections_max{job=~\"$job\",service_name=~\"$instance\"}, 1)",
           "refId": "A",
           "legendFormat": "active %"
         },
         {
-          "expr": "100 * hikaricp_connections_idle{job=~\"$job\",instance=~\"$instance\"} / clamp_min(hikaricp_connections_max{job=~\"$job\",instance=~\"$instance\"}, 1)",
+          "expr": "100 * hikaricp_connections_idle{job=~\"$job\",service_name=~\"$instance\"} / clamp_min(hikaricp_connections_max{job=~\"$job\",service_name=~\"$instance\"}, 1)",
           "refId": "B",
           "legendFormat": "idle %"
         }
@@ -2629,7 +2870,7 @@
         },
         "definition": "label_values(spring_authorization_server_events_total, service_name)",
         "includeAll": true,
-        "label": "Instance",
+        "label": "Service",
         "name": "instance",
         "options": [],
         "query": {
@@ -2638,7 +2879,8 @@
         },
         "refresh": 1,
         "type": "query",
-        "multi": true
+        "multi": true,
+        "description": "OpenTelemetry service_name selector."
       }
     ]
   },
@@ -2670,6 +2912,6 @@
   "timezone": "browser",
   "title": "Spring Authorization Server",
   "uid": "spring-auth-prod",
-  "version": 17,
+  "version": 19,
   "weekStart": ""
 }
