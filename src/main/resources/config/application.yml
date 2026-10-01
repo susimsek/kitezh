@@ -106,6 +106,8 @@ management:
         enabled: ${MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED:false}
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+    exemplars:
+      include: ${MANAGEMENT_TRACING_EXEMPLARS_INCLUDE:sampled-traces}
   otlp:
     metrics:
       export:
