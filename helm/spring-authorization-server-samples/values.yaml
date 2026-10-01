@@ -87,13 +87,13 @@ serviceMonitor:
 
 probes:
   startup:
-    enabled: false
-    path: /actuator/health/readiness
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    timeoutSeconds: 1
+    enabled: true
+    path: /actuator/health/liveness
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 2
     successThreshold: 1
-    failureThreshold: 10
+    failureThreshold: 60
   liveness:
     enabled: true
     path: /actuator/health/liveness

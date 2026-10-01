@@ -162,7 +162,7 @@ app:
     server:
       enabled: ${APP_LOG_SERVER_ENABLED:true}
       level: ${APP_LOG_SERVER_LEVEL:BASIC}
-      exclude-paths: ${APP_LOG_SERVER_EXCLUDE_PATHS:}
+      exclude-paths: ${APP_LOG_SERVER_EXCLUDE_PATHS:/actuator/(health(?:/.*)?|prometheus|metrics(?:/.*)?)}
       file-enabled: ${APP_LOG_SERVER_FILE_ENABLED:false}
       file-path: ${APP_LOG_SERVER_FILE_PATH:logs/application-access.log}
   session:
