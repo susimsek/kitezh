@@ -317,7 +317,8 @@
         {
           "expr": "(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
           "refId": "A",
-          "legendFormat": "requests/sec"
+          "legendFormat": "requests/sec",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -356,7 +357,8 @@
         {
           "expr": "((100 * sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or (100 * sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or vector(0))",
           "refId": "A",
-          "legendFormat": "5xx %"
+          "legendFormat": "5xx %",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -395,7 +397,8 @@
         {
           "expr": "((sum(rate(http_server_requests_milliseconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)) or (1000 * sum(rate(http_server_requests_seconds_sum{job=~\"$job\",instance=~\"$instance\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])), 1)))",
           "refId": "A",
-          "legendFormat": "average"
+          "legendFormat": "average",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -434,7 +437,8 @@
         {
           "expr": "(histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))) or 1000 * histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))))",
           "refId": "A",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -473,7 +477,8 @@
         {
           "expr": "(histogram_quantile(0.99, sum by (le) (rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))) or 1000 * histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))))",
           "refId": "A",
-          "legendFormat": "p99"
+          "legendFormat": "p99",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -566,7 +571,8 @@
       "targets": [
         {
           "expr": "((sum(rate(http_server_requests_milliseconds_bucket{job=~\"$job\",instance=~\"$instance\",le=\"250\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)) or (sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\",le=\"0.25\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)))",
-          "refId": "A"
+          "refId": "A",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -621,7 +627,8 @@
       "targets": [
         {
           "expr": "((sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)) or (sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"5..\"}[$__range])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])), 1)) or vector(0))",
-          "refId": "A"
+          "refId": "A",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -676,7 +683,8 @@
       "targets": [
         {
           "expr": "(sum(increase(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])) or sum(increase(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[$__range])))",
-          "refId": "A"
+          "refId": "A",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -791,7 +799,8 @@
         {
           "expr": "(sum by (status,outcome) (rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"4..|5..\"}[5m])) or sum by (status,outcome) (rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\",status=~\"4..|5..\"}[5m])))",
           "refId": "A",
-          "legendFormat": "{{status}} {{outcome}}"
+          "legendFormat": "{{status}} {{outcome}}",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -1950,7 +1959,8 @@
         {
           "expr": "(sum by (instance) (rate(http_server_requests_milliseconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])) or sum by (instance) (rate(http_server_requests_seconds_count{job=~\"$job\",instance=~\"$instance\"}[5m])))",
           "refId": "A",
-          "legendFormat": "{{instance}}"
+          "legendFormat": "{{instance}}",
+          "exemplar": true
         }
       ],
       "fieldConfig": {
@@ -2470,7 +2480,8 @@
         {
           "expr": "sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m]))",
           "refId": "A",
-          "format": "heatmap"
+          "format": "heatmap",
+          "exemplar": true
         }
       ],
       "fieldConfig": {

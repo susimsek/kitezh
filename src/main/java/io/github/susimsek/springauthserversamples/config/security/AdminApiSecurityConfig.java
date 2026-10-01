@@ -39,7 +39,7 @@ public class AdminApiSecurityConfig {
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(applicationProperties.dpop()),
-                new ObservabilityMdcFilter(loggingProperties.getAccess()));
+                new ObservabilityMdcFilter(loggingProperties));
     }
 
     SecurityFilterChain adminApiSecurityFilterChain(

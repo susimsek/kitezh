@@ -126,7 +126,7 @@ public class SecurityConfig {
                 applicationProperties,
                 browserDependencies,
                 socialDependencies,
-                new ObservabilityMdcFilter(loggingProperties.getAccess()));
+                new ObservabilityMdcFilter(loggingProperties));
     }
 
     SecurityFilterChain defaultSecurityFilterChain(

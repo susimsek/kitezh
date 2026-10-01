@@ -55,7 +55,7 @@ public class LoggingAppenderConfiguration {
         if (properties.isSyslogEnabled()) {
             appenders.add(syslogAppender(context));
         }
-        if (properties.getAccess().isFileEnabled()) {
+        if (properties.getServer().isFileEnabled()) {
             installAccessFile(context);
         }
         if (properties.isAsyncEnabled()) {
@@ -139,7 +139,7 @@ public class LoggingAppenderConfiguration {
     }
 
     private Appender<ILoggingEvent> accessFileAppender(LoggerContext context) {
-        LoggingProperties.Access access = properties.getAccess();
+        LoggingProperties.Server access = properties.getServer();
         RollingFileAppender<ILoggingEvent> fileAppender = new RollingFileAppender<>();
         fileAppender.setContext(context);
         fileAppender.setName("APPLICATION_ACCESS_FILE");

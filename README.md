@@ -181,10 +181,29 @@ and import steps.
 
 Console and file logs are plain text by default. Set `LOGGING_STRUCTURED_FORMAT_CONSOLE` or
 `LOGGING_STRUCTURED_FORMAT_FILE` to `json` or `ecs` for structured output. HTTP access logging is
-enabled by default and can be configured with `APP_LOG_ACCESS_PATTERN` (`common`, `combined`, or
-`long`), `APP_LOG_ACCESS_EXCLUDE_PATHS`, `APP_LOG_ACCESS_MASKED_HEADERS`,
-`APP_LOG_ACCESS_MASKED_COOKIES`, and `APP_LOG_ACCESS_FILE_ENABLED`. Request bodies are never written
-to access logs.
+enabled by default and can be configured with `APP_LOG_SERVER_LEVEL` (`BASIC`, `HEADERS`, or
+`FULL`), `APP_LOG_SERVER_EXCLUDE_PATHS`, and `APP_LOG_SERVER_FILE_ENABLED`. Set
+`APP_LOG_SERVER_ENABLED=false` to disable it. The `enabled` switch controls whether a handler is
+active; there is no `NONE` level. Shared Zalando-style obfuscation is configured under
+`APP_LOG_OBFUSCATE_HEADERS`, `APP_LOG_OBFUSCATE_BODY_FIELDS`, `APP_LOG_OBFUSCATE_COOKIES`, and
+`APP_LOG_OBFUSCATE_PARAMETERS`, and `APP_LOG_OBFUSCATE_REPLACEMENT`. Query parameters are included
+in logged URIs and sensitive names are replaced with `***`. Outgoing HTTP
+request metadata is disabled by default. For temporary diagnostics, set
+`APP_LOG_CLIENT_ENABLED=true`; this logs method, redacted URI, status, duration, and exceptions
+through the shared RestClient builder. Use `APP_LOG_CLIENT_LEVEL=HEADERS` to include masked request
+and response headers, or `APP_LOG_CLIENT_LEVEL=FULL` to also capture bounded, masked text, JSON, and
+form-encoded request and response bodies. `BASIC` logs method, URI, status, and duration. Body
+capture for both inbound and outbound HTTP logs is limited to 8 KiB by default via
+`APP_LOG_MAX_BODY_BYTES`; bodies with an unknown or over-limit response size are omitted so the
+response stream is not consumed unexpectedly. Use
+`APP_LOG_CLIENT_EXCLUDE_PATHS` for comma-separated outbound path prefixes. Body logging is disabled
+by default and should only be enabled temporarily in a controlled environment. Set
+`APP_LOG_SERVER_LEVEL=FULL` to include the bounded, masked inbound request and response bodies.
+Access records carry
+`direction=inbound` and `type=request`; outgoing client records carry `direction=outbound` and
+`type=request` or `type=response`, with `outcome=failure` for failed calls. With structured logs
+enabled, these are queryable fields in Grafana, for example
+`{service_name="spring-authorization-server-samples"} | json | direction="outbound"`.
 
 ## Configuration and Profiles
 

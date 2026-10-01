@@ -29,7 +29,7 @@ public class AccountApiSecurityConfig {
                 http,
                 accountApiJwtDecoder,
                 new DpopNonceService(applicationProperties.dpop()),
-                new ObservabilityMdcFilter(loggingProperties.getAccess()));
+                new ObservabilityMdcFilter(loggingProperties));
     }
 
     SecurityFilterChain accountApiSecurityFilterChain(

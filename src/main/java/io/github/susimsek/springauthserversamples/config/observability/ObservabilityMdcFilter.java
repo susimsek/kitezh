@@ -6,9 +6,14 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -16,12 +21,16 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingRequestWrapper;
+import org.springframework.web.util.ContentCachingResponseWrapper;
 
 /** Adds request and security context fields to logs exported through OpenTelemetry. */
 public final class ObservabilityMdcFilter extends OncePerRequestFilter {
@@ -35,51 +44,148 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private static final String IP_ADDRESS = "ipAddress";
     private static final String TRACE_ID = "traceId";
     private static final String SPAN_ID = "spanId";
-    private static final String MASKED_VALUE = "***";
+    private static final String DIRECTION = "direction";
+    private static final String INBOUND = "inbound";
+    private static final String TYPE = "type";
+    private static final Set<String> ALWAYS_MASKED_HEADERS =
+            Set.of("authorization", "cookie", "set-cookie", "proxy-authorization");
+    private static final Set<String> ALWAYS_MASKED_BODY_FIELDS =
+            Set.of(
+                    "access_token",
+                    "refresh_token",
+                    "id_token",
+                    "client_secret",
+                    "password",
+                    "authorization",
+                    "cookie",
+                    "token",
+                    "secret",
+                    "api_key",
+                    "assertion",
+                    "saml_response",
+                    "private_key",
+                    "code",
+                    "code_verifier",
+                    "captchatoken",
+                    "response",
+                    "sitekey",
+                    "apikey",
+                    "auth_req_id",
+                    "client_notification_token",
+                    "id_token_hint",
+                    "login_hint_token",
+                    "user_code",
+                    "dpop",
+                    "dpop_proof",
+                    "jwk");
+    private static final Set<String> ALWAYS_MASKED_PARAMETERS =
+            Set.of(
+                    "access_token",
+                    "refresh_token",
+                    "id_token",
+                    "client_secret",
+                    "client_assertion",
+                    "password",
+                    "authorization",
+                    "token",
+                    "secret",
+                    "api_key",
+                    "assertion",
+                    "code",
+                    "state",
+                    "nonce",
+                    "request",
+                    "request_uri",
+                    "login_hint_token",
+                    "user_code");
 
     private static final String[] MDC_KEYS = {
         CLIENT_ID, USER_ID, SESSION_ID, IP_ADDRESS, TRACE_ID, SPAN_ID
     };
 
-    private final LoggingProperties.Access accessProperties;
+    private final LoggingProperties.Server serverProperties;
+    private final String replacement;
     private final Set<String> maskedHeaders;
+    private final Set<String> maskedBodyFields;
+    private final Set<String> maskedParameters;
     private final Set<String> maskedCookies;
     private final List<Pattern> excludedPaths;
+    private final int maxBodyBytes;
 
     public ObservabilityMdcFilter() {
-        this(new LoggingProperties().getAccess());
+        this(new LoggingProperties());
     }
 
-    public ObservabilityMdcFilter(LoggingProperties.Access accessProperties) {
-        this.accessProperties = accessProperties;
-        this.maskedHeaders = lowerCaseSet(accessProperties.getMaskedHeaders());
-        this.maskedCookies = lowerCaseSet(accessProperties.getMaskedCookies());
+    public ObservabilityMdcFilter(LoggingProperties.Server serverProperties) {
+        this(serverProperties, new LoggingProperties.Obfuscate());
+    }
+
+    public ObservabilityMdcFilter(LoggingProperties properties) {
+        this(properties.getServer(), properties.getObfuscate(), properties.getMaxBodyBytes());
+    }
+
+    public ObservabilityMdcFilter(
+            LoggingProperties.Server serverProperties, LoggingProperties.Obfuscate obfuscate) {
+        this(serverProperties, obfuscate, 8192);
+    }
+
+    public ObservabilityMdcFilter(
+            LoggingProperties.Server serverProperties,
+            LoggingProperties.Obfuscate obfuscate,
+            int maxBodyBytes) {
+        this.serverProperties = serverProperties;
+        this.replacement = obfuscate.getReplacement();
+        this.maskedHeaders = new HashSet<>(lowerCaseSet(obfuscate.getHeaders()));
+        this.maskedHeaders.addAll(ALWAYS_MASKED_HEADERS);
+        this.maskedBodyFields = new HashSet<>(lowerCaseSet(obfuscate.getBodyFields()));
+        this.maskedBodyFields.addAll(ALWAYS_MASKED_BODY_FIELDS);
+        this.maskedParameters = new HashSet<>(lowerCaseSet(obfuscate.getParameters()));
+        this.maskedParameters.addAll(ALWAYS_MASKED_PARAMETERS);
+        this.maskedCookies = lowerCaseSet(obfuscate.getCookies());
         this.excludedPaths =
-                accessProperties.getExcludePaths().stream().map(Pattern::compile).toList();
+                serverProperties.getExcludePaths().stream().map(Pattern::compile).toList();
+        this.maxBodyBytes = Math.max(0, maxBodyBytes);
     }
 
     @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        boolean shouldLog = serverProperties.isEnabled() && !excluded(request.getRequestURI());
+        boolean includeBody = shouldLog && serverProperties.getLevel() == HttpLoggingLevel.FULL;
+        ContentCachingRequestWrapper requestWrapper =
+                includeBody ? new ContentCachingRequestWrapper(request, cacheLimit()) : null;
+        ContentCachingResponseWrapper responseWrapper =
+                includeBody ? new ContentCachingResponseWrapper(response) : null;
+        HttpServletRequest requestToFilter = requestWrapper == null ? request : requestWrapper;
+        HttpServletResponse responseToFilter = responseWrapper == null ? response : responseWrapper;
         final Map<String, String> previousValues = captureCurrentValues();
         final long startedAt = System.nanoTime();
         final boolean[] failed = {false};
-        putIfPresent(IP_ADDRESS, request.getRemoteAddr());
+        putIfPresent(IP_ADDRESS, requestToFilter.getRemoteAddr());
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        putIfPresent(CLIENT_ID, clientId(request, authentication));
+        putIfPresent(CLIENT_ID, clientId(requestToFilter, authentication));
         putIfPresent(USER_ID, userId(authentication));
-        putIfPresent(SESSION_ID, sessionId(request, authentication));
+        putIfPresent(SESSION_ID, sessionId(requestToFilter, authentication));
         putTraceContext();
         try {
-            filterChain.doFilter(request, response);
+            filterChain.doFilter(requestToFilter, responseToFilter);
         } catch (IOException | ServletException | RuntimeException exception) {
             failed[0] = true;
             throw exception;
         } finally {
-            if (accessProperties.isEnabled() && !excluded(request.getRequestURI())) {
-                logAccess(request, startedAt, failed[0] ? 500 : response.getStatus());
+            if (shouldLog) {
+                logAccess(
+                        requestToFilter,
+                        responseToFilter,
+                        requestWrapper,
+                        responseWrapper,
+                        startedAt,
+                        failed[0] ? 500 : responseToFilter.getStatus());
+            }
+            if (responseWrapper != null) {
+                responseWrapper.copyBodyToResponse();
             }
             restore(previousValues);
         }
@@ -170,32 +276,145 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                 });
     }
 
-    private void logAccess(HttpServletRequest request, long startedAt, int status) {
-        LoggingProperties.Access access = accessProperties;
+    private void logAccess(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            ContentCachingRequestWrapper requestWrapper,
+            ContentCachingResponseWrapper responseWrapper,
+            long startedAt,
+            int status) {
+        LoggingProperties.Server server = serverProperties;
+        long durationMillis = durationMillis(startedAt);
+        String target = requestTarget(request);
         String common =
                 String.format(
-                        "HTTP access method=%s uri=%s status=%d ipAddress=%s durationMs=%d",
+                        "HTTP access direction=inbound method=%s uri=%s status=%d ipAddress=%s"
+                                + " durationMs=%d",
                         request.getMethod(),
-                        request.getRequestURI(),
+                        target,
                         status,
                         request.getRemoteAddr(),
-                        (System.nanoTime() - startedAt) / 1_000_000);
-        String pattern = access.getPattern().toLowerCase();
-        if ("combined".equals(pattern) || "long".equals(pattern)) {
-            common +=
-                    String.format(
-                            " userAgent=%s referer=%s",
-                            request.getHeader("User-Agent"), request.getHeader("Referer"));
-        }
-        if ("long".equals(pattern)) {
+                        durationMillis);
+        boolean includeHeaders =
+                server.getLevel() == HttpLoggingLevel.HEADERS
+                        || server.getLevel() == HttpLoggingLevel.FULL;
+        boolean includeBody = server.getLevel() == HttpLoggingLevel.FULL;
+        if (includeHeaders) {
             common += " headers=" + headers(request, maskedHeaders);
             common += " cookies=" + cookies(request, maskedCookies);
+            common += " responseHeaders=" + responseHeaders(response, maskedHeaders);
         }
-        ACCESS_LOG.info(common);
+        String requestBody =
+                includeBody(requestWrapper)
+                        ? body(requestWrapper.getContentAsByteArray(), request)
+                        : null;
+        String responseBody =
+                includeBody(responseWrapper)
+                        ? body(responseWrapper.getContentAsByteArray(), response)
+                        : null;
+        if (includeBody) {
+            common += " requestBody=" + requestBody + " responseBody=" + responseBody;
+        }
+        var log =
+                ACCESS_LOG
+                        .atInfo()
+                        .addKeyValue(DIRECTION, INBOUND)
+                        .addKeyValue(TYPE, "request")
+                        .addKeyValue("origin", "remote")
+                        .addKeyValue("http.method", request.getMethod())
+                        .addKeyValue("http.target", target)
+                        .addKeyValue("http.status_code", status)
+                        .addKeyValue("http.client_ip", request.getRemoteAddr())
+                        .addKeyValue("http.duration_ms", durationMillis);
+        if (includeHeaders) {
+            log.addKeyValue("http.response_headers", responseHeaders(response, maskedHeaders));
+        }
+        if (includeBody) {
+            log.addKeyValue("http.request_body", requestBody);
+            log.addKeyValue("http.response_body", responseBody);
+        }
+        log.log(common);
     }
 
-    private static Map<String, String> headers(
-            HttpServletRequest request, Set<String> headersToMask) {
+    private boolean includeBody(ContentCachingRequestWrapper wrapper) {
+        return wrapper != null && serverProperties.getLevel() == HttpLoggingLevel.FULL;
+    }
+
+    private boolean includeBody(ContentCachingResponseWrapper wrapper) {
+        return wrapper != null && serverProperties.getLevel() == HttpLoggingLevel.FULL;
+    }
+
+    private String body(byte[] bytes, HttpServletRequest request) {
+        return HttpLogBodySanitizer.sanitize(
+                bytes,
+                contentHeaders(request.getContentType()),
+                maxBodyBytes,
+                replacement,
+                maskedBodyFields);
+    }
+
+    private String body(byte[] bytes, HttpServletResponse response) {
+        return HttpLogBodySanitizer.sanitize(
+                bytes,
+                contentHeaders(response.getContentType()),
+                maxBodyBytes,
+                replacement,
+                maskedBodyFields);
+    }
+
+    private static HttpHeaders contentHeaders(String contentType) {
+        HttpHeaders headers = new HttpHeaders();
+        if (contentType != null && !contentType.isBlank()) {
+            try {
+                headers.setContentType(MediaType.parseMediaType(contentType));
+            } catch (IllegalArgumentException _) {
+                // An invalid content type cannot be safely classified as text.
+            }
+        }
+        return headers;
+    }
+
+    private int cacheLimit() {
+        return maxBodyBytes == Integer.MAX_VALUE ? Integer.MAX_VALUE : maxBodyBytes + 1;
+    }
+
+    private String requestTarget(HttpServletRequest request) {
+        String query = maskQuery(request.getQueryString());
+        return request.getRequestURI() + (query.isBlank() ? "" : "?" + query);
+    }
+
+    private String maskQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return "";
+        }
+        return Arrays.stream(query.split("&", -1))
+                .map(
+                        parameter -> {
+                            int separator = parameter.indexOf('=');
+                            if (separator < 0) {
+                                return parameter;
+                            }
+                            String name = parameter.substring(0, separator);
+                            return maskedParameters.contains(decode(name).toLowerCase(Locale.ROOT))
+                                    ? name + "=" + replacement
+                                    : parameter;
+                        })
+                .collect(Collectors.joining("&"));
+    }
+
+    private static String decode(String value) {
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException exception) {
+            return value;
+        }
+    }
+
+    private static long durationMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
+    }
+
+    private Map<String, String> headers(HttpServletRequest request, Set<String> headersToMask) {
         Map<String, String> values = new LinkedHashMap<>();
         Enumeration<String> names = request.getHeaderNames();
         if (names != null) {
@@ -204,15 +423,27 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                 values.put(
                         name,
                         headersToMask.contains(name.toLowerCase())
-                                ? MASKED_VALUE
+                                ? replacement
                                 : request.getHeader(name));
             }
         }
         return values;
     }
 
-    private static Map<String, String> cookies(
-            HttpServletRequest request, Set<String> cookiesToMask) {
+    private Map<String, String> responseHeaders(
+            HttpServletResponse response, Set<String> headersToMask) {
+        Map<String, String> values = new LinkedHashMap<>();
+        for (String name : response.getHeaderNames()) {
+            values.put(
+                    name,
+                    headersToMask.contains(name.toLowerCase())
+                            ? replacement
+                            : String.join(", ", response.getHeaders(name)));
+        }
+        return values;
+    }
+
+    private Map<String, String> cookies(HttpServletRequest request, Set<String> cookiesToMask) {
         if (request.getCookies() == null) {
             return Map.of();
         }
@@ -221,7 +452,7 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
             values.put(
                     cookie.getName(),
                     cookiesToMask.contains(cookie.getName().toLowerCase())
-                            ? MASKED_VALUE
+                            ? replacement
                             : cookie.getValue());
         }
         return values;

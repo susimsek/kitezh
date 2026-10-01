@@ -60,7 +60,7 @@ class LoggingAppenderConfigurationTest {
         LoggingProperties properties = new LoggingProperties();
         Path directory = Files.createTempDirectory("logging-test");
         properties.setFilePath(directory.resolve("application.log").toString());
-        properties.getAccess().setFilePath(directory.resolve("access.log").toString());
+        properties.getServer().setFilePath(directory.resolve("access.log").toString());
         MockEnvironment environment = new MockEnvironment();
         LoggingAppenderConfiguration configuration =
                 new LoggingAppenderConfiguration(properties, environment);
@@ -205,8 +205,8 @@ class LoggingAppenderConfigurationTest {
         root.addAppender(existing);
         Path directory = Files.createTempDirectory("logging-existing");
         LoggingProperties properties = new LoggingProperties();
-        properties.getAccess().setFileEnabled(true);
-        properties.getAccess().setFilePath(directory.resolve("access.log").toString());
+        properties.getServer().setFileEnabled(true);
+        properties.getServer().setFilePath(directory.resolve("access.log").toString());
         properties.setAsyncEnabled(false);
         LoggingAppenderConfiguration configuration =
                 new LoggingAppenderConfiguration(properties, new MockEnvironment());
@@ -237,8 +237,8 @@ class LoggingAppenderConfigurationTest {
         properties.setFileEnabled(true);
         properties.setFilePath(directory.resolve("application.log").toString());
         properties.setSyslogEnabled(true);
-        properties.getAccess().setFileEnabled(true);
-        properties.getAccess().setFilePath(directory.resolve("access.log").toString());
+        properties.getServer().setFileEnabled(true);
+        properties.getServer().setFilePath(directory.resolve("access.log").toString());
         properties.setAsyncEnabled(false);
         LoggingAppenderConfiguration configuration =
                 new LoggingAppenderConfiguration(properties, new MockEnvironment());

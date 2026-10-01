@@ -148,7 +148,7 @@ public class AuthorizationServerConfig {
                         cibaAuthenticationProvider,
                         socialProviderLogoutSuccessHandler,
                         securityContextRepository,
-                        new ObservabilityMdcFilter(loggingProperties.getAccess())));
+                        new ObservabilityMdcFilter(loggingProperties)));
     }
 
     SecurityFilterChain authorizationServerSecurityFilterChain(
