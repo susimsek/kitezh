@@ -5,6 +5,8 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=spring-authorization-server-samples&metric=coverage)](https://sonarcloud.io/summary/new_code?id=spring-authorization-server-samples)
 [![Vulnerabilities](https://snyk.io/test/github/susimsek/spring-authorization-server-samples/badge.svg)](https://snyk.io/test/github/susimsek/spring-authorization-server-samples)
 [![Docker Image Size](https://img.shields.io/docker/image-size/suayb/spring-authorization-server-samples/latest-native?label=Image%20Size)](https://hub.docker.com/r/suayb/spring-authorization-server-samples)
+[![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://spring-authorization-server-samples.onrender.com)
+[![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/spring-auth-prod/spring-authorization-server)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Maven](https://img.shields.io/badge/Maven-3.9+-C71A36?logo=apache-maven&logoColor=white)](https://maven.apache.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot/)
