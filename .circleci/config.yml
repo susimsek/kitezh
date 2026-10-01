@@ -1,0 +1,63 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: cimg/openjdk:25.0-node
+    working_directory: ~/spring-authorization-server-samples
+    environment:
+      PNPM_VERSION: 11.22.0
+    steps:
+      - checkout
+
+      - run:
+          name: Set up pnpm
+          command: |
+            corepack enable
+            corepack prepare "pnpm@${PNPM_VERSION}" --activate
+            java --version
+            node --version
+            pnpm --version
+
+      - restore_cache:
+          keys:
+            - maven-v1-{{ checksum "pom.xml" }}
+            - maven-v1-
+
+      - run:
+          name: Download Maven dependencies
+          command: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
+
+      - save_cache:
+          key: maven-v1-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+
+      - run:
+          name: Install frontend dependencies
+          command: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - run:
+          name: Verify backend
+          command: ./mvnw -B -ntp verify -Dskip.frontend=true
+
+      - run:
+          name: Type-check frontend
+          command: pnpm --dir src/main/frontend typecheck
+
+      - run:
+          name: Lint frontend
+          command: pnpm --dir src/main/frontend lint
+
+      - run:
+          name: Check frontend formatting
+          command: pnpm --dir src/main/frontend format:check
+
+      - run:
+          name: Build frontend
+          command: pnpm --dir src/main/frontend build
+
+workflows:
+  build-and-test:
+    jobs:
+      - build
