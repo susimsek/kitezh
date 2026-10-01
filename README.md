@@ -169,15 +169,42 @@ Telemetry is disabled by default; configure the standard `MANAGEMENT_*` OTLP var
 [Grafana Cloud Explore](https://eagerlattice1653.grafana.net/explore).
 
 The production profile also exposes Micrometer metrics at `/actuator/prometheus` for Prometheus
-scraping. Import the production dashboard from
-[`observability/grafana/spring-boot-production.json`](observability/grafana/spring-boot-production.json)
-and load the baseline alert rules from [`observability/prometheus/alerts.yml`](observability/prometheus/alerts.yml).
+scraping. The production dashboard is stored at
+[`src/main/docker/observability/grafana/spring-authorization-server.json`](src/main/docker/observability/grafana/spring-authorization-server.json)
+and the baseline Prometheus alert rules are stored at
+[`src/main/docker/observability/prometheus/alerts.yml`](src/main/docker/observability/prometheus/alerts.yml).
 The dashboard follows Keycloak's observability model: Prometheus collects the metrics and Grafana
 renders the dashboard. Production request histograms are enabled so P95 and P99 latency panels are
 available. Application Caffeine caches are pre-registered so hit, miss, eviction, size, and
-eviction-weight meters are published from startup. See
-[`observability/grafana/README.md`](observability/grafana/README.md) for the scrape configuration
-and import steps.
+eviction-weight meters are published from startup. The dashboard JSON and baseline alert rules
+are kept under `src/main/docker/observability/`.
+
+For local development, the repository includes Grafana's `grafana/otel-lgtm` image. It provides a
+local OpenTelemetry Collector, Grafana, Loki, Mimir, and Tempo stack for traces, logs, and metrics.
+Start it with its dedicated Compose file. The dashboard is provisioned automatically and opened as
+Grafana's home dashboard, while `alerts.yml` is loaded as a Prometheus rule file:
+
+```bash
+docker compose -f src/main/docker/observability.yml up -d
+```
+
+Open Grafana at [http://localhost:3000](http://localhost:3000) with `admin` / `admin`. To export
+telemetry from the locally running Spring Boot application over OTLP/HTTP, start it with:
+
+```bash
+MANAGEMENT_OPENTELEMETRY_ENABLED=true \
+MANAGEMENT_TRACING_EXPORT_ENABLED=true \
+MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=true \
+MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=http://localhost:4318/v1/traces \
+MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED=true \
+MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT=http://localhost:4318/v1/logs \
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=true \
+MANAGEMENT_OTLP_METRICS_EXPORT_URL=http://localhost:4318/v1/metrics \
+./mvnw spring-boot:run
+```
+
+The LGTM image is intended for local development, demos, and testing; use Grafana Cloud or a
+production OpenTelemetry deployment for production telemetry.
 
 Console and file logs are plain text by default. Set `LOGGING_STRUCTURED_FORMAT_CONSOLE` or
 `LOGGING_STRUCTURED_FORMAT_FILE` to `json` or `ecs` for structured output. HTTP access logging is
@@ -1100,6 +1127,12 @@ Files under `src/main/docker/*.yml` are marked as "dev purpose only".
 - PostgreSQL: `docker compose -f src/main/docker/postgresql.yml up -d`
 - OpenLDAP: `docker compose -f src/main/docker/openldap.yml up -d`
 - App with prebuilt native image: `docker compose -f src/main/docker/app.yml up -d`
+- Grafana OTel LGTM: `docker compose -f src/main/docker/observability.yml up -d`
+- SonarQube Community for local analysis: `docker compose -f src/main/docker/sonar.yml up -d`
+
+SonarQube is an independent Docker development tool and is not enabled by the Spring Boot `dev`
+profile. Open [http://localhost:9000](http://localhost:9000) after starting it and sign in with
+the local default account `admin` / `admin`.
 
 ### LDAP
 

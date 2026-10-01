@@ -1,0 +1,22 @@
+# Dev tooling only. DO NOT use in production.
+name: spring-authorization-server-samples
+
+services:
+  sonarqube:
+    image: sonarqube:26.9.0.129388-community
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "127.0.0.1:9000:9000"
+    # Persistence is disabled by default for this local development tool.
+    # Uncomment these mounts and the top-level volume declarations below when needed.
+    # volumes:
+    #   - sonarqube-data:/opt/sonarqube/data
+    #   - sonarqube-extensions:/opt/sonarqube/extensions
+    #   - sonarqube-logs:/opt/sonarqube/logs
+
+# Uncomment together with the service mounts above to persist SonarQube data.
+# volumes:
+#   sonarqube-data:
+#   sonarqube-extensions:
+#   sonarqube-logs:
