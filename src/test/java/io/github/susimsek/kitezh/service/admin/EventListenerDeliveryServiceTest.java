@@ -13,13 +13,13 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import io.github.susimsek.springauthserversamples.domain.EventListenerDeliveryEntity;
-import io.github.susimsek.springauthserversamples.domain.EventListenerDeliveryStatus;
-import io.github.susimsek.springauthserversamples.domain.EventListenerEventType;
-import io.github.susimsek.springauthserversamples.domain.EventListenerProviderEntity;
-import io.github.susimsek.springauthserversamples.domain.EventListenerProviderType;
-import io.github.susimsek.springauthserversamples.repository.EventListenerDeliveryRepository;
-import io.github.susimsek.springauthserversamples.repository.EventListenerProviderRepository;
+import io.github.susimsek.kitezh.domain.EventListenerDeliveryEntity;
+import io.github.susimsek.kitezh.domain.EventListenerDeliveryStatus;
+import io.github.susimsek.kitezh.domain.EventListenerEventType;
+import io.github.susimsek.kitezh.domain.EventListenerProviderEntity;
+import io.github.susimsek.kitezh.domain.EventListenerProviderType;
+import io.github.susimsek.kitezh.repository.EventListenerDeliveryRepository;
+import io.github.susimsek.kitezh.repository.EventListenerProviderRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +126,6 @@ class EventListenerDeliveryServiceTest {
     @Test
     void processesSuccessfulDeliveryAndRetriesThenFails() {
         RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         EventListenerProviderEntity provider = provider("provider-1", true);
         provider.setMaxAttempts(2);
         EventListenerDeliveryEntity delivery = delivery("provider-1");
@@ -136,6 +135,7 @@ class EventListenerDeliveryServiceTest {
                                 any(), any()))
                 .thenReturn(List.of(delivery));
 
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("https://example.com/events"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().json("{\"event\":\"value\"}"))

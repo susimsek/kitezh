@@ -1,4 +1,4 @@
-package io.github.susimsek.springauthserversamples.service.admin;
+package io.github.susimsek.kitezh.service.admin;
 
 import java.util.Locale;
 import java.util.Set;

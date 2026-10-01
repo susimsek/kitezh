@@ -1,4 +1,4 @@
-package io.github.susimsek.springauthserversamples.service.admin;
+package io.github.susimsek.kitezh.service.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,15 +7,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.susimsek.springauthserversamples.domain.EventListenerDeliveryEntity;
-import io.github.susimsek.springauthserversamples.domain.EventListenerDeliveryStatus;
-import io.github.susimsek.springauthserversamples.domain.EventListenerEventType;
-import io.github.susimsek.springauthserversamples.domain.EventListenerProviderEntity;
-import io.github.susimsek.springauthserversamples.domain.EventListenerProviderType;
-import io.github.susimsek.springauthserversamples.dto.admin.EventListenerProviderRequestDTO;
-import io.github.susimsek.springauthserversamples.repository.EventListenerDeliveryRepository;
-import io.github.susimsek.springauthserversamples.repository.EventListenerProviderRepository;
-import io.github.susimsek.springauthserversamples.service.error.ApiException;
+import io.github.susimsek.kitezh.domain.EventListenerDeliveryEntity;
+import io.github.susimsek.kitezh.domain.EventListenerDeliveryStatus;
+import io.github.susimsek.kitezh.domain.EventListenerEventType;
+import io.github.susimsek.kitezh.domain.EventListenerProviderEntity;
+import io.github.susimsek.kitezh.domain.EventListenerProviderType;
+import io.github.susimsek.kitezh.dto.admin.EventListenerProviderRequestDTO;
+import io.github.susimsek.kitezh.repository.EventListenerDeliveryRepository;
+import io.github.susimsek.kitezh.repository.EventListenerProviderRepository;
+import io.github.susimsek.kitezh.service.error.ApiException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -74,18 +74,20 @@ class EventListenerProviderServiceTest {
     void rejectsDuplicateMissingAndUnsafeProviderConfigurations() {
         EventListenerProviderEntity existing = entity("existing", "duplicate");
         when(repository.findByNameIgnoreCase("duplicate")).thenReturn(Optional.of(existing));
-        assertThatThrownBy(() -> service.create(request("duplicate", true)))
-                .isInstanceOf(ApiException.class);
+        EventListenerProviderRequestDTO duplicateRequest = request("duplicate", true);
+        assertThatThrownBy(() -> service.create(duplicateRequest)).isInstanceOf(ApiException.class);
 
-        assertThatThrownBy(() -> service.create(request("unsafe", true, "http://127.0.0.1")))
-                .isInstanceOf(ApiException.class);
+        EventListenerProviderRequestDTO unsafeRequest = request("unsafe", true, "http://127.0.0.1");
+        assertThatThrownBy(() -> service.create(unsafeRequest)).isInstanceOf(ApiException.class);
 
         when(repository.findById("missing")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.get("missing")).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> service.update("missing", request("missing", true)))
+        EventListenerProviderRequestDTO missingRequest = request("missing", true);
+        assertThatThrownBy(() -> service.update("missing", missingRequest))
                 .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> service.delete("missing")).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> service.deliveries("missing", PageRequest.of(0, 20)))
+        PageRequest missingPageable = PageRequest.of(0, 20);
+        assertThatThrownBy(() -> service.deliveries("missing", missingPageable))
                 .isInstanceOf(ApiException.class);
     }
 

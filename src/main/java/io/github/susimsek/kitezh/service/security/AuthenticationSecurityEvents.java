@@ -27,7 +27,8 @@ public class AuthenticationSecurityEvents {
         String remoteAddress = remoteAddress();
         accountLockService.recordSuccess(username);
         loginRateLimitService.clear(username, remoteAddress);
-        userEventService.record(UserEventType.LOGIN_SUCCESS, username, clientId, remoteAddress);
+        userEventService.recordEvent(
+                UserEventType.LOGIN_SUCCESS, username, clientId, remoteAddress);
     }
 
     @EventListener
@@ -36,7 +37,8 @@ public class AuthenticationSecurityEvents {
         String clientId = clientId();
         String remoteAddress = remoteAddress();
         accountLockService.recordFailure(username, remoteAddress);
-        userEventService.record(UserEventType.LOGIN_FAILURE, username, clientId, remoteAddress);
+        userEventService.recordEvent(
+                UserEventType.LOGIN_FAILURE, username, clientId, remoteAddress);
     }
 
     private static String username(Authentication authentication) {

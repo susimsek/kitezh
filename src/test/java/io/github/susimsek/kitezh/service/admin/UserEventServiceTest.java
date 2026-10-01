@@ -49,7 +49,7 @@ class UserEventServiceTest {
                         any(Instant.class)))
                 .thenReturn(new UserEventEntity());
 
-        service.record(UserEventType.LOGIN_SUCCESS, "alice", "admin-console", "192.0.2.10");
+        service.recordEvent(UserEventType.LOGIN_SUCCESS, "alice", "admin-console", "192.0.2.10");
 
         verify(repository).deleteByOccurredAtBefore(any(Instant.class));
         verify(repository).save(any(UserEventEntity.class));
@@ -59,7 +59,7 @@ class UserEventServiceTest {
     void skipsDisabledAndUnconfiguredEventTypes() {
         when(settingsRepository.findById(1L)).thenReturn(Optional.of(settings(false, 0)));
 
-        service.record(UserEventType.LOGIN_FAILURE, "alice", "192.0.2.10");
+        service.recordEvent(UserEventType.LOGIN_FAILURE, "alice", "192.0.2.10");
 
         verifyNoInteractions(repository, userRepository, mapper);
     }
@@ -84,13 +84,14 @@ class UserEventServiceTest {
 
         assertThat(
                         service.events(
-                                        "alice",
-                                        UserEventType.LOGIN_FAILURE,
-                                        "alice",
-                                        "admin-console",
-                                        "192.0.2.10",
-                                        null,
-                                        null,
+                                        new UserEventSearchCriteria(
+                                                "alice",
+                                                UserEventType.LOGIN_FAILURE,
+                                                "alice",
+                                                "admin-console",
+                                                "192.0.2.10",
+                                                null,
+                                                null),
                                         pageable)
                                 .getContent())
                 .containsExactly(dto);

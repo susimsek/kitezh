@@ -45,7 +45,7 @@ class AuthenticationSecurityEventsTest {
         verify(accountLockService).recordSuccess("alice");
         verify(loginRateLimitService).clear("alice", "192.0.2.10");
         verify(userEventService)
-                .record(UserEventType.LOGIN_SUCCESS, "alice", "admin-console", "192.0.2.10");
+                .recordEvent(UserEventType.LOGIN_SUCCESS, "alice", "admin-console", "192.0.2.10");
     }
 
     @Test
@@ -68,6 +68,7 @@ class AuthenticationSecurityEventsTest {
 
         verify(accountLockService).recordFailure(authentication.getName(), "unknown");
         verify(userEventService)
-                .record(UserEventType.LOGIN_FAILURE, authentication.getName(), null, "unknown");
+                .recordEvent(
+                        UserEventType.LOGIN_FAILURE, authentication.getName(), null, "unknown");
     }
 }

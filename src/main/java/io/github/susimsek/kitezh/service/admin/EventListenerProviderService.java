@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class EventListenerProviderService {
+    private static final String EVENT_LISTENER = "event-listener";
+
     private final EventListenerProviderRepository repository;
     private final EventListenerDeliveryRepository deliveryRepository;
     private final AdminAuditEventService auditEventService;
@@ -51,7 +53,7 @@ public class EventListenerProviderService {
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         repository.save(entity);
-        auditEventService.record("event-listener.created", "event-listener", entity.getId());
+        auditEventService.record("event-listener.created", EVENT_LISTENER, entity.getId());
         return toDTO(entity);
     }
 
@@ -63,7 +65,7 @@ public class EventListenerProviderService {
         apply(entity, request);
         entity.setUpdatedAt(Instant.now());
         repository.save(entity);
-        auditEventService.record("event-listener.updated", "event-listener", id);
+        auditEventService.record("event-listener.updated", EVENT_LISTENER, id);
         return toDTO(entity);
     }
 
@@ -71,7 +73,7 @@ public class EventListenerProviderService {
     public void delete(String id) {
         entity(id);
         repository.deleteById(id);
-        auditEventService.record("event-listener.deleted", "event-listener", id);
+        auditEventService.record("event-listener.deleted", EVENT_LISTENER, id);
     }
 
     @Transactional(readOnly = true)

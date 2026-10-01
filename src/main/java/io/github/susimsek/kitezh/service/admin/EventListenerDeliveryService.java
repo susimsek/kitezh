@@ -163,7 +163,7 @@ public class EventListenerDeliveryService {
     private String writePayload(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException _) {
             return "{\"eventType\":\"unknown\"}";
         }
     }

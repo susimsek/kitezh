@@ -5,6 +5,7 @@ import io.github.susimsek.kitezh.domain.UserEventType;
 import io.github.susimsek.kitezh.dto.admin.UserEventDTO;
 import io.github.susimsek.kitezh.dto.admin.UserEventSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.UserEventSettingsRequestDTO;
+import io.github.susimsek.kitezh.service.admin.UserEventSearchCriteria;
 import io.github.susimsek.kitezh.service.admin.UserEventService;
 import io.github.susimsek.kitezh.service.admin.UserEventSettingsService;
 import io.github.susimsek.kitezh.web.ApiController;
@@ -80,7 +81,9 @@ class AdminUserEventController {
                             sort = "occurredAt",
                             direction = org.springframework.data.domain.Sort.Direction.DESC)
                     Pageable pageable) {
-        return userEventService.events(q, type, username, clientId, ipAddress, from, to, pageable);
+        return userEventService.events(
+                new UserEventSearchCriteria(q, type, username, clientId, ipAddress, from, to),
+                pageable);
     }
 
     @GetMapping("/{id}")

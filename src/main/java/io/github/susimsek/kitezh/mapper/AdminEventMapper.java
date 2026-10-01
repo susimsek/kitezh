@@ -10,7 +10,9 @@ public interface AdminEventMapper {
 
     AdminEventDTO toDTO(AdminEventEntity entity);
 
-    AdminEventEntity toEntity(
+    AdminEventEntity toEntity(AdminEventData data);
+
+    record AdminEventData(
             String id,
             String actor,
             String clientId,
@@ -19,5 +21,5 @@ public interface AdminEventMapper {
             String targetType,
             String targetId,
             String details,
-            java.time.Instant occurredAt);
+            java.time.Instant occurredAt) {}
 }

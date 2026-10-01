@@ -98,15 +98,16 @@ public class AdminAuditEventService {
         String eventId = UUID.randomUUID().toString();
         adminEventRepository.save(
                 adminEventMapper.toEntity(
-                        eventId,
-                        actor,
-                        currentClientId(),
-                        currentIpAddress(),
-                        action,
-                        targetType,
-                        targetId,
-                        details,
-                        Instant.now()));
+                        new AdminEventMapper.AdminEventData(
+                                eventId,
+                                actor,
+                                currentClientId(),
+                                currentIpAddress(),
+                                action,
+                                targetType,
+                                targetId,
+                                details,
+                                Instant.now())));
         if (eventListenerDeliveryService != null) {
             eventListenerDeliveryService.dispatch(
                     io.github.susimsek.kitezh.domain.EventListenerEventType

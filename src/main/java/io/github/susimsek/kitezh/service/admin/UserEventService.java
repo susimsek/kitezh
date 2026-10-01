@@ -9,6 +9,9 @@ import io.github.susimsek.kitezh.repository.UserEventRepository;
 import io.github.susimsek.kitezh.repository.UserEventSettingsRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
@@ -24,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class UserEventService {
+    private static final String CLIENT_ID = "clientId";
+    private static final String IP_ADDRESS = "ipAddress";
+    private static final String USERNAME = "username";
 
     private final UserEventRepository repository;
     private final UserEventSettingsRepository settingsRepository;
@@ -38,12 +44,13 @@ public class UserEventService {
     }
 
     @Transactional
-    public void record(UserEventType type, String username, String ipAddress) {
+    public void recordEvent(UserEventType type, String username, String ipAddress) {
         recordInternal(type, username, null, ipAddress);
     }
 
     @Transactional
-    public void record(UserEventType type, String username, String clientId, String ipAddress) {
+    public void recordEvent(
+            UserEventType type, String username, String clientId, String ipAddress) {
         recordInternal(type, username, clientId, ipAddress);
     }
 
@@ -75,35 +82,27 @@ public class UserEventService {
                     Map.of(
                             "eventType",
                             type.name(),
-                            "username",
+                            USERNAME,
                             username,
-                            "clientId",
+                            CLIENT_ID,
                             clientId == null ? "" : clientId,
-                            "ipAddress",
+                            IP_ADDRESS,
                             ipAddress == null ? "" : ipAddress));
         }
     }
 
     @Transactional(readOnly = true)
-    public Page<UserEventDTO> events(
-            String query,
-            UserEventType type,
-            String username,
-            String clientId,
-            String ipAddress,
-            Instant from,
-            Instant to,
-            Pageable pageable) {
+    public Page<UserEventDTO> events(UserEventSearchCriteria criteria, Pageable pageable) {
         return repository
                 .findAll(
                         eventSpecification(
-                                AdminSearch.normalize(query),
-                                type,
-                                username,
-                                clientId,
-                                ipAddress,
-                                from,
-                                to),
+                                AdminSearch.normalize(criteria.query()),
+                                criteria.type(),
+                                criteria.username(),
+                                criteria.clientId(),
+                                criteria.ipAddress(),
+                                criteria.from(),
+                                criteria.to()),
                         pageable)
                 .map(mapper::toDTO);
     }
@@ -146,37 +145,67 @@ public class UserEventService {
             Instant to) {
         return (root, _, cb) -> {
             var predicate = cb.conjunction();
-            if (!query.isBlank()) {
-                String like = "%" + query.toLowerCase() + "%";
-                predicate =
-                        cb.and(
-                                predicate,
-                                cb.or(
-                                        cb.like(cb.lower(root.get("username")), like),
-                                        cb.like(cb.lower(root.get("type").as(String.class)), like),
-                                        cb.like(cb.lower(root.get("clientId")), like),
-                                        cb.like(cb.lower(root.get("ipAddress")), like)));
-            }
-            if (type != null) {
-                predicate = cb.and(predicate, cb.equal(root.get("type"), type));
-            }
-            if (username != null && !username.isBlank()) {
-                predicate = cb.and(predicate, cb.equal(root.get("username"), username));
-            }
-            if (clientId != null && !clientId.isBlank()) {
-                predicate = cb.and(predicate, cb.equal(root.get("clientId"), clientId));
-            }
-            if (ipAddress != null && !ipAddress.isBlank()) {
-                predicate = cb.and(predicate, cb.equal(root.get("ipAddress"), ipAddress));
-            }
-            if (from != null) {
-                predicate =
-                        cb.and(predicate, cb.greaterThanOrEqualTo(root.get("occurredAt"), from));
-            }
-            if (to != null) {
-                predicate = cb.and(predicate, cb.lessThanOrEqualTo(root.get("occurredAt"), to));
-            }
-            return predicate;
+            predicate = addSearchPredicate(predicate, root, cb, query);
+            predicate = addTypePredicate(predicate, root, cb, type);
+            predicate = addEqualsPredicate(predicate, root, cb, USERNAME, username);
+            predicate = addEqualsPredicate(predicate, root, cb, CLIENT_ID, clientId);
+            predicate = addEqualsPredicate(predicate, root, cb, IP_ADDRESS, ipAddress);
+            predicate = addFromPredicate(predicate, root, cb, from);
+            return addToPredicate(predicate, root, cb, to);
         };
+    }
+
+    private static Predicate addSearchPredicate(
+            Predicate predicate, Root<UserEventEntity> root, CriteriaBuilder cb, String query) {
+        if (query.isBlank()) {
+            return predicate;
+        }
+        String like = "%" + query.toLowerCase() + "%";
+        return cb.and(
+                predicate,
+                cb.or(
+                        cb.like(cb.lower(root.get(USERNAME)), like),
+                        cb.like(cb.lower(root.get("type").as(String.class)), like),
+                        cb.like(cb.lower(root.get(CLIENT_ID)), like),
+                        cb.like(cb.lower(root.get(IP_ADDRESS)), like)));
+    }
+
+    private static Predicate addTypePredicate(
+            Predicate predicate,
+            Root<UserEventEntity> root,
+            CriteriaBuilder cb,
+            UserEventType type) {
+        if (type == null) {
+            return predicate;
+        }
+        return cb.and(predicate, cb.equal(root.get("type"), type));
+    }
+
+    private static Predicate addEqualsPredicate(
+            Predicate predicate,
+            Root<UserEventEntity> root,
+            CriteriaBuilder cb,
+            String property,
+            String value) {
+        if (value == null || value.isBlank()) {
+            return predicate;
+        }
+        return cb.and(predicate, cb.equal(root.get(property), value));
+    }
+
+    private static Predicate addFromPredicate(
+            Predicate predicate, Root<UserEventEntity> root, CriteriaBuilder cb, Instant from) {
+        if (from == null) {
+            return predicate;
+        }
+        return cb.and(predicate, cb.greaterThanOrEqualTo(root.get("occurredAt"), from));
+    }
+
+    private static Predicate addToPredicate(
+            Predicate predicate, Root<UserEventEntity> root, CriteriaBuilder cb, Instant to) {
+        if (to == null) {
+            return predicate;
+        }
+        return cb.and(predicate, cb.lessThanOrEqualTo(root.get("occurredAt"), to));
     }
 }
