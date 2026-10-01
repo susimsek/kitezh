@@ -347,7 +347,6 @@ class ObservabilityMdcFilterTest {
 
     @Test
     void ignoresBlankRequestIdentifiersAndAnonymousAuthentication() throws Exception {
-        LoggingProperties.Server server = new LoggingProperties.Server();
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
         obfuscate.setHeaders(java.util.Arrays.asList(null, " ", "X-Secret"));
         obfuscate.setCookies(java.util.Arrays.asList(null, " ", "SESSION"));
@@ -362,6 +361,7 @@ class ObservabilityMdcFilterTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
 
         AtomicReference<Map<String, String>> observed = new AtomicReference<>();
+        LoggingProperties.Server server = new LoggingProperties.Server();
         ObservabilityMdcFilter configuredFilter = new ObservabilityMdcFilter(server, obfuscate);
         configuredFilter.doFilterInternal(
                 request,
