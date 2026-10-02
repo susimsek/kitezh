@@ -7,6 +7,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AdminEventSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
+import io.github.susimsek.springauthserversamples.domain.BrandingSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.CibaPolicyEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
@@ -25,6 +26,7 @@ import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.springauthserversamples.repository.AdminEventSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
+import io.github.susimsek.springauthserversamples.repository.BrandingSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.CibaPolicyRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
@@ -92,6 +94,7 @@ public class CacheConfig {
         return List.of(
                 AdminEventSettingsRepository.ADMIN_EVENT_SETTINGS_BY_ID_CACHE,
                 AuthorityRepository.AUTHORITY_BY_NAME_CACHE,
+                BrandingSettingsRepository.BRANDING_SETTINGS_BY_ID_CACHE,
                 CibaPolicyRepository.CIBA_POLICY_BY_ID_CACHE,
                 OfflineAccessPolicyRepository.OFFLINE_ACCESS_POLICY_BY_ID_CACHE,
                 ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
@@ -153,6 +156,7 @@ public class CacheConfig {
             return cacheManager -> {
                 createCache(cacheManager, AdminEventSettingsEntity.class.getName());
                 createCache(cacheManager, AuthorizationConsentEntity.class.getName());
+                createCache(cacheManager, BrandingSettingsEntity.class.getName());
                 createCache(cacheManager, ClientScopeEntity.class.getName());
                 createCache(cacheManager, ClientRoleEntity.class.getName());
                 createCache(cacheManager, CibaPolicyEntity.class.getName());
@@ -205,6 +209,7 @@ public class CacheConfig {
                 createCache(
                         cacheManager,
                         AdminEventSettingsRepository.ADMIN_EVENT_SETTINGS_BY_ID_CACHE);
+                createCache(cacheManager, BrandingSettingsRepository.BRANDING_SETTINGS_BY_ID_CACHE);
                 createCache(cacheManager, EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE);
                 createCache(cacheManager, LoginSettingsRepository.LOGIN_SETTINGS_BY_ID_CACHE);
                 createCache(

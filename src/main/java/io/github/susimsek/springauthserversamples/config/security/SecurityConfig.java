@@ -172,7 +172,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         authorize ->
                                 authorize
-                                        .requestMatchers("/avatars/**", "/oidc/session-iframe.html")
+                                        .requestMatchers(
+                                                "/avatars/**",
+                                                "/apple-icon.png",
+                                                "/brand/**",
+                                                "/favicon.ico",
+                                                "/icon.svg",
+                                                "/oidc/session-iframe.html")
                                         .permitAll()
                                         .requestMatchers("/api/auth/mfa/**")
                                         .authenticated()

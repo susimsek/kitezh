@@ -691,8 +691,27 @@
         "userProfile": "User profile",
         "localization": "Localization",
         "cibaPolicy": "CIBA policy",
-        "offlineAccess": "Offline access"
+        "offlineAccess": "Offline access",
+        "branding": "Branding"
       }
+    },
+    "branding": {
+      "title": "Branding",
+      "subtitle": "Manage the application name and the static assets used across the login and console screens.",
+      "applicationName": "Application name",
+      "applicationNameHint": "This name is shown in the login, Administration Console and Account Console headers.",
+      "primaryColor": "Primary color",
+      "accentColor": "Accent color",
+      "backgroundColor": "Background color",
+      "previewTitle": "Brand preview",
+      "previewSubtitle": "Logo and icon files remain static assets; colors and the application name are stored as branding settings.",
+      "logoPath": "Logo path",
+      "faviconPath": "Favicon path",
+      "appleTouchIconPath": "Apple touch icon path",
+      "save": "Save branding",
+      "saved": "Branding settings saved.",
+      "loading": "Loading branding settings…",
+      "error": "Branding settings could not be loaded or saved."
     },
     "offlineAccess": {
       "title": "Offline access policy",

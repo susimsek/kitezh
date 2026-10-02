@@ -7,6 +7,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AdminEventSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentEntity;
+import io.github.susimsek.springauthserversamples.domain.BrandingSettingsEntity;
 import io.github.susimsek.springauthserversamples.domain.CibaPolicyEntity;
 import io.github.susimsek.springauthserversamples.domain.ClientRoleEntity;
 import io.github.susimsek.springauthserversamples.domain.EmailSettingsEntity;
@@ -24,6 +25,7 @@ import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.springauthserversamples.repository.AdminEventSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
+import io.github.susimsek.springauthserversamples.repository.BrandingSettingsRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientScopeRepository;
 import io.github.susimsek.springauthserversamples.repository.EmailSettingsRepository;
@@ -143,6 +145,7 @@ class CacheConfigTest {
         CacheManager cacheManager = configuration.jcacheManager(customizer);
         assertThat(cacheManager.getCache(AdminEventSettingsEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorizationConsentEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(BrandingSettingsEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorityEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(AuthorityEntity.class.getName() + ".compositeRoles"))
                 .isNotNull();
@@ -204,6 +207,8 @@ class CacheConfigTest {
         assertThat(
                         cacheManager.getCache(
                                 AdminEventSettingsRepository.ADMIN_EVENT_SETTINGS_BY_ID_CACHE))
+                .isNotNull();
+        assertThat(cacheManager.getCache(BrandingSettingsRepository.BRANDING_SETTINGS_BY_ID_CACHE))
                 .isNotNull();
         assertThat(cacheManager.getCache(EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE))
                 .isNotNull();

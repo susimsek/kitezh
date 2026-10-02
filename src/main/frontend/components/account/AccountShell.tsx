@@ -8,6 +8,8 @@ import { LanguageSwitcher } from "@/components/auth/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/auth/ThemeSwitcher";
 import { ConsoleUserMenu } from "@/components/auth/ConsoleUserMenu";
 import { ConsoleAlertsProvider } from "@/components/auth/ConsoleAlerts";
+import { BrandLogo } from "@/components/shared/BrandLogo";
+import { useBranding } from "@/components/auth/BrandingProvider";
 import { Icon, type IconName } from "@/components/shared/Icon";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
@@ -23,6 +25,7 @@ export function AccountShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const branding = useBranding();
   const { accessToken, idTokenParsed, logout, tokenParsed, username } = useAccountAuth();
   const [open, setOpen] = useState(false);
   const items: ReadonlyArray<readonly [string, string, IconName]> = [
@@ -51,9 +54,9 @@ export function AccountShell({
                 className="admin-brand d-flex align-items-center gap-2 fw-semibold mb-0"
               >
                 <span className="admin-brand-mark">
-                  <Icon icon="shieldHalved" />
+                  <BrandLogo size={36} />
                 </span>
-                <span>{dictionary.account.product}</span>
+                <span>{branding.applicationName || dictionary.account.product}</span>
               </Navbar.Brand>
             </div>
             <div className="admin-navbar-actions d-flex align-items-center gap-2">

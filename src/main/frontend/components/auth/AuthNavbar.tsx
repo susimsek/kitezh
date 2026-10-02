@@ -4,7 +4,8 @@ import { Container, Navbar } from "react-bootstrap";
 
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
-import { Icon } from "@/components/shared/Icon";
+import { BrandLogo } from "@/components/shared/BrandLogo";
+import { useBranding } from "./BrandingProvider";
 
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { ThemeSwitcher } from "./ThemeSwitcher";
@@ -15,14 +16,13 @@ type AuthNavbarProps = {
 };
 
 export function AuthNavbar({ locale, dictionary }: AuthNavbarProps) {
+  const branding = useBranding();
   return (
     <Navbar className="auth-navbar bg-body border-bottom">
       <Container>
         <Navbar.Brand href={`/login`} className="d-flex align-items-center gap-2 fw-semibold">
-          <span className="text-primary">
-            <Icon icon="shieldHalved" />
-          </span>
-          {dictionary.brand.product}
+          <BrandLogo size={36} />
+          {branding.applicationName || dictionary.brand.product}
         </Navbar.Brand>
 
         <div className="d-flex align-items-center gap-2">

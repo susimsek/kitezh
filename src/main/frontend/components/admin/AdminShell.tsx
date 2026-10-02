@@ -9,6 +9,8 @@ import { LanguageSwitcher } from "@/components/auth/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/auth/ThemeSwitcher";
 import { ConsoleUserMenu } from "@/components/auth/ConsoleUserMenu";
 import { ConsoleAlertsProvider } from "@/components/auth/ConsoleAlerts";
+import { BrandLogo } from "@/components/shared/BrandLogo";
+import { useBranding } from "@/components/auth/BrandingProvider";
 import { Icon, type IconName } from "@/components/shared/Icon";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
@@ -23,6 +25,7 @@ type Props = {
 
 export function AdminShell({ locale, dictionary, children }: Props) {
   const pathname = usePathname();
+  const branding = useBranding();
   const { access, accessToken, idTokenParsed, logout, tokenParsed, username } = useAdminAuth();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const items: ReadonlyArray<readonly [string, string, IconName, boolean | undefined]> = [
@@ -79,9 +82,11 @@ export function AdminShell({ locale, dictionary, children }: Props) {
                 className="admin-brand d-flex align-items-center gap-2 fw-semibold mb-0"
               >
                 <span className="admin-brand-mark">
-                  <Icon icon="shieldHalved" />
+                  <BrandLogo size={36} />
                 </span>
-                <span className="admin-brand-copy text-truncate">{dictionary.admin.product}</span>
+                <span className="admin-brand-copy text-truncate">
+                  {branding.applicationName || dictionary.admin.product}
+                </span>
               </Navbar.Brand>
             </div>
 

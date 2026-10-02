@@ -19,6 +19,7 @@ import LdapFederationSettings from "./LdapFederationSettings";
 import AdminLocalizationSettings, { type LocalizationSection } from "./AdminLocalizationSettings";
 import AdminCibaPolicySettings from "./AdminCibaPolicySettings";
 import AdminOfflineAccessSettings from "./AdminOfflineAccessSettings";
+import AdminBrandingSettings from "./AdminBrandingSettings";
 
 const SETTINGS_SECTIONS = [
   "general",
@@ -33,6 +34,7 @@ const SETTINGS_SECTIONS = [
   "offline-access",
   "user-profile",
   "localization",
+  "branding",
 ] as const;
 type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
@@ -121,6 +123,11 @@ export default function AdminSettings({
       label: dictionary.admin.settings.sections.localization,
       href: "/admin/settings/localization",
     },
+    {
+      key: "branding",
+      label: dictionary.admin.settings.sections.branding,
+      href: "/admin/settings/branding",
+    },
   ] satisfies Array<{
     key: SettingsSection;
     label: string;
@@ -162,6 +169,7 @@ export default function AdminSettings({
           mode={localizationAction === "create" ? "create" : "list"}
         />
       ) : null}
+      {active === "branding" ? <AdminBrandingSettings /> : null}
       {active === "user-federation" ? <LdapFederationSettings /> : null}
       {active !== "general" &&
       active !== "email" &&
@@ -170,6 +178,7 @@ export default function AdminSettings({
       active !== "offline-access" &&
       active !== "user-profile" &&
       active !== "localization" &&
+      active !== "branding" &&
       active !== "user-federation" ? (
         <LoginSettings embedded focusSection={active as LoginSettingsSection} />
       ) : null}

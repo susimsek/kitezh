@@ -691,8 +691,27 @@
         "userProfile": "Kullanıcı profili",
         "localization": "Yerelleştirme",
         "cibaPolicy": "CIBA politikası",
-        "offlineAccess": "Çevrimdışı erişim"
+        "offlineAccess": "Çevrimdışı erişim",
+        "branding": "Markalama"
       }
+    },
+    "branding": {
+      "title": "Markalama",
+      "subtitle": "Giriş ve konsol ekranlarında kullanılan uygulama adını ve statik varlıkları yönetin.",
+      "applicationName": "Uygulama adı",
+      "applicationNameHint": "Bu ad giriş, Yönetim Konsolu ve Hesap Konsolu başlıklarında gösterilir.",
+      "primaryColor": "Birincil renk",
+      "accentColor": "Vurgu rengi",
+      "backgroundColor": "Arka plan rengi",
+      "previewTitle": "Marka önizlemesi",
+      "previewSubtitle": "Logo ve ikon dosyaları statik kalır; renkler ve uygulama adı branding ayarı olarak saklanır.",
+      "logoPath": "Logo yolu",
+      "faviconPath": "Favicon yolu",
+      "appleTouchIconPath": "Apple touch icon yolu",
+      "save": "Markalamayı kaydet",
+      "saved": "Markalama ayarları kaydedildi.",
+      "loading": "Markalama ayarları yükleniyor…",
+      "error": "Markalama ayarları yüklenemedi veya kaydedilemedi."
     },
     "offlineAccess": {
       "title": "Çevrimdışı erişim politikası",
