@@ -8,18 +8,21 @@ import { ServiceAccountRoles } from "./ServiceAccountRoles";
 jest.mock("@/lib/admin-api", () => ({ adminRequest: jest.fn() }));
 
 const mockAddAlert = jest.fn();
+const mockAddError = jest.fn();
 const authState = {
-  accessToken: "admin-token",
+  accessToken: "admin-token" as string | null,
   access: { manageClients: true },
 };
 
 jest.mock("./AdminAuthProvider", () => ({ useAdminAuth: () => authState }));
 jest.mock("@/components/auth/ConsoleAlerts", () => ({
-  useConsoleAlerts: () => ({ addAlert: mockAddAlert, addError: jest.fn() }),
+  useConsoleAlerts: () => ({ addAlert: mockAddAlert, addError: mockAddError }),
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  authState.accessToken = "admin-token";
+  authState.access = { manageClients: true };
 });
 
 it("creates a protocol mapper and reloads the list", async () => {
@@ -165,6 +168,9 @@ it("assigns service-account roles through the validated form", async () => {
         data: { username: "service-account-client-1", roleIds: [] },
       } as never;
     }
+    if (config.url?.includes("/api/admin/roles")) {
+      return { status: 200, data: { content: [{ name: "ROLE_REPORTS" }] } } as never;
+    }
     return { status: 200, data: { content: [{ id: 7, name: "orders.read" }] } } as never;
   });
 
@@ -178,8 +184,252 @@ it("assigns service-account roles through the validated form", async () => {
       url: "/api/admin/clients/client-1/service-account/roles",
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: { roleIds: [7] },
+      data: { roleIds: [7], applicationRoles: [] },
     }),
   );
   expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.saved);
+});
+
+it("assigns application roles and revokes service-account tokens", async () => {
+  const request = jest.mocked(adminRequest);
+  let resolveRevoke: (value: unknown) => void = () => undefined;
+  const revokeResponse = new Promise((resolve) => {
+    resolveRevoke = resolve;
+  });
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "PUT") {
+      return {
+        status: 200,
+        data: {
+          username: "service-account-client-1",
+          roleIds: [],
+          applicationRoles: ["ROLE_ADMIN"],
+        },
+      } as never;
+    }
+    if (config.method === "POST") return revokeResponse as never;
+    if (config.url?.includes("/service-account")) {
+      return {
+        status: 200,
+        data: {
+          username: "service-account-client-1",
+          roleIds: [7],
+          applicationRoles: ["ROLE_REPORTS"],
+        },
+      } as never;
+    }
+    if (config.url?.includes("/api/admin/roles")) {
+      return {
+        status: 200,
+        data: { content: [{ name: "ROLE_REPORTS" }, { name: "ROLE_ADMIN" }] },
+      } as never;
+    }
+    return { status: 200, data: { content: [{ id: 7, name: "orders.read" }] } } as never;
+  });
+
+  render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  await screen.findByRole("checkbox", { name: "ROLE_REPORTS" });
+  fireEvent.click(screen.getByRole("checkbox", { name: "ROLE_REPORTS" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "ROLE_ADMIN" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "orders.read" }));
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith("admin-token", {
+      url: "/api/admin/clients/client-1/service-account/roles",
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: { roleIds: [], applicationRoles: ["ROLE_ADMIN"] },
+    }),
+  );
+
+  fireEvent.click(
+    screen.getByRole("button", { name: en.admin.clients.serviceAccountRoles.revokeTokens }),
+  );
+  expect(screen.getByText(en.admin.clients.serviceAccountRoles.revokeTokensConfirm)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.cancel }));
+  await waitFor(() =>
+    expect(screen.queryByText(en.admin.clients.serviceAccountRoles.revokeTokensConfirm)).toBeNull(),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: en.admin.clients.serviceAccountRoles.revokeTokens }),
+  );
+  const confirmButtons = screen.getAllByRole("button", {
+    name: en.admin.clients.serviceAccountRoles.revokeTokens,
+  });
+  fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+  await waitFor(() =>
+    expect(
+      screen
+        .getAllByRole("button", {
+          name: en.admin.clients.serviceAccountRoles.revokeTokens,
+        })[1]
+        ?.querySelector(".spinner-border"),
+    ).not.toBeNull(),
+  );
+  resolveRevoke({ status: 204 });
+
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith("admin-token", {
+      url: "/api/admin/clients/client-1/service-account/revoke",
+      method: "POST",
+    }),
+  );
+  expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.serviceAccountRoles.tokensRevoked);
+});
+
+it("shows service-account save errors", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "PUT") return { status: 400, data: {} } as never;
+    if (config.url?.includes("/service-account")) {
+      return {
+        status: 200,
+        data: { username: "service-account-client-1", roleIds: [] },
+      } as never;
+    }
+    if (config.url?.includes("/api/admin/roles")) {
+      return { status: 200, data: { content: [] } } as never;
+    }
+    return { status: 200, data: { content: [] } } as never;
+  });
+
+  render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  await screen.findByText("service-account-client-1");
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  await waitFor(() =>
+    expect(mockAddError).toHaveBeenCalledWith(en.admin.clients.serviceAccountRoles.error),
+  );
+  expect(screen.getByText("service-account-client-1")).toBeVisible();
+});
+
+it("shows service-account token revoke errors", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "POST") return { status: 500, data: {} } as never;
+    if (config.url?.includes("/service-account")) {
+      return {
+        status: 200,
+        data: { username: "service-account-client-1", roleIds: [], applicationRoles: [] },
+      } as never;
+    }
+    if (config.url?.includes("/api/admin/roles")) {
+      return { status: 200, data: { content: [] } } as never;
+    }
+    return { status: 200, data: { content: [] } } as never;
+  });
+
+  render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  await screen.findByText("service-account-client-1");
+  fireEvent.click(
+    screen.getByRole("button", { name: en.admin.clients.serviceAccountRoles.revokeTokens }),
+  );
+  const confirmButtons = screen.getAllByRole("button", {
+    name: en.admin.clients.serviceAccountRoles.revokeTokens,
+  });
+  fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+  await waitFor(() =>
+    expect(mockAddError).toHaveBeenCalledWith(en.admin.clients.serviceAccountRoles.error),
+  );
+  expect(screen.getByText("service-account-client-1")).toBeVisible();
+});
+
+it("shows service-account network errors and restores the save action", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "PUT") throw new Error("network failure");
+    if (config.url?.includes("/service-account")) {
+      return {
+        status: 200,
+        data: { username: "service-account-client-1", roleIds: [], applicationRoles: [] },
+      } as never;
+    }
+    return { status: 200, data: { content: [] } } as never;
+  });
+
+  render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  await screen.findByText("service-account-client-1");
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  await waitFor(() =>
+    expect(mockAddError).toHaveBeenCalledWith(en.admin.clients.serviceAccountRoles.error),
+  );
+  expect(screen.getByRole("button", { name: en.admin.common.save })).toBeEnabled();
+});
+
+it("shows service-account loading errors", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.url?.includes("/service-account")) {
+      return {
+        status: 200,
+        data: { username: "service-account-client-1", roleIds: [] },
+      } as never;
+    }
+    if (config.url?.includes("/api/admin/roles")) {
+      return { status: 500, data: {} } as never;
+    }
+    return { status: 200, data: { content: [] } } as never;
+  });
+
+  render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+
+  expect(await screen.findByText(en.admin.clients.serviceAccountRoles.error)).toBeVisible();
+});
+
+it("does not load service-account data without an access token", () => {
+  authState.accessToken = null;
+
+  render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+
+  expect(screen.getByText(en.admin.common.loading)).toBeVisible();
+  expect(adminRequest).not.toHaveBeenCalled();
+});
+
+it("does not mutate a service account without client-management access", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "PUT" || config.method === "POST") {
+      throw new Error("mutation should not be sent");
+    }
+    if (config.url?.includes("/service-account")) {
+      return {
+        status: 200,
+        data: { username: "service-account-client-1", roleIds: [], applicationRoles: [] },
+      } as never;
+    }
+    return { status: 200, data: { content: [] } } as never;
+  });
+  authState.access = { manageClients: false };
+
+  const { rerender } = render(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  await screen.findByText("service-account-client-1");
+  fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+  await waitFor(() =>
+    expect(request).not.toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({ method: "PUT" }),
+    ),
+  );
+
+  authState.access = { manageClients: true };
+  rerender(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  fireEvent.click(
+    screen.getByRole("button", { name: en.admin.clients.serviceAccountRoles.revokeTokens }),
+  );
+  authState.access = { manageClients: false };
+  rerender(<ServiceAccountRoles clientId="client-1" dictionary={en} />);
+  const confirmButtons = screen.getAllByRole("button", {
+    name: en.admin.clients.serviceAccountRoles.revokeTokens,
+  });
+  fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+  await waitFor(() =>
+    expect(request).not.toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
 });

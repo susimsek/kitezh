@@ -270,7 +270,9 @@ public class AdminClientController {
     @GetMapping("/{id}/service-account")
     @Operation(
             summary = "Get client service account",
-            description = "Returns the service-account identity and assigned client roles.")
+            description =
+                    "Returns the service-account identity, application roles, and effective client"
+                            + " roles.")
     @ApiResponse(responseCode = "200", description = "Service account returned.")
     AdminServiceAccountDTO serviceAccount(@PathVariable String id) {
         return serviceAccountService.find(id);
@@ -279,12 +281,23 @@ public class AdminClientController {
     @PutMapping("/{id}/service-account/roles")
     @Operation(
             summary = "Replace service-account roles",
-            description = "Replaces the client roles assigned to the service account.")
+            description =
+                    "Replaces the application and client roles assigned to the service account.")
     @ApiResponse(responseCode = "200", description = "Service-account roles updated.")
     AdminServiceAccountDTO serviceAccountRoles(
             @PathVariable String id,
             @Valid @RequestBody AdminServiceAccountRolesRequestDTO request) {
         return serviceAccountService.replaceRoles(id, request);
+    }
+
+    @PostMapping("/{id}/service-account/revoke")
+    @Operation(
+            summary = "Revoke service-account tokens",
+            description = "Revokes active OAuth2 authorizations issued to the service account.")
+    @ApiResponse(responseCode = "204", description = "Service-account tokens revoked.")
+    ResponseEntity<Void> revokeServiceAccountTokens(@PathVariable String id) {
+        serviceAccountService.revokeTokens(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/scope-assignments")

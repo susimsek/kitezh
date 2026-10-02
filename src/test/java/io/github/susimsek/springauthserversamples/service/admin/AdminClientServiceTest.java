@@ -1298,6 +1298,56 @@ class AdminClientServiceTest {
                 .update(
                         "client-id",
                         advancedRequest(
+                                "renamed-service-client",
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                null,
+                                null,
+                                true,
+                                null));
+
+        assertThat(serviceUser.getUsername()).isEqualTo("service-account-renamed-service-client");
+        verify(authorizationRepository).deleteByPrincipalName("service-account-advanced-client");
+        verify(userRepository, atLeastOnce()).save(serviceUser);
+
+        serviceWithAccounts()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                "renamed-service-client",
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials"),
+                                "poll",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false,
+                                null));
+
+        verify(serviceAccountRepository, times(1)).delete(account);
+        verify(userRepository, times(1)).delete(serviceUser);
+        verify(authorizationRepository)
+                .deleteByPrincipalName("service-account-renamed-service-client");
+
+        serviceWithAccounts().delete("client-id");
+
+        verify(serviceAccountRepository, times(2)).delete(account);
+        verify(userRepository, times(2)).delete(serviceUser);
+    }
+
+    @Test
+    void skipsServiceAccountSynchronizationWhenUserRepositoryIsUnavailable() {
+        wireSaveMapper();
+        when(clientRepository.existsByClientId("advanced-client")).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+
+        serviceWithMissingUserRepository()
+                .create(
+                        advancedRequest(
                                 Set.of("client_secret_basic"),
                                 Set.of("client_credentials"),
                                 "poll",
@@ -1307,29 +1357,16 @@ class AdminClientServiceTest {
                                 null,
                                 true));
 
-        assertThat(serviceUser.getUsername()).isEqualTo("service-account-advanced-client");
-        verify(userRepository, atLeastOnce()).save(serviceUser);
+        verify(serviceAccountRepository, never()).save(any(ServiceAccountEntity.class));
 
-        serviceWithAccounts()
-                .update(
-                        "client-id",
-                        advancedRequest(
-                                Set.of("client_secret_basic"),
-                                Set.of("client_credentials"),
-                                "poll",
-                                null,
-                                null,
-                                null,
-                                null,
-                                false));
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient client = registeredClient("client-id", "advanced-client");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
 
-        verify(serviceAccountRepository, times(1)).delete(account);
-        verify(userRepository, times(1)).delete(serviceUser);
+        serviceWithMissingUserRepository().delete("client-id");
 
-        serviceWithAccounts().delete("client-id");
-
-        verify(serviceAccountRepository, times(2)).delete(account);
-        verify(userRepository, times(2)).delete(serviceUser);
+        verify(serviceAccountRepository, never()).delete(any(ServiceAccountEntity.class));
     }
 
     private AdminClientService service() {
@@ -1354,6 +1391,19 @@ class AdminClientServiceTest {
                 adminAuditEventService,
                 serviceAccountRepository,
                 userRepository);
+    }
+
+    private AdminClientService serviceWithMissingUserRepository() {
+        return new AdminClientService(
+                clientRepository,
+                authorizationRepository,
+                authorizationConsentRepository,
+                registeredClientMapper,
+                mapperSupport,
+                passwordEncoder,
+                adminAuditEventService,
+                serviceAccountRepository,
+                null);
     }
 
     private AtomicReference<RegisteredClient> wireSaveMapper() {
@@ -1471,6 +1521,7 @@ class AdminClientServiceTest {
             Duration gracePeriod,
             boolean serviceAccountEnabled) {
         return advancedRequest(
+                "advanced-client",
                 methods,
                 grants,
                 cibaMode,
@@ -1492,8 +1543,32 @@ class AdminClientServiceTest {
             Duration gracePeriod,
             boolean serviceAccountEnabled,
             String cibaNotificationEndpoint) {
-        return new AdminClientRequestDTO(
+        return advancedRequest(
                 "advanced-client",
+                methods,
+                grants,
+                cibaMode,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod,
+                serviceAccountEnabled,
+                cibaNotificationEndpoint);
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            String clientId,
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled,
+            String cibaNotificationEndpoint) {
+        return new AdminClientRequestDTO(
+                clientId,
                 "Advanced client",
                 methods,
                 grants,
