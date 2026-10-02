@@ -318,10 +318,18 @@ public class AdminClientService {
                 serviceAccountRepository.save(new ServiceAccountEntity(client.getId(), saved));
             } else {
                 UserEntity user = existing.getUser();
-                user.setUsername(serviceAccountUsername(client.getClientId()));
+                String previousUsername = user.getUsername();
+                String username = serviceAccountUsername(client.getClientId());
+                if (!username.equals(previousUsername)) {
+                    authorizationRepository.deleteByPrincipalName(previousUsername);
+                    user.setUsername(username);
+                }
+                user.setEnabled(true);
+                user.setServiceAccount(true);
                 userRepository.save(user);
             }
         } else if (existing != null) {
+            authorizationRepository.deleteByPrincipalName(existing.getUser().getUsername());
             serviceAccountRepository.delete(existing);
             userRepository.delete(existing.getUser());
         }
@@ -333,6 +341,7 @@ public class AdminClientService {
         }
         ServiceAccountEntity existing = serviceAccount(clientId);
         if (existing != null) {
+            authorizationRepository.deleteByPrincipalName(existing.getUser().getUsername());
             serviceAccountRepository.delete(existing);
             userRepository.delete(existing.getUser());
         }

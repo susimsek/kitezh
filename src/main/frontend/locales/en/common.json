@@ -800,7 +800,12 @@
       "serviceAccountRoles": {
         "title": "Service-account roles",
         "error": "Service-account roles could not be loaded.",
-        "notEnabled": "This client has no service account enabled."
+        "notEnabled": "This client has no service account enabled.",
+        "applicationRoles": "Application roles",
+        "clientRoles": "Client roles",
+        "revokeTokens": "Revoke tokens",
+        "revokeTokensConfirm": "Revoke all active tokens issued to this service account?",
+        "tokensRevoked": "Service-account tokens revoked successfully."
       },
       "serviceAccountHelp": "Creates a non-interactive local user for client_credentials and client-role assignments.",
       "loadError": "Clients could not be loaded.",

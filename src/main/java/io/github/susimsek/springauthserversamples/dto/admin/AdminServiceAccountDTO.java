@@ -1,6 +1,7 @@
 package io.github.susimsek.springauthserversamples.dto.admin;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Map;
 import java.util.Set;
 
 @Schema(
@@ -21,5 +22,17 @@ public record AdminServiceAccountDTO(
                 Set<String> roles,
         @Schema(
                         description = "Direct client role identifiers.",
+                        example = "[1, 2]",
                         requiredMode = Schema.RequiredMode.REQUIRED)
-                Set<Long> roleIds) {}
+                Set<Long> roleIds,
+        @Schema(
+                        description =
+                                "Direct application-role names assigned to the service account.",
+                        example = "[\"ROLE_REPORTS\"]",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                Set<String> applicationRoles,
+        @Schema(
+                        description = "Effective client roles grouped by public client ID.",
+                        example = "{\"demo-client\":[\"orders.read\"]}",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                Map<String, Set<String>> clientRoles) {}

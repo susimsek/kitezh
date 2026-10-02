@@ -231,14 +231,6 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                     status,
                     durationMillis,
                     headers);
-        } else if (includeBody) {
-            log.log(
-                    "HTTP client response method={} uri={} status={} durationMs={} body={}",
-                    request.getMethod(),
-                    target,
-                    status,
-                    durationMillis,
-                    body);
         } else {
             log.log(
                     "HTTP client response method={} uri={} status={} durationMs={}",
@@ -281,12 +273,6 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                     request.getMethod(),
                     target,
                     headers);
-        } else if (includeBody) {
-            log.log(
-                    "HTTP client request method={} uri={} body={}",
-                    request.getMethod(),
-                    target,
-                    body);
         } else {
             log.log("HTTP client request method={} uri={}", request.getMethod(), target);
         }

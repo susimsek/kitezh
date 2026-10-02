@@ -800,7 +800,12 @@
       "serviceAccountRoles": {
         "title": "Service account rolleri",
         "error": "Service account rolleri yüklenemedi.",
-        "notEnabled": "Bu istemcide service account etkin değil."
+        "notEnabled": "Bu istemcide service account etkin değil.",
+        "applicationRoles": "Uygulama rolleri",
+        "clientRoles": "İstemci rolleri",
+        "revokeTokens": "Token'ları iptal et",
+        "revokeTokensConfirm": "Bu service account tarafından verilen tüm aktif token'lar iptal edilsin mi?",
+        "tokensRevoked": "Service account token'ları başarıyla iptal edildi."
       },
       "serviceAccountHelp": "client_credentials ve istemci rolü atamaları için etkileşimsiz yerel kullanıcı oluşturur.",
       "loadError": "İstemciler yüklenemedi.",

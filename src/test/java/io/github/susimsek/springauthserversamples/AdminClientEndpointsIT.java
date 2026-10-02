@@ -64,9 +64,14 @@ class AdminClientEndpointsIT {
                             put("/api/admin/clients/{id}/service-account/roles", id)
                                     .with(admin())
                                     .contentType(MediaType.APPLICATION_JSON)
-                                    .content("{\"roleIds\":[]}"))
+                                    .content("{\"roleIds\":[],\"applicationRoles\":[]}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.roleIds").isArray());
+
+            mockMvc.perform(
+                            post("/api/admin/clients/{id}/service-account/revoke", id)
+                                    .with(admin()))
+                    .andExpect(status().isNoContent());
 
             mockMvc.perform(post("/api/admin/clients/{id}/secret", id).with(admin()))
                     .andExpect(status().isOk())
