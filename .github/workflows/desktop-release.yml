@@ -107,11 +107,25 @@ jobs:
             exit 1
           fi
 
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
-          else
-            gh release create "${RELEASE_TAG}" "${assets[@]}" \
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
               --verify-tag \
               --title "${RELEASE_TAG}" \
               --generate-notes
           fi
+
+          for asset in "${assets[@]}"; do
+            uploaded=false
+            for attempt in 1 2 3; do
+              if gh release upload "${RELEASE_TAG}" "${asset}" --clobber; then
+                uploaded=true
+                break
+              fi
+              echo "Upload failed for ${asset}; retrying (${attempt}/3)..." >&2
+              sleep 10
+            done
+            if [ "${uploaded}" != true ]; then
+              echo "Unable to upload ${asset} after three attempts." >&2
+              exit 1
+            fi
+          done
