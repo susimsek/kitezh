@@ -16,6 +16,7 @@ import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
 
 import { useAdminAuth } from "./AdminAuthProvider";
+import { AdminGlobalSearch } from "./AdminGlobalSearch";
 
 type Props = {
   locale: Locale;
@@ -89,6 +90,8 @@ export function AdminShell({ locale, dictionary, children }: Props) {
                 </span>
               </Navbar.Brand>
             </div>
+
+            <AdminGlobalSearch dictionary={dictionary} />
 
             <div className="admin-navbar-actions d-flex align-items-center gap-2">
               <LanguageSwitcher

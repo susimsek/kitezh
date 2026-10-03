@@ -1,0 +1,2 @@
+id;application_name;logo_path;favicon_path;apple_touch_icon_path;primary_color;accent_color;background_color
+1;Authorization Server;/brand/logo.svg;/favicon.ico;/apple-icon.png;#0d6efd;#0b2b69;#f8f9fa

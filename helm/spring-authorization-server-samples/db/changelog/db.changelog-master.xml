@@ -40,4 +40,5 @@
 	<include file="db/changelog/changes/022-create-ciba.xml"/>
 	<include file="db/changelog/changes/023-create-ciba-policy.xml"/>
 	<include file="db/changelog/changes/029-create-offline-access-policy.xml"/>
+	<include file="db/changelog/changes/030-branding-settings.xml"/>
 </databaseChangeLog>

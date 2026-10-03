@@ -64,6 +64,18 @@ public class AdminApiSecurityConfig {
                                 authorize
                                         .requestMatchers(HttpMethod.GET, "/api/admin/dashboard")
                                         .hasAuthority(AuthoritiesConstants.ADMIN)
+                                        .requestMatchers(HttpMethod.GET, "/api/admin/search")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.USER_QUERY,
+                                                AuthoritiesConstants.USER_VIEWER,
+                                                AuthoritiesConstants.USER_MANAGER,
+                                                AuthoritiesConstants.CLIENT_QUERY,
+                                                AuthoritiesConstants.CLIENT_VIEWER,
+                                                AuthoritiesConstants.CLIENT_MANAGER,
+                                                AuthoritiesConstants.GROUP_QUERY,
+                                                AuthoritiesConstants.GROUP_VIEWER,
+                                                AuthoritiesConstants.GROUP_MANAGER)
                                         .requestMatchers("/api/admin/settings/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN)
                                         .requestMatchers("/api/admin/whoami")

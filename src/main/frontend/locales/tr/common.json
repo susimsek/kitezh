@@ -247,6 +247,18 @@
   "admin": {
     "product": "Admin Console",
     "manage": "Yönetim",
+    "globalSearch": {
+      "placeholder": "Kullanıcı, istemci, rol veya grup ara",
+      "ariaLabel": "Yönetim kaynaklarında ara",
+      "loading": "Aranıyor…",
+      "noResults": "Eşleşen kaynak bulunamadı.",
+      "types": {
+        "user": "Kullanıcılar",
+        "client": "İstemciler",
+        "role": "Roller",
+        "group": "Gruplar"
+      }
+    },
     "nav": {
       "dashboard": "Genel Bakış",
       "clients": "İstemciler",

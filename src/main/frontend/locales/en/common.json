@@ -247,6 +247,18 @@
   "admin": {
     "product": "Admin Console",
     "manage": "Manage",
+    "globalSearch": {
+      "placeholder": "Search users, clients, roles, or groups",
+      "ariaLabel": "Search administration resources",
+      "loading": "Searching…",
+      "noResults": "No matching resources found.",
+      "types": {
+        "user": "Users",
+        "client": "Clients",
+        "role": "Roles",
+        "group": "Groups"
+      }
+    },
     "nav": {
       "dashboard": "Dashboard",
       "clients": "Clients",
