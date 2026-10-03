@@ -56,7 +56,9 @@ export function AccountShell({
                 <span className="admin-brand-mark">
                   <BrandLogo size={36} />
                 </span>
-                <span>{branding.applicationName || dictionary.account.product}</span>
+                <span className="admin-brand-copy text-truncate">
+                  {branding.applicationName || dictionary.account.product}
+                </span>
               </Navbar.Brand>
             </div>
             <div className="admin-navbar-actions d-flex align-items-center gap-2">

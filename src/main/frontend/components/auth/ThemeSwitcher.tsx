@@ -37,9 +37,10 @@ export function ThemeSwitcher({ dictionary }: ThemeSwitcherProps) {
         size="sm"
         className="console-navbar-control"
         aria-label={dictionary.theme.label}
+        title={labels[theme]}
       >
         <Icon icon={themeIcons[theme]} className="me-2" />
-        {labels[theme]}
+        <span className="console-navbar-label">{labels[theme]}</span>
       </Dropdown.Toggle>
       <Dropdown.Menu>
         {(Object.keys(labels) as Theme[]).map((value) => (

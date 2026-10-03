@@ -88,9 +88,10 @@ export function LanguageSwitcher({ label, accessToken }: LanguageSwitcherProps) 
         size="sm"
         className="console-navbar-control"
         aria-label={label}
+        title={languageNames[activeLocale]}
       >
         <Icon icon="globe" className="me-2" />
-        {languageNames[activeLocale]}
+        <span className="console-navbar-label">{languageNames[activeLocale]}</span>
       </Dropdown.Toggle>
       <Dropdown.Menu>
         {supportedLocales.map((language) => (
