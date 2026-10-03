@@ -153,6 +153,7 @@ jobs:
           - platform: windows
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     timeout-minutes: 30
 
     steps:
@@ -212,7 +213,6 @@ jobs:
     timeout-minutes: 40
     env:
       NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
-      NATIVE_TAG: latest-native-${{ matrix.architecture }}
       NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
       NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
 
@@ -294,6 +294,7 @@ jobs:
       - name: Publish architecture image
         if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         run: |
+          NATIVE_TAG="latest-native-${NATIVE_ARCHITECTURE}"
           ./mvnw -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
             -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
@@ -325,11 +326,13 @@ jobs:
         if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         run: |
           IMAGE="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
+          TARGET_TAG="latest-native"
+          SOURCE_TAG_PREFIX="latest-native"
           docker buildx imagetools create \
-            --tag "${IMAGE}:latest-native" \
-            "${IMAGE}:latest-native-amd64" \
-            "${IMAGE}:latest-native-arm64"
-          docker buildx imagetools inspect "${IMAGE}:latest-native"
+            --tag "${IMAGE}:${TARGET_TAG}" \
+            "${IMAGE}:${SOURCE_TAG_PREFIX}-amd64" \
+            "${IMAGE}:${SOURCE_TAG_PREFIX}-arm64"
+          docker buildx imagetools inspect "${IMAGE}:${TARGET_TAG}"
 
       - name: Update Docker Hub description
         if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}

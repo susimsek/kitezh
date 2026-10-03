@@ -10,7 +10,7 @@ The image provides the authorization server, localized login and consent pages, 
 docker pull suayb/spring-authorization-server-samples:latest-native
 ```
 
-The `latest-native` tag is published to Docker Hub from the `main` branch by GitHub Actions after the native build passes. The image is intended for demonstrations and sample deployments; configure an external PostgreSQL database before using it outside local testing.
+The `latest-native` tag is published to Docker Hub from validated `main` pushes by GitHub Actions after the native build passes. Versioned `v*` tags additionally publish immutable tags such as `0.1.0-amd64`, `0.1.0-arm64`, and `0.1.0`. The image is intended for demonstrations and sample deployments; configure an external PostgreSQL database before using it outside local testing.
 
 ## Included capabilities
 
@@ -177,7 +177,7 @@ The Render Blueprint in `render.yaml` deploys the same Docker Hub image with:
 - port: `10000` through `SERVER_PORT`
 - PostgreSQL and OTLP values supplied as Render environment variables
 
-The GitHub Actions workflow builds amd64 and arm64 native images with GraalVM, publishes architecture-specific tags through Jib, combines them into the `latest-native` multi-arch manifest, and optionally triggers the Render Deploy Hook.
+The GitHub Actions workflow builds amd64 and arm64 native images with GraalVM, publishes architecture-specific tags through Jib, combines them into the `latest-native` multi-arch manifest for `main` or a versioned manifest for `v*` tags, and optionally triggers the matching Render Deploy Hook.
 
 ## Build and publish locally
 

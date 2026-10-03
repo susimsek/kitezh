@@ -4,6 +4,7 @@ services:
     runtime: image
     plan: free
     region: frankfurt
+    autoDeploy: false
     image:
       url: docker.io/suayb/spring-authorization-server-samples:latest-native
     healthCheckPath: /actuator/health/readiness

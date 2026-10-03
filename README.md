@@ -1348,15 +1348,16 @@ terraform -chdir=terraform destroy -auto-approve
 
 ## Continuous Integration
 
-Pipeline: `.github/workflows/ci.yml`
+Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.github/workflows/backend-release.yml`
 
 - Docker Compose, Helm, and Terraform definitions are validated on every branch.
 - `./mvnw verify` for backend tests + quality gates
 - `./mvnw -Pprod,native -DskipTests native:compile` for musl static native builds on amd64 and arm64
 - Compress each `target/native-executable` with UPX
-- Push architecture-specific native images to Docker Hub on the `main` branch via Jib
-- Publish the `latest-native` multi-arch manifest after both images are available
-- Trigger the Render image-backed service through its Deploy Hook after the image is published
+- Push architecture-specific native images to Docker Hub on validated `main` pushes via Jib
+- Publish the `latest-native` multi-arch manifest and trigger the Render demo Deploy Hook after both images are available
+- Push immutable versioned architecture images and a matching multi-arch manifest for `v*` tags
+- Optionally deploy a versioned release image through `RENDER_RELEASE_DEPLOY_HOOK_URL`
 
 ### Render Blueprint deployment
 
@@ -1370,11 +1371,14 @@ Live demo: [Render](https://spring-authorization-server-samples.onrender.com)
 
 Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
 Render Deploy Hook. A successful `main` image publish then calls the hook and starts a new Render
-deployment. Keep the hook URL only in GitHub Secrets.
+demo deployment. `autoDeploy` is disabled in the Blueprint, so registry pushes alone do not
+restart Render. For a separate production service, add its Deploy Hook as
+`RENDER_RELEASE_DEPLOY_HOOK_URL`; a `v0.1.0` tag then deploys the immutable `0.1.0` image.
 
 Environment variables:
 
 - SonarCloud: `SONAR_TOKEN` (optional)
 - Snyk: `SNYK_TOKEN` (optional)
-- Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (only on `main`)
+- Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (validated `main` pushes and `v*` tags)
 - Render deploy: `RENDER_DEPLOY_HOOK_URL` (optional; only on `main`)
+- Render release deploy: `RENDER_RELEASE_DEPLOY_HOOK_URL` (optional; only on `v*` tags)

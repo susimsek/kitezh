@@ -1,0 +1,219 @@
+name: Backend Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24.18.0"
+  PNPM_VERSION: "11.22.0"
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+jobs:
+  verify:
+    name: Verify release commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          install: false
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Install Maven dependencies
+        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
+
+      - name: Install frontend dependencies
+        run: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - name: Build frontend assets
+        run: pnpm --dir src/main/frontend build
+
+      - name: Verify backend
+        run: ./mvnw -B -ntp verify -Dskip.frontend=true
+
+  native-image:
+    name: Release image (${{ matrix.architecture }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+            native_image_musl: "true"
+            native_image_args: "--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g"
+            runtime_image: scratch
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+            native_image_musl: "false"
+            native_image_args: "--no-fallback,-Os,--static-nolibc,-J-Xmx10g"
+            runtime_image: gcr.io/distroless/base-debian12:nonroot
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+      NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
+      NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+          native-image-musl: ${{ matrix.native_image_musl }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          install: false
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Install Maven dependencies
+        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
+
+      - name: Install frontend dependencies
+        run: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - name: Build frontend assets
+        run: pnpm --dir src/main/frontend build
+
+      - name: Install UPX
+        run: |
+          UPX_VERSION=5.1.0
+          UPX_ARCHIVE="upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux.tar.xz"
+          curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
+          tar -xJf "${UPX_ARCHIVE}"
+          mkdir -p "${RUNNER_TEMP}/bin"
+          mv "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux/upx" "${RUNNER_TEMP}/bin/upx"
+          chmod +x "${RUNNER_TEMP}/bin/upx"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+          upx --version
+
+      - name: Build GraalVM native executable
+        env:
+          MANAGEMENT_OPENTELEMETRY_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "true"
+        run: |
+          ./mvnw -B -ntp -Pprod,native -DskipTests \
+            -Dskip.frontend=true \
+            -Dspotless.skip=true \
+            -Dcheckstyle.skip=true \
+            -DbuildArgs="${NATIVE_IMAGE_ARGS}" \
+            native:compile
+
+      - name: Compress native executable
+        run: upx --lzma --best target/native-executable
+
+      - name: Publish versioned architecture image
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION_TAG#v}"
+          ./mvnw -ntp -Pprod,native -DskipTests \
+            -Dskip.frontend=true \
+            -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
+            -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
+            jib:build \
+            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${VERSION}-${NATIVE_ARCHITECTURE}" \
+            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
+            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
+
+  publish-manifest:
+    name: Publish release multi-arch image
+    needs: native-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check Docker Hub credentials
+        run: |
+          test -n "${DOCKERHUB_USERNAME}"
+          test -n "${DOCKERHUB_TOKEN}"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Create and verify release manifest
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION_TAG#v}"
+          IMAGE="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-arm64"
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+
+  deploy-render-release:
+    name: Deploy release image to Render
+    needs: publish-manifest
+    if: ${{ always() && needs.publish-manifest.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.RENDER_RELEASE_DEPLOY_HOOK_URL }}
+
+    steps:
+      - name: Skip Render release deploy when hook is not configured
+        if: ${{ env.RENDER_RELEASE_DEPLOY_HOOK_URL == '' }}
+        run: echo "RENDER_RELEASE_DEPLOY_HOOK_URL is not configured; skipping release deployment."
+
+      - name: Trigger Render release deploy
+        if: ${{ env.RENDER_RELEASE_DEPLOY_HOOK_URL != '' }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            --request POST \
+            --get \
+            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${VERSION}" \
+            "${RENDER_RELEASE_DEPLOY_HOOK_URL}"
