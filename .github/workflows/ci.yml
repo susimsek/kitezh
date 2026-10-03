@@ -148,13 +148,23 @@ jobs:
         include:
           - architecture: amd64
             runner: ubuntu-24.04
+            native_image_musl: "true"
+            native_image_args: "--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g"
+            runtime_image: scratch
           - architecture: arm64
             runner: ubuntu-24.04-arm
+            # GraalVM CE Linux AArch64 does not ship the musl-linked static JDK
+            # libraries, so use a mostly-static glibc image for this leg.
+            native_image_musl: "false"
+            native_image_args: "--no-fallback,-Os,--static-nolibc,-J-Xmx10g"
+            runtime_image: gcr.io/distroless/base-debian12:nonroot
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     env:
       NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
       NATIVE_TAG: latest-native-${{ matrix.architecture }}
+      NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
+      NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
 
     steps:
       - name: Check out source
@@ -167,7 +177,7 @@ jobs:
           distribution: graalvm-community
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: "maven"
-          native-image-musl: "true"
+          native-image-musl: ${{ matrix.native_image_musl }}
 
       - name: Set up Node.js and pnpm
         uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
@@ -225,7 +235,7 @@ jobs:
             -Dskip.frontend=true \
             -Dspotless.skip=true \
             -Dcheckstyle.skip=true \
-            -DbuildArgs="--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g" \
+            -DbuildArgs="${NATIVE_IMAGE_ARGS}" \
             native:compile
 
       - name: Compress native executable
@@ -236,6 +246,7 @@ jobs:
         run: |
           ./mvnw -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
+            -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
             -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
             jib:build \
             -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${NATIVE_TAG}" \
