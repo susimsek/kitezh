@@ -40,6 +40,17 @@ jobs:
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    environment: desktop-release
+    env:
+      CSC_LINK: ${{ matrix.platform == 'macos' && secrets.MAC_CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+      APPLE_API_KEY_BASE64: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_BASE64 || '' }}
+      APPLE_API_KEY_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
+      APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+      WIN_CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WIN_CSC_LINK || '' }}
+      WIN_CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+      LINUX_GPG_PRIVATE_KEY: ${{ matrix.platform == 'linux' && secrets.LINUX_GPG_PRIVATE_KEY || '' }}
+      LINUX_GPG_PASSPHRASE: ${{ matrix.platform == 'linux' && secrets.LINUX_GPG_PASSPHRASE || '' }}
 
     steps:
       - name: Check out source
@@ -72,8 +83,85 @@ jobs:
       - name: Test desktop shell
         run: pnpm --dir src/main/desktop test
 
+      - name: Prepare Apple notarization key
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          if [[ -z "${APPLE_API_KEY_BASE64}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
+            exit 0
+          fi
+          key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "${APPLE_API_KEY_BASE64}" | base64 --decode > "${key_path}"
+          chmod 600 "${key_path}"
+          echo "APPLE_API_KEY=${key_path}" >> "${GITHUB_ENV}"
+
       - name: Build desktop package
-        run: pnpm --dir src/main/desktop package
+        shell: bash
+        run: |
+          if [[ "${{ matrix.platform }}" == "macos" && -n "${CSC_LINK}" && -n "${CSC_KEY_PASSWORD}" && -n "${APPLE_API_KEY}" && -n "${APPLE_API_KEY_ID}" && -n "${APPLE_API_ISSUER}" ]]; then
+            pnpm --dir src/main/desktop run build
+            pnpm --dir src/main/desktop exec electron-builder --publish never --mac --config.mac.notarize=true
+          else
+            pnpm --dir src/main/desktop package
+          fi
+
+      - name: Verify macOS signature and notarization
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          if [[ -z "${CSC_LINK}" || -z "${CSC_KEY_PASSWORD}" || -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
+            echo "macOS signing and notarization secrets are not configured; keeping this package unsigned."
+            exit 0
+          fi
+          app_path="$(find src/main/desktop/release -type d -name '*.app' -print -quit)"
+          test -n "${app_path}"
+          codesign --verify --deep --strict --verbose=2 "${app_path}"
+          spctl --assess --type exec --verbose "${app_path}"
+          xcrun stapler validate "${app_path}"
+
+      - name: Verify Windows Authenticode signature
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK)) {
+            Write-Host "Windows signing secret is not configured; keeping this package unsigned."
+            exit 0
+          }
+          $installers = Get-ChildItem -Path "src/main/desktop/release" -Filter "*.exe"
+          if ($installers.Count -eq 0) { throw "No Windows installer was produced." }
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+            if ($signature.Status -ne "Valid") {
+              throw "Invalid Authenticode signature for $($installer.Name): $($signature.Status)"
+            }
+          }
+
+      - name: Validate Linux package metadata and sign checksums
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "${deb_path}"
+          test -n "$(dpkg-deb -f "${deb_path}" Package)"
+          test -n "$(dpkg-deb -f "${deb_path}" Version)"
+          test -n "$(dpkg-deb -f "${deb_path}" Architecture)"
+          test -n "$(dpkg-deb -f "${deb_path}" Maintainer)"
+          dpkg-deb --info "${deb_path}"
+          appimage_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          test -n "${appimage_path}"
+          test -x "${appimage_path}"
+          (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb > SHA256SUMS)
+          if [[ -z "${LINUX_GPG_PRIVATE_KEY}" ]]; then
+            echo "Linux GPG signing key is not configured; publishing unsigned packages with SHA256SUMS."
+            exit 0
+          fi
+          printf '%s' "${LINUX_GPG_PRIVATE_KEY}" | gpg --batch --import
+          gpg_args=(--batch --yes --armor --detach-sign)
+          if [[ -n "${LINUX_GPG_PASSPHRASE}" ]]; then
+            gpg_args+=(--pinentry-mode loopback --passphrase "${LINUX_GPG_PASSPHRASE}")
+          fi
+          gpg "${gpg_args[@]}" --output src/main/desktop/release/SHA256SUMS.asc src/main/desktop/release/SHA256SUMS
 
       - name: Upload desktop package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

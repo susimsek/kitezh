@@ -356,6 +356,14 @@ The packaged app uses the `springauth://oauth/callback` protocol and stores cons
 the operating system's protected Electron storage. Release signing, macOS notarization, and
 auto-update publishing require platform certificates and are not part of the unsigned local build.
 
+To enable signing for the `desktop-release` GitHub Environment, configure these secrets without
+committing certificate material: `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` for the base64-encoded
+macOS Developer ID `.p12`, `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER` for
+notarization, and `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` for the base64-encoded Windows `.pfx`.
+Linux always validates Debian metadata and publishes `SHA256SUMS`; adding `LINUX_GPG_PRIVATE_KEY`
+and the optional `LINUX_GPG_PASSPHRASE` also publishes `SHA256SUMS.asc`. If these secrets are absent,
+the corresponding packages remain unsigned and the release still produces verifiable checksums.
+
 ## Administration and Account Consoles
 
 The static frontend also contains browser-based OIDC clients for administration and end-user account management. Both use the Authorization Code flow with PKCE (S256), obtain access, ID, and refresh tokens, refresh access tokens before they expire, and sign out through the OIDC end-session endpoint. Access, ID, and refresh tokens remain in browser memory; only the short-lived authorization transaction is retained across the redirect callback.
