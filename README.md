@@ -1357,7 +1357,7 @@ Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.git
 - Push architecture-specific native images to Docker Hub on validated `main` pushes via Jib
 - Publish the `latest-native` multi-arch manifest and trigger the Render demo Deploy Hook after both images are available
 - Push immutable versioned architecture images and a matching multi-arch manifest for `v*` tags
-- Optionally deploy a versioned release image through `RENDER_RELEASE_DEPLOY_HOOK_URL`
+- Optionally deploy a versioned release image through the existing `RENDER_DEPLOY_HOOK_URL`
 
 ### Render Blueprint deployment
 
@@ -1372,8 +1372,9 @@ Live demo: [Render](https://spring-authorization-server-samples.onrender.com)
 Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
 Render Deploy Hook. A successful `main` image publish then calls the hook and starts a new Render
 demo deployment. `autoDeploy` is disabled in the Blueprint, so registry pushes alone do not
-restart Render. For a separate production service, add its Deploy Hook as
-`RENDER_RELEASE_DEPLOY_HOOK_URL`; a `v0.1.0` tag then deploys the immutable `0.1.0` image.
+restart Render. The same hook is reused by the release workflow for now: a `v0.1.0` tag deploys
+the immutable `0.1.0` image to this service. A separate production service and hook can be added
+later without changing the image build process.
 
 Environment variables:
 
@@ -1381,4 +1382,4 @@ Environment variables:
 - Snyk: `SNYK_TOKEN` (optional)
 - Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (validated `main` pushes and `v*` tags)
 - Render deploy: `RENDER_DEPLOY_HOOK_URL` (optional; only on `main`)
-- Render release deploy: `RENDER_RELEASE_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
+- Render release deploy: `RENDER_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
