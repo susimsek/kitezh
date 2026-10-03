@@ -15,7 +15,6 @@ import io.github.susimsek.springauthserversamples.session.JpaIndexedSessionRepos
 import java.time.Duration;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,24 +34,14 @@ public class LoginSettingsService {
 
     public LoginSettingsService(
             LoginSettingsRepository repository, AdminAuditEventService auditEventService) {
-        this(
-                repository,
-                auditEventService,
-                null,
-                Mappers.getMapper(LoginSettingsMapper.class),
-                null);
+        this(repository, auditEventService, null, null, null);
     }
 
     public LoginSettingsService(
             LoginSettingsRepository repository,
             AdminAuditEventService auditEventService,
             JpaIndexedSessionRepository sessionRepository) {
-        this(
-                repository,
-                auditEventService,
-                sessionRepository,
-                Mappers.getMapper(LoginSettingsMapper.class),
-                null);
+        this(repository, auditEventService, sessionRepository, null, null);
     }
 
     public LoginSettingsService(
@@ -60,12 +49,7 @@ public class LoginSettingsService {
             AdminAuditEventService auditEventService,
             JpaIndexedSessionRepository sessionRepository,
             SocialProviderSettingsService socialProviderSettingsService) {
-        this(
-                repository,
-                auditEventService,
-                sessionRepository,
-                Mappers.getMapper(LoginSettingsMapper.class),
-                socialProviderSettingsService);
+        this(repository, auditEventService, sessionRepository, null, socialProviderSettingsService);
     }
 
     @Transactional(readOnly = true)

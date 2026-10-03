@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.springauthserversamples.domain.LoginSettingsEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminLoginSettingsRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.WebAuthnPolicyDTO;
+import io.github.susimsek.springauthserversamples.mapper.LoginSettingsMapper;
 import io.github.susimsek.springauthserversamples.repository.LoginSettingsRepository;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
@@ -17,6 +18,7 @@ import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 @SuppressWarnings({"java:S5778", "java:S5961"})
 class LoginSettingsServiceTest {
@@ -30,7 +32,13 @@ class LoginSettingsServiceTest {
     void setUp() {
         settings = settings();
         when(repository.findById(1L)).thenReturn(Optional.of(settings));
-        service = new LoginSettingsService(repository, auditEventService);
+        service =
+                new LoginSettingsService(
+                        repository,
+                        auditEventService,
+                        null,
+                        Mappers.getMapper(LoginSettingsMapper.class),
+                        null);
     }
 
     @Test
@@ -39,7 +47,9 @@ class LoginSettingsServiceTest {
                         new LoginSettingsService(
                                 repository,
                                 auditEventService,
-                                mock(JpaIndexedSessionRepository.class)))
+                                mock(JpaIndexedSessionRepository.class),
+                                Mappers.getMapper(LoginSettingsMapper.class),
+                                null))
                 .isNotNull();
         assertThat(service.publicLoginSettings().userRegistration()).isTrue();
         assertThat(service.adminLoginSettings().passwordMinimumLength()).isEqualTo(12);
@@ -126,6 +136,7 @@ class LoginSettingsServiceTest {
                         repository,
                         auditEventService,
                         sessionRepository,
+                        Mappers.getMapper(LoginSettingsMapper.class),
                         socialProviderSettingsService);
 
         configuredService.update(validRequest());

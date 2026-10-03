@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.UserAvatarEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.mapper.AdminAvatarMapper;
 import io.github.susimsek.springauthserversamples.repository.UserAvatarRepository;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.awt.image.BufferedImage;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -208,7 +210,10 @@ class AdminAvatarServiceTest {
 
     private AdminAvatarService service() {
         return new AdminAvatarService(
-                adminUserService, userAvatarRepository, adminAuditEventService);
+                adminUserService,
+                userAvatarRepository,
+                adminAuditEventService,
+                Mappers.getMapper(AdminAvatarMapper.class));
     }
 
     private static byte[] image(String format, int width, int height) throws IOException {

@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -50,7 +51,7 @@ public class SocialLoginService {
     private final UserRepository userRepository;
     private final SocialIdentityRepository socialIdentityRepository;
     private final AuthorityRepository authorityRepository;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     private final LoginSettingsService loginSettingsService;
     private final SocialProviderSettingsService socialProviderSettingsService;
     private final SocialIdentityMapperService socialIdentityMapperService;

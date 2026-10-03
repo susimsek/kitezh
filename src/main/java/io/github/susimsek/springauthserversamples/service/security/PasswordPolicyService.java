@@ -16,7 +16,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +35,7 @@ public class PasswordPolicyService {
             PasswordHistoryRepository passwordHistoryRepository,
             PasswordEncoder passwordEncoder,
             ApplicationProperties applicationProperties) {
-        this(
-                passwordHistoryRepository,
-                passwordEncoder,
-                applicationProperties,
-                Mappers.getMapper(PasswordHistoryMapper.class),
-                null);
+        this(passwordHistoryRepository, passwordEncoder, applicationProperties, null, null);
     }
 
     @Transactional(readOnly = true)

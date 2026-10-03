@@ -8,18 +8,22 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.EmailSettingsEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminEmailSettingsRequestDTO;
+import io.github.susimsek.springauthserversamples.mapper.EmailSettingsMapper;
 import io.github.susimsek.springauthserversamples.repository.EmailSettingsRepository;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 class EmailSettingsServiceTest {
 
     private final EmailSettingsRepository repository = mock(EmailSettingsRepository.class);
     private final AdminAuditEventService audit = mock(AdminAuditEventService.class);
     private final EmailSettingsEntity settings = settings();
-    private final EmailSettingsService service = new EmailSettingsService(repository, audit);
+    private final EmailSettingsService service =
+            new EmailSettingsService(
+                    repository, audit, Mappers.getMapper(EmailSettingsMapper.class));
 
     @BeforeEach
     void setUp() {

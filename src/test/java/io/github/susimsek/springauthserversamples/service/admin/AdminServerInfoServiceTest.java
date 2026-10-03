@@ -6,11 +6,14 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.OAuth2KeyEntity;
+import io.github.susimsek.springauthserversamples.mapper.AdminKeyMapper;
+import io.github.susimsek.springauthserversamples.mapper.AdminServerInfoMapper;
 import io.github.susimsek.springauthserversamples.repository.OAuth2KeyRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.springframework.boot.session.autoconfigure.SessionProperties;
 
 class AdminServerInfoServiceTest {
@@ -33,7 +36,12 @@ class AdminServerInfoServiceTest {
         when(keyRepository.findAllKeys()).thenReturn(List.of(inactive, active));
 
         AdminServerInfoService service =
-                new AdminServerInfoService(properties, sessionProperties, keyRepository);
+                new AdminServerInfoService(
+                        properties,
+                        sessionProperties,
+                        keyRepository,
+                        Mappers.getMapper(AdminKeyMapper.class),
+                        Mappers.getMapper(AdminServerInfoMapper.class));
 
         var result = service.serverInfo();
 

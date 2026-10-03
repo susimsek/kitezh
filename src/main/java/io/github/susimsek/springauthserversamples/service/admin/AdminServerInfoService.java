@@ -10,7 +10,6 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.boot.session.autoconfigure.SessionProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,12 +28,7 @@ public class AdminServerInfoService {
             ApplicationProperties applicationProperties,
             SessionProperties sessionProperties,
             OAuth2KeyRepository oauth2KeyRepository) {
-        this(
-                applicationProperties,
-                sessionProperties,
-                oauth2KeyRepository,
-                Mappers.getMapper(AdminKeyMapper.class),
-                Mappers.getMapper(AdminServerInfoMapper.class));
+        this(applicationProperties, sessionProperties, oauth2KeyRepository, null, null);
     }
 
     @Transactional(readOnly = true)

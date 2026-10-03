@@ -11,6 +11,7 @@ import io.github.susimsek.springauthserversamples.domain.ClientScopeEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeAssignmentRequestDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminClientScopeRequestDTO;
+import io.github.susimsek.springauthserversamples.mapper.AdminClientScopeMapper;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.springauthserversamples.mapper.RegisteredClientMapper;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -304,7 +306,8 @@ class AdminClientScopeServiceTest {
                 clientRepository,
                 registeredClientMapper,
                 mapperSupport,
-                adminAuditEventService);
+                adminAuditEventService,
+                Mappers.getMapper(AdminClientScopeMapper.class));
     }
 
     private static ClientScopeEntity scope(String id, String name) {

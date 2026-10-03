@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.springauthserversamples.domain.AuthorizationEntity;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.UserSessionEntity;
+import io.github.susimsek.springauthserversamples.mapper.AccountSessionMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.UserSessionRepository;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -138,7 +140,8 @@ class AccountSessionServiceTest {
                 authorizationRepository,
                 clientRepository,
                 auditEventService,
-                sessionInvalidationService);
+                sessionInvalidationService,
+                Mappers.getMapper(AccountSessionMapper.class));
     }
 
     private static UserSessionEntity session(String sessionId) {

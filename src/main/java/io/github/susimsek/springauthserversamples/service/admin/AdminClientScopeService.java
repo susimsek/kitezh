@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,7 +50,7 @@ public class AdminClientScopeService {
                 registeredClientMapper,
                 mapperSupport,
                 adminAuditEventService,
-                Mappers.getMapper(AdminClientScopeMapper.class));
+                null);
     }
 
     @Transactional(readOnly = true)

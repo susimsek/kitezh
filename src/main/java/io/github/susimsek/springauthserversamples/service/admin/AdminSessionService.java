@@ -16,7 +16,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -50,7 +49,7 @@ public class AdminSessionService {
                 clientRepository,
                 adminAuditEventService,
                 sessionInvalidationService,
-                Mappers.getMapper(AdminSessionMapper.class));
+                null);
     }
 
     @Transactional(readOnly = true)

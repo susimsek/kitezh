@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.PasswordHistoryEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.mapper.PasswordHistoryMapper;
 import io.github.susimsek.springauthserversamples.repository.PasswordHistoryRepository;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.time.Instant;
@@ -15,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -192,7 +194,12 @@ class PasswordPolicyServiceTest {
     }
 
     private PasswordPolicyService service() {
-        return new PasswordPolicyService(historyRepository, passwordEncoder, applicationProperties);
+        return new PasswordPolicyService(
+                historyRepository,
+                passwordEncoder,
+                applicationProperties,
+                Mappers.getMapper(PasswordHistoryMapper.class),
+                null);
     }
 
     private PasswordPolicyService serviceWithPolicy(ApplicationProperties.PasswordPolicy policy) {

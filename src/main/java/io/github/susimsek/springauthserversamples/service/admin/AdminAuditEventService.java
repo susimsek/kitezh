@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -31,11 +30,11 @@ public class AdminAuditEventService {
     public AdminAuditEventService(
             AdminEventRepository adminEventRepository,
             AdminEventSettingsRepository settingsRepository) {
-        this(adminEventRepository, Mappers.getMapper(AdminEventMapper.class), settingsRepository);
+        this(adminEventRepository, null, settingsRepository);
     }
 
     public AdminAuditEventService(AdminEventRepository adminEventRepository) {
-        this(adminEventRepository, Mappers.getMapper(AdminEventMapper.class), null);
+        this(adminEventRepository, null, null);
     }
 
     @Transactional

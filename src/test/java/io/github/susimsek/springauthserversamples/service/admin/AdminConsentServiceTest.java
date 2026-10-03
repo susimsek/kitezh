@@ -15,6 +15,7 @@ import io.github.susimsek.springauthserversamples.domain.AuthorizationConsentId;
 import io.github.susimsek.springauthserversamples.domain.RegisteredClientEntity;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminConsentDTO;
+import io.github.susimsek.springauthserversamples.mapper.AdminConsentMapper;
 import io.github.susimsek.springauthserversamples.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationConsentRepository;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -275,6 +277,7 @@ class AdminConsentServiceTest {
                 clientRepository,
                 userRepository,
                 mapperSupport,
-                adminAuditEventService);
+                adminAuditEventService,
+                Mappers.getMapper(AdminConsentMapper.class));
     }
 }

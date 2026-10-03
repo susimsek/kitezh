@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -575,7 +576,9 @@ class AdminGroupServiceTest {
                 authorityRepository,
                 userRepository,
                 userAccessInvalidationService,
-                adminAuditEventService);
+                adminAuditEventService,
+                Mappers.getMapper(AdminGroupMapper.class),
+                null);
     }
 
     private AdminGroupService serviceWithPermissions() {

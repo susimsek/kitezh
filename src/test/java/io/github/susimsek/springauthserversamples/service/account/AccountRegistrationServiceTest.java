@@ -11,6 +11,7 @@ import io.github.susimsek.springauthserversamples.config.ApplicationProperties;
 import io.github.susimsek.springauthserversamples.domain.AuthorityEntity;
 import io.github.susimsek.springauthserversamples.domain.UserAction;
 import io.github.susimsek.springauthserversamples.domain.UserEntity;
+import io.github.susimsek.springauthserversamples.mapper.AccountRegistrationMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorityRepository;
 import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.security.AuthoritiesConstants;
@@ -23,6 +24,7 @@ import java.util.Locale;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -214,7 +216,9 @@ class AccountRegistrationServiceTest {
                         auditEventService,
                         applicationProperties,
                         emailSettingsService,
-                        loginSettingsService)
+                        loginSettingsService,
+                        Mappers.getMapper(AccountRegistrationMapper.class),
+                        null)
                 .register("carol", "Carol", "", null, "password", "password", Locale.ENGLISH);
 
         verify(userActionService, never()).sendForCurrentUser(any(), any(), any());
@@ -227,6 +231,10 @@ class AccountRegistrationServiceTest {
                 passwordService,
                 userActionService,
                 auditEventService,
-                applicationProperties);
+                applicationProperties,
+                null,
+                null,
+                Mappers.getMapper(AccountRegistrationMapper.class),
+                null);
     }
 }

@@ -16,7 +16,6 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,11 +37,7 @@ public class AdminAvatarService {
             AdminUserService adminUserService,
             UserAvatarRepository userAvatarRepository,
             AdminAuditEventService adminAuditEventService) {
-        this(
-                adminUserService,
-                userAvatarRepository,
-                adminAuditEventService,
-                Mappers.getMapper(AdminAvatarMapper.class));
+        this(adminUserService, userAvatarRepository, adminAuditEventService, null);
     }
 
     @Transactional

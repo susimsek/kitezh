@@ -14,7 +14,6 @@ import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventS
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -43,7 +42,7 @@ public class AccountApplicationService {
                 clientRepository,
                 mapperSupport,
                 auditEventService,
-                Mappers.getMapper(AccountApplicationMapper.class));
+                null);
     }
 
     @Transactional(readOnly = true)

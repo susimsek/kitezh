@@ -34,6 +34,7 @@ import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,7 +65,11 @@ class UserActionServiceTest {
                         invalidationService,
                         auditEventService,
                         eventPublisher,
-                        applicationProperties);
+                        applicationProperties,
+                        null,
+                        Mappers.getMapper(AccountActionTokenMapper.class),
+                        null,
+                        null);
     }
 
     @Test

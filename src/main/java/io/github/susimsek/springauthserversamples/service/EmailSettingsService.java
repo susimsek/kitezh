@@ -7,7 +7,6 @@ import io.github.susimsek.springauthserversamples.mapper.EmailSettingsMapper;
 import io.github.susimsek.springauthserversamples.repository.EmailSettingsRepository;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -23,7 +22,7 @@ public class EmailSettingsService {
 
     public EmailSettingsService(
             EmailSettingsRepository repository, AdminAuditEventService auditEventService) {
-        this(repository, auditEventService, Mappers.getMapper(EmailSettingsMapper.class));
+        this(repository, auditEventService, null);
     }
 
     @Transactional(readOnly = true)

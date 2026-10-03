@@ -25,7 +25,6 @@ import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -74,7 +73,7 @@ public class UserActionService {
                 eventPublisher,
                 applicationProperties,
                 emailSettingsService,
-                Mappers.getMapper(AccountActionTokenMapper.class),
+                null,
                 null,
                 null);
     }

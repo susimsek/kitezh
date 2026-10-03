@@ -7,12 +7,14 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.springauthserversamples.domain.OAuth2KeyEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminKeyDTO;
+import io.github.susimsek.springauthserversamples.mapper.AdminKeyMapper;
 import io.github.susimsek.springauthserversamples.repository.OAuth2KeyRepository;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -83,7 +85,8 @@ class KeyManagementServiceTest {
     }
 
     private KeyManagementService service() {
-        return new KeyManagementService(keyRepository, auditEventService);
+        return new KeyManagementService(
+                keyRepository, auditEventService, Mappers.getMapper(AdminKeyMapper.class));
     }
 
     private static OAuth2KeyEntity key() {

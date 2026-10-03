@@ -305,6 +305,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Keep `@Schema` requiredness aligned with Bean Validation and actual runtime behavior; do not mark optional or nullable fields as required in OpenAPI.
 - Document every controller operation with `@Operation`, relevant `@ApiResponse` entries, request/response schemas, representative examples, parameters, and `@SecurityRequirement`. Keep documentation on the controller contract, not in generated or ad hoc code.
 - Use MapStruct mappers for entity-to-DTO, DTO-to-entity, and update mappings where a mapper exists or the mapping is non-trivial. Keep mapping orchestration out of controllers and avoid duplicating mapping logic in services.
+- MapStruct mappers use Spring component injection. Do not call `Mappers.getMapper(...)` from `src/main`; inject the mapper interface into production services so native images do not require reflection for mapper construction. Unit tests may use `Mappers.getMapper(...)` when a Spring context is not available.
 - Place mapper interfaces under `mapper`, define explicit null/ignore behavior for partial updates, and add mapper tests when mappings contain derived fields, nested data, or security-sensitive values.
 - Keep OpenAPI examples valid against the DTO constraints and current endpoint behavior; update documentation and tests together when a contract changes.
 
@@ -327,6 +328,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Keep default messages in `messages.properties`; add Turkish translations in `messages_tr.properties`.
 - Avoid adding custom exception layers unless they serve application-specific behavior that Spring Authorization Server does not already provide.
 - In Java source, use imports and simple class names for application types. Keep fully qualified names only where a string value, logger/configuration key, reflection metadata, or another framework contract explicitly requires the name.
+- Use Lombok `@RequiredArgsConstructor` for constructor injection in application components. Keep dependencies in `final` fields and avoid hand-written constructor-injection boilerplate unless the constructor has behavior that cannot be expressed by Lombok.
 
 ### Transaction Management
 

@@ -16,6 +16,7 @@ import io.github.susimsek.springauthserversamples.domain.UserSessionEntity;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminAuthorizationDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDTO;
 import io.github.susimsek.springauthserversamples.dto.admin.AdminSessionDetailDTO;
+import io.github.susimsek.springauthserversamples.mapper.AdminSessionMapper;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
 import io.github.susimsek.springauthserversamples.repository.ClientRepository;
 import io.github.susimsek.springauthserversamples.repository.UserSessionRepository;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -273,6 +275,7 @@ class AdminSessionServiceTest {
                 authorizationRepository,
                 clientRepository,
                 adminAuditEventService,
-                sessionInvalidationService);
+                sessionInvalidationService,
+                Mappers.getMapper(AdminSessionMapper.class));
     }
 }

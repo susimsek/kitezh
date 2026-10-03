@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -61,7 +60,7 @@ public class AdminGroupService {
                 userRepository,
                 userAccessInvalidationService,
                 adminAuditEventService,
-                Mappers.getMapper(AdminGroupMapper.class),
+                null,
                 null);
     }
 

@@ -13,7 +13,6 @@ import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -48,7 +47,7 @@ public class AdminConsentService {
                 userRepository,
                 mapperSupport,
                 adminAuditEventService,
-                Mappers.getMapper(AdminConsentMapper.class));
+                null);
     }
 
     @Transactional(readOnly = true)

@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,7 +60,7 @@ public class RequiredActionService {
                 completionRepository,
                 handlers,
                 auditEventService,
-                Mappers.getMapper(RequiredActionMapper.class),
+                null,
                 null);
     }
 

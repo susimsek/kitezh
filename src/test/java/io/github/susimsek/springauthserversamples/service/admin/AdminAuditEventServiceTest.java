@@ -25,6 +25,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,7 +39,9 @@ class AdminAuditEventServiceTest {
     private final AdminEventRepository eventRepository = mock(AdminEventRepository.class);
     private final AdminEventSettingsRepository settingsRepository =
             mock(AdminEventSettingsRepository.class);
-    private final AdminAuditEventService service = new AdminAuditEventService(eventRepository);
+    private final AdminAuditEventService service =
+            new AdminAuditEventService(
+                    eventRepository, Mappers.getMapper(AdminEventMapper.class), null);
 
     @BeforeEach
     void resetRepositoryStubs() {
@@ -109,7 +112,10 @@ class AdminAuditEventServiceTest {
         AdminEventSettingsEntity settings = settings(true, true, true, 30);
         when(settingsRepository.findById(1L)).thenReturn(java.util.Optional.of(settings));
         AdminAuditEventService configuredService =
-                new AdminAuditEventService(eventRepository, settingsRepository);
+                new AdminAuditEventService(
+                        eventRepository,
+                        Mappers.getMapper(AdminEventMapper.class),
+                        settingsRepository);
 
         configuredService.record("user.updated", "user", "7", "details");
 
@@ -122,7 +128,10 @@ class AdminAuditEventServiceTest {
         AdminEventSettingsEntity settings = settings(true, true, false, 0);
         when(settingsRepository.findById(1L)).thenReturn(java.util.Optional.of(settings));
         AdminAuditEventService configuredService =
-                new AdminAuditEventService(eventRepository, settingsRepository);
+                new AdminAuditEventService(
+                        eventRepository,
+                        Mappers.getMapper(AdminEventMapper.class),
+                        settingsRepository);
 
         configuredService.record("user.updated", "user", "7", "details");
 
@@ -136,7 +145,10 @@ class AdminAuditEventServiceTest {
         AdminEventSettingsEntity settings = settings(false, true, true, 30);
         when(settingsRepository.findById(1L)).thenReturn(java.util.Optional.of(settings));
 
-        new AdminAuditEventService(eventRepository, settingsRepository)
+        new AdminAuditEventService(
+                        eventRepository,
+                        Mappers.getMapper(AdminEventMapper.class),
+                        settingsRepository)
                 .record("user.updated", "user", "7");
 
         verifyNoInteractions(eventRepository);
@@ -147,7 +159,10 @@ class AdminAuditEventServiceTest {
         AdminEventSettingsEntity settings = settings(true, false, true, 30);
         when(settingsRepository.findById(1L)).thenReturn(java.util.Optional.of(settings));
 
-        new AdminAuditEventService(eventRepository, settingsRepository)
+        new AdminAuditEventService(
+                        eventRepository,
+                        Mappers.getMapper(AdminEventMapper.class),
+                        settingsRepository)
                 .record("user.updated", "user", "7");
 
         verifyNoInteractions(eventRepository);
@@ -159,7 +174,10 @@ class AdminAuditEventServiceTest {
 
         assertThatThrownBy(
                         () ->
-                                new AdminAuditEventService(eventRepository, settingsRepository)
+                                new AdminAuditEventService(
+                                                eventRepository,
+                                                Mappers.getMapper(AdminEventMapper.class),
+                                                settingsRepository)
                                         .record("user.updated", "user", "7"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Event settings are not initialized");

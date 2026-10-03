@@ -16,7 +16,6 @@ import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import java.util.List;
-import org.mapstruct.factory.Mappers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
@@ -51,7 +50,7 @@ public class AdminRoleService {
                 userRepository,
                 adminAuditEventService,
                 adminUserService,
-                Mappers.getMapper(AdminRoleMapper.class),
+                null,
                 null);
     }
 

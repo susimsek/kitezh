@@ -8,7 +8,6 @@ import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.repository.UserSessionRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +31,7 @@ public class AdminDashboardService {
                 userRepository,
                 userSessionRepository,
                 authorizationConsentRepository,
-                Mappers.getMapper(AdminDashboardMapper.class));
+                null);
     }
 
     @Transactional(readOnly = true)

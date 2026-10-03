@@ -13,7 +13,6 @@ import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import java.util.Base64;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.mapstruct.factory.Mappers;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +30,7 @@ public class KeyManagementService {
     public KeyManagementService(
             OAuth2KeyRepository oauth2KeyRepository,
             AdminAuditEventService adminAuditEventService) {
-        this(oauth2KeyRepository, adminAuditEventService, Mappers.getMapper(AdminKeyMapper.class));
+        this(oauth2KeyRepository, adminAuditEventService, null);
     }
 
     @Transactional(readOnly = true)

@@ -28,8 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.mapstruct.factory.Mappers;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 @SuppressWarnings("java:S4449")
 public class AdminClientService {
 
@@ -69,30 +69,6 @@ public class AdminClientService {
     private final ServiceAccountRepository serviceAccountRepository;
     private final UserRepository userRepository;
 
-    @Autowired
-    public AdminClientService(
-            ClientRepository clientRepository,
-            AuthorizationRepository authorizationRepository,
-            AuthorizationConsentRepository authorizationConsentRepository,
-            RegisteredClientMapper registeredClientMapper,
-            AuthorizationServerMapperSupport mapperSupport,
-            PasswordEncoder passwordEncoder,
-            AdminAuditEventService adminAuditEventService,
-            ServiceAccountRepository serviceAccountRepository,
-            UserRepository userRepository) {
-        this(
-                clientRepository,
-                authorizationRepository,
-                authorizationConsentRepository,
-                registeredClientMapper,
-                mapperSupport,
-                passwordEncoder,
-                adminAuditEventService,
-                Mappers.getMapper(AdminClientMapper.class),
-                serviceAccountRepository,
-                userRepository);
-    }
-
     public AdminClientService(
             ClientRepository clientRepository,
             AuthorizationRepository authorizationRepository,
@@ -110,30 +86,8 @@ public class AdminClientService {
                 passwordEncoder,
                 adminAuditEventService,
                 null,
+                null,
                 null);
-    }
-
-    private AdminClientService(
-            ClientRepository clientRepository,
-            AuthorizationRepository authorizationRepository,
-            AuthorizationConsentRepository authorizationConsentRepository,
-            RegisteredClientMapper registeredClientMapper,
-            AuthorizationServerMapperSupport mapperSupport,
-            PasswordEncoder passwordEncoder,
-            AdminAuditEventService adminAuditEventService,
-            AdminClientMapper adminClientMapper,
-            ServiceAccountRepository serviceAccountRepository,
-            UserRepository userRepository) {
-        this.clientRepository = clientRepository;
-        this.authorizationRepository = authorizationRepository;
-        this.authorizationConsentRepository = authorizationConsentRepository;
-        this.registeredClientMapper = registeredClientMapper;
-        this.mapperSupport = mapperSupport;
-        this.passwordEncoder = passwordEncoder;
-        this.adminAuditEventService = adminAuditEventService;
-        this.adminClientMapper = adminClientMapper;
-        this.serviceAccountRepository = serviceAccountRepository;
-        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
