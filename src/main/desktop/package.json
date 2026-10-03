@@ -27,8 +27,8 @@
   },
   "devDependencies": {
     "@types/node": "24.10.1",
-    "electron-builder": "26.15.3",
     "electron": "44.5.1",
+    "electron-builder": "26.15.3",
     "typescript": "5.9.2"
   },
   "build": {
@@ -41,6 +41,7 @@
     "files": [
       "dist/**/*",
       "renderer/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "protocols": [
@@ -69,5 +70,14 @@
         "nsis"
       ]
     }
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "susimsek",
+    "repo": "spring-authorization-server-samples",
+    "releaseType": "release"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
   }
 }

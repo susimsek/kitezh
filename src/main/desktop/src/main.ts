@@ -35,6 +35,13 @@ import {
   isTrustedRendererFrame,
   isTrustedRendererUrl,
 } from "./security/origin-policy";
+import {
+  checkForUpdates,
+  configureAutoUpdater,
+  downloadUpdate,
+  installUpdate,
+  type DesktopUpdateStatus,
+} from "./update";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -470,6 +477,18 @@ function registerIpc() {
     assertTrustedSender(event);
     return safeStorage.isEncryptionAvailable() ? "available" : "unavailable";
   });
+  ipcMain.handle("desktop:update-check", (event) => {
+    assertTrustedSender(event);
+    return checkForUpdates();
+  });
+  ipcMain.handle("desktop:update-download", (event) => {
+    assertTrustedSender(event);
+    return downloadUpdate();
+  });
+  ipcMain.handle("desktop:update-install", (event) => {
+    assertTrustedSender(event);
+    installUpdate();
+  });
 }
 
 function enforceContentSecurityPolicy() {
@@ -521,6 +540,11 @@ if (!hasLock) {
     enforceContentSecurityPolicy();
     await registerRendererProtocol();
     void createWindow();
+    configureAutoUpdater((status: DesktopUpdateStatus) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("desktop:update-status", status);
+      }
+    });
     if (process.platform === "darwin")
       app.on(
         "activate",

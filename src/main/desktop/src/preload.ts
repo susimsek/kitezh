@@ -24,6 +24,17 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   getConfig: () => ipcRenderer.invoke("desktop:config"),
   getAppVersion: () => ipcRenderer.invoke("desktop:app-version"),
+  updates: {
+    check: () => ipcRenderer.invoke("desktop:update-check"),
+    download: () => ipcRenderer.invoke("desktop:update-download"),
+    install: () => ipcRenderer.invoke("desktop:update-install"),
+    onStatus: (listener: (status: unknown) => void) => {
+      const callback = (_event: Electron.IpcRendererEvent, status: unknown) =>
+        listener(status);
+      ipcRenderer.on("desktop:update-status", callback);
+      return () => ipcRenderer.removeListener("desktop:update-status", callback);
+    },
+  },
   openExternal: (url: string) =>
     ipcRenderer.invoke("desktop:open-external", url),
   onAuthCallback: (

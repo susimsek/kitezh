@@ -12,6 +12,15 @@ export type DesktopTokens = {
   version: 1;
 };
 export type DesktopAuthCallback = { console: DesktopConsole; url: string; error?: string };
+export type DesktopUpdateStatus =
+  | { state: "unsupported" }
+  | { state: "checking" }
+  | { state: "available"; version: string }
+  | { state: "not-available" }
+  | { state: "downloading"; percent: number }
+  | { state: "downloaded"; version: string }
+  | { state: "recovered"; version: string }
+  | { state: "error"; message: string };
 
 let desktopConnectivity: "unknown" | "online" | "offline" = "unknown";
 
@@ -43,6 +52,12 @@ export type DesktopApi = {
   };
   getConfig: () => Promise<DesktopConfig>;
   getAppVersion: () => Promise<string>;
+  updates: {
+    check: () => Promise<void>;
+    download: () => Promise<void>;
+    install: () => Promise<void>;
+    onStatus: (listener: (status: DesktopUpdateStatus) => void) => () => void;
+  };
   openExternal: (url: string) => Promise<void>;
   onAuthCallback: (listener: (callback: DesktopAuthCallback) => void) => () => void;
 };

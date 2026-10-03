@@ -42,15 +42,16 @@ jobs:
     timeout-minutes: 30
     environment: desktop-release
     env:
-      CSC_LINK: ${{ matrix.platform == 'macos' && secrets.MAC_CSC_LINK || '' }}
-      CSC_KEY_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
-      APPLE_API_KEY_BASE64: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_BASE64 || '' }}
-      APPLE_API_KEY_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
-      APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
-      WIN_CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WIN_CSC_LINK || '' }}
-      WIN_CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
-      LINUX_GPG_PRIVATE_KEY: ${{ matrix.platform == 'linux' && secrets.LINUX_GPG_PRIVATE_KEY || '' }}
-      LINUX_GPG_PASSPHRASE: ${{ matrix.platform == 'linux' && secrets.LINUX_GPG_PASSPHRASE || '' }}
+      MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK || '' }}
+      MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD || '' }}
+      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 || '' }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID || '' }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER || '' }}
+      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK || '' }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD || '' }}
+      LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY || '' }}
+      LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE || '' }}
+      UPDATE_MANIFEST_SIGNING_KEY: ${{ secrets.UPDATE_MANIFEST_SIGNING_KEY || '' }}
 
     steps:
       - name: Check out source
@@ -80,6 +81,35 @@ jobs:
       - name: Install desktop dependencies
         run: pnpm --dir src/main/desktop install --frozen-lockfile
 
+      - name: Prepare platform signing configuration
+        shell: bash
+        run: |
+          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+            if [[ -n "${MAC_CSC_LINK}" && -n "${MAC_CSC_KEY_PASSWORD}" ]]; then
+              {
+                echo "CSC_LINK=${MAC_CSC_LINK}"
+                echo "CSC_KEY_PASSWORD=${MAC_CSC_KEY_PASSWORD}"
+              } >> "${GITHUB_ENV}"
+            else
+              echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+            fi
+          elif [[ "${{ matrix.platform }}" == "windows" ]]; then
+            if [[ -n "${WIN_CSC_LINK}" && -n "${WIN_CSC_KEY_PASSWORD}" ]]; then
+              {
+                echo "CSC_LINK=${WIN_CSC_LINK}"
+                echo "CSC_KEY_PASSWORD=${WIN_CSC_KEY_PASSWORD}"
+              } >> "${GITHUB_ENV}"
+            else
+              echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+            fi
+          else
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Prepare update manifest verification key
+        shell: bash
+        run: node src/main/desktop/scripts/write-update-manifest-public-key.mjs
+
       - name: Test desktop shell
         run: pnpm --dir src/main/desktop test
 
@@ -98,7 +128,7 @@ jobs:
       - name: Build desktop package
         shell: bash
         run: |
-          if [[ "${{ matrix.platform }}" == "macos" && -n "${CSC_LINK}" && -n "${CSC_KEY_PASSWORD}" && -n "${APPLE_API_KEY}" && -n "${APPLE_API_KEY_ID}" && -n "${APPLE_API_ISSUER}" ]]; then
+          if [[ "${{ matrix.platform }}" == "macos" && -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY}" && -n "${APPLE_API_KEY_ID}" && -n "${APPLE_API_ISSUER}" ]]; then
             pnpm --dir src/main/desktop run build
             pnpm --dir src/main/desktop exec electron-builder --publish never --mac --config.mac.notarize=true
           else
@@ -109,7 +139,7 @@ jobs:
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
         run: |
-          if [[ -z "${CSC_LINK}" || -z "${CSC_KEY_PASSWORD}" || -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
+          if [[ -z "${CSC_LINK:-}" || -z "${CSC_KEY_PASSWORD:-}" || -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
             echo "macOS signing and notarization secrets are not configured; keeping this package unsigned."
             exit 0
           fi
@@ -135,6 +165,10 @@ jobs:
               throw "Invalid Authenticode signature for $($installer.Name): $($signature.Status)"
             }
           }
+
+      - name: Sign update manifests
+        shell: bash
+        run: node src/main/desktop/scripts/sign-update-manifests.mjs src/main/desktop/release
 
       - name: Validate Linux package metadata and sign checksums
         if: ${{ matrix.platform == 'linux' }}

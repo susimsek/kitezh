@@ -17,7 +17,14 @@
     "adminConsole": "Admin Console’a giriş yap",
     "adminConsoleDescription": "Kullanıcıları, istemcileri, rolleri, grupları ve sunucu ayarlarını yönetin.",
     "accountConsole": "Account Console’a giriş yap",
-    "accountConsoleDescription": "Profilinizi, güvenliğinizi, oturumlarınızı ve uygulamalarınızı yönetin."
+    "accountConsoleDescription": "Profilinizi, güvenliğinizi, oturumlarınızı ve uygulamalarınızı yönetin.",
+    "updateAvailable": "{version} sürümü kullanıma hazır.",
+    "updateDownload": "Güncellemeyi indir",
+    "updateDownloading": "Güncelleme indiriliyor (%{percent}).",
+    "updateReady": "{version} sürümü kuruluma hazır.",
+    "updateRestart": "Yeniden başlat ve kur",
+    "updateError": "Masaüstü güncellemesi tamamlanamadı. Mevcut sürümünüz kullanılabilir durumda.",
+    "updateRecovered": "Güncelleme temiz şekilde başlatılamadı. Mevcut kurulum kullanılmaya devam ediyor ({version})."
   },
   "navbar": {
     "language": "Dil"

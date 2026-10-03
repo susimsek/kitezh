@@ -17,7 +17,14 @@
     "adminConsole": "Sign in to Admin Console",
     "adminConsoleDescription": "Manage users, clients, roles, groups, and server settings.",
     "accountConsole": "Sign in to Account Console",
-    "accountConsoleDescription": "Manage your profile, security, sessions, and applications."
+    "accountConsoleDescription": "Manage your profile, security, sessions, and applications.",
+    "updateAvailable": "Version {version} is available.",
+    "updateDownload": "Download update",
+    "updateDownloading": "Downloading update ({percent}%).",
+    "updateReady": "Version {version} is ready to install.",
+    "updateRestart": "Restart and install",
+    "updateError": "The desktop update could not be completed. Your current version is still available.",
+    "updateRecovered": "The update did not start cleanly. The current installation is still active ({version})."
   },
   "navbar": {
     "language": "Language"
