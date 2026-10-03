@@ -83,7 +83,7 @@ export function AdminGlobalSearch({ dictionary }: Props) {
   const showResults = open && query.trim().length >= 2;
 
   return (
-    <div className="admin-global-search">
+    <div className={`admin-global-search${showResults ? " has-results" : ""}`}>
       <InputGroup>
         <InputGroup.Text>
           <ActionIcon action="search" className="" />
@@ -159,7 +159,11 @@ export function AdminGlobalSearch({ dictionary }: Props) {
               </div>
             ))
           ) : loading ? null : (
-            <div className="p-3 text-body-secondary small">{copy.noResults}</div>
+            <ListGroup variant="flush">
+              <ListGroup.Item className="admin-global-search-empty" role="status">
+                {copy.noResults}
+              </ListGroup.Item>
+            </ListGroup>
           )}
         </div>
       )}

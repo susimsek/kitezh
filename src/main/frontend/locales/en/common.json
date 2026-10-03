@@ -248,7 +248,7 @@
     "product": "Admin Console",
     "manage": "Manage",
     "globalSearch": {
-      "placeholder": "Search users, clients, roles, or groups",
+      "placeholder": "Search administration",
       "ariaLabel": "Search administration resources",
       "loading": "Searching…",
       "noResults": "No matching resources found.",

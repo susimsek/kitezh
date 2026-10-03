@@ -248,7 +248,7 @@
     "product": "Admin Console",
     "manage": "Yönetim",
     "globalSearch": {
-      "placeholder": "Kullanıcı, istemci, rol veya grup ara",
+      "placeholder": "Yönetimde ara",
       "ariaLabel": "Yönetim kaynaklarında ara",
       "loading": "Aranıyor…",
       "noResults": "Eşleşen kaynak bulunamadı.",
