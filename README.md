@@ -1327,15 +1327,16 @@ Pipeline: `.github/workflows/ci.yml`
 
 - Docker Compose, Helm, and Terraform definitions are validated on every branch.
 - `./mvnw verify` for backend tests + quality gates
-- `./mvnw -Pprod,native -DskipTests native:compile` for a musl static native build
-- Compress `target/native-executable` with UPX
-- Push the native Docker image to Docker Hub on the `main` branch via Jib
+- `./mvnw -Pprod,native -DskipTests native:compile` for musl static native builds on amd64 and arm64
+- Compress each `target/native-executable` with UPX
+- Push architecture-specific native images to Docker Hub on the `main` branch via Jib
+- Publish the `latest-native` multi-arch manifest after both images are available
 - Trigger the Render image-backed service through its Deploy Hook after the image is published
 
 ### Render Blueprint deployment
 
 `render.yaml` keeps the Render web service configuration in Git. It uses the published
-`latest-native` amd64 image and the `/actuator/health/readiness` health check. Connect the
+`latest-native` multi-arch image and the `/actuator/health/readiness` health check. Connect the
 repository in Render with **New → Blueprint**, select the `main` branch, and apply the Blueprint
 to manage the existing `spring-authorization-server-samples` service. Render prompts for the
 database URL, username, password, and public issuer because those values are marked `sync: false`.

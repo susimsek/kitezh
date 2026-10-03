@@ -1,6 +1,6 @@
 # Spring Authorization Server Samples (GraalVM Native Image)
 
-A Spring Boot 4.1, Java 25 and Spring Security 7 OAuth2 Authorization Server and OpenID Connect Provider. The published image is a statically linked GraalVM native executable built for `linux/amd64`.
+A Spring Boot 4.1, Java 25 and Spring Security 7 OAuth2 Authorization Server and OpenID Connect Provider. The published image is a statically linked GraalVM native executable published for `linux/amd64` and `linux/arm64`.
 
 The image provides the authorization server, localized login and consent pages, the Administration Console, and the Account Console on port `9090`.
 
@@ -177,7 +177,7 @@ The Render Blueprint in `render.yaml` deploys the same Docker Hub image with:
 - port: `10000` through `SERVER_PORT`
 - PostgreSQL and OTLP values supplied as Render environment variables
 
-The GitHub Actions workflow builds the amd64 native image with GraalVM, publishes `latest-native` through Jib, and optionally triggers the Render Deploy Hook.
+The GitHub Actions workflow builds amd64 and arm64 native images with GraalVM, publishes architecture-specific tags through Jib, combines them into the `latest-native` multi-arch manifest, and optionally triggers the Render Deploy Hook.
 
 ## Build and publish locally
 
@@ -203,7 +203,7 @@ docker.io/suayb/spring-authorization-server-samples:latest-native
 
 ## Notes
 
-- The native image is built for `linux/amd64`; ARM64 is not published by the current workflow.
+- The `latest-native` tag selects the `linux/amd64` or `linux/arm64` image automatically; architecture-specific tags are available as `latest-native-amd64` and `latest-native-arm64`.
 - The image uses a static native executable and does not contain a shell or package manager.
 - H2 is a development dependency and is not included in the published `prod,native` image.
 - Liquibase seed data is the source of truth for users, groups, authorities, and registered clients.

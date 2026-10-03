@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
   workflow_dispatch:
 
@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '24.18.0'
-  PNPM_VERSION: '11.22.0'
+  NODE_VERSION: "24.18.0"
+  PNPM_VERSION: "11.22.0"
   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -69,11 +69,10 @@ jobs:
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
-          java-version: '25'
+          java-version: "25"
           distribution: graalvm-community
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          cache: 'maven'
-          native-image-musl: 'true'
+          cache: "maven"
 
       - name: Set up Node.js and pnpm
         uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
@@ -89,7 +88,6 @@ jobs:
           java -version
           node --version
           pnpm --version
-          native-image --version
 
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
@@ -141,17 +139,75 @@ jobs:
             -Dsonar.organization=susimsek \
             -Dsonar.token="${SONAR_TOKEN}"
 
+  native-image:
+    name: Native image (${{ matrix.architecture }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+      NATIVE_TAG: latest-native-${{ matrix.architecture }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+          native-image-musl: "true"
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          install: false
+
+      - name: Print tool versions
+        run: |
+          java -version
+          node --version
+          pnpm --version
+          native-image --version
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Install Maven dependencies
+        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
+
+      - name: Install frontend dependencies
+        run: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - name: Build frontend assets
+        run: pnpm --dir src/main/frontend build
+
       - name: Install UPX
         run: |
           UPX_VERSION=5.1.0
-          UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
+          UPX_ARCHIVE="upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux.tar.xz"
           curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
           tar -xJf "${UPX_ARCHIVE}"
           mkdir -p "${RUNNER_TEMP}/bin"
-          mv "upx-${UPX_VERSION}-amd64_linux/upx" "${RUNNER_TEMP}/bin/upx"
+          mv "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux/upx" "${RUNNER_TEMP}/bin/upx"
           chmod +x "${RUNNER_TEMP}/bin/upx"
           echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
-          rm -rf "${UPX_ARCHIVE}" "upx-${UPX_VERSION}-amd64_linux"
+          rm -rf "${UPX_ARCHIVE}" "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux"
           upx --version
 
       - name: Build GraalVM native executable
@@ -159,11 +215,11 @@ jobs:
           # Spring AOT evaluates conditional OTLP auto-configurations at build time.
           # Keep the exporters in the native image; Render supplies the endpoints
           # and credentials at runtime.
-          MANAGEMENT_OPENTELEMETRY_ENABLED: 'true'
-          MANAGEMENT_TRACING_EXPORT_ENABLED: 'true'
-          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: 'true'
-          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: 'true'
-          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'true'
+          MANAGEMENT_OPENTELEMETRY_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "true"
         run: |
           ./mvnw -B -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
@@ -175,19 +231,44 @@ jobs:
       - name: Compress native executable
         run: upx --lzma --best target/native-executable
 
-      - name: Publish Docker image
+      - name: Publish architecture image
         if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         run: |
           ./mvnw -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
-            -Djib-maven-plugin.architecture=amd64 \
+            -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
             jib:build \
-            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
+            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${NATIVE_TAG}" \
             -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
             -Djib.to.auth.password="${DOCKERHUB_TOKEN}" # NOSONAR - value is supplied by a GitHub Actions secret
 
+  publish-native-manifest:
+    name: Publish native multi-arch manifest
+    needs: native-image
+    if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Create and verify multi-arch manifest
+        run: |
+          IMAGE="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:latest-native" \
+            "${IMAGE}:latest-native-amd64" \
+            "${IMAGE}:latest-native-arm64"
+          docker buildx imagetools inspect "${IMAGE}:latest-native"
+
       - name: Update Docker Hub description
-        if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         run: |
           README_PATH="docs/README-dockerhub.md"
           if [ ! -f "${README_PATH}" ]; then
@@ -217,6 +298,7 @@ jobs:
     needs:
       - infrastructure-validation
       - build
+      - publish-native-manifest
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
