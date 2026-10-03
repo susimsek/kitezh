@@ -22,6 +22,8 @@ spring:
       max-request-size: 2MB
   messages:
     basename: i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
   profiles:
     active: '@spring.profiles.active@'
   docker:

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import io.github.susimsek.springauthserversamples.repository.LocalizationMessageOverrideRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.context.MessageSourceProperties;
 import org.springframework.context.MessageSource;
 
 class MessageSourceConfigTest {
@@ -12,7 +13,8 @@ class MessageSourceConfigTest {
     @Test
     void createsBundledAndDatabaseBackedMessageSources() {
         MessageSourceConfig config = new MessageSourceConfig();
-        MessageSource bundled = config.bundledMessageSource();
+        MessageSourceProperties properties = new MessageSourceProperties();
+        MessageSource bundled = config.bundledMessageSource(properties);
         assertThat(bundled).isNotNull();
         assertThat(config.messageSource(bundled, mock(LocalizationMessageOverrideRepository.class)))
                 .isInstanceOf(DatabaseMessageSource.class);

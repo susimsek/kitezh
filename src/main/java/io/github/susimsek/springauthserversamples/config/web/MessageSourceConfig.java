@@ -2,6 +2,8 @@ package io.github.susimsek.springauthserversamples.config.web;
 
 import io.github.susimsek.springauthserversamples.repository.LocalizationMessageOverrideRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.context.MessageSourceProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,14 +11,22 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.support.ReloadableResourceBundleMessageSource;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(MessageSourceProperties.class)
 public class MessageSourceConfig {
 
     @Bean(name = "bundledMessageSource")
-    MessageSource bundledMessageSource() {
+    MessageSource bundledMessageSource(MessageSourceProperties properties) {
         ReloadableResourceBundleMessageSource source = new ReloadableResourceBundleMessageSource();
-        source.setBasenames("classpath:/i18n/messages");
-        source.setDefaultEncoding("UTF-8");
-        source.setFallbackToSystemLocale(false);
+        source.setBasenames(properties.getBasename().toArray(String[]::new));
+        if (properties.getEncoding() != null) {
+            source.setDefaultEncoding(properties.getEncoding().name());
+        }
+        source.setFallbackToSystemLocale(properties.isFallbackToSystemLocale());
+        if (properties.getCacheDuration() != null) {
+            source.setCacheMillis(properties.getCacheDuration().toMillis());
+        }
+        source.setAlwaysUseMessageFormat(properties.isAlwaysUseMessageFormat());
+        source.setUseCodeAsDefaultMessage(properties.isUseCodeAsDefaultMessage());
         return source;
     }
 
