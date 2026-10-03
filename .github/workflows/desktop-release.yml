@@ -1,15 +1,17 @@
 name: Desktop Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows:
+      - Backend Release
+    types:
+      - completed
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-release-${{ github.ref }}
+  group: desktop-release-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 env:
@@ -19,6 +21,7 @@ env:
 jobs:
   package:
     name: Package desktop (${{ matrix.platform }})
+    if: ${{ github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v') }}
     strategy:
       fail-fast: false
       matrix:
@@ -35,6 +38,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Node.js and pnpm
         uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
@@ -69,12 +74,18 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: package
+    if: ${{ needs.package.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
 
     steps:
+      - name: Check out release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
       - name: Download desktop packages
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -83,6 +94,7 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           mapfile -d '' assets < <(find release-assets -type f -print0)
           if [ "${#assets[@]}" -eq 0 ]; then
@@ -90,11 +102,11 @@ jobs:
             exit 1
           fi
 
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+            gh release create "${RELEASE_TAG}" "${assets[@]}" \
               --verify-tag \
-              --title "${GITHUB_REF_NAME}" \
+              --title "${RELEASE_TAG}" \
               --generate-notes
           fi
