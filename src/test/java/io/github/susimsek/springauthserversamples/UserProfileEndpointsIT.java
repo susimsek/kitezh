@@ -54,7 +54,7 @@ class UserProfileEndpointsIT {
                                                         new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("department"))
-                .andExpect(jsonPath("$.page.totalElements").value(1));
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

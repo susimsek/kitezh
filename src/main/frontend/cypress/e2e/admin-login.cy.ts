@@ -8,7 +8,7 @@ describe("admin login", () => {
   };
   type SessionPage = {
     content: Array<{ id: string }>;
-    page: { totalElements: number };
+    totalElements: number;
   };
 
   const decodeJwt = (token: string) => {
@@ -58,7 +58,7 @@ describe("admin login", () => {
           headers: { Authorization: `Bearer ${accessToken}` },
           url: "/api/admin/sessions?size=100&status=active",
         })
-        .its("body.page.totalElements");
+        .its("body.totalElements");
     });
 
   const oidcSessionId = async (sessionId: string) => {

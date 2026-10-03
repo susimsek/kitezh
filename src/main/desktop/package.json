@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Electron desktop console for Spring Authorization Server Samples",
+  "author": {
+    "name": "Suayb Simsek",
+    "email": "susimsek@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/susimsek/spring-authorization-server-samples",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/susimsek/spring-authorization-server-samples.git"
+  },
   "main": "dist/main.js",
   "type": "commonjs",
   "packageManager": "pnpm@11.22.0",

@@ -124,7 +124,7 @@ class AccountSecurityEndpointsIT {
         mockMvc.perform(get("/api/account/webauthn/credentials").with(account("user")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.page.totalElements").value(0));
+                .andExpect(jsonPath("$.totalElements").value(0));
 
         mockMvc.perform(
                         get("/api/account/webauthn/credentials/not-a-credential")
