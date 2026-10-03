@@ -6,12 +6,18 @@ on:
       - Backend Release
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to package (for example, v0.1.0)
+        required: true
+        default: v0.1.0
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-release-${{ github.event.workflow_run.head_branch }}
+  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 env:
@@ -21,7 +27,7 @@ env:
 jobs:
   package:
     name: Package desktop (${{ matrix.platform }})
-    if: ${{ github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,11 +45,11 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.event.workflow_run.head_sha }}
 
       - name: Set desktop release version
         env:
-          RELEASE_VERSION: ${{ github.event.workflow_run.head_branch }}
+          RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.head_branch }}
         run: node src/main/desktop/scripts/set-release-version.mjs
 
       - name: Set up Node.js and pnpm
@@ -89,7 +95,7 @@ jobs:
       - name: Check out release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.event.workflow_run.head_sha }}
 
       - name: Download desktop packages
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -99,7 +105,7 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.head_branch }}
         run: |
           mapfile -d '' assets < <(find release-assets -type f -print0)
           if [ "${#assets[@]}" -eq 0 ]; then
