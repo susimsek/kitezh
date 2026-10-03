@@ -35,6 +35,7 @@ export type { AdminAccess } from "@/store/auth-slice";
 
 const ADMIN_AUTH_CONFIG = {
   clientId: "admin-console",
+  desktopClientId: "desktop-admin-console",
   scope: "profile email admin-api",
   transactionKey: CONSOLE_TRANSACTION_KEYS.admin,
   postLoginReturnToKey: "AUTH_ADMIN_RETURN_TO",

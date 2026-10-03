@@ -310,7 +310,7 @@ public class AdminApiSecurityConfig {
         return ConsoleJwtDecoderFactory.create(
                 jwkSource,
                 applicationProperties.authorizationServer().issuer(),
-                ConsoleClients.ADMIN,
+                ConsoleClients.ADMIN_CLIENTS,
                 authorizationRepository);
     }
 

@@ -4,6 +4,21 @@
     "framework": "Spring Security",
     "description": "Secure OAuth 2.0 and OpenID Connect authorization."
   },
+  "desktop": {
+    "offline": "The desktop app is offline. Reconnect to continue.",
+    "signInUnavailable": "Secure sign-in is currently unavailable. Check your connection and try again.",
+    "signInTitle": "Sign in to the desktop app",
+    "signInDescription": "Continue securely in your default browser.",
+    "signInWithBrowser": "Sign in with browser",
+    "browserSignInHint": "Your password stays in the browser and is never stored by the desktop app.",
+    "chooseConsoleEyebrow": "Continue securely",
+    "chooseConsoleTitle": "Choose a console",
+    "chooseConsoleDescription": "Select where you want to continue.",
+    "adminConsole": "Sign in to Admin Console",
+    "adminConsoleDescription": "Manage users, clients, roles, groups, and server settings.",
+    "accountConsole": "Sign in to Account Console",
+    "accountConsoleDescription": "Manage your profile, security, sessions, and applications."
+  },
   "navbar": {
     "language": "Language"
   },

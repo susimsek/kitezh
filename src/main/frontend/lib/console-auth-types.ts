@@ -32,6 +32,7 @@ export type AuthorizationTransaction = {
 
 export type ConsoleAuthConfig = {
   clientId: string;
+  desktopClientId?: string;
   scope: string;
   transactionKey: string;
   redirectPath: (locale: Locale) => string;

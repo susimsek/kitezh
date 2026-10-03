@@ -1,0 +1,64 @@
+{
+  "name": "spring-authorization-server-samples-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop console for Spring Authorization Server Samples",
+  "main": "dist/main.js",
+  "type": "commonjs",
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "build:renderer": "node scripts/build-renderer.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:main": "tsc -p tsconfig.json",
+    "test": "pnpm run build:main && node --test test/**/*.test.mjs",
+    "build": "pnpm run build:renderer && tsc -p tsconfig.json",
+    "start": "node scripts/run-desktop.mjs production",
+    "dev": "node scripts/run-desktop.mjs local",
+    "package": "pnpm run build && electron-builder"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "electron-builder": "26.15.3",
+    "electron": "44.5.1",
+    "typescript": "5.9.2"
+  },
+  "build": {
+    "appId": "io.github.susimsek.springauthserversamples.desktop",
+    "productName": "Spring Authorization Server",
+    "directories": {
+      "output": "release"
+    },
+    "icon": "assets/icon.png",
+    "files": [
+      "dist/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "protocols": [
+      {
+        "name": "Spring Authorization Server OAuth callback",
+        "schemes": [
+          "springauth"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}

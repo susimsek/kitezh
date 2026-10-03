@@ -59,6 +59,8 @@ import { RequiredActionsPage } from "@/components/auth/RequiredActionsPage";
 import { ErrorView } from "@/components/auth/ErrorView";
 import { NotFoundView } from "@/components/auth/NotFoundView";
 import { MfaChallengePage } from "@/components/auth/MfaChallengePage";
+import { DesktopConsoleChooser } from "@/components/shared/DesktopConsoleChooser";
+import { isDesktopRuntime } from "@/lib/desktop-api";
 import AdminEvents from "@/components/admin/AdminEvents";
 import ServerInfo from "@/components/admin/ServerInfo";
 import AdminSettings from "@/components/admin/AdminSettings";
@@ -206,13 +208,26 @@ export function AppRoutes() {
         <Route
           index
           element={
-            <>
-              <AdminPostLoginRedirect />
-              <LoginForm {...props} />
-            </>
+            isDesktopRuntime() ? (
+              <DesktopConsoleChooser dictionary={dictionary} />
+            ) : (
+              <>
+                <AdminPostLoginRedirect />
+                <LoginForm {...props} />
+              </>
+            )
           }
         />
-        <Route path="login" element={<LoginForm {...props} />} />
+        <Route
+          path="login"
+          element={
+            isDesktopRuntime() ? (
+              <DesktopConsoleChooser dictionary={dictionary} />
+            ) : (
+              <LoginForm {...props} />
+            )
+          }
+        />
         <Route path="register" element={<RegistrationForm dictionary={dictionary} />} />
         <Route path="consent" element={<ConsentForm dictionary={dictionary} />} />
         <Route path="required-actions" element={<RequiredActionsPage dictionary={dictionary} />} />

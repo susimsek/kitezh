@@ -142,6 +142,8 @@ management:
           include: readinessState,db
 
 app:
+  desktop:
+    renderer-origin: ${APP_DESKTOP_RENDERER_ORIGIN:app://renderer}
   logging:
     file-enabled: ${APP_LOG_FILE_ENABLED:false}
     file-path: ${APP_LOG_FILE_PATH:logs/application.log}

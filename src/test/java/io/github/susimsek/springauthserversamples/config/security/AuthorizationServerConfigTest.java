@@ -462,6 +462,28 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    void addsAdminRolesToDesktopAdminAccessToken() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(new UserEntity()));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "desktop-admin-console",
+                                Set.of("admin-api")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+    }
+
+    @Test
     void addsClientRolesOnlyWhenRolesScopeIsAuthorized() {
         UserEntity user = new UserEntity();
         RegisteredClientEntity client = new RegisteredClientEntity();

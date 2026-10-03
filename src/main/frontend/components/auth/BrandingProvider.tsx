@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import "@/lib/desktop-api";
 
 export type BrandingSettings = {
   applicationName: string;

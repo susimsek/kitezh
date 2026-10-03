@@ -54,7 +54,8 @@ class AccountControllerDelegationTest {
                         avatarService,
                         deletionService,
                         mfaService,
-                        recoveryCodeService);
+                        recoveryCodeService,
+                        webAuthnService);
         final Authentication authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         "alice", "ignored", java.util.List.of());

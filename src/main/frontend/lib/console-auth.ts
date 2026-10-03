@@ -7,10 +7,10 @@ import { codeChallenge, decodeJwt, ensureOpenIdScope, randomValue } from "./cons
 import {
   clearStoredTransactions,
   readAndRemoveTransaction,
-  readStoredTokens,
-  removeAllStoredTokens,
-  removeStoredTokens,
-  storeTokens,
+  readPersistedTokens,
+  removeAllPersistedTokens,
+  removePersistedTokens,
+  persistTokens,
   storeTransaction,
 } from "./console-auth-storage";
 import type {
@@ -20,6 +20,7 @@ import type {
   ConsoleTokenResponse,
 } from "./console-auth-types";
 import { applyConsoleToken, clearConsoleAuth, setConsoleInitialized } from "@/store/auth-slice";
+import { apiUrl, isDesktopRuntime } from "./desktop-api";
 
 export { CONSOLE_TRANSACTION_KEYS } from "./console-auth-storage";
 export type { ConsoleTokenResponse, JwtPayload } from "./console-auth-types";
@@ -33,6 +34,9 @@ function isPermanentRefreshFailure(error: unknown) {
 }
 
 export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKind) {
+  const clientId = isDesktopRuntime()
+    ? (config.desktopClientId ?? config.clientId)
+    : config.clientId;
   const dispatch = useAppDispatch();
   const auth = useAppSelector((state) => state.auth[consoleKind]);
   const {
@@ -74,7 +78,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       expiresAtRef.current = null;
       timeSkewRef.current = null;
       refreshInProgress.current = null;
-      if (removeStoredToken) removeStoredTokens(consoleKind);
+      if (removeStoredToken) void removePersistedTokens(consoleKind).catch(() => undefined);
       dispatch(clearConsoleAuth({ console: consoleKind, loggingOut }));
       clearTransactionState();
     },
@@ -113,13 +117,13 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       idTokenRef.current = nextIdToken;
       refreshTokenRef.current = nextRefreshToken;
       expiresAtRef.current = nextExpiresAt;
-      storeTokens(consoleKind, {
+      void persistTokens(consoleKind, {
         accessToken: token.access_token,
         expiresAt: nextExpiresAt,
         idToken: nextIdToken,
         refreshToken: nextRefreshToken,
         version: 1,
-      });
+      }).catch(() => undefined);
       dispatch(
         applyConsoleToken({
           console: consoleKind,
@@ -158,9 +162,9 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       let timeLocal = Date.now();
       const request = axios
         .post<ConsoleTokenResponse>(
-          "/oauth2/token",
+          apiUrl("/oauth2/token"),
           new URLSearchParams({
-            client_id: config.clientId,
+            client_id: clientId,
             grant_type: "refresh_token",
             refresh_token: currentRefreshToken,
           }),
@@ -193,22 +197,32 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       refreshInProgress.current = request;
       return request;
     },
-    [applyToken, clearAuthentication, config.clientId],
+    [applyToken, clearAuthentication, clientId],
   );
 
   useEffect(() => {
-    const stored = readStoredTokens(consoleKind);
-    if (stored) {
-      applyToken({
-        access_token: stored.accessToken,
-        expires_in: Math.max(0, Math.ceil((stored.expiresAt - Date.now()) / 1000)),
-        id_token: stored.idToken ?? undefined,
-        refresh_token: stored.refreshToken ?? undefined,
+    let cancelled = false;
+    void readPersistedTokens(consoleKind)
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored) {
+          applyToken({
+            access_token: stored.accessToken,
+            expires_in: Math.max(0, Math.ceil((stored.expiresAt - Date.now()) / 1000)),
+            id_token: stored.idToken ?? undefined,
+            refresh_token: stored.refreshToken ?? undefined,
+          });
+          return;
+        }
+        dispatch(setConsoleInitialized({ console: consoleKind, initialized: true }));
+      })
+      .catch(() => {
+        if (!cancelled)
+          dispatch(setConsoleInitialized({ console: consoleKind, initialized: true }));
       });
-      return;
-    }
-
-    dispatch(setConsoleInitialized({ console: consoleKind, initialized: true }));
+    return () => {
+      cancelled = true;
+    };
   }, [applyToken, consoleKind, dispatch]);
 
   const beginAuthorization = useCallback(
@@ -216,10 +230,19 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       if (authorizationInProgress.current) return authorizationInProgress.current;
 
       const request = (async () => {
+        if (
+          isDesktopRuntime() &&
+          window.desktopApi &&
+          (await window.desktopApi.auth.getStorageStatus()) !== "available"
+        ) {
+          throw new Error("Secure desktop storage is unavailable");
+        }
         const codeVerifier = randomValue();
         const state = randomValue();
         const nonce = randomValue();
-        const redirectUri = `${window.location.origin}${config.redirectPath(locale)}`;
+        const redirectUri = isDesktopRuntime()
+          ? "springauth://oauth/callback"
+          : `${window.location.origin}${config.redirectPath(locale)}`;
         const transaction: AuthorizationTransaction = {
           codeVerifier,
           expires: Date.now() + CALLBACK_TTL_MS,
@@ -234,7 +257,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
 
         try {
           const parameters = new URLSearchParams({
-            client_id: config.clientId,
+            client_id: clientId,
             code_challenge: await codeChallenge(codeVerifier),
             code_challenge_method: "S256",
             nonce,
@@ -245,9 +268,25 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
             state,
             ui_locales: locale,
           });
-          const authorizationUrl = new URL("/oauth2/authorize", window.location.origin);
+          const authorizationUrl = new URL(
+            "/oauth2/authorize",
+            isDesktopRuntime() && window.desktopApi
+              ? window.desktopApi.apiBaseUrl
+              : window.location.origin,
+          );
           authorizationUrl.search = parameters.toString();
-          window.location.assign(authorizationUrl);
+          if (isDesktopRuntime() && window.desktopApi) {
+            await window.desktopApi.auth.startLogin({
+              console: consoleKind,
+              authorizationUrl: authorizationUrl.toString(),
+              state,
+              codeVerifier,
+              clientId,
+              redirectUri,
+            });
+          } else {
+            window.location.assign(authorizationUrl);
+          }
         } catch (error) {
           readAndRemoveTransaction(config, state);
           clearTransactionState();
@@ -258,7 +297,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       authorizationInProgress.current = request;
       return request;
     },
-    [clearTransactionState, config],
+    [clearTransactionState, clientId, config, consoleKind],
   );
 
   const completeAuthorization = useCallback(
@@ -269,13 +308,33 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
         throw new Error("Missing authorization transaction");
       }
 
+      if (isDesktopRuntime()) {
+        try {
+          const stored = await readPersistedTokens(consoleKind);
+          if (!stored) throw new Error("Missing desktop session");
+          applyToken(
+            {
+              access_token: stored.accessToken,
+              expires_in: Math.max(0, Math.ceil((stored.expiresAt - Date.now()) / 1000)),
+              id_token: stored.idToken ?? undefined,
+              refresh_token: stored.refreshToken ?? undefined,
+            },
+            Date.now(),
+            transaction.nonce,
+          );
+          return transaction.returnTo;
+        } finally {
+          clearTransactionState();
+        }
+      }
+
       const generation = tokenGeneration.current;
       let timeLocal = Date.now();
       try {
         const response = await axios.post<ConsoleTokenResponse>(
-          "/oauth2/token",
+          apiUrl("/oauth2/token"),
           new URLSearchParams({
-            client_id: config.clientId,
+            client_id: clientId,
             code,
             code_verifier: transaction.codeVerifier,
             grant_type: "authorization_code",
@@ -295,8 +354,29 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
         clearTransactionState();
       }
     },
-    [applyToken, clearTransactionState, config],
+    [applyToken, clearTransactionState, clientId, config, consoleKind],
   );
+
+  useEffect(() => {
+    if (!isDesktopRuntime() || !window.desktopApi) return undefined;
+    return window.desktopApi.onAuthCallback(
+      ({ console: callbackConsole, url: callbackUrl, error }) => {
+        if (callbackConsole !== consoleKind) return;
+        if (error) {
+          window.location.replace("/login?error=authorization");
+          return;
+        }
+        const callback = new URL(callbackUrl);
+        const fragment = new URLSearchParams(callback.hash.replace(/^#/, ""));
+        const code = callback.searchParams.get("code") ?? fragment.get("code");
+        const state = callback.searchParams.get("state") ?? fragment.get("state");
+        if (!state || (!isDesktopRuntime() && !code)) return;
+        void completeAuthorization(isDesktopRuntime() ? "" : (code ?? ""), state)
+          .then((returnTo) => window.location.replace(returnTo))
+          .catch(() => window.location.replace("/login?error=authorization"));
+      },
+    );
+  }, [completeAuthorization, consoleKind]);
 
   const logout = useCallback(
     async (locale: Locale) => {
@@ -305,26 +385,38 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       clearAuthentication(true, false);
       // OIDC logout ends the shared browser session. Clear both console token sets so a later
       // navigation cannot hydrate a token issued before that shared logout.
-      removeAllStoredTokens();
+      void removeAllPersistedTokens().catch(() => undefined);
 
-      const postLogoutRedirectUri = `${window.location.origin}${config.postLogoutRedirectPath(locale)}`;
+      const postLogoutRedirectUri = isDesktopRuntime()
+        ? "springauth://logout/callback"
+        : `${window.location.origin}${config.postLogoutRedirectPath(locale)}`;
       if (!idTokenHint) {
-        await axios.post("/logout").catch(() => undefined);
-        window.location.replace(`${window.location.origin}/login?logout`);
+        await axios.post(apiUrl("/logout")).catch(() => undefined);
+        window.location.replace("/login?logout");
         return;
       }
 
       const parameters = new URLSearchParams({
-        client_id: config.clientId,
+        client_id: clientId,
         post_logout_redirect_uri: postLogoutRedirectUri,
       });
       parameters.set("id_token_hint", idTokenHint);
 
-      const logoutUrl = new URL("/connect/logout", window.location.origin);
+      const logoutUrl = new URL(
+        "/connect/logout",
+        isDesktopRuntime() && window.desktopApi
+          ? window.desktopApi.apiBaseUrl
+          : window.location.origin,
+      );
       logoutUrl.search = parameters.toString();
-      window.location.replace(logoutUrl);
+      if (isDesktopRuntime() && window.desktopApi) {
+        await window.desktopApi.openExternal(logoutUrl.toString());
+        window.location.replace("/login?logout");
+      } else {
+        window.location.replace(logoutUrl);
+      }
     },
-    [clearAuthentication, config],
+    [clearAuthentication, clientId, config],
   );
 
   const clearLocalSession = useCallback(() => {

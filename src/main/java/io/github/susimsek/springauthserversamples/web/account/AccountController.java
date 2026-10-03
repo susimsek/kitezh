@@ -76,27 +76,6 @@ public class AccountController {
     private final RecoveryCodeService recoveryCodeService;
     private final WebAuthnService webAuthnService;
 
-    AccountController(
-            AccountProfileService accountProfileService,
-            UserProfileService userProfileService,
-            AccountSessionService accountSessionService,
-            AccountApplicationService accountApplicationService,
-            AccountAvatarService accountAvatarService,
-            AccountDeletionService accountDeletionService,
-            MfaService mfaService,
-            RecoveryCodeService recoveryCodeService) {
-        this(
-                accountProfileService,
-                userProfileService,
-                accountSessionService,
-                accountApplicationService,
-                accountAvatarService,
-                accountDeletionService,
-                mfaService,
-                recoveryCodeService,
-                null);
-    }
-
     @GetMapping("/mfa")
     @Operation(
             summary = "Read MFA status",

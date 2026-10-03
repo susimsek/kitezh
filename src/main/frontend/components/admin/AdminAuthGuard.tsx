@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "@/routing/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { Alert } from "react-bootstrap";
+import { usePathname, useRouter, useSearchParams } from "@/routing/navigation";
 
 import type { Locale } from "@/i18n/config";
 import { useDictionary } from "@/i18n/client";
@@ -10,6 +11,8 @@ import {
   isCanceledRequest,
   useConsoleSessionLifecycle,
 } from "@/components/auth/useConsoleSessionLifecycle";
+import { DesktopSignInScreen } from "@/components/shared/DesktopSignInScreen";
+import { isDesktopRuntime } from "@/lib/desktop-api";
 
 import { type AdminAccess, useAdminAuth } from "./AdminAuthProvider";
 
@@ -30,7 +33,9 @@ export function AdminAuthGuard({
 }) {
   const dictionary = useDictionary();
   const [authorized, setAuthorized] = useState(false);
+  const [desktopSignInPending, setDesktopSignInPending] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const {
     accessToken,
@@ -43,8 +48,9 @@ export function AdminAuthGuard({
     setUsername,
   } = useAdminAuth();
   const isAuthorizationCallback = pathname.replace(/\/+$/, "").endsWith("/callback");
+  const desktopSignInRequested = searchParams.get("desktopSignIn") === "1";
 
-  const startLogin = useConsoleSessionLifecycle({
+  const { startAuthorization: startLogin, authorizationError } = useConsoleSessionLifecycle({
     accessToken,
     beginAuthorization,
     expiresAt,
@@ -53,11 +59,19 @@ export function AdminAuthGuard({
     refreshAccessToken,
     registerTokenHandlers: registerAdminTokenHandlers,
   });
+  const isDesktopSignInPending =
+    desktopSignInPending || (desktopSignInRequested && !accessToken && !authorizationError);
 
   useEffect(() => {
     if (!initialized || isLoggingOut || isAuthorizationCallback) return;
 
     if (!accessToken) {
+      if (isDesktopRuntime()) {
+        if (desktopSignInRequested) {
+          void startLogin(true);
+        }
+        return;
+      }
       // A normal authorization request reuses the server's browser SSO session when it
       // exists, and displays the login page only when it does not. A separate silent
       // probe would start a second authorization transaction.
@@ -119,16 +133,50 @@ export function AdminAuthGuard({
     startLogin,
     setAccess,
     setUsername,
+    desktopSignInRequested,
   ]);
+
+  const signInWithBrowser = useCallback(async () => {
+    setDesktopSignInPending(true);
+    await startLogin(true);
+    setDesktopSignInPending(false);
+  }, [startLogin]);
 
   if (isAuthorizationCallback) return callbackContent ?? children;
 
-  if (!initialized || !authorized || !accessToken) {
+  if (!initialized || isLoggingOut) {
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary">
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">{dictionary.admin.common.loading}</span>
         </div>
+      </div>
+    );
+  }
+
+  if (isDesktopRuntime() && !authorized && !accessToken) {
+    return (
+      <DesktopSignInScreen
+        dictionary={dictionary}
+        error={authorizationError}
+        onSignIn={signInWithBrowser}
+        pending={isDesktopSignInPending}
+      />
+    );
+  }
+
+  if (!authorized || !accessToken) {
+    return (
+      <div className="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary">
+        {authorizationError ? (
+          <Alert variant="danger" className="m-3">
+            {dictionary.desktop.signInUnavailable}
+          </Alert>
+        ) : (
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">{dictionary.admin.common.loading}</span>
+          </div>
+        )}
       </div>
     );
   }

@@ -3,6 +3,8 @@ package io.github.susimsek.springauthserversamples.config.security;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.springauthserversamples.repository.AuthorizationRepository;
+import java.util.Collection;
+import java.util.Set;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -21,10 +23,18 @@ final class ConsoleJwtDecoderFactory {
             String issuer,
             String audience,
             AuthorizationRepository authorizationRepository) {
+        return create(jwkSource, issuer, Set.of(audience), authorizationRepository);
+    }
+
+    static JwtDecoder create(
+            JWKSource<SecurityContext> jwkSource,
+            String issuer,
+            Collection<String> audiences,
+            AuthorizationRepository authorizationRepository) {
         NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withJwkSource(jwkSource).build();
         OAuth2TokenValidator<Jwt> audienceValidator =
                 jwt ->
-                        jwt.getAudience().contains(audience)
+                        jwt.getAudience().stream().anyMatch(audiences::contains)
                                 ? OAuth2TokenValidatorResult.success()
                                 : OAuth2TokenValidatorResult.failure(
                                         new OAuth2Error(

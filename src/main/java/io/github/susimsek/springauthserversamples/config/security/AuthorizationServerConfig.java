@@ -540,7 +540,8 @@ public class AuthorizationServerConfig {
 
     private static boolean isAdminAccessToken(JwtEncodingContext context) {
         return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
-                && ConsoleClients.ADMIN.equals(context.getRegisteredClient().getClientId());
+                && ConsoleClients.ADMIN_CLIENTS.contains(
+                        context.getRegisteredClient().getClientId());
     }
 
     private static List<ClientScopeEntity> groupMappers(

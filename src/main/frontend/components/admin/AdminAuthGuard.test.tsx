@@ -32,6 +32,7 @@ jest.mock("@/lib/admin-api", () => ({
 jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
   usePathname: () => pathname,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: mockReplace }),
 }));
 jest.mock("./AdminAuthProvider", () => ({ useAdminAuth: () => auth }));

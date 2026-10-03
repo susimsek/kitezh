@@ -8,6 +8,7 @@ import { ViewHeader } from "@/components/admin/ViewHeader";
 import { useAdminAuth } from "@/components/admin/AdminAuthProvider";
 import { AdminActionIcon } from "@/components/admin/AdminActionIcon";
 import { adminRequest } from "@/lib/admin-api";
+import { apiUrl } from "@/lib/desktop-api";
 
 type KeySummary = {
   kid: string;
@@ -98,7 +99,7 @@ export default function ServerInfoPage() {
 
         const localUrl = (endpoint: string) => {
           const url = new URL(endpoint);
-          return `${window.location.origin}${url.pathname}${url.search}`;
+          return apiUrl(`${url.pathname}${url.search}`);
         };
         const [discoveryResponse, jwksResponse] = await Promise.all([
           fetch(localUrl(response.data.discoveryEndpoint), { signal: controller.signal }),

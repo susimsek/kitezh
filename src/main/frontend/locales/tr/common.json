@@ -4,6 +4,21 @@
     "framework": "Spring Security",
     "description": "Güvenli OAuth 2.0 ve OpenID Connect yetkilendirmesi."
   },
+  "desktop": {
+    "offline": "Masaüstü uygulaması çevrimdışı. Devam etmek için bağlantıyı yenileyin.",
+    "signInUnavailable": "Güvenli oturum açma şu anda kullanılamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
+    "signInTitle": "Masaüstü uygulamasında oturum açın",
+    "signInDescription": "Varsayılan tarayıcınızda güvenli şekilde devam edin.",
+    "signInWithBrowser": "Tarayıcıyla oturum aç",
+    "browserSignInHint": "Parolanız tarayıcıda kalır ve masaüstü uygulamasında saklanmaz.",
+    "chooseConsoleEyebrow": "Güvenli şekilde devam edin",
+    "chooseConsoleTitle": "Bir konsol seçin",
+    "chooseConsoleDescription": "Devam etmek istediğiniz konsolu seçin.",
+    "adminConsole": "Admin Console’a giriş yap",
+    "adminConsoleDescription": "Kullanıcıları, istemcileri, rolleri, grupları ve sunucu ayarlarını yönetin.",
+    "accountConsole": "Account Console’a giriş yap",
+    "accountConsoleDescription": "Profilinizi, güvenliğinizi, oturumlarınızı ve uygulamalarınızı yönetin."
+  },
   "navbar": {
     "language": "Dil"
   },
@@ -1087,7 +1102,7 @@
       "signOutAllConfirm": "Bu kullanıcının tüm oturumları kapatılsın mı?",
       "revoke": "İptal et",
       "revokeConfirm": "Bu yetkilendirme izni iptal edilsin mi?",
-      "offlineSessionsDescription": "Tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
+      "offlineSessionsDescription": "Kullanıcıların tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
       "offlineBadge": "Çevrimdışı erişim",
       "offlineNoExpiry": "Süresiz",
       "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?",
@@ -1216,11 +1231,7 @@
       "no": "Hayır",
       "passkeyDeleteConfirm": "Bu kullanıcının geçiş anahtarı kaldırılsın mı? Bu anahtarla artık giriş yapamaz.",
       "save": "Kaydet",
-      "loading": "Yükleniyor…",
-      "offlineSessionsDescription": "Kullanıcıların tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
-      "offlineBadge": "Çevrimdışı erişim",
-      "offlineNoExpiry": "Süresiz",
-      "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?"
+      "loading": "Yükleniyor…"
     },
     "placeholder": "Bu yönetim bölümü sonraki geliştirme adımı için hazır.",
     "clientScopes": {

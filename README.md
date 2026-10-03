@@ -331,6 +331,31 @@ pnpm dev
 
 The exported page is served at `/login` and submits credentials directly to Spring Security's `POST /login` endpoint. CSRF protection is intentionally disabled in this sample.
 
+### Electron desktop console
+
+The Electron shell packages the same static renderer used by the web consoles. Start the
+authorization server with the `dev` profile on port `9090`, then run:
+
+```bash
+cd src/main/desktop
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+`pnpm dev` uses `http://localhost:9090`; `pnpm start` uses the deployed Render API unless
+`DESKTOP_API_BASE_URL` is explicitly supplied. Build platform installers with `pnpm package`.
+Local development opens Electron DevTools automatically, so the Network panel can be used to
+inspect renderer API, token refresh, and logout requests. The OAuth authorization page and the
+main-process token exchange run outside that renderer panel; inspect the system browser for the
+authorization redirect and use main-process diagnostics when debugging that exchange.
+Branch builds upload Linux, macOS, and Windows installers as short-lived GitHub Actions artifacts.
+To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
+`desktop-release` workflow attaches the platform installers to the matching GitHub Release.
+These CI packages are unsigned until platform signing credentials are configured.
+The packaged app uses the `springauth://oauth/callback` protocol and stores console sessions in
+the operating system's protected Electron storage. Release signing, macOS notarization, and
+auto-update publishing require platform certificates and are not part of the unsigned local build.
+
 ## Administration and Account Consoles
 
 The static frontend also contains browser-based OIDC clients for administration and end-user account management. Both use the Authorization Code flow with PKCE (S256), obtain access, ID, and refresh tokens, refresh access tokens before they expire, and sign out through the OIDC end-session endpoint. Access, ID, and refresh tokens remain in browser memory; only the short-lived authorization transaction is retained across the redirect callback.

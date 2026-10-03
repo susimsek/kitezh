@@ -139,6 +139,56 @@ jobs:
             -Dsonar.organization=susimsek \
             -Dsonar.token="${SONAR_TOKEN}"
 
+  desktop:
+    name: Desktop package (${{ matrix.platform }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+          - platform: macos
+            runner: macos-latest
+          - platform: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            src/main/frontend/pnpm-lock.yaml
+            src/main/desktop/pnpm-lock.yaml
+          install: false
+
+      - name: Install frontend dependencies
+        run: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - name: Install desktop dependencies
+        run: pnpm --dir src/main/desktop install --frozen-lockfile
+
+      - name: Test desktop shell
+        run: pnpm --dir src/main/desktop test
+
+      - name: Build desktop package
+        run: pnpm --dir src/main/desktop package
+
+      - name: Upload desktop package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-${{ matrix.platform }}-${{ github.sha }}
+          path: src/main/desktop/release/*
+          if-no-files-found: error
+
   native-image:
     name: Native image (${{ matrix.architecture }})
     needs: build
@@ -312,6 +362,7 @@ jobs:
     needs:
       - infrastructure-validation
       - build
+      - desktop
       - publish-native-manifest
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest

@@ -74,7 +74,7 @@ public class AccountApiSecurityConfig {
         return ConsoleJwtDecoderFactory.create(
                 jwkSource,
                 applicationProperties.authorizationServer().issuer(),
-                ConsoleClients.ACCOUNT,
+                ConsoleClients.ACCOUNT_CLIENTS,
                 authorizationRepository);
     }
 }

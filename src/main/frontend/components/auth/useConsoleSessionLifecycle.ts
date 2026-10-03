@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Locale } from "@/i18n/config";
 import type { TokenHandlers } from "@/lib/authenticated-api-client";
@@ -24,16 +24,23 @@ export function useConsoleSessionLifecycle({
   registerTokenHandlers,
 }: ConsoleSessionLifecycleOptions) {
   const authorizationStarted = useRef(false);
+  const [authorizationError, setAuthorizationError] = useState(false);
 
-  const startAuthorization = useCallback(() => {
-    if (authorizationStarted.current) return;
-    authorizationStarted.current = true;
-    void beginAuthorization(locale, `${window.location.pathname}${window.location.search}`).catch(
-      () => {
+  const startAuthorization = useCallback(
+    (force = false) => {
+      if (authorizationStarted.current && !force) return Promise.resolve();
+      authorizationStarted.current = true;
+      setAuthorizationError(false);
+      return beginAuthorization(
+        locale,
+        `${window.location.pathname}${window.location.search}`,
+      ).catch(() => {
         authorizationStarted.current = false;
-      },
-    );
-  }, [beginAuthorization, locale]);
+        setAuthorizationError(true);
+      });
+    },
+    [beginAuthorization, locale],
+  );
 
   useEffect(() => {
     if (accessToken) authorizationStarted.current = false;
@@ -64,7 +71,7 @@ export function useConsoleSessionLifecycle({
     return () => window.clearTimeout(timer);
   }, [expiresAt, isAuthorizationCallback, refreshAccessToken, startAuthorization]);
 
-  return startAuthorization;
+  return { startAuthorization, authorizationError };
 }
 
 export function isCanceledRequest(error: unknown) {

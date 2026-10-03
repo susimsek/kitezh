@@ -193,6 +193,8 @@ textarea.form-control {
 
 /* Authentication screens */
 .auth-app {
+  width: 100%;
+  min-width: 0;
   background:
     radial-gradient(circle at 15% 20%, rgba(var(--bs-primary-rgb), 0.08), transparent 25rem),
     var(--console-brand-background);
@@ -263,6 +265,44 @@ textarea.form-control {
 
 .auth-card .form-control:focus {
   box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.12);
+}
+
+.desktop-sign-in {
+  width: 100%;
+}
+
+.desktop-sign-in-card {
+  width: 100%;
+  max-width: none;
+}
+
+.desktop-console-options {
+  display: grid;
+  gap: 1rem;
+}
+
+.desktop-console-option > p {
+  max-width: 30rem;
+  margin-inline: auto;
+  line-height: 1.45;
+}
+
+@media (max-width: 480px) {
+  .desktop-sign-in {
+    width: 100%;
+  }
+
+  .desktop-console-option > p {
+    font-size: 0.8125rem;
+  }
+}
+
+html[data-desktop-connectivity="offline"] form button[type="submit"],
+html[data-desktop-connectivity="offline"] button.btn-danger,
+html[data-desktop-connectivity="offline"] button.btn-outline-danger {
+  cursor: not-allowed;
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .consent-client-icon {
