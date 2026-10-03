@@ -16,7 +16,7 @@ import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AdminRoleService {
 
     private static final String ROLE_NOT_FOUND = "Role not found";
@@ -38,39 +39,6 @@ public class AdminRoleService {
     private final AdminUserService adminUserService;
     private final AdminRoleMapper adminRoleMapper;
     private final UserAccessInvalidationService userAccessInvalidationService;
-
-    public AdminRoleService(
-            AuthorityRepository authorityRepository,
-            UserRepository userRepository,
-            AdminAuditEventService adminAuditEventService,
-            AdminUserService adminUserService) {
-        this(
-                null,
-                authorityRepository,
-                userRepository,
-                adminAuditEventService,
-                adminUserService,
-                null,
-                null);
-    }
-
-    @Autowired
-    public AdminRoleService(
-            ClientRoleRepository clientRoleRepository,
-            AuthorityRepository authorityRepository,
-            UserRepository userRepository,
-            AdminAuditEventService adminAuditEventService,
-            AdminUserService adminUserService,
-            AdminRoleMapper adminRoleMapper,
-            UserAccessInvalidationService userAccessInvalidationService) {
-        this.authorityRepository = authorityRepository;
-        this.clientRoleRepository = clientRoleRepository;
-        this.userRepository = userRepository;
-        this.adminAuditEventService = adminAuditEventService;
-        this.adminUserService = adminUserService;
-        this.adminRoleMapper = adminRoleMapper;
-        this.userAccessInvalidationService = userAccessInvalidationService;
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminRoleDTO> roles(String query, Pageable pageable) {

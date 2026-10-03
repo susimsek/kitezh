@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Administration operations for Keycloak-style groups and their realm-role mappings. */
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminGroupService {
 
     private static final String GROUP_TARGET = "group";
@@ -47,22 +47,6 @@ public class AdminGroupService {
     private final AdminAuditEventService adminAuditEventService;
     private final AdminGroupMapper adminGroupMapper;
     private final GroupPermissionRepository groupPermissionRepository;
-
-    public AdminGroupService(
-            GroupRepository groupRepository,
-            AuthorityRepository authorityRepository,
-            UserRepository userRepository,
-            UserAccessInvalidationService userAccessInvalidationService,
-            AdminAuditEventService adminAuditEventService) {
-        this(
-                groupRepository,
-                authorityRepository,
-                userRepository,
-                userAccessInvalidationService,
-                adminAuditEventService,
-                null,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminGroupDTO> findAll(String query, Pageable pageable) {

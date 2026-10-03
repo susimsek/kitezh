@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Tracks failed secondary-authentication attempts independently from password failures. */
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class MfaBruteForceService {
 
     private final UserRepository userRepository;

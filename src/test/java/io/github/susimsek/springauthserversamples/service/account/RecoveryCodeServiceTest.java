@@ -170,7 +170,12 @@ class RecoveryCodeServiceTest {
 
     private RecoveryCodeService service() {
         return new RecoveryCodeService(
-                userRepository, recoveryCodeRepository, passwordEncoder, auditEventService);
+                userRepository,
+                recoveryCodeRepository,
+                passwordEncoder,
+                auditEventService,
+                null,
+                loginSettingsRepository);
     }
 
     private RecoveryCodeService serviceWithMfa() {
@@ -179,7 +184,8 @@ class RecoveryCodeServiceTest {
                 recoveryCodeRepository,
                 passwordEncoder,
                 auditEventService,
-                mfaBruteForceService);
+                mfaBruteForceService,
+                loginSettingsRepository);
     }
 
     private RecoveryCodeService serviceWithSettings() {

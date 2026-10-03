@@ -15,12 +15,13 @@ import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.PasswordService;
 import java.time.Duration;
 import java.time.Instant;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AccountProfileService {
 
     private static final String CURRENT_PASSWORD_FIELD = "currentPassword";
@@ -33,26 +34,6 @@ public class AccountProfileService {
     private final UserActionService userActionService;
     private final LoginSettingsService loginSettingsService;
     private final LdapFederationWriteService ldapFederationWriteService;
-
-    @Autowired
-    public AccountProfileService(
-            UserRepository userRepository,
-            AccountProfileMapper accountProfileMapper,
-            PasswordService passwordService,
-            AdminAuditEventService auditEventService,
-            UserAccessInvalidationService userAccessInvalidationService,
-            UserActionService userActionService,
-            LoginSettingsService loginSettingsService,
-            LdapFederationWriteService ldapFederationWriteService) {
-        this.userRepository = userRepository;
-        this.accountProfileMapper = accountProfileMapper;
-        this.passwordService = passwordService;
-        this.auditEventService = auditEventService;
-        this.userAccessInvalidationService = userAccessInvalidationService;
-        this.userActionService = userActionService;
-        this.loginSettingsService = loginSettingsService;
-        this.ldapFederationWriteService = ldapFederationWriteService;
-    }
 
     @Transactional(readOnly = true)
     public AccountProfileDTO profile(String username) {

@@ -52,7 +52,8 @@ class DomainOAuth2AuthorizationServiceTest {
                         authorizationRepository,
                         registeredClientRepository,
                         authorizationMapper,
-                        mapperSupport);
+                        mapperSupport,
+                        offlineAccessPolicyService);
     }
 
     @AfterEach

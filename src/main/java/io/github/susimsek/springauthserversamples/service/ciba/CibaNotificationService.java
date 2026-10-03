@@ -4,38 +4,20 @@ import io.github.susimsek.springauthserversamples.config.security.SocialLoginSec
 import io.github.susimsek.springauthserversamples.domain.CibaAuthenticationRequestEntity;
 import java.net.URI;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** Delivers CIBA ping notifications and push token responses to registered client endpoints. */
 @Service
+@RequiredArgsConstructor
 public class CibaNotificationService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CibaNotificationService.class);
 
     private final CibaNotificationClient notificationClient;
     private final SocialLoginSecretCipher tokenCipher;
-
-    public CibaNotificationService() {
-        this(null, (endpoint, authorization, body) -> {});
-    }
-
-    @Autowired
-    public CibaNotificationService(
-            SocialLoginSecretCipher tokenCipher, CibaNotificationClient notificationClient) {
-        this.tokenCipher = tokenCipher;
-        this.notificationClient = notificationClient;
-    }
-
-    public CibaNotificationService(SocialLoginSecretCipher tokenCipher) {
-        this(tokenCipher, (endpoint, authorization, body) -> {});
-    }
-
-    CibaNotificationService(CibaNotificationClient notificationClient) {
-        this(null, notificationClient);
-    }
 
     /** Sends the CIBA ping notification. */
     public boolean notifyPing(CibaAuthenticationRequestEntity request) {

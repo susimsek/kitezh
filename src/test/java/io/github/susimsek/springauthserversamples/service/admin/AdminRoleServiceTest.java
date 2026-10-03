@@ -631,8 +631,8 @@ class AdminRoleServiceTest {
 
     private AdminRoleService service() {
         return new AdminRoleService(
-                null,
                 authorityRepository,
+                null,
                 userRepository,
                 adminAuditEventService,
                 adminUserService,
@@ -642,8 +642,8 @@ class AdminRoleServiceTest {
 
     private AdminRoleService extendedService() {
         return new AdminRoleService(
-                clientRoleRepository,
                 authorityRepository,
+                clientRoleRepository,
                 userRepository,
                 adminAuditEventService,
                 adminUserService,

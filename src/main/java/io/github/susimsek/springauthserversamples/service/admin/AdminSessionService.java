@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminSessionService {
 
     private static final String ACTIVE_STATUS = "active";
@@ -34,23 +34,6 @@ public class AdminSessionService {
     private final AdminAuditEventService adminAuditEventService;
     private final SessionInvalidationService sessionInvalidationService;
     private final AdminSessionMapper adminSessionMapper;
-
-    public AdminSessionService(
-            AdminUserService adminUserService,
-            UserSessionRepository userSessionRepository,
-            AuthorizationRepository authorizationRepository,
-            ClientRepository clientRepository,
-            AdminAuditEventService adminAuditEventService,
-            SessionInvalidationService sessionInvalidationService) {
-        this(
-                adminUserService,
-                userSessionRepository,
-                authorizationRepository,
-                clientRepository,
-                adminAuditEventService,
-                sessionInvalidationService,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminSessionDTO> sessions(

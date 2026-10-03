@@ -38,7 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings("java:S107")
 public class AdminUserService {
 

@@ -43,7 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings("java:S4449")
 public class AdminClientService {
 
@@ -68,27 +68,6 @@ public class AdminClientService {
     private final AdminClientMapper adminClientMapper;
     private final ServiceAccountRepository serviceAccountRepository;
     private final UserRepository userRepository;
-
-    public AdminClientService(
-            ClientRepository clientRepository,
-            AuthorizationRepository authorizationRepository,
-            AuthorizationConsentRepository authorizationConsentRepository,
-            RegisteredClientMapper registeredClientMapper,
-            AuthorizationServerMapperSupport mapperSupport,
-            PasswordEncoder passwordEncoder,
-            AdminAuditEventService adminAuditEventService) {
-        this(
-                clientRepository,
-                authorizationRepository,
-                authorizationConsentRepository,
-                registeredClientMapper,
-                mapperSupport,
-                passwordEncoder,
-                adminAuditEventService,
-                null,
-                null,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminClientDTO> findAll(String query, Pageable pageable) {

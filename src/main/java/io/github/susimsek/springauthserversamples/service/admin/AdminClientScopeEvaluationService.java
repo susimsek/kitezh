@@ -28,12 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
+@RequiredArgsConstructor
 public class AdminClientScopeEvaluationService {
 
     private final ClientRepository clientRepository;
@@ -44,43 +45,6 @@ public class AdminClientScopeEvaluationService {
     private final UserProfileAttributeRepository userProfileAttributeRepository;
     private final RegisteredClientMapper registeredClientMapper;
     private final AuthorizationServerMapperSupport mapperSupport;
-
-    public AdminClientScopeEvaluationService(
-            ClientRepository clientRepository,
-            ClientMapperRepository mapperRepository,
-            ClientScopeRepository clientScopeRepository,
-            ClientScopeMapperRepository clientScopeMapperRepository,
-            UserRepository userRepository) {
-        this(
-                clientRepository,
-                mapperRepository,
-                clientScopeRepository,
-                clientScopeMapperRepository,
-                userRepository,
-                null,
-                null,
-                null);
-    }
-
-    @Autowired
-    public AdminClientScopeEvaluationService(
-            ClientRepository clientRepository,
-            ClientMapperRepository mapperRepository,
-            ClientScopeRepository clientScopeRepository,
-            ClientScopeMapperRepository clientScopeMapperRepository,
-            UserRepository userRepository,
-            UserProfileAttributeRepository userProfileAttributeRepository,
-            RegisteredClientMapper registeredClientMapper,
-            AuthorizationServerMapperSupport mapperSupport) {
-        this.clientRepository = clientRepository;
-        this.mapperRepository = mapperRepository;
-        this.clientScopeRepository = clientScopeRepository;
-        this.clientScopeMapperRepository = clientScopeMapperRepository;
-        this.userRepository = userRepository;
-        this.userProfileAttributeRepository = userProfileAttributeRepository;
-        this.registeredClientMapper = registeredClientMapper;
-        this.mapperSupport = mapperSupport;
-    }
 
     @Transactional(readOnly = true)
     public AdminClientScopeEvaluationDTO evaluate(String clientId, String scopes, String subject) {

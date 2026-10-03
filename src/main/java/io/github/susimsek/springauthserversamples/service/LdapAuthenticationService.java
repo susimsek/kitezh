@@ -12,7 +12,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class LdapAuthenticationService {
 
     private static final PasswordEncoder PASSWORD_ENCODER =
@@ -32,37 +33,6 @@ public class LdapAuthenticationService {
     private final UserRepository userRepository;
     private final AuthorityRepository authorityRepository;
     private final LdapFederationMapperService mapperService;
-
-    @Autowired
-    public LdapAuthenticationService(
-            LdapFederationSettingsService settingsService,
-            LdapDirectoryClient directoryClient,
-            LdapFederationIdentityRepository identityRepository,
-            UserRepository userRepository,
-            AuthorityRepository authorityRepository,
-            LdapFederationMapperService mapperService) {
-        this.settingsService = settingsService;
-        this.directoryClient = directoryClient;
-        this.identityRepository = identityRepository;
-        this.userRepository = userRepository;
-        this.authorityRepository = authorityRepository;
-        this.mapperService = mapperService;
-    }
-
-    public LdapAuthenticationService(
-            LdapFederationSettingsService settingsService,
-            LdapDirectoryClient directoryClient,
-            LdapFederationIdentityRepository identityRepository,
-            UserRepository userRepository,
-            AuthorityRepository authorityRepository) {
-        this(
-                settingsService,
-                directoryClient,
-                identityRepository,
-                userRepository,
-                authorityRepository,
-                null);
-    }
 
     @Transactional
     @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, allEntries = true)

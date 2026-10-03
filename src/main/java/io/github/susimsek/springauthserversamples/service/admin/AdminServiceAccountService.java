@@ -16,11 +16,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AdminServiceAccountService {
 
     private static final String SERVICE_ACCOUNT_NOT_FOUND = "Service account not found";
@@ -32,40 +33,6 @@ public class AdminServiceAccountService {
     private final ClientRoleRepository clientRoleRepository;
     private final AdminAuditEventService auditEventService;
     private final UserAccessInvalidationService userAccessInvalidationService;
-
-    @Autowired
-    public AdminServiceAccountService(
-            ServiceAccountRepository serviceAccountRepository,
-            UserRepository userRepository,
-            AuthorityRepository authorityRepository,
-            ClientRepository clientRepository,
-            ClientRoleRepository clientRoleRepository,
-            AdminAuditEventService auditEventService,
-            UserAccessInvalidationService userAccessInvalidationService) {
-        this.serviceAccountRepository = serviceAccountRepository;
-        this.userRepository = userRepository;
-        this.authorityRepository = authorityRepository;
-        this.clientRepository = clientRepository;
-        this.clientRoleRepository = clientRoleRepository;
-        this.auditEventService = auditEventService;
-        this.userAccessInvalidationService = userAccessInvalidationService;
-    }
-
-    public AdminServiceAccountService(
-            ServiceAccountRepository serviceAccountRepository,
-            UserRepository userRepository,
-            ClientRoleRepository clientRoleRepository,
-            AdminAuditEventService auditEventService,
-            UserAccessInvalidationService userAccessInvalidationService) {
-        this(
-                serviceAccountRepository,
-                userRepository,
-                null,
-                null,
-                clientRoleRepository,
-                auditEventService,
-                userAccessInvalidationService);
-    }
 
     @Transactional(readOnly = true)
     public AdminServiceAccountDTO find(String clientId) {

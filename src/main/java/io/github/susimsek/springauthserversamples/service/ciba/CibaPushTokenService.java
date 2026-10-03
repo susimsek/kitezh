@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -44,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Generates and delivers the final token response for CIBA push-mode requests. */
 @Service
+@RequiredArgsConstructor
 public class CibaPushTokenService {
 
     private static final String SERVER_ERROR = "server_error";
@@ -58,24 +59,6 @@ public class CibaPushTokenService {
     private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
     private final CibaNotificationService notificationService;
     private final AuthorizationServerSettings authorizationServerSettings;
-
-    @Autowired
-    public CibaPushTokenService(
-            CibaAuthenticationRequestRepository requestRepository,
-            RegisteredClientRepository clientRepository,
-            UserDetailsService userDetailsService,
-            OAuth2AuthorizationService authorizationService,
-            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
-            CibaNotificationService notificationService,
-            AuthorizationServerSettings authorizationServerSettings) {
-        this.requestRepository = requestRepository;
-        this.clientRepository = clientRepository;
-        this.userDetailsService = userDetailsService;
-        this.authorizationService = authorizationService;
-        this.tokenGenerator = tokenGenerator;
-        this.notificationService = notificationService;
-        this.authorizationServerSettings = authorizationServerSettings;
-    }
 
     @Transactional
     public void issue(CibaAuthenticationRequestEntity request) {

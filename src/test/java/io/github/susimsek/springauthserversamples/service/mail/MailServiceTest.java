@@ -40,7 +40,7 @@ class MailServiceTest {
     @Test
     void skipsDeliveryWhenMailIsDisabled() {
         MailService service =
-                new MailService(properties(false), mailSender, messageSource, templateEngine);
+                new MailService(properties(false), mailSender, messageSource, templateEngine, null);
 
         service.sendPasswordReset(
                 "user@example.com", "user", Locale.ENGLISH, "https://example/reset");
@@ -59,7 +59,7 @@ class MailServiceTest {
                         "mail.verification.subject", null, Locale.forLanguageTag("tr")))
                 .thenReturn("E-posta adresinizi doğrulayın");
         MailService service =
-                new MailService(properties(true), mailSender, messageSource, templateEngine);
+                new MailService(properties(true), mailSender, messageSource, templateEngine, null);
 
         service.sendEmailVerification(
                 "user@example.com",
@@ -94,7 +94,7 @@ class MailServiceTest {
         when(messageSource.getMessage("mail.password-reset.subject", null, Locale.ENGLISH))
                 .thenReturn("Reset password");
         MailService service =
-                new MailService(properties(true), mailSender, messageSource, templateEngine);
+                new MailService(properties(true), mailSender, messageSource, templateEngine, null);
 
         service.sendPasswordReset(
                 "user@example.com", "user", Locale.ENGLISH, "https://example/reset");
@@ -110,7 +110,7 @@ class MailServiceTest {
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
         doThrow(new MailSendException("SMTP unavailable")).when(mailSender).send(mimeMessage);
 
-        new MailService(properties(true), mailSender, messageSource, templateEngine)
+        new MailService(properties(true), mailSender, messageSource, templateEngine, null)
                 .sendEmail("user@example.com", "Subject", "Body", false);
 
         verify(mailSender).send(mimeMessage);
@@ -127,7 +127,7 @@ class MailServiceTest {
                         "mail.test.text", null, "This is a test email.", Locale.ENGLISH))
                 .thenReturn("This is a test email.");
         MailService service =
-                new MailService(properties(false), mailSender, messageSource, templateEngine);
+                new MailService(properties(false), mailSender, messageSource, templateEngine, null);
 
         service.testConnection(
                 new EmailSettingsService.EmailConfiguration(
@@ -165,7 +165,7 @@ class MailServiceTest {
                 .thenReturn("This is a test email.");
         doThrow(new MailSendException("SMTP unavailable")).when(mailSender).send(mimeMessage);
         MailService service =
-                new MailService(properties(false), mailSender, messageSource, templateEngine);
+                new MailService(properties(false), mailSender, messageSource, templateEngine, null);
 
         assertThatThrownBy(
                         () ->

@@ -5,7 +5,7 @@ import io.github.susimsek.springauthserversamples.repository.UserRepository;
 import io.github.susimsek.springauthserversamples.service.security.AccountLockService;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import java.time.Instant;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,26 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class DomainUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final AccountLockService accountLockService;
     private final LoginSettingsService loginSettingsService;
-
-    @Autowired
-    public DomainUserDetailsService(
-            UserRepository userRepository,
-            AccountLockService accountLockService,
-            LoginSettingsService loginSettingsService) {
-        this.userRepository = userRepository;
-        this.accountLockService = accountLockService;
-        this.loginSettingsService = loginSettingsService;
-    }
-
-    public DomainUserDetailsService(
-            UserRepository userRepository, AccountLockService accountLockService) {
-        this(userRepository, accountLockService, null);
-    }
 
     @Transactional(readOnly = true)
     @Override

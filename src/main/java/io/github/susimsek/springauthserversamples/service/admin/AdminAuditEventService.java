@@ -19,23 +19,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings({"java:S107", "java:S6213", "java:S6829"})
 public class AdminAuditEventService {
 
     private final AdminEventRepository adminEventRepository;
     private final AdminEventMapper adminEventMapper;
     private final AdminEventSettingsRepository settingsRepository;
-
-    public AdminAuditEventService(
-            AdminEventRepository adminEventRepository,
-            AdminEventSettingsRepository settingsRepository) {
-        this(adminEventRepository, null, settingsRepository);
-    }
-
-    public AdminAuditEventService(AdminEventRepository adminEventRepository) {
-        this(adminEventRepository, null, null);
-    }
 
     @Transactional
     public void record(String action, String targetType, String targetId) {

@@ -5,13 +5,15 @@ import io.github.susimsek.springauthserversamples.repository.LdapFederationProvi
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import java.time.Duration;
 import java.time.Instant;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** Runs manual and scheduled LDAP imports without introducing realm-scoped state. */
 @Service
+@RequiredArgsConstructor
 public class LdapFederationSyncService {
 
     private final LdapFederationProviderRepository providerRepository;
@@ -19,26 +21,11 @@ public class LdapFederationSyncService {
     private final LdapDirectoryClient directoryClient;
     private final LdapAuthenticationService authenticationService;
     private final AdminAuditEventService auditEventService;
-    private final TransactionTemplate transactionTemplate;
-
-    @Autowired
-    public LdapFederationSyncService(
-            LdapFederationProviderRepository providerRepository,
-            LdapFederationSettingsService settingsService,
-            LdapDirectoryClient directoryClient,
-            LdapAuthenticationService authenticationService,
-            AdminAuditEventService auditEventService,
-            org.springframework.transaction.PlatformTransactionManager transactionManager) {
-        this.providerRepository = providerRepository;
-        this.settingsService = settingsService;
-        this.directoryClient = directoryClient;
-        this.authenticationService = authenticationService;
-        this.auditEventService = auditEventService;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-    }
+    private final PlatformTransactionManager transactionManager;
 
     public SyncResult synchronize(String providerId, SyncMode mode) {
-        return transactionTemplate.execute(status -> synchronizeInTransaction(providerId, mode));
+        return new TransactionTemplate(transactionManager)
+                .execute(status -> synchronizeInTransaction(providerId, mode));
     }
 
     private SyncResult synchronizeInTransaction(String providerId, SyncMode mode) {

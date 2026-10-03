@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -39,6 +39,7 @@ import org.springframework.util.StringUtils;
 
 /** Creates and advances the persisted CIBA request lifecycle. */
 @Service
+@RequiredArgsConstructor
 public class CibaAuthenticationService {
 
     private static final int MAX_REQUEST_TTL_SECONDS = 3600;
@@ -56,121 +57,8 @@ public class CibaAuthenticationService {
     private final CibaPushTokenService pushTokenService;
     private final JwtDecoder jwtDecoder;
     private final CibaPolicyService policyService;
-    private final String authorizationServerIssuer;
+    private final AuthorizationServerSettings authorizationServerSettings;
     private final SocialLoginSecretCipher notificationTokenCipher;
-
-    @Autowired
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository,
-            UserRepository userRepository,
-            CibaNotificationService notificationService,
-            CibaPushTokenService pushTokenService,
-            JwtDecoder jwtDecoder,
-            CibaPolicyService policyService,
-            AuthorizationServerSettings authorizationServerSettings,
-            SocialLoginSecretCipher notificationTokenCipher) {
-        this.requestRepository = requestRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-        this.pushTokenService = pushTokenService;
-        this.jwtDecoder = jwtDecoder;
-        this.policyService = policyService;
-        this.authorizationServerIssuer =
-                authorizationServerSettings == null
-                        ? null
-                        : authorizationServerSettings.getIssuer();
-        this.notificationTokenCipher = notificationTokenCipher;
-    }
-
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository,
-            UserRepository userRepository,
-            CibaNotificationService notificationService,
-            CibaPushTokenService pushTokenService,
-            JwtDecoder jwtDecoder,
-            CibaPolicyService policyService,
-            AuthorizationServerSettings authorizationServerSettings) {
-        this(
-                requestRepository,
-                userRepository,
-                notificationService,
-                pushTokenService,
-                jwtDecoder,
-                policyService,
-                authorizationServerSettings,
-                null);
-    }
-
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository,
-            UserRepository userRepository,
-            CibaNotificationService notificationService,
-            CibaPushTokenService pushTokenService,
-            JwtDecoder jwtDecoder) {
-        this(
-                requestRepository,
-                userRepository,
-                notificationService,
-                pushTokenService,
-                jwtDecoder,
-                null,
-                null,
-                null);
-    }
-
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository,
-            UserRepository userRepository,
-            CibaNotificationService notificationService,
-            CibaPushTokenService pushTokenService,
-            JwtDecoder jwtDecoder,
-            CibaPolicyService policyService) {
-        this(
-                requestRepository,
-                userRepository,
-                notificationService,
-                pushTokenService,
-                jwtDecoder,
-                policyService,
-                null,
-                null);
-    }
-
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository,
-            UserRepository userRepository,
-            CibaNotificationService notificationService,
-            CibaPushTokenService pushTokenService) {
-        this(
-                requestRepository,
-                userRepository,
-                notificationService,
-                pushTokenService,
-                null,
-                null,
-                null,
-                null);
-    }
-
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository, UserRepository userRepository) {
-        this(
-                requestRepository,
-                userRepository,
-                new CibaNotificationService(),
-                null,
-                null,
-                null,
-                null,
-                null);
-    }
-
-    public CibaAuthenticationService(
-            CibaAuthenticationRequestRepository requestRepository,
-            UserRepository userRepository,
-            CibaNotificationService notificationService) {
-        this(requestRepository, userRepository, notificationService, null, null, null, null, null);
-    }
 
     @Transactional
     public CibaAuthenticationRequestEntity create(
@@ -544,8 +432,10 @@ public class CibaAuthenticationService {
             }
             if (jwt.getAudience() == null
                     || jwt.getAudience().isEmpty()
-                    || (authorizationServerIssuer != null
-                            && !jwt.getAudience().contains(authorizationServerIssuer))) {
+                    || (authorizationServerSettings != null
+                            && authorizationServerSettings.getIssuer() != null
+                            && !jwt.getAudience()
+                                    .contains(authorizationServerSettings.getIssuer()))) {
                 throw protocol(INVALID_REQUEST, "The CIBA request was not issued to this client");
             }
             Map<String, Object> claims = jwt.getClaims();

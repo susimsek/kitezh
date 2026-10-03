@@ -362,7 +362,9 @@ class MfaServiceTest {
                                 loginSettingsRepository,
                                 totpService,
                                 auditEventService,
-                                invalidationService))
+                                invalidationService,
+                                recoveryCodeRepository,
+                                mfaBruteForceService))
                 .isNotNull();
     }
 

@@ -21,7 +21,7 @@ import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.EffectiveRoleService;
 import java.util.LinkedHashSet;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AdminClientRoleService {
 
     private static final String ROLE_TARGET = "client-role";
@@ -41,45 +42,6 @@ public class AdminClientRoleService {
     private final UserAccessInvalidationService userAccessInvalidationService;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminRoleMapper adminRoleMapper;
-
-    public AdminClientRoleService(
-            ClientRepository clientRepository,
-            ClientRoleRepository clientRoleRepository,
-            UserRepository userRepository,
-            GroupRepository groupRepository,
-            UserAccessInvalidationService userAccessInvalidationService,
-            AdminAuditEventService adminAuditEventService,
-            AdminRoleMapper adminRoleMapper) {
-        this(
-                clientRepository,
-                clientRoleRepository,
-                null,
-                userRepository,
-                groupRepository,
-                userAccessInvalidationService,
-                adminAuditEventService,
-                adminRoleMapper);
-    }
-
-    @Autowired
-    public AdminClientRoleService(
-            ClientRepository clientRepository,
-            ClientRoleRepository clientRoleRepository,
-            AuthorityRepository authorityRepository,
-            UserRepository userRepository,
-            GroupRepository groupRepository,
-            UserAccessInvalidationService userAccessInvalidationService,
-            AdminAuditEventService adminAuditEventService,
-            AdminRoleMapper adminRoleMapper) {
-        this.clientRepository = clientRepository;
-        this.clientRoleRepository = clientRoleRepository;
-        this.authorityRepository = authorityRepository;
-        this.userRepository = userRepository;
-        this.groupRepository = groupRepository;
-        this.userAccessInvalidationService = userAccessInvalidationService;
-        this.adminAuditEventService = adminAuditEventService;
-        this.adminRoleMapper = adminRoleMapper;
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminClientRoleDTO> findAll(String clientId, String query, Pageable pageable) {

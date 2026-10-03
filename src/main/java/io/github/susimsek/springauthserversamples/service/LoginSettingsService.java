@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings("java:S6829")
 public class LoginSettingsService {
 
@@ -31,26 +31,6 @@ public class LoginSettingsService {
     private final JpaIndexedSessionRepository sessionRepository;
     private final LoginSettingsMapper loginSettingsMapper;
     private final SocialProviderSettingsService socialProviderSettingsService;
-
-    public LoginSettingsService(
-            LoginSettingsRepository repository, AdminAuditEventService auditEventService) {
-        this(repository, auditEventService, null, null, null);
-    }
-
-    public LoginSettingsService(
-            LoginSettingsRepository repository,
-            AdminAuditEventService auditEventService,
-            JpaIndexedSessionRepository sessionRepository) {
-        this(repository, auditEventService, sessionRepository, null, null);
-    }
-
-    public LoginSettingsService(
-            LoginSettingsRepository repository,
-            AdminAuditEventService auditEventService,
-            JpaIndexedSessionRepository sessionRepository,
-            SocialProviderSettingsService socialProviderSettingsService) {
-        this(repository, auditEventService, sessionRepository, null, socialProviderSettingsService);
-    }
 
     @Transactional(readOnly = true)
     public LoginSettingsDTO publicLoginSettings() {

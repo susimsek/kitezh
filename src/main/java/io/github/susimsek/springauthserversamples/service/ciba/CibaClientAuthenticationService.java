@@ -3,6 +3,7 @@ package io.github.susimsek.springauthserversamples.service.ciba;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -14,17 +15,11 @@ import org.springframework.util.StringUtils;
 
 /** Authenticates confidential clients calling the CIBA backchannel endpoint. */
 @Service
+@RequiredArgsConstructor
 public class CibaClientAuthenticationService {
 
     private final RegisteredClientRepository registeredClientRepository;
     private final PasswordEncoder passwordEncoder;
-
-    public CibaClientAuthenticationService(
-            RegisteredClientRepository registeredClientRepository,
-            PasswordEncoder passwordEncoder) {
-        this.registeredClientRepository = registeredClientRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
 
     public OAuth2ClientAuthenticationToken authenticate(HttpServletRequest request) {
         Credentials credentials = credentials(request);

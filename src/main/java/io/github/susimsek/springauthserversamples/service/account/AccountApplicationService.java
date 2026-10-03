@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AccountApplicationService {
 
     private final AuthorizationConsentRepository authorizationConsentRepository;
@@ -29,21 +29,6 @@ public class AccountApplicationService {
     private final AuthorizationServerMapperSupport mapperSupport;
     private final AdminAuditEventService auditEventService;
     private final AccountApplicationMapper accountApplicationMapper;
-
-    public AccountApplicationService(
-            AuthorizationConsentRepository authorizationConsentRepository,
-            AuthorizationRepository authorizationRepository,
-            ClientRepository clientRepository,
-            AuthorizationServerMapperSupport mapperSupport,
-            AdminAuditEventService auditEventService) {
-        this(
-                authorizationConsentRepository,
-                authorizationRepository,
-                clientRepository,
-                mapperSupport,
-                auditEventService,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AccountApplicationDTO> applications(String username, Pageable pageable) {

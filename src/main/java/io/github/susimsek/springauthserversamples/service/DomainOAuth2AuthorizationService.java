@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
@@ -27,7 +26,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @Autowired)
+@RequiredArgsConstructor
 public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
     private static final String OFFLINE_ACCESS_SCOPE = "offline_access";
@@ -37,19 +36,6 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
     private final AuthorizationMapper authorizationMapper;
     private final AuthorizationServerMapperSupport mapperSupport;
     private final OfflineAccessPolicyService offlineAccessPolicyService;
-
-    public DomainOAuth2AuthorizationService(
-            AuthorizationRepository authorizationRepository,
-            RegisteredClientRepository registeredClientRepository,
-            AuthorizationMapper authorizationMapper,
-            AuthorizationServerMapperSupport mapperSupport) {
-        this(
-                authorizationRepository,
-                registeredClientRepository,
-                authorizationMapper,
-                mapperSupport,
-                null);
-    }
 
     @Override
     @Transactional

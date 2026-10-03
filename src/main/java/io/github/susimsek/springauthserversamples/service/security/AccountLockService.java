@@ -13,20 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AccountLockService {
 
     private final UserRepository userRepository;
     private final UserAccessInvalidationService userAccessInvalidationService;
     private final ApplicationProperties applicationProperties;
     private final LoginSettingsService loginSettingsService;
-
-    public AccountLockService(
-            UserRepository userRepository,
-            UserAccessInvalidationService userAccessInvalidationService,
-            ApplicationProperties applicationProperties) {
-        this(userRepository, userAccessInvalidationService, applicationProperties, null);
-    }
 
     @Transactional
     @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, allEntries = true)

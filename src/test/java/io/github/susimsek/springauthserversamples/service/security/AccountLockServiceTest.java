@@ -51,7 +51,8 @@ class AccountLockServiceTest {
         when(userRepository.findForActionById(7L)).thenReturn(Optional.of(user));
 
         final AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
         service.recordFailure("alice", "127.0.0.1");
         service.recordFailure("alice", "127.0.0.1");
 
@@ -76,7 +77,8 @@ class AccountLockServiceTest {
                                 policy(false, 5, 3, false)));
 
         final AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
         service.recordFailure(null, "127.0.0.1");
         service.recordFailure(" ", "127.0.0.1");
         service.recordFailure("alice", "127.0.0.1");
@@ -98,7 +100,8 @@ class AccountLockServiceTest {
         when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
 
         final AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
         service.recordSuccess(" alice ");
 
         assertThat(user.getFailedLoginCount()).isZero();
@@ -133,7 +136,8 @@ class AccountLockServiceTest {
                         new ApplicationProperties.Security(
                                 new ApplicationProperties.PasswordPolicy(), policy));
         final AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
 
         UserEntity disabled = user(1L, "disabled");
         disabled.setEnabled(false);
@@ -166,7 +170,8 @@ class AccountLockServiceTest {
         user.setFailedLoginCount(4);
         when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
         AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
 
         service.recordFailure("alice", "127.0.0.1");
         assertThat(user.getFailedLoginCount()).isEqualTo(1);
@@ -190,7 +195,8 @@ class AccountLockServiceTest {
         UserEntity user = user(7L, "alice");
         when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
         AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
 
         service.recordFailure("alice", "127.0.0.1");
         user.setLockedUntil(Instant.now().minusSeconds(1));
@@ -209,7 +215,8 @@ class AccountLockServiceTest {
         when(userRepository.findForActionById(7L)).thenReturn(Optional.of(user));
         when(userRepository.findForActionById(99L)).thenReturn(Optional.empty());
         AccountLockService service =
-                new AccountLockService(userRepository, invalidationService, applicationProperties);
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
 
         service.unlock(7L);
         service.unlock(99L);
@@ -219,7 +226,8 @@ class AccountLockServiceTest {
     }
 
     private AccountLockService serviceWithPolicy() {
-        return new AccountLockService(userRepository, invalidationService, applicationProperties);
+        return new AccountLockService(
+                userRepository, invalidationService, applicationProperties, null);
     }
 
     private static ApplicationProperties.BruteForce policy(

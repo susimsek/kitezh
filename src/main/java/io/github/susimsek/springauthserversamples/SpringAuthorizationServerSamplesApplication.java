@@ -11,7 +11,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.ImportRuntimeHints;
-import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.service.registry.ImportHttpServices;
 
@@ -26,8 +25,6 @@ import org.springframework.web.service.registry.ImportHttpServices;
 @ImportHttpServices(group = "oidc-discovery", types = OidcDiscoveryClient.class)
 @ImportHttpServices(group = "registration-captcha", types = RegistrationCaptchaClient.class)
 @EnableAsync
-@EnableSpringDataWebSupport(
-        pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class SpringAuthorizationServerSamplesApplication {
 
     public static void main(String[] args) {

@@ -30,7 +30,8 @@ class CibaNotificationServiceTest {
         CibaNotificationService service =
                 new CibaNotificationService(
                         HttpServiceClientFactory.create(
-                                CibaNotificationClient.class, builder.build()));
+                                CibaNotificationClient.class, builder.build()),
+                        null);
         CibaAuthenticationRequestEntity request = request("https://client.example/ciba", "token");
 
         server.expect(requestTo("https://client.example/ciba"))
@@ -56,7 +57,8 @@ class CibaNotificationServiceTest {
         CibaNotificationService service =
                 new CibaNotificationService(
                         HttpServiceClientFactory.create(
-                                CibaNotificationClient.class, builder.build()));
+                                CibaNotificationClient.class, builder.build()),
+                        null);
 
         assertThat(service.notifyPing(request(null, "token"))).isFalse();
         assertThat(service.deliverPush(request("not a uri", "token"), Map.of())).isFalse();
@@ -77,7 +79,8 @@ class CibaNotificationServiceTest {
     void decryptsEncryptedCallbackTokensAndKeepsLegacyTokens() {
         SocialLoginSecretCipher cipher = Mockito.mock(SocialLoginSecretCipher.class);
         Mockito.when(cipher.decrypt("v1:encrypted")).thenReturn("decrypted-token");
-        CibaNotificationService service = new CibaNotificationService(cipher);
+        CibaNotificationService service =
+                new CibaNotificationService((endpoint, authorization, body) -> {}, cipher);
 
         CibaAuthenticationRequestEntity encrypted =
                 request("https://client.example/ciba", "v1:encrypted");

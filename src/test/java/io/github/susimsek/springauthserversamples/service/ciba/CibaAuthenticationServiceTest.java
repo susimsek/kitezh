@@ -40,7 +40,7 @@ class CibaAuthenticationServiceTest {
             mock(CibaAuthenticationRequestRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final CibaAuthenticationService service =
-            new CibaAuthenticationService(requestRepository, userRepository);
+            CibaTestSupport.service(requestRepository, userRepository);
     private final RegisteredClient client = client();
 
     @BeforeEach
@@ -52,8 +52,11 @@ class CibaAuthenticationServiceTest {
     @Test
     void supportsNotificationAndPushTokenConstructor() {
         CibaAuthenticationService configuredService =
-                new CibaAuthenticationService(
-                        requestRepository, userRepository, new CibaNotificationService(), null);
+                CibaTestSupport.service(
+                        requestRepository,
+                        userRepository,
+                        CibaTestSupport.notificationService(),
+                        null);
 
         assertThat(configuredService).isNotNull();
     }
@@ -246,10 +249,10 @@ class CibaAuthenticationServiceTest {
         user.setEnabled(true);
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         CibaAuthenticationService policyAwareService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         null,
                         policyService);
@@ -329,7 +332,7 @@ class CibaAuthenticationServiceTest {
         user.setEnabled(true);
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         CibaAuthenticationService pingService =
-                new CibaAuthenticationService(requestRepository, userRepository, notifications);
+                CibaTestSupport.service(requestRepository, userRepository, notifications);
 
         CibaAuthenticationRequestEntity request =
                 pingService.create(
@@ -422,7 +425,7 @@ class CibaAuthenticationServiceTest {
         user.setEnabled(true);
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         CibaAuthenticationService pushService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository, userRepository, notifications, pushTokens, null);
         CibaAuthenticationRequestEntity request =
                 pushService.create(
@@ -444,7 +447,7 @@ class CibaAuthenticationServiceTest {
 
         verify(pushTokens).issue(request);
         CibaAuthenticationService noPushService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository, userRepository, notifications, null, null);
         noPushService.approve(request.getAuthReqId(), "admin");
         request.setStatus(CibaAuthenticationRequestStatus.DENIED);
@@ -499,10 +502,10 @@ class CibaAuthenticationServiceTest {
                                 .expiresAt(issuedAt.plusSeconds(300))
                                 .build());
         CibaAuthenticationService hintService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         decoder);
 
@@ -580,10 +583,10 @@ class CibaAuthenticationServiceTest {
                                 .expiresAt(issuedAt.plusSeconds(300))
                                 .build());
         CibaAuthenticationService requestService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         decoder);
 
@@ -648,10 +651,10 @@ class CibaAuthenticationServiceTest {
         user.setEnabled(true);
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         CibaAuthenticationService requestService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         decoder);
         assertThat(
@@ -785,10 +788,10 @@ class CibaAuthenticationServiceTest {
     void validatesSignedRequestIssuerTemporalClaimsAndAudience() {
         final JwtDecoder decoder = mock(JwtDecoder.class);
         CibaAuthenticationService requestService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         decoder,
                         null,
@@ -913,10 +916,10 @@ class CibaAuthenticationServiceTest {
         user.setEnabled(true);
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         CibaAuthenticationService requestService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         decoder);
         Instant issuedAt = Instant.now();

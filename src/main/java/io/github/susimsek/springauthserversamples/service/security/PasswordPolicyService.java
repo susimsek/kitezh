@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class PasswordPolicyService {
 
     private final PasswordHistoryRepository passwordHistoryRepository;
@@ -30,13 +30,6 @@ public class PasswordPolicyService {
     private final ApplicationProperties applicationProperties;
     private final PasswordHistoryMapper passwordHistoryMapper;
     private final LoginSettingsService loginSettingsService;
-
-    public PasswordPolicyService(
-            PasswordHistoryRepository passwordHistoryRepository,
-            PasswordEncoder passwordEncoder,
-            ApplicationProperties applicationProperties) {
-        this(passwordHistoryRepository, passwordEncoder, applicationProperties, null, null);
-    }
 
     @Transactional(readOnly = true)
     public void validate(UserEntity user, String rawPassword) {

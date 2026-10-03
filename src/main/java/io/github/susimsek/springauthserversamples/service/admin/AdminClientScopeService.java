@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminClientScopeService {
 
     private static final String CLIENT_SCOPE_TARGET = "client-scope";
@@ -37,21 +37,6 @@ public class AdminClientScopeService {
     private final AuthorizationServerMapperSupport mapperSupport;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminClientScopeMapper adminClientScopeMapper;
-
-    public AdminClientScopeService(
-            ClientScopeRepository clientScopeRepository,
-            ClientRepository clientRepository,
-            RegisteredClientMapper registeredClientMapper,
-            AuthorizationServerMapperSupport mapperSupport,
-            AdminAuditEventService adminAuditEventService) {
-        this(
-                clientScopeRepository,
-                clientRepository,
-                registeredClientMapper,
-                mapperSupport,
-                adminAuditEventService,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminClientScopeDTO> findAll(String query, Pageable pageable) {

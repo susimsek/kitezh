@@ -29,7 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings("java:S6829")
 public class RequiredActionService {
 
@@ -45,43 +45,6 @@ public class RequiredActionService {
     private final AdminAuditEventService auditEventService;
     private final RequiredActionMapper requiredActionMapper;
     private final LoginSettingsService loginSettingsService;
-
-    public RequiredActionService(
-            UserRepository userRepository,
-            RequiredActionDefinitionRepository definitionRepository,
-            UserRequiredActionRepository assignmentRepository,
-            RequiredActionCompletionRepository completionRepository,
-            List<RequiredActionHandler> handlers,
-            AdminAuditEventService auditEventService) {
-        this(
-                userRepository,
-                definitionRepository,
-                assignmentRepository,
-                completionRepository,
-                handlers,
-                auditEventService,
-                null,
-                null);
-    }
-
-    public RequiredActionService(
-            UserRepository userRepository,
-            RequiredActionDefinitionRepository definitionRepository,
-            UserRequiredActionRepository assignmentRepository,
-            RequiredActionCompletionRepository completionRepository,
-            List<RequiredActionHandler> handlers,
-            AdminAuditEventService auditEventService,
-            RequiredActionMapper requiredActionMapper) {
-        this(
-                userRepository,
-                definitionRepository,
-                assignmentRepository,
-                completionRepository,
-                handlers,
-                auditEventService,
-                requiredActionMapper,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public List<RequiredActionDTO> pending(String username) {

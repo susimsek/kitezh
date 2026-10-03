@@ -13,12 +13,13 @@ import io.github.susimsek.springauthserversamples.service.error.ApiErrorCode;
 import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import io.github.susimsek.springauthserversamples.service.security.MfaBruteForceService;
 import io.github.susimsek.springauthserversamples.service.security.TotpService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class MfaService {
 
     private static final String INVALID_AUTHENTICATOR_CODE = "The authenticator code is invalid";
@@ -30,40 +31,6 @@ public class MfaService {
     private final UserAccessInvalidationService userAccessInvalidationService;
     private final RecoveryCodeRepository recoveryCodeRepository;
     private final MfaBruteForceService mfaBruteForceService;
-
-    @Autowired
-    MfaService(
-            UserRepository userRepository,
-            LoginSettingsRepository loginSettingsRepository,
-            TotpService totpService,
-            AdminAuditEventService auditEventService,
-            UserAccessInvalidationService userAccessInvalidationService,
-            RecoveryCodeRepository recoveryCodeRepository,
-            MfaBruteForceService mfaBruteForceService) {
-        this.userRepository = userRepository;
-        this.loginSettingsRepository = loginSettingsRepository;
-        this.totpService = totpService;
-        this.auditEventService = auditEventService;
-        this.userAccessInvalidationService = userAccessInvalidationService;
-        this.recoveryCodeRepository = recoveryCodeRepository;
-        this.mfaBruteForceService = mfaBruteForceService;
-    }
-
-    MfaService(
-            UserRepository userRepository,
-            LoginSettingsRepository loginSettingsRepository,
-            TotpService totpService,
-            AdminAuditEventService auditEventService,
-            UserAccessInvalidationService userAccessInvalidationService) {
-        this(
-                userRepository,
-                loginSettingsRepository,
-                totpService,
-                auditEventService,
-                userAccessInvalidationService,
-                null,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public MfaStatusDTO status(String username) {

@@ -7,23 +7,17 @@ import io.github.susimsek.springauthserversamples.mapper.EmailSettingsMapper;
 import io.github.susimsek.springauthserversamples.repository.EmailSettingsRepository;
 import io.github.susimsek.springauthserversamples.service.admin.AdminAuditEventService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @Autowired)
+@RequiredArgsConstructor
 public class EmailSettingsService {
     private static final long SETTINGS_ID = 1L;
     private final EmailSettingsRepository repository;
     private final AdminAuditEventService auditEventService;
     private final EmailSettingsMapper emailSettingsMapper;
-
-    public EmailSettingsService(
-            EmailSettingsRepository repository, AdminAuditEventService auditEventService) {
-        this(repository, auditEventService, null);
-    }
 
     @Transactional(readOnly = true)
     public AdminEmailSettingsDTO get() {

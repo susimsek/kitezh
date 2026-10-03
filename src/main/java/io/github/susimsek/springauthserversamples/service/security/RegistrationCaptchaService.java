@@ -6,8 +6,8 @@ import io.github.susimsek.springauthserversamples.service.error.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -15,56 +15,14 @@ import org.springframework.util.MultiValueMap;
 /** Verifies registration CAPTCHA tokens using the Google APIs used by Keycloak. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class RegistrationCaptchaService {
 
     private static final String DEFAULT_ACTION = "register";
     private static final String ENTERPRISE_PROVIDER = "enterprise";
 
     private final RegistrationCaptchaSettingsService settingsService;
-    private final RegistrationCaptchaConfiguration fixedConfiguration;
     private final RegistrationCaptchaClient captchaClient;
-
-    @Autowired
-    public RegistrationCaptchaService(
-            RegistrationCaptchaSettingsService settingsService,
-            RegistrationCaptchaClient captchaClient) {
-        this.settingsService = settingsService;
-        this.fixedConfiguration = null;
-        this.captchaClient = captchaClient;
-    }
-
-    public RegistrationCaptchaService(RegistrationCaptchaSettingsService settingsService) {
-        this(settingsService, new DisabledRegistrationCaptchaClient());
-    }
-
-    RegistrationCaptchaService(
-            RegistrationCaptchaConfiguration configuration,
-            RegistrationCaptchaClient captchaClient) {
-        this(null, configuration, captchaClient);
-    }
-
-    private static final class DisabledRegistrationCaptchaClient
-            implements RegistrationCaptchaClient {
-
-        @Override
-        public StandardResponse verify(URI endpoint, MultiValueMap<String, String> form) {
-            return new StandardResponse(false, null, null);
-        }
-
-        @Override
-        public EnterpriseResponse assess(URI endpoint, EnterpriseRequest request) {
-            return new EnterpriseResponse(null, null, null);
-        }
-    }
-
-    private RegistrationCaptchaService(
-            RegistrationCaptchaSettingsService settingsService,
-            RegistrationCaptchaConfiguration fixedConfiguration,
-            RegistrationCaptchaClient captchaClient) {
-        this.settingsService = settingsService;
-        this.fixedConfiguration = fixedConfiguration;
-        this.captchaClient = captchaClient;
-    }
 
     public RegistrationCaptchaDTO publicSettings() {
         return publicSettingsInternal(publicConfiguration());
@@ -230,24 +188,18 @@ public class RegistrationCaptchaService {
     }
 
     private RegistrationCaptchaConfiguration publicConfiguration() {
-        return settingsService == null ? fixedConfiguration : settingsService.publicConfiguration();
+        return settingsService.publicConfiguration();
     }
 
     private RegistrationCaptchaConfiguration verificationConfiguration() {
-        return settingsService == null
-                ? fixedConfiguration
-                : settingsService.verificationConfiguration();
+        return settingsService.verificationConfiguration();
     }
 
     private RegistrationCaptchaConfiguration loginPublicConfiguration() {
-        return settingsService == null
-                ? fixedConfiguration
-                : settingsService.loginPublicConfiguration();
+        return settingsService.loginPublicConfiguration();
     }
 
     private RegistrationCaptchaConfiguration loginVerificationConfiguration() {
-        return settingsService == null
-                ? fixedConfiguration
-                : settingsService.loginVerificationConfiguration();
+        return settingsService.loginVerificationConfiguration();
     }
 }

@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AdminGlobalSearchService {
 
     private static final int RESULTS_PER_RESOURCE = 5;
@@ -57,17 +59,6 @@ public class AdminGlobalSearchService {
     private final ClientRepository clientRepository;
     private final AuthorityRepository authorityRepository;
     private final GroupRepository groupRepository;
-
-    public AdminGlobalSearchService(
-            UserRepository userRepository,
-            ClientRepository clientRepository,
-            AuthorityRepository authorityRepository,
-            GroupRepository groupRepository) {
-        this.userRepository = userRepository;
-        this.clientRepository = clientRepository;
-        this.authorityRepository = authorityRepository;
-        this.groupRepository = groupRepository;
-    }
 
     @Transactional(readOnly = true)
     public AdminSearchResponseDTO search(String query, Authentication authentication) {

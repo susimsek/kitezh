@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminAvatarService {
 
     private static final long MAX_AVATAR_PIXELS = 4_000_000;
@@ -32,13 +32,6 @@ public class AdminAvatarService {
     private final UserAvatarRepository userAvatarRepository;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminAvatarMapper adminAvatarMapper;
-
-    public AdminAvatarService(
-            AdminUserService adminUserService,
-            UserAvatarRepository userAvatarRepository,
-            AdminAuditEventService adminAuditEventService) {
-        this(adminUserService, userAvatarRepository, adminAuditEventService, null);
-    }
 
     @Transactional
     public AdminAvatarDTO updateAvatar(Long id, MultipartFile file, String currentUsername) {

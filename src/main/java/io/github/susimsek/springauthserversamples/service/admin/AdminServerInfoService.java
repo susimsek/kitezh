@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminServerInfoService {
 
     private final ApplicationProperties applicationProperties;
@@ -23,13 +23,6 @@ public class AdminServerInfoService {
     private final OAuth2KeyRepository oauth2KeyRepository;
     private final AdminKeyMapper adminKeyMapper;
     private final AdminServerInfoMapper adminServerInfoMapper;
-
-    public AdminServerInfoService(
-            ApplicationProperties applicationProperties,
-            SessionProperties sessionProperties,
-            OAuth2KeyRepository oauth2KeyRepository) {
-        this(applicationProperties, sessionProperties, oauth2KeyRepository, null, null);
-    }
 
     @Transactional(readOnly = true)
     public AdminServerInfoDTO serverInfo() {

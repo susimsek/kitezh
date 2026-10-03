@@ -36,7 +36,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -59,7 +58,7 @@ import org.springframework.web.multipart.MultipartFile;
 @ApiController
 @RestController
 @RequestMapping("/api/account")
-@RequiredArgsConstructor(onConstructor_ = @Autowired)
+@RequiredArgsConstructor
 @Tag(
         name = "Account",
         description = "Account Console profile, session, and application management.")

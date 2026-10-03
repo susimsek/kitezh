@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings("java:S6829")
 public class UserActionService {
 
@@ -54,48 +54,6 @@ public class UserActionService {
     private final LoginSettingsService loginSettingsService;
     private final TotpService totpService;
     private final SecureRandom secureRandom = new SecureRandom();
-
-    public UserActionService(
-            UserRepository userRepository,
-            UserActionTokenRepository tokenRepository,
-            PasswordService passwordService,
-            UserAccessInvalidationService userAccessInvalidationService,
-            AdminAuditEventService auditEventService,
-            ApplicationEventPublisher eventPublisher,
-            ApplicationProperties applicationProperties,
-            EmailSettingsService emailSettingsService) {
-        this(
-                userRepository,
-                tokenRepository,
-                passwordService,
-                userAccessInvalidationService,
-                auditEventService,
-                eventPublisher,
-                applicationProperties,
-                emailSettingsService,
-                null,
-                null,
-                null);
-    }
-
-    public UserActionService(
-            UserRepository userRepository,
-            UserActionTokenRepository tokenRepository,
-            PasswordService passwordService,
-            UserAccessInvalidationService userAccessInvalidationService,
-            AdminAuditEventService auditEventService,
-            ApplicationEventPublisher eventPublisher,
-            ApplicationProperties applicationProperties) {
-        this(
-                userRepository,
-                tokenRepository,
-                passwordService,
-                userAccessInvalidationService,
-                auditEventService,
-                eventPublisher,
-                applicationProperties,
-                null);
-    }
 
     @Transactional
     public void forgotPassword(String identifier, Locale locale) {

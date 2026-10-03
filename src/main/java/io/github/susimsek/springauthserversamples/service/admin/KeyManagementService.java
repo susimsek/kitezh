@@ -20,18 +20,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class KeyManagementService {
 
     private final OAuth2KeyRepository oauth2KeyRepository;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminKeyMapper adminKeyMapper;
-
-    public KeyManagementService(
-            OAuth2KeyRepository oauth2KeyRepository,
-            AdminAuditEventService adminAuditEventService) {
-        this(oauth2KeyRepository, adminAuditEventService, null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminKeyDTO> keys(String query, Boolean active, Pageable pageable) {

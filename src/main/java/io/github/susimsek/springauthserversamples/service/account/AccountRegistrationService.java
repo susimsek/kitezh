@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 @SuppressWarnings("java:S6829")
 public class AccountRegistrationService {
 
@@ -36,46 +36,6 @@ public class AccountRegistrationService {
     private final LoginSettingsService loginSettingsService;
     private final AccountRegistrationMapper accountRegistrationMapper;
     private final LdapFederationWriteService ldapFederationWriteService;
-
-    public AccountRegistrationService(
-            UserRepository userRepository,
-            AuthorityRepository authorityRepository,
-            PasswordService passwordService,
-            UserActionService userActionService,
-            AdminAuditEventService auditEventService,
-            ApplicationProperties applicationProperties,
-            EmailSettingsService emailSettingsService,
-            LoginSettingsService loginSettingsService) {
-        this(
-                userRepository,
-                authorityRepository,
-                passwordService,
-                userActionService,
-                auditEventService,
-                applicationProperties,
-                emailSettingsService,
-                loginSettingsService,
-                null,
-                null);
-    }
-
-    public AccountRegistrationService(
-            UserRepository userRepository,
-            AuthorityRepository authorityRepository,
-            PasswordService passwordService,
-            UserActionService userActionService,
-            AdminAuditEventService auditEventService,
-            ApplicationProperties applicationProperties) {
-        this(
-                userRepository,
-                authorityRepository,
-                passwordService,
-                userActionService,
-                auditEventService,
-                applicationProperties,
-                null,
-                null);
-    }
 
     @Transactional
     @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, allEntries = true)

@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AccountSessionService {
 
     private final UserSessionRepository userSessionRepository;
@@ -31,21 +31,6 @@ public class AccountSessionService {
     private final AdminAuditEventService auditEventService;
     private final SessionInvalidationService sessionInvalidationService;
     private final AccountSessionMapper accountSessionMapper;
-
-    public AccountSessionService(
-            UserSessionRepository userSessionRepository,
-            AuthorizationRepository authorizationRepository,
-            ClientRepository clientRepository,
-            AdminAuditEventService auditEventService,
-            SessionInvalidationService sessionInvalidationService) {
-        this(
-                userSessionRepository,
-                authorizationRepository,
-                clientRepository,
-                auditEventService,
-                sessionInvalidationService,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AccountSessionDTO> sessions(

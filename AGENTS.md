@@ -329,6 +329,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Avoid adding custom exception layers unless they serve application-specific behavior that Spring Authorization Server does not already provide.
 - In Java source, use imports and simple class names for application types. Keep fully qualified names only where a string value, logger/configuration key, reflection metadata, or another framework contract explicitly requires the name.
 - Use Lombok `@RequiredArgsConstructor` for constructor injection in application components. Keep dependencies in `final` fields and avoid hand-written constructor-injection boilerplate unless the constructor has behavior that cannot be expressed by Lombok.
+- Application services under `src/main/java` must not declare manual constructors; use Lombok-generated constructor injection. Test sources may keep explicit constructors or factory helpers when they make isolated setup clearer.
 
 ### Transaction Management
 

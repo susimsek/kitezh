@@ -126,7 +126,7 @@ class DomainUserDetailsServiceTest {
     }
 
     private DomainUserDetailsService service() {
-        return new DomainUserDetailsService(userRepository, accountLockService);
+        return new DomainUserDetailsService(userRepository, accountLockService, null);
     }
 
     private static UserEntity user(boolean enabled, String... authorities) {

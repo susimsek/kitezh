@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminConsentService {
 
     private final AdminUserService adminUserService;
@@ -30,25 +30,6 @@ public class AdminConsentService {
     private final AuthorizationServerMapperSupport mapperSupport;
     private final AdminAuditEventService adminAuditEventService;
     private final AdminConsentMapper adminConsentMapper;
-
-    public AdminConsentService(
-            AdminUserService adminUserService,
-            AuthorizationConsentRepository authorizationConsentRepository,
-            AuthorizationRepository authorizationRepository,
-            ClientRepository clientRepository,
-            UserRepository userRepository,
-            AuthorizationServerMapperSupport mapperSupport,
-            AdminAuditEventService adminAuditEventService) {
-        this(
-                adminUserService,
-                authorizationConsentRepository,
-                authorizationRepository,
-                clientRepository,
-                userRepository,
-                mapperSupport,
-                adminAuditEventService,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public Page<AdminConsentDTO> consents(

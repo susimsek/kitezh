@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
+@RequiredArgsConstructor
 public class AdminDashboardService {
 
     private final ClientRepository clientRepository;
@@ -20,19 +20,6 @@ public class AdminDashboardService {
     private final UserSessionRepository userSessionRepository;
     private final AuthorizationConsentRepository authorizationConsentRepository;
     private final AdminDashboardMapper adminDashboardMapper;
-
-    public AdminDashboardService(
-            ClientRepository clientRepository,
-            UserRepository userRepository,
-            UserSessionRepository userSessionRepository,
-            AuthorizationConsentRepository authorizationConsentRepository) {
-        this(
-                clientRepository,
-                userRepository,
-                userSessionRepository,
-                authorizationConsentRepository,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public AdminDashboardDTO dashboard() {

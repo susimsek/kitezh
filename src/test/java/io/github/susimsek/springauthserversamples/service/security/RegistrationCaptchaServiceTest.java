@@ -41,7 +41,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"success\":true}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         new RegistrationCaptchaConfiguration(
                                 true,
                                 "recaptcha",
@@ -80,7 +80,7 @@ class RegistrationCaptchaServiceTest {
                                         + "\"event\":{\"expectedAction\":\"register\"}}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         new RegistrationCaptchaConfiguration(
                                 true,
                                 "enterprise",
@@ -141,7 +141,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"success\":true,\"score\":0.9,\"action\":\"register\"}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -176,7 +176,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"success\":true,\"score\":0.2,\"action\":\"other\"}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -204,7 +204,7 @@ class RegistrationCaptchaServiceTest {
                 .expect(requestTo("https://www.google.com/recaptcha/api/siteverify"))
                 .andRespond(withServerError());
         RegistrationCaptchaService errorService =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -232,7 +232,7 @@ class RegistrationCaptchaServiceTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -273,7 +273,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"success\":true,\"score\":0.9,\"action\":\"register\"}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService standardService =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -304,7 +304,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"tokenProperties\":null,\"riskAnalysis\":null,\"event\":null}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService enterpriseService =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "enterprise",
@@ -339,7 +339,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"success\":false}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService standardService =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -368,7 +368,7 @@ class RegistrationCaptchaServiceTest {
                                 "{\"success\":true,\"action\":\"register\"}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService v3Service =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "recaptcha",
@@ -509,7 +509,7 @@ class RegistrationCaptchaServiceTest {
                                         + "\"event\":{\"expectedAction\":\"register\"}}",
                                 org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "enterprise",
@@ -595,7 +595,9 @@ class RegistrationCaptchaServiceTest {
         Mockito.when(settingsService.verificationConfiguration()).thenReturn(loginConfiguration);
         Mockito.when(settingsService.loginVerificationConfiguration())
                 .thenReturn(loginConfiguration);
-        RegistrationCaptchaService service = new RegistrationCaptchaService(settingsService);
+        RegistrationCaptchaService service =
+                new RegistrationCaptchaService(
+                        settingsService, Mockito.mock(RegistrationCaptchaClient.class));
 
         assertThat(service.publicSettings().enabled()).isTrue();
         assertThat(service.publicLoginSettings().enabled()).isFalse();
@@ -605,14 +607,6 @@ class RegistrationCaptchaServiceTest {
         Mockito.verify(settingsService).loginPublicConfiguration();
         Mockito.verify(settingsService).verificationConfiguration();
         Mockito.verify(settingsService).loginVerificationConfiguration();
-    }
-
-    private static RegistrationCaptchaService service(
-            RegistrationCaptchaConfiguration configuration) {
-        return new RegistrationCaptchaService(
-                configuration,
-                HttpServiceClientFactory.create(
-                        RegistrationCaptchaClient.class, RestClient.builder().build()));
     }
 
     private static void assertEnterpriseFailure(String response) {
@@ -625,7 +619,7 @@ class RegistrationCaptchaServiceTest {
                 .andRespond(
                         withSuccess(response, org.springframework.http.MediaType.APPLICATION_JSON));
         RegistrationCaptchaService service =
-                new RegistrationCaptchaService(
+                service(
                         configuration(
                                 true,
                                 "enterprise",
@@ -646,6 +640,26 @@ class RegistrationCaptchaServiceTest {
                                         "token", Mockito.mock(HttpServletRequest.class)))
                 .hasFieldOrPropertyWithValue("errorCodeValue", "captcha_failed");
         server.verify();
+    }
+
+    private static RegistrationCaptchaService service(
+            RegistrationCaptchaConfiguration configuration,
+            RegistrationCaptchaClient captchaClient) {
+        RegistrationCaptchaSettingsService settingsService =
+                Mockito.mock(RegistrationCaptchaSettingsService.class);
+        Mockito.when(settingsService.publicConfiguration()).thenReturn(configuration);
+        Mockito.when(settingsService.verificationConfiguration()).thenReturn(configuration);
+        Mockito.when(settingsService.loginPublicConfiguration()).thenReturn(configuration);
+        Mockito.when(settingsService.loginVerificationConfiguration()).thenReturn(configuration);
+        return new RegistrationCaptchaService(settingsService, captchaClient);
+    }
+
+    private static RegistrationCaptchaService service(
+            RegistrationCaptchaConfiguration configuration) {
+        return service(
+                configuration,
+                HttpServiceClientFactory.create(
+                        RegistrationCaptchaClient.class, RestClient.builder().build()));
     }
 
     private static RegistrationCaptchaConfiguration configuration(

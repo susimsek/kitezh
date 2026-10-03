@@ -56,7 +56,8 @@ class LdapAuthenticationServiceTest {
                         directoryClient,
                         identityRepository,
                         userRepository,
-                        authorityRepository);
+                        authorityRepository,
+                        null);
         when(settingsService.enabledProviders()).thenReturn(List.of(provider));
         when(settingsService.configuration(provider, null)).thenReturn(configuration);
         when(identityRepository.findByProviderIdAndExternalId("provider-id", "object-id"))

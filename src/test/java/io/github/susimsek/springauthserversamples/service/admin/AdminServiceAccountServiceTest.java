@@ -225,6 +225,8 @@ class AdminServiceAccountServiceTest {
         return new AdminServiceAccountService(
                 serviceAccountRepository,
                 userRepository,
+                null,
+                null,
                 clientRoleRepository,
                 auditEventService,
                 invalidationService);

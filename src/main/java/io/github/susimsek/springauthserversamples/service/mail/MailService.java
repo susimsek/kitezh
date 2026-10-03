@@ -8,6 +8,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
@@ -21,6 +22,7 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 
 /** Sends localized HTML email without coupling delivery to an HTTP request transaction. */
 @Service
+@RequiredArgsConstructor
 @SuppressWarnings("java:S4449")
 public class MailService {
 
@@ -28,33 +30,11 @@ public class MailService {
     private static final String VERIFICATION_TEMPLATE = "mail/emailVerification";
     private static final String PASSWORD_RESET_TEMPLATE = "mail/passwordReset";
 
-    private final ApplicationProperties.Mail properties;
+    private final ApplicationProperties applicationProperties;
     private final JavaMailSender mailSender;
     private final MessageSource messageSource;
     private final SpringTemplateEngine templateEngine;
     private final EmailSettingsService emailSettingsService;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    public MailService(
-            ApplicationProperties applicationProperties,
-            JavaMailSender mailSender,
-            MessageSource messageSource,
-            SpringTemplateEngine templateEngine,
-            EmailSettingsService emailSettingsService) {
-        this.properties = applicationProperties.mail();
-        this.mailSender = mailSender;
-        this.messageSource = messageSource;
-        this.templateEngine = templateEngine;
-        this.emailSettingsService = emailSettingsService;
-    }
-
-    public MailService(
-            ApplicationProperties applicationProperties,
-            JavaMailSender mailSender,
-            MessageSource messageSource,
-            SpringTemplateEngine templateEngine) {
-        this(applicationProperties, mailSender, messageSource, templateEngine, null);
-    }
 
     @Async
     public void sendEmailVerification(
@@ -160,9 +140,9 @@ public class MailService {
     private EmailSettingsService.EmailConfiguration configuration() {
         return emailSettingsService == null
                 ? new EmailSettingsService.EmailConfiguration(
-                        properties.enabled(),
-                        properties.from(),
-                        properties.baseUrl(),
+                        applicationProperties.mail().enabled(),
+                        applicationProperties.mail().from(),
+                        applicationProperties.mail().baseUrl(),
                         null,
                         0,
                         null,

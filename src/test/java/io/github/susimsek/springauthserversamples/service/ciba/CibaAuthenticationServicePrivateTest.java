@@ -32,7 +32,7 @@ class CibaAuthenticationServicePrivateTest {
             Mockito.mock(CibaAuthenticationRequestRepository.class);
     private final UserRepository userRepository = Mockito.mock(UserRepository.class);
     private final CibaAuthenticationService service =
-            new CibaAuthenticationService(requestRepository, userRepository);
+            CibaTestSupport.service(requestRepository, userRepository);
 
     @Test
     void coversRequestClaimAndMergeValidationBranches() {
@@ -256,10 +256,10 @@ class CibaAuthenticationServicePrivateTest {
     void coversTokenHintFailureAndNotificationFallbackBranches() {
         var decoder = Mockito.mock(org.springframework.security.oauth2.jwt.JwtDecoder.class);
         CibaAuthenticationService hintService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         decoder);
         RegisteredClient client =
@@ -418,10 +418,10 @@ class CibaAuthenticationServicePrivateTest {
         Mockito.when(cipher.isConfigured()).thenReturn(true);
         Mockito.when(cipher.encrypt("token")).thenReturn("v1:encrypted");
         CibaAuthenticationService encryptedService =
-                new CibaAuthenticationService(
+                CibaTestSupport.service(
                         requestRepository,
                         userRepository,
-                        new CibaNotificationService(),
+                        CibaTestSupport.notificationService(),
                         null,
                         null,
                         null,

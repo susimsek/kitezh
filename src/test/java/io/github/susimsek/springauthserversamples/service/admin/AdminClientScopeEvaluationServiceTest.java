@@ -502,7 +502,10 @@ class AdminClientScopeEvaluationServiceTest {
                 mapperRepository,
                 scopeRepository,
                 scopeMapperRepository,
-                userRepository);
+                userRepository,
+                null,
+                null,
+                null);
     }
 
     private static ClientMapperEntity mapper(

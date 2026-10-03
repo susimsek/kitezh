@@ -16,12 +16,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RecoveryCodeService {
 
     private static final int CODE_COUNT = 12;
@@ -35,51 +36,6 @@ public class RecoveryCodeService {
     private final MfaBruteForceService mfaBruteForceService;
     private final LoginSettingsRepository loginSettingsRepository;
     private final SecureRandom secureRandom = new SecureRandom();
-
-    @Autowired
-    public RecoveryCodeService(
-            UserRepository userRepository,
-            RecoveryCodeRepository recoveryCodeRepository,
-            PasswordEncoder passwordEncoder,
-            AdminAuditEventService auditEventService,
-            MfaBruteForceService mfaBruteForceService,
-            LoginSettingsRepository loginSettingsRepository) {
-        this.userRepository = userRepository;
-        this.recoveryCodeRepository = recoveryCodeRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.auditEventService = auditEventService;
-        this.mfaBruteForceService = mfaBruteForceService;
-        this.loginSettingsRepository = loginSettingsRepository;
-    }
-
-    public RecoveryCodeService(
-            UserRepository userRepository,
-            RecoveryCodeRepository recoveryCodeRepository,
-            PasswordEncoder passwordEncoder,
-            AdminAuditEventService auditEventService,
-            MfaBruteForceService mfaBruteForceService) {
-        this(
-                userRepository,
-                recoveryCodeRepository,
-                passwordEncoder,
-                auditEventService,
-                mfaBruteForceService,
-                null);
-    }
-
-    public RecoveryCodeService(
-            UserRepository userRepository,
-            RecoveryCodeRepository recoveryCodeRepository,
-            PasswordEncoder passwordEncoder,
-            AdminAuditEventService auditEventService) {
-        this(
-                userRepository,
-                recoveryCodeRepository,
-                passwordEncoder,
-                auditEventService,
-                null,
-                null);
-    }
 
     @Transactional(readOnly = true)
     public RecoveryCodesStatusDTO status(String username) {
