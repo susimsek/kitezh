@@ -887,6 +887,12 @@
       "cibaDeliveryMode": "CIBA teslim yöntemi",
       "cibaDeliveryModeHelp": "İstemcinin CIBA token yanıtını nasıl alacağını seçin. Ping ve push istekleri her istekte yeni bir callback tokenı gönderir.",
       "cibaNotificationEndpoint": "CIBA bildirim endpoint’i",
+      "tokenExchange": "Token exchange politikası",
+      "tokenExchangeHelp": "RFC 8693 değişimi yalnızca gizli istemciler içindir. Bu istemci için scope daraltma, delegation ve hedef kitleleri yapılandırın.",
+      "tokenExchangeDownscopeOnly": "Değiştirilen scope’ları subject token ile sınırla",
+      "tokenExchangeAllowDelegation": "Actor token delegation’a izin ver",
+      "tokenExchangeAllowedAudiences": "İzin verilen hedef audience’lar",
+      "tokenExchangeAllowedAudiencesHelp": "Her satıra bir kayıtlı istemci ID’si yazın. İstekte bulunan istemci her zaman kendisine exchange yapabilir.",
       "offlineSessionIdle": "Çevrimdışı oturum boşta kalma override’ı",
       "offlineSessionMax": "Çevrimdışı oturum azami ömür override’ı",
       "offlineSessionHelp": "P30D gibi isteğe bağlı ISO-8601 süresi kullanın."

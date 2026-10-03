@@ -69,12 +69,18 @@ describe("ClientForm", () => {
       clientId: "old-client",
       clientName: "Old client",
       clientAuthenticationMethods: ["client_secret_basic"],
-      authorizationGrantTypes: ["authorization_code"],
+      authorizationGrantTypes: [
+        "authorization_code",
+        "urn:ietf:params:oauth:grant-type:token-exchange",
+      ],
       redirectUris: ["https://app.example/callback"],
       postLogoutRedirectUris: [],
       scopes: ["openid"],
       requireAuthorizationConsent: true,
       requireProofKey: true,
+      tokenExchangeDownscopeOnly: false,
+      tokenExchangeAllowDelegation: false,
+      tokenExchangeAllowedAudiences: ["reports-api"],
       authorizationCodeTimeToLive: "PT5M",
       accessTokenTimeToLive: "PT5M",
       refreshTokenTimeToLive: "PT1H",
@@ -84,12 +90,35 @@ describe("ClientForm", () => {
 
     render(<ClientForm dictionary={dictionary} id="client-1" locale="en" mode="edit" />);
     expect(await screen.findByDisplayValue("old-client")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(dictionary.admin.clients.tokenExchangeDownscopeOnly),
+    ).not.toBeChecked();
+    expect(
+      screen.getByLabelText(dictionary.admin.clients.tokenExchangeAllowedAudiences),
+    ).toHaveValue("reports-api");
+    fireEvent.click(screen.getByLabelText(dictionary.admin.clients.tokenExchangeDownscopeOnly));
+    fireEvent.change(
+      screen.getByLabelText(dictionary.admin.clients.tokenExchangeAllowedAudiences),
+      {
+        target: { value: "reports-api\nanalytics-api" },
+      },
+    );
     fireEvent.change(document.querySelector('input[name="clientName"]')!, {
       target: { value: "Updated client" },
     });
     fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/clients/client-1/settings"));
+    expect(mockAdminRequest).toHaveBeenLastCalledWith(
+      "token",
+      expect.objectContaining({
+        method: "PUT",
+        data: expect.objectContaining({
+          tokenExchangeDownscopeOnly: true,
+          tokenExchangeAllowedAudiences: ["reports-api", "analytics-api"],
+        }),
+      }),
+    );
   });
 
   it("covers capability toggles, switches, cancel, and validation branches", async () => {

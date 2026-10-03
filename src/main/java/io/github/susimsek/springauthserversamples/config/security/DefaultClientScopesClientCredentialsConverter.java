@@ -19,7 +19,6 @@ import org.springframework.security.oauth2.server.authorization.web.authenticati
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2ClientCredentialsAuthenticationConverter;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2DeviceCodeAuthenticationConverter;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2RefreshTokenAuthenticationConverter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2TokenExchangeAuthenticationConverter;
 import org.springframework.security.web.authentication.AuthenticationConverter;
 import org.springframework.security.web.authentication.DelegatingAuthenticationConverter;
 
@@ -33,7 +32,9 @@ public final class DefaultClientScopesClientCredentialsConverter
                             new OAuth2RefreshTokenAuthenticationConverter(),
                             new OAuth2ClientCredentialsAuthenticationConverter(),
                             new OAuth2DeviceCodeAuthenticationConverter(),
-                            new OAuth2TokenExchangeAuthenticationConverter()));
+                            new TokenExchangeAuthenticationConverter(),
+                            new org.springframework.security.oauth2.server.authorization.web
+                                    .authentication.OAuth2TokenExchangeAuthenticationConverter()));
 
     @Override
     public Authentication convert(HttpServletRequest request) {

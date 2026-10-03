@@ -213,6 +213,30 @@ describe("admin console", () => {
     cy.contains("Root URL").should("be.visible");
     cy.contains("Front-channel logout").should("be.visible");
     cy.contains("Back-channel logout").should("be.visible");
+    cy.contains("Token exchange policy").should("be.visible");
+    cy.intercept("PUT", "/api/admin/clients/demo-client").as("saveTokenExchangePolicy");
+    cy.get('input[name="tokenExchangeDownscopeOnly"]').check();
+    cy.get('textarea[name="tokenExchangeAllowedAudiences"]')
+      .clear()
+      .type("reports-api{enter}analytics-api");
+    cy.contains("button", "Save").click();
+    cy.wait("@saveTokenExchangePolicy").then(({ request, response }) => {
+      expect(response?.statusCode).to.eq(200);
+      expect(request.body).to.include({
+        tokenExchangeDownscopeOnly: true,
+        tokenExchangeAllowDelegation: false,
+      });
+      expect(request.body.tokenExchangeAllowedAudiences).to.deep.equal([
+        "reports-api",
+        "analytics-api",
+      ]);
+    });
+    cy.contains("Client saved successfully.").should("be.visible");
+    cy.intercept("PUT", "/api/admin/clients/demo-client").as("restoreTokenExchangePolicy");
+    cy.get('input[name="tokenExchangeDownscopeOnly"]').uncheck();
+    cy.get('textarea[name="tokenExchangeAllowedAudiences"]').clear();
+    cy.contains("button", "Save").click();
+    cy.wait("@restoreTokenExchangePolicy").its("response.statusCode").should("eq", 200);
 
     cy.contains(".admin-detail-tabs a", "Credentials").click();
     cy.contains("Client secret", { timeout: 15_000 }).should("be.visible");

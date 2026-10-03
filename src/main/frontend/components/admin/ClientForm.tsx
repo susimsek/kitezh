@@ -63,6 +63,9 @@ type FormState = {
   dpopSigningAlgorithms: (typeof DPOP_ALGORITHMS)[number][];
   cibaDeliveryMode: (typeof CIBA_DELIVERY_MODES)[number];
   cibaNotificationEndpoint: string;
+  tokenExchangeDownscopeOnly: boolean;
+  tokenExchangeAllowDelegation: boolean;
+  tokenExchangeAllowedAudiences: string;
   authorizationCodeTimeToLive: string;
   accessTokenTimeToLive: string;
   refreshTokenTimeToLive: string;
@@ -98,6 +101,9 @@ const EMPTY: FormState = {
   dpopSigningAlgorithms: ["RS256", "ES256"],
   cibaDeliveryMode: "poll",
   cibaNotificationEndpoint: "",
+  tokenExchangeDownscopeOnly: false,
+  tokenExchangeAllowDelegation: false,
+  tokenExchangeAllowedAudiences: "",
   authorizationCodeTimeToLive: "PT5M",
   accessTokenTimeToLive: "PT5M",
   refreshTokenTimeToLive: "PT1H",
@@ -176,6 +182,9 @@ const clientSchema = (validation: Dictionary["admin"]["common"]["validation"]) =
       dpopSigningAlgorithms: z.array(z.enum(DPOP_ALGORITHMS)).min(1, validation.selection),
       cibaDeliveryMode: z.enum(CIBA_DELIVERY_MODES),
       cibaNotificationEndpoint: z.string(),
+      tokenExchangeDownscopeOnly: z.boolean(),
+      tokenExchangeAllowDelegation: z.boolean(),
+      tokenExchangeAllowedAudiences: z.string(),
       authorizationCodeTimeToLive: z.string(),
       accessTokenTimeToLive: z.string(),
       refreshTokenTimeToLive: z.string(),
@@ -398,6 +407,9 @@ export function ClientForm({
           ]) as FormState["dpopSigningAlgorithms"],
           cibaDeliveryMode: client.cibaDeliveryMode ?? "poll",
           cibaNotificationEndpoint: client.cibaNotificationEndpoint ?? "",
+          tokenExchangeDownscopeOnly: client.tokenExchangeDownscopeOnly ?? false,
+          tokenExchangeAllowDelegation: client.tokenExchangeAllowDelegation ?? false,
+          tokenExchangeAllowedAudiences: (client.tokenExchangeAllowedAudiences ?? []).join("\n"),
           authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "PT5M",
           accessTokenTimeToLive: client.accessTokenTimeToLive ?? "PT5M",
           refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "PT1H",
@@ -452,6 +464,7 @@ export function ClientForm({
       postLogoutRedirectUris: lines(values.postLogoutRedirectUris),
       webOrigins: lines(values.webOrigins),
       scopes: words(values.scopes),
+      tokenExchangeAllowedAudiences: lines(values.tokenExchangeAllowedAudiences),
       offlineSessionIdle: values.offlineSessionIdle.trim() || null,
       offlineSessionMax: values.offlineSessionMax.trim() || null,
     };
@@ -737,6 +750,56 @@ export function ClientForm({
                   </div>
                 )}
               </Col>
+              {authorizationGrantTypes.includes(
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+              ) && (
+                <Col xs={12}>
+                  <Card className="border-0 bg-body-tertiary">
+                    <Card.Body>
+                      <h3 className="h6">{dictionary.admin.clients.tokenExchange}</h3>
+                      <p className="small text-body-secondary">
+                        {dictionary.admin.clients.tokenExchangeHelp}
+                      </p>
+                      <Row className="g-3">
+                        <Col md={6}>
+                          <Form.Check
+                            type="switch"
+                            id="token-exchange-downscope-only"
+                            label={dictionary.admin.clients.tokenExchangeDownscopeOnly}
+                            {...register("tokenExchangeDownscopeOnly")}
+                            disabled={!canManageClients}
+                          />
+                        </Col>
+                        <Col md={6}>
+                          <Form.Check
+                            type="switch"
+                            id="token-exchange-allow-delegation"
+                            label={dictionary.admin.clients.tokenExchangeAllowDelegation}
+                            {...register("tokenExchangeAllowDelegation")}
+                            disabled={!canManageClients}
+                          />
+                        </Col>
+                        <Col xs={12}>
+                          <Form.Label htmlFor="token-exchange-allowed-audiences">
+                            {dictionary.admin.clients.tokenExchangeAllowedAudiences}
+                          </Form.Label>
+                          <Form.Control
+                            as="textarea"
+                            id="token-exchange-allowed-audiences"
+                            rows={2}
+                            placeholder={dictionary.admin.clients.tokenExchangeAllowedAudiencesHelp}
+                            {...register("tokenExchangeAllowedAudiences")}
+                            disabled={!canManageClients}
+                          />
+                          <Form.Text>
+                            {dictionary.admin.clients.tokenExchangeAllowedAudiencesHelp}
+                          </Form.Text>
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              )}
               <Col md={6}>
                 <div className="admin-setting-row">
                   <div className="fw-semibold">

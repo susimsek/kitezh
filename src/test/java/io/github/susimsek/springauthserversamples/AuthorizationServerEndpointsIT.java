@@ -167,6 +167,113 @@ class AuthorizationServerEndpointsIT {
     }
 
     @Test
+    void tokenExchangeExchangesAnActiveSubjectToken() throws Exception {
+        MvcResult sourceResult =
+                mockMvc.perform(
+                                post("/oauth2/token")
+                                        .with(httpBasic("demo-client", "demo-secret"))
+                                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                        .param("grant_type", "client_credentials")
+                                        .param("scope", "openid"))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        String subjectToken =
+                JSON_MAPPER
+                        .readTree(sourceResult.getResponse().getContentAsString())
+                        .get("access_token")
+                        .asText();
+        MvcResult exchangeResult =
+                mockMvc.perform(
+                                post("/oauth2/token")
+                                        .with(httpBasic("demo-client", "demo-secret"))
+                                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                        .param(
+                                                "grant_type",
+                                                "urn:ietf:params:oauth:grant-type:token-exchange")
+                                        .param("subject_token", subjectToken)
+                                        .param(
+                                                "subject_token_type",
+                                                "urn:ietf:params:oauth:token-type:access_token"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.access_token").isNotEmpty())
+                        .andExpect(
+                                jsonPath("$.issued_token_type")
+                                        .value("urn:ietf:params:oauth:token-type:access_token"))
+                        .andReturn();
+
+        String exchangedToken =
+                JSON_MAPPER
+                        .readTree(exchangeResult.getResponse().getContentAsString())
+                        .get("access_token")
+                        .asText();
+        assertThat(jwtClaims(exchangedToken).get("aud").toString()).contains("demo-client");
+    }
+
+    @Test
+    void tokenExchangeCanIssueAUsableRotatingRefreshToken() throws Exception {
+        JsonNode source =
+                tokenRequest(
+                        "demo-client",
+                        "demo-secret",
+                        Map.of("grant_type", "client_credentials", "scope", "openid"));
+        JsonNode exchange =
+                tokenRequest(
+                        "demo-client",
+                        "demo-secret",
+                        Map.of(
+                                "grant_type",
+                                "urn:ietf:params:oauth:grant-type:token-exchange",
+                                "subject_token",
+                                source.get("access_token").asText(),
+                                "subject_token_type",
+                                "urn:ietf:params:oauth:token-type:access_token",
+                                "requested_token_type",
+                                "urn:ietf:params:oauth:token-type:refresh_token"));
+
+        String exchangedRefreshToken = exchange.get("refresh_token").asText();
+        assertThat(exchange.get("issued_token_type").asText())
+                .isEqualTo("urn:ietf:params:oauth:token-type:refresh_token");
+
+        JsonNode refresh =
+                tokenRequest(
+                        "demo-client",
+                        "demo-secret",
+                        Map.of(
+                                "grant_type",
+                                "refresh_token",
+                                "refresh_token",
+                                exchangedRefreshToken));
+        assertThat(refresh.get("refresh_token").asText()).isNotEqualTo(exchangedRefreshToken);
+    }
+
+    @Test
+    void tokenExchangeCanIssueAnIdTokenForAnOpenIdSubject() throws Exception {
+        JsonNode source =
+                tokenRequest(
+                        "demo-client",
+                        "demo-secret",
+                        Map.of("grant_type", "client_credentials", "scope", "openid"));
+        JsonNode exchange =
+                tokenRequest(
+                        "demo-client",
+                        "demo-secret",
+                        Map.of(
+                                "grant_type",
+                                "urn:ietf:params:oauth:grant-type:token-exchange",
+                                "subject_token",
+                                source.get("access_token").asText(),
+                                "subject_token_type",
+                                "urn:ietf:params:oauth:token-type:access_token",
+                                "requested_token_type",
+                                "urn:ietf:params:oauth:token-type:id_token"));
+
+        assertThat(exchange.get("issued_token_type").asText())
+                .isEqualTo("urn:ietf:params:oauth:token-type:id_token");
+        assertThat(jwtClaims(exchange.get("id_token").asText()).get("sub").asText())
+                .isEqualTo("demo-client");
+    }
+
+    @Test
     void cibaPollGrantWaitsForApprovalThenIssuesToken() throws Exception {
         MvcResult requestResult =
                 mockMvc.perform(

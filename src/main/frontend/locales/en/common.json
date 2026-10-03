@@ -887,6 +887,12 @@
       "cibaDeliveryMode": "CIBA delivery mode",
       "cibaDeliveryModeHelp": "Choose how the client receives the CIBA token response. Ping and push requests provide a fresh callback token per request.",
       "cibaNotificationEndpoint": "CIBA notification endpoint",
+      "tokenExchange": "Token exchange policy",
+      "tokenExchangeHelp": "RFC 8693 exchange is confidential-client only. Configure downscoping, delegation, and target audiences for this client.",
+      "tokenExchangeDownscopeOnly": "Limit exchanged scopes to the subject token",
+      "tokenExchangeAllowDelegation": "Allow actor-token delegation",
+      "tokenExchangeAllowedAudiences": "Allowed target audiences",
+      "tokenExchangeAllowedAudiencesHelp": "Enter one registered client ID per line. The requesting client may always exchange to itself.",
       "offlineSessionIdle": "Offline session idle override",
       "offlineSessionMax": "Offline session max override",
       "offlineSessionHelp": "Optional ISO-8601 duration override, such as P30D."
