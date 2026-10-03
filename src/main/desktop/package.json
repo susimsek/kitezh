@@ -23,7 +23,7 @@
     "build": "pnpm run build:renderer && tsc -p tsconfig.json",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",
-    "package": "pnpm run build && electron-builder"
+    "package": "pnpm run build && electron-builder --publish never"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
