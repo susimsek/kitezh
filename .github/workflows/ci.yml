@@ -185,11 +185,14 @@ jobs:
         working-directory: src/main/desktop
         run: pnpm package
 
+      - name: Collect distributable desktop assets
+        run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${{ runner.temp }}/desktop-release-assets"
+
       - name: Upload desktop package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: desktop-${{ matrix.platform }}-${{ github.sha }}
-          path: src/main/desktop/release/*
+          path: ${{ runner.temp }}/desktop-release-assets/*
           if-no-files-found: error
 
   native-image:

@@ -212,7 +212,7 @@ jobs:
           gpg "${gpg_args[@]}" --output src/main/desktop/release/SHA256SUMS.asc src/main/desktop/release/SHA256SUMS
 
       - name: Collect distributable release assets
-        run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${RUNNER_TEMP}/desktop-release-assets"
+        run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${{ runner.temp }}/desktop-release-assets"
 
       - name: Upload desktop package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
