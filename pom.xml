@@ -30,7 +30,7 @@
 			<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
 			<gatling.version>3.15.1</gatling.version>
 		<gatling-maven-plugin.version>4.21.10</gatling-maven-plugin.version>
-		<springdoc-openapi.version>3.1.0</springdoc-openapi.version>
+		<springdoc-openapi.version>3.1.1</springdoc-openapi.version>
 		<opentelemetry-logback-appender.version>2.28.1-alpha</opentelemetry-logback-appender.version>
 		<opentelemetry-instrumentation.version>2.28.1-alpha</opentelemetry-instrumentation.version>
 			<jib-maven-plugin.version>3.5.2</jib-maven-plugin.version>
