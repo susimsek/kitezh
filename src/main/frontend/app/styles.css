@@ -275,6 +275,10 @@ textarea.form-control {
   max-width: 46rem;
 }
 
+.download-release-error {
+  max-width: 46rem;
+}
+
 .download-platform-icon {
   min-height: 4rem;
   display: flex;

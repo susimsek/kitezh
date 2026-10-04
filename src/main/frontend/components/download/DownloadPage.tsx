@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { Button, Col, Container, Row, Spinner, Stack } from "react-bootstrap";
+import { Alert, Button, Col, Container, Row, Spinner, Stack } from "react-bootstrap";
 
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { ActionIcon } from "@/components/shared/ActionIcon";
@@ -94,10 +94,10 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
   const copy = dictionary.download;
   const [release, setRelease] = useState<DesktopRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
+  const [releaseError, setReleaseError] = useState(false);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchLatestDesktopRelease(controller.signal)
+  const fetchRelease = useCallback((signal?: AbortSignal) => {
+    return fetchLatestDesktopRelease(signal)
       .then((latestRelease) => {
         setRelease(latestRelease);
         setReleaseLoading(false);
@@ -107,10 +107,16 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
           return;
         }
         setReleaseLoading(false);
+        setReleaseError(true);
         console.warn("Unable to resolve the latest desktop release", error);
       });
-    return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchRelease(controller.signal);
+    return () => controller.abort();
+  }, [fetchRelease]);
 
   const platforms: DownloadPlatform[] = [
     {
@@ -184,6 +190,10 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
             <Spinner animation="border" aria-hidden="true" />
             <span>{copy.loading}</span>
           </div>
+        ) : releaseError ? (
+          <Alert variant="danger" className="download-release-error text-center mx-auto">
+            {copy.loadError}
+          </Alert>
         ) : (
           <Row className="download-platforms g-4 g-lg-5 justify-content-center">
             {platforms.map((platform) => (
@@ -218,29 +228,31 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
           </Row>
         )}
 
-        <div className="download-page-footer text-center mt-4 mt-md-5">
-          <p className="text-body-secondary mb-3">{copy.checksums}</p>
-          <Stack direction="horizontal" gap={2} className="justify-content-center flex-wrap">
-            <Button
-              as="a"
-              href="https://github.com/susimsek/kitezh/releases/latest/download/SHA256SUMS"
-              variant="secondary"
-              download
-            >
-              <ActionIcon action="download" />
-              {copy.downloadChecksums}
-            </Button>
-            <Button
-              as="a"
-              href={DESKTOP_RELEASES_URL}
-              variant="secondary"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {copy.releaseNotes}
-            </Button>
-          </Stack>
-        </div>
+        {!releaseLoading && !releaseError && (
+          <div className="download-page-footer text-center mt-4 mt-md-5">
+            <p className="text-body-secondary mb-3">{copy.checksums}</p>
+            <Stack direction="horizontal" gap={2} className="justify-content-center flex-wrap">
+              <Button
+                as="a"
+                href="https://github.com/susimsek/kitezh/releases/latest/download/SHA256SUMS"
+                variant="secondary"
+                download
+              >
+                <ActionIcon action="download" />
+                {copy.downloadChecksums}
+              </Button>
+              <Button
+                as="a"
+                href={DESKTOP_RELEASES_URL}
+                variant="secondary"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {copy.releaseNotes}
+              </Button>
+            </Stack>
+          </div>
+        )}
       </Container>
     </main>
   );

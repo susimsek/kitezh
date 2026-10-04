@@ -145,6 +145,8 @@ management:
           include: readinessState,db
 
 app:
+  github-api:
+    token: ${GITHUB_API_TOKEN:}
   desktop:
     renderer-origin: ${APP_DESKTOP_RENDERER_ORIGIN:app://renderer}
   logging:

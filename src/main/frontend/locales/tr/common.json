@@ -73,6 +73,7 @@
     "title": "Uygulamayı indirin",
     "subtitle": "İşletim sisteminize uygun paketi seçerek güvenli şekilde başlayın.",
     "loading": "Kullanılabilir paketler yükleniyor...",
+    "loadError": "Kullanılabilir paketler yüklenemedi.",
     "windows": {
       "title": "Windows",
       "description": "64 bit Windows için kurulum, taşınabilir ve AppX paketleri.",

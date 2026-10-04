@@ -51,4 +51,24 @@ test.describe("download page", () => {
       page.locator(`a[href="${"https://github.com/susimsek/kitezh/releases/latest"}"]`),
     ).toHaveAttribute("href", "https://github.com/susimsek/kitezh/releases/latest");
   });
+
+  test("shows a page error when the release lookup fails", async ({ page }) => {
+    await page.route("**/api/public/desktop-release", async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ status: 500 }),
+      });
+    });
+    await page.goto("/download");
+
+    await expect(page.locator(".download-release-error")).toHaveText(
+      /Available packages could not be loaded\.|Kullanılabilir paketler yüklenemedi\./i,
+    );
+    await expect(page.locator("a.download-asset-button")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /SHA-256 checksums/i })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /View release notes|Sürüm notlarını görüntüle/i }),
+    ).toHaveCount(0);
+  });
 });

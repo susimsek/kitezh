@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.config.aot.NativeRuntimeHints;
+import io.github.susimsek.kitezh.config.http.GitHubApiProperties;
 import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.security.SocialLoginProperties;
 import io.github.susimsek.kitezh.service.client.CibaNotificationClient;
@@ -18,6 +19,7 @@ import org.springframework.web.service.registry.ImportHttpServices;
 @SpringBootApplication
 @EnableConfigurationProperties({
     ApplicationProperties.class,
+    GitHubApiProperties.class,
     SocialLoginProperties.class,
     LoggingProperties.class
 })

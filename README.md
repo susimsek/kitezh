@@ -1436,6 +1436,7 @@ Environment variables:
 - Snyk: `SNYK_TOKEN` (optional)
 - Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (only on `v*` tags)
 - Render release deploy: `RENDER_RELEASE_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
+- GitHub Releases API: `GITHUB_API_TOKEN` (optional on local development; configure as a Render secret)
 
 ## Project Policies
 

@@ -50,3 +50,5 @@ services:
         sync: false
       - key: APP_AUTHORIZATIONSERVER_ISSUER
         value: https://kitezh.onrender.com
+      - key: GITHUB_API_TOKEN
+        sync: false
