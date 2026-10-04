@@ -55,6 +55,7 @@ This repository is a Spring Boot 4.1 + Java 25 sample application built around t
 26. [Helm](#helm)
 27. [Terraform](#terraform)
 28. [Continuous Integration](#continuous-integration)
+29. [Project Policies](#project-policies)
 
 ## Features
 
@@ -1420,3 +1421,10 @@ Environment variables:
 - Snyk: `SNYK_TOKEN` (optional)
 - Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (only on `v*` tags)
 - Render release deploy: `RENDER_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
+
+## Project Policies
+
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Apache-2.0 License](LICENSE.md)
