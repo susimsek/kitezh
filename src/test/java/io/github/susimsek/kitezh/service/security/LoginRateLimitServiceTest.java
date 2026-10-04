@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
 import java.time.Duration;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class LoginRateLimitServiceTest {
@@ -59,7 +60,8 @@ class LoginRateLimitServiceTest {
                         userLimit);
         return new ApplicationProperties(
                 new ApplicationProperties.Cache(
-                        new ApplicationProperties.Caffeine(Duration.ofHours(1), 500, 1000)),
+                        new ApplicationProperties.Caffeine(
+                                Duration.ofHours(1), 500, 1000, Map.of())),
                 new ApplicationProperties.Session("0 * * * * *"),
                 new ApplicationProperties.AuthorizationServer("http://localhost"),
                 new ApplicationProperties.Mail(false, "from", "http://localhost"),

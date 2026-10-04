@@ -2395,7 +2395,7 @@ class AuthorizationServerConfigTest {
         return new ApplicationProperties(
                 new ApplicationProperties.Cache(
                         new ApplicationProperties.Caffeine(
-                                java.time.Duration.ofHours(1), 500, 1000)),
+                                java.time.Duration.ofHours(1), 500, 1000, Map.of())),
                 new ApplicationProperties.Session("0 * * * * *"),
                 new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                 new ApplicationProperties.Mail(

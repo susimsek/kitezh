@@ -316,7 +316,7 @@ class SessionConfigTest {
                         new ApplicationProperties(
                                 new ApplicationProperties.Cache(
                                         new ApplicationProperties.Caffeine(
-                                                Duration.ofHours(1), 500, 1000)),
+                                                Duration.ofHours(1), 500, 1000, Map.of())),
                                 new ApplicationProperties.Session("-"),
                                 new ApplicationProperties.AuthorizationServer(
                                         "http://127.0.0.1:9090"),
@@ -344,7 +344,8 @@ class SessionConfigTest {
                 new SessionProperties(),
                 new ApplicationProperties(
                         new ApplicationProperties.Cache(
-                                new ApplicationProperties.Caffeine(Duration.ofHours(1), 500, 1000)),
+                                new ApplicationProperties.Caffeine(
+                                        Duration.ofHours(1), 500, 1000, Map.of())),
                         new ApplicationProperties.Session("-"),
                         new ApplicationProperties.AuthorizationServer("http://127.0.0.1:9090"),
                         new ApplicationProperties.Mail(

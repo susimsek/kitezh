@@ -138,7 +138,8 @@ class WebAuthnConfigTest {
         final ApplicationProperties properties =
                 new ApplicationProperties(
                         new ApplicationProperties.Cache(
-                                new ApplicationProperties.Caffeine(Duration.ofHours(1), 1, 10)),
+                                new ApplicationProperties.Caffeine(
+                                        Duration.ofHours(1), 1, 10, Map.of())),
                         new ApplicationProperties.Session("*"),
                         new ApplicationProperties.AuthorizationServer(
                                 "https://issuer.example:9443"),
@@ -234,7 +235,8 @@ class WebAuthnConfigTest {
         final ApplicationProperties properties =
                 new ApplicationProperties(
                         new ApplicationProperties.Cache(
-                                new ApplicationProperties.Caffeine(Duration.ofHours(1), 1, 10)),
+                                new ApplicationProperties.Caffeine(
+                                        Duration.ofHours(1), 1, 10, Map.of())),
                         new ApplicationProperties.Session("*"),
                         new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                         new ApplicationProperties.Mail(
@@ -326,7 +328,7 @@ class WebAuthnConfigTest {
     private static ApplicationProperties properties() {
         return new ApplicationProperties(
                 new ApplicationProperties.Cache(
-                        new ApplicationProperties.Caffeine(Duration.ofHours(1), 1, 10)),
+                        new ApplicationProperties.Caffeine(Duration.ofHours(1), 1, 10, Map.of())),
                 new ApplicationProperties.Session("*"),
                 new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                 new ApplicationProperties.Mail(

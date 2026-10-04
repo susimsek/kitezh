@@ -46,7 +46,7 @@ public record ApplicationProperties(
 
     public ApplicationProperties() {
         this(
-                new Cache(new Caffeine(Duration.ofHours(1), 500, 1000)),
+                new Cache(new Caffeine(Duration.ofHours(1), 500, 1000, Map.of())),
                 new Session("0 * * * * *"),
                 new AuthorizationServer(DEFAULT_ISSUER),
                 new Mail(false, "Kitezh <no-reply@localhost>", DEFAULT_ISSUER),
@@ -120,14 +120,6 @@ public record ApplicationProperties(
 
         public Caffeine() {
             this(Duration.ofHours(1), 500, 1000, Map.of());
-        }
-
-        public Caffeine(Duration ttl, int initialCapacity, long maximumSize) {
-            this(ttl, initialCapacity, maximumSize, Map.of());
-        }
-
-        public Caffeine {
-            overrides = overrides == null ? Map.of() : Map.copyOf(overrides);
         }
     }
 

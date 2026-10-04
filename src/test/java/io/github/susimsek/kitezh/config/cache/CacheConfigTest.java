@@ -68,7 +68,7 @@ class CacheConfigTest {
     @Test
     void usesDefaultCaffeineProperties() {
         ApplicationProperties.Caffeine caffeine =
-                new ApplicationProperties.Caffeine(Duration.ofHours(1), 500, 1000L);
+                new ApplicationProperties.Caffeine(Duration.ofHours(1), 500, 1000L, Map.of());
 
         assertThat(caffeine.ttl()).isEqualTo(Duration.ofHours(1));
         assertThat(caffeine.initialCapacity()).isEqualTo(500);

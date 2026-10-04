@@ -13,6 +13,7 @@ import io.github.susimsek.kitezh.service.SocialTokenService;
 import io.github.susimsek.kitezh.service.account.MfaService;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -281,7 +282,8 @@ class SecurityConfigTest {
         ApplicationProperties properties =
                 new ApplicationProperties(
                         new ApplicationProperties.Cache(
-                                new ApplicationProperties.Caffeine(Duration.ofHours(1), 1, 10)),
+                                new ApplicationProperties.Caffeine(
+                                        Duration.ofHours(1), 1, 10, Map.of())),
                         new ApplicationProperties.Session("0 * * * * *"),
                         new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                         new ApplicationProperties.Mail(
@@ -313,7 +315,8 @@ class SecurityConfigTest {
         ApplicationProperties nullWebAuthnProperties =
                 new ApplicationProperties(
                         new ApplicationProperties.Cache(
-                                new ApplicationProperties.Caffeine(Duration.ofHours(1), 1, 10)),
+                                new ApplicationProperties.Caffeine(
+                                        Duration.ofHours(1), 1, 10, Map.of())),
                         new ApplicationProperties.Session("0 * * * * *"),
                         new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                         new ApplicationProperties.Mail(

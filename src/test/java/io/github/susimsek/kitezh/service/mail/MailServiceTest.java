@@ -19,6 +19,7 @@ import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -223,7 +224,7 @@ class MailServiceTest {
     private static ApplicationProperties properties(boolean enabled) {
         return new ApplicationProperties(
                 new ApplicationProperties.Cache(
-                        new ApplicationProperties.Caffeine(Duration.ofHours(1), 10, 100)),
+                        new ApplicationProperties.Caffeine(Duration.ofHours(1), 10, 100, Map.of())),
                 new ApplicationProperties.Session("0 * * * * *"),
                 new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                 new ApplicationProperties.Mail(

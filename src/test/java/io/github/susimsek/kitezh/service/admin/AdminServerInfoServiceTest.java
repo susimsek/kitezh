@@ -12,6 +12,7 @@ import io.github.susimsek.kitezh.repository.OAuth2KeyRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 import org.springframework.boot.session.autoconfigure.SessionProperties;
@@ -23,7 +24,8 @@ class AdminServerInfoServiceTest {
         ApplicationProperties properties =
                 new ApplicationProperties(
                         new ApplicationProperties.Cache(
-                                new ApplicationProperties.Caffeine(Duration.ofHours(1), 50, 100)),
+                                new ApplicationProperties.Caffeine(
+                                        Duration.ofHours(1), 50, 100, Map.of())),
                         new ApplicationProperties.Session("0 * * * * *"),
                         new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                         new ApplicationProperties.Mail(
