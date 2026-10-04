@@ -26,7 +26,7 @@
 [![Terraform](https://img.shields.io/badge/Terraform-Infrastructure-623CE4?logo=terraform&logoColor=white)](https://www.terraform.io/)
 [![Codex](https://custom-icon-badges.demolab.com/badge/Codex-AI%20Agent-74aa9c?&logo=openai&logoColor=white)](https://openai.com/codex/)
 
-This repository is a Spring Boot 4.1 + Java 25 application built around the Authorization Server support integrated into **Spring Security 7**. It acts as an OAuth2 Authorization Server and OpenID Connect Provider, stores users and clients in a relational database with Liquibase-managed schema, uses Spring Data JPA and Hibernate second-level cache with Caffeine/JCache, supports H2 for local development and PostgreSQL for production-style runs, loads RSA JWK signing keys from the database, and can be compiled as a GraalVM native executable.
+Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authorization Server support integrated into **Spring Security 7**. It provides an OAuth2 Authorization Server and OpenID Connect Provider, stores users and clients in a relational database with Liquibase-managed schema, uses Spring Data JPA and Hibernate second-level cache with Caffeine/JCache, supports H2 for local development and PostgreSQL for production-style runs, loads RSA JWK signing keys from the database, and can be compiled as a GraalVM native executable.
 
 ## Table of Contents
 

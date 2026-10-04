@@ -1,8 +1,8 @@
-# Kitezh (GraalVM Native Image)
+# Kitezh container image
 
-A Spring Boot 4.1, Java 25 and Spring Security 7 OAuth2 Authorization Server and OpenID Connect Provider. The published image is a statically linked GraalVM native executable published for `linux/amd64` and `linux/arm64`.
+Kitezh is an OAuth2 and OpenID Connect identity platform built with Spring Boot 4.1, Java 25, and Spring Security 7. The published Docker image is a statically linked GraalVM native executable available for `linux/amd64` and `linux/arm64`.
 
-The image provides the authorization server, localized login and consent pages, the Administration Console, and the Account Console on port `9090`.
+The image includes the authorization server, localized login and consent pages, the Administration Console, and the Account Console. It listens on port `9090` by default.
 
 ## Image
 
@@ -10,7 +10,16 @@ The image provides the authorization server, localized login and consent pages, 
 docker pull suayb/kitezh:latest
 ```
 
-The `latest` tag is published to Docker Hub only by validated `v*` releases after the native build passes. Each release also publishes immutable tags such as `0.1.0-amd64`, `0.1.0-arm64`, and `0.1.0`. The image is intended for demonstrations and deployments; configure an external PostgreSQL database before using it outside local testing.
+Official links:
+
+- Source: [github.com/susimsek/kitezh](https://github.com/susimsek/kitezh)
+- Docker Hub: [hub.docker.com/r/suayb/kitezh](https://hub.docker.com/r/suayb/kitezh)
+- Releases: [Kitezh releases](https://github.com/susimsek/kitezh/releases)
+- Live demo: [kitezh.onrender.com](https://kitezh.onrender.com)
+
+The `latest` image is a multi-architecture manifest. Docker selects the matching `linux/amd64` or `linux/arm64` image for the host automatically.
+
+The `latest` tag is published to Docker Hub only by validated `v*` releases after the native builds pass. Each release also publishes immutable architecture tags such as `0.1.0-amd64` and `0.1.0-arm64`, plus the versioned multi-architecture tag `0.1.0`. The image is suitable for local evaluation and deployments; configure an external PostgreSQL database before using it outside local testing.
 
 ## Included capabilities
 
@@ -27,7 +36,7 @@ The `latest` tag is published to Docker Hub only by validated `v*` releases afte
 - Actuator liveness, readiness, metrics, and Prometheus endpoints
 - Optional OTLP metrics, traces, and logs for Grafana Cloud or a local LGTM stack
 
-## Start with the repository Compose file
+## Start with the Kitezh Compose stack
 
 From a checkout of this repository, the prebuilt image can be started with PostgreSQL and the separate Liquibase migration container:
 
@@ -49,7 +58,7 @@ docker compose -f src/main/docker/app.yml down
 
 The Compose fixture is for development. PostgreSQL data is ephemeral unless the commented volume in `src/main/docker/postgresql.yml` is enabled.
 
-## Run the image with an external PostgreSQL database
+## Run Kitezh with an external PostgreSQL database
 
 The published image is built with the `prod` profile and requires PostgreSQL settings:
 
@@ -65,7 +74,7 @@ docker run --rm -p 9090:9090 \
 
 The application runs Liquibase migrations on startup. Set `SPRING_LIQUIBASE_DROP_FIRST=true` only for an intentionally disposable demo database because it removes existing objects before applying the changelog.
 
-## Browser consoles
+## Kitezh browser consoles
 
 Open the following URLs after the application starts:
 
@@ -167,7 +176,7 @@ GET /actuator/prometheus
 
 The application exposes liveness and readiness probes with the database included in readiness. Management endpoints should remain private to the cluster or deployment platform.
 
-## Container deployment
+## Deploy Kitezh
 
 The Render Blueprint in `render.yaml` deploys the same Docker Hub image with:
 
