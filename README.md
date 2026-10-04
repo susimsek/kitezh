@@ -405,10 +405,11 @@ public key is derived during the build and bundled in the application. When a si
 the desktop app verifies it before asking `electron-updater` to check for a package.
 Set `DESKTOP_UPDATE_REQUIRE_SIGNATURE=true` for deployments that must reject unsigned manifests.
 Failed signature, download, or installation preparation leaves the current installation in place.
-The app also records a short startup health marker and reports an interrupted update on the next
-launch. A true post-install binary rollback requires a platform-specific bootstrapper or installer
-backup; `electron-updater` does not provide a portable rollback API, so the workflow does not claim
-to replace the previous application binary automatically.
+Before installing on supported auto-update targets, the app creates a protected backup of the
+current macOS app bundle, Windows installation directory, or Linux AppImage. A detached watchdog
+restores that backup and relaunches the previous version if the new process does not clear its
+startup health marker. Linux system packages remain outside this rollback path because their
+installers are managed by the operating system.
 
 ## Administration and Account Consoles
 

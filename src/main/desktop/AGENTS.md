@@ -104,6 +104,9 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
   - trusted renderer and external-origin policies;
   - secure storage validation and Admin/Account session separation;
   - first-launch and second-instance deep-link delivery.
+- Auto-update tests must cover backup creation, startup health confirmation, interrupted-update
+  detection, and restoration of the previous supported installation when the new process fails
+  before the health window completes.
 - Test observable failure states, including unavailable API, invalid callback, expired state, denied authorization, token exchange failure, refresh failure, logout failure, and unavailable secure storage.
 - Use the repository formatter and keep `git diff --check` clean. Do not edit generated output under `dist/`, `renderer/`, or `release/`.
 - A successful local package is unsigned. Signing, notarization, auto-update publication, and real-device packaged E2E checks require platform credentials and must be performed in the release workflow.
@@ -122,6 +125,8 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
   `.pak`, `chrome-sandbox`, `app-update.yml`, and builder diagnostics are packaged internals and
   must not be uploaded as separate release assets.
 - Test protocol registration and callback delivery on each target OS before a release. A browser redirect must return to the correct console and must not be accepted by the other console.
+- Keep the rollback watchdog limited to packaged macOS, Windows, and Linux AppImage installs;
+  Linux system packages are managed by the operating system and are not eligible for in-app rollback.
 - Keep production API defaults and release URLs explicit and reviewable; do not silently switch a packaged build to localhost.
 
 ## UI and Renderer Standards

@@ -1,7 +1,8 @@
 import { autoUpdater } from "electron-updater";
 import { app, net } from "electron";
+import { spawn } from "node:child_process";
 import { verify } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type DesktopUpdateStatus =
@@ -18,6 +19,7 @@ type UpdateListener = (status: DesktopUpdateStatus) => void;
 
 const UPDATE_REPOSITORY = "susimsek/kitezh";
 const UPDATE_RECOVERY_FILE = "desktop-update-recovery.json";
+const UPDATE_WATCHDOG_FILE = "desktop-update-watchdog.js";
 const UPDATE_HEALTH_WINDOW_MS = 15_000;
 
 let listener: UpdateListener | null = null;
@@ -38,10 +40,37 @@ function updateRecoveryPath() {
   return path.join(app.getPath("userData"), UPDATE_RECOVERY_FILE);
 }
 
+function rollbackTarget() {
+  if (process.platform === "darwin") {
+    return {
+      type: "directory" as const,
+      path: path.resolve(process.execPath, "../../../"),
+      executable: process.execPath,
+    };
+  }
+  if (process.platform === "win32") {
+    return {
+      type: "directory" as const,
+      path: path.dirname(process.execPath),
+      executable: process.execPath,
+    };
+  }
+  if (process.env.APPIMAGE) {
+    return {
+      type: "file" as const,
+      path: process.env.APPIMAGE,
+      executable: process.env.APPIMAGE,
+    };
+  }
+  return null;
+}
+
 async function verifyPublishedManifest() {
   const manifestResponse = await net.fetch(updateManifestUrl());
   if (!manifestResponse.ok) {
-    throw new Error(`Update manifest request failed with ${manifestResponse.status}.`);
+    throw new Error(
+      `Update manifest request failed with ${manifestResponse.status}.`,
+    );
   }
   const manifest = Buffer.from(await manifestResponse.arrayBuffer());
   const signatureResponse = await net.fetch(`${updateManifestUrl()}.sig`);
@@ -52,9 +81,14 @@ async function verifyPublishedManifest() {
     return;
   }
   if (!signatureResponse.ok) {
-    throw new Error(`Update signature request failed with ${signatureResponse.status}.`);
+    throw new Error(
+      `Update signature request failed with ${signatureResponse.status}.`,
+    );
   }
-  const signature = Buffer.from((await signatureResponse.text()).trim(), "base64");
+  const signature = Buffer.from(
+    (await signatureResponse.text()).trim(),
+    "base64",
+  );
   const publicKey = await readFile(
     path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
   );
@@ -64,25 +98,71 @@ async function verifyPublishedManifest() {
 }
 
 async function markUpdatePending(version: string) {
+  const target = rollbackTarget();
+  if (!target) {
+    throw new Error("Rollback is unavailable for this installation type.");
+  }
+  const backupPath = path.join(
+    app.getPath("userData"),
+    `desktop-update-backup-${Date.now()}`,
+  );
+  await mkdir(path.dirname(backupPath), { recursive: true });
+  if (target.type === "directory") {
+    await cp(target.path, backupPath, { recursive: true, force: true });
+  } else {
+    await cp(target.path, backupPath, { force: true });
+  }
   await writeFile(
     updateRecoveryPath(),
-    JSON.stringify({ version, previousVersion: app.getVersion(), startedAt: Date.now() }),
+    JSON.stringify({
+      version,
+      previousVersion: app.getVersion(),
+      startedAt: Date.now(),
+      backupPath,
+      targetPath: target.path,
+      targetType: target.type,
+      executablePath: target.executable,
+    }),
     { mode: 0o600 },
   );
+  await startRollbackWatchdog();
 }
 
 async function markUpdateHealthy() {
   try {
+    const state = JSON.parse(await readFile(updateRecoveryPath(), "utf8")) as {
+      backupPath?: string;
+    };
     await unlink(updateRecoveryPath());
+    if (state.backupPath)
+      await rm(state.backupPath, { recursive: true, force: true });
   } catch {
     // The marker is optional and may not exist on the first launch.
   }
+}
+
+async function startRollbackWatchdog() {
+  const source = path.join(app.getAppPath(), "dist", UPDATE_WATCHDOG_FILE);
+  const destination = path.join(app.getPath("userData"), UPDATE_WATCHDOG_FILE);
+  await cp(source, destination, { force: true });
+  const child = spawn(
+    process.execPath,
+    [destination, updateRecoveryPath(), `${process.pid}`],
+    {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      windowsHide: true,
+    },
+  );
+  child.unref();
 }
 
 async function initializeUpdateRecovery() {
   try {
     const state = JSON.parse(await readFile(updateRecoveryPath(), "utf8")) as {
       version?: string;
+      previousVersion?: string;
       startedAt?: number;
     };
     if (state.version === app.getVersion() && state.startedAt) {
@@ -92,8 +172,14 @@ async function initializeUpdateRecovery() {
         await markUpdateHealthy();
         return;
       }
-      setTimeout(() => void markUpdateHealthy(), UPDATE_HEALTH_WINDOW_MS - elapsed);
+      setTimeout(
+        () => void markUpdateHealthy(),
+        UPDATE_HEALTH_WINDOW_MS - elapsed,
+      );
       return;
+    }
+    if (state.previousVersion === app.getVersion()) {
+      publish({ state: "recovered", version: app.getVersion() });
     }
     await markUpdateHealthy();
   } catch {
@@ -102,7 +188,11 @@ async function initializeUpdateRecovery() {
 }
 
 function isSupported() {
-  if (!process.env.DESKTOP_AUTO_UPDATE || process.env.DESKTOP_AUTO_UPDATE === "true") {
+  if (!app.isPackaged) return false;
+  if (
+    !process.env.DESKTOP_AUTO_UPDATE ||
+    process.env.DESKTOP_AUTO_UPDATE === "true"
+  ) {
     return process.platform !== "linux" || Boolean(process.env.APPIMAGE);
   }
   return false;
@@ -139,7 +229,10 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
     publish({ state: "downloaded", version: info.version });
   });
   autoUpdater.on("error", () =>
-    publish({ state: "error", message: "Desktop update could not be completed." }),
+    publish({
+      state: "error",
+      message: "Desktop update could not be completed.",
+    }),
   );
 
   void initializeUpdateRecovery();
@@ -155,7 +248,10 @@ export async function checkForUpdates() {
     await verifyPublishedManifest();
     await autoUpdater.checkForUpdates();
   } catch {
-    publish({ state: "error", message: "Desktop update could not be checked." });
+    publish({
+      state: "error",
+      message: "Desktop update could not be checked.",
+    });
   }
 }
 
@@ -164,7 +260,10 @@ export async function downloadUpdate() {
   try {
     await autoUpdater.downloadUpdate();
   } catch {
-    publish({ state: "error", message: "Desktop update could not be downloaded." });
+    publish({
+      state: "error",
+      message: "Desktop update could not be downloaded.",
+    });
   }
 }
 
@@ -173,6 +272,9 @@ export function installUpdate() {
   void markUpdatePending(downloadedVersion)
     .then(() => autoUpdater.quitAndInstall(false, true))
     .catch(() =>
-      publish({ state: "error", message: "Desktop update could not be prepared." }),
+      publish({
+        state: "error",
+        message: "Desktop update could not be prepared.",
+      }),
     );
 }
