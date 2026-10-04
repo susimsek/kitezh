@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-This repository is a demonstration project. Security fixes are applied to the latest `main`
+Kitezh is a demonstration identity platform. Security fixes are applied to the latest `main`
 branch and the latest published release when practical.
 
 ## Reporting a vulnerability

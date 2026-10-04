@@ -32,7 +32,7 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 
 1. [Features](#features)
 2. [Requirements](#requirements)
-3. [Project Layout](#project-layout)
+3. [Kitezh Layout](#kitezh-layout)
 4. [Configuration](#configuration)
 5. [Observability](#observability)
 6. [Configuration and Profiles](#configuration-and-profiles)
@@ -96,7 +96,7 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 - `curl` *(optional, for OAuth2 endpoint testing)*
 - `jq` *(optional, for parsing token responses)*
 
-## Project Layout
+## Kitezh Layout
 
 - Application code: `src/main/java/io/github/susimsek/kitezh`
     - `config`: Spring configuration
@@ -185,7 +185,7 @@ available. Application Caffeine caches are pre-registered so hit, miss, eviction
 eviction-weight meters are published from startup. The dashboard JSON and baseline alert rules
 are kept under `src/main/docker/observability/`.
 
-For local development, the repository includes Grafana's `grafana/otel-lgtm` image. It provides a
+For local development, Kitezh includes Grafana's `grafana/otel-lgtm` image. It provides a
 local OpenTelemetry Collector, Grafana, Loki, Mimir, and Tempo stack for traces, logs, and metrics.
 Start it with its dedicated Compose file. The dashboard is provisioned automatically and opened as
 Grafana's home dashboard, while `alerts.yml` is loaded as a Prometheus rule file:
@@ -279,7 +279,7 @@ Key selection rules:
 - inactive keys are exposed as public-only JWKs, so tokens issued before a rotation can still be verified;
 - all keys remain published by the JWK Set endpoint until they are removed from the table.
 
-The repository result is cached with Spring Cache, so database-side key changes become visible after cache expiry (or explicit cache eviction).
+Kitezh key lookups are cached with Spring Cache, so database-side key changes become visible after cache expiry (or explicit cache eviction).
 
 ## Persistent User Sessions
 

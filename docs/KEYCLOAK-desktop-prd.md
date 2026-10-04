@@ -1,4 +1,4 @@
-# Keycloak Electron Desktop Console PRD
+# Kitezh Electron Desktop Console PRD (Keycloak parity)
 
 ## Purpose
 

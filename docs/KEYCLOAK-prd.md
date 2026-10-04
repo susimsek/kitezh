@@ -1,4 +1,4 @@
-# Keycloak PRD
+# Kitezh Administration Console PRD (Keycloak parity)
 
 ## Purpose
 

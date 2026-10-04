@@ -38,13 +38,13 @@ The `latest` tag is published to Docker Hub only by validated `v*` releases afte
 
 ## Start with the Kitezh Compose stack
 
-From a checkout of this repository, the prebuilt image can be started with PostgreSQL and the separate Liquibase migration container:
+From a Kitezh checkout, the prebuilt image can be started with PostgreSQL and the separate Liquibase migration container:
 
 ```bash
 docker compose -f src/main/docker/app.yml up -d
 ```
 
-The application is available at `http://localhost:9090`. Check readiness with:
+Kitezh is available at `http://localhost:9090`. Check readiness with:
 
 ```bash
 curl http://localhost:9090/actuator/health/readiness
@@ -72,7 +72,7 @@ docker run --rm -p 9090:9090 \
   suayb/kitezh:latest
 ```
 
-The application runs Liquibase migrations on startup. Set `SPRING_LIQUIBASE_DROP_FIRST=true` only for an intentionally disposable demo database because it removes existing objects before applying the changelog.
+Kitezh runs Liquibase migrations on startup. Set `SPRING_LIQUIBASE_DROP_FIRST=true` only for an intentionally disposable demo database because it removes existing objects before applying the changelog.
 
 ## Kitezh browser consoles
 
@@ -174,7 +174,7 @@ GET /actuator/metrics
 GET /actuator/prometheus
 ```
 
-The application exposes liveness and readiness probes with the database included in readiness. Management endpoints should remain private to the cluster or deployment platform.
+Kitezh exposes liveness and readiness probes with the database included in readiness. Management endpoints should remain private to the cluster or deployment platform.
 
 ## Deploy Kitezh
 
@@ -217,4 +217,4 @@ docker.io/suayb/kitezh:latest
 - H2 is a development dependency and is not included in the published `prod,native` image.
 - Liquibase seed data is the source of truth for users, groups, authorities, and registered clients.
 - Keep at least one active RSA signing key and retain old public keys during key rotation.
-- Use the repository README for the full API, Helm, Terraform, observability, and development documentation.
+- Use the Kitezh README for the full API, Helm, Terraform, observability, and development documentation.

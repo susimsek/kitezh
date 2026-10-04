@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for helping improve Kitezh.
+Thank you for helping improve Kitezh, the identity platform in this repository.
 
 ## Before you start
 
@@ -19,7 +19,7 @@ pnpm --dir src/main/frontend lint
 pnpm --dir src/main/frontend typecheck
 ```
 
-Run the application locally with `./mvnw spring-boot:run`. The default development server
+Run Kitezh locally with `./mvnw spring-boot:run`. The default development server
 listens on port 9090.
 
 ## Pull requests
