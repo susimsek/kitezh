@@ -4,7 +4,7 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=spring-authorization-server-samples&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=spring-authorization-server-samples)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=spring-authorization-server-samples&metric=coverage)](https://sonarcloud.io/summary/new_code?id=spring-authorization-server-samples)
 [![Vulnerabilities](https://snyk.io/test/github/susimsek/spring-authorization-server-samples/badge.svg)](https://snyk.io/test/github/susimsek/spring-authorization-server-samples)
-[![Docker Image Size](https://img.shields.io/docker/image-size/suayb/spring-authorization-server-samples/latest-native?label=Image%20Size)](https://hub.docker.com/r/suayb/spring-authorization-server-samples)
+[![Docker Image Size](https://img.shields.io/docker/image-size/suayb/spring-authorization-server-samples/latest?label=Image%20Size)](https://hub.docker.com/r/suayb/spring-authorization-server-samples)
 [![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://spring-authorization-server-samples.onrender.com)
 [![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/spring-auth-prod/spring-authorization-server)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
@@ -1139,7 +1139,7 @@ Native Docker image:
 
 ```bash
 ./mvnw -Pprod,native -DskipTests jib:dockerBuild \
-  -Djib.to.image=spring-authorization-server-samples:latest-native
+  -Djib.to.image=spring-authorization-server-samples:latest
 ```
 
 Run the native image with PostgreSQL:
@@ -1151,7 +1151,7 @@ docker run --rm -p 9090:9090 \
   -e SPRING_DATASOURCE_USERNAME=appuser \
   -e SPRING_DATASOURCE_PASSWORD=appuser \
   -e APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090 \
-  spring-authorization-server-samples:latest-native
+  spring-authorization-server-samples:latest
 ```
 
 ## Kubernetes Health Probe
@@ -1381,13 +1381,13 @@ Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.git
 - Compress each `target/native-executable` with UPX
 - Build and verify amd64 and arm64 native executables on validated branch and pull-request runs
 - Push architecture-specific native images to Docker Hub only for `v*` release tags via Jib
-- Publish both the immutable release tag and the `latest-native` multi-arch manifest after both release images are available
+- Publish both the immutable release tag and the `latest` multi-arch manifest after both release images are available
 - Optionally deploy a versioned release image through the existing `RENDER_DEPLOY_HOOK_URL`
 
 ### Render Blueprint deployment
 
 `render.yaml` keeps the Render web service configuration in Git. It uses the published
-`latest-native` multi-arch image and the `/actuator/health/readiness` health check. Connect the
+`latest` multi-arch image and the `/actuator/health/readiness` health check. Connect the
 repository in Render with **New → Blueprint**, select the `main` branch, and apply the Blueprint
 to manage the existing `spring-authorization-server-samples` service. Render prompts for the
 database URL, username, password, and public issuer because those values are marked `sync: false`.
@@ -1395,7 +1395,7 @@ database URL, username, password, and public issuer because those values are mar
 Live demo: [Render](https://spring-authorization-server-samples.onrender.com)
 
 Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
-Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest-native`
+Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest`
 manifest before calling the hook. `autoDeploy` is disabled in the Blueprint, so branch builds and
 registry pushes never restart Render. The same hook is reused by the release workflow for now: a
 `v0.1.0` tag deploys the immutable `0.1.0` image to this service. A separate production service

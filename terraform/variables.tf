@@ -61,7 +61,7 @@ variable "image_repository" {
 variable "image_tag" {
   description = "Container image tag for the application."
   type        = string
-  default     = "latest-native"
+  default     = "latest"
 }
 
 variable "spring_profile" {

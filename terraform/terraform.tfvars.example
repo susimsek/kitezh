@@ -7,7 +7,7 @@ ingress_host       = "spring-authorization-server.127.0.0.1.nip.io"
 ingress_http_host_port = 9090
 ingress_https_host_port = 8443
 image_repository   = "docker.io/suayb/spring-authorization-server-samples"
-image_tag          = "latest-native"
+image_tag          = "latest"
 spring_profile     = "prod"
 
 # Replace for anything beyond local development.

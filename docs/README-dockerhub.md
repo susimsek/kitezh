@@ -7,10 +7,10 @@ The image provides the authorization server, localized login and consent pages, 
 ## Image
 
 ```bash
-docker pull suayb/spring-authorization-server-samples:latest-native
+docker pull suayb/spring-authorization-server-samples:latest
 ```
 
-The `latest-native` tag is published to Docker Hub from validated `main` pushes by GitHub Actions after the native build passes. Versioned `v*` tags additionally publish immutable tags such as `0.1.0-amd64`, `0.1.0-arm64`, and `0.1.0`. The image is intended for demonstrations and sample deployments; configure an external PostgreSQL database before using it outside local testing.
+The `latest` tag is published to Docker Hub only by validated `v*` releases after the native build passes. Each release also publishes immutable tags such as `0.1.0-amd64`, `0.1.0-arm64`, and `0.1.0`. The image is intended for demonstrations and sample deployments; configure an external PostgreSQL database before using it outside local testing.
 
 ## Included capabilities
 
@@ -60,7 +60,7 @@ docker run --rm -p 9090:9090 \
   -e SPRING_DATASOURCE_USERNAME=appuser \
   -e SPRING_DATASOURCE_PASSWORD=appuser \
   -e APP_AUTHORIZATION_SERVER_ISSUER=http://localhost:9090 \
-  suayb/spring-authorization-server-samples:latest-native
+  suayb/spring-authorization-server-samples:latest
 ```
 
 The application runs Liquibase migrations on startup. Set `SPRING_LIQUIBASE_DROP_FIRST=true` only for an intentionally disposable demo database because it removes existing objects before applying the changelog.
@@ -171,13 +171,13 @@ The application exposes liveness and readiness probes with the database included
 
 The Render Blueprint in `render.yaml` deploys the same Docker Hub image with:
 
-- image: `docker.io/suayb/spring-authorization-server-samples:latest-native`
+- image: `docker.io/suayb/spring-authorization-server-samples:latest`
 - region: Frankfurt
 - health check: `/actuator/health/readiness`
 - port: `10000` through `SERVER_PORT`
 - PostgreSQL and OTLP values supplied as Render environment variables
 
-The GitHub Actions workflow builds amd64 and arm64 native images with GraalVM, publishes architecture-specific tags through Jib, combines them into the `latest-native` multi-arch manifest for `main` or a versioned manifest for `v*` tags, and optionally triggers the matching Render Deploy Hook.
+The GitHub Actions workflow builds amd64 and arm64 native images with GraalVM, publishes versioned architecture-specific tags through Jib, combines them into the `latest` and versioned multi-arch manifests for `v*` tags, and optionally triggers the matching Render Deploy Hook.
 
 ## Build and publish locally
 
@@ -192,18 +192,18 @@ Build a local native image with Jib:
 ```bash
 ./mvnw -Pprod,native -DskipTests jib:dockerBuild \
   -Djib-maven-plugin.architecture=amd64 \
-  -Djib.to.image=spring-authorization-server-samples:latest-native
+  -Djib.to.image=spring-authorization-server-samples:latest
 ```
 
 The CI publish command uses the Docker Hub repository and tag below:
 
 ```text
-docker.io/suayb/spring-authorization-server-samples:latest-native
+docker.io/suayb/spring-authorization-server-samples:latest
 ```
 
 ## Notes
 
-- The `latest-native` tag selects the `linux/amd64` or `linux/arm64` image automatically; architecture-specific tags are available as `latest-native-amd64` and `latest-native-arm64`.
+- The `latest` tag selects the `linux/amd64` or `linux/arm64` image automatically; versioned architecture-specific tags are available as `<version>-amd64` and `<version>-arm64`.
 - The image uses a static native executable and does not contain a shell or package manager.
 - H2 is a development dependency and is not included in the published `prod,native` image.
 - Liquibase seed data is the source of truth for users, groups, authorities, and registered clients.

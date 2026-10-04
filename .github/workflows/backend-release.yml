@@ -196,11 +196,11 @@ jobs:
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
           docker buildx imagetools create \
-            --tag "${IMAGE}:latest-native" \
+            --tag "${IMAGE}:latest" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
           docker buildx imagetools inspect "${IMAGE}:${VERSION}"
-          docker buildx imagetools inspect "${IMAGE}:latest-native"
+          docker buildx imagetools inspect "${IMAGE}:latest"
 
       - name: Update Docker Hub description
         run: |

@@ -13,7 +13,7 @@ updateStrategy:
 image:
   repository: docker.io/suayb/spring-authorization-server-samples
   pullPolicy: IfNotPresent
-  tag: "latest-native"
+  tag: "latest"
 
 initContainers:
   waitForDb:

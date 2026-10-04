@@ -2,7 +2,7 @@
 name: spring-authorization-server-samples
 services:
   app:
-    image: docker.io/suayb/spring-authorization-server-samples:latest-native
+    image: docker.io/suayb/spring-authorization-server-samples:latest
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/authserversamples

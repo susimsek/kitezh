@@ -221,13 +221,13 @@ The packaged Electron app uses a local renderer and the Render deployment as its
 The supported release path is:
 
 1. GitHub Actions checks the repository, frontend, backend, security, Compose, Helm, Terraform, and native-image metadata.
-2. The native-image matrix produces `latest-native-amd64` and `latest-native-arm64` images.
-3. The publish job creates and verifies the `latest-native` multi-architecture manifest.
+2. The native-image matrix produces versioned `${VERSION}-amd64` and `${VERSION}-arm64` images.
+3. The publish job creates and verifies both the `${VERSION}` and `latest` multi-architecture manifests.
 4. The workflow calls `RENDER_DEPLOY_HOOK_URL` after the manifest is available.
 5. Render pulls the manifest-selected image for its architecture, starts the container on port `10000`, and waits for readiness.
 6. The deployment smoke check verifies the public issuer, discovery document, readiness, login page, static assets, protected Admin route, and the API endpoints used by the Electron local-renderer smoke test.
 
-Render’s prebuilt-image service does not rebuild from Git on every commit. Therefore `autoDeploy` is not the control plane for this service; the image tag/digest and deploy hook are. For reproducible production rollouts, record the immutable image digest in the release and retain the previous digest for rollback. The demo may continue to use `latest-native`, but the release log must record the resolved digest.
+Render’s prebuilt-image service does not rebuild from Git on every commit. Therefore `autoDeploy` is not the control plane for this service; the image tag/digest and deploy hook are. For reproducible production rollouts, record the immutable image digest in the release and retain the previous digest for rollback. The demo may continue to use `latest`, but the release log must record the resolved digest.
 
 The deployment contract must also define:
 
