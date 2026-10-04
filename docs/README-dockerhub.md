@@ -15,7 +15,7 @@ Official links:
 - Source: [github.com/susimsek/kitezh](https://github.com/susimsek/kitezh)
 - Docker Hub: [hub.docker.com/r/suayb/kitezh](https://hub.docker.com/r/suayb/kitezh)
 - Releases: [Kitezh releases](https://github.com/susimsek/kitezh/releases)
-- Live demo: [kitezh.onrender.com](https://kitezh.onrender.com)
+- Live demo: [spring-authorization-server-samples.onrender.com](https://spring-authorization-server-samples.onrender.com)
 
 The `latest` image is a multi-architecture manifest. Docker selects the matching `linux/amd64` or `linux/arm64` image for the host automatically.
 
@@ -68,7 +68,7 @@ docker run --rm -p 9090:9090 \
   -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/kitezh \
   -e SPRING_DATASOURCE_USERNAME=appuser \
   -e SPRING_DATASOURCE_PASSWORD=appuser \
-  -e APP_AUTHORIZATION_SERVER_ISSUER=http://localhost:9090 \
+  -e APP_AUTHORIZATIONSERVER_ISSUER=http://localhost:9090 \
   suayb/kitezh:latest
 ```
 
@@ -85,7 +85,7 @@ Open the following URLs after the application starts:
 
 Both consoles use Authorization Code + PKCE, refresh-token rotation, and OIDC logout. The issuer and redirect URIs must use the same public address when the image is exposed through another hostname.
 
-The public demo is available at [kitezh.onrender.com](https://kitezh.onrender.com).
+The public demo is available at [spring-authorization-server-samples.onrender.com](https://spring-authorization-server-samples.onrender.com).
 
 ## OAuth2 and OIDC checks
 
@@ -144,7 +144,7 @@ The most relevant environment variables are:
 | `SPRING_DATASOURCE_PASSWORD` | none in `prod` | Database password |
 | `SPRING_LIQUIBASE_ENABLED` | `true` | Enable Liquibase migrations |
 | `SPRING_LIQUIBASE_DROP_FIRST` | `false` | Drop database objects before migration; use only for disposable demos |
-| `APP_AUTHORIZATION_SERVER_ISSUER` | `https://kitezh.local` | Public OAuth2/OIDC issuer |
+| `APP_AUTHORIZATIONSERVER_ISSUER` | `https://kitezh.local` | Public OAuth2/OIDC issuer |
 | `APP_DPOP_NONCE_REQUIRED` | `false` | Require DPoP nonce validation |
 | `MANAGEMENT_OPENTELEMETRY_ENABLED` | `false` | Enable OpenTelemetry resource/export configuration |
 | `MANAGEMENT_TRACING_EXPORT_ENABLED` | `false` | Enable trace export |

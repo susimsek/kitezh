@@ -42,7 +42,7 @@ app:
       initial-capacity: 500
       maximum-size: 1000
   authorization-server:
-    issuer: ${APP_AUTHORIZATION_SERVER_ISSUER:https://kitezh.local}
+    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.local}
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
 
 logging:

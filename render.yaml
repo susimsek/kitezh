@@ -48,5 +48,5 @@ services:
         sync: false
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
-      - key: APP_AUTHORIZATION_SERVER_ISSUER
-        value: https://kitezh.onrender.com
+      - key: APP_AUTHORIZATIONSERVER_ISSUER
+        value: https://spring-authorization-server-samples.onrender.com

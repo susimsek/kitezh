@@ -5,7 +5,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kitezh)
 [![Vulnerabilities](https://snyk.io/test/github/susimsek/kitezh/badge.svg)](https://snyk.io/test/github/susimsek/kitezh)
 [![Docker Image Size](https://img.shields.io/docker/image-size/suayb/kitezh/latest?label=Image%20Size)](https://hub.docker.com/r/suayb/kitezh)
-[![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh.onrender.com)
+[![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://spring-authorization-server-samples.onrender.com)
 [![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/spring-auth-prod/kitezh)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Maven](https://img.shields.io/badge/Maven-3.9+-C71A36?logo=apache-maven&logoColor=white)](https://maven.apache.org/)
@@ -416,7 +416,7 @@ The static frontend also contains browser-based OIDC clients for administration 
 
 The authorization server browser session provides SSO between the login screen and the console clients. The Admin Console includes client, client-scope, user, role, session, consent, signing-key, event, and server-information screens. The Account Console provides personal information, password, TOTP MFA, and one-time recovery-code security, authorized applications, and session-management screens.
 
-The registered redirect and post-logout redirect URIs are seeded for `localhost:9090` and `https://kitezh.local`. When deploying elsewhere, set `app.authorization-server.issuer` (or `APP_AUTHORIZATION_SERVER_ISSUER`) to the public address and register matching client redirect URIs.
+The registered redirect and post-logout redirect URIs are seeded for `localhost:9090` and `https://kitezh.local`. When deploying elsewhere, set `app.authorization-server.issuer` (or `APP_AUTHORIZATIONSERVER_ISSUER`) to the public address and register matching client redirect URIs.
 
 ## Run Locally
 
@@ -476,7 +476,7 @@ Configure the datasource and issuer. Signing keys are loaded from the database a
 ```bash
 export SPRING_DATASOURCE_USERNAME=appuser
 export SPRING_DATASOURCE_PASSWORD=appuser
-export APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090
+export APP_AUTHORIZATIONSERVER_ISSUER=http://127.0.0.1:9090
 ```
 
 Then run the app with the `prod` profile:
@@ -1124,7 +1124,7 @@ SPRING_PROFILES_ACTIVE=prod \
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/kitezh \
 SPRING_DATASOURCE_USERNAME=appuser \
 SPRING_DATASOURCE_PASSWORD=appuser \
-APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090 \
+APP_AUTHORIZATIONSERVER_ISSUER=http://127.0.0.1:9090 \
 ./target/native-executable
 ```
 
@@ -1174,7 +1174,7 @@ docker run --rm -p 9090:9090 \
   -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/kitezh \
   -e SPRING_DATASOURCE_USERNAME=appuser \
   -e SPRING_DATASOURCE_PASSWORD=appuser \
-  -e APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090 \
+  -e APP_AUTHORIZATIONSERVER_ISSUER=http://127.0.0.1:9090 \
   kitezh:latest
 ```
 
@@ -1416,7 +1416,7 @@ repository in Render with **New → Blueprint**, select the `main` branch, and a
 to manage the existing `kitezh` service. Render prompts for the
 database URL, username, password, and public issuer because those values are marked `sync: false`.
 
-Live demo: [Render](https://kitezh.onrender.com)
+Live demo: [Render](https://spring-authorization-server-samples.onrender.com)
 
 Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
 Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest`
