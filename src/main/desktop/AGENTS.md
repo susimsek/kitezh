@@ -40,6 +40,8 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - `src/security/auth-flow.ts`: PKCE state, callback parsing, token exchange, and callback sanitization.
 - `src/security/origin-policy.ts`: trusted renderer and external-origin checks.
 - `scripts/build-renderer.mjs`: builds the shared Next.js static renderer into `renderer/`.
+- `scripts/collect-release-assets.mjs`: stages only user-downloadable installers, updater metadata,
+  and verification files for a GitHub Release.
 - `scripts/run-desktop.mjs`: cross-platform local/production launcher and local DevTools configuration.
 - `test/`: Node test-runner coverage for callback, origin, and token-exchange security behavior.
 - `assets/`: packaged application artwork.
@@ -112,6 +114,10 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Preserve the current platform targets: macOS DMG/ZIP, Linux AppImage/deb, and Windows NSIS unless a release decision changes them.
 - Build each platform in its supported CI environment; do not claim that a local package is signed or notarized.
 - Upload installers as CI artifacts before publishing them. Do not place generated installers or blockmaps in source control.
+- Publish only distributable installers (`.dmg`, `.zip`, `.AppImage`, `.deb`, `.rpm`, and `.exe`),
+  updater metadata (`latest*.yml` and optional signatures), and checksums. Files such as `app.asar`,
+  `.pak`, `chrome-sandbox`, `app-update.yml`, and builder diagnostics are packaged internals and
+  must not be uploaded as separate release assets.
 - Test protocol registration and callback delivery on each target OS before a release. A browser redirect must return to the correct console and must not be accepted by the other console.
 - Keep production API defaults and release URLs explicit and reviewable; do not silently switch a packaged build to localhost.
 
