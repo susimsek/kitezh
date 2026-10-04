@@ -28,25 +28,25 @@ type DownloadPlatform = {
 
 const platformAssets = {
   windows: {
-    installer: "kitezh-0.1.0-win-x64-setup.exe",
-    portable: "kitezh-0.1.0-win-x64-portable.exe",
-    appx: "kitezh-0.1.0-win-x64-appx.appx",
+    installer: "kitezh-windows-x64-setup.exe",
+    portable: "kitezh-windows-x64-portable.exe",
+    appx: "kitezh-windows-x64-appx.appx",
   },
   linux: {
     x64: {
-      appImage: "kitezh-0.1.0-linux-x86_64.AppImage",
-      deb: "kitezh-0.1.0-linux-amd64.deb",
-      rpm: "kitezh-0.1.0-linux-x86_64.rpm",
-      snap: "kitezh-0.1.0-linux-amd64.snap",
+      appImage: "kitezh-linux-x64.AppImage",
+      deb: "kitezh-linux-x64.deb",
+      rpm: "kitezh-linux-x64.rpm",
+      snap: "kitezh-linux-x64.snap",
     },
     arm64: {
-      appImage: "kitezh-0.1.0-linux-arm64.AppImage",
-      deb: "kitezh-0.1.0-linux-arm64.deb",
+      appImage: "kitezh-linux-arm64.AppImage",
+      deb: "kitezh-linux-arm64.deb",
     },
   },
   macos: {
-    universal: "kitezh-0.1.0-macos-universal.dmg",
-    intel: "kitezh-0.1.0-macos-x64.dmg",
+    universal: "kitezh-macos-universal.dmg",
+    intel: "kitezh-macos-x64.dmg",
   },
 };
 

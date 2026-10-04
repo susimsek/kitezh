@@ -13,10 +13,11 @@ test.describe("download page", () => {
     await expect(page.getByRole("heading", { name: "Linux" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "macOS" })).toBeVisible();
 
-    const assetLinks = page.locator('a[href*="releases/latest/download/"]');
+    const assetLinks = page.locator('a[href*="releases/latest/download/kitezh-"]');
     await expect(assetLinks).toHaveCount(12);
     for (const link of await assetLinks.all()) {
       await expect(link).toHaveAttribute("download", "");
+      await expect(link).not.toHaveAttribute("href", /0\.1\.0/);
     }
     await expect(
       page.locator('a[href="https://github.com/susimsek/kitezh/releases/latest"]'),

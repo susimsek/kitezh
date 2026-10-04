@@ -374,6 +374,9 @@ To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
 Each release includes macOS x64 and universal DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
 and Snap packages, Linux ARM64 AppImage and Debian packages, Windows NSIS, portable EXE, and AppX
 packages, plus an SPDX JSON software bill of materials.
+The public download page uses stable platform and architecture aliases that each release publishes
+alongside the versioned files, so links continue to resolve to the latest release without changing
+the Electron updater manifests.
 macOS and Windows CI packages remain unsigned until their platform signing credentials are configured;
 Linux packages receive keyless Sigstore bundles in the release workflow.
 The packaged app uses the `kitezh://oauth/callback` protocol and stores console sessions in
