@@ -2,6 +2,7 @@
   "name": "spring-authorization-server-samples-frontend",
   "version": "0.0.1",
   "private": true,
+  "description": "Web administration and account consoles for the Spring Authorization Server sample",
   "homepage": "https://spring-authorization-server-samples.onrender.com",
   "repository": {
     "type": "git",
