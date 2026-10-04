@@ -57,18 +57,21 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
+      "artifactName": "spring-authorization-server-${version}-macos-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
       ]
     },
     "linux": {
+      "artifactName": "spring-authorization-server-${version}-linux-${arch}.${ext}",
       "target": [
         "AppImage",
         "deb"
       ]
     },
     "win": {
+      "artifactName": "spring-authorization-server-${version}-win-${arch}-setup.${ext}",
       "target": [
         "nsis"
       ]

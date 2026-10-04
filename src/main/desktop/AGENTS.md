@@ -111,6 +111,9 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 ## Packaging and Release
 
 - Keep the Electron application ID, product name, protocol registration, icons, and platform targets aligned in `package.json`.
+- Keep release artifact names lowercase and explicit about version, platform, and architecture; use a
+  `-setup` suffix only for installer artifacts. The product name shown inside the application may
+  remain title-cased independently of the downloadable filename.
 - Preserve the current platform targets: macOS DMG/ZIP, Linux AppImage/deb, and Windows NSIS unless a release decision changes them.
 - Build each platform in its supported CI environment; do not claim that a local package is signed or notarized.
 - Upload installers as CI artifacts before publishing them. Do not place generated installers or blockmaps in source control.
