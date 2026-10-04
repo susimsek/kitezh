@@ -68,14 +68,31 @@
       "artifactName": "spring-authorization-server-${version}-linux-${arch}.${ext}",
       "target": [
         "AppImage",
-        "deb"
+        "deb",
+        "rpm",
+        "snap"
       ]
     },
     "win": {
       "artifactName": "spring-authorization-server-${version}-win-${arch}-setup.${ext}",
       "target": [
-        "nsis"
+        "nsis",
+        "portable",
+        "appx"
       ]
+    },
+    "portable": {
+      "artifactName": "spring-authorization-server-${version}-win-${arch}-portable.${ext}"
+    },
+    "appx": {
+      "artifactName": "spring-authorization-server-${version}-win-${arch}-appx.${ext}",
+      "publisherDisplayName": "Suayb Simsek"
+    },
+    "snapcraft": {
+      "base": "core22",
+      "core22": {
+        "confinement": "strict"
+      }
     }
   },
   "publish": {

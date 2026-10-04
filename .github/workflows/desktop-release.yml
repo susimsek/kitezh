@@ -142,11 +142,18 @@ jobs:
         shell: bash
         working-directory: src/main/desktop
         run: |
-          if [[ "${{ matrix.platform }}" == "macos" && -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY}" && -n "${APPLE_API_KEY_ID}" && -n "${APPLE_API_ISSUER}" ]]; then
-            pnpm run build
-            pnpm exec electron-builder --publish never --mac --config.mac.notarize=true
-          else
+          if [[ "${{ matrix.platform }}" != "macos" ]]; then
             pnpm package
+            exit 0
+          fi
+
+          pnpm run build
+          if [[ -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY:-}" && -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER:-}" ]]; then
+            pnpm exec electron-builder --publish never --mac --x64 --config.mac.notarize=true
+            pnpm exec electron-builder --publish never --mac --universal --config.mac.notarize=true
+          else
+            pnpm exec electron-builder --publish never --mac --x64
+            pnpm exec electron-builder --publish never --mac --universal
           fi
 
       - name: Verify macOS signature and notarization
@@ -196,10 +203,16 @@ jobs:
           test -n "$(dpkg-deb -f "${deb_path}" Architecture)"
           test -n "$(dpkg-deb -f "${deb_path}" Maintainer)"
           dpkg-deb --info "${deb_path}"
+          rpm_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.rpm' -print -quit)"
+          test -n "${rpm_path}"
+          rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}\n' "${rpm_path}"
+          snap_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.snap' -print -quit)"
+          test -n "${snap_path}"
+          test -s "${snap_path}"
           appimage_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
           test -n "${appimage_path}"
           test -x "${appimage_path}"
-          (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb > SHA256SUMS)
+          (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb *.rpm *.snap > SHA256SUMS)
           if [[ -z "${LINUX_GPG_PRIVATE_KEY}" ]]; then
             echo "Linux GPG signing key is not configured; publishing unsigned packages with SHA256SUMS."
             exit 0
@@ -240,6 +253,17 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-assets
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: release-assets/spring-authorization-server-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.head_branch }}-sbom.spdx.json
+          artifact-name: spring-authorization-server-sbom
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
 
       - name: Create or update GitHub Release
         env:
