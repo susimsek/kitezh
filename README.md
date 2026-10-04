@@ -98,7 +98,7 @@ This repository is a Spring Boot 4.1 + Java 25 application built around the Auth
 
 ## Project Layout
 
-- Application code: `src/main/java/io/github/susimsek/springauthserversamples`
+- Application code: `src/main/java/io/github/susimsek/kitezh`
     - `config`: Spring configuration
         - `aot`: GraalVM Native Image runtime hints
         - `cache`: Spring Cache and Hibernate second-level cache configuration
@@ -116,7 +116,7 @@ This repository is a Spring Boot 4.1 + Java 25 application built around the Auth
 - Docker compose files: `src/main/docker`
 - Helm chart: `helm/kitezh`
 - Tests: `src/test/java`
-    - Application unit/integration tests: `src/test/java/io/github/susimsek/springauthserversamples`
+    - Application unit/integration tests: `src/test/java/io/github/susimsek/kitezh`
     - Gatling performance tests: `src/test/java/gatling/simulations`
 
 ## Configuration
@@ -376,7 +376,7 @@ and Snap packages, Linux ARM64 AppImage and Debian packages, Windows NSIS, porta
 packages, plus an SPDX JSON software bill of materials.
 macOS and Windows CI packages remain unsigned until their platform signing credentials are configured;
 Linux packages receive keyless Sigstore bundles in the release workflow.
-The packaged app uses the `springauth://oauth/callback` protocol and stores console sessions in
+The packaged app uses the `kitezh://oauth/callback` protocol and stores console sessions in
 the operating system's protected Electron storage. Release signing, macOS notarization, and
 auto-update publishing require platform certificates and are not part of the unsigned local build.
 

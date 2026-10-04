@@ -1,6 +1,6 @@
 import { URL } from "node:url";
 
-export const DESKTOP_PROTOCOL = "springauth";
+export const DESKTOP_PROTOCOL = "kitezh";
 export const RENDERER_PROTOCOL = "app";
 export const RENDERER_HOST = "renderer";
 export const DEFAULT_API_BASE_URL =

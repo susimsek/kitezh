@@ -19,12 +19,7 @@ test.describe("download page", () => {
       await expect(link).toHaveAttribute("download", "");
     }
     await expect(
-      page.locator(
-        'a[href="https://github.com/susimsek/kitezh/releases/latest"]',
-      ),
-    ).toHaveAttribute(
-      "href",
-      "https://github.com/susimsek/kitezh/releases/latest",
-    );
+      page.locator('a[href="https://github.com/susimsek/kitezh/releases/latest"]'),
+    ).toHaveAttribute("href", "https://github.com/susimsek/kitezh/releases/latest");
   });
 });

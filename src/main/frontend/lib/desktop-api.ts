@@ -92,7 +92,7 @@ export function assertDesktopOnline(method?: string) {
 
 export function getApiUrl(pathOrUrl: string | URL) {
   const value = pathOrUrl.toString();
-  if (/^(https?|app|springauth):/i.test(value)) return value;
+  if (/^(https?|app|kitezh):/i.test(value)) return value;
   if (!isDesktopRuntime() || !window.desktopApi) return value;
   return new URL(value, window.desktopApi.apiBaseUrl).toString();
 }

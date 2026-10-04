@@ -67,7 +67,7 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
   - `routing/AppRoutes.tsx` and `components/account`: end-user Account Console routes and UI.
   - `lib/console-auth.ts`: shared browser OIDC Authorization Code + PKCE, refresh-token, and logout adapter.
 
-- Application root: `src/main/java/io/github/susimsek/springauthserversamples`
+- Application root: `src/main/java/io/github/susimsek/kitezh`
   - `config`: Spring configuration
     - `aot`: GraalVM Native Image runtime hints (`NativeRuntimeHints`)
     - `cache`: Spring Cache and Hibernate second-level cache configuration
@@ -91,7 +91,7 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
 - Helm chart: `helm/kitezh`
 - Terraform local infrastructure: `terraform`
 - Tests: `src/test/java`
-  - Unit and integration tests: `src/test/java/io/github/susimsek/springauthserversamples`
+  - Unit and integration tests: `src/test/java/io/github/susimsek/kitezh`
   - Gatling performance tests: `src/test/java/gatling/simulations`
 
 ## Code Style and Quality Gates

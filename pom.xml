@@ -43,7 +43,7 @@
 		<node.version>v24.18.0</node.version>
 		<skip.frontend>false</skip.frontend>
 		<native-image-name>native-executable</native-image-name>
-		<start-class>io.github.susimsek.springauthserversamples.SpringAuthorizationServerSamplesApplication</start-class>
+		<start-class>io.github.susimsek.kitezh.KitezhApplication</start-class>
 </properties>
 
 	<dependencies>
@@ -366,7 +366,7 @@
 				<configuration>
 					<destFile>${java.io.tmpdir}/kitezh-jacoco.exec</destFile>
 					<excludes>
-						<exclude>io/github/susimsek/springauthserversamples/mapper/*MapperImpl.class</exclude>
+						<exclude>io/github/susimsek/kitezh/mapper/*MapperImpl.class</exclude>
 					</excludes>
 				</configuration>
 				<executions>

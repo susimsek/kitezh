@@ -42,4 +42,4 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: DEBUG
-    io.github.susimsek.springauthserversamples: DEBUG
+    io.github.susimsek.kitezh: DEBUG

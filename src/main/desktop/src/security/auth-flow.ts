@@ -75,7 +75,7 @@ export async function exchangeAuthorizationCode(
   };
 }
 
-export function parseAuthCallback(value: string, protocol = "springauth") {
+export function parseAuthCallback(value: string, protocol = "kitezh") {
   try {
     const url = new URL(value);
     if (
@@ -98,7 +98,7 @@ export function parseAuthCallback(value: string, protocol = "springauth") {
   }
 }
 
-export function parseLogoutCallback(value: string, protocol = "springauth") {
+export function parseLogoutCallback(value: string, protocol = "kitezh") {
   try {
     const url = new URL(value);
     return (
@@ -113,7 +113,7 @@ export function parseLogoutCallback(value: string, protocol = "springauth") {
   }
 }
 
-export function sanitizedAuthCallback(state: string, protocol = "springauth") {
+export function sanitizedAuthCallback(state: string, protocol = "kitezh") {
   const callback = new URL(`${protocol}://oauth/callback`);
   callback.searchParams.set("state", state);
   return callback.toString();

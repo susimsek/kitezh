@@ -16,7 +16,7 @@
       "subtitle": "Use the same authorization server across browser and desktop clients.",
       "security": {
         "title": "Secure by default",
-        "description": "PKCE, OpenID Connect, passkeys, MFA, and session controls are built into the sample."
+        "description": "PKCE, OpenID Connect, passkeys, MFA, and session controls are built into Kitezh."
       },
       "protocols": {
         "title": "OAuth 2.0 and OIDC",

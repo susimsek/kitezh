@@ -241,7 +241,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
         const state = randomValue();
         const nonce = randomValue();
         const redirectUri = isDesktopRuntime()
-          ? "springauth://oauth/callback"
+          ? "kitezh://oauth/callback"
           : `${window.location.origin}${config.redirectPath(locale)}`;
         const transaction: AuthorizationTransaction = {
           codeVerifier,
@@ -388,7 +388,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       void removeAllPersistedTokens().catch(() => undefined);
 
       const postLogoutRedirectUri = isDesktopRuntime()
-        ? "springauth://logout/callback"
+        ? "kitezh://logout/callback"
         : `${window.location.origin}${config.postLogoutRedirectPath(locale)}`;
       if (!idTokenHint) {
         await axios.post(apiUrl("/logout")).catch(() => undefined);

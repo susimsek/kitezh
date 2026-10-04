@@ -22,26 +22,26 @@ test("preserves an initial desktop protocol callback on first launch", () => {
   assert.equal(
     findDesktopDeepLink([
       "electron",
-      "springauth://oauth/callback?state=state",
+      "kitezh://oauth/callback?state=state",
     ]),
-    "springauth://oauth/callback?state=state",
+    "kitezh://oauth/callback?state=state",
   );
   assert.equal(findDesktopDeepLink(["electron", "--no-sandbox"]), null);
 });
 
 test("accepts only the expected desktop callback route", () => {
   assert.deepEqual(
-    parseAuthCallback("springauth://oauth/callback?state=state-1&code=code-1"),
+    parseAuthCallback("kitezh://oauth/callback?state=state-1&code=code-1"),
     { state: "state-1", code: "code-1", error: null },
   );
   assert.deepEqual(
     parseAuthCallback(
-      "springauth://oauth/callback#state=state-2&error=access_denied",
+      "kitezh://oauth/callback#state=state-2&error=access_denied",
     ),
     { state: "state-2", code: null, error: "access_denied" },
   );
   assert.equal(
-    parseAuthCallback("springauth://other/callback?state=state"),
+    parseAuthCallback("kitezh://other/callback?state=state"),
     null,
   );
   assert.equal(
@@ -51,10 +51,10 @@ test("accepts only the expected desktop callback route", () => {
 });
 
 test("accepts only the exact native logout callback", () => {
-  assert.equal(parseLogoutCallback("springauth://logout/callback"), true);
-  assert.equal(parseLogoutCallback("springauth://oauth/callback"), false);
+  assert.equal(parseLogoutCallback("kitezh://logout/callback"), true);
+  assert.equal(parseLogoutCallback("kitezh://oauth/callback"), false);
   assert.equal(
-    parseLogoutCallback("springauth://logout/callback?state=unexpected"),
+    parseLogoutCallback("kitezh://logout/callback?state=unexpected"),
     false,
   );
   assert.equal(
@@ -66,7 +66,7 @@ test("accepts only the exact native logout callback", () => {
 test("sanitizes callback data before sending it to the renderer", () => {
   assert.equal(
     sanitizedAuthCallback("state-1"),
-    "springauth://oauth/callback?state=state-1",
+    "kitezh://oauth/callback?state=state-1",
   );
 });
 
@@ -75,7 +75,7 @@ test("rejects stale or mismatched authorization state", () => {
     state: "state-1",
     codeVerifier: "verifier",
     clientId: "desktop-admin-console",
-    redirectUri: "springauth://oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
     createdAt: 10_000,
   };
   assert.equal(isPendingAuthorizationValid(pending, "state-1", 10_001), true);
@@ -103,7 +103,7 @@ test("exchanges the authorization code with PKCE and validates the token respons
       state: "state",
       codeVerifier: "verifier",
       clientId: "desktop-admin-console",
-      redirectUri: "springauth://oauth/callback",
+      redirectUri: "kitezh://oauth/callback",
       createdAt: Date.now(),
     },
     "code",

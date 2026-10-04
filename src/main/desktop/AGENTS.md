@@ -62,7 +62,7 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Validate all values crossing IPC boundaries, including console names, token records, callback URLs, client IDs, redirect URIs, and external URLs. Reject malformed or unexpected values.
 - Allow external navigation only for the configured authorization server and explicitly allowlisted OAuth provider hosts. Open approved external URLs with `shell.openExternal`; deny arbitrary renderer navigation and popup windows.
 - Keep the Content Security Policy synchronized with the configured API origin. Do not add broad `*` source allowances.
-- Keep the `springauth://oauth/callback` protocol exact. Accept only the registered callback route, validate the PKCE state, reject stale or mismatched requests, and sanitize callback data before sending it to the renderer.
+- Keep the `kitezh://oauth/callback` protocol exact. Accept only the registered callback route, validate the PKCE state, reject stale or mismatched requests, and sanitize callback data before sending it to the renderer.
 - Store desktop access, ID, and refresh tokens only in the main-process operating-system protected storage through Electron `safeStorage`. Never put tokens in renderer `localStorage`, query strings, URLs, Redux state, logs, crash reports, or telemetry.
 - Never log authorization codes, PKCE verifiers, access tokens, refresh tokens, ID tokens, client secrets, or provider responses containing credentials.
 - Do not add development bypasses, disabled certificate validation, insecure HTTP origins, or unrestricted shell execution to make a flow easier to test.
@@ -71,7 +71,7 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 ## Authentication
 
 - Use Authorization Code + PKCE (S256) for both the Admin and Account desktop clients.
-- Keep the desktop client IDs and `springauth://oauth/callback` redirect URI aligned with Liquibase-seeded registered clients.
+- Keep the desktop client IDs and `kitezh://oauth/callback` redirect URI aligned with Liquibase-seeded registered clients.
 - Generate high-entropy state and code verifiers, retain pending authorization only in the main process, expire it, and consume it once.
 - Complete the authorization-code exchange in the main process. The renderer receives only the sanitized result and the session adapter state it needs.
 - Refresh tokens only through the shared console authentication adapter when the access token is near expiry or a refresh is explicitly required. Replace the encrypted session record atomically after a successful exchange.

@@ -52,7 +52,7 @@
       {
         "name": "Kitezh OAuth callback",
         "schemes": [
-          "springauth"
+          "kitezh"
         ]
       }
     ],

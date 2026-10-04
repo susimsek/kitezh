@@ -71,12 +71,12 @@ Electron security is a release requirement: use a current Electron version, `con
 
 ### Desktop authentication and OAuth callback
 
-The desktop renderer uses Authorization Code + PKCE with the system browser. The local renderer calls the Render authorization server through the configured API base URL; it does not embed arbitrary provider pages in a webview. A dedicated public desktop client uses a custom callback such as `springauth://oauth/callback`, which Electron registers and forwards to the single running instance.[^13]
+The desktop renderer uses Authorization Code + PKCE with the system browser. The local renderer calls the Render authorization server through the configured API base URL; it does not embed arbitrary provider pages in a webview. A dedicated public desktop client uses a custom callback such as `kitezh://oauth/callback`, which Electron registers and forwards to the single running instance.[^13]
 
 1. The Electron window loads the packaged `app://renderer/` export.
 2. The renderer asks the preload bridge to start the selected console login.
 3. The renderer creates the PKCE transaction, while the main process validates the state, verifier, client, redirect URI, and authorization-server origin before opening the URL and recording the pending request in memory.
-4. The authorization server redirects to `springauth://oauth/callback`; Electron validates the sender, state, issuer, and code, then exchanges the code over HTTPS.
+4. The authorization server redirects to `kitezh://oauth/callback`; Electron validates the sender, state, issuer, and code, then exchanges the code over HTTPS.
 5. The main process stores the access, ID, and refresh token set in the OS-protected vault and exposes only session operations to the renderer.
 6. Logout revokes the refresh token when possible, calls OIDC logout with the ID-token hint, clears the vault, and returns the renderer to its local login route.
 

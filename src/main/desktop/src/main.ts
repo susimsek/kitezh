@@ -425,7 +425,7 @@ function registerIpc() {
         !["desktop-admin-console", "desktop-account-console"].includes(
           value.clientId,
         ) ||
-        value.redirectUri !== "springauth://oauth/callback"
+        value.redirectUri !== "kitezh://oauth/callback"
       ) {
         throw new Error("Invalid desktop authorization request");
       }

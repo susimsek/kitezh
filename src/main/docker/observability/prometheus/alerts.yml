@@ -2,23 +2,23 @@ groups:
   - name: kitezh-production
     interval: 30s
     rules:
-      - alert: SpringAuthorizationServerDown
+      - alert: KitezhDown
         expr: up{job=~"kitezh.*"} == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: Spring Authorization Server is unavailable
+          summary: Kitezh is unavailable
           description: The Prometheus target {{ $labels.instance }} has been down for more than five minutes.
-      - alert: SpringAuthorizationServerScrapeMissing
+      - alert: KitezhScrapeMissing
         expr: absent(up{job=~"kitezh.*"})
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: Spring Authorization Server scrape target is missing
-          description: Prometheus has no Spring Authorization Server scrape target for more than five minutes.
-      - alert: SpringAuthorizationServerAuthenticationErrorRate
+          summary: Kitezh scrape target is missing
+          description: Prometheus has no Kitezh scrape target for more than five minutes.
+      - alert: KitezhAuthenticationErrorRate
         expr: |
           sum(rate(http_server_requests_seconds_count{
             job=~"kitezh.*",
@@ -35,7 +35,7 @@ groups:
         annotations:
           summary: Authentication server-error SLI is above target
           description: Authentication requests are returning server errors above the 0.1 percent SLO for five minutes.
-      - alert: SpringAuthorizationServerAuthenticationLatency
+      - alert: KitezhAuthenticationLatency
         expr: |
           histogram_quantile(0.95,
             sum by (le) (rate(http_server_requests_seconds_bucket{
@@ -49,7 +49,7 @@ groups:
         annotations:
           summary: Authentication latency SLI is above target
           description: The authentication request p95 latency has exceeded 250 milliseconds for ten minutes.
-      - alert: SpringAuthorizationServerHighHeapUsage
+      - alert: KitezhHighHeapUsage
         expr: |
           100 * sum(jvm_memory_used_bytes{job=~"kitezh.*",area="heap"})
           / clamp_min(sum(jvm_memory_max_bytes{job=~"kitezh.*",area="heap"}), 1) > 85
@@ -59,7 +59,7 @@ groups:
         annotations:
           summary: JVM heap usage is high
           description: JVM heap usage has exceeded 85 percent for ten minutes.
-      - alert: SpringAuthorizationServerHikariPoolSaturated
+      - alert: KitezhHikariPoolSaturated
         expr: sum(hikaricp_connections_pending{job=~"kitezh.*"}) > 0
         for: 5m
         labels:

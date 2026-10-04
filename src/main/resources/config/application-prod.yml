@@ -49,4 +49,4 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: INFO
-    io.github.susimsek.springauthserversamples: INFO
+    io.github.susimsek.kitezh: INFO

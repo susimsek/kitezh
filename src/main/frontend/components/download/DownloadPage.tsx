@@ -6,10 +6,8 @@ import type { Dictionary } from "@/i18n/get-dictionary";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon, type IconName } from "@/components/shared/Icon";
 
-const RELEASES_URL =
-  "https://github.com/susimsek/kitezh/releases/latest";
-const DOWNLOAD_URL =
-  "https://github.com/susimsek/kitezh/releases/latest/download";
+const RELEASES_URL = "https://github.com/susimsek/kitezh/releases/latest";
+const DOWNLOAD_URL = "https://github.com/susimsek/kitezh/releases/latest/download";
 
 type DownloadAsset = {
   file: string;
