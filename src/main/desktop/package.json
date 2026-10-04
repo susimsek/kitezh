@@ -85,6 +85,7 @@
       "artifactName": "spring-authorization-server-${version}-win-${arch}-portable.${ext}"
     },
     "appx": {
+      "applicationId": "SpringAuthorizationServerSamples",
       "artifactName": "spring-authorization-server-${version}-win-${arch}-appx.${ext}",
       "publisherDisplayName": "Suayb Simsek"
     },
