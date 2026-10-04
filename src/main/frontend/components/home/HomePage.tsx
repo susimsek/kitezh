@@ -1,12 +1,13 @@
 "use client";
 
-import { Button, Card, Col, Container, Row, Stack } from "react-bootstrap";
+import { Card, Col, Container, Row, Stack } from "react-bootstrap";
 
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { BrandLogo } from "@/components/shared/BrandLogo";
 import { Icon, type IconName } from "@/components/shared/Icon";
 import { useBranding } from "@/components/auth/BrandingProvider";
+import Link from "@/routing/Link";
 
 type HomeFeature = {
   icon: IconName;
@@ -50,14 +51,14 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
                   <h1 className="display-4 fw-bold mb-0">{copy.title}</h1>
                   <p className="lead text-body-secondary mb-0">{copy.subtitle}</p>
                   <Stack direction="horizontal" gap={2} className="flex-wrap pt-2">
-                    <Button as="a" href="/download" variant="primary" size="lg">
+                    <Link className="btn btn-primary btn-lg" href="/download">
                       <ActionIcon action="download" />
                       {copy.download}
-                    </Button>
-                    <Button as="a" href="/login" variant="secondary" size="lg">
+                    </Link>
+                    <Link className="btn btn-secondary btn-lg" href="/login">
                       <ActionIcon action="login" />
                       {copy.signIn}
-                    </Button>
+                    </Link>
                   </Stack>
                   <p className="small text-body-secondary mb-0">{copy.openSource}</p>
                 </Stack>
@@ -110,14 +111,14 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
               <h2 className="h6 mb-3">{copy.footer.product}</h2>
               <Stack gap={2} as="ul" className="list-unstyled mb-0">
                 <li>
-                  <a className="home-footer-link" href="/login">
+                  <Link className="home-footer-link" href="/login">
                     {copy.footer.signIn}
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a className="home-footer-link" href="/download">
+                  <Link className="home-footer-link" href="/download">
                     {copy.footer.download}
-                  </a>
+                  </Link>
                 </li>
               </Stack>
             </Col>

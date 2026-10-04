@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Button, Col, Container, Row, Stack } from "react-bootstrap";
+import { Button, Col, Container, Row, Spinner, Stack } from "react-bootstrap";
 
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { ActionIcon } from "@/components/shared/ActionIcon";
@@ -66,7 +66,22 @@ function DownloadLink({
   asset: DownloadAsset;
   release: DesktopRelease | null;
 }) {
-  const href = findDesktopAssetUrl(release, downloadAsset.matcher) ?? DESKTOP_RELEASES_URL;
+  const href = findDesktopAssetUrl(release, downloadAsset.matcher);
+  if (!href) {
+    return (
+      <Button
+        type="button"
+        variant="primary"
+        className="download-asset-button"
+        disabled
+        aria-disabled="true"
+      >
+        <ActionIcon action="download" />
+        {downloadAsset.label}
+      </Button>
+    );
+  }
+
   return (
     <Button as="a" href={href} variant="primary" className="download-asset-button" download>
       <ActionIcon action="download" />
@@ -78,15 +93,20 @@ function DownloadLink({
 export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
   const copy = dictionary.download;
   const [release, setRelease] = useState<DesktopRelease | null>(null);
+  const [releaseLoading, setReleaseLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
     void fetchLatestDesktopRelease(controller.signal)
-      .then(setRelease)
+      .then((latestRelease) => {
+        setRelease(latestRelease);
+        setReleaseLoading(false);
+      })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
+        setReleaseLoading(false);
         console.warn("Unable to resolve the latest desktop release", error);
       });
     return () => controller.abort();
@@ -156,35 +176,47 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
           <p className="lead text-body-secondary mb-0">{copy.subtitle}</p>
         </Stack>
 
-        <Row className="download-platforms g-4 g-lg-5 justify-content-center">
-          {platforms.map((platform) => (
-            <Col key={platform.title} xs={12} md={4}>
-              <section className="download-platform h-100">
-                <div className="download-platform-icon text-primary mb-3" aria-hidden="true">
-                  <Icon icon={platform.icon} size="3x" />
-                </div>
-                <h2 className="h3 mb-2">{platform.title}</h2>
-                <p className="text-body-secondary mb-4">{platform.description}</p>
-                <Stack gap={4}>
-                  {platform.groups.map((group) => (
-                    <div key={group.label}>
-                      <h3 className="h6 text-uppercase text-body-secondary mb-2">{group.label}</h3>
-                      <div className="download-asset-grid">
-                        {group.assets.map((downloadAsset) => (
-                          <DownloadLink
-                            key={downloadAsset.label}
-                            asset={downloadAsset}
-                            release={release}
-                          />
-                        ))}
+        {releaseLoading ? (
+          <div
+            className="download-release-loading d-flex flex-column align-items-center justify-content-center gap-3 py-5"
+            role="status"
+          >
+            <Spinner animation="border" aria-hidden="true" />
+            <span>{copy.loading}</span>
+          </div>
+        ) : (
+          <Row className="download-platforms g-4 g-lg-5 justify-content-center">
+            {platforms.map((platform) => (
+              <Col key={platform.title} xs={12} md={4}>
+                <section className="download-platform h-100">
+                  <div className="download-platform-icon text-primary mb-3" aria-hidden="true">
+                    <Icon icon={platform.icon} size="3x" />
+                  </div>
+                  <h2 className="h3 mb-2">{platform.title}</h2>
+                  <p className="text-body-secondary mb-4">{platform.description}</p>
+                  <Stack gap={4}>
+                    {platform.groups.map((group) => (
+                      <div key={group.label}>
+                        <h3 className="h6 text-uppercase text-body-secondary mb-2">
+                          {group.label}
+                        </h3>
+                        <div className="download-asset-grid">
+                          {group.assets.map((downloadAsset) => (
+                            <DownloadLink
+                              key={downloadAsset.label}
+                              asset={downloadAsset}
+                              release={release}
+                            />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </Stack>
-              </section>
-            </Col>
-          ))}
-        </Row>
+                    ))}
+                  </Stack>
+                </section>
+              </Col>
+            ))}
+          </Row>
+        )}
 
         <div className="download-page-footer text-center mt-4 mt-md-5">
           <p className="text-body-secondary mb-3">{copy.checksums}</p>

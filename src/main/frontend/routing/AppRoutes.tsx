@@ -135,7 +135,7 @@ function PublicLayout() {
 function DownloadLayout() {
   return (
     <div className="auth-app min-vh-100 bg-body-tertiary">
-      <AuthNavbar locale={useLocale()} dictionary={useDictionary()} />
+      <AuthNavbar locale={useLocale()} dictionary={useDictionary()} showDownload />
       <Outlet />
     </div>
   );

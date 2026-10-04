@@ -72,6 +72,7 @@
     "eyebrow": "Desktop application",
     "title": "Download the application",
     "subtitle": "Choose the package for your operating system and start securely.",
+    "loading": "Loading available packages...",
     "windows": {
       "title": "Windows",
       "description": "Installer, portable, and AppX packages for 64-bit Windows.",

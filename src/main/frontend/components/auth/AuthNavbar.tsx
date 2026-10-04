@@ -6,6 +6,7 @@ import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { BrandLogo } from "@/components/shared/BrandLogo";
 import { ActionIcon } from "@/components/shared/ActionIcon";
+import Link from "@/routing/Link";
 import { useBranding } from "./BrandingProvider";
 
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -22,7 +23,11 @@ export function AuthNavbar({ locale, dictionary, showDownload = false }: AuthNav
   return (
     <Navbar className="auth-navbar bg-body border-bottom">
       <Container className="auth-navbar-inner">
-        <Navbar.Brand href={`/`} className="auth-brand d-flex align-items-center gap-2 fw-semibold">
+        <Navbar.Brand
+          as={Link}
+          href="/"
+          className="auth-brand d-flex align-items-center gap-2 fw-semibold"
+        >
           <BrandLogo size={36} />
           <span className="auth-brand-copy text-truncate">
             {branding.applicationName || dictionary.brand.product}
@@ -33,14 +38,14 @@ export function AuthNavbar({ locale, dictionary, showDownload = false }: AuthNav
           <LanguageSwitcher locale={locale} label={dictionary.navbar.language} />
           <ThemeSwitcher dictionary={dictionary} />
           {showDownload && (
-            <a
+            <Link
               href="/download"
               className="btn btn-primary btn-sm"
               aria-label={dictionary.navbar.download}
             >
               <ActionIcon action="download" />
               <span className="d-none d-md-inline">{dictionary.navbar.download}</span>
-            </a>
+            </Link>
           )}
         </div>
       </Container>
