@@ -15,7 +15,7 @@ Official links:
 - Source: [github.com/susimsek/kitezh](https://github.com/susimsek/kitezh)
 - Docker Hub: [hub.docker.com/r/suayb/kitezh](https://hub.docker.com/r/suayb/kitezh)
 - Releases: [Kitezh releases](https://github.com/susimsek/kitezh/releases)
-- Live demo: [spring-authorization-server-samples.onrender.com](https://spring-authorization-server-samples.onrender.com)
+- Live demo: [kitezh.onrender.com](https://kitezh.onrender.com)
 
 The `latest` image is a multi-architecture manifest. Docker selects the matching `linux/amd64` or `linux/arm64` image for the host automatically.
 
@@ -85,7 +85,7 @@ Open the following URLs after the application starts:
 
 Both consoles use Authorization Code + PKCE, refresh-token rotation, and OIDC logout. The issuer and redirect URIs must use the same public address when the image is exposed through another hostname.
 
-The public demo is available at [spring-authorization-server-samples.onrender.com](https://spring-authorization-server-samples.onrender.com).
+The public demo is available at [kitezh.onrender.com](https://kitezh.onrender.com).
 
 ## OAuth2 and OIDC checks
 
