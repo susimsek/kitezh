@@ -1,6 +1,14 @@
 import { library } from "@fortawesome/fontawesome-svg-core";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faGithub, faGoogle, faLinkedinIn, faMicrosoft } from "@fortawesome/free-brands-svg-icons";
+import {
+  faApple,
+  faGithub,
+  faGoogle,
+  faLinkedinIn,
+  faLinux,
+  faMicrosoft,
+  faWindows,
+} from "@fortawesome/free-brands-svg-icons";
 import {
   faAddressCard,
   faAnglesLeft,
@@ -102,6 +110,7 @@ export type ActionIconName =
 
 export type IconName =
   | "addressCard"
+  | "apple"
   | "anglesLeft"
   | "anglesRight"
   | "bars"
@@ -121,6 +130,7 @@ export type IconName =
   | "key"
   | "laptop"
   | "layerGroup"
+  | "linux"
   | "lock"
   | "moon"
   | "shieldHalved"
@@ -129,6 +139,7 @@ export type IconName =
   | "user"
   | "userShield"
   | "users"
+  | "windows"
   | "xmark"
   | "github"
   | "google"
@@ -176,6 +187,7 @@ export const actionIcons: Record<ActionIconName, IconDefinition> = {
 
 export const icons: Record<IconName, IconDefinition> = {
   addressCard: faAddressCard,
+  apple: faApple,
   anglesLeft: faAnglesLeft,
   anglesRight: faAnglesRight,
   bars: faBars,
@@ -195,6 +207,7 @@ export const icons: Record<IconName, IconDefinition> = {
   key: faKey,
   laptop: faLaptop,
   layerGroup: faLayerGroup,
+  linux: faLinux,
   lock: faLock,
   moon: faMoon,
   shieldHalved: faShieldHalved,
@@ -203,6 +216,7 @@ export const icons: Record<IconName, IconDefinition> = {
   user: faUser,
   userShield: faUserShield,
   users: faUsers,
+  windows: faWindows,
   xmark: faXmark,
   github: faGithub,
   google: faGoogle,
@@ -216,6 +230,7 @@ export const loadIcons = () => {
   if (loaded) return;
 
   library.add(
+    faApple,
     faAnglesLeft,
     faAnglesRight,
     faAddressCard,
@@ -254,6 +269,7 @@ export const loadIcons = () => {
     faLaptop,
     faLayerGroup,
     faLinkedinIn,
+    faLinux,
     faLock,
     faMagnifyingGlass,
     faMoon,
@@ -275,6 +291,7 @@ export const loadIcons = () => {
     faUserSlash,
     faUserShield,
     faUsers,
+    faWindows,
     faUpload,
     faXmark,
   );

@@ -10,7 +10,6 @@ import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 import { AdminAuthGuard } from "@/components/admin/AdminAuthGuard";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminAuthorizationCallback } from "@/components/admin/AdminAuthorizationCallback";
-import { AdminPostLoginRedirect } from "@/components/admin/AdminPostLoginRedirect";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminBreadcrumb } from "@/components/admin/AdminBreadcrumb";
@@ -52,6 +51,7 @@ import { SocialAccountLinks } from "@/components/account/SocialAccountLinks";
 import { CibaApprovalPanel } from "@/components/account/CibaApprovalPanel";
 import { UserProfileAttributeForm } from "@/components/admin/UserProfileAttributeForm";
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthNavbar } from "@/components/auth/AuthNavbar";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { RegistrationForm } from "@/components/auth/RegistrationForm";
 import { ConsentForm } from "@/components/auth/ConsentForm";
@@ -59,6 +59,8 @@ import { RequiredActionsPage } from "@/components/auth/RequiredActionsPage";
 import { ErrorView } from "@/components/auth/ErrorView";
 import { NotFoundView } from "@/components/auth/NotFoundView";
 import { MfaChallengePage } from "@/components/auth/MfaChallengePage";
+import { DownloadPage } from "@/components/download/DownloadPage";
+import { HomePage } from "@/components/home/HomePage";
 import { DesktopConsoleChooser } from "@/components/shared/DesktopConsoleChooser";
 import { isDesktopRuntime } from "@/lib/desktop-api";
 import AdminEvents from "@/components/admin/AdminEvents";
@@ -127,6 +129,24 @@ function PublicLayout() {
     <AuthLayout locale={useLocale()} dictionary={useDictionary()}>
       <Outlet />
     </AuthLayout>
+  );
+}
+
+function DownloadLayout() {
+  return (
+    <div className="auth-app min-vh-100 bg-body-tertiary">
+      <AuthNavbar locale={useLocale()} dictionary={useDictionary()} />
+      <Outlet />
+    </div>
+  );
+}
+
+function LandingLayout() {
+  return (
+    <div className="auth-app min-vh-100 bg-body-tertiary">
+      <AuthNavbar locale={useLocale()} dictionary={useDictionary()} showDownload />
+      <Outlet />
+    </div>
   );
 }
 
@@ -204,20 +224,22 @@ export function AppRoutes() {
   const props = { dictionary, locale };
   return (
     <Routes>
-      <Route element={<PublicLayout />}>
+      <Route element={<LandingLayout />}>
         <Route
           index
           element={
             isDesktopRuntime() ? (
               <DesktopConsoleChooser dictionary={dictionary} />
             ) : (
-              <>
-                <AdminPostLoginRedirect />
-                <LoginForm {...props} />
-              </>
+              <HomePage dictionary={dictionary} />
             )
           }
         />
+      </Route>
+      <Route element={<DownloadLayout />}>
+        <Route path="download" element={<DownloadPage dictionary={dictionary} />} />
+      </Route>
+      <Route element={<PublicLayout />}>
         <Route
           path="login"
           element={

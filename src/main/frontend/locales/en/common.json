@@ -4,6 +4,31 @@
     "framework": "Spring Security",
     "description": "Secure OAuth 2.0 and OpenID Connect authorization."
   },
+  "home": {
+    "eyebrow": "Authorization for modern applications",
+    "title": "Build secure sign-in and consent flows with Spring Security.",
+    "subtitle": "A production-ready OAuth 2.0 and OpenID Connect authorization server with an administration console, account console, and desktop application.",
+    "download": "Download the application",
+    "signIn": "Open the sign-in page",
+    "openSource": "Open source and ready for local development.",
+    "features": {
+      "title": "Everything you need to get started",
+      "subtitle": "Use the same authorization server across browser and desktop clients.",
+      "security": {
+        "title": "Secure by default",
+        "description": "PKCE, OpenID Connect, passkeys, MFA, and session controls are built into the sample."
+      },
+      "protocols": {
+        "title": "OAuth 2.0 and OIDC",
+        "description": "Issue, introspect, revoke, and refresh tokens with standards-based endpoints."
+      },
+      "consoles": {
+        "title": "Admin and Account Consoles",
+        "description": "Manage users, clients, roles, groups, profile settings, and account security."
+      }
+    },
+    "footer": "{product} is built with Spring Security and Spring Boot."
+  },
   "desktop": {
     "offline": "The desktop app is offline. Reconnect to continue.",
     "signInUnavailable": "Secure sign-in is currently unavailable. Check your connection and try again.",
@@ -27,7 +52,49 @@
     "updateRecovered": "The update did not start cleanly. The current installation is still active ({version})."
   },
   "navbar": {
-    "language": "Language"
+    "language": "Language",
+    "download": "Download"
+  },
+  "download": {
+    "eyebrow": "Desktop application",
+    "title": "Download the application",
+    "subtitle": "Choose the package for your operating system and start securely.",
+    "windows": {
+      "title": "Windows",
+      "description": "Installer, portable, and AppX packages for 64-bit Windows.",
+      "architecture": "x64",
+      "assets": {
+        "installer": "Installer",
+        "portable": "Portable",
+        "appx": "Microsoft Store package"
+      }
+    },
+    "linux": {
+      "title": "Linux",
+      "description": "Packages for x86_64 and ARM64 Linux systems.",
+      "architectures": {
+        "x64": "x86_64",
+        "arm64": "ARM64"
+      },
+      "assets": {
+        "appImage": "AppImage",
+        "deb": "Debian package",
+        "rpm": "RPM package",
+        "snap": "Snap package"
+      }
+    },
+    "macos": {
+      "title": "macOS",
+      "description": "Universal and Intel disk images for macOS.",
+      "architecture": "Disk images",
+      "assets": {
+        "universal": "Universal",
+        "intel": "Intel"
+      }
+    },
+    "checksums": "Verify your download with the published SHA-256 checksums.",
+    "downloadChecksums": "SHA-256 checksums",
+    "releaseNotes": "View release notes"
   },
   "login": {
     "eyebrow": "Welcome back",
