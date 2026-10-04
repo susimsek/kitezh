@@ -92,6 +92,9 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Run `pnpm typecheck`, `pnpm test`, and `pnpm build` after desktop changes.
 - Run `pnpm test:e2e` for changes to the main process, preload bridge, renderer startup,
   protocol handling, or desktop authentication flow. Linux CI should run it through `xvfb-run`.
+- Keep Electron E2E independently configurable from the frontend suite: desktop tests use the
+  desktop package's pinned `playwright-core` Electron launcher and Node test runner, while
+  frontend browser tests use `@playwright/test` under `src/main/frontend/e2e`.
 - Run `pnpm package` when changing packaging configuration, protocol registration, assets, preload/main behavior, or renderer integration.
 - Add or update tests for:
   - callback route and protocol validation;

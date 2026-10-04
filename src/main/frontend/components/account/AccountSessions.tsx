@@ -163,7 +163,7 @@ export function AccountSessions({ dictionary }: { dictionary: Dictionary }) {
                     size="sm"
                     disabled={sessionRemoving || otherSessionsRemoving}
                     onClick={() => setPending({ type: "others" })}
-                    data-cy="sign-out-others"
+                    data-testid="sign-out-others"
                   >
                     <ActionIcon action="logout" />
                     {copy.sessions.signOutOthers}
@@ -190,7 +190,7 @@ export function AccountSessions({ dictionary }: { dictionary: Dictionary }) {
                 <div
                   className={`account-session-card ${session.current ? "current" : ""}`}
                   key={session.id}
-                  data-cy="session-row"
+                  data-testid="session-row"
                 >
                   <div className="account-session-icon">
                     <Icon icon={session.current ? "shieldHalved" : "desktop"} />

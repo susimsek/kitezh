@@ -673,7 +673,7 @@ export function AccountProfileForm({ dictionary }: { dictionary: Dictionary }) {
             <Button
               type="submit"
               disabled={!isDirty || isSubmitting || profileUpdating}
-              data-cy="save-profile"
+              data-testid="save-profile"
             >
               {isSubmitting || profileUpdating ? (
                 <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />

@@ -331,6 +331,19 @@ pnpm dev
 
 The exported page is served at `/login` and submits credentials directly to Spring Security's `POST /login` endpoint. CSRF protection is intentionally disabled in this sample.
 
+Frontend browser E2E tests use Playwright and are configured independently from the Electron
+tests. With the server running on port `9090`, install the Chromium browser once and run:
+
+```bash
+cd src/main/frontend
+pnpm test:e2e:install
+pnpm test:e2e
+```
+
+Use `pnpm test:e2e:open` for Playwright UI mode, or set `E2E_BASE_URL` and the
+`E2E_ADMIN_*`/`E2E_USER_*` credentials for another environment. The Electron package keeps its
+own Playwright-based launch and test configuration under `src/main/desktop`.
+
 ### Electron desktop console
 
 The Electron shell packages the same static renderer used by the web consoles. Start the

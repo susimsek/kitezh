@@ -155,7 +155,7 @@ export function AccountPasswordForm({ dictionary }: { dictionary: Dictionary }) 
             <Button
               type="submit"
               disabled={!isDirty || isSubmitting || passwordUpdating}
-              data-cy="save-password"
+              data-testid="save-password"
             >
               {isSubmitting || passwordUpdating ? (
                 <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
