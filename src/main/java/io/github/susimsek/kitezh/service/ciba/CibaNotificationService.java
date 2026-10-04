@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh.service.ciba;
 
 import io.github.susimsek.kitezh.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.kitezh.domain.CibaAuthenticationRequestEntity;
+import io.github.susimsek.kitezh.service.client.CibaNotificationClient;
 import java.net.URI;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;

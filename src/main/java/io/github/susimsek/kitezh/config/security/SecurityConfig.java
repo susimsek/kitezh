@@ -188,6 +188,8 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers("/api/auth/**")
                                         .permitAll()
+                                        .requestMatchers("/api/public/desktop-release")
+                                        .permitAll()
                                         .requestMatchers("/oauth2/bc-authorize")
                                         .permitAll()
                                         .requestMatchers(

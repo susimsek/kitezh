@@ -1,4 +1,4 @@
-package io.github.susimsek.kitezh.config.security;
+package io.github.susimsek.kitezh.service.client;
 
 import java.net.URI;
 import java.util.Map;

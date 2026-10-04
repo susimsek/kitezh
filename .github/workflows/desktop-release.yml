@@ -177,9 +177,6 @@ jobs:
             pnpm exec electron-builder --publish never --mac --universal
           fi
 
-      - name: Create stable download aliases
-        run: node src/main/desktop/scripts/create-download-aliases.mjs src/main/desktop/release
-
       - name: Verify macOS signature and notarization
         if: ${{ matrix.platform == 'macos' }}
         shell: bash

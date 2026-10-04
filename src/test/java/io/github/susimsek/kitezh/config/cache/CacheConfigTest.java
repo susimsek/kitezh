@@ -39,6 +39,7 @@ import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
 import io.github.susimsek.kitezh.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
+import io.github.susimsek.kitezh.service.DesktopReleaseService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.HashMap;
@@ -82,8 +83,33 @@ class CacheConfigTest {
         assertThat(cacheManager).isInstanceOf(CaffeineCacheManager.class);
         Cache cache = cacheManager.getCache(UserRepository.USER_BY_USERNAME_CACHE);
         assertThat(cache).isNotNull();
+        assertThat(cacheManager.getCache(DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE))
+                .isNotNull();
         cache.put("key", "value");
         assertThat(cache.get("key", String.class)).isEqualTo("value");
+    }
+
+    @Test
+    void appliesDesktopReleaseCacheTtlSeparately() {
+        CaffeineCacheManager cacheManager =
+                (CaffeineCacheManager) new CacheConfig(applicationProperties()).cacheManager();
+
+        com.github.benmanes.caffeine.cache.Cache<?, ?> nativeCache =
+                ((org.springframework.cache.caffeine.CaffeineCache)
+                                cacheManager.getCache(
+                                        DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE))
+                        .getNativeCache();
+
+        assertThat(nativeCache.policy().expireAfterWrite()).isPresent();
+        assertThat(
+                        nativeCache
+                                .policy()
+                                .expireAfterWrite()
+                                .orElseThrow()
+                                .getExpiresAfter(java.util.concurrent.TimeUnit.MINUTES))
+                .isEqualTo(15);
+        assertThat(nativeCache.policy().eviction()).isPresent();
+        assertThat(nativeCache.policy().eviction().orElseThrow().getMaximum()).isEqualTo(1);
     }
 
     @Test
@@ -260,7 +286,14 @@ class CacheConfigTest {
     private static ApplicationProperties applicationProperties() {
         return new ApplicationProperties(
                 new ApplicationProperties.Cache(
-                        new ApplicationProperties.Caffeine(Duration.ofMinutes(5), 10, 100)),
+                        new ApplicationProperties.Caffeine(
+                                Duration.ofMinutes(5),
+                                10,
+                                100,
+                                Map.of(
+                                        DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE,
+                                        new ApplicationProperties.CacheOverride(
+                                                Duration.ofMinutes(15), 1, 1)))),
                 new ApplicationProperties.Session("0 * * * * *"),
                 new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                 new ApplicationProperties.Mail(

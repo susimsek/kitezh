@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.susimsek.kitezh.config.http.HttpServiceClientFactory;
+import io.github.susimsek.kitezh.service.client.RegistrationCaptchaClient;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

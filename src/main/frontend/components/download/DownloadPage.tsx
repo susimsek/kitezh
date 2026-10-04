@@ -1,16 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { Button, Col, Container, Row, Stack } from "react-bootstrap";
 
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon, type IconName } from "@/components/shared/Icon";
-
-const RELEASES_URL = "https://github.com/susimsek/kitezh/releases/latest";
-const DOWNLOAD_URL = "https://github.com/susimsek/kitezh/releases/latest/download";
+import {
+  DESKTOP_RELEASES_URL,
+  fetchLatestDesktopRelease,
+  findDesktopAssetUrl,
+  type DesktopRelease,
+} from "@/lib/desktop-downloads";
 
 type DownloadAsset = {
-  file: string;
+  matcher: RegExp;
   label: string;
 };
 
@@ -28,41 +33,42 @@ type DownloadPlatform = {
 
 const platformAssets = {
   windows: {
-    installer: "kitezh-windows-x64-setup.exe",
-    portable: "kitezh-windows-x64-portable.exe",
-    appx: "kitezh-windows-x64-appx.appx",
+    installer: /-win-x64-setup\.exe$/,
+    portable: /-win-x64-portable\.exe$/,
+    appx: /-win-x64-appx\.appx$/,
   },
   linux: {
     x64: {
-      appImage: "kitezh-linux-x64.AppImage",
-      deb: "kitezh-linux-x64.deb",
-      rpm: "kitezh-linux-x64.rpm",
-      snap: "kitezh-linux-x64.snap",
+      appImage: /-linux-x86_64\.AppImage$/,
+      deb: /-linux-amd64\.deb$/,
+      rpm: /-linux-x86_64\.rpm$/,
+      snap: /-linux-amd64\.snap$/,
     },
     arm64: {
-      appImage: "kitezh-linux-arm64.AppImage",
-      deb: "kitezh-linux-arm64.deb",
+      appImage: /-linux-arm64\.AppImage$/,
+      deb: /-linux-arm64\.deb$/,
     },
   },
   macos: {
-    universal: "kitezh-macos-universal.dmg",
-    intel: "kitezh-macos-x64.dmg",
+    universal: /-macos-universal\.dmg$/,
+    intel: /-macos-x64\.dmg$/,
   },
 };
 
-function asset(file: string, label: string): DownloadAsset {
-  return { file, label };
+function asset(matcher: RegExp, label: string): DownloadAsset {
+  return { matcher, label };
 }
 
-function DownloadLink({ asset: downloadAsset }: { asset: DownloadAsset }) {
+function DownloadLink({
+  asset: downloadAsset,
+  release,
+}: {
+  asset: DownloadAsset;
+  release: DesktopRelease | null;
+}) {
+  const href = findDesktopAssetUrl(release, downloadAsset.matcher) ?? DESKTOP_RELEASES_URL;
   return (
-    <Button
-      as="a"
-      href={`${DOWNLOAD_URL}/${downloadAsset.file}`}
-      variant="primary"
-      className="download-asset-button"
-      download
-    >
+    <Button as="a" href={href} variant="primary" className="download-asset-button" download>
       <ActionIcon action="download" />
       {downloadAsset.label}
     </Button>
@@ -71,6 +77,21 @@ function DownloadLink({ asset: downloadAsset }: { asset: DownloadAsset }) {
 
 export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
   const copy = dictionary.download;
+  const [release, setRelease] = useState<DesktopRelease | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchLatestDesktopRelease(controller.signal)
+      .then(setRelease)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        console.warn("Unable to resolve the latest desktop release", error);
+      });
+    return () => controller.abort();
+  }, []);
+
   const platforms: DownloadPlatform[] = [
     {
       icon: "windows",
@@ -150,7 +171,11 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
                       <h3 className="h6 text-uppercase text-body-secondary mb-2">{group.label}</h3>
                       <div className="download-asset-grid">
                         {group.assets.map((downloadAsset) => (
-                          <DownloadLink key={downloadAsset.file} asset={downloadAsset} />
+                          <DownloadLink
+                            key={downloadAsset.label}
+                            asset={downloadAsset}
+                            release={release}
+                          />
                         ))}
                       </div>
                     </div>
@@ -164,11 +189,22 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
         <div className="download-page-footer text-center mt-4 mt-md-5">
           <p className="text-body-secondary mb-3">{copy.checksums}</p>
           <Stack direction="horizontal" gap={2} className="justify-content-center flex-wrap">
-            <Button as="a" href={`${DOWNLOAD_URL}/SHA256SUMS`} variant="secondary" download>
+            <Button
+              as="a"
+              href="https://github.com/susimsek/kitezh/releases/latest/download/SHA256SUMS"
+              variant="secondary"
+              download
+            >
               <ActionIcon action="download" />
               {copy.downloadChecksums}
             </Button>
-            <Button as="a" href={RELEASES_URL} variant="secondary" target="_blank" rel="noreferrer">
+            <Button
+              as="a"
+              href={DESKTOP_RELEASES_URL}
+              variant="secondary"
+              target="_blank"
+              rel="noreferrer"
+            >
               {copy.releaseNotes}
             </Button>
           </Stack>

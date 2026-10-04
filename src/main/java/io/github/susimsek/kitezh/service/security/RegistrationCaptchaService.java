@@ -1,6 +1,11 @@
 package io.github.susimsek.kitezh.service.security;
 
 import io.github.susimsek.kitezh.dto.account.RegistrationCaptchaDTO;
+import io.github.susimsek.kitezh.dto.captcha.CaptchaEnterpriseEventDTO;
+import io.github.susimsek.kitezh.dto.captcha.CaptchaEnterpriseRequestDTO;
+import io.github.susimsek.kitezh.dto.captcha.CaptchaEnterpriseResponseDTO;
+import io.github.susimsek.kitezh.dto.captcha.CaptchaStandardResponseDTO;
+import io.github.susimsek.kitezh.service.client.RegistrationCaptchaClient;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -87,7 +92,7 @@ public class RegistrationCaptchaService {
         if (request.getRemoteAddr() != null && !request.getRemoteAddr().isBlank()) {
             form.add("remoteip", request.getRemoteAddr());
         }
-        RegistrationCaptchaClient.StandardResponse response =
+        CaptchaStandardResponseDTO response =
                 captchaClient.verify(
                         URI.create("https://www." + domain(config) + "/recaptcha/api/siteverify"),
                         form);
@@ -104,21 +109,21 @@ public class RegistrationCaptchaService {
 
     private boolean verifyEnterprise(
             RegistrationCaptchaConfiguration config, String token, HttpServletRequest request) {
-        RegistrationCaptchaClient.EnterpriseEvent event =
-                new RegistrationCaptchaClient.EnterpriseEvent(
+        CaptchaEnterpriseEventDTO event =
+                new CaptchaEnterpriseEventDTO(
                         token,
                         config.siteKey().trim(),
                         request.getHeader("User-Agent"),
                         request.getRemoteAddr(),
                         action(config));
-        RegistrationCaptchaClient.EnterpriseResponse response =
+        CaptchaEnterpriseResponseDTO response =
                 captchaClient.assess(
                         URI.create(
                                 "https://recaptchaenterprise.googleapis.com/v1/projects/"
                                         + config.projectId().trim()
                                         + "/assessments?key="
                                         + config.apiKey().trim()),
-                        new RegistrationCaptchaClient.EnterpriseRequest(event));
+                        new CaptchaEnterpriseRequestDTO(event));
         if (response == null
                 || response.tokenProperties() == null
                 || response.riskAnalysis() == null

@@ -11,6 +11,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import io.github.susimsek.kitezh.config.http.HttpServiceClientFactory;
 import io.github.susimsek.kitezh.config.security.SocialLoginSecretCipher;
 import io.github.susimsek.kitezh.domain.CibaAuthenticationRequestEntity;
+import io.github.susimsek.kitezh.service.client.CibaNotificationClient;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

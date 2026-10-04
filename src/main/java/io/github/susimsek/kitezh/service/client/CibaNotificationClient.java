@@ -1,4 +1,4 @@
-package io.github.susimsek.kitezh.service.ciba;
+package io.github.susimsek.kitezh.service.client;
 
 import java.net.URI;
 import java.util.Map;

@@ -34,6 +34,9 @@ spring:
     clients:
       connect-timeout: 2s
       read-timeout: 5s
+    serviceclient:
+      github-release:
+        base-url: https://api.github.com
   jpa:
     open-in-view: false
     properties:

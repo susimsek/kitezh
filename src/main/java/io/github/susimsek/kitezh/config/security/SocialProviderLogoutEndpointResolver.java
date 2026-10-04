@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh.config.security;
 
 import io.github.susimsek.kitezh.service.SocialProviderSettingsService.ProviderCredentials;
+import io.github.susimsek.kitezh.service.client.OidcDiscoveryClient;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

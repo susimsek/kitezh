@@ -34,6 +34,8 @@ management:
         http.server.requests: 250ms,1s,5s
 
 app:
+  desktop-release:
+    cache-ttl: PT15M
   social-login:
     encryption-key: demo-static-social-ciba-key-2026-change-me
   cache:
@@ -41,6 +43,11 @@ app:
       ttl: PT1H
       initial-capacity: 500
       maximum-size: 1000
+      overrides:
+        desktopLatestRelease:
+          ttl: PT15M
+          initial-capacity: 1
+          maximum-size: 1
   authorization-server:
     issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.local}
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}

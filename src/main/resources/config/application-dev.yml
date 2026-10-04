@@ -34,6 +34,11 @@ app:
       ttl: PT1H
       initial-capacity: 50
       maximum-size: 100
+      overrides:
+        desktopLatestRelease:
+          ttl: PT15M
+          initial-capacity: 1
+          maximum-size: 1
   authorization-server:
     issuer: http://localhost:9090
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}

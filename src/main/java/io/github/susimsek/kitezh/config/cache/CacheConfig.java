@@ -42,6 +42,7 @@ import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
 import io.github.susimsek.kitezh.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
+import io.github.susimsek.kitezh.service.DesktopReleaseService;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.OptionalLong;
@@ -72,7 +73,20 @@ public class CacheConfig {
     public CaffeineCacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCaffeine(buildCaffeineConfig(cacheProperties()));
-        cacheManager.setCacheNames(cacheNames());
+        List<String> cacheNames = cacheNames();
+        cacheManager.setCacheNames(cacheNames);
+        cacheProperties()
+                .overrides()
+                .forEach(
+                        (cacheName, override) -> {
+                            if (!cacheNames.contains(cacheName)) {
+                                throw new IllegalArgumentException(
+                                        "Unknown cache name in app.cache.caffeine.overrides: "
+                                                + cacheName);
+                            }
+                            cacheManager.registerCustomCache(
+                                    cacheName, buildCaffeineConfig(override).build());
+                        });
         return cacheManager;
     }
 
@@ -113,7 +127,8 @@ public class CacheConfig {
                 UserProfileAttributeDefinitionRepository
                         .ENABLED_PROFILE_ATTRIBUTE_DEFINITIONS_CACHE,
                 UserProfileAttributeDefinitionRepository.PROFILE_ATTRIBUTE_DEFINITION_BY_NAME_CACHE,
-                UserRepository.USER_BY_USERNAME_CACHE);
+                UserRepository.USER_BY_USERNAME_CACHE,
+                DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE);
     }
 
     private ApplicationProperties.Caffeine cacheProperties() {
@@ -121,6 +136,15 @@ public class CacheConfig {
     }
 
     private Caffeine<Object, Object> buildCaffeineConfig(ApplicationProperties.Caffeine config) {
+        return Caffeine.newBuilder()
+                .expireAfterWrite(config.ttl())
+                .initialCapacity(config.initialCapacity())
+                .maximumSize(config.maximumSize())
+                .recordStats();
+    }
+
+    private Caffeine<Object, Object> buildCaffeineConfig(
+            ApplicationProperties.CacheOverride config) {
         return Caffeine.newBuilder()
                 .expireAfterWrite(config.ttl())
                 .initialCapacity(config.initialCapacity())

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.config.http.HttpServiceClientFactory;
 import io.github.susimsek.kitezh.service.SocialProviderSettingsService.ProviderCredentials;
+import io.github.susimsek.kitezh.service.client.OidcDiscoveryClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;

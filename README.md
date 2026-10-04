@@ -374,9 +374,11 @@ To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
 Each release includes macOS x64 and universal DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
 and Snap packages, Linux ARM64 AppImage and Debian packages, Windows NSIS, portable EXE, and AppX
 packages, plus an SPDX JSON software bill of materials.
-The public download page uses stable platform and architecture aliases that each release publishes
-alongside the versioned files, so links continue to resolve to the latest release without changing
-the Electron updater manifests.
+The public download page keeps a stable layout and reads the latest release through the
+same-origin `/api/public/desktop-release` endpoint. The backend fetches GitHub Release metadata
+once per cache period and returns only allowlisted, versioned platform assets, so browsers do not
+call the GitHub API directly or consume its unauthenticated rate limit. The Electron updater
+continues to use the standard `latest*.yml` manifests; no duplicate binary aliases are published.
 macOS and Windows CI packages remain unsigned until their platform signing credentials are configured;
 Linux packages receive keyless Sigstore bundles in the release workflow.
 The packaged app uses the `kitezh://oauth/callback` protocol and stores console sessions in
@@ -1409,7 +1411,7 @@ Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.git
 - Build and verify amd64 and arm64 native executables on validated branch and pull-request runs
 - Push architecture-specific native images to Docker Hub only for `v*` release tags via Jib
 - Publish both the immutable release tag and the `latest` multi-arch manifest after both release images are available
-- Optionally deploy a versioned release image through the existing `RENDER_DEPLOY_HOOK_URL`
+- Optionally deploy a versioned release image through the existing `RENDER_RELEASE_DEPLOY_HOOK_URL`
 
 ### Render Blueprint deployment
 
@@ -1421,7 +1423,7 @@ database URL, username, password, and public issuer because those values are mar
 
 Live demo: [Render](https://kitezh.onrender.com)
 
-Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
+Create a GitHub Actions repository secret named `RENDER_RELEASE_DEPLOY_HOOK_URL` from the service's
 Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest`
 manifest before calling the hook. `autoDeploy` is disabled in the Blueprint, so branch builds and
 registry pushes never restart Render. The same hook is reused by the release workflow for now: a
@@ -1433,7 +1435,7 @@ Environment variables:
 - SonarCloud: `SONAR_TOKEN` (optional)
 - Snyk: `SNYK_TOKEN` (optional)
 - Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (only on `v*` tags)
-- Render release deploy: `RENDER_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
+- Render release deploy: `RENDER_RELEASE_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
 
 ## Project Policies
 

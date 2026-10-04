@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh.config;
 
 import java.time.Duration;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -28,12 +29,15 @@ public record ApplicationProperties(
             WebAuthn webAuthn,
             RegistrationCaptcha registrationCaptcha,
             DPoP dpop) {
-        this.cache = cache;
-        this.session = session;
+        this.cache = cache == null ? new Cache() : cache;
+        this.session = session == null ? new Session("0 * * * * *") : session;
         this.authorizationServer =
                 authorizationServer == null ? new AuthorizationServer() : authorizationServer;
-        this.mail = mail;
-        this.security = security;
+        this.mail =
+                mail == null
+                        ? new Mail(false, "Kitezh <no-reply@localhost>", DEFAULT_ISSUER)
+                        : mail;
+        this.security = security == null ? new Security() : security;
         this.webAuthn = webAuthn == null ? new WebAuthn() : webAuthn;
         this.registrationCaptcha =
                 registrationCaptcha == null ? new RegistrationCaptcha() : registrationCaptcha;
@@ -101,12 +105,41 @@ public record ApplicationProperties(
                 new DPoP());
     }
 
-    public record Cache(@DefaultValue Caffeine caffeine) {}
+    public record Cache(@DefaultValue Caffeine caffeine) {
+
+        public Cache() {
+            this(new Caffeine());
+        }
+    }
 
     public record Caffeine(
             @DefaultValue("PT1H") Duration ttl,
             @DefaultValue("500") int initialCapacity,
-            @DefaultValue("1000") long maximumSize) {}
+            @DefaultValue("1000") long maximumSize,
+            Map<String, CacheOverride> overrides) {
+
+        public Caffeine() {
+            this(Duration.ofHours(1), 500, 1000, Map.of());
+        }
+
+        public Caffeine(Duration ttl, int initialCapacity, long maximumSize) {
+            this(ttl, initialCapacity, maximumSize, Map.of());
+        }
+
+        public Caffeine {
+            overrides = overrides == null ? Map.of() : Map.copyOf(overrides);
+        }
+    }
+
+    public record CacheOverride(
+            @DefaultValue("PT1H") Duration ttl,
+            @DefaultValue("500") int initialCapacity,
+            @DefaultValue("1000") long maximumSize) {
+
+        public CacheOverride() {
+            this(Duration.ofHours(1), 500, 1000);
+        }
+    }
 
     public record Session(@DefaultValue("0 * * * * *") String cleanupCron) {}
 
