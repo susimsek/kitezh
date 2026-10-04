@@ -2,6 +2,14 @@
   "name": "spring-authorization-server-samples-frontend",
   "version": "0.0.1",
   "private": true,
+  "homepage": "https://spring-authorization-server-samples.onrender.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/susimsek/spring-authorization-server-samples.git"
+  },
+  "bugs": {
+    "url": "https://github.com/susimsek/spring-authorization-server-samples/issues"
+  },
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev": "next dev",
