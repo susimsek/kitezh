@@ -17,6 +17,7 @@ const distributablePattern =
   /\.(AppImage|appx|deb|dmg|exe|rpm|snap|zip|tar\.gz|blockmap)$/i;
 const metadataPattern = /^latest.*\.yml(?:\.sig)?$/i;
 const checksumPattern = /^SHA256SUMS(?:\.asc)?$/;
+const sigstoreBundlePattern = /\.sigstore\.json$/i;
 
 const entries = await readdir(releaseDirectory, { withFileTypes: true });
 const assets = entries
@@ -26,7 +27,8 @@ const assets = entries
     (name) =>
       distributablePattern.test(name) ||
       metadataPattern.test(name) ||
-      checksumPattern.test(name),
+      checksumPattern.test(name) ||
+      sigstoreBundlePattern.test(name),
   );
 
 if (assets.length === 0) {

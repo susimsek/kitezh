@@ -86,7 +86,7 @@ The backend must register a separate public desktop client with exact custom-pro
 
 The initial P0 foundation is implemented in the repository. The Electron main process owns the encrypted session vault, validates the custom-protocol callback and PKCE state, exchanges the authorization code, and sends only a sanitized callback state to the renderer. The preload bridge validates its narrow typed contract, the renderer uses a desktop session adapter, and the backend allows only the configured `app://renderer` origin. Window bounds and maximized state are restored from a noncredential preferences file. The renderer shows a localized offline/API connectivity banner and a visible authorization/storage failure state instead of leaving the console on an endless loading spinner.
 
-Automated desktop tests cover callback route parsing, callback sanitization, state expiry/mismatch, PKCE token-response validation, and renderer-origin enforcement. CI now creates unsigned Linux, macOS, and Windows artifacts and publishes them for version tags; signed release artifacts, platform update delivery, and provider-backed browser E2E remain release work after this P0 foundation.
+Automated desktop tests cover callback route parsing, callback sanitization, state expiry/mismatch, PKCE token-response validation, and renderer-origin enforcement. CI packages Linux, macOS, and Windows artifacts for version tags; Linux packages receive keyless Sigstore bundles, while platform certificates are still required for macOS and Windows signing. Platform update delivery and provider-backed browser E2E remain release work after this P0 foundation.
 
 ### Renderer session and IPC contract
 
