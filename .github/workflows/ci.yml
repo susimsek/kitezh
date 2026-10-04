@@ -19,8 +19,6 @@ env:
   PNPM_VERSION: "11.22.0"
   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
   infrastructure-validation:
@@ -191,7 +189,7 @@ jobs:
           if-no-files-found: error
 
   native-image:
-    name: Native image (${{ matrix.architecture }})
+    name: Native image verification (${{ matrix.architecture }})
     needs: build
     strategy:
       fail-fast: false
@@ -201,20 +199,17 @@ jobs:
             runner: ubuntu-24.04
             native_image_musl: "true"
             native_image_args: "--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g"
-            runtime_image: scratch
           - architecture: arm64
             runner: ubuntu-24.04-arm
             # GraalVM CE Linux AArch64 does not ship the musl-linked static JDK
             # libraries, so use a mostly-static glibc image for this leg.
             native_image_musl: "false"
             native_image_args: "--no-fallback,-Os,--static-nolibc,-J-Xmx10g"
-            runtime_image: gcr.io/distroless/base-debian12:nonroot
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     env:
       NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
       NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
-      NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
 
     steps:
       - name: Check out source
@@ -290,99 +285,3 @@ jobs:
 
       - name: Compress native executable
         run: upx --lzma --best target/native-executable
-
-      - name: Publish architecture image
-        if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        run: |
-          NATIVE_TAG="latest-native-${NATIVE_ARCHITECTURE}"
-          ./mvnw -ntp -Pprod,native -DskipTests \
-            -Dskip.frontend=true \
-            -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
-            -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
-            jib:build \
-            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${NATIVE_TAG}" \
-            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
-            -Djib.to.auth.password="${DOCKERHUB_TOKEN}" # NOSONAR - value is supplied by a GitHub Actions secret
-
-  publish-native-manifest:
-    name: Publish native multi-arch manifest
-    needs: native-image
-    if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Log in to Docker Hub
-        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
-
-      - name: Create and verify multi-arch manifest
-        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        run: |
-          IMAGE="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
-          TARGET_TAG="latest-native"
-          SOURCE_TAG_PREFIX="latest-native"
-          docker buildx imagetools create \
-            --tag "${IMAGE}:${TARGET_TAG}" \
-            "${IMAGE}:${SOURCE_TAG_PREFIX}-amd64" \
-            "${IMAGE}:${SOURCE_TAG_PREFIX}-arm64"
-          docker buildx imagetools inspect "${IMAGE}:${TARGET_TAG}"
-
-      - name: Update Docker Hub description
-        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        run: |
-          README_PATH="docs/README-dockerhub.md"
-          if [ ! -f "${README_PATH}" ]; then
-            echo "${README_PATH} not found; skipping Docker Hub README update."
-            exit 0
-          fi
-
-          TOKEN="$({
-            jq -n \
-              --arg identifier "${DOCKERHUB_USERNAME}" \
-              --arg secret "${DOCKERHUB_TOKEN}" \
-              '{identifier: $identifier, secret: $secret}'
-          } | curl -fsS -X POST \
-            -H 'Content-Type: application/json' \
-            --data-binary @- \
-            https://hub.docker.com/v2/auth/token | jq -er '.access_token')"
-
-          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
-            | curl -fsS -X PATCH \
-              -H "Authorization: Bearer ${TOKEN}" \
-              -H 'Content-Type: application/json' \
-              --data-binary @- \
-              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
-
-  deploy-render:
-    name: Deploy to Render
-    needs:
-      - infrastructure-validation
-      - build
-      - desktop
-      - publish-native-manifest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-
-    steps:
-      - name: Skip Render deploy when hook is not configured
-        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' || env.DOCKERHUB_USERNAME == '' || env.DOCKERHUB_TOKEN == '' }}
-        run: echo "Render deploy hook or Docker Hub credentials are not configured; skipping Render deployment."
-
-      - name: Trigger Render deploy
-        if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        run: |
-          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
-            --request POST \
-            --get \
-            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
-            "${RENDER_DEPLOY_HOOK_URL}"

@@ -171,6 +171,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Check Docker Hub credentials
         run: |
           test -n "${DOCKERHUB_USERNAME}"
@@ -192,7 +195,38 @@ jobs:
             --tag "${IMAGE}:${VERSION}" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:latest-native" \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-arm64"
           docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+          docker buildx imagetools inspect "${IMAGE}:latest-native"
+
+      - name: Update Docker Hub description
+        run: |
+          README_PATH="docs/README-dockerhub.md"
+          if [ ! -f "${README_PATH}" ]; then
+            echo "${README_PATH} not found; skipping Docker Hub README update."
+            exit 0
+          fi
+
+          TOKEN="$(
+            jq -n \
+              --arg identifier "${DOCKERHUB_USERNAME}" \
+              --arg secret "${DOCKERHUB_TOKEN}" \
+              '{identifier: $identifier, secret: $secret}' \
+            | curl -fsS -X POST \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              https://hub.docker.com/v2/auth/token \
+            | jq -er '.access_token')"
+
+          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
+            | curl -fsS -X PATCH \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
 
   deploy-render-release:
     name: Deploy release image to Render
