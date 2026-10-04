@@ -194,6 +194,7 @@ public class SecurityConfig {
                                                 "/admin",
                                                 "/admin/**",
                                                 "/",
+                                                "/download",
                                                 "/index.html",
                                                 "/404.html",
                                                 "/account/**",

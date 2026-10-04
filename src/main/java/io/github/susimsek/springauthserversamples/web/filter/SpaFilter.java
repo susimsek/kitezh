@@ -20,6 +20,7 @@ public class SpaFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_PAGES =
             Set.of(
                     "/",
+                    "/download",
                     "/login",
                     "/register",
                     "/consent",

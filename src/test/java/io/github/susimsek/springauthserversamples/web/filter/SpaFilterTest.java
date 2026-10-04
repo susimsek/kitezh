@@ -21,6 +21,7 @@ class SpaFilterTest {
     @ValueSource(
             strings = {
                 "/",
+                "/download",
                 "/login",
                 "/login/",
                 "/consent",
