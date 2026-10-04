@@ -170,16 +170,20 @@ jobs:
           install: false
 
       - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+        working-directory: src/main/frontend
+        run: pnpm install --frozen-lockfile
 
       - name: Install desktop dependencies
-        run: pnpm --dir src/main/desktop install --frozen-lockfile
+        working-directory: src/main/desktop
+        run: pnpm install --frozen-lockfile
 
       - name: Test desktop shell
-        run: pnpm --dir src/main/desktop test
+        working-directory: src/main/desktop
+        run: pnpm test
 
       - name: Build desktop package
-        run: pnpm --dir src/main/desktop package
+        working-directory: src/main/desktop
+        run: pnpm package
 
       - name: Upload desktop package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

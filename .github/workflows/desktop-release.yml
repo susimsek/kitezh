@@ -76,10 +76,12 @@ jobs:
           install: false
 
       - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+        working-directory: src/main/frontend
+        run: pnpm install --frozen-lockfile
 
       - name: Install desktop dependencies
-        run: pnpm --dir src/main/desktop install --frozen-lockfile
+        working-directory: src/main/desktop
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare platform signing configuration
         shell: bash
@@ -111,15 +113,17 @@ jobs:
         run: node src/main/desktop/scripts/write-update-manifest-public-key.mjs
 
       - name: Test desktop shell
-        run: pnpm --dir src/main/desktop test
+        working-directory: src/main/desktop
+        run: pnpm test
 
       - name: Run Electron E2E tests
         shell: bash
+        working-directory: src/main/desktop
         run: |
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            xvfb-run -a pnpm --dir src/main/desktop test:e2e
+            xvfb-run -a pnpm test:e2e
           else
-            pnpm --dir src/main/desktop test:e2e
+            pnpm test:e2e
           fi
 
       - name: Prepare Apple notarization key
@@ -136,12 +140,13 @@ jobs:
 
       - name: Build desktop package
         shell: bash
+        working-directory: src/main/desktop
         run: |
           if [[ "${{ matrix.platform }}" == "macos" && -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY}" && -n "${APPLE_API_KEY_ID}" && -n "${APPLE_API_ISSUER}" ]]; then
-            pnpm --dir src/main/desktop run build
-            pnpm --dir src/main/desktop exec electron-builder --publish never --mac --config.mac.notarize=true
+            pnpm run build
+            pnpm exec electron-builder --publish never --mac --config.mac.notarize=true
           else
-            pnpm --dir src/main/desktop package
+            pnpm package
           fi
 
       - name: Verify macOS signature and notarization
