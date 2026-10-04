@@ -6,8 +6,8 @@
   },
   "home": {
     "eyebrow": "Authorization for modern applications",
-    "title": "Build secure sign-in and consent flows with Spring Security.",
-    "subtitle": "A production-ready OAuth 2.0 and OpenID Connect authorization server with an administration console, account console, and desktop application.",
+    "title": "Secure identity for modern applications.",
+    "subtitle": "A standards-based identity platform for secure sign-in, authorization, and consent across browser and desktop applications.",
     "download": "Download the application",
     "signIn": "Open the sign-in page",
     "openSource": "Open source and ready for local development.",
@@ -27,7 +27,20 @@
         "description": "Manage users, clients, roles, groups, profile settings, and account security."
       }
     },
-    "footer": "{product} is built with Spring Security and Spring Boot."
+    "footer": {
+      "description": "A secure foundation for authentication, authorization, and identity across modern applications.",
+      "product": "Product",
+      "signIn": "Sign in",
+      "download": "Download",
+      "resources": "Resources",
+      "documentation": "Documentation",
+      "releases": "Releases",
+      "project": "Project",
+      "sourceCode": "Source code",
+      "license": "Apache License 2.0",
+      "security": "Security",
+      "copyright": "{product} · Open source software."
+    }
   },
   "desktop": {
     "offline": "The desktop app is offline. Reconnect to continue.",

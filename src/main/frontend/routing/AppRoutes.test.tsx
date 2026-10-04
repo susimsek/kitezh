@@ -38,7 +38,7 @@ describe("SPA not-found routes", () => {
   it("lets the user return home through client-side routing", () => {
     openRoute("/account/missing");
     fireEvent.click(screen.getByRole("link", { name: en.error.backToHome }));
-    expect(screen.getByRole("textbox", { name: en.login.username })).toBeVisible();
+    expect(screen.getByRole("heading", { name: en.home.title })).toBeVisible();
     expect(screen.queryByText(en.error.types.not_found.title)).not.toBeInTheDocument();
   });
 

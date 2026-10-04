@@ -6,8 +6,8 @@
   },
   "home": {
     "eyebrow": "Modern uygulamalar için yetkilendirme",
-    "title": "Spring Security ile güvenli giriş ve onay akışları oluşturun.",
-    "subtitle": "Yönetim konsolu, hesap konsolu ve masaüstü uygulaması içeren üretime hazır OAuth 2.0 ve OpenID Connect yetkilendirme sunucusu.",
+    "title": "Modern uygulamalar için güvenli kimlik.",
+    "subtitle": "Tarayıcı ve masaüstü uygulamalarında güvenli giriş, yetkilendirme ve onay akışları için standartlara dayalı bir kimlik platformu.",
     "download": "Uygulamayı indir",
     "signIn": "Giriş sayfasını aç",
     "openSource": "Açık kaynak ve yerel geliştirmeye hazır.",
@@ -27,7 +27,20 @@
         "description": "Kullanıcıları, istemcileri, rolleri, grupları, profil ayarlarını ve hesap güvenliğini yönetin."
       }
     },
-    "footer": "{product}, Spring Security ve Spring Boot ile geliştirilmiştir."
+    "footer": {
+      "description": "Modern uygulamalarda kimlik doğrulama, yetkilendirme ve kimlik yönetimi için güvenli bir temel.",
+      "product": "Ürün",
+      "signIn": "Giriş yap",
+      "download": "İndir",
+      "resources": "Kaynaklar",
+      "documentation": "Dokümantasyon",
+      "releases": "Sürümler",
+      "project": "Proje",
+      "sourceCode": "Kaynak kodu",
+      "license": "Apache License 2.0",
+      "security": "Güvenlik",
+      "copyright": "{product} · Açık kaynak yazılım."
+    }
   },
   "desktop": {
     "offline": "Masaüstü uygulaması çevrimdışı. Devam etmek için bağlantıyı yenileyin.",

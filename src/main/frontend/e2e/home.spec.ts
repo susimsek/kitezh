@@ -8,7 +8,9 @@ test.describe("public landing page", () => {
 
     await expect(page).toHaveURL(/\/$/);
     await expect(
-      page.getByRole("heading", { name: /Build secure sign-in|Spring Security ile güvenli/i }),
+      page.getByRole("heading", {
+        name: /Secure identity|Modern uygulamalar için güvenli kimlik/i,
+      }),
     ).toBeVisible();
     await expect(page.locator('input[name="username"]')).toHaveCount(0);
     await expect(page.locator('a[href="/download"]').first()).toBeVisible();

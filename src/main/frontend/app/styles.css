@@ -344,6 +344,25 @@ textarea.form-control {
   font-size: var(--console-font-size-sm);
 }
 
+.home-site-footer {
+  background: var(--bs-body-bg);
+}
+
+.home-footer-description {
+  max-width: 28rem;
+}
+
+.home-footer-link {
+  color: var(--bs-secondary-color);
+  text-decoration: none;
+}
+
+.home-footer-link:hover,
+.home-footer-link:focus-visible {
+  color: var(--bs-primary);
+  text-decoration: underline;
+}
+
 @media (max-width: 767.98px) {
   .home-hero {
     text-align: center;
