@@ -368,9 +368,9 @@ Electron test under Xvfb; macOS and Windows run it on their native runners.
 Branch builds upload Linux, macOS, and Windows installers as short-lived GitHub Actions artifacts.
 To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
 `desktop-release` workflow attaches the platform installers to the matching GitHub Release.
-Each release includes macOS x64 and universal DMG/ZIP packages, Linux AppImage, Debian, RPM, and
-Snap packages, Windows NSIS, portable EXE, and AppX packages, plus an SPDX JSON software bill of
-materials.
+Each release includes macOS x64 and universal DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
+and Snap packages, Linux ARM64 AppImage and Debian packages, Windows NSIS, portable EXE, and AppX
+packages, plus an SPDX JSON software bill of materials.
 These CI packages are unsigned until platform signing credentials are configured.
 The packaged app uses the `springauth://oauth/callback` protocol and stores console sessions in
 the operating system's protected Electron storage. Release signing, macOS notarization, and

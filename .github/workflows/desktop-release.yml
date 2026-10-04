@@ -26,17 +26,25 @@ env:
 
 jobs:
   package:
-    name: Package desktop (${{ matrix.platform }})
+    name: Package desktop (${{ matrix.platform }}-${{ matrix.architecture }})
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux
+            architecture: x64
+            deb_architecture: amd64
             runner: ubuntu-latest
+          - platform: linux
+            architecture: arm64
+            deb_architecture: arm64
+            runner: ubuntu-24.04-arm
           - platform: macos
+            architecture: universal
             runner: macos-latest
           - platform: windows
+            architecture: x64
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -142,7 +150,17 @@ jobs:
         shell: bash
         working-directory: src/main/desktop
         run: |
-          if [[ "${{ matrix.platform }}" != "macos" ]]; then
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            pnpm run build
+            if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
+              pnpm exec electron-builder --publish never --linux AppImage deb
+            else
+              pnpm exec electron-builder --publish never --linux AppImage deb rpm snap
+            fi
+            exit 0
+          fi
+
+          if [[ "${{ matrix.platform }}" == "windows" ]]; then
             pnpm package
             exit 0
           fi
@@ -202,17 +220,24 @@ jobs:
           test -n "$(dpkg-deb -f "${deb_path}" Version)"
           test -n "$(dpkg-deb -f "${deb_path}" Architecture)"
           test -n "$(dpkg-deb -f "${deb_path}" Maintainer)"
+          expected_deb_arch="${{ matrix.deb_architecture }}"
+          actual_deb_arch="$(dpkg-deb -f "${deb_path}" Architecture)"
+          test "${actual_deb_arch}" = "${expected_deb_arch}"
           dpkg-deb --info "${deb_path}"
-          rpm_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.rpm' -print -quit)"
-          test -n "${rpm_path}"
-          rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}\n' "${rpm_path}"
-          snap_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.snap' -print -quit)"
-          test -n "${snap_path}"
-          test -s "${snap_path}"
           appimage_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
           test -n "${appimage_path}"
           test -x "${appimage_path}"
-          (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb *.rpm *.snap > SHA256SUMS)
+          if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
+            (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb > SHA256SUMS)
+          else
+            rpm_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.rpm' -print -quit)"
+            test -n "${rpm_path}"
+            rpm -qp --queryformat '%{NAME} %{VERSION} %{ARCH}\n' "${rpm_path}"
+            snap_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.snap' -print -quit)"
+            test -n "${snap_path}"
+            test -s "${snap_path}"
+            (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb *.rpm *.snap > SHA256SUMS)
+          fi
           if [[ -z "${LINUX_GPG_PRIVATE_KEY}" ]]; then
             echo "Linux GPG signing key is not configured; publishing unsigned packages with SHA256SUMS."
             exit 0
@@ -230,7 +255,7 @@ jobs:
       - name: Upload desktop package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: desktop-${{ matrix.platform }}
+          name: desktop-${{ matrix.platform }}-${{ matrix.architecture }}
           path: ${{ runner.temp }}/desktop-release-assets/*
           if-no-files-found: error
 
