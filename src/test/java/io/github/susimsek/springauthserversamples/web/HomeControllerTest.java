@@ -12,7 +12,7 @@ class HomeControllerTest {
         Map<String, Object> payload = new HomeController().index();
 
         assertThat(payload)
-                .containsEntry("application", "spring-authorization-server-samples")
+                .containsEntry("application", "kitezh")
                 .containsEntry("metadata", "/.well-known/openid-configuration")
                 .containsEntry("jwkSet", "/oauth2/jwks")
                 .containsEntry("tokenEndpoint", "/oauth2/token")

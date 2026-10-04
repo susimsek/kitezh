@@ -4,9 +4,9 @@ export const DESKTOP_PROTOCOL = "springauth";
 export const RENDERER_PROTOCOL = "app";
 export const RENDERER_HOST = "renderer";
 export const DEFAULT_API_BASE_URL =
-  "https://spring-authorization-server-samples.onrender.com";
+  "https://kitezh.onrender.com";
 export const LOCAL_API_BASE_URL = "http://localhost:9090";
-const DEPLOYED_API_HOST = "spring-authorization-server-samples.onrender.com";
+const DEPLOYED_API_HOST = "kitezh.onrender.com";
 const ALLOWED_EXTERNAL_HOSTS = new Set([
   DEPLOYED_API_HOST,
   "accounts.google.com",

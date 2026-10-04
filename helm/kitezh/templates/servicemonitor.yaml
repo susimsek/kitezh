@@ -2,10 +2,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "spring-authorization-server-samples.fullname" . }}
+  name: {{ include "kitezh.fullname" . }}
   namespace: {{ default .Release.Namespace .Values.serviceMonitor.namespace }}
   labels:
-    {{ include "spring-authorization-server-samples.labels" . | nindent 4 }}
+    {{ include "kitezh.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}
     {{ toYaml . | nindent 4 }}
     {{- end }}
@@ -16,7 +16,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 6 }}
+      {{ include "kitezh.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: {{ .Values.serviceMonitor.port | quote }}
       path: {{ .Values.serviceMonitor.path | quote }}

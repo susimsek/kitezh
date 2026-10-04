@@ -29,7 +29,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(
                         new Info()
-                                .title("Spring Authorization Server Sample API")
+                                .title("Kitezh Sample API")
                                 .version("v1")
                                 .description(
                                         "OAuth 2.1 / OpenID Connect provider with Keycloak-style"

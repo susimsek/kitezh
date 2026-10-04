@@ -1,9 +1,9 @@
 groups:
-  - name: spring-authorization-server-production
+  - name: kitezh-production
     interval: 30s
     rules:
       - alert: SpringAuthorizationServerDown
-        expr: up{job=~"spring-authorization-server.*"} == 0
+        expr: up{job=~"kitezh.*"} == 0
         for: 5m
         labels:
           severity: critical
@@ -11,7 +11,7 @@ groups:
           summary: Spring Authorization Server is unavailable
           description: The Prometheus target {{ $labels.instance }} has been down for more than five minutes.
       - alert: SpringAuthorizationServerScrapeMissing
-        expr: absent(up{job=~"spring-authorization-server.*"})
+        expr: absent(up{job=~"kitezh.*"})
         for: 5m
         labels:
           severity: critical
@@ -21,12 +21,12 @@ groups:
       - alert: SpringAuthorizationServerAuthenticationErrorRate
         expr: |
           sum(rate(http_server_requests_seconds_count{
-            job=~"spring-authorization-server.*",
+            job=~"kitezh.*",
             uri=~"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke",
             outcome="SERVER_ERROR"
           }[5m]))
           / clamp_min(sum(rate(http_server_requests_seconds_count{
-            job=~"spring-authorization-server.*",
+            job=~"kitezh.*",
             uri=~"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke"
           }[5m])), 1) > 0.001
         for: 5m
@@ -39,7 +39,7 @@ groups:
         expr: |
           histogram_quantile(0.95,
             sum by (le) (rate(http_server_requests_seconds_bucket{
-              job=~"spring-authorization-server.*",
+              job=~"kitezh.*",
               uri=~"/login|/logout|/oauth2/authorize|/oauth2/token|/oauth2/introspect|/oauth2/revoke"
             }[5m]))
           ) > 0.25
@@ -51,8 +51,8 @@ groups:
           description: The authentication request p95 latency has exceeded 250 milliseconds for ten minutes.
       - alert: SpringAuthorizationServerHighHeapUsage
         expr: |
-          100 * sum(jvm_memory_used_bytes{job=~"spring-authorization-server.*",area="heap"})
-          / clamp_min(sum(jvm_memory_max_bytes{job=~"spring-authorization-server.*",area="heap"}), 1) > 85
+          100 * sum(jvm_memory_used_bytes{job=~"kitezh.*",area="heap"})
+          / clamp_min(sum(jvm_memory_max_bytes{job=~"kitezh.*",area="heap"}), 1) > 85
         for: 10m
         labels:
           severity: warning
@@ -60,7 +60,7 @@ groups:
           summary: JVM heap usage is high
           description: JVM heap usage has exceeded 85 percent for ten minutes.
       - alert: SpringAuthorizationServerHikariPoolSaturated
-        expr: sum(hikaricp_connections_pending{job=~"spring-authorization-server.*"}) > 0
+        expr: sum(hikaricp_connections_pending{job=~"kitezh.*"}) > 0
         for: 5m
         labels:
           severity: warning

@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "spring-authorization-server-samples.fullname" . }}-liquibase
+  name: {{ include "kitezh.fullname" . }}-liquibase
   labels:
-    {{ include "spring-authorization-server-samples.labels" . | nindent 4 }}
+    {{ include "kitezh.labels" . | nindent 4 }}
 data:
   db.changelog-master.xml: |-
 {{ .Files.Get "db/changelog/db.changelog-master.xml" | indent 4 }}

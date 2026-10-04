@@ -23,7 +23,7 @@ class OpenApiConfigTest {
         OpenApiConfig config = new OpenApiConfig();
         OpenAPI api = config.authorizationServerOpenApi(new ApplicationProperties());
 
-        assertThat(api.getInfo().getTitle()).contains("Authorization Server");
+        assertThat(api.getInfo().getTitle()).contains("Kitezh");
         assertThat(api.getServers()).hasSize(1);
         assertThat(api.getComponents().getSecuritySchemes())
                 .containsKeys(

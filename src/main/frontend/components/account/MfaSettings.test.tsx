@@ -35,7 +35,7 @@ describe("MFA account settings", () => {
           enabled: false,
           available: true,
           required: false,
-          issuer: "Authorization Server",
+          issuer: "Kitezh",
           digits: 6,
         }),
       )
@@ -80,7 +80,7 @@ describe("MFA account settings", () => {
           enabled: false,
           available: true,
           required: false,
-          issuer: "Authorization Server",
+          issuer: "Kitezh",
           digits: 8,
         }),
       )
@@ -112,7 +112,7 @@ describe("MFA account settings", () => {
           enabled: true,
           available: true,
           required: true,
-          issuer: "Authorization Server",
+          issuer: "Kitezh",
           digits: 6,
         }),
       )

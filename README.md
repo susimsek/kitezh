@@ -1,12 +1,12 @@
-# Spring Authorization Server Samples
+# Kitezh
 
-[![Build Status](https://github.com/susimsek/spring-authorization-server-samples/actions/workflows/ci.yml/badge.svg)](https://github.com/susimsek/spring-authorization-server-samples/actions/workflows/ci.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=spring-authorization-server-samples&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=spring-authorization-server-samples)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=spring-authorization-server-samples&metric=coverage)](https://sonarcloud.io/summary/new_code?id=spring-authorization-server-samples)
-[![Vulnerabilities](https://snyk.io/test/github/susimsek/spring-authorization-server-samples/badge.svg)](https://snyk.io/test/github/susimsek/spring-authorization-server-samples)
-[![Docker Image Size](https://img.shields.io/docker/image-size/suayb/spring-authorization-server-samples/latest?label=Image%20Size)](https://hub.docker.com/r/suayb/spring-authorization-server-samples)
-[![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://spring-authorization-server-samples.onrender.com)
-[![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/spring-auth-prod/spring-authorization-server)
+[![Build Status](https://github.com/susimsek/kitezh/actions/workflows/ci.yml/badge.svg)](https://github.com/susimsek/kitezh/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=kitezh)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kitezh)
+[![Vulnerabilities](https://snyk.io/test/github/susimsek/kitezh/badge.svg)](https://snyk.io/test/github/susimsek/kitezh)
+[![Docker Image Size](https://img.shields.io/docker/image-size/suayb/kitezh/latest?label=Image%20Size)](https://hub.docker.com/r/suayb/kitezh)
+[![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh.onrender.com)
+[![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/spring-auth-prod/kitezh)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Maven](https://img.shields.io/badge/Maven-3.9+-C71A36?logo=apache-maven&logoColor=white)](https://maven.apache.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot/)
@@ -26,7 +26,7 @@
 [![Terraform](https://img.shields.io/badge/Terraform-Infrastructure-623CE4?logo=terraform&logoColor=white)](https://www.terraform.io/)
 [![Codex](https://custom-icon-badges.demolab.com/badge/Codex-AI%20Agent-74aa9c?&logo=openai&logoColor=white)](https://openai.com/codex/)
 
-This repository is a Spring Boot 4.1 + Java 25 sample application built around the Authorization Server support integrated into **Spring Security 7**. It acts as an OAuth2 Authorization Server and OpenID Connect Provider, stores users and clients in a relational database with Liquibase-managed schema, uses Spring Data JPA and Hibernate second-level cache with Caffeine/JCache, supports H2 for local development and PostgreSQL for production-style runs, loads RSA JWK signing keys from the database, and can be compiled as a GraalVM native executable.
+This repository is a Spring Boot 4.1 + Java 25 application built around the Authorization Server support integrated into **Spring Security 7**. It acts as an OAuth2 Authorization Server and OpenID Connect Provider, stores users and clients in a relational database with Liquibase-managed schema, uses Spring Data JPA and Hibernate second-level cache with Caffeine/JCache, supports H2 for local development and PostgreSQL for production-style runs, loads RSA JWK signing keys from the database, and can be compiled as a GraalVM native executable.
 
 ## Table of Contents
 
@@ -107,14 +107,14 @@ This repository is a Spring Boot 4.1 + Java 25 sample application built around t
     - `repository`: Spring Data JPA repositories
     - `service`: Authorization Server persistence adapters, user details, and JWK loading
     - `security`: localized security handlers, auditor/security utilities, and the database-backed `JWKSource`
-    - `web`: lightweight MVC endpoints for sample landing output
+    - `web`: lightweight MVC endpoints for landing output
 - Configuration: `src/main/resources/config`
 - Liquibase changelogs: `src/main/resources/db/changelog`
 - Liquibase seed data: `src/main/resources/db/data`
 - i18n messages: `src/main/resources/i18n`
 - Native image metadata: `src/main/resources/META-INF/native-image`
 - Docker compose files: `src/main/docker`
-- Helm chart: `helm/spring-authorization-server-samples`
+- Helm chart: `helm/kitezh`
 - Tests: `src/test/java`
     - Application unit/integration tests: `src/test/java/io/github/susimsek/springauthserversamples`
     - Gatling performance tests: `src/test/java/gatling/simulations`
@@ -125,12 +125,12 @@ Main configuration lives in `src/main/resources/config/application.yml`.
 
 Important defaults:
 
-- Application name: `spring-authorization-server-samples`
+- Application name: `kitezh`
 - HTTP port: `9090`
-- Database: `jdbc:h2:mem:authserversamples`
+- Database: `jdbc:h2:mem:kitezh`
 - JPA DDL mode: `none`
 - Liquibase changelog: `classpath:db/changelog/db.changelog-master.xml`
-- Default issuer: `https://spring-authorization-server-samples.local`
+- Default issuer: `https://kitezh.local`
 - Hibernate second-level cache: enabled
 - Cache provider: JCache backed by Caffeine
 - Registration/login CAPTCHA: disabled by default; supports Google reCAPTCHA v2/v3 and reCAPTCHA Enterprise
@@ -157,7 +157,7 @@ Secret/API key handling:
 The admin API accepts the secret/API key only on an authenticated update and stores them encrypted
 with AES-GCM in the `login_settings` table. The values are never returned to the browser; the
 panel only receives a configured/not-configured flag. A blank secret field preserves the current
-value. The demo profiles use a fixed sample encryption key; replace it with a deployment-managed
+value. The demo profiles use a fixed demo encryption key; replace it with a deployment-managed
 secret before using the production profile outside local development, and keep it stable
 across restarts and deployments.
 
@@ -176,7 +176,7 @@ Telemetry is disabled by default; configure the standard `MANAGEMENT_*` OTLP var
 
 The production profile also exposes Micrometer metrics at `/actuator/prometheus` for Prometheus
 scraping. The production dashboard is stored at
-[`src/main/docker/observability/grafana/spring-authorization-server.json`](src/main/docker/observability/grafana/spring-authorization-server.json)
+[`src/main/docker/observability/grafana/kitezh.json`](src/main/docker/observability/grafana/kitezh.json)
 and the baseline Prometheus alert rules are stored at
 [`src/main/docker/observability/prometheus/alerts.yml`](src/main/docker/observability/prometheus/alerts.yml).
 The dashboard follows Keycloak's observability model: Prometheus collects the metrics and Grafana
@@ -236,7 +236,7 @@ Access records carry
 `direction=inbound` and `type=request`; outgoing client records carry `direction=outbound` and
 `type=request` or `type=response`, with `outcome=failure` for failed calls. With structured logs
 enabled, these are queryable fields in Grafana, for example
-`{service_name="spring-authorization-server-samples"} | json | direction="outbound"`.
+`{service_name="kitezh"} | json | direction="outbound"`.
 
 ## Configuration and Profiles
 
@@ -333,7 +333,7 @@ pnpm install
 pnpm dev
 ```
 
-The exported page is served at `/login` and submits credentials directly to Spring Security's `POST /login` endpoint. CSRF protection is intentionally disabled in this sample.
+The exported page is served at `/login` and submits credentials directly to Spring Security's `POST /login` endpoint. CSRF protection is intentionally disabled in this application.
 
 Frontend browser E2E tests use Playwright and are configured independently from the Electron
 tests. With the server running on port `9090`, install the Chromium browser once and run:
@@ -416,13 +416,13 @@ The static frontend also contains browser-based OIDC clients for administration 
 
 The authorization server browser session provides SSO between the login screen and the console clients. The Admin Console includes client, client-scope, user, role, session, consent, signing-key, event, and server-information screens. The Account Console provides personal information, password, TOTP MFA, and one-time recovery-code security, authorized applications, and session-management screens.
 
-The registered redirect and post-logout redirect URIs are seeded for `localhost:9090` and `https://spring-authorization-server-samples.local`. When deploying elsewhere, set `app.authorization-server.issuer` (or `APP_AUTHORIZATION_SERVER_ISSUER`) to the public address and register matching client redirect URIs.
+The registered redirect and post-logout redirect URIs are seeded for `localhost:9090` and `https://kitezh.local`. When deploying elsewhere, set `app.authorization-server.issuer` (or `APP_AUTHORIZATION_SERVER_ISSUER`) to the public address and register matching client redirect URIs.
 
 ## Run Locally
 
 ### Dev (H2)
 
-The development profile uses the Liquibase-seeded sample JWK stored in `oauth2_key`.
+The development profile uses the Liquibase-seeded demo JWK stored in `oauth2_key`.
 
 Start the authorization server:
 
@@ -442,7 +442,7 @@ Open [http://localhost:9090/h2-console/](http://localhost:9090/h2-console/) afte
 application with the `dev` profile. Use:
 
 - Driver Class: `org.h2.Driver`
-- JDBC URL: `jdbc:h2:mem:authserversamples;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
+- JDBC URL: `jdbc:h2:mem:kitezh;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
 - User Name: `sa`
 - Password: leave empty
 
@@ -556,11 +556,11 @@ Framework endpoint families supported by Spring Security's Authorization Server:
 - OIDC logout: `GET /connect/logout`
 - Optional when configured: `GET /userinfo`, `POST /oauth2/par`, `POST /oauth2/device_authorization`, `GET|POST /oauth2/device_verification`, `POST /connect/register`
 
-This sample currently focuses on metadata, JWK Set, authorization code, refresh token, client credentials, CIBA, introspection, revocation, and logout.
+This application currently focuses on metadata, JWK Set, authorization code, refresh token, client credentials, CIBA, introspection, revocation, and logout.
 
 ## Authorization Server Flows
 
-This sample behaves as an OAuth2 Authorization Server and OpenID Connect Provider. The main runtime responsibilities are:
+This application behaves as an OAuth2 Authorization Server and OpenID Connect Provider. The main runtime responsibilities are:
 
 - publish OIDC discovery metadata
 - publish the JWK Set containing the active signing key and passive verification keys
@@ -643,7 +643,7 @@ redirect URI because the user approves the request in the Account Console.
 Ping and push clients must register a notification endpoint and send a fresh
 `client_notification_token` with every backchannel request. The token is encrypted before it is
 stored with the pending request and is sent as a bearer token only to the registered endpoint.
-The demo profiles provide a fixed AES-GCM key for ping or push delivery. Replace that sample key
+The demo profiles provide a fixed AES-GCM key for ping or push delivery. Replace that demo key
 with a deployment-managed secret before using the production profile outside this demo.
 
 Create a backchannel authentication request:
@@ -700,7 +700,7 @@ How to think about it:
 
 - client secret proves who the client is
 - PKCE proves that the same client that started the browser redirect is the one finishing the token exchange
-- in this sample, `pkce-client` uses both protections together
+- in this application, `pkce-client` uses both protections together
 
 Seeded PKCE client:
 
@@ -761,8 +761,8 @@ Important PKCE notes:
 - `code_verifier` must match the `code_challenge` used in the authorize request
 - `code_challenge_method=S256` means the challenge is the SHA-256 hash of the verifier
 - `require-proof-key=true` is enabled to prevent PKCE downgrade attacks
-- this sample uses a confidential client with PKCE, so the token request still uses HTTP Basic client authentication
-- `demo-client` is the non-PKCE confidential client in this sample
+- this application uses a confidential client with PKCE, so the token request still uses HTTP Basic client authentication
+- `demo-client` is the non-PKCE confidential client in this application
 
 ### Refresh Token Flow
 
@@ -966,14 +966,14 @@ Main tables:
 Development uses:
 
 ```text
-jdbc:h2:mem:authserversamples;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+jdbc:h2:mem:kitezh;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
 ```
 
 Production uses PostgreSQL.
 
 ## Internationalization
 
-The sample keeps i18n message bundles under:
+The application keeps i18n message bundles under:
 
 ```text
 src/main/resources/i18n
@@ -1087,7 +1087,7 @@ export SONAR_TOKEN=...
 The Maven verification phase enforces a 96% instruction and line coverage floor
 with JaCoCo. This keeps a one percentage point safety margin above the 95%
 coverage target reported by SonarCloud. The SonarCloud project uses the
-`Spring Authorization Server 95 Coverage` quality gate for that floor.
+`Kitezh 95 Coverage` quality gate for that floor.
 
 ## GraalVM Native Image
 
@@ -1121,7 +1121,7 @@ Run it:
 
 ```bash
 SPRING_PROFILES_ACTIVE=prod \
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/authserversamples \
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/kitezh \
 SPRING_DATASOURCE_USERNAME=appuser \
 SPRING_DATASOURCE_PASSWORD=appuser \
 APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090 \
@@ -1163,7 +1163,7 @@ Native Docker image:
 
 ```bash
 ./mvnw -Pprod,native -DskipTests jib:dockerBuild \
-  -Djib.to.image=spring-authorization-server-samples:latest
+  -Djib.to.image=kitezh:latest
 ```
 
 Run the native image with PostgreSQL:
@@ -1171,11 +1171,11 @@ Run the native image with PostgreSQL:
 ```bash
 docker run --rm -p 9090:9090 \
   -e SPRING_PROFILES_ACTIVE=prod \
-  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/authserversamples \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/kitezh \
   -e SPRING_DATASOURCE_USERNAME=appuser \
   -e SPRING_DATASOURCE_PASSWORD=appuser \
   -e APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090 \
-  spring-authorization-server-samples:latest
+  kitezh:latest
 ```
 
 ## Kubernetes Health Probe
@@ -1236,20 +1236,20 @@ Spring Boot Docker Compose integration:
 
 ## Helm
 
-- Chart: `helm/spring-authorization-server-samples`
+- Chart: `helm/kitezh`
 
 The chart stores database credentials in a generated Kubernetes Secret by default, or can reference an existing Secret with `existingSecret.enabled=true`. RSA JWK signing keys are persisted in PostgreSQL and loaded from the `oauth2_key` table by all replicas.
 
 Lint:
 
 ```bash
-helm lint helm/spring-authorization-server-samples
+helm lint helm/kitezh
 ```
 
 Render:
 
 ```bash
-helm template spring-authorization-server-samples helm/spring-authorization-server-samples
+helm template kitezh helm/kitezh
 ```
 
 Create namespace:
@@ -1261,13 +1261,13 @@ kubectl create namespace apps --dry-run=client -o yaml | kubectl apply -f -
 Install/upgrade:
 
 ```bash
-helm upgrade --install spring-authorization-server-samples helm/spring-authorization-server-samples -n apps
+helm upgrade --install kitezh helm/kitezh -n apps
 ```
 
 Install/upgrade with values:
 
 ```bash
-helm upgrade --install spring-authorization-server-samples helm/spring-authorization-server-samples -n apps -f helm/spring-authorization-server-samples/values.yaml
+helm upgrade --install kitezh helm/kitezh -n apps -f helm/kitezh/values.yaml
 ```
 
 Check release:
@@ -1282,7 +1282,7 @@ kubectl get ingress -n apps
 Uninstall:
 
 ```bash
-helm uninstall spring-authorization-server-samples -n apps
+helm uninstall kitezh -n apps
 ```
 
 To use an existing database Secret, provide keys named `database-username` and `database-password`:
@@ -1354,19 +1354,19 @@ terraform -chdir=terraform output -raw openid_configuration_url
 Default ingress hostname:
 
 ```text
-spring-authorization-server.127.0.0.1.nip.io
+kitezh.127.0.0.1.nip.io
 ```
 
 Example:
 
 ```bash
-curl http://spring-authorization-server.127.0.0.1.nip.io:9090/.well-known/openid-configuration
+curl http://kitezh.127.0.0.1.nip.io:9090/.well-known/openid-configuration
 ```
 
 Fetch the JWK Set:
 
 ```bash
-curl http://spring-authorization-server.127.0.0.1.nip.io:9090/oauth2/jwks
+curl http://kitezh.127.0.0.1.nip.io:9090/oauth2/jwks
 ```
 
 Fallback access:
@@ -1374,13 +1374,13 @@ Fallback access:
 ```bash
 kubectl --kubeconfig="$(terraform -chdir=terraform output -raw kubeconfig_path)" \
   -n apps \
-  port-forward svc/spring-authorization-server-samples 9090:9090
+  port-forward svc/kitezh 9090:9090
 ```
 
 Destroy only the application Helm release:
 
 ```bash
-terraform -chdir=terraform destroy -target=helm_release.spring_authorization_server_samples
+terraform -chdir=terraform destroy -target=helm_release.kitezh
 ```
 
 Destroy all:
@@ -1413,10 +1413,10 @@ Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.git
 `render.yaml` keeps the Render web service configuration in Git. It uses the published
 `latest` multi-arch image and the `/actuator/health/readiness` health check. Connect the
 repository in Render with **New → Blueprint**, select the `main` branch, and apply the Blueprint
-to manage the existing `spring-authorization-server-samples` service. Render prompts for the
+to manage the existing `kitezh` service. Render prompts for the
 database URL, username, password, and public issuer because those values are marked `sync: false`.
 
-Live demo: [Render](https://spring-authorization-server-samples.onrender.com)
+Live demo: [Render](https://kitezh.onrender.com)
 
 Create a GitHub Actions repository secret named `RENDER_DEPLOY_HOOK_URL` from the service's
 Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest`

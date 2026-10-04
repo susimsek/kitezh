@@ -125,8 +125,8 @@ test("trusts only the packaged renderer origin", () => {
 test("accepts only configured API and external origins", () => {
   assert.equal(getApiBaseUrl("http://localhost:9090"), "http://localhost:9090");
   assert.equal(
-    getApiBaseUrl("https://spring-authorization-server-samples.onrender.com"),
-    "https://spring-authorization-server-samples.onrender.com",
+    getApiBaseUrl("https://kitezh.onrender.com"),
+    "https://kitezh.onrender.com",
   );
   assert.throws(
     () => getApiBaseUrl("https://example.test"),

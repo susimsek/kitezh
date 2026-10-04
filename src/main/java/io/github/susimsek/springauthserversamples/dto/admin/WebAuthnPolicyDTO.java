@@ -9,9 +9,7 @@ import jakarta.validation.constraints.Size;
 /** The WebAuthn ceremony policy exposed by the administration API. */
 @Schema(name = "WebAuthnPolicy", description = "WebAuthn relying-party and authenticator policy.")
 public record WebAuthnPolicyDTO(
-        @Schema(
-                        description = "Human-readable relying-party entity name.",
-                        example = "Spring Authorization Server")
+        @Schema(description = "Human-readable relying-party entity name.", example = "Kitezh")
                 @NotBlank
                 @Size(max = 255)
                 String rpName,

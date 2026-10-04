@@ -20,11 +20,11 @@ test.describe("download page", () => {
     }
     await expect(
       page.locator(
-        'a[href="https://github.com/susimsek/spring-authorization-server-samples/releases/latest"]',
+        'a[href="https://github.com/susimsek/kitezh/releases/latest"]',
       ),
     ).toHaveAttribute(
       "href",
-      "https://github.com/susimsek/spring-authorization-server-samples/releases/latest",
+      "https://github.com/susimsek/kitezh/releases/latest",
     );
   });
 });

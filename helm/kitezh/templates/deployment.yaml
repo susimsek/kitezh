@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "spring-authorization-server-samples.fullname" . }}
+  name: {{ include "kitezh.fullname" . }}
   labels:
-    {{ include "spring-authorization-server-samples.labels" . | nindent 4 }}
+    {{ include "kitezh.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -13,7 +13,7 @@ spec:
 {{ toYaml .Values.updateStrategy | nindent 4 }}
   selector:
     matchLabels:
-      {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 6 }}
+      {{ include "kitezh.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -23,14 +23,14 @@ spec:
         {{ toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 8 }}
+        {{ include "kitezh.selectorLabels" . | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{ toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "spring-authorization-server-samples.serviceAccountName" . }}
+      serviceAccountName: {{ include "kitezh.serviceAccountName" . }}
       securityContext:
         {{ toYaml .Values.podSecurityContext | nindent 8 }}
       {{- if .Values.dnsPolicy }}
@@ -71,12 +71,12 @@ spec:
             - name: LIQUIBASE_COMMAND_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "spring-authorization-server-samples.databaseSecretName" . }}
+                  name: {{ include "kitezh.databaseSecretName" . }}
                   key: database-username
             - name: LIQUIBASE_COMMAND_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "spring-authorization-server-samples.databaseSecretName" . }}
+                  name: {{ include "kitezh.databaseSecretName" . }}
                   key: database-password
             - name: LIQUIBASE_COMMAND_CHANGELOG_FILE
               value: {{ .Values.initContainers.liquibase.changeLogFile | quote }}
@@ -108,12 +108,12 @@ spec:
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "spring-authorization-server-samples.databaseSecretName" . }}
+                  name: {{ include "kitezh.databaseSecretName" . }}
                   key: database-username
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "spring-authorization-server-samples.databaseSecretName" . }}
+                  name: {{ include "kitezh.databaseSecretName" . }}
                   key: database-password
           volumeMounts:
             - name: config
@@ -157,14 +157,14 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "spring-authorization-server-samples.fullname" . }}
+            name: {{ include "kitezh.fullname" . }}
             items:
               - key: application.yml
                 path: application.yml
         {{- if .Values.initContainers.liquibase.enabled }}
         - name: liquibase-volume
           configMap:
-            name: {{ include "spring-authorization-server-samples.fullname" . }}-liquibase
+            name: {{ include "kitezh.fullname" . }}-liquibase
             items:
               - key: db.changelog-master.xml
                 path: changelog/db.changelog-master.xml
@@ -193,7 +193,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
                 labelSelector:
                   matchLabels:
-                    {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 20 }}
+                    {{ include "kitezh.selectorLabels" . | nindent 20 }}
       {{- with .Values.tolerations }}
       tolerations:
         {{ toYaml . | nindent 8 }}

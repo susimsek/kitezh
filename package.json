@@ -1,16 +1,16 @@
 {
-  "name": "spring-authorization-server-samples-frontend",
+  "name": "kitezh-frontend",
   "version": "0.0.1",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Web administration and account consoles for the Spring Authorization Server sample",
-  "homepage": "https://spring-authorization-server-samples.onrender.com",
+  "description": "Web administration and account consoles for the Kitezh identity and access platform",
+  "homepage": "https://kitezh.onrender.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/susimsek/spring-authorization-server-samples.git"
+    "url": "https://github.com/susimsek/kitezh.git"
   },
   "bugs": {
-    "url": "https://github.com/susimsek/spring-authorization-server-samples/issues"
+    "url": "https://github.com/susimsek/kitezh/issues"
   },
   "packageManager": "pnpm@11.22.0",
   "scripts": {

@@ -313,8 +313,8 @@ jobs:
         with:
           path: .
           format: spdx-json
-          output-file: release-assets/spring-authorization-server-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.head_branch }}-sbom.spdx.json
-          artifact-name: spring-authorization-server-sbom
+          output-file: release-assets/kitezh-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.head_branch }}-sbom.spdx.json
+          artifact-name: kitezh-sbom
           upload-artifact: false
           upload-release-assets: false
           dependency-snapshot: false

@@ -55,7 +55,7 @@ app:
     issuer: http://127.0.0.1:0
   mail:
     enabled: false
-    from: Spring Authorization Server <no-reply@localhost>
+    from: Kitezh <no-reply@localhost>
     base-url: http://127.0.0.1:0
   security:
     password-policy:

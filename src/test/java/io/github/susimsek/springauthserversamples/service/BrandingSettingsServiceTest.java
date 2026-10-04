@@ -27,7 +27,7 @@ class BrandingSettingsServiceTest {
         assertThat(service.publicSettings())
                 .satisfies(
                         value -> {
-                            assertThat(value.applicationName()).isEqualTo("Authorization Server");
+                            assertThat(value.applicationName()).isEqualTo("Kitezh");
                             assertThat(value.logoPath()).isEqualTo("/brand/logo.svg");
                             assertThat(value.primaryColor()).isEqualTo("#0d6efd");
                         });
@@ -56,7 +56,7 @@ class BrandingSettingsServiceTest {
     private static BrandingSettingsEntity settings() {
         BrandingSettingsEntity entity = new BrandingSettingsEntity();
         entity.setId(1L);
-        entity.setApplicationName("Authorization Server");
+        entity.setApplicationName("Kitezh");
         entity.setLogoPath("/brand/logo.svg");
         entity.setFaviconPath("/favicon.ico");
         entity.setAppleTouchIconPath("/apple-icon.png");

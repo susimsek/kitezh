@@ -160,7 +160,7 @@ jobs:
             -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
             -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
             jib:build \
-            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${VERSION}-${NATIVE_ARCHITECTURE}" \
+            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/kitezh:${VERSION}-${NATIVE_ARCHITECTURE}" \
             -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
             -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
 
@@ -190,7 +190,7 @@ jobs:
           VERSION_TAG: ${{ github.ref_name }}
         run: |
           VERSION="${VERSION_TAG#v}"
-          IMAGE="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
+          IMAGE="docker.io/${DOCKERHUB_USERNAME}/kitezh"
           docker buildx imagetools create \
             --tag "${IMAGE}:${VERSION}" \
             "${IMAGE}:${VERSION}-amd64" \
@@ -226,7 +226,7 @@ jobs:
               -H "Authorization: Bearer ${TOKEN}" \
               -H 'Content-Type: application/json' \
               --data-binary @- \
-              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/kitezh"
 
   deploy-render-release:
     name: Deploy release image to Render
@@ -249,5 +249,5 @@ jobs:
           curl --fail --silent --show-error --retry 3 --retry-delay 5 \
             --request POST \
             --get \
-            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:${VERSION}" \
+            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/kitezh:${VERSION}" \
             "${RENDER_DEPLOY_HOOK_URL}"

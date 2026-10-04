@@ -9,10 +9,10 @@
 		<relativePath/>
 	</parent>
 	<groupId>io.github.susimsek</groupId>
-	<artifactId>spring-authorization-server-samples</artifactId>
+	<artifactId>kitezh</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-authorization-server-samples</name>
-	<description>Spring Authorization Server sample</description>
+	<name>kitezh</name>
+	<description>Kitezh identity and access platform</description>
 
 	<properties>
 			<java.version>25</java.version>
@@ -364,7 +364,7 @@
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>${jacoco.version}</version>
 				<configuration>
-					<destFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</destFile>
+					<destFile>${java.io.tmpdir}/kitezh-jacoco.exec</destFile>
 					<excludes>
 						<exclude>io/github/susimsek/springauthserversamples/mapper/*MapperImpl.class</exclude>
 					</excludes>
@@ -383,7 +383,7 @@
 							<goal>report</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/kitezh-jacoco.exec</dataFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -392,7 +392,7 @@
 							<goal>prepare-agent-integration</goal>
 						</goals>
 						<configuration>
-							<destFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco-it.exec</destFile>
+							<destFile>${java.io.tmpdir}/kitezh-jacoco-it.exec</destFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -402,7 +402,7 @@
 							<goal>report-integration</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco-it.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/kitezh-jacoco-it.exec</dataFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -412,7 +412,7 @@
 							<goal>check</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/kitezh-jacoco.exec</dataFile>
 							<rules>
 								<rule>
 									<element>BUNDLE</element>

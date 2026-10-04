@@ -60,7 +60,7 @@ let pendingDeepLink: string | null = null;
 type ConsoleName = "admin" | "account";
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
 type StoredTokens = DesktopTokens;
-const DESKTOP_APP_NAME = "Spring Authorization Server";
+const DESKTOP_APP_NAME = "Kitezh";
 type WindowState = {
   x?: number;
   y?: number;
@@ -498,7 +498,7 @@ function enforceContentSecurityPolicy() {
         responseHeaders: {
           ...details.responseHeaders,
           "Content-Security-Policy": [
-            "default-src 'self'; connect-src 'self' https://spring-authorization-server-samples.onrender.com http://localhost:9090; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:",
+            "default-src 'self'; connect-src 'self' https://kitezh.onrender.com http://localhost:9090; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:",
           ],
         },
       });

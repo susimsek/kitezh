@@ -105,7 +105,7 @@ type WebAuthnPolicy = {
 };
 
 const defaultWebAuthnPolicy: WebAuthnPolicy = {
-  rpName: "Spring Authorization Server",
+  rpName: "Kitezh",
   rpId: "",
   signatureAlgorithms: "ES256,RS256,EdDSA",
   attestation: "none",
@@ -165,7 +165,7 @@ const defaultSettings: Settings = {
   bruteForceUsernameIpRequestsPerMinute: 5,
   otpEnabled: false,
   otpRequired: false,
-  otpIssuer: "Spring Authorization Server",
+  otpIssuer: "Kitezh",
   otpAlgorithm: "SHA1",
   otpDigits: 6,
   otpPeriodSeconds: 30,

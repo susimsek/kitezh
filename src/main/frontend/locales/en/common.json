@@ -1,6 +1,6 @@
 {
   "brand": {
-    "product": "Authorization Server",
+    "product": "Kitezh",
     "framework": "Spring Security",
     "description": "Secure OAuth 2.0 and OpenID Connect authorization."
   },

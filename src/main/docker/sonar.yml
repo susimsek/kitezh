@@ -1,5 +1,5 @@
 # Dev tooling only. DO NOT use in production.
-name: spring-authorization-server-samples
+name: kitezh
 
 services:
   sonarqube:

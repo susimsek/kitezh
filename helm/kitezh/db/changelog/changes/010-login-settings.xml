@@ -19,7 +19,7 @@
 			<column name="login_with_email" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
 			<column name="verify_email" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
 			<column name="webauthn_mediation" type="varchar(20)" defaultValue="none"><constraints nullable="false"/></column>
-			<column name="webauthn_rp_name" type="varchar(255)" defaultValue="Spring Authorization Server"><constraints nullable="false"/></column>
+			<column name="webauthn_rp_name" type="varchar(255)" defaultValue="Kitezh"><constraints nullable="false"/></column>
 			<column name="webauthn_rp_id" type="varchar(253)" defaultValue=""><constraints nullable="false"/></column>
 			<column name="webauthn_signature_algorithms" type="varchar(255)" defaultValue="ES256,RS256,EdDSA"><constraints nullable="false"/></column>
 			<column name="webauthn_attestation" type="varchar(20)" defaultValue="none"><constraints nullable="false"/></column>
@@ -29,7 +29,7 @@
 			<column name="webauthn_timeout_seconds" type="int" defaultValueNumeric="300"><constraints nullable="false"/></column>
 			<column name="webauthn_avoid_same_authenticator" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
 			<column name="webauthn_acceptable_aaguids" type="varchar(4000)"/>
-			<column name="webauthn_passwordless_rp_name" type="varchar(255)" defaultValue="Spring Authorization Server"><constraints nullable="false"/></column>
+			<column name="webauthn_passwordless_rp_name" type="varchar(255)" defaultValue="Kitezh"><constraints nullable="false"/></column>
 			<column name="webauthn_passwordless_rp_id" type="varchar(253)" defaultValue=""><constraints nullable="false"/></column>
 			<column name="webauthn_passwordless_signature_algorithms" type="varchar(255)" defaultValue="ES256,RS256,EdDSA"><constraints nullable="false"/></column>
 			<column name="webauthn_passwordless_attestation" type="varchar(20)" defaultValue="none"><constraints nullable="false"/></column>
@@ -134,7 +134,7 @@
 			<column name="brute_force_username_ip_requests_per_minute" type="int" defaultValueNumeric="5"><constraints nullable="false"/></column>
 			<column name="otp_enabled" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
 			<column name="otp_required" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
-			<column name="otp_issuer" type="varchar(100)" defaultValue="Spring Authorization Server"><constraints nullable="false"/></column>
+			<column name="otp_issuer" type="varchar(100)" defaultValue="Kitezh"><constraints nullable="false"/></column>
 			<column name="otp_algorithm" type="varchar(10)" defaultValue="SHA1"><constraints nullable="false"/></column>
 			<column name="otp_digits" type="int" defaultValueNumeric="6"><constraints nullable="false"/></column>
 			<column name="otp_period_seconds" type="int" defaultValueNumeric="30"><constraints nullable="false"/></column>

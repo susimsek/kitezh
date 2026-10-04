@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for helping improve Spring Authorization Server Samples.
+Thank you for helping improve Kitezh.
 
 ## Before you start
 

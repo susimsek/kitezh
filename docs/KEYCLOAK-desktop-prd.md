@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This product requirements document defines the Electron desktop console and its shared web renderer for the Spring Authorization Server sample. It is based on an audit of the current Next.js static-export frontend, Spring Boot APIs, shared UI components, observability setup, GitHub Actions pipeline, and Render image deployment. It compares the current implementation with Keycloak’s Admin and Account Console information architecture and JHipster’s operational dashboards, while preserving this project’s single-issuer model and existing security boundaries.
+This product requirements document defines the Electron desktop console and its shared web renderer for the Kitezh application. It is based on an audit of the current Next.js static-export frontend, Spring Boot APIs, shared UI components, observability setup, GitHub Actions pipeline, and Render image deployment. It compares the current implementation with Keycloak’s Admin and Account Console information architecture and JHipster’s operational dashboards, while preserving this project’s single-issuer model and existing security boundaries.
 
 The term “desktop” means a packaged Electron application with a local renderer. The existing responsive Next.js UI remains the shared renderer source, while Electron packages its static output locally and connects to the Render-hosted Spring Boot API. Spring Boot remains the authority for authentication, authorization, validation, persistence, audit events, localization, and deployment health.
 
@@ -39,7 +39,7 @@ The desktop application must be a thin native shell around the same static rende
 | Renderer | Load the packaged local static export through `app://` and run the same Next.js React components as the web console | No Node integration, no privileged Electron imports, no secrets in the bundle, and no arbitrary remote navigation. |
 | Spring Boot/Render | Authenticate users, issue and revoke OAuth tokens, enforce permissions, persist data, audit mutations, and publish health/observability data | Never trust a renderer-only authorization decision or desktop-provided role claim. |
 
-The package lives in a separate workspace at `src/main/desktop/` with `main`, `preload`, packaging configuration, generated renderer assets, and platform assets. The renderer source continues to come from `src/main/frontend`. Electron loads the generated local export through `app://renderer/` and calls the Render API through `DESKTOP_API_BASE_URL`, defaulting to `https://spring-authorization-server-samples.onrender.com` in the packaged release and `http://localhost:9090` in local development. The backend must allow the exact desktop origin for the required API methods; wildcard CORS is forbidden.
+The package lives in a separate workspace at `src/main/desktop/` with `main`, `preload`, packaging configuration, generated renderer assets, and platform assets. The renderer source continues to come from `src/main/frontend`. Electron loads the generated local export through `app://renderer/` and calls the Render API through `DESKTOP_API_BASE_URL`, defaulting to `https://kitezh.onrender.com` in the packaged release and `http://localhost:9090` in local development. The backend must allow the exact desktop origin for the required API methods; wildcard CORS is forbidden.
 
 The project layout is:
 
@@ -216,7 +216,7 @@ The browser should consume a purpose-built, permission-checked summary API or si
 
 Render is configured as an image-backed Blueprint service in `render.yaml`. Render supports prebuilt image services, explicit port binding, and health checks; the Blueprint schema represents this as `runtime: image` with an `image` field.[^5][^6] The service uses the Frankfurt region, the free plan for the demo, `SERVER_PORT=10000`, and `/actuator/health/readiness` as its health check. PostgreSQL values, issuer, and OTLP credentials are supplied as Blueprint prompts or Render environment values; credentials must never be committed.
 
-The packaged Electron app uses a local renderer and the Render deployment as its backend API. Its production configuration must set `DESKTOP_API_BASE_URL=https://spring-authorization-server-samples.onrender.com`; local development may override this with `http://localhost:9090`. The value is a nonsecret, signed-release configuration value. The desktop API adapter must validate the URL scheme and exact host, prepend it to API and authorization requests, and never silently fall back to an arbitrary origin. The backend must allow the exact `app://renderer` origin for the required desktop API calls; wildcard CORS is forbidden.
+The packaged Electron app uses a local renderer and the Render deployment as its backend API. Its production configuration must set `DESKTOP_API_BASE_URL=https://kitezh.onrender.com`; local development may override this with `http://localhost:9090`. The value is a nonsecret, signed-release configuration value. The desktop API adapter must validate the URL scheme and exact host, prepend it to API and authorization requests, and never silently fall back to an arbitrary origin. The backend must allow the exact `app://renderer` origin for the required desktop API calls; wildcard CORS is forbidden.
 
 The supported release path is:
 
@@ -256,7 +256,7 @@ Every new route must therefore satisfy all of the following:
 
 All new console features must follow the existing server-authoritative model. Hide unauthorized links for usability, but enforce the same decision on every HTTP method and deep link. Mutable administration operations must emit an audit event, invalidate affected sessions/authorizations when effective permissions change, evict the corresponding cache in the same transaction, and expose a bounded DTO rather than a JPA entity.
 
-Use the existing cache policy: cache stable reference/configuration data, avoid caching sessions, audit events, one-time tokens, recovery codes, and filtered/paginated query results, and register every Hibernate second-level region explicitly. New Liquibase bootstrap data belongs in the create changelog/seed CSV for this demo; do not add corrective update changesets for initial sample data.
+Use the existing cache policy: cache stable reference/configuration data, avoid caching sessions, audit events, one-time tokens, recovery codes, and filtered/paginated query results, and register every Hibernate second-level region explicitly. New Liquibase bootstrap data belongs in the create changelog/seed CSV for this demo; do not add corrective update changesets for initial bootstrap data.
 
 ### Verification and acceptance criteria
 

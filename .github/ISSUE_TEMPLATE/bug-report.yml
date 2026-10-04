@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in the sample application.
+description: Report a reproducible problem in the application.
 title: "[Bug]: "
 labels:
   - bug

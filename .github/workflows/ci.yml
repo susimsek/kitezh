@@ -46,9 +46,9 @@ jobs:
 
       - name: Validate Helm chart
         run: |
-          diff -qr src/main/resources/db helm/spring-authorization-server-samples/db
-          helm lint helm/spring-authorization-server-samples
-          helm template spring-authorization-server-samples helm/spring-authorization-server-samples >/dev/null
+          diff -qr src/main/resources/db helm/kitezh/db
+          helm lint helm/kitezh
+          helm template kitezh helm/kitezh >/dev/null
 
       - name: Validate Terraform configuration
         run: |

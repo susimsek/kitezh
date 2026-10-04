@@ -25,7 +25,7 @@ type BrandingSettings = {
 };
 
 const defaultSettings: BrandingSettings = {
-  applicationName: "Authorization Server",
+  applicationName: "Kitezh",
   logoPath: "/brand/logo.svg",
   faviconPath: "/favicon.ico",
   appleTouchIconPath: "/apple-icon.png",

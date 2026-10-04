@@ -1,20 +1,20 @@
 # Dev purpose only. DO NOT use in production.
-name: spring-authorization-server-samples
+name: kitezh
 
 services:
   otel-lgtm:
     image: grafana/otel-lgtm:0.34.0
     environment:
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/spring-authorization-server.json
-      PROMETHEUS_EXTRA_ARGS: --rule.file=/otel-lgtm/spring-authorization-server-alerts.yml
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh.json
+      PROMETHEUS_EXTRA_ARGS: --rule.file=/otel-lgtm/kitezh-alerts.yml
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
     volumes:
-      - ./observability/grafana/spring-authorization-server.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/spring-authorization-server.json:ro
+      - ./observability/grafana/kitezh.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh.json:ro
       - ./observability/grafana/dashboards-provisioning.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro
-      - ./observability/prometheus/alerts.yml:/otel-lgtm/spring-authorization-server-alerts.yml:ro
+      - ./observability/prometheus/alerts.yml:/otel-lgtm/kitezh-alerts.yml:ro
     healthcheck:
       test: ['CMD-SHELL', 'test -f /tmp/ready']
       start_period: 30s

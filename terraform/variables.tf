@@ -31,7 +31,7 @@ variable "ingress_class_name" {
 variable "ingress_host" {
   description = "Hostname exposed through ingress-nginx for the authorization server."
   type        = string
-  default     = "spring-authorization-server.127.0.0.1.nip.io"
+  default     = "kitezh.127.0.0.1.nip.io"
 }
 
 variable "ingress_nginx_chart_version" {
@@ -55,7 +55,7 @@ variable "ingress_https_host_port" {
 variable "image_repository" {
   description = "Container image repository for the application."
   type        = string
-  default     = "docker.io/suayb/spring-authorization-server-samples"
+  default     = "docker.io/suayb/kitezh"
 }
 
 variable "image_tag" {

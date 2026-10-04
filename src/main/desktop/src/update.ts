@@ -16,7 +16,7 @@ export type DesktopUpdateStatus =
 
 type UpdateListener = (status: DesktopUpdateStatus) => void;
 
-const UPDATE_REPOSITORY = "susimsek/spring-authorization-server-samples";
+const UPDATE_REPOSITORY = "susimsek/kitezh";
 const UPDATE_RECOVERY_FILE = "desktop-update-recovery.json";
 const UPDATE_HEALTH_WINDOW_MS = 15_000;
 

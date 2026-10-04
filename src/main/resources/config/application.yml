@@ -13,7 +13,7 @@ spring:
     console:
       enabled: false
   application:
-    name: spring-authorization-server-samples
+    name: kitezh
   web:
     locale: en
   servlet:
@@ -78,14 +78,14 @@ logging:
       file: ${LOGGING_STRUCTURED_FORMAT_FILE:}
     ecs:
       service:
-        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:spring-authorization-server-samples}
+        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:kitezh}
         environment: ${LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:dev}}
 
 management:
   opentelemetry:
     enabled: ${MANAGEMENT_OPENTELEMETRY_ENABLED:false}
     resource-attributes:
-      service.name: ${OTEL_SERVICE_NAME:spring-authorization-server-samples}
+      service.name: ${OTEL_SERVICE_NAME:kitezh}
       deployment.environment: ${SPRING_PROFILES_ACTIVE:dev}
     tracing:
       export:
@@ -176,13 +176,13 @@ app:
   session:
     cleanup-cron: "0 * * * * *"
   authorization-server:
-    issuer: https://spring-authorization-server-samples.local
+    issuer: https://kitezh.local
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
   dpop:
     nonce-required: ${APP_DPOP_NONCE_REQUIRED:false}
     nonce-ttl: ${APP_DPOP_NONCE_TTL:PT5M}
   web-authn:
-    rp-name: Spring Authorization Server Samples
+    rp-name: Kitezh
     rp-id: ""
     allowed-origins: ""
     timeout-seconds: 300

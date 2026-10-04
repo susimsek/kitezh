@@ -21,7 +21,7 @@ public record MfaStatusDTO(
                 boolean required,
         @Schema(
                         description = "Configured TOTP issuer label.",
-                        example = "Spring Authorization Server",
+                        example = "Kitezh",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 String issuer,
         @Schema(

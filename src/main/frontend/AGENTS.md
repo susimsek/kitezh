@@ -56,7 +56,7 @@ These instructions apply to `src/main/frontend/**` and supplement the repository
 
 ## Authentication
 
-- The frontend is a Next.js static export served by Spring Boot. Spring Security continues to process `POST /login`; CSRF is intentionally disabled in this sample.
+- The frontend is a Next.js static export served by Spring Boot. Spring Security continues to process `POST /login`; CSRF is intentionally disabled in this application.
 - Keep console authentication in `lib/console-auth.ts` aligned with the project's Keycloak-style model: Authorization Code + PKCE, namespaced console token records, single-flight refresh near expiry, one retry after a 401, and OIDC logout with an ID-token hint and registered post-logout URI.
 - Persist each console's access, ID, and refresh token set only in its namespaced `localStorage` record. Browser SSO remains supplied by the server-side Spring Session; never copy a token set from one console to the other.
 - Use `adminRequest` for Administration Console APIs and `accountRequest` for Account Console APIs. Do not add parallel Axios clients, custom bearer-token handling, or a second console authentication flow.

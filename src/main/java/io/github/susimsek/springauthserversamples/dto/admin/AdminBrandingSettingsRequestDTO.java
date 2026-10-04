@@ -11,7 +11,7 @@ public record AdminBrandingSettingsRequestDTO(
                 @Size(max = 100)
                 @Schema(
                         description = "Application name shown in public and console headers.",
-                        example = "Authorization Server",
+                        example = "Kitezh",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 String applicationName,
         @NotBlank

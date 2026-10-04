@@ -127,7 +127,7 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
                 <li>
                   <a
                     className="home-footer-link"
-                    href="https://github.com/susimsek/spring-authorization-server-samples#readme"
+                    href="https://github.com/susimsek/kitezh#readme"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -137,7 +137,7 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
                 <li>
                   <a
                     className="home-footer-link"
-                    href="https://github.com/susimsek/spring-authorization-server-samples/releases"
+                    href="https://github.com/susimsek/kitezh/releases"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -152,7 +152,7 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
                 <li>
                   <a
                     className="home-footer-link"
-                    href="https://github.com/susimsek/spring-authorization-server-samples"
+                    href="https://github.com/susimsek/kitezh"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -162,7 +162,7 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
                 <li>
                   <a
                     className="home-footer-link"
-                    href="https://github.com/susimsek/spring-authorization-server-samples/blob/main/LICENSE"
+                    href="https://github.com/susimsek/kitezh/blob/main/LICENSE"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -172,7 +172,7 @@ export function HomePage({ dictionary }: { dictionary: Dictionary }) {
                 <li>
                   <a
                     className="home-footer-link"
-                    href="https://github.com/susimsek/spring-authorization-server-samples/security/policy"
+                    href="https://github.com/susimsek/kitezh/security/policy"
                     target="_blank"
                     rel="noreferrer"
                   >

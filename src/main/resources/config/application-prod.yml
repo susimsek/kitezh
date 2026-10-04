@@ -7,7 +7,7 @@ spring:
       profiles:
         active: prod
   datasource:
-    url: jdbc:postgresql://localhost:5432/authserversamples
+    url: jdbc:postgresql://localhost:5432/kitezh
     username: ${SPRING_DATASOURCE_USERNAME}
     hikari:
       maximum-pool-size: 10
@@ -42,7 +42,7 @@ app:
       initial-capacity: 500
       maximum-size: 1000
   authorization-server:
-    issuer: ${APP_AUTHORIZATION_SERVER_ISSUER:https://spring-authorization-server-samples.local}
+    issuer: ${APP_AUTHORIZATION_SERVER_ISSUER:https://kitezh.local}
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
 
 logging:

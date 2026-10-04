@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "spring-authorization-server-samples.fullname" . }}
+  name: {{ include "kitezh.fullname" . }}
   labels:
-    {{ include "spring-authorization-server-samples.labels" . | nindent 4 }}
+    {{ include "kitezh.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -16,4 +16,4 @@ spec:
       protocol: TCP
       name: management
   selector:
-    {{ include "spring-authorization-server-samples.selectorLabels" . | nindent 4 }}
+    {{ include "kitezh.selectorLabels" . | nindent 4 }}

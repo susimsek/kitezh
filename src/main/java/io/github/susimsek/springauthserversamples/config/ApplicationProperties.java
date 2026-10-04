@@ -45,7 +45,7 @@ public record ApplicationProperties(
                 new Cache(new Caffeine(Duration.ofHours(1), 500, 1000)),
                 new Session("0 * * * * *"),
                 new AuthorizationServer(DEFAULT_ISSUER),
-                new Mail(false, "Spring Authorization Server <no-reply@localhost>", DEFAULT_ISSUER),
+                new Mail(false, "Kitezh <no-reply@localhost>", DEFAULT_ISSUER),
                 new Security(),
                 new WebAuthn(),
                 new RegistrationCaptcha(),
@@ -124,7 +124,7 @@ public record ApplicationProperties(
     }
 
     public record WebAuthn(
-            @DefaultValue("Spring Authorization Server Samples") String rpName,
+            @DefaultValue("Kitezh") String rpName,
             @DefaultValue("") String rpId,
             @DefaultValue("") String allowedOrigins,
             @DefaultValue("300") int timeoutSeconds,
@@ -133,14 +133,7 @@ public record ApplicationProperties(
             @DefaultValue("NONE") String attestation) {
 
         public WebAuthn() {
-            this(
-                    "Spring Authorization Server Samples",
-                    "",
-                    "",
-                    300,
-                    "REQUIRED",
-                    "REQUIRED",
-                    "NONE");
+            this("Kitezh", "", "", 300, "REQUIRED", "REQUIRED", "NONE");
         }
     }
 
@@ -170,7 +163,7 @@ public record ApplicationProperties(
 
     public record Mail(
             @DefaultValue("false") boolean enabled,
-            @DefaultValue("Spring Authorization Server <no-reply@localhost>") String from,
+            @DefaultValue("Kitezh <no-reply@localhost>") String from,
             @DefaultValue("http://127.0.0.1:9090") String baseUrl) {}
 
     public record Security(

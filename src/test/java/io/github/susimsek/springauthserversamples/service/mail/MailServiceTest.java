@@ -132,7 +132,7 @@ class MailServiceTest {
         service.testConnection(
                 new EmailSettingsService.EmailConfiguration(
                         false,
-                        "Spring Authorization Server <no-reply@example.com>",
+                        "Kitezh <no-reply@example.com>",
                         "https://example.com",
                         "localhost",
                         1025,
@@ -172,8 +172,7 @@ class MailServiceTest {
                                 service.testConnection(
                                         new EmailSettingsService.EmailConfiguration(
                                                 false,
-                                                "Spring Authorization Server"
-                                                        + " <no-reply@example.com>",
+                                                "Kitezh" + " <no-reply@example.com>",
                                                 "https://example.com",
                                                 "localhost",
                                                 1025,
@@ -228,8 +227,6 @@ class MailServiceTest {
                 new ApplicationProperties.Session("0 * * * * *"),
                 new ApplicationProperties.AuthorizationServer("https://issuer.example"),
                 new ApplicationProperties.Mail(
-                        enabled,
-                        "Spring Authorization Server <no-reply@example.com>",
-                        "https://example.com"));
+                        enabled, "Kitezh <no-reply@example.com>", "https://example.com"));
     }
 }

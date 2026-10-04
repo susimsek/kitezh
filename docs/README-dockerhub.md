@@ -1,4 +1,4 @@
-# Spring Authorization Server Samples (GraalVM Native Image)
+# Kitezh (GraalVM Native Image)
 
 A Spring Boot 4.1, Java 25 and Spring Security 7 OAuth2 Authorization Server and OpenID Connect Provider. The published image is a statically linked GraalVM native executable published for `linux/amd64` and `linux/arm64`.
 
@@ -7,10 +7,10 @@ The image provides the authorization server, localized login and consent pages, 
 ## Image
 
 ```bash
-docker pull suayb/spring-authorization-server-samples:latest
+docker pull suayb/kitezh:latest
 ```
 
-The `latest` tag is published to Docker Hub only by validated `v*` releases after the native build passes. Each release also publishes immutable tags such as `0.1.0-amd64`, `0.1.0-arm64`, and `0.1.0`. The image is intended for demonstrations and sample deployments; configure an external PostgreSQL database before using it outside local testing.
+The `latest` tag is published to Docker Hub only by validated `v*` releases after the native build passes. Each release also publishes immutable tags such as `0.1.0-amd64`, `0.1.0-arm64`, and `0.1.0`. The image is intended for demonstrations and deployments; configure an external PostgreSQL database before using it outside local testing.
 
 ## Included capabilities
 
@@ -56,11 +56,11 @@ The published image is built with the `prod` profile and requires PostgreSQL set
 ```bash
 docker run --rm -p 9090:9090 \
   -e SPRING_PROFILES_ACTIVE=prod \
-  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/authserversamples \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/kitezh \
   -e SPRING_DATASOURCE_USERNAME=appuser \
   -e SPRING_DATASOURCE_PASSWORD=appuser \
   -e APP_AUTHORIZATION_SERVER_ISSUER=http://localhost:9090 \
-  suayb/spring-authorization-server-samples:latest
+  suayb/kitezh:latest
 ```
 
 The application runs Liquibase migrations on startup. Set `SPRING_LIQUIBASE_DROP_FIRST=true` only for an intentionally disposable demo database because it removes existing objects before applying the changelog.
@@ -76,7 +76,7 @@ Open the following URLs after the application starts:
 
 Both consoles use Authorization Code + PKCE, refresh-token rotation, and OIDC logout. The issuer and redirect URIs must use the same public address when the image is exposed through another hostname.
 
-The public demo is available at [spring-authorization-server-samples.onrender.com](https://spring-authorization-server-samples.onrender.com).
+The public demo is available at [kitezh.onrender.com](https://kitezh.onrender.com).
 
 ## OAuth2 and OIDC checks
 
@@ -130,12 +130,12 @@ The most relevant environment variables are:
 | --- | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | `prod` in the published image | Select the Spring profile |
 | `SERVER_PORT` | `9090` | HTTP listen port; Render sets this to `10000` |
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/authserversamples` in `prod` | PostgreSQL JDBC URL |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/kitezh` in `prod` | PostgreSQL JDBC URL |
 | `SPRING_DATASOURCE_USERNAME` | none in `prod` | Database username |
 | `SPRING_DATASOURCE_PASSWORD` | none in `prod` | Database password |
 | `SPRING_LIQUIBASE_ENABLED` | `true` | Enable Liquibase migrations |
 | `SPRING_LIQUIBASE_DROP_FIRST` | `false` | Drop database objects before migration; use only for disposable demos |
-| `APP_AUTHORIZATION_SERVER_ISSUER` | `https://spring-authorization-server-samples.local` | Public OAuth2/OIDC issuer |
+| `APP_AUTHORIZATION_SERVER_ISSUER` | `https://kitezh.local` | Public OAuth2/OIDC issuer |
 | `APP_DPOP_NONCE_REQUIRED` | `false` | Require DPoP nonce validation |
 | `MANAGEMENT_OPENTELEMETRY_ENABLED` | `false` | Enable OpenTelemetry resource/export configuration |
 | `MANAGEMENT_TRACING_EXPORT_ENABLED` | `false` | Enable trace export |
@@ -171,7 +171,7 @@ The application exposes liveness and readiness probes with the database included
 
 The Render Blueprint in `render.yaml` deploys the same Docker Hub image with:
 
-- image: `docker.io/suayb/spring-authorization-server-samples:latest`
+- image: `docker.io/suayb/kitezh:latest`
 - region: Frankfurt
 - health check: `/actuator/health/readiness`
 - port: `10000` through `SERVER_PORT`
@@ -192,13 +192,13 @@ Build a local native image with Jib:
 ```bash
 ./mvnw -Pprod,native -DskipTests jib:dockerBuild \
   -Djib-maven-plugin.architecture=amd64 \
-  -Djib.to.image=spring-authorization-server-samples:latest
+  -Djib.to.image=kitezh:latest
 ```
 
 The CI publish command uses the Docker Hub repository and tag below:
 
 ```text
-docker.io/suayb/spring-authorization-server-samples:latest
+docker.io/suayb/kitezh:latest
 ```
 
 ## Notes

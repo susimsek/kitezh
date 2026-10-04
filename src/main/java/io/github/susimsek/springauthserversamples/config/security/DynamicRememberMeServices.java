@@ -27,8 +27,7 @@ public class DynamicRememberMeServices implements RememberMeServices {
                         return current;
                     }
                     TokenBasedRememberMeServices created =
-                            new TokenBasedRememberMeServices(
-                                    "spring-authorization-server-samples", userDetailsService);
+                            new TokenBasedRememberMeServices("kitezh", userDetailsService);
                     created.setTokenValiditySeconds(14 * 24 * 60 * 60);
                     return created;
                 });

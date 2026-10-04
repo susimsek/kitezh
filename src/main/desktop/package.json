@@ -1,17 +1,17 @@
 {
-  "name": "spring-authorization-server-samples-desktop",
+  "name": "kitezh-desktop",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Electron desktop console for Spring Authorization Server Samples",
+  "description": "Electron desktop console for Kitezh",
   "author": {
     "name": "Suayb Simsek",
     "email": "susimsek@users.noreply.github.com"
   },
-  "homepage": "https://github.com/susimsek/spring-authorization-server-samples",
+  "homepage": "https://github.com/susimsek/kitezh",
   "repository": {
     "type": "git",
-    "url": "https://github.com/susimsek/spring-authorization-server-samples.git"
+    "url": "https://github.com/susimsek/kitezh.git"
   },
   "main": "dist/main.js",
   "type": "commonjs",
@@ -36,8 +36,8 @@
     "typescript": "5.9.2"
   },
   "build": {
-    "appId": "io.github.susimsek.springauthserversamples.desktop",
-    "productName": "Spring Authorization Server",
+    "appId": "io.github.susimsek.kitezh.desktop",
+    "productName": "Kitezh",
     "directories": {
       "output": "release"
     },
@@ -50,7 +50,7 @@
     ],
     "protocols": [
       {
-        "name": "Spring Authorization Server OAuth callback",
+        "name": "Kitezh OAuth callback",
         "schemes": [
           "springauth"
         ]
@@ -58,14 +58,14 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "artifactName": "spring-authorization-server-${version}-macos-${arch}.${ext}",
+      "artifactName": "kitezh-${version}-macos-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
       ]
     },
     "linux": {
-      "artifactName": "spring-authorization-server-${version}-linux-${arch}.${ext}",
+      "artifactName": "kitezh-${version}-linux-${arch}.${ext}",
       "target": [
         "AppImage",
         "deb",
@@ -74,7 +74,7 @@
       ]
     },
     "win": {
-      "artifactName": "spring-authorization-server-${version}-win-${arch}-setup.${ext}",
+      "artifactName": "kitezh-${version}-win-${arch}-setup.${ext}",
       "target": [
         "nsis",
         "portable",
@@ -82,11 +82,11 @@
       ]
     },
     "portable": {
-      "artifactName": "spring-authorization-server-${version}-win-${arch}-portable.${ext}"
+      "artifactName": "kitezh-${version}-win-${arch}-portable.${ext}"
     },
     "appx": {
-      "applicationId": "SpringAuthorizationServerSamples",
-      "artifactName": "spring-authorization-server-${version}-win-${arch}-appx.${ext}",
+      "applicationId": "KitezhDesktop",
+      "artifactName": "kitezh-${version}-win-${arch}-appx.${ext}",
       "publisherDisplayName": "Suayb Simsek"
     },
     "snapcraft": {
@@ -99,7 +99,7 @@
   "publish": {
     "provider": "github",
     "owner": "susimsek",
-    "repo": "spring-authorization-server-samples",
+    "repo": "kitezh",
     "releaseType": "release"
   },
   "dependencies": {

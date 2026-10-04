@@ -236,7 +236,7 @@ public record AdminLoginSettingsRequestDTO(
                 recoveryCodeWarningThreshold,
                 true,
                 new WebAuthnPolicyDTO(
-                        "Spring Authorization Server",
+                        "Kitezh",
                         "",
                         "ES256,RS256,EdDSA",
                         "none",
@@ -247,7 +247,7 @@ public record AdminLoginSettingsRequestDTO(
                         true,
                         ""),
                 new WebAuthnPolicyDTO(
-                        "Spring Authorization Server",
+                        "Kitezh",
                         "",
                         "ES256,RS256,EdDSA",
                         "none",

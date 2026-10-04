@@ -7,9 +7,9 @@ import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon, type IconName } from "@/components/shared/Icon";
 
 const RELEASES_URL =
-  "https://github.com/susimsek/spring-authorization-server-samples/releases/latest";
+  "https://github.com/susimsek/kitezh/releases/latest";
 const DOWNLOAD_URL =
-  "https://github.com/susimsek/spring-authorization-server-samples/releases/latest/download";
+  "https://github.com/susimsek/kitezh/releases/latest/download";
 
 type DownloadAsset = {
   file: string;
@@ -30,25 +30,25 @@ type DownloadPlatform = {
 
 const platformAssets = {
   windows: {
-    installer: "spring-authorization-server-0.1.0-win-x64-setup.exe",
-    portable: "spring-authorization-server-0.1.0-win-x64-portable.exe",
-    appx: "spring-authorization-server-0.1.0-win-x64-appx.appx",
+    installer: "kitezh-0.1.0-win-x64-setup.exe",
+    portable: "kitezh-0.1.0-win-x64-portable.exe",
+    appx: "kitezh-0.1.0-win-x64-appx.appx",
   },
   linux: {
     x64: {
-      appImage: "spring-authorization-server-0.1.0-linux-x86_64.AppImage",
-      deb: "spring-authorization-server-0.1.0-linux-amd64.deb",
-      rpm: "spring-authorization-server-0.1.0-linux-x86_64.rpm",
-      snap: "spring-authorization-server-0.1.0-linux-amd64.snap",
+      appImage: "kitezh-0.1.0-linux-x86_64.AppImage",
+      deb: "kitezh-0.1.0-linux-amd64.deb",
+      rpm: "kitezh-0.1.0-linux-x86_64.rpm",
+      snap: "kitezh-0.1.0-linux-amd64.snap",
     },
     arm64: {
-      appImage: "spring-authorization-server-0.1.0-linux-arm64.AppImage",
-      deb: "spring-authorization-server-0.1.0-linux-arm64.deb",
+      appImage: "kitezh-0.1.0-linux-arm64.AppImage",
+      deb: "kitezh-0.1.0-linux-arm64.deb",
     },
   },
   macos: {
-    universal: "spring-authorization-server-0.1.0-macos-universal.dmg",
-    intel: "spring-authorization-server-0.1.0-macos-x64.dmg",
+    universal: "kitezh-0.1.0-macos-universal.dmg",
+    intel: "kitezh-0.1.0-macos-x64.dmg",
   },
 };
 

@@ -1,6 +1,6 @@
 {
   "brand": {
-    "product": "Yetkilendirme Sunucusu",
+    "product": "Kitezh",
     "framework": "Spring Security",
     "description": "Güvenli OAuth 2.0 ve OpenID Connect yetkilendirmesi."
   },
@@ -382,7 +382,7 @@
     },
     "dashboard": {
       "title": "Genel Bakış",
-      "subtitle": "Authorization Server yapılandırmasını ve güvenlik kaynaklarını yönetin.",
+      "subtitle": "Kitezh yapılandırmasını ve güvenlik kaynaklarını yönetin.",
       "serverHealth": "Sunucu durumu",
       "readinessProbe": "Hazırlık denetimi",
       "openServerInfo": "Sunucu bilgisini aç",
@@ -394,7 +394,7 @@
     },
     "serverInfo": {
       "title": "Sunucu bilgisi",
-      "description": "Authorization Server çalışma zamanı ayarlarını, OpenID Connect discovery bilgisini ve imzalama anahtarlarını inceleyin.",
+      "description": "Kitezh çalışma zamanı ayarlarını, OpenID Connect discovery bilgisini ve imzalama anahtarlarını inceleyin.",
       "runtime": "Çalışma zamanı",
       "sessionTimeout": "SSO oturum zaman aşımı",
       "activeSigningKey": "Etkin imzalama anahtarı",
@@ -846,7 +846,7 @@
     },
     "clients": {
       "title": "İstemciler",
-      "subtitle": "Authorization Server üzerinde kayıtlı uygulamalar.",
+      "subtitle": "Kitezh üzerinde kayıtlı uygulamalar.",
       "search": "İstemcilerde ara",
       "client": "İstemci",
       "grants": "Grant tipleri",
@@ -1176,7 +1176,7 @@
       "offlineSessions": "Çevrimdışı oturumlar",
       "consents": "İzinler",
       "keys": "Anahtarlar",
-      "description": "Authorization Server kaynaklarını yönetin.",
+      "description": "Kitezh kaynaklarını yönetin.",
       "operationError": "Yönetim işlemi tamamlanamadı.",
       "empty": "Kayıt bulunamadı.",
       "rotateKey": "İmza anahtarını döndür",
@@ -1198,7 +1198,7 @@
       "email": "E-posta",
       "emailVerified": "E-posta doğrulandı",
       "avatar": "Avatar",
-      "avatarHelp": "En fazla 2 MiB ve 4 megapiksel JPEG veya PNG. Authorization Server veritabanında saklanır.",
+      "avatarHelp": "En fazla 2 MiB ve 4 megapiksel JPEG veya PNG. Kitezh veritabanında saklanır.",
       "uploadAvatar": "Avatar yükle",
       "removeAvatar": "Avatarı kaldır",
       "removeAvatarConfirm": "Bu kullanıcının avatarı kaldırılsın mı?",

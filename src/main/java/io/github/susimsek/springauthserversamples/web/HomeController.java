@@ -26,10 +26,10 @@ public class HomeController {
                                     @Schema(
                                             type = "object",
                                             example =
-                                                    "{\"application\":\"spring-authorization-server-samples\",\"metadata\":\"/.well-known/openid-configuration\",\"jwkSet\":\"/oauth2/jwks\",\"tokenEndpoint\":\"/oauth2/token\",\"authorizationEndpoint\":\"/oauth2/authorize\"}")))
+                                                    "{\"application\":\"kitezh\",\"metadata\":\"/.well-known/openid-configuration\",\"jwkSet\":\"/oauth2/jwks\",\"tokenEndpoint\":\"/oauth2/token\",\"authorizationEndpoint\":\"/oauth2/authorize\"}")))
     Map<String, Object> index() {
         return Map.of(
-                "application", "spring-authorization-server-samples",
+                "application", "kitezh",
                 "metadata", "/.well-known/openid-configuration",
                 "jwkSet", "/oauth2/jwks",
                 "tokenEndpoint", "/oauth2/token",
