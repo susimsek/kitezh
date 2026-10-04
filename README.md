@@ -12,7 +12,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot/)
 [![Spring Security](https://img.shields.io/badge/Spring%20Security-Authorization%20Server-6DB33F?logo=springsecurity&logoColor=white)](https://docs.spring.io/spring-security/reference/servlet/oauth2/authorization-server/index.html)
 [![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-Persistence-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-data-jpa/)
-[![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-UI-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![Electron](https://img.shields.io/badge/Electron-Desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Liquibase](https://img.shields.io/badge/Liquibase-Migrations-2A62FF?logo=liquibase&logoColor=white)](https://www.liquibase.com/)
