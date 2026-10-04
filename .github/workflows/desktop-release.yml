@@ -65,7 +65,7 @@ jobs:
         run: node src/main/desktop/scripts/set-release-version.mjs
 
       - name: Set up Node.js and pnpm
-        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
