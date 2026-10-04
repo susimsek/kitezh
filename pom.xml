@@ -25,7 +25,7 @@
 			<google-java-format.version>1.35.0</google-java-format.version>
 			<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
 			<maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
-			<checkstyle.version>13.9.0</checkstyle.version>
+			<checkstyle.version>14.3.0</checkstyle.version>
 			<properties-maven-plugin.version>1.2.1</properties-maven-plugin.version>
 			<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
 			<gatling.version>3.15.1</gatling.version>
