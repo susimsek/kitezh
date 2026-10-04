@@ -27,7 +27,7 @@
 			<maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
 			<checkstyle.version>13.9.0</checkstyle.version>
 			<properties-maven-plugin.version>1.2.1</properties-maven-plugin.version>
-			<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
+			<sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
 			<gatling.version>3.15.1</gatling.version>
 		<gatling-maven-plugin.version>4.21.10</gatling-maven-plugin.version>
 		<springdoc-openapi.version>3.1.0</springdoc-openapi.version>
