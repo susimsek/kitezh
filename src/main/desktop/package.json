@@ -19,7 +19,9 @@
     "build:renderer": "node scripts/build-renderer.mjs",
     "typecheck": "tsc --noEmit",
     "build:main": "tsc -p tsconfig.json",
-    "test": "pnpm run build:main && node --test test/**/*.test.mjs",
+    "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",
+    "test": "pnpm run test:unit",
+    "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
     "build": "pnpm run build:renderer && tsc -p tsconfig.json",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",
@@ -29,6 +31,7 @@
     "@types/node": "24.10.1",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
+    "playwright-core": "1.63.0",
     "typescript": "5.9.2"
   },
   "build": {

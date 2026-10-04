@@ -9,7 +9,9 @@ import {
   sanitizedAuthCallback,
 } from "../dist/security/auth-flow.js";
 import {
+  getApiBaseUrl,
   findDesktopDeepLink,
+  isAllowedExternalUrl,
 } from "../dist/config.js";
 import {
   isTrustedRendererFrame,
@@ -18,7 +20,10 @@ import {
 
 test("preserves an initial desktop protocol callback on first launch", () => {
   assert.equal(
-    findDesktopDeepLink(["electron", "springauth://oauth/callback?state=state"]),
+    findDesktopDeepLink([
+      "electron",
+      "springauth://oauth/callback?state=state",
+    ]),
     "springauth://oauth/callback?state=state",
   );
   assert.equal(findDesktopDeepLink(["electron", "--no-sandbox"]), null);
@@ -48,8 +53,14 @@ test("accepts only the expected desktop callback route", () => {
 test("accepts only the exact native logout callback", () => {
   assert.equal(parseLogoutCallback("springauth://logout/callback"), true);
   assert.equal(parseLogoutCallback("springauth://oauth/callback"), false);
-  assert.equal(parseLogoutCallback("springauth://logout/callback?state=unexpected"), false);
-  assert.equal(parseLogoutCallback("https://example.com/logout/callback"), false);
+  assert.equal(
+    parseLogoutCallback("springauth://logout/callback?state=unexpected"),
+    false,
+  );
+  assert.equal(
+    parseLogoutCallback("https://example.com/logout/callback"),
+    false,
+  );
 });
 
 test("sanitizes callback data before sending it to the renderer", () => {
@@ -109,4 +120,19 @@ test("trusts only the packaged renderer origin", () => {
   assert.equal(isTrustedRendererUrl("app://renderer.evil/"), false);
   assert.equal(isTrustedRendererFrame("https://example.test/"), false);
   assert.equal(isTrustedRendererFrame(undefined), false);
+});
+
+test("accepts only configured API and external origins", () => {
+  assert.equal(getApiBaseUrl("http://localhost:9090"), "http://localhost:9090");
+  assert.equal(
+    getApiBaseUrl("https://spring-authorization-server-samples.onrender.com"),
+    "https://spring-authorization-server-samples.onrender.com",
+  );
+  assert.throws(
+    () => getApiBaseUrl("https://example.test"),
+    /deployed Render host/,
+  );
+  assert.equal(isAllowedExternalUrl("https://github.com/example/oauth"), true);
+  assert.equal(isAllowedExternalUrl("https://evil.example/oauth"), false);
+  assert.equal(isAllowedExternalUrl("javascript:alert(1)"), false);
 });

@@ -348,6 +348,9 @@ Local development opens Electron DevTools automatically, so the Network panel ca
 inspect renderer API, token refresh, and logout requests. The OAuth authorization page and the
 main-process token exchange run outside that renderer panel; inspect the system browser for the
 authorization redirect and use main-process diagnostics when debugging that exchange.
+Run `pnpm --dir src/main/desktop test:unit` for main/preload security unit tests and
+`pnpm --dir src/main/desktop test:e2e` for the Electron renderer smoke test. Linux CI runs the
+Electron test under Xvfb; macOS and Windows run it on their native runners.
 Branch builds upload Linux, macOS, and Windows installers as short-lived GitHub Actions artifacts.
 To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
 `desktop-release` workflow attaches the platform installers to the matching GitHub Release.

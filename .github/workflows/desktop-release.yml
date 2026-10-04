@@ -113,6 +113,15 @@ jobs:
       - name: Test desktop shell
         run: pnpm --dir src/main/desktop test
 
+      - name: Run Electron E2E tests
+        shell: bash
+        run: |
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            xvfb-run -a pnpm --dir src/main/desktop test:e2e
+          else
+            pnpm --dir src/main/desktop test:e2e
+          fi
+
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
         shell: bash

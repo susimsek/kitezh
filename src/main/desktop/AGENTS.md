@@ -23,6 +23,8 @@ These instructions apply to `src/main/desktop/**` and supplement the repository-
 | Type check | `pnpm typecheck` |
 | Build main/preload | `pnpm run build:main` |
 | Build renderer and Electron code | `pnpm run build` |
+| Run desktop unit tests | `pnpm test:unit` |
+| Run Electron E2E tests | `pnpm test:e2e` |
 | Run desktop security tests | `pnpm test` |
 | Run local desktop app | `pnpm dev` |
 | Run against deployed API | `pnpm start` |
@@ -88,6 +90,8 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 ## Testing and Quality Gates
 
 - Run `pnpm typecheck`, `pnpm test`, and `pnpm build` after desktop changes.
+- Run `pnpm test:e2e` for changes to the main process, preload bridge, renderer startup,
+  protocol handling, or desktop authentication flow. Linux CI should run it through `xvfb-run`.
 - Run `pnpm package` when changing packaging configuration, protocol registration, assets, preload/main behavior, or renderer integration.
 - Add or update tests for:
   - callback route and protocol validation;
