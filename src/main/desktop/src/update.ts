@@ -202,6 +202,10 @@ function isSupported() {
   return false;
 }
 
+function isUpdatePreviewEnabled() {
+  return !app.isPackaged && process.env.DESKTOP_UPDATE_PREVIEW === "true";
+}
+
 function publish(status: DesktopUpdateStatus) {
   listener?.(status);
 }
@@ -245,6 +249,13 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
 
 export async function checkForUpdates() {
   if (!isSupported()) {
+    if (isUpdatePreviewEnabled()) {
+      publish({ state: "checking" });
+      const version =
+        process.env.DESKTOP_UPDATE_PREVIEW_VERSION ?? `${app.getVersion()}-preview`;
+      setTimeout(() => publish({ state: "available", version }), 600);
+      return;
+    }
     publish({ state: "unsupported" });
     return;
   }

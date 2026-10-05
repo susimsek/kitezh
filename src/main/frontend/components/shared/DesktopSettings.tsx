@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, type KeyboardEvent } from "react";
-import { Alert, Button, Card, Container, Form, Spinner, Stack } from "react-bootstrap";
+import { Alert, Button, Card, Container, Form, InputGroup, Spinner, Stack } from "react-bootstrap";
+import { useTranslation } from "react-i18next";
 
 import { Icon, type IconName } from "@/components/shared/Icon";
-import { useDictionary } from "@/i18n/client";
+import { useDictionary, useLocale } from "@/i18n/client";
+import { locales, type Locale } from "@/i18n/config";
+import { DESKTOP_LANGUAGE_MODE_KEY, detectLocale, persistLocale } from "@/i18n/locale-cookie";
 import {
   isDesktopRuntime,
   type DesktopDiagnostics,
@@ -14,9 +17,11 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setTheme } from "@/store/theme-slice";
 
 import { THEME_STORAGE_KEY, type Theme } from "../auth/theme";
+import { ActionIcon } from "./ActionIcon";
 
 type PreferenceKey = "launchAtLogin" | "notifications" | "automaticDownload" | "globalShortcut";
 type SettingsSection = "general" | "notifications" | "appearance" | "updates" | "diagnostics";
+type LanguageMode = Locale | "system";
 
 const sectionIcons: Record<SettingsSection, IconName> = {
   general: "sliders",
@@ -26,18 +31,36 @@ const sectionIcons: Record<SettingsSection, IconName> = {
   diagnostics: "circleInfo",
 };
 
+const defaultPreferences: DesktopPreferences = {
+  launchAtLogin: false,
+  notifications: true,
+  globalShortcut: "CommandOrControl+Shift+K",
+  automaticDownload: false,
+};
+
 export function DesktopSettings() {
   const dictionary = useDictionary();
+  const { i18n } = useTranslation("common");
+  const locale = useLocale();
   const dispatch = useAppDispatch();
   const theme = useAppSelector((state) => state.theme.value) as Theme;
   const [section, setSection] = useState<SettingsSection>("general");
-  const [preferences, setPreferences] = useState<DesktopPreferences | null>(null);
+  const [preferences, setPreferences] = useState<DesktopPreferences>(defaultPreferences);
   const [diagnostics, setDiagnostics] = useState<DesktopDiagnostics | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [pending, setPending] = useState<PreferenceKey | null>(null);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [copyingDiagnostics, setCopyingDiagnostics] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [languageMode, setLanguageMode] = useState<LanguageMode>(() => {
+    if (
+      typeof window !== "undefined" &&
+      localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system"
+    ) {
+      return "system";
+    }
+    return locale;
+  });
 
   useEffect(() => {
     if (!isDesktopRuntime() || !window.desktopApi) return undefined;
@@ -45,27 +68,14 @@ export function DesktopSettings() {
     void desktopApi.preferences
       .get()
       .then(setPreferences)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => setError(true));
     void desktopApi.diagnostics
       .get()
       .then(setDiagnostics)
       .catch(() => undefined);
   }, []);
 
-  if (loading) {
-    return (
-      <main className="auth-content d-flex align-items-center justify-content-center min-vh-100">
-        <Spinner
-          animation="border"
-          role="status"
-          aria-label={dictionary.desktop.settings.loading}
-        />
-      </main>
-    );
-  }
-
-  if (!isDesktopRuntime() || !window.desktopApi || !preferences) {
+  if (!isDesktopRuntime() || !window.desktopApi) {
     return null;
   }
 
@@ -120,16 +130,64 @@ export function DesktopSettings() {
     dispatch(setTheme(nextTheme));
   };
 
-  const sections: Array<{ id: SettingsSection; label: string }> = [
-    { id: "general", label: dictionary.desktop.settings.sections.general },
+  const changeLocale = (nextMode: LanguageMode) => {
+    setLanguageMode(nextMode);
+    if (nextMode === "system") {
+      localStorage.setItem(DESKTOP_LANGUAGE_MODE_KEY, "system");
+      const systemLocale = detectLocale("", navigator.languages);
+      persistLocale(systemLocale);
+      void i18n.changeLanguage(systemLocale);
+      return;
+    }
+    localStorage.removeItem(DESKTOP_LANGUAGE_MODE_KEY);
+    persistLocale(nextMode);
+    void i18n.changeLanguage(nextMode);
+  };
+
+  const sections: Array<{
+    id: SettingsSection;
+    label: string;
+    description: string;
+    keywords: string;
+  }> = [
+    {
+      id: "general",
+      label: dictionary.desktop.settings.sections.general,
+      description: dictionary.desktop.settings.sectionDescriptions.general,
+      keywords: `${dictionary.desktop.settings.launchAtLogin} ${dictionary.desktop.settings.globalShortcut} ${dictionary.desktop.settings.language}`,
+    },
     {
       id: "notifications",
       label: dictionary.desktop.settings.sections.notifications,
+      description: dictionary.desktop.settings.sectionDescriptions.notifications,
+      keywords: dictionary.desktop.settings.notifications,
     },
-    { id: "appearance", label: dictionary.desktop.settings.sections.appearance },
-    { id: "updates", label: dictionary.desktop.settings.sections.updates },
-    { id: "diagnostics", label: dictionary.desktop.settings.sections.diagnostics },
+    {
+      id: "appearance",
+      label: dictionary.desktop.settings.sections.appearance,
+      description: dictionary.desktop.settings.sectionDescriptions.appearance,
+      keywords: dictionary.desktop.settings.theme,
+    },
+    {
+      id: "updates",
+      label: dictionary.desktop.settings.sections.updates,
+      description: dictionary.desktop.settings.sectionDescriptions.updates,
+      keywords: `${dictionary.desktop.settings.automaticUpdates} ${dictionary.desktop.settings.updateCheckDescription}`,
+    },
+    {
+      id: "diagnostics",
+      label: dictionary.desktop.settings.sections.diagnostics,
+      description: dictionary.desktop.settings.sectionDescriptions.diagnostics,
+      keywords: `${dictionary.desktop.settings.diagnostics.appVersion} ${dictionary.desktop.settings.diagnostics.runtime} ${dictionary.desktop.settings.diagnostics.recentEvents}`,
+    },
   ];
+
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase();
+  const visibleSections = sections.filter(({ label, description, keywords }) => {
+    if (!normalizedSearch) return true;
+    return `${label} ${description} ${keywords}`.toLocaleLowerCase().includes(normalizedSearch);
+  });
+  const activeSection = section;
 
   const themeLabels: Record<Theme, string> = {
     system: dictionary.theme.system,
@@ -164,14 +222,11 @@ export function DesktopSettings() {
   };
 
   return (
-    <main className="auth-content min-vh-100 py-4 py-md-5">
-      <Container className="d-flex justify-content-center">
-        <Card className="auth-card w-100" style={{ maxWidth: "64rem" }}>
+    <main className="auth-content desktop-settings-page">
+      <Container fluid>
+        <Card className="auth-card desktop-settings-card w-100">
           <Card.Body className="p-4 p-md-5">
             <Stack gap={1} className="mb-4">
-              <span className="text-primary text-uppercase fw-semibold small">
-                {dictionary.desktop.settings.eyebrow}
-              </span>
               <h1 className="h3 fw-bold mb-1">{dictionary.desktop.settings.title}</h1>
               <p className="text-body-secondary mb-0">{dictionary.desktop.settings.description}</p>
             </Stack>
@@ -185,35 +240,58 @@ export function DesktopSettings() {
             <div className="row g-4">
               <div className="col-12 col-md-4">
                 <nav
-                  className="nav nav-pills flex-column gap-1"
+                  className="desktop-settings-navigation"
                   aria-label={dictionary.desktop.settings.navigation}
                 >
-                  {sections.map(({ id, label }) => (
-                    <Button
-                      key={id}
-                      type="button"
-                      variant={section === id ? "primary" : "light"}
-                      className="text-start d-flex align-items-center gap-2"
-                      aria-current={section === id ? "page" : undefined}
-                      onClick={() => setSection(id)}
-                    >
-                      <Icon icon={sectionIcons[id]} />
-                      <span>{label}</span>
-                    </Button>
-                  ))}
+                  <InputGroup className="desktop-settings-search mb-3">
+                    <InputGroup.Text>
+                      <ActionIcon action="search" className="m-0" />
+                    </InputGroup.Text>
+                    <Form.Control
+                      type="search"
+                      value={searchQuery}
+                      placeholder={dictionary.desktop.settings.searchPlaceholder}
+                      aria-label={dictionary.desktop.settings.search}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                    />
+                  </InputGroup>
+                  {visibleSections.length > 0 ? (
+                    <>
+                      <span className="desktop-settings-navigation-title">
+                        {dictionary.desktop.settings.navigationTitle}
+                      </span>
+                      {visibleSections.map(({ id, label }) => (
+                        <Button
+                          key={id}
+                          type="button"
+                          variant="link"
+                          className={`desktop-settings-nav-item ${activeSection === id ? "active" : ""}`}
+                          aria-current={activeSection === id ? "page" : undefined}
+                          onClick={() => setSection(id)}
+                        >
+                          <Icon icon={sectionIcons[id]} />
+                          <span>{label}</span>
+                        </Button>
+                      ))}
+                    </>
+                  ) : (
+                    <p className="small text-body-secondary mb-0 px-2">
+                      {dictionary.desktop.settings.noSearchResults}
+                    </p>
+                  )}
                 </nav>
               </div>
 
               <div className="col-12 col-md-8">
                 <section aria-labelledby="desktop-settings-section-title">
                   <h2 id="desktop-settings-section-title" className="h4 fw-bold mb-1">
-                    {sections.find(({ id }) => id === section)?.label}
+                    {sections.find(({ id }) => id === activeSection)?.label}
                   </h2>
                   <p className="text-body-secondary mb-4">
-                    {dictionary.desktop.settings.sectionDescriptions[section]}
+                    {dictionary.desktop.settings.sectionDescriptions[activeSection]}
                   </p>
 
-                  {section === "general" && (
+                  {activeSection === "general" && (
                     <Stack gap={3}>
                       <Form.Check
                         type="switch"
@@ -228,6 +306,29 @@ export function DesktopSettings() {
                       <Form.Text className="text-body-secondary">
                         {dictionary.desktop.settings.launchAtLoginDescription}
                       </Form.Text>
+                      <Form.Group>
+                        <Form.Label htmlFor="desktop-language">
+                          {dictionary.desktop.settings.language}
+                        </Form.Label>
+                        <Form.Select
+                          id="desktop-language"
+                          value={languageMode}
+                          onChange={(event) => changeLocale(event.target.value as LanguageMode)}
+                          aria-describedby="desktop-language-help"
+                        >
+                          <option value="system">
+                            {dictionary.desktop.settings.systemLanguage}
+                          </option>
+                          {locales.map((value) => (
+                            <option key={value} value={value}>
+                              {value === "en" ? "English" : "Türkçe"}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Form.Text id="desktop-language-help" className="text-body-secondary">
+                          {dictionary.desktop.settings.languageDescription}
+                        </Form.Text>
+                      </Form.Group>
                       <Form.Group>
                         <Form.Label htmlFor="desktop-global-shortcut">
                           {dictionary.desktop.settings.globalShortcut}
@@ -260,7 +361,7 @@ export function DesktopSettings() {
                     </Stack>
                   )}
 
-                  {section === "notifications" && (
+                  {activeSection === "notifications" && (
                     <Form.Check
                       type="switch"
                       id="desktop-notifications"
@@ -273,28 +374,41 @@ export function DesktopSettings() {
                     />
                   )}
 
-                  {section === "appearance" && (
+                  {activeSection === "appearance" && (
                     <fieldset>
-                      <legend className="fs-6 fw-semibold">
-                        {dictionary.desktop.settings.theme}
+                      <legend className="fs-6 fw-semibold mb-3">
+                        {dictionary.desktop.settings.themeMode}
                       </legend>
-                      <Stack gap={2}>
+                      <div
+                        className="desktop-theme-modes"
+                        role="radiogroup"
+                        aria-label={dictionary.desktop.settings.theme}
+                      >
                         {(Object.keys(themeLabels) as Theme[]).map((value) => (
-                          <Form.Check
+                          <button
                             key={value}
-                            type="radio"
-                            name="desktop-theme"
-                            id={`desktop-theme-${value}`}
-                            label={themeLabels[value]}
-                            checked={theme === value}
-                            onChange={() => changeTheme(value)}
-                          />
+                            type="button"
+                            className={`desktop-theme-mode${theme === value ? " active" : ""}`}
+                            role="radio"
+                            aria-checked={theme === value}
+                            onClick={() => changeTheme(value)}
+                          >
+                            <span
+                              className={`desktop-theme-preview desktop-theme-preview-${value}`}
+                              aria-hidden="true"
+                            >
+                              <span />
+                              <span />
+                              <span />
+                            </span>
+                            <span>{themeLabels[value]}</span>
+                          </button>
                         ))}
-                      </Stack>
+                      </div>
                     </fieldset>
                   )}
 
-                  {section === "updates" && (
+                  {activeSection === "updates" && (
                     <Stack gap={3}>
                       <Form.Check
                         type="switch"
@@ -315,7 +429,7 @@ export function DesktopSettings() {
                     </Stack>
                   )}
 
-                  {section === "diagnostics" && (
+                  {activeSection === "diagnostics" && (
                     <Stack gap={3}>
                       {diagnostics ? (
                         <>

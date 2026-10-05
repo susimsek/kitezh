@@ -20,6 +20,9 @@ if (mode === "local" && !environment.DESKTOP_API_BASE_URL) {
 if (mode === "local" && !environment.DESKTOP_DEVTOOLS) {
   environment.DESKTOP_DEVTOOLS = "true";
 }
+if (mode === "local" && !environment.DESKTOP_UPDATE_PREVIEW) {
+  environment.DESKTOP_UPDATE_PREVIEW = "true";
+}
 
 const build = spawnSync(pnpm, ["run", "build"], {
   cwd: desktopDirectory,

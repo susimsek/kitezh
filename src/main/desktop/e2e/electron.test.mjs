@@ -76,7 +76,7 @@ test("opens settings in a separate window without requiring login", async () => 
     });
     const settingsWindow = await settingsWindowPromise;
     await settingsWindow
-      .getByRole("heading", { name: "Kitezh settings" })
+      .getByRole("heading", { name: "Settings" })
       .waitFor();
 
     for (const section of [
@@ -98,6 +98,11 @@ test("opens settings in a separate window without requiring login", async () => 
       1,
     );
     await settingsWindow.getByRole("button", { name: "General" }).click();
+    assert.equal(await settingsWindow.locator("#desktop-language").count(), 1);
+    assert.deepEqual(
+      await settingsWindow.locator("#desktop-language option").allTextContents(),
+      ["System", "English", "Türkçe"],
+    );
     const shortcut = settingsWindow.locator("#desktop-global-shortcut");
     await shortcut.click();
     await shortcut.press("Control+Shift+K");

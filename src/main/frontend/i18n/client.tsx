@@ -7,13 +7,18 @@ import config from "@/i18n.config";
 import en from "@/locales/en/common.json";
 import { defaultLocale, isLocale } from "./config";
 import type { Dictionary } from "./get-dictionary";
-import { detectLocale, persistLocale } from "./locale-cookie";
+import { DESKTOP_LANGUAGE_MODE_KEY, detectLocale, persistLocale } from "./locale-cookie";
+import { isDesktopRuntime } from "@/lib/desktop-api";
 import { setLocale } from "@/store/locale-slice";
 import { useAppDispatch } from "@/store/hooks";
 import { messageBundles } from "./bundles";
 
 export function ClientI18nProvider({ children }: { children: ReactNode }) {
-  const [initialLocale] = useState(() => detectLocale(document.cookie, navigator.languages));
+  const [initialLocale] = useState(() => {
+    const desktopSystemLanguage =
+      isDesktopRuntime() && localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system";
+    return detectLocale(desktopSystemLanguage ? "" : document.cookie, navigator.languages);
+  });
   const dispatch = useAppDispatch();
   useEffect(() => {
     dispatch(setLocale(initialLocale));

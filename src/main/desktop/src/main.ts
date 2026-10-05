@@ -432,7 +432,7 @@ async function showAboutDialog() {
     parent: mainWindow ?? undefined,
     modal: false,
     width: 520,
-    height: 470,
+    height: 520,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -454,18 +454,14 @@ async function showAboutDialog() {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>About ${DESKTOP_APP_NAME}</title>
     <style>
-      :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8f9fa; color: #202124; }
-      main { width: 100%; box-sizing: border-box; padding: 2.5rem 2rem 2rem; text-align: center; }
+      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #202124; color: #f1f3f4; }
+      main { width: 100%; box-sizing: border-box; padding: 2rem 2rem 1.75rem; text-align: center; }
       img { width: 112px; height: 112px; border-radius: 24px; margin-bottom: 1.5rem; }
       h1 { margin: 0 0 1.25rem; font-size: 2rem; font-weight: 700; }
-      p { margin: 0.5rem 0; font-size: 1.1rem; line-height: 1.45; color: #5f6368; }
+      p { margin: 0.5rem 0; font-size: 1.1rem; line-height: 1.45; color: #c4c7c5; }
       .version { margin-top: 1rem; font-size: 1rem; }
-      footer { margin-top: 1.5rem; font-size: 0.95rem; color: #6b7280; }
-      @media (prefers-color-scheme: dark) {
-        body { background: #202124; color: #f1f3f4; }
-        p, footer { color: #c4c7c5; }
-      }
+      footer { margin-top: 1.5rem; font-size: 0.95rem; color: #c4c7c5; }
     </style>
   </head>
   <body>
@@ -493,12 +489,12 @@ async function showSettingsWindow() {
   settingsWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: false,
-    width: 900,
-    height: 760,
-    minWidth: 720,
-    minHeight: 620,
+    width: 1100,
+    height: 640,
+    minWidth: 900,
+    minHeight: 560,
     title: `${DESKTOP_APP_NAME} Settings`,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#202124",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -766,7 +762,7 @@ async function showUpdateCheckWindow() {
     height: 300,
     resizable: false,
     title: windowTitle,
-    backgroundColor: "#20272b",
+    backgroundColor: "#202124",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -785,14 +781,14 @@ async function showUpdateCheckWindow() {
     <style>
       :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #20272b; color: #f1f3f4; }
-      main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 28px 48px; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #202124; color: #f1f3f4; }
+      main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
       .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: #3a4246; }
       .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: #1683ff; transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
       @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
-      button { display: block; margin: 28px 0 0 auto; min-width: 200px; padding: 14px 28px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 20px; font-weight: 600; cursor: pointer; }
+      button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
       button:hover { background: #414c52; }
     </style>
   </head>
@@ -857,7 +853,7 @@ async function showUpdateConfirmation() {
     height: 430,
     resizable: false,
     title,
-    backgroundColor: "#20272b",
+    backgroundColor: "#202124",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -891,13 +887,13 @@ async function showUpdateConfirmation() {
     <style>
       :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #20272b; color: #f1f3f4; }
-      main { padding: 30px 42px 18px; }
+      body { margin: 0; min-height: 100vh; background: #202124; color: #f1f3f4; }
+      main { padding: 26px 28px 14px; }
       .warning { width: 88px; height: 80px; display: grid; place-items: center; padding-top: 12px; margin: 0 0 18px 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #f3c438; color: #fff; font-size: 48px; line-height: 1; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
       h1 { margin: 0 0 16px; font-size: 25px; line-height: 1.2; font-weight: 700; }
       p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: #d4d8da; }
-      footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 42px 30px; }
-      button { min-width: 150px; padding: 13px 24px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
+      footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
+      button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
       button.primary { background: #1683ff; }
       button:hover { filter: brightness(1.12); }
     </style>
@@ -953,7 +949,7 @@ async function showUpdateDialog(version: string, force = false) {
     height: 360,
     resizable: false,
     title,
-    backgroundColor: "#20272b",
+    backgroundColor: "#202124",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1008,15 +1004,15 @@ async function showUpdateDialog(version: string, force = false) {
     <style>
       :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #20272b; color: #f1f3f4; }
-      main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 28px 48px 24px; }
+      body { margin: 0; min-height: 100vh; background: #202124; color: #f1f3f4; }
+      main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 24px 28px 18px; }
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
       p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: #d4d8da; }
       label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: #e2e5e7; }
       input { width: 25px; height: 25px; accent-color: #1683ff; }
-      footer { display: flex; justify-content: flex-end; gap: 18px; padding: 0 48px 30px; }
-      button { min-width: 250px; padding: 14px 28px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 20px; font-weight: 600; cursor: pointer; }
+      footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
+      button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
       button.primary { background: #1683ff; }
       button:hover { filter: brightness(1.12); }
     </style>

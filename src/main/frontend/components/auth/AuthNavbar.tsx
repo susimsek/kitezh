@@ -6,6 +6,7 @@ import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { BrandLogo } from "@/components/shared/BrandLogo";
 import { DesktopUpdateControl } from "@/components/shared/DesktopUpdateControl";
+import { isDesktopRuntime } from "@/lib/desktop-api";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import Link from "@/routing/Link";
 import { useBranding } from "./BrandingProvider";
@@ -36,8 +37,12 @@ export function AuthNavbar({ locale, dictionary, showDownload = false }: AuthNav
         </Navbar.Brand>
 
         <div className="auth-navbar-actions d-flex align-items-center gap-2">
-          <LanguageSwitcher locale={locale} label={dictionary.navbar.language} />
-          <ThemeSwitcher dictionary={dictionary} />
+          {!isDesktopRuntime() && (
+            <>
+              <LanguageSwitcher locale={locale} label={dictionary.navbar.language} />
+              <ThemeSwitcher dictionary={dictionary} />
+            </>
+          )}
           {showDownload && (
             <Link
               href="/download"
