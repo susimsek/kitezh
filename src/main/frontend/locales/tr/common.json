@@ -52,9 +52,9 @@
     "chooseConsoleTitle": "Bir konsol seçin",
     "chooseConsoleDescription": "Devam etmek istediğiniz konsolu seçin.",
     "adminConsole": "Admin Console’a giriş yap",
-    "adminConsoleDescription": "Kullanıcıları, istemcileri, rolleri, grupları ve sunucu ayarlarını yönetin.",
+    "adminConsoleDescription": "Yönetim ve erişim kontrolü.",
     "accountConsole": "Account Console’a giriş yap",
-    "accountConsoleDescription": "Profilinizi, güvenliğinizi, oturumlarınızı ve uygulamalarınızı yönetin.",
+    "accountConsoleDescription": "Profil ve hesap ayarları.",
     "updateChecking": "Güncellemeler denetleniyor…",
     "updateButton": "Güncelle",
     "updateAvailable": "{version} sürümü kullanıma hazır.",
@@ -63,7 +63,23 @@
     "updateReady": "{version} sürümü kuruluma hazır.",
     "updateRestart": "Yeniden başlat ve kur",
     "updateError": "Masaüstü güncellemesi tamamlanamadı. Mevcut sürümünüz kullanılabilir durumda.",
-    "updateRecovered": "Güncelleme temiz şekilde başlatılamadı. Mevcut kurulum kullanılmaya devam ediyor ({version})."
+    "updateRecovered": "Güncelleme temiz şekilde başlatılamadı. Mevcut kurulum kullanılmaya devam ediyor ({version}).",
+    "settings": {
+      "eyebrow": "Masaüstü tercihleri",
+      "title": "Kitezh ayarları",
+      "description": "Kitezh’in başlatılma, bildirim ve güncelleme davranışını yönetin. Güncellemeleri Kitezh uygulama menüsünden denetleyin.",
+      "loading": "Masaüstü ayarları yükleniyor",
+      "error": "Masaüstü ayarları kaydedilemedi.",
+      "launchAtLogin": "Kitezh’i oturum açıldığında başlat",
+      "launchAtLoginDescription": "Bilgisayarınızda oturum açtığınızda Kitezh’i otomatik olarak açar.",
+      "notifications": "Masaüstü bildirimlerini göster",
+      "notificationsDescription": "Kitezh güncellemeleri ve arka plan işlemleri için bildirim gösterir.",
+      "automaticUpdates": "Güncellemeleri otomatik olarak indir ve kur",
+      "automaticUpdatesDescription": "Güncellemeleri arka planda indirir ve Kitezh yeniden başladığında kurar.",
+      "globalShortcut": "Hızlı erişim kısayolu",
+      "globalShortcutDescription": "Bu kısayola her yerden basarak Kitezh’i gösterin veya gizleyin.",
+      "done": "Bitti"
+    }
   },
   "navbar": {
     "language": "Dil",

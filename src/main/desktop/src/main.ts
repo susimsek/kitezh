@@ -1,7 +1,10 @@
 import {
   app,
   BrowserWindow,
+  globalShortcut,
   Menu,
+  nativeImage,
+  Notification,
   ipcMain,
   net,
   protocol,
@@ -11,9 +14,10 @@ import {
   session,
   type MenuItemConstructorOptions,
   type MenuItem,
+  Tray,
 } from "electron";
 import { existsSync, statSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -43,6 +47,7 @@ import {
   configureAutoUpdater,
   downloadUpdate,
   installUpdate,
+  setAutomaticInstallOnAppQuit,
   type DesktopUpdateStatus,
 } from "./update";
 
@@ -65,10 +70,12 @@ protocol.registerSchemesAsPrivileged([
 
 let mainWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
 let updateCheckWindow: BrowserWindow | null = null;
 let updateAvailableWindow: BrowserWindow | null = null;
 let updateConfirmationWindow: BrowserWindow | null = null;
 let updateConfirmationResolver: ((confirmed: boolean) => void) | null = null;
+let tray: Tray | null = null;
 let pendingDeepLink: string | null = null;
 let promptedUpdateVersion: string | null = null;
 let manualUpdateCheckRequested = false;
@@ -81,6 +88,12 @@ type UpdatePreferences = {
   remindUntil?: number;
   automaticDownload?: boolean;
 };
+type DesktopPreferences = {
+  launchAtLogin: boolean;
+  notifications: boolean;
+  globalShortcut: string;
+};
+const DEFAULT_GLOBAL_SHORTCUT = "Alt+Space";
 type WindowState = {
   x?: number;
   y?: number;
@@ -384,8 +397,181 @@ async function showAboutDialog() {
   aboutWindow.show();
 }
 
+async function showSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    parent: mainWindow ?? undefined,
+    modal: false,
+    width: 900,
+    height: 760,
+    minWidth: 720,
+    minHeight: 620,
+    title: `${DESKTOP_APP_NAME} Settings`,
+    backgroundColor: "#f8f9fa",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+  settingsWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  settingsWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isTrustedRendererUrl(url)) event.preventDefault();
+  });
+  settingsWindow.on("closed", () => {
+    settingsWindow = null;
+  });
+  await settingsWindow.loadURL(
+    `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-settings`,
+  );
+  settingsWindow.center();
+  settingsWindow.show();
+}
+
 function updatePreferencesPath() {
   return path.join(app.getPath("userData"), UPDATE_PREFERENCES_FILE);
+}
+
+function desktopPreferencesPath() {
+  return path.join(app.getPath("userData"), "desktop-preferences.json");
+}
+
+function linuxAutostartPath() {
+  return path.join(app.getPath("appData"), "autostart", "kitezh.desktop");
+}
+
+function launchAtLoginEnabled() {
+  if (process.platform === "linux") return existsSync(linuxAutostartPath());
+  return app.getLoginItemSettings().openAtLogin;
+}
+
+function defaultDesktopPreferences(): DesktopPreferences {
+  return {
+    launchAtLogin: launchAtLoginEnabled(),
+    notifications: true,
+    globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
+  };
+}
+
+async function readDesktopPreferences(): Promise<DesktopPreferences> {
+  const defaults = defaultDesktopPreferences();
+  try {
+    const value = JSON.parse(
+      await readFile(desktopPreferencesPath(), "utf8"),
+    ) as Partial<DesktopPreferences>;
+    return {
+      launchAtLogin:
+        typeof value.launchAtLogin === "boolean"
+          ? value.launchAtLogin
+          : defaults.launchAtLogin,
+      notifications:
+        typeof value.notifications === "boolean"
+          ? value.notifications
+          : defaults.notifications,
+      globalShortcut:
+        typeof value.globalShortcut === "string" &&
+        value.globalShortcut.length > 0
+          ? value.globalShortcut
+          : defaults.globalShortcut,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+async function writeDesktopPreferences(preferences: DesktopPreferences) {
+  await mkdir(path.dirname(desktopPreferencesPath()), { recursive: true });
+  await writeFile(desktopPreferencesPath(), JSON.stringify(preferences), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+}
+
+async function applyLaunchAtLogin(enabled: boolean) {
+  if (process.platform === "linux") {
+    const file = linuxAutostartPath();
+    if (!enabled) {
+      await rm(file, { force: true });
+      return;
+    }
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(
+      file,
+      `[Desktop Entry]\nType=Application\nName=${DESKTOP_APP_NAME}\nExec="${process.execPath}"\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n`,
+      { encoding: "utf8", mode: 0o600 },
+    );
+    return;
+  }
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    args:
+      process.defaultApp && process.argv[1]
+        ? [path.resolve(process.argv[1])]
+        : [],
+  });
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function toggleQuickAccess() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isVisible() && mainWindow.isFocused()) {
+    mainWindow.hide();
+    return;
+  }
+  focusMainWindow();
+}
+
+function registerGlobalShortcut(accelerator: string) {
+  globalShortcut.unregisterAll();
+  if (!globalShortcut.register(accelerator, toggleQuickAccess)) {
+    globalShortcut.register(DEFAULT_GLOBAL_SHORTCUT, toggleQuickAccess);
+  }
+}
+
+function createTray() {
+  if (tray) return;
+  const icon = nativeImage.createFromPath(
+    path.join(app.getAppPath(), "assets/icon.png"),
+  );
+  tray = new Tray(icon);
+  tray.setToolTip(DESKTOP_APP_NAME);
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: `Open ${DESKTOP_APP_NAME}`, click: focusMainWindow },
+      {
+        label: "Settings…",
+        click: () => void showSettingsWindow(),
+      },
+      {
+        label: "Check for Updates…",
+        click: () => void requestUpdateCheck(),
+      },
+      { type: "separator" },
+      { role: "quit", label: `Quit ${DESKTOP_APP_NAME}` },
+    ]),
+  );
+  tray.on("click", focusMainWindow);
+}
+
+function notifyDesktop(title: string, body: string) {
+  if (!Notification.isSupported()) return;
+  void readDesktopPreferences().then((preferences) => {
+    if (!preferences.notifications) return;
+    new Notification({ title, body }).show();
+  });
 }
 
 async function readUpdatePreferences(): Promise<UpdatePreferences> {
@@ -662,6 +848,7 @@ async function showUpdateDialog(version: string) {
           ...preferences,
           automaticDownload,
         };
+        setAutomaticInstallOnAppQuit(automaticDownload);
         if (action === "skip") {
           next.skippedVersion = version;
           delete next.remindUntil;
@@ -739,6 +926,15 @@ function setLogoutMenuVisible(visible: boolean) {
   if (logoutMenuItem) logoutMenuItem.visible = visible;
 }
 
+function toggleDeveloperTools() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.webContents.isDevToolsOpened()) {
+    mainWindow.webContents.closeDevTools();
+  } else {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
+}
+
 function installApplicationMenu() {
   const applicationMenu: MenuItemConstructorOptions = {
     label: DESKTOP_APP_NAME,
@@ -750,7 +946,7 @@ function installApplicationMenu() {
       { type: "separator" },
       {
         label: "Settings…",
-        click: () => mainWindow?.webContents.send("desktop:menu-settings"),
+        click: () => void showSettingsWindow(),
       },
       {
         label: "Check for Updates…",
@@ -775,10 +971,29 @@ function installApplicationMenu() {
       { role: "quit", label: `Quit ${DESKTOP_APP_NAME}` },
     ],
   };
+  const viewSubmenu: MenuItemConstructorOptions[] = [
+    { role: "reload" },
+    { role: "forceReload" },
+    { type: "separator" },
+    ...(process.env.DESKTOP_DEVTOOLS === "true"
+      ? [
+          {
+            label: "Toggle Developer Tools",
+            click: toggleDeveloperTools,
+          },
+          { type: "separator" as const },
+        ]
+      : []),
+    { role: "resetZoom" },
+    { role: "zoomIn" },
+    { role: "zoomOut" },
+    { type: "separator" },
+    { role: "togglefullscreen" },
+  ];
   const template: MenuItemConstructorOptions[] = [
     applicationMenu,
     { role: "editMenu" },
-    { role: "viewMenu" },
+    { label: "View", submenu: viewSubmenu },
     { role: "windowMenu" },
     { role: "help" },
   ];
@@ -828,12 +1043,6 @@ async function createWindow() {
     void saveWindowState(mainWindow!);
   });
   void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/`);
-  if (process.env.DESKTOP_DEVTOOLS === "true") {
-    mainWindow.webContents.once("did-finish-load", () => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      mainWindow.webContents.openDevTools({ mode: "detach" });
-    });
-  }
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -872,6 +1081,59 @@ function registerIpc() {
   ipcMain.handle("desktop:app-version", (event) => {
     assertTrustedSender(event);
     return app.getVersion();
+  });
+  ipcMain.handle("desktop:preferences-get", async (event) => {
+    assertTrustedSender(event);
+    const preferences = await readDesktopPreferences();
+    const updatePreferences = await readUpdatePreferences();
+    return {
+      ...preferences,
+      automaticDownload: updatePreferences.automaticDownload === true,
+    };
+  });
+  ipcMain.handle("desktop:preferences-set", async (event, value: unknown) => {
+    assertTrustedSender(event);
+    if (!value || typeof value !== "object")
+      throw new Error("Invalid desktop preferences");
+    const input = value as Partial<DesktopPreferences> & {
+      automaticDownload?: boolean;
+    };
+    const current = await readDesktopPreferences();
+    const next: DesktopPreferences = {
+      launchAtLogin:
+        typeof input.launchAtLogin === "boolean"
+          ? input.launchAtLogin
+          : current.launchAtLogin,
+      notifications:
+        typeof input.notifications === "boolean"
+          ? input.notifications
+          : current.notifications,
+      globalShortcut:
+        typeof input.globalShortcut === "string" &&
+        input.globalShortcut.length > 0
+          ? input.globalShortcut
+          : current.globalShortcut,
+    };
+    await applyLaunchAtLogin(next.launchAtLogin);
+    registerGlobalShortcut(next.globalShortcut);
+    await writeDesktopPreferences(next);
+    if (typeof input.automaticDownload === "boolean") {
+      const updatePreferences = await readUpdatePreferences();
+      await writeUpdatePreferences({
+        ...updatePreferences,
+        automaticDownload: input.automaticDownload,
+      });
+      setAutomaticInstallOnAppQuit(input.automaticDownload);
+    }
+    const updatePreferences = await readUpdatePreferences();
+    return {
+      ...next,
+      automaticDownload: updatePreferences.automaticDownload === true,
+    };
+  });
+  ipcMain.handle("desktop:settings-close", (event) => {
+    assertTrustedSender(event);
+    if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
   });
   ipcMain.handle(
     "desktop:auth-start-login",
@@ -1030,6 +1292,12 @@ if (!hasLock) {
     pendingDeepLink = findDesktopDeepLink();
     registerDesktopProtocol();
     registerIpc();
+    const desktopPreferences = await readDesktopPreferences();
+    void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
+    registerGlobalShortcut(desktopPreferences.globalShortcut);
+    createTray();
+    const updatePreferences = await readUpdatePreferences();
+    setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
     void readVault()
       .then((vault) =>
         setLogoutMenuVisible(Boolean(vault.admin || vault.account)),
@@ -1045,8 +1313,20 @@ if (!hasLock) {
         closeUpdateCheckWindow();
       }
       if (status.state === "available") {
+        notifyDesktop(
+          `${DESKTOP_APP_NAME} update available`,
+          `Version ${status.version} is ready to download.`,
+        );
         void handleAvailableUpdate(status.version);
         return;
+      }
+      if (status.state === "downloaded") {
+        notifyDesktop(
+          `${DESKTOP_APP_NAME} update ready`,
+          `Version ${status.version} will be installed when you restart.`,
+        );
+      } else if (status.state === "error") {
+        notifyDesktop(`${DESKTOP_APP_NAME} update failed`, status.message);
       }
       sendUpdateStatus(status);
     });
@@ -1055,6 +1335,11 @@ if (!hasLock) {
         "activate",
         () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
       );
+  });
+  app.on("before-quit", () => {
+    globalShortcut.unregisterAll();
+    tray?.destroy();
+    tray = null;
   });
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();

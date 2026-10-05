@@ -52,9 +52,9 @@
     "chooseConsoleTitle": "Choose a console",
     "chooseConsoleDescription": "Select where you want to continue.",
     "adminConsole": "Sign in to Admin Console",
-    "adminConsoleDescription": "Manage users, clients, roles, groups, and server settings.",
+    "adminConsoleDescription": "Administration and access control.",
     "accountConsole": "Sign in to Account Console",
-    "accountConsoleDescription": "Manage your profile, security, sessions, and applications.",
+    "accountConsoleDescription": "Profile and account settings.",
     "updateChecking": "Checking for updates…",
     "updateButton": "Update",
     "updateAvailable": "Version {version} is available.",
@@ -63,7 +63,23 @@
     "updateReady": "Version {version} is ready to install.",
     "updateRestart": "Restart and install",
     "updateError": "The desktop update could not be completed. Your current version is still available.",
-    "updateRecovered": "The update did not start cleanly. The current installation is still active ({version})."
+    "updateRecovered": "The update did not start cleanly. The current installation is still active ({version}).",
+    "settings": {
+      "eyebrow": "Desktop preferences",
+      "title": "Kitezh settings",
+      "description": "Control how Kitezh starts, notifies you, and receives updates. Check for updates from the Kitezh app menu.",
+      "loading": "Loading desktop settings",
+      "error": "Desktop settings could not be saved.",
+      "launchAtLogin": "Launch Kitezh at login",
+      "launchAtLoginDescription": "Open Kitezh automatically when you sign in to your computer.",
+      "notifications": "Show desktop notifications",
+      "notificationsDescription": "Show update and background-operation notifications from Kitezh.",
+      "automaticUpdates": "Automatically download and install updates",
+      "automaticUpdatesDescription": "Download updates in the background and install them when Kitezh restarts.",
+      "globalShortcut": "Quick access shortcut",
+      "globalShortcutDescription": "Press this shortcut anywhere to show or hide Kitezh.",
+      "done": "Done"
+    }
   },
   "navbar": {
     "language": "Language",

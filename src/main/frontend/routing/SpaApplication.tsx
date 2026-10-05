@@ -13,7 +13,6 @@ export default function SpaApplication() {
     <ClientI18nProvider>
       <BrowserRouter>
         <DesktopMenuLogoutHandler />
-        <DesktopMenuSettingsHandler />
         <DesktopConnectivityBanner />
         <DesktopUpdateBanner />
         <AppRoutes />
@@ -29,17 +28,6 @@ function DesktopMenuLogoutHandler() {
       void window.desktopApi!.auth.clearAllSessions().finally(() => {
         window.location.replace("/login?logout");
       });
-    });
-  }, []);
-
-  return null;
-}
-
-function DesktopMenuSettingsHandler() {
-  useEffect(() => {
-    if (!isDesktopRuntime() || !window.desktopApi) return undefined;
-    return window.desktopApi.onMenuSettings(() => {
-      window.location.replace("/admin/settings");
     });
   }, []);
 

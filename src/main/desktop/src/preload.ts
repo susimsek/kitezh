@@ -24,6 +24,14 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   getConfig: () => ipcRenderer.invoke("desktop:config"),
   getAppVersion: () => ipcRenderer.invoke("desktop:app-version"),
+  preferences: {
+    get: () => ipcRenderer.invoke("desktop:preferences-get"),
+    set: (value: unknown) =>
+      ipcRenderer.invoke("desktop:preferences-set", value),
+  },
+  settings: {
+    close: () => ipcRenderer.invoke("desktop:settings-close"),
+  },
   updates: {
     check: () => ipcRenderer.invoke("desktop:update-check"),
     download: () => ipcRenderer.invoke("desktop:update-download"),
@@ -56,10 +64,5 @@ contextBridge.exposeInMainWorld("desktopApi", {
     const callback = () => listener();
     ipcRenderer.on("desktop:menu-logout", callback);
     return () => ipcRenderer.removeListener("desktop:menu-logout", callback);
-  },
-  onMenuSettings: (listener: () => void) => {
-    const callback = () => listener();
-    ipcRenderer.on("desktop:menu-settings", callback);
-    return () => ipcRenderer.removeListener("desktop:menu-settings", callback);
   },
 });

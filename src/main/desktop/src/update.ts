@@ -26,6 +26,10 @@ let listener: UpdateListener | null = null;
 let configured = false;
 let downloadedVersion: string | null = null;
 
+export function setAutomaticInstallOnAppQuit(enabled: boolean) {
+  autoUpdater.autoInstallOnAppQuit = enabled;
+}
+
 function updateManifestName() {
   if (process.platform === "darwin") return "latest-mac.yml";
   if (process.platform === "win32") return "latest.yml";

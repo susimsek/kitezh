@@ -22,6 +22,13 @@ export type DesktopUpdateStatus =
   | { state: "recovered"; version: string }
   | { state: "error"; message: string };
 
+export type DesktopPreferences = {
+  launchAtLogin: boolean;
+  notifications: boolean;
+  globalShortcut: string;
+  automaticDownload: boolean;
+};
+
 let desktopConnectivity: "unknown" | "online" | "offline" = "unknown";
 
 export class DesktopOfflineError extends Error {
@@ -52,6 +59,13 @@ export type DesktopApi = {
   };
   getConfig: () => Promise<DesktopConfig>;
   getAppVersion: () => Promise<string>;
+  preferences: {
+    get: () => Promise<DesktopPreferences>;
+    set: (value: Partial<DesktopPreferences>) => Promise<DesktopPreferences>;
+  };
+  settings: {
+    close: () => Promise<void>;
+  };
   updates: {
     check: () => Promise<void>;
     download: () => Promise<void>;
@@ -61,7 +75,6 @@ export type DesktopApi = {
   openExternal: (url: string) => Promise<void>;
   onAuthCallback: (listener: (callback: DesktopAuthCallback) => void) => () => void;
   onMenuLogout: (listener: () => void) => () => void;
-  onMenuSettings: (listener: () => void) => () => void;
 };
 
 declare global {
