@@ -43,7 +43,6 @@
     }
   },
   "desktop": {
-    "offline": "Masaüstü uygulaması çevrimdışı. Devam etmek için bağlantıyı yenileyin.",
     "signInUnavailable": "Güvenli oturum açma şu anda kullanılamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
     "signInTitle": "Masaüstü uygulamasında oturum açın",
     "signInDescription": "Varsayılan tarayıcınızda güvenli şekilde devam edin.",
@@ -56,6 +55,8 @@
     "adminConsoleDescription": "Kullanıcıları, istemcileri, rolleri, grupları ve sunucu ayarlarını yönetin.",
     "accountConsole": "Account Console’a giriş yap",
     "accountConsoleDescription": "Profilinizi, güvenliğinizi, oturumlarınızı ve uygulamalarınızı yönetin.",
+    "updateChecking": "Güncellemeler denetleniyor…",
+    "updateButton": "Güncelle",
     "updateAvailable": "{version} sürümü kullanıma hazır.",
     "updateDownload": "Güncellemeyi indir",
     "updateDownloading": "Güncelleme indiriliyor (%{percent}).",

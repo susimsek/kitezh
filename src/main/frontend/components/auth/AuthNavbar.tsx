@@ -5,6 +5,7 @@ import { Container, Navbar } from "react-bootstrap";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { BrandLogo } from "@/components/shared/BrandLogo";
+import { DesktopUpdateControl } from "@/components/shared/DesktopUpdateControl";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import Link from "@/routing/Link";
 import { useBranding } from "./BrandingProvider";
@@ -47,6 +48,7 @@ export function AuthNavbar({ locale, dictionary, showDownload = false }: AuthNav
               <span className="d-none d-md-inline">{dictionary.navbar.download}</span>
             </Link>
           )}
+          <DesktopUpdateControl />
         </div>
       </Container>
     </Navbar>

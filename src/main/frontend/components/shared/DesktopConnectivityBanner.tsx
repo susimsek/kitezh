@@ -1,14 +1,11 @@
 "use client";
 
-import { Alert } from "react-bootstrap";
 import { useEffect, useState } from "react";
 
-import { useDictionary } from "@/i18n/client";
 import { apiUrl, isDesktopRuntime, setDesktopConnectivity } from "@/lib/desktop-api";
 
 export function DesktopConnectivityBanner() {
-  const dictionary = useDictionary();
-  const [offline, setOffline] = useState(false);
+  const [, setOffline] = useState(false);
 
   useEffect(() => {
     if (!isDesktopRuntime()) return undefined;
@@ -60,15 +57,8 @@ export function DesktopConnectivityBanner() {
     };
   }, []);
 
-  if (!offline) return null;
-  return (
-    <Alert
-      variant="warning"
-      className="position-fixed top-0 start-50 translate-middle-x m-2 shadow"
-      role="status"
-      aria-live="polite"
-    >
-      {dictionary.desktop.offline}
-    </Alert>
-  );
+  // Keep the connectivity probe active for write protection, but do not show a
+  // persistent banner. The update and authentication dialogs surface actionable
+  // failures when the user actually needs the server.
+  return null;
 }

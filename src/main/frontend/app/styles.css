@@ -1888,6 +1888,31 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
   z-index: 1090;
   width: min(24rem, calc(100vw - 2rem));
 }
+
+.desktop-status-banner {
+  position: fixed;
+  top: calc(var(--admin-navbar-height) + 0.75rem);
+  right: 1rem;
+  z-index: 1090;
+  width: min(32rem, calc(100vw - 2rem));
+  margin: 0 !important;
+}
+
+.desktop-status-banner + .desktop-status-banner {
+  top: calc(var(--admin-navbar-height) + 5.25rem);
+}
+
+.desktop-status-banner .btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+  .desktop-status-banner {
+    right: 0.5rem;
+    width: calc(100vw - 1rem);
+  }
+}
+
 .console-alert-stack .toast {
   min-width: min(24rem, calc(100vw - 2rem));
   box-shadow: 0 0.45rem 1.4rem rgba(0, 0, 0, 0.18);

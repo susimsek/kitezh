@@ -60,6 +60,8 @@ export type DesktopApi = {
   };
   openExternal: (url: string) => Promise<void>;
   onAuthCallback: (listener: (callback: DesktopAuthCallback) => void) => () => void;
+  onMenuLogout: (listener: () => void) => () => void;
+  onMenuSettings: (listener: () => void) => () => void;
 };
 
 declare global {

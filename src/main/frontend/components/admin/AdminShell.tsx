@@ -10,6 +10,7 @@ import { ThemeSwitcher } from "@/components/auth/ThemeSwitcher";
 import { ConsoleUserMenu } from "@/components/auth/ConsoleUserMenu";
 import { ConsoleAlertsProvider } from "@/components/auth/ConsoleAlerts";
 import { BrandLogo } from "@/components/shared/BrandLogo";
+import { DesktopUpdateControl } from "@/components/shared/DesktopUpdateControl";
 import { useBranding } from "@/components/auth/BrandingProvider";
 import { Icon, type IconName } from "@/components/shared/Icon";
 import type { Locale } from "@/i18n/config";
@@ -100,6 +101,7 @@ export function AdminShell({ locale, dictionary, children }: Props) {
                 accessToken={accessToken}
               />
               <ThemeSwitcher dictionary={dictionary} />
+              <DesktopUpdateControl />
               <ConsoleUserMenu
                 username={username ?? "…"}
                 avatarSrc={idTokenParsed?.picture ?? tokenParsed?.picture}

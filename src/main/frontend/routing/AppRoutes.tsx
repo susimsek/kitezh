@@ -142,9 +142,14 @@ function DownloadLayout() {
 }
 
 function LandingLayout() {
+  const desktopRuntime = isDesktopRuntime();
   return (
     <div className="auth-app min-vh-100 bg-body-tertiary">
-      <AuthNavbar locale={useLocale()} dictionary={useDictionary()} showDownload />
+      <AuthNavbar
+        locale={useLocale()}
+        dictionary={useDictionary()}
+        showDownload={!desktopRuntime}
+      />
       <Outlet />
     </div>
   );

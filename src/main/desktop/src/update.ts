@@ -244,6 +244,7 @@ export async function checkForUpdates() {
     publish({ state: "unsupported" });
     return;
   }
+  publish({ state: "checking" });
   try {
     await verifyPublishedManifest();
     await autoUpdater.checkForUpdates();
@@ -256,14 +257,16 @@ export async function checkForUpdates() {
 }
 
 export async function downloadUpdate() {
-  if (!isSupported()) return;
+  if (!isSupported()) return false;
   try {
     await autoUpdater.downloadUpdate();
+    return true;
   } catch {
     publish({
       state: "error",
       message: "Desktop update could not be downloaded.",
     });
+    return false;
   }
 }
 

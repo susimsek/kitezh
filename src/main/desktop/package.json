@@ -4,10 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "description": "Electron desktop console for Kitezh",
-  "author": {
-    "name": "Suayb Simsek",
-    "email": "susimsek@users.noreply.github.com"
-  },
+  "author": "Kitezh",
   "homepage": "https://github.com/susimsek/kitezh",
   "repository": {
     "type": "git",
@@ -38,6 +35,7 @@
   "build": {
     "appId": "io.github.susimsek.kitezh.desktop",
     "productName": "Kitezh",
+    "copyright": "Copyright © 2026 Kitezh",
     "directories": {
       "output": "release"
     },
@@ -87,7 +85,7 @@
     "appx": {
       "applicationId": "KitezhDesktop",
       "artifactName": "kitezh-${version}-win-${arch}-appx.${ext}",
-      "publisherDisplayName": "Suayb Simsek"
+      "publisherDisplayName": "Kitezh"
     },
     "snapcraft": {
       "base": "core22",

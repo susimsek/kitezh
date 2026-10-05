@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
       const callback = (_event: Electron.IpcRendererEvent, status: unknown) =>
         listener(status);
       ipcRenderer.on("desktop:update-status", callback);
-      return () => ipcRenderer.removeListener("desktop:update-status", callback);
+      return () =>
+        ipcRenderer.removeListener("desktop:update-status", callback);
     },
   },
   openExternal: (url: string) =>
@@ -50,5 +51,15 @@ contextBridge.exposeInMainWorld("desktopApi", {
     ) => listener(value);
     ipcRenderer.on("desktop:auth-callback", callback);
     return () => ipcRenderer.removeListener("desktop:auth-callback", callback);
+  },
+  onMenuLogout: (listener: () => void) => {
+    const callback = () => listener();
+    ipcRenderer.on("desktop:menu-logout", callback);
+    return () => ipcRenderer.removeListener("desktop:menu-logout", callback);
+  },
+  onMenuSettings: (listener: () => void) => {
+    const callback = () => listener();
+    ipcRenderer.on("desktop:menu-settings", callback);
+    return () => ipcRenderer.removeListener("desktop:menu-settings", callback);
   },
 });
