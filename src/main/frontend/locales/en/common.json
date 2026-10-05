@@ -70,6 +70,19 @@
       "description": "Control how Kitezh starts, notifies you, and receives updates. Check for updates from the Kitezh app menu.",
       "loading": "Loading desktop settings",
       "error": "Desktop settings could not be saved.",
+      "navigation": "Settings sections",
+      "sections": {
+        "general": "General",
+        "notifications": "Notifications",
+        "appearance": "Appearance",
+        "updates": "Updates"
+      },
+      "sectionDescriptions": {
+        "general": "Manage how Kitezh starts and how you open it quickly.",
+        "notifications": "Choose whether Kitezh can show desktop notifications.",
+        "appearance": "Choose the theme used by the desktop application.",
+        "updates": "Control how Kitezh downloads and installs application updates."
+      },
       "launchAtLogin": "Launch Kitezh at login",
       "launchAtLoginDescription": "Open Kitezh automatically when you sign in to your computer.",
       "notifications": "Show desktop notifications",
@@ -78,6 +91,8 @@
       "automaticUpdatesDescription": "Download updates in the background and install them when Kitezh restarts.",
       "globalShortcut": "Quick access shortcut",
       "globalShortcutDescription": "Press this shortcut anywhere to show or hide Kitezh.",
+      "theme": "Application theme",
+      "updateCheckDescription": "To check for updates manually, use Kitezh → Check for Updates… from the application menu.",
       "done": "Done"
     }
   },

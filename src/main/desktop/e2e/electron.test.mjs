@@ -79,6 +79,21 @@ test("opens settings in a separate window without requiring login", async () => 
       .getByRole("heading", { name: "Kitezh settings" })
       .waitFor();
 
+    for (const section of ["General", "Notifications", "Appearance", "Updates"]) {
+      assert.equal(
+        await settingsWindow.getByRole("button", { name: section }).count(),
+        1,
+      );
+    }
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow
+      .getByRole("heading", { name: "Appearance" })
+      .waitFor();
+    assert.equal(
+      await settingsWindow.getByRole("radio", { name: "System" }).count(),
+      1,
+    );
+
     assert.equal(await settingsWindow.url(), "app://renderer/desktop-settings");
     assert.equal(
       await settingsWindow
@@ -95,6 +110,40 @@ test("opens settings in a separate window without requiring login", async () => 
         .getByRole("heading", { name: "Choose a console" })
         .count(),
       1,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("brings the existing window forward on a second launch", async () => {
+  const application = await launchDesktop();
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow.waitForLoadState("domcontentloaded");
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+
+    await application.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.hide();
+    });
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.isVisible(),
+      ),
+      false,
+    );
+
+    await application.evaluate(({ app }) => {
+      app.emit("second-instance", {}, []);
+    });
+    await mainWindow.waitForTimeout(100);
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.isVisible(),
+      ),
+      true,
     );
   } finally {
     await application.close();

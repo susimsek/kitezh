@@ -79,6 +79,7 @@ let tray: Tray | null = null;
 let pendingDeepLink: string | null = null;
 let promptedUpdateVersion: string | null = null;
 let manualUpdateCheckRequested = false;
+let suppressNextUpdateNotification = false;
 let logoutMenuItem: MenuItem | null = null;
 type ConsoleName = "admin" | "account";
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
@@ -566,12 +567,23 @@ function createTray() {
   tray.on("click", focusMainWindow);
 }
 
-function notifyDesktop(title: string, body: string) {
+function notifyDesktop(title: string, body: string, onClick?: () => void) {
   if (!Notification.isSupported()) return;
   void readDesktopPreferences().then((preferences) => {
     if (!preferences.notifications) return;
-    new Notification({ title, body }).show();
+    const notification = new Notification({ title, body });
+    if (onClick) notification.on("click", onClick);
+    notification.show();
   });
+}
+
+function isMainWindowInBackground() {
+  return (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    !mainWindow.isVisible() ||
+    !mainWindow.isFocused()
+  );
 }
 
 async function readUpdatePreferences(): Promise<UpdatePreferences> {
@@ -601,6 +613,7 @@ async function handleAvailableUpdate(version: string) {
   const preferences = await readUpdatePreferences();
   const manualCheck = manualUpdateCheckRequested;
   manualUpdateCheckRequested = false;
+  suppressNextUpdateNotification = manualCheck;
   const skipped = preferences.skippedVersion === version;
   const reminded =
     typeof preferences.remindUntil === "number" &&
@@ -795,13 +808,13 @@ async function showUpdateConfirmation() {
   });
 }
 
-async function showUpdateDialog(version: string) {
-  if (promptedUpdateVersion === version) return;
-  promptedUpdateVersion = version;
+async function showUpdateDialog(version: string, force = false) {
   if (updateAvailableWindow && !updateAvailableWindow.isDestroyed()) {
     updateAvailableWindow.focus();
     return;
   }
+  if (!force && promptedUpdateVersion === version) return;
+  promptedUpdateVersion = version;
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
@@ -1277,10 +1290,11 @@ if (!hasLock) {
   app.quit();
 } else {
   app.on("second-instance", (_event, commandLine) => {
-    void sendDeepLink(
-      commandLine.find((value) => value.startsWith(`${DESKTOP_PROTOCOL}://`)) ??
-        "",
+    focusMainWindow();
+    const deepLink = commandLine.find((value) =>
+      value.startsWith(`${DESKTOP_PROTOCOL}://`),
     );
+    if (deepLink) void sendDeepLink(deepLink);
   });
   app.on("open-url", (event, url) => {
     event.preventDefault();
@@ -1313,20 +1327,30 @@ if (!hasLock) {
         closeUpdateCheckWindow();
       }
       if (status.state === "available") {
-        notifyDesktop(
-          `${DESKTOP_APP_NAME} update available`,
-          `Version ${status.version} is ready to download.`,
-        );
+        const manualCheck = manualUpdateCheckRequested;
+        if (!manualCheck && isMainWindowInBackground()) {
+          notifyDesktop(
+            `${DESKTOP_APP_NAME} update available`,
+            `Version ${status.version} is ready to download.`,
+            () => void showUpdateDialog(status.version, true),
+          );
+        }
         void handleAvailableUpdate(status.version);
         return;
       }
       if (status.state === "downloaded") {
-        notifyDesktop(
-          `${DESKTOP_APP_NAME} update ready`,
-          `Version ${status.version} will be installed when you restart.`,
-        );
-      } else if (status.state === "error") {
-        notifyDesktop(`${DESKTOP_APP_NAME} update failed`, status.message);
+        const suppressNotification = suppressNextUpdateNotification;
+        suppressNextUpdateNotification = false;
+        if (!suppressNotification && isMainWindowInBackground()) {
+          notifyDesktop(
+            `${DESKTOP_APP_NAME} update ready`,
+            `Version ${status.version} will be installed when you restart.`,
+            () => void showUpdateConfirmation(),
+          );
+        }
+      } else if (status.state === "not-available" || status.state === "error") {
+        manualUpdateCheckRequested = false;
+        suppressNextUpdateNotification = false;
       }
       sendUpdateStatus(status);
     });

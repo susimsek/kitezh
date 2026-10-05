@@ -70,6 +70,19 @@
       "description": "Kitezh’in başlatılma, bildirim ve güncelleme davranışını yönetin. Güncellemeleri Kitezh uygulama menüsünden denetleyin.",
       "loading": "Masaüstü ayarları yükleniyor",
       "error": "Masaüstü ayarları kaydedilemedi.",
+      "navigation": "Ayar bölümleri",
+      "sections": {
+        "general": "Genel",
+        "notifications": "Bildirimler",
+        "appearance": "Görünüm",
+        "updates": "Güncellemeler"
+      },
+      "sectionDescriptions": {
+        "general": "Kitezh’in nasıl başlayacağını ve hızlıca nasıl açılacağını yönetin.",
+        "notifications": "Kitezh’in masaüstü bildirimleri gösterip göstermeyeceğini seçin.",
+        "appearance": "Masaüstü uygulamasında kullanılacak temayı seçin.",
+        "updates": "Kitezh’in uygulama güncellemelerini nasıl indirip kuracağını yönetin."
+      },
       "launchAtLogin": "Kitezh’i oturum açıldığında başlat",
       "launchAtLoginDescription": "Bilgisayarınızda oturum açtığınızda Kitezh’i otomatik olarak açar.",
       "notifications": "Masaüstü bildirimlerini göster",
@@ -78,6 +91,8 @@
       "automaticUpdatesDescription": "Güncellemeleri arka planda indirir ve Kitezh yeniden başladığında kurar.",
       "globalShortcut": "Hızlı erişim kısayolu",
       "globalShortcutDescription": "Bu kısayola her yerden basarak Kitezh’i gösterin veya gizleyin.",
+      "theme": "Uygulama teması",
+      "updateCheckDescription": "Güncellemeleri elle denetlemek için uygulama menüsünden Kitezh → Güncellemeleri denetle… seçeneğini kullanın.",
       "done": "Bitti"
     }
   },
