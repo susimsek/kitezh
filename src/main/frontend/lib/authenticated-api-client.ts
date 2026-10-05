@@ -1,4 +1,5 @@
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
+import { apiUrl, assertDesktopOnline } from "./desktop-api";
 
 export type TokenHandlers = {
   refresh: () => Promise<string | null>;
@@ -16,7 +17,7 @@ type PageMetadata = {
 
 export function createAuthenticatedApiClient() {
   let tokenHandlers: TokenHandlers | undefined;
-  const client = axios.create({ validateStatus: () => true });
+  const client = axios.create({ baseURL: apiUrl("/"), validateStatus: () => true });
 
   client.interceptors.response.use(async (response) => {
     response.data = normalizePageResponse(response.data);
@@ -41,6 +42,11 @@ export function createAuthenticatedApiClient() {
       tokenHandlers = handlers;
     },
     request<T>(accessToken: string, config: AxiosRequestConfig) {
+      try {
+        assertDesktopOnline(config.method);
+      } catch (error) {
+        return Promise.reject(error);
+      }
       return client.request<T>({
         ...config,
         headers: {

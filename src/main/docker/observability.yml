@@ -1,0 +1,31 @@
+# Dev purpose only. DO NOT use in production.
+name: kitezh
+
+services:
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.34.0
+    environment:
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh.json
+      PROMETHEUS_EXTRA_ARGS: --rule.file=/otel-lgtm/kitezh-alerts.yml
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./observability/grafana/kitezh.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh.json:ro
+      - ./observability/grafana/dashboards-provisioning.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro
+      - ./observability/prometheus/alerts.yml:/otel-lgtm/kitezh-alerts.yml:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'test -f /tmp/ready']
+      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # Persistence is disabled by default for this development stack.
+    # Uncomment this mount and the top-level volume declaration below when needed.
+    # volumes:
+    #   - otel-lgtm-data:/data
+
+# Uncomment together with the service mount above to persist local telemetry data.
+# volumes:
+#   otel-lgtm-data:

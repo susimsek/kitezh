@@ -29,6 +29,7 @@ jest.mock("@/lib/account-api", () => ({
 jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
   usePathname: () => pathname,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: jest.fn() }),
 }));
 jest.mock("./AccountAuthProvider", () => ({ useAccountAuth: () => auth }));

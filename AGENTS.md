@@ -1,6 +1,6 @@
 # AI Agent Guidelines
 
-This repo is a Java 25 + Spring Boot 4.1 sample application for the Authorization Server support integrated into **Spring Security 7**. It uses Spring Security 7 Authorization Server, Spring Data JPA, H2, PostgreSQL, Liquibase XML changelogs, Lombok, Caffeine/JCache, Spotless, Checkstyle, Sonar, JaCoCo, Helm, Terraform, Docker Compose, and GraalVM Native Image support.
+This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Server support integrated into **Spring Security 7**. It uses Spring Security 7 Authorization Server, Spring Data JPA, H2, PostgreSQL, Liquibase XML changelogs, Lombok, Caffeine/JCache, Spotless, Checkstyle, Sonar, JaCoCo, Helm, Terraform, Docker Compose, and GraalVM Native Image support.
 
 ## Table of Contents
 
@@ -20,6 +20,11 @@ This repo is a Java 25 + Spring Boot 4.1 sample application for the Authorizatio
 ## Agent MCP Usage Guidelines
 
 - Use Context7 when library/API documentation is needed for Spring Boot, Spring Security 7 Authorization Server, Spring Data JPA, Hibernate, Liquibase, Maven plugins, Helm, Terraform, or related setup/configuration details.
+- Use the official Grafana MCP server (`mcp-grafana`) for Grafana Cloud observability work, including dashboards, metrics, logs, traces, and alerts. Connect it to the configured Grafana Cloud stack through `GRAFANA_URL` and a Viewer-scoped `GRAFANA_SERVICE_ACCOUNT_TOKEN`.
+- Use the official SonarQube MCP server for SonarCloud quality gates, issues, coverage, code smells, and security findings. Run it locally over STDIO from the standalone Java 21+ JAR with `SONARQUBE_READ_ONLY=true`; do not depend on Podman or another container runtime for the local MCP connection.
+- Use the GitHub MCP server for repository, branch, commit, pull request, issue, and workflow operations through the configured GitHub MCP endpoint. Authenticate with `GITHUB_PAT_TOKEN` and keep the token in local Codex or environment configuration only.
+- Keep Grafana MCP credentials in the local Codex or environment configuration only; never commit service-account tokens or other Grafana credentials to this repository, Docker Compose files, Helm values, or documentation.
+- Keep SonarQube MCP credentials in the local Codex or environment configuration only; never commit SonarQube tokens to this repository, Docker Compose files, Helm values, or documentation.
 - Prefer official documentation or primary sources for framework behavior.
 
 ## Quick Reference
@@ -62,7 +67,7 @@ This repo is a Java 25 + Spring Boot 4.1 sample application for the Authorizatio
   - `routing/AppRoutes.tsx` and `components/account`: end-user Account Console routes and UI.
   - `lib/console-auth.ts`: shared browser OIDC Authorization Code + PKCE, refresh-token, and logout adapter.
 
-- Application root: `src/main/java/io/github/susimsek/springauthserversamples`
+- Application root: `src/main/java/io/github/susimsek/kitezh`
   - `config`: Spring configuration
     - `aot`: GraalVM Native Image runtime hints (`NativeRuntimeHints`)
     - `cache`: Spring Cache and Hibernate second-level cache configuration
@@ -70,7 +75,7 @@ This repo is a Java 25 + Spring Boot 4.1 sample application for the Authorizatio
   - `domain`: JPA entities (`UserEntity`, `AuthorityEntity`) and auditing base class
   - `repository`: Spring Data JPA repositories
   - `security`: authority constants, user-details service, and security utilities
-  - `web`: sample landing endpoint
+  - `web`: landing endpoint
 - Application config: `src/main/resources/config/application.yml`
 - Liquibase:
   - Master: `src/main/resources/db/changelog/db.changelog-master.xml`
@@ -83,10 +88,10 @@ This repo is a Java 25 + Spring Boot 4.1 sample application for the Authorizatio
   - Runtime hints: `src/main/java/.../config/aot/NativeRuntimeHints.java`
   - Resource-based GraalVM config: `src/main/resources/META-INF/native-image/**`
 - Docker compose: `src/main/docker/*.yml`
-- Helm chart: `helm/spring-authorization-server-samples`
+- Helm chart: `helm/kitezh`
 - Terraform local infrastructure: `terraform`
 - Tests: `src/test/java`
-  - Unit and integration tests: `src/test/java/io/github/susimsek/springauthserversamples`
+  - Unit and integration tests: `src/test/java/io/github/susimsek/kitezh`
   - Gatling performance tests: `src/test/java/gatling/simulations`
 
 ## Code Style and Quality Gates
@@ -272,7 +277,7 @@ curl http://localhost:9090/actuator/health/readiness
 - The Admin Console requests `admin-api`; its APIs additionally require the relevant administrative authority. The Account Console requests `account-api`; `admin/admin` and `user/user` can use it.
 - The issuer is configured via `app.authorization-server.issuer`.
 - Client secrets are stored as BCrypt hashes in Liquibase seed data.
-- The sample enables OpenID Connect 1.0.
+- The application enables OpenID Connect 1.0.
 - Exactly one `oauth2_key` row must be active; inactive rows are published as public-only verification keys.
 
 ## Development Guidelines
@@ -285,7 +290,7 @@ curl http://localhost:9090/actuator/health/readiness
 
 ### Validation
 
-- This sample does not use the gRPC Protovalidate layer from the original project.
+- This application does not use the gRPC Protovalidate layer from the original project.
 - Validate every application request DTO with Jakarta Bean Validation and `@Valid`/`@Validated` at the controller boundary; do not rely on service-layer checks alone.
 - Put constraints on the DTO field that owns the rule, including nullability, blank values, length, format, ranges, collection size, and cross-field rules where applicable.
 - Use validation groups only when create/update semantics genuinely differ, and keep group selection explicit in the controller.
@@ -300,6 +305,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Keep `@Schema` requiredness aligned with Bean Validation and actual runtime behavior; do not mark optional or nullable fields as required in OpenAPI.
 - Document every controller operation with `@Operation`, relevant `@ApiResponse` entries, request/response schemas, representative examples, parameters, and `@SecurityRequirement`. Keep documentation on the controller contract, not in generated or ad hoc code.
 - Use MapStruct mappers for entity-to-DTO, DTO-to-entity, and update mappings where a mapper exists or the mapping is non-trivial. Keep mapping orchestration out of controllers and avoid duplicating mapping logic in services.
+- MapStruct mappers use Spring component injection. Do not call `Mappers.getMapper(...)` from `src/main`; inject the mapper interface into production services so native images do not require reflection for mapper construction. Unit tests may use `Mappers.getMapper(...)` when a Spring context is not available.
 - Place mapper interfaces under `mapper`, define explicit null/ignore behavior for partial updates, and add mapper tests when mappings contain derived fields, nested data, or security-sensitive values.
 - Keep OpenAPI examples valid against the DTO constraints and current endpoint behavior; update documentation and tests together when a contract changes.
 
@@ -318,10 +324,12 @@ curl http://localhost:9090/actuator/health/readiness
 
 ### Error Handling and i18n
 
-- Centralized domain exception handling is currently minimal compared to the original gRPC sample.
+- Centralized domain exception handling is currently minimal compared to the original gRPC project.
 - Keep default messages in `messages.properties`; add Turkish translations in `messages_tr.properties`.
 - Avoid adding custom exception layers unless they serve application-specific behavior that Spring Authorization Server does not already provide.
 - In Java source, use imports and simple class names for application types. Keep fully qualified names only where a string value, logger/configuration key, reflection metadata, or another framework contract explicitly requires the name.
+- Use Lombok `@RequiredArgsConstructor` for constructor injection in application components. Keep dependencies in `final` fields and avoid hand-written constructor-injection boilerplate unless the constructor has behavior that cannot be expressed by Lombok.
+- Application services under `src/main/java` must not declare manual constructors; use Lombok-generated constructor injection. Test sources may keep explicit constructors or factory helpers when they make isolated setup clearer.
 
 ### Transaction Management
 
@@ -349,7 +357,7 @@ curl http://localhost:9090/actuator/health/readiness
 
 ### Social login
 
-- Social login is implemented with Spring Security OAuth2 Client and is disabled by default. Enable it with `APP_SOCIAL_LOGIN_ENABLED=true` and provide provider credentials through `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`, `LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET`, or `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`.
+- Social login is implemented with Spring Security OAuth2 Client. Provider enablement, Client IDs, and Client Secrets are managed from the Administration Console and persisted in the database, matching Keycloak’s identity-provider model. Do not add provider credential fallbacks to application YAML or environment variables. Keep `SOCIAL_LOGIN_ENCRYPTION_KEY` stable across restarts and deployments so encrypted provider secrets remain readable.
 - Supported registrations are `google`, `github`, `linkedin`, and `microsoft`. Their callback URI is `http://localhost:9090/login/oauth2/code/{registrationId}` in local development; each provider application must register its exact callback URI.
 - The login page obtains configured registrations from `GET /api/auth/social-providers` and starts the standard `/oauth2/authorization/{registrationId}` flow. It must keep the existing label, disable duplicate clicks, and show an inline spinner while redirecting.
 - A successful provider response is converted into a local session authentication. `SocialLoginService` stores a unique `(provider, subject)` link in `social_identities`, creates the local `UserEntity` on first login, and assigns only `ROLE_USER`. The local username is a deterministic provider/subject-derived value; provider email and profile names are imported when present.
@@ -360,7 +368,7 @@ curl http://localhost:9090/actuator/health/readiness
 ### Keycloak parity review
 
 - The implementation follows Keycloak’s identity-broker model for provider-specific subject links, first-login local-user creation, profile import, local session establishment, and provider callback flows.
-- When an unlinked social identity reports an email already owned locally, the sample follows the safe part of Keycloak’s First Broker Login behavior: it returns `account_link_required`, keeps only the verified provider subject in the server session, and requires local authentication before linking. Authenticated users can also start linking from the Account Console security page. It does not enable Keycloak’s deliberately unsafe automatic-linking variant.
+- When an unlinked social identity reports an email already owned locally, the application follows the safe part of Keycloak’s First Broker Login behavior: it returns `account_link_required`, keeps only the verified provider subject in the server session, and requires local authentication before linking. Authenticated users can also start linking from the Account Console security page. It does not enable Keycloak’s deliberately unsafe automatic-linking variant.
 - The implementation is intentionally limited to Google, GitHub, LinkedIn, and Microsoft. Additional Keycloak providers or arbitrary OIDC/SAML providers should be added through a focused registration/configuration change, not by accepting provider URLs from user input.
 
 ### Database and Liquibase
@@ -371,7 +379,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Registered client seed data lives in CSV and must stay aligned with `RegisteredClientEntity`, `RegisteredClientMapper`, and Spring Authorization Server's registered-client model.
 - For DB changes: add a new Liquibase XML changelog and include it from `db/changelog/db.changelog-master.xml`.
 - Social provider links are persisted in `social_identities`; keep the `(provider, subject)` unique constraint and cascading `user_id` foreign key aligned with `SocialIdentityEntity` and `SocialLoginService`.
-- Do not modify existing changelogs that have already been applied unless this is still local sample bootstrap work and no migration history needs preservation.
+- Do not modify existing changelogs that have already been applied unless this is still local application bootstrap work and no migration history needs preservation.
 - This repository is a demo bootstrap: do not use Liquibase `update`, `alter`, or follow-up seed correction changesets for schema or initial data changes. Put the final columns, constraints, and initial rows in the create changelog and its first seed CSV; keep related seed data in the existing feature CSV instead of adding separate correction files.
 - Hibernate second-level cache uses JCache backed by Caffeine. Cache regions are configured in `config/cache/CacheConfig`.
 - Every entity annotated with `@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)` must have a matching `Entity.class.getName()` region registered in `CacheConfig`; add the region and a focused `CacheConfigTest` assertion in the same change.
@@ -388,7 +396,7 @@ curl http://localhost:9090/actuator/health/readiness
 - Keep changes focused; avoid drive-by refactors in the same PR.
 - Prefer small, logically grouped commits; avoid `WIP` or noisy fixup commits.
 - Do not commit local generated output such as `target/`.
-- Do not commit secrets. The sample credentials are for local development only.
+- Do not commit secrets. The local development credentials are for local development only.
 - Before opening a PR: apply formatting and run tests (`./mvnw spotless:apply` and `./mvnw test`).
 - Use **Conventional Commits**:
   - `feat`: new feature
@@ -420,11 +428,11 @@ curl http://localhost:9090/actuator/health/readiness
 
 ## Common Mistakes to Avoid
 
-- Reintroducing gRPC-specific assumptions into this HTTP/OAuth2 sample.
+- Reintroducing gRPC-specific assumptions into this HTTP/OAuth2 application.
 - Moving registered client seed logic back into runtime Java code instead of Liquibase.
 - Editing build output under `target/`.
 - Forgetting to run `./mvnw spotless:apply` before committing.
-- Forgetting that port `9090` is now the sample’s default HTTP port.
+- Forgetting that port `9090` is now the application’s default HTTP port.
 - Changing `oauth2_registered_client` seed structure without checking `RegisteredClientEntity`, mapper behavior, and Spring Security's `RegisteredClient` model.
 - Adding new Liquibase resources or native-sensitive framework usage without updating runtime hints where needed.
 

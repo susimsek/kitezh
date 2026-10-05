@@ -1,11 +1,132 @@
 {
   "brand": {
-    "product": "Authorization Server",
+    "product": "Kitezh",
     "framework": "Spring Security",
     "description": "Secure OAuth 2.0 and OpenID Connect authorization."
   },
+  "home": {
+    "eyebrow": "Authorization for modern applications",
+    "title": "Secure identity for modern applications.",
+    "subtitle": "A standards-based identity platform for secure sign-in, authorization, and consent across browser and desktop applications.",
+    "download": "Download the application",
+    "signIn": "Open the sign-in page",
+    "openSource": "Open source and ready for local development.",
+    "features": {
+      "title": "Everything you need to get started",
+      "subtitle": "Use the same authorization server across browser and desktop clients.",
+      "security": {
+        "title": "Secure by default",
+        "description": "PKCE, OpenID Connect, passkeys, MFA, and session controls are built into Kitezh."
+      },
+      "protocols": {
+        "title": "OAuth 2.0 and OIDC",
+        "description": "Issue, introspect, revoke, and refresh tokens with standards-based endpoints."
+      },
+      "consoles": {
+        "title": "Admin and Account Consoles",
+        "description": "Manage users, clients, roles, groups, profile settings, and account security."
+      }
+    },
+    "footer": {
+      "description": "A secure foundation for authentication, authorization, and identity across modern applications.",
+      "product": "Product",
+      "signIn": "Sign in",
+      "download": "Download",
+      "resources": "Resources",
+      "documentation": "Documentation",
+      "releases": "Releases",
+      "project": "Project",
+      "sourceCode": "Source code",
+      "license": "Apache License 2.0",
+      "security": "Security",
+      "copyright": "{product} · Open source software."
+    }
+  },
+  "desktop": {
+    "signInUnavailable": "Secure sign-in is currently unavailable. Check your connection and try again.",
+    "signInTitle": "Sign in to the desktop app",
+    "signInDescription": "Continue securely in your default browser.",
+    "signInWithBrowser": "Sign in with browser",
+    "browserSignInHint": "Your password stays in the browser and is never stored by the desktop app.",
+    "chooseConsoleEyebrow": "Continue securely",
+    "chooseConsoleTitle": "Choose a console",
+    "chooseConsoleDescription": "Select where you want to continue.",
+    "adminConsole": "Sign in to Admin Console",
+    "adminConsoleDescription": "Administration and access control.",
+    "accountConsole": "Sign in to Account Console",
+    "accountConsoleDescription": "Profile and account settings.",
+    "updateChecking": "Checking for updates…",
+    "updateButton": "Update",
+    "updateAvailable": "Version {version} is available.",
+    "updateDownload": "Download update",
+    "updateDownloading": "Downloading update ({percent}%).",
+    "updateReady": "Version {version} is ready to install.",
+    "updateRestart": "Restart and install",
+    "updateError": "The desktop update could not be completed. Your current version is still available.",
+    "updateRecovered": "The update did not start cleanly. The current installation is still active ({version}).",
+    "settings": {
+      "eyebrow": "Desktop preferences",
+      "title": "Kitezh settings",
+      "description": "Control how Kitezh starts, notifies you, and receives updates. Check for updates from the Kitezh app menu.",
+      "loading": "Loading desktop settings",
+      "error": "Desktop settings could not be saved.",
+      "launchAtLogin": "Launch Kitezh at login",
+      "launchAtLoginDescription": "Open Kitezh automatically when you sign in to your computer.",
+      "notifications": "Show desktop notifications",
+      "notificationsDescription": "Show update and background-operation notifications from Kitezh.",
+      "automaticUpdates": "Automatically download and install updates",
+      "automaticUpdatesDescription": "Download updates in the background and install them when Kitezh restarts.",
+      "globalShortcut": "Quick access shortcut",
+      "globalShortcutDescription": "Press this shortcut anywhere to show or hide Kitezh.",
+      "done": "Done"
+    }
+  },
   "navbar": {
-    "language": "Language"
+    "language": "Language",
+    "download": "Download"
+  },
+  "download": {
+    "eyebrow": "Desktop application",
+    "title": "Download the application",
+    "subtitle": "Choose the package for your operating system and start securely.",
+    "loading": "Loading available packages...",
+    "loadError": "Available packages could not be loaded.",
+    "windows": {
+      "title": "Windows",
+      "description": "Installer, portable, and AppX packages for 64-bit Windows.",
+      "architecture": "x64",
+      "assets": {
+        "installer": "Installer",
+        "portable": "Portable",
+        "appx": "Microsoft Store package"
+      }
+    },
+    "linux": {
+      "title": "Linux",
+      "description": "Packages for x86_64 and ARM64 Linux systems.",
+      "architectures": {
+        "x64": "x86_64",
+        "arm64": "ARM64"
+      },
+      "assets": {
+        "appImage": "AppImage",
+        "deb": "Debian package",
+        "rpm": "RPM package",
+        "snap": "Snap package"
+      }
+    },
+    "macos": {
+      "title": "macOS",
+      "description": "Universal and Intel disk images for macOS.",
+      "architecture": "Disk images",
+      "assets": {
+        "universal": "Universal",
+        "intel": "Intel"
+      }
+    },
+    "checksums": "Verify your download with the published SHA-256 checksums.",
+    "downloadChecksums": "SHA-256 checksums",
+    "releaseNotes": "View release notes"
   },
   "login": {
     "eyebrow": "Welcome back",
@@ -247,6 +368,18 @@
   "admin": {
     "product": "Admin Console",
     "manage": "Manage",
+    "globalSearch": {
+      "placeholder": "Search administration",
+      "ariaLabel": "Search administration resources",
+      "loading": "Searching…",
+      "noResults": "No matching resources found.",
+      "types": {
+        "user": "Users",
+        "client": "Clients",
+        "role": "Roles",
+        "group": "Groups"
+      }
+    },
     "nav": {
       "dashboard": "Dashboard",
       "clients": "Clients",
@@ -691,8 +824,27 @@
         "userProfile": "User profile",
         "localization": "Localization",
         "cibaPolicy": "CIBA policy",
-        "offlineAccess": "Offline access"
+        "offlineAccess": "Offline access",
+        "branding": "Branding"
       }
+    },
+    "branding": {
+      "title": "Branding",
+      "subtitle": "Manage the application name and the static assets used across the login and console screens.",
+      "applicationName": "Application name",
+      "applicationNameHint": "This name is shown in the login, Administration Console and Account Console headers.",
+      "primaryColor": "Primary color",
+      "accentColor": "Accent color",
+      "backgroundColor": "Background color",
+      "previewTitle": "Brand preview",
+      "previewSubtitle": "Logo and icon files remain static assets; colors and the application name are stored as branding settings.",
+      "logoPath": "Logo path",
+      "faviconPath": "Favicon path",
+      "appleTouchIconPath": "Apple touch icon path",
+      "save": "Save branding",
+      "saved": "Branding settings saved.",
+      "loading": "Loading branding settings…",
+      "error": "Branding settings could not be loaded or saved."
     },
     "offlineAccess": {
       "title": "Offline access policy",

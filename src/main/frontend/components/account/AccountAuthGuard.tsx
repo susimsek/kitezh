@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "@/routing/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { Alert } from "react-bootstrap";
+import { usePathname, useRouter, useSearchParams } from "@/routing/navigation";
 
 import type { Locale } from "@/i18n/config";
+import { useDictionary } from "@/i18n/client";
 import { accountRequest, registerAccountTokenHandlers } from "@/lib/account-api";
 import {
   isCanceledRequest,
   useConsoleSessionLifecycle,
 } from "@/components/auth/useConsoleSessionLifecycle";
+import { DesktopSignInScreen } from "@/components/shared/DesktopSignInScreen";
+import { isDesktopRuntime } from "@/lib/desktop-api";
 import { useAccountAuth } from "./AccountAuthProvider";
 
 type Profile = { username: string };
@@ -23,7 +27,10 @@ export function AccountAuthGuard({
   callbackContent?: React.ReactNode;
 }) {
   const [authorized, setAuthorized] = useState(false);
+  const [desktopSignInPending, setDesktopSignInPending] = useState(false);
+  const dictionary = useDictionary();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const {
     accessToken,
@@ -35,8 +42,9 @@ export function AccountAuthGuard({
     setUsername,
   } = useAccountAuth();
   const callback = pathname.replace(/\/+$/, "").endsWith("/callback");
+  const desktopSignInRequested = searchParams.get("desktopSignIn") === "1";
 
-  const startLogin = useConsoleSessionLifecycle({
+  const { startAuthorization: startLogin, authorizationError } = useConsoleSessionLifecycle({
     accessToken,
     beginAuthorization,
     expiresAt,
@@ -45,10 +53,18 @@ export function AccountAuthGuard({
     refreshAccessToken,
     registerTokenHandlers: registerAccountTokenHandlers,
   });
+  const isDesktopSignInPending =
+    desktopSignInPending || (desktopSignInRequested && !accessToken && !authorizationError);
 
   useEffect(() => {
     if (!initialized || isLoggingOut || callback) return;
     if (!accessToken) {
+      if (isDesktopRuntime()) {
+        if (desktopSignInRequested) {
+          void startLogin(true);
+        }
+        return;
+      }
       startLogin();
       return;
     }
@@ -79,13 +95,49 @@ export function AccountAuthGuard({
     router,
     startLogin,
     setUsername,
+    desktopSignInRequested,
   ]);
 
+  const signInWithBrowser = useCallback(async () => {
+    setDesktopSignInPending(true);
+    await startLogin(true);
+    setDesktopSignInPending(false);
+  }, [startLogin]);
+
   if (callback) return callbackContent ?? children;
-  if (!initialized || !authorized || !accessToken) {
+  if (!initialized || isLoggingOut) {
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary">
-        <div className="spinner-border text-primary" role="status" />
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">{dictionary.account.common.loading}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDesktopRuntime() && !authorized && !accessToken) {
+    return (
+      <DesktopSignInScreen
+        dictionary={dictionary}
+        error={authorizationError}
+        onSignIn={signInWithBrowser}
+        pending={isDesktopSignInPending}
+      />
+    );
+  }
+
+  if (!authorized || !accessToken) {
+    return (
+      <div className="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary">
+        {authorizationError ? (
+          <Alert variant="danger" className="m-3">
+            {dictionary.desktop.signInUnavailable}
+          </Alert>
+        ) : (
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">{dictionary.account.common.loading}</span>
+          </div>
+        )}
       </div>
     );
   }

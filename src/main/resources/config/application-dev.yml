@@ -12,7 +12,7 @@ spring:
     compose:
       enabled: false
   datasource:
-    url: jdbc:h2:mem:authserversamples;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:kitezh;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
     password:
   jpa:
@@ -34,6 +34,11 @@ app:
       ttl: PT1H
       initial-capacity: 50
       maximum-size: 100
+      overrides:
+        desktopLatestRelease:
+          ttl: PT15M
+          initial-capacity: 1
+          maximum-size: 1
   authorization-server:
     issuer: http://localhost:9090
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
@@ -42,4 +47,4 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: DEBUG
-    io.github.susimsek.springauthserversamples: DEBUG
+    io.github.susimsek.kitezh: DEBUG

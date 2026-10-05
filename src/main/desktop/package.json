@@ -1,0 +1,106 @@
+{
+  "name": "kitezh-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Electron desktop console for Kitezh",
+  "author": "Kitezh",
+  "homepage": "https://github.com/susimsek/kitezh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/susimsek/kitezh.git"
+  },
+  "main": "dist/main.js",
+  "type": "commonjs",
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "build:renderer": "node scripts/build-renderer.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:main": "tsc -p tsconfig.json",
+    "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",
+    "test": "pnpm run test:unit",
+    "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
+    "build": "pnpm run build:renderer && tsc -p tsconfig.json",
+    "start": "node scripts/run-desktop.mjs production",
+    "dev": "node scripts/run-desktop.mjs local",
+    "package": "pnpm run build && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "playwright-core": "1.63.0",
+    "typescript": "5.9.2"
+  },
+  "build": {
+    "appId": "io.github.susimsek.kitezh.desktop",
+    "productName": "Kitezh",
+    "copyright": "Copyright © 2026 Kitezh",
+    "directories": {
+      "output": "release"
+    },
+    "icon": "assets/icon.png",
+    "files": [
+      "dist/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "protocols": [
+      {
+        "name": "Kitezh OAuth callback",
+        "schemes": [
+          "kitezh"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "artifactName": "kitezh-${version}-macos-${arch}.${ext}",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "artifactName": "kitezh-${version}-linux-${arch}.${ext}",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm",
+        "snap"
+      ]
+    },
+    "win": {
+      "artifactName": "kitezh-${version}-win-${arch}-setup.${ext}",
+      "target": [
+        "nsis",
+        "portable",
+        "appx"
+      ]
+    },
+    "portable": {
+      "artifactName": "kitezh-${version}-win-${arch}-portable.${ext}"
+    },
+    "appx": {
+      "applicationId": "KitezhDesktop",
+      "artifactName": "kitezh-${version}-win-${arch}-appx.${ext}",
+      "publisherDisplayName": "Kitezh"
+    },
+    "snapcraft": {
+      "base": "core22",
+      "core22": {
+        "confinement": "strict"
+      }
+    }
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "susimsek",
+    "repo": "kitezh",
+    "releaseType": "release"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  }
+}

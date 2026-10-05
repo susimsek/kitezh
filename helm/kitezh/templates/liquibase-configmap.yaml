@@ -1,0 +1,23 @@
+{{- if .Values.initContainers.liquibase.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kitezh.fullname" . }}-liquibase
+  labels:
+    {{ include "kitezh.labels" . | nindent 4 }}
+data:
+  db.changelog-master.xml: |-
+{{ .Files.Get "db/changelog/db.changelog-master.xml" | indent 4 }}
+{{- range $path, $_ := .Files.Glob "db/changelog/changes/*.xml" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- range $path, $_ := .Files.Glob "db/data/*.csv" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+binaryData:
+{{- range $path, $_ := .Files.Glob "db/data/blob/*" }}
+  {{ base $path }}: {{ $.Files.Get $path | b64enc | quote }}
+{{- end }}
+{{- end }}

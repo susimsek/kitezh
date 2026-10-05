@@ -429,7 +429,7 @@ export function AccountProfileForm({ dictionary }: { dictionary: Dictionary }) {
         <Form onSubmit={submit} noValidate>
           <Row className="g-4">
             <Col xs={12}>
-              <div className="d-flex align-items-center gap-3 pb-3 border-bottom">
+              <div className="account-avatar-row d-flex align-items-center gap-3 pb-3 border-bottom">
                 {avatarUrl ? (
                   <Image
                     alt=""
@@ -673,7 +673,7 @@ export function AccountProfileForm({ dictionary }: { dictionary: Dictionary }) {
             <Button
               type="submit"
               disabled={!isDirty || isSubmitting || profileUpdating}
-              data-cy="save-profile"
+              data-testid="save-profile"
             >
               {isSubmitting || profileUpdating ? (
                 <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />

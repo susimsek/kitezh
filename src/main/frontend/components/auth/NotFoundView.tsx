@@ -10,7 +10,7 @@ import { Icon } from "@/components/shared/Icon";
 export function NotFoundView() {
   const { t } = useTranslation("common");
   return (
-    <Card className="border-0 shadow-sm text-center" data-cy="not-found">
+    <Card className="border-0 shadow-sm text-center" data-testid="not-found">
       <Card.Body className="p-4 p-md-5">
         <Icon icon="compass" className="text-primary mb-3" size="3x" />
         <div className="display-1 fw-bold text-primary" aria-hidden="true">

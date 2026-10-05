@@ -7,7 +7,7 @@ spring:
       profiles:
         active: prod
   datasource:
-    url: jdbc:postgresql://localhost:5432/authserversamples
+    url: jdbc:postgresql://localhost:5432/kitezh
     username: ${SPRING_DATASOURCE_USERNAME}
     hikari:
       maximum-pool-size: 10
@@ -18,6 +18,10 @@ spring:
       hibernate.format_sql: false
   liquibase:
     contexts: prod
+
+server:
+  compression:
+    enabled: true
 
 management:
   metrics:
@@ -30,6 +34,8 @@ management:
         http.server.requests: 250ms,1s,5s
 
 app:
+  desktop-release:
+    cache-ttl: PT15M
   social-login:
     encryption-key: demo-static-social-ciba-key-2026-change-me
   cache:
@@ -37,12 +43,17 @@ app:
       ttl: PT1H
       initial-capacity: 500
       maximum-size: 1000
+      overrides:
+        desktopLatestRelease:
+          ttl: PT15M
+          initial-capacity: 1
+          maximum-size: 1
   authorization-server:
-    issuer: ${APP_AUTHORIZATION_SERVER_ISSUER:https://spring-authorization-server-samples.local}
+    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.local}
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
 
 logging:
   level:
     root: INFO
     org.hibernate.SQL: INFO
-    io.github.susimsek.springauthserversamples: INFO
+    io.github.susimsek.kitezh: INFO

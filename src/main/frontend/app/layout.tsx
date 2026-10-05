@@ -4,13 +4,27 @@ import "./styles.css";
 import type { Metadata } from "next";
 
 import { StoreProvider } from "@/store/StoreProvider";
+import { BrandingProvider } from "@/components/auth/BrandingProvider";
 import { ThemeManager } from "@/components/auth/ThemeManager";
 import { loadIcons } from "@/lib/icon-loader";
 
 loadIcons();
 
 // Keep callback query parameters out of the browser's fallback document title.
-export const metadata: Metadata = { title: "Authorization Server" };
+export const metadata: Metadata = {
+  metadataBase: new URL("https://kitezh.onrender.com"),
+  title: "Kitezh",
+  description: "Kitezh identity and access platform",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    title: "Kitezh",
+    description: "Kitezh identity and access platform",
+  },
+};
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -20,8 +34,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body>
         <StoreProvider>
-          <ThemeManager />
-          {children}
+          <BrandingProvider>
+            <ThemeManager />
+            {children}
+          </BrandingProvider>
         </StoreProvider>
       </body>
     </html>

@@ -4,6 +4,8 @@ import type {
   ConsoleKind,
   StoredConsoleTokens,
 } from "./console-auth-types";
+import { isDesktopRuntime } from "./desktop-api";
+import { electronSessionAdapter } from "./electron-session-adapter";
 
 const TOKEN_STORAGE_PREFIX = "AUTH_CONSOLE_TOKEN";
 const CONSOLE_KINDS: ConsoleKind[] = ["admin", "account"];
@@ -112,12 +114,27 @@ export function readStoredTokens(consoleKind: ConsoleKind) {
   return null;
 }
 
+export async function readPersistedTokens(consoleKind: ConsoleKind) {
+  if (isDesktopRuntime() && window.desktopApi) {
+    return electronSessionAdapter.read(consoleKind);
+  }
+  return readStoredTokens(consoleKind);
+}
+
 export function storeTokens(consoleKind: ConsoleKind, tokens: StoredConsoleTokens) {
   try {
     localStorage.setItem(tokenStorageKey(consoleKind), JSON.stringify(tokens));
   } catch {
     // The running console keeps working when storage is unavailable.
   }
+}
+
+export async function persistTokens(consoleKind: ConsoleKind, tokens: StoredConsoleTokens) {
+  if (isDesktopRuntime() && window.desktopApi) {
+    await electronSessionAdapter.write(consoleKind, tokens);
+    return;
+  }
+  storeTokens(consoleKind, tokens);
 }
 
 export function removeStoredTokens(consoleKind: ConsoleKind) {
@@ -128,8 +145,24 @@ export function removeStoredTokens(consoleKind: ConsoleKind) {
   }
 }
 
+export async function removePersistedTokens(consoleKind: ConsoleKind) {
+  if (isDesktopRuntime() && window.desktopApi) {
+    await electronSessionAdapter.clear(consoleKind);
+    return;
+  }
+  removeStoredTokens(consoleKind);
+}
+
 export function removeAllStoredTokens() {
   CONSOLE_KINDS.forEach(removeStoredTokens);
+}
+
+export async function removeAllPersistedTokens() {
+  if (isDesktopRuntime() && window.desktopApi) {
+    await electronSessionAdapter.clearAll();
+    return;
+  }
+  removeAllStoredTokens();
 }
 
 function isTransactionStorageKey(key: string) {

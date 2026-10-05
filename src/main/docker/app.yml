@@ -1,14 +1,14 @@
 # Dev purpose only. DO NOT use in production.
-name: spring-authorization-server-samples
+name: kitezh
 services:
   app:
-    image: docker.io/suayb/spring-authorization-server-samples:latest-native
+    image: docker.io/suayb/kitezh:latest
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/authserversamples
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/kitezh
       - SPRING_DATASOURCE_USERNAME=appuser
       - SPRING_LIQUIBASE_ENABLED=false
-      - APP_AUTHORIZATION_SERVER_ISSUER=http://127.0.0.1:9090
+      - APP_AUTHORIZATIONSERVER_ISSUER=http://127.0.0.1:9090
     ports:
       - "127.0.0.1:9090:9090"
     depends_on:
@@ -23,7 +23,7 @@ services:
       postgresql:
         condition: service_healthy
     environment:
-      - LIQUIBASE_COMMAND_URL=jdbc:postgresql://postgresql:5432/authserversamples
+      - LIQUIBASE_COMMAND_URL=jdbc:postgresql://postgresql:5432/kitezh
       - LIQUIBASE_COMMAND_USERNAME=appuser
       - LIQUIBASE_COMMAND_CHANGELOG_FILE=db/changelog/db.changelog-master.xml
     volumes:

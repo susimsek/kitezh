@@ -13,7 +13,7 @@ spring:
     console:
       enabled: false
   application:
-    name: spring-authorization-server-samples
+    name: kitezh
   web:
     locale: en
   servlet:
@@ -22,6 +22,8 @@ spring:
       max-request-size: 2MB
   messages:
     basename: i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
   profiles:
     active: '@spring.profiles.active@'
   docker:
@@ -32,6 +34,9 @@ spring:
     clients:
       connect-timeout: 2s
       read-timeout: 5s
+    serviceclient:
+      github-release:
+        base-url: https://api.github.com
   jpa:
     open-in-view: false
     properties:
@@ -54,7 +59,9 @@ spring:
   data:
     web:
       pageable:
+        default-page-size: 20
         max-page-size: 100
+        serialization-mode: VIA_DTO
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
 
@@ -74,14 +81,14 @@ logging:
       file: ${LOGGING_STRUCTURED_FORMAT_FILE:}
     ecs:
       service:
-        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:spring-authorization-server-samples}
+        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:kitezh}
         environment: ${LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:dev}}
 
 management:
   opentelemetry:
     enabled: ${MANAGEMENT_OPENTELEMETRY_ENABLED:false}
     resource-attributes:
-      service.name: ${OTEL_SERVICE_NAME:spring-authorization-server-samples}
+      service.name: ${OTEL_SERVICE_NAME:kitezh}
       deployment.environment: ${SPRING_PROFILES_ACTIVE:dev}
     tracing:
       export:
@@ -138,6 +145,10 @@ management:
           include: readinessState,db
 
 app:
+  github-api:
+    token: ${GITHUB_API_TOKEN:}
+  desktop:
+    renderer-origin: ${APP_DESKTOP_RENDERER_ORIGIN:app://renderer}
   logging:
     file-enabled: ${APP_LOG_FILE_ENABLED:false}
     file-path: ${APP_LOG_FILE_PATH:logs/application.log}
@@ -169,28 +180,14 @@ app:
       file-path: ${APP_LOG_SERVER_FILE_PATH:logs/application-access.log}
   session:
     cleanup-cron: "0 * * * * *"
-  social-login:
-    enabled: ${APP_SOCIAL_LOGIN_ENABLED:false}
-    google:
-      client-id: ${GOOGLE_CLIENT_ID:}
-      client-secret: ${GOOGLE_CLIENT_SECRET:}
-    github:
-      client-id: ${GITHUB_CLIENT_ID:}
-      client-secret: ${GITHUB_CLIENT_SECRET:}
-    linkedin:
-      client-id: ${LINKEDIN_CLIENT_ID:}
-      client-secret: ${LINKEDIN_CLIENT_SECRET:}
-    microsoft:
-      client-id: ${MICROSOFT_CLIENT_ID:}
-      client-secret: ${MICROSOFT_CLIENT_SECRET:}
   authorization-server:
-    issuer: https://spring-authorization-server-samples.local
+    issuer: https://kitezh.local
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
   dpop:
     nonce-required: ${APP_DPOP_NONCE_REQUIRED:false}
     nonce-ttl: ${APP_DPOP_NONCE_TTL:PT5M}
   web-authn:
-    rp-name: Spring Authorization Server Samples
+    rp-name: Kitezh
     rp-id: ""
     allowed-origins: ""
     timeout-seconds: 300

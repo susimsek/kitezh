@@ -1,5 +1,5 @@
 # Dev purpose only. DO NOT use in production.
-name: spring-authorization-server-samples-openldap
+name: kitezh-openldap
 
 services:
   openldap:

@@ -23,7 +23,7 @@ These instructions apply to `src/main/frontend/**` and supplement the repository
 | Lint                 | `pnpm lint`                               |
 | Unit/component tests | `pnpm test:unit`                          |
 | Production build     | `pnpm build`                              |
-| Cypress E2E tests    | `pnpm test:e2e`                           |
+| Playwright E2E tests | `pnpm test:e2e`                           |
 
 ## Project Structure
 
@@ -35,7 +35,7 @@ These instructions apply to `src/main/frontend/**` and supplement the repository
 - `lib/admin-api.ts` and `lib/account-api.ts`: authenticated Administration and Account Console API clients.
 - `store/reducers.ts` and `store/*-slice.ts`: the JHipster-style root reducer registry for shared auth, locale, and theme state; page-scoped API data stays local to its feature.
 - `locales/en` and `locales/tr`: English and Turkish user-facing messages.
-- `cypress`: browser E2E specifications and support commands.
+- `e2e`: frontend browser E2E specifications and shared Playwright fixtures. Electron tests remain independently configured under `src/main/desktop/e2e`.
 
 ## Code Style and Quality Gates
 
@@ -50,13 +50,13 @@ These instructions apply to `src/main/frontend/**` and supplement the repository
 - Keep Jest tests close to the component or library behavior they cover and use the existing test naming conventions.
 - Test observable behavior: loading, successful state, empty state, validation, failed requests, authorization failures, and mutation feedback where relevant.
 - Social-login UI coverage must verify provider discovery rendering, backend redirect targets, duplicate-click prevention, and the inline loading spinner; provider-owner authentication itself requires configured test credentials and must not be simulated by entering secrets into committed tests.
-- New or materially changed console flows require component coverage and Cypress E2E coverage for the affected login, refresh/reload, direct deep-link, mutation, error, and logout paths.
-- Keep Cypress route assertions aligned with the unprefixed route contract.
+- New or materially changed console flows require component coverage and Playwright E2E coverage for the affected login, refresh/reload, direct deep-link, mutation, error, and logout paths.
+- Keep Playwright route assertions aligned with the unprefixed route contract. Frontend and Electron suites use Playwright but keep separate package dependencies, configs, and launch targets so either application can be built and tested independently.
 - Run `pnpm build` after changes to routes, static-export configuration, or production rendering behavior.
 
 ## Authentication
 
-- The frontend is a Next.js static export served by Spring Boot. Spring Security continues to process `POST /login`; CSRF is intentionally disabled in this sample.
+- The frontend is a Next.js static export served by Spring Boot. Spring Security continues to process `POST /login`; CSRF is intentionally disabled in this application.
 - Keep console authentication in `lib/console-auth.ts` aligned with the project's Keycloak-style model: Authorization Code + PKCE, namespaced console token records, single-flight refresh near expiry, one retry after a 401, and OIDC logout with an ID-token hint and registered post-logout URI.
 - Persist each console's access, ID, and refresh token set only in its namespaced `localStorage` record. Browser SSO remains supplied by the server-side Spring Session; never copy a token set from one console to the other.
 - Use `adminRequest` for Administration Console APIs and `accountRequest` for Account Console APIs. Do not add parallel Axios clients, custom bearer-token handling, or a second console authentication flow.
@@ -109,6 +109,7 @@ These instructions apply to `src/main/frontend/**` and supplement the repository
 - Do not use `outline-*` or `btn-outline-*` button variants. Use solid Bootstrap variants so controls remain legible in both `data-bs-theme="light"` and `data-bs-theme="dark"`.
 - Do not hard-code theme-sensitive colors such as white or black for UI content. Prefer Bootstrap theme variables (`--bs-body-*`, `--bs-*-bg`, `--bs-*-text-emphasis`, `--bs-border-*`, and their RGB variables); preserve visible focus indicators with the shared focus-ring token.
 - Keep page headers, breadcrumbs, form sections, cards, tables, modals, empty states, loading states, and responsive action areas aligned with the existing shared CSS classes before adding a new pattern.
+- Pages and components that make an API call during their initial render must show a page-level loading state with a visible spinner until the request completes. Keep data-dependent cards, tables, and action controls hidden while the initial request is pending; do not use disabled controls or fallback navigation links as the loading state. Reuse shared loading patterns and localize the loading message.
 - Use the shared spacing rhythm (`--console-space-*`) and surface/control radii. Keep table cells vertically centered, preserve horizontal scrolling for dense tables on small screens, and stack modal/form actions when space is constrained.
 - Status badges must communicate the same state with the same semantic color across screens. Prefer filled, theme-compatible badges and avoid `text-bg-light` for content that must work on dark surfaces.
 - Icon-only controls must meet the shared touch target where practical and include an accessible `aria-label` or equivalent visible name. Do not remove focus styles to achieve visual similarity.

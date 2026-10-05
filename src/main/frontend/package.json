@@ -1,7 +1,17 @@
 {
-  "name": "spring-authorization-server-samples-frontend",
+  "name": "kitezh-frontend",
   "version": "0.0.1",
   "private": true,
+  "license": "Apache-2.0",
+  "description": "Web administration and account consoles for the Kitezh identity and access platform",
+  "homepage": "https://kitezh.onrender.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/susimsek/kitezh.git"
+  },
+  "bugs": {
+    "url": "https://github.com/susimsek/kitezh/issues"
+  },
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev": "next dev",
@@ -13,11 +23,12 @@
     "format:check": "prettier --check .",
     "test:unit": "jest",
     "test:unit:coverage": "jest --coverage",
-    "test:e2e": "cypress run",
-    "test:e2e:open": "cypress open",
-    "test:e2e:chrome": "cypress run --browser chrome",
-    "test:e2e:admin": "cypress run --spec cypress/e2e/admin-login.cy.ts",
-    "test:e2e:account": "cypress run --spec cypress/e2e/account-console.cy.ts"
+    "test:e2e": "playwright test",
+    "test:e2e:open": "playwright test --ui",
+    "test:e2e:chrome": "playwright test --project=chromium",
+    "test:e2e:admin": "playwright test e2e/admin-console.spec.ts",
+    "test:e2e:account": "playwright test e2e/account-console.spec.ts",
+    "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "7.3.1",
@@ -41,13 +52,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
     "@types/node": "24.10.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
-    "cypress": "15.21.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.1",
     "jest": "^30.4.2",

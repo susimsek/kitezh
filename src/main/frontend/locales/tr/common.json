@@ -1,11 +1,132 @@
 {
   "brand": {
-    "product": "Yetkilendirme Sunucusu",
+    "product": "Kitezh",
     "framework": "Spring Security",
     "description": "Güvenli OAuth 2.0 ve OpenID Connect yetkilendirmesi."
   },
+  "home": {
+    "eyebrow": "Modern uygulamalar için yetkilendirme",
+    "title": "Modern uygulamalar için güvenli kimlik.",
+    "subtitle": "Tarayıcı ve masaüstü uygulamalarında güvenli giriş, yetkilendirme ve onay akışları için standartlara dayalı bir kimlik platformu.",
+    "download": "Uygulamayı indir",
+    "signIn": "Giriş sayfasını aç",
+    "openSource": "Açık kaynak ve yerel geliştirmeye hazır.",
+    "features": {
+      "title": "Başlamak için gerekenler",
+      "subtitle": "Aynı yetkilendirme sunucusunu tarayıcı ve masaüstü istemcilerinde kullanın.",
+      "security": {
+        "title": "Varsayılan olarak güvenli",
+        "description": "PKCE, OpenID Connect, geçiş anahtarları, MFA ve oturum kontrolleri örneğe dahildir."
+      },
+      "protocols": {
+        "title": "OAuth 2.0 ve OIDC",
+        "description": "Standart endpoint’lerle token üretin, inceleyin, iptal edin ve yenileyin."
+      },
+      "consoles": {
+        "title": "Yönetim ve Hesap Konsolları",
+        "description": "Kullanıcıları, istemcileri, rolleri, grupları, profil ayarlarını ve hesap güvenliğini yönetin."
+      }
+    },
+    "footer": {
+      "description": "Modern uygulamalarda kimlik doğrulama, yetkilendirme ve kimlik yönetimi için güvenli bir temel.",
+      "product": "Ürün",
+      "signIn": "Giriş yap",
+      "download": "İndir",
+      "resources": "Kaynaklar",
+      "documentation": "Dokümantasyon",
+      "releases": "Sürümler",
+      "project": "Proje",
+      "sourceCode": "Kaynak kodu",
+      "license": "Apache License 2.0",
+      "security": "Güvenlik",
+      "copyright": "{product} · Açık kaynak yazılım."
+    }
+  },
+  "desktop": {
+    "signInUnavailable": "Güvenli oturum açma şu anda kullanılamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
+    "signInTitle": "Masaüstü uygulamasında oturum açın",
+    "signInDescription": "Varsayılan tarayıcınızda güvenli şekilde devam edin.",
+    "signInWithBrowser": "Tarayıcıyla oturum aç",
+    "browserSignInHint": "Parolanız tarayıcıda kalır ve masaüstü uygulamasında saklanmaz.",
+    "chooseConsoleEyebrow": "Güvenli şekilde devam edin",
+    "chooseConsoleTitle": "Bir konsol seçin",
+    "chooseConsoleDescription": "Devam etmek istediğiniz konsolu seçin.",
+    "adminConsole": "Admin Console’a giriş yap",
+    "adminConsoleDescription": "Yönetim ve erişim kontrolü.",
+    "accountConsole": "Account Console’a giriş yap",
+    "accountConsoleDescription": "Profil ve hesap ayarları.",
+    "updateChecking": "Güncellemeler denetleniyor…",
+    "updateButton": "Güncelle",
+    "updateAvailable": "{version} sürümü kullanıma hazır.",
+    "updateDownload": "Güncellemeyi indir",
+    "updateDownloading": "Güncelleme indiriliyor (%{percent}).",
+    "updateReady": "{version} sürümü kuruluma hazır.",
+    "updateRestart": "Yeniden başlat ve kur",
+    "updateError": "Masaüstü güncellemesi tamamlanamadı. Mevcut sürümünüz kullanılabilir durumda.",
+    "updateRecovered": "Güncelleme temiz şekilde başlatılamadı. Mevcut kurulum kullanılmaya devam ediyor ({version}).",
+    "settings": {
+      "eyebrow": "Masaüstü tercihleri",
+      "title": "Kitezh ayarları",
+      "description": "Kitezh’in başlatılma, bildirim ve güncelleme davranışını yönetin. Güncellemeleri Kitezh uygulama menüsünden denetleyin.",
+      "loading": "Masaüstü ayarları yükleniyor",
+      "error": "Masaüstü ayarları kaydedilemedi.",
+      "launchAtLogin": "Kitezh’i oturum açıldığında başlat",
+      "launchAtLoginDescription": "Bilgisayarınızda oturum açtığınızda Kitezh’i otomatik olarak açar.",
+      "notifications": "Masaüstü bildirimlerini göster",
+      "notificationsDescription": "Kitezh güncellemeleri ve arka plan işlemleri için bildirim gösterir.",
+      "automaticUpdates": "Güncellemeleri otomatik olarak indir ve kur",
+      "automaticUpdatesDescription": "Güncellemeleri arka planda indirir ve Kitezh yeniden başladığında kurar.",
+      "globalShortcut": "Hızlı erişim kısayolu",
+      "globalShortcutDescription": "Bu kısayola her yerden basarak Kitezh’i gösterin veya gizleyin.",
+      "done": "Bitti"
+    }
+  },
   "navbar": {
-    "language": "Dil"
+    "language": "Dil",
+    "download": "İndir"
+  },
+  "download": {
+    "eyebrow": "Masaüstü uygulaması",
+    "title": "Uygulamayı indirin",
+    "subtitle": "İşletim sisteminize uygun paketi seçerek güvenli şekilde başlayın.",
+    "loading": "Kullanılabilir paketler yükleniyor...",
+    "loadError": "Kullanılabilir paketler yüklenemedi.",
+    "windows": {
+      "title": "Windows",
+      "description": "64 bit Windows için kurulum, taşınabilir ve AppX paketleri.",
+      "architecture": "x64",
+      "assets": {
+        "installer": "Kurulum",
+        "portable": "Taşınabilir",
+        "appx": "Microsoft Store paketi"
+      }
+    },
+    "linux": {
+      "title": "Linux",
+      "description": "x86_64 ve ARM64 Linux sistemleri için paketler.",
+      "architectures": {
+        "x64": "x86_64",
+        "arm64": "ARM64"
+      },
+      "assets": {
+        "appImage": "AppImage",
+        "deb": "Debian paketi",
+        "rpm": "RPM paketi",
+        "snap": "Snap paketi"
+      }
+    },
+    "macos": {
+      "title": "macOS",
+      "description": "macOS için Universal ve Intel disk imajları.",
+      "architecture": "Disk imajları",
+      "assets": {
+        "universal": "Universal",
+        "intel": "Intel"
+      }
+    },
+    "checksums": "İndirdiğiniz dosyayı yayınlanan SHA-256 değerleriyle doğrulayabilirsiniz.",
+    "downloadChecksums": "SHA-256 değerleri",
+    "releaseNotes": "Sürüm notlarını görüntüle"
   },
   "login": {
     "eyebrow": "Tekrar hoş geldiniz",
@@ -247,6 +368,18 @@
   "admin": {
     "product": "Admin Console",
     "manage": "Yönetim",
+    "globalSearch": {
+      "placeholder": "Yönetimde ara",
+      "ariaLabel": "Yönetim kaynaklarında ara",
+      "loading": "Aranıyor…",
+      "noResults": "Eşleşen kaynak bulunamadı.",
+      "types": {
+        "user": "Kullanıcılar",
+        "client": "İstemciler",
+        "role": "Roller",
+        "group": "Gruplar"
+      }
+    },
     "nav": {
       "dashboard": "Genel Bakış",
       "clients": "İstemciler",
@@ -268,7 +401,7 @@
     },
     "dashboard": {
       "title": "Genel Bakış",
-      "subtitle": "Authorization Server yapılandırmasını ve güvenlik kaynaklarını yönetin.",
+      "subtitle": "Kitezh yapılandırmasını ve güvenlik kaynaklarını yönetin.",
       "serverHealth": "Sunucu durumu",
       "readinessProbe": "Hazırlık denetimi",
       "openServerInfo": "Sunucu bilgisini aç",
@@ -280,7 +413,7 @@
     },
     "serverInfo": {
       "title": "Sunucu bilgisi",
-      "description": "Authorization Server çalışma zamanı ayarlarını, OpenID Connect discovery bilgisini ve imzalama anahtarlarını inceleyin.",
+      "description": "Kitezh çalışma zamanı ayarlarını, OpenID Connect discovery bilgisini ve imzalama anahtarlarını inceleyin.",
       "runtime": "Çalışma zamanı",
       "sessionTimeout": "SSO oturum zaman aşımı",
       "activeSigningKey": "Etkin imzalama anahtarı",
@@ -691,8 +824,27 @@
         "userProfile": "Kullanıcı profili",
         "localization": "Yerelleştirme",
         "cibaPolicy": "CIBA politikası",
-        "offlineAccess": "Çevrimdışı erişim"
+        "offlineAccess": "Çevrimdışı erişim",
+        "branding": "Markalama"
       }
+    },
+    "branding": {
+      "title": "Markalama",
+      "subtitle": "Giriş ve konsol ekranlarında kullanılan uygulama adını ve statik varlıkları yönetin.",
+      "applicationName": "Uygulama adı",
+      "applicationNameHint": "Bu ad giriş, Yönetim Konsolu ve Hesap Konsolu başlıklarında gösterilir.",
+      "primaryColor": "Birincil renk",
+      "accentColor": "Vurgu rengi",
+      "backgroundColor": "Arka plan rengi",
+      "previewTitle": "Marka önizlemesi",
+      "previewSubtitle": "Logo ve ikon dosyaları statik kalır; renkler ve uygulama adı branding ayarı olarak saklanır.",
+      "logoPath": "Logo yolu",
+      "faviconPath": "Favicon yolu",
+      "appleTouchIconPath": "Apple touch icon yolu",
+      "save": "Markalamayı kaydet",
+      "saved": "Markalama ayarları kaydedildi.",
+      "loading": "Markalama ayarları yükleniyor…",
+      "error": "Markalama ayarları yüklenemedi veya kaydedilemedi."
     },
     "offlineAccess": {
       "title": "Çevrimdışı erişim politikası",
@@ -713,7 +865,7 @@
     },
     "clients": {
       "title": "İstemciler",
-      "subtitle": "Authorization Server üzerinde kayıtlı uygulamalar.",
+      "subtitle": "Kitezh üzerinde kayıtlı uygulamalar.",
       "search": "İstemcilerde ara",
       "client": "İstemci",
       "grants": "Grant tipleri",
@@ -1049,7 +1201,7 @@
       "offlineSessions": "Çevrimdışı oturumlar",
       "consents": "İzinler",
       "keys": "Anahtarlar",
-      "description": "Authorization Server kaynaklarını yönetin.",
+      "description": "Kitezh kaynaklarını yönetin.",
       "operationError": "Yönetim işlemi tamamlanamadı.",
       "empty": "Kayıt bulunamadı.",
       "rotateKey": "İmza anahtarını döndür",
@@ -1062,7 +1214,7 @@
       "signOutAllConfirm": "Bu kullanıcının tüm oturumları kapatılsın mı?",
       "revoke": "İptal et",
       "revokeConfirm": "Bu yetkilendirme izni iptal edilsin mi?",
-      "offlineSessionsDescription": "Tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
+      "offlineSessionsDescription": "Kullanıcıların tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
       "offlineBadge": "Çevrimdışı erişim",
       "offlineNoExpiry": "Süresiz",
       "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?",
@@ -1071,7 +1223,7 @@
       "email": "E-posta",
       "emailVerified": "E-posta doğrulandı",
       "avatar": "Avatar",
-      "avatarHelp": "En fazla 2 MiB ve 4 megapiksel JPEG veya PNG. Authorization Server veritabanında saklanır.",
+      "avatarHelp": "En fazla 2 MiB ve 4 megapiksel JPEG veya PNG. Kitezh veritabanında saklanır.",
       "uploadAvatar": "Avatar yükle",
       "removeAvatar": "Avatarı kaldır",
       "removeAvatarConfirm": "Bu kullanıcının avatarı kaldırılsın mı?",
@@ -1191,11 +1343,7 @@
       "no": "Hayır",
       "passkeyDeleteConfirm": "Bu kullanıcının geçiş anahtarı kaldırılsın mı? Bu anahtarla artık giriş yapamaz.",
       "save": "Kaydet",
-      "loading": "Yükleniyor…",
-      "offlineSessionsDescription": "Kullanıcıların tarayıcı çıkışından sonra geçerli kalan refresh token oturumlarını yönetin.",
-      "offlineBadge": "Çevrimdışı erişim",
-      "offlineNoExpiry": "Süresiz",
-      "offlineRevokeConfirm": "Bu çevrimdışı oturum iptal edilsin mi?"
+      "loading": "Yükleniyor…"
     },
     "placeholder": "Bu yönetim bölümü sonraki geliştirme adımı için hazır.",
     "clientScopes": {

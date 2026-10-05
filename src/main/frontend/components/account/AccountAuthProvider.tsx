@@ -32,6 +32,7 @@ type AccountAuthValue = AccountAuthRuntime & {
 
 const ACCOUNT_AUTH_CONFIG = {
   clientId: "account-console",
+  desktopClientId: "desktop-account-console",
   scope: "profile email account-api",
   transactionKey: CONSOLE_TRANSACTION_KEYS.account,
   redirectPath: () => `/account/callback`,

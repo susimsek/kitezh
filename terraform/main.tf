@@ -112,9 +112,9 @@ resource "helm_release" "ingress_nginx" {
   depends_on = [kind_cluster.local]
 }
 
-resource "helm_release" "spring_authorization_server_samples" {
-  name              = "spring-authorization-server-samples"
-  chart             = "${path.module}/../helm/spring-authorization-server-samples"
+resource "helm_release" "kitezh" {
+  name              = "kitezh"
+  chart             = "${path.module}/../helm/kitezh"
   namespace         = kubernetes_namespace_v1.app.metadata[0].name
   dependency_update = true
   wait              = true

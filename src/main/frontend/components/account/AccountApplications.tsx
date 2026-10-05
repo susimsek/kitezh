@@ -89,7 +89,7 @@ export function AccountApplications({ dictionary }: { dictionary: Dictionary }) 
                 <div
                   className="account-application-card"
                   key={application.clientId}
-                  data-cy="application-row"
+                  data-testid="application-row"
                 >
                   <div className="account-application-icon">
                     <Icon icon="cube" />

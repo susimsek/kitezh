@@ -62,6 +62,9 @@ jest.mock("@/components/auth/LanguageSwitcher", () => ({
 jest.mock("@/components/auth/ThemeSwitcher", () => ({
   ThemeSwitcher: () => <button>Theme</button>,
 }));
+jest.mock("./AdminGlobalSearch", () => ({
+  AdminGlobalSearch: () => <div aria-label="global search" />,
+}));
 jest.mock("@fortawesome/react-fontawesome", () => ({
   FontAwesomeIcon: () => <span aria-hidden="true" />,
 }));

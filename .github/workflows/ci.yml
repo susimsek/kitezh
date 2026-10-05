@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
   workflow_dispatch:
 
@@ -15,12 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '24.18.0'
-  PNPM_VERSION: '11.22.0'
+  NODE_VERSION: "24.18.0"
+  PNPM_VERSION: "11.22.0"
   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
   infrastructure-validation:
@@ -43,12 +41,14 @@ jobs:
           docker compose -f src/main/docker/postgresql.yml config --quiet
           docker compose -f src/main/docker/openldap.yml config --quiet
           docker compose -f src/main/docker/app.yml config --quiet
+          docker compose -f src/main/docker/observability.yml config --quiet
+          docker compose -f src/main/docker/sonar.yml config --quiet
 
       - name: Validate Helm chart
         run: |
-          diff -qr src/main/resources/db helm/spring-authorization-server-samples/db
-          helm lint helm/spring-authorization-server-samples
-          helm template spring-authorization-server-samples helm/spring-authorization-server-samples >/dev/null
+          diff -qr src/main/resources/db helm/kitezh/db
+          helm lint helm/kitezh
+          helm template kitezh helm/kitezh >/dev/null
 
       - name: Validate Terraform configuration
         run: |
@@ -67,11 +67,10 @@ jobs:
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
-          java-version: '25'
+          java-version: "25"
           distribution: graalvm-community
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          cache: 'maven'
-          native-image-musl: 'true'
+          cache: "maven"
 
       - name: Set up Node.js and pnpm
         uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
@@ -87,7 +86,6 @@ jobs:
           java -version
           node --version
           pnpm --version
-          native-image --version
 
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
@@ -139,17 +137,139 @@ jobs:
             -Dsonar.organization=susimsek \
             -Dsonar.token="${SONAR_TOKEN}"
 
+  desktop:
+    name: Desktop package (${{ matrix.platform }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+          - platform: macos
+            runner: macos-latest
+          - platform: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            src/main/frontend/pnpm-lock.yaml
+            src/main/desktop/pnpm-lock.yaml
+          install: false
+
+      - name: Install frontend dependencies
+        working-directory: src/main/frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install desktop dependencies
+        working-directory: src/main/desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Test desktop shell
+        working-directory: src/main/desktop
+        run: pnpm test
+
+      - name: Build desktop package
+        working-directory: src/main/desktop
+        run: pnpm package
+
+      - name: Collect distributable desktop assets
+        run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${{ runner.temp }}/desktop-release-assets"
+
+      - name: Upload desktop package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-${{ matrix.platform }}-${{ github.sha }}
+          path: ${{ runner.temp }}/desktop-release-assets/*
+          if-no-files-found: error
+
+  native-image:
+    name: Native image verification (${{ matrix.architecture }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+            native_image_musl: "true"
+            native_image_args: "--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g"
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+            # GraalVM CE Linux AArch64 does not ship the musl-linked static JDK
+            # libraries, so use a mostly-static glibc image for this leg.
+            native_image_musl: "false"
+            native_image_args: "--no-fallback,-Os,--static-nolibc,-J-Xmx10g"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+      NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+          native-image-musl: ${{ matrix.native_image_musl }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          install: false
+
+      - name: Print tool versions
+        run: |
+          java -version
+          node --version
+          pnpm --version
+          native-image --version
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Install Maven dependencies
+        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
+
+      - name: Install frontend dependencies
+        run: pnpm --dir src/main/frontend install --frozen-lockfile
+
+      - name: Build frontend assets
+        run: pnpm --dir src/main/frontend build
+
       - name: Install UPX
         run: |
           UPX_VERSION=5.1.0
-          UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
+          UPX_ARCHIVE="upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux.tar.xz"
           curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
           tar -xJf "${UPX_ARCHIVE}"
           mkdir -p "${RUNNER_TEMP}/bin"
-          mv "upx-${UPX_VERSION}-amd64_linux/upx" "${RUNNER_TEMP}/bin/upx"
+          mv "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux/upx" "${RUNNER_TEMP}/bin/upx"
           chmod +x "${RUNNER_TEMP}/bin/upx"
           echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
-          rm -rf "${UPX_ARCHIVE}" "upx-${UPX_VERSION}-amd64_linux"
+          rm -rf "${UPX_ARCHIVE}" "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux"
           upx --version
 
       - name: Build GraalVM native executable
@@ -157,80 +277,18 @@ jobs:
           # Spring AOT evaluates conditional OTLP auto-configurations at build time.
           # Keep the exporters in the native image; Render supplies the endpoints
           # and credentials at runtime.
-          MANAGEMENT_OPENTELEMETRY_ENABLED: 'true'
-          MANAGEMENT_TRACING_EXPORT_ENABLED: 'true'
-          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: 'true'
-          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: 'true'
-          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: 'true'
+          MANAGEMENT_OPENTELEMETRY_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "true"
         run: |
           ./mvnw -B -ntp -Pprod,native -DskipTests \
             -Dskip.frontend=true \
             -Dspotless.skip=true \
             -Dcheckstyle.skip=true \
-            -DbuildArgs="--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g" \
+            -DbuildArgs="${NATIVE_IMAGE_ARGS}" \
             native:compile
 
       - name: Compress native executable
         run: upx --lzma --best target/native-executable
-
-      - name: Publish Docker image
-        if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        run: |
-          ./mvnw -ntp -Pprod,native -DskipTests \
-            -Dskip.frontend=true \
-            -Djib-maven-plugin.architecture=amd64 \
-            jib:build \
-            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
-            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
-            -Djib.to.auth.password="${DOCKERHUB_TOKEN}" # NOSONAR - value is supplied by a GitHub Actions secret
-
-      - name: Update Docker Hub description
-        if: ${{ github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        run: |
-          README_PATH="docs/README-dockerhub.md"
-          if [ ! -f "${README_PATH}" ]; then
-            echo "${README_PATH} not found; skipping Docker Hub README update."
-            exit 0
-          fi
-
-          TOKEN="$({
-            jq -n \
-              --arg identifier "${DOCKERHUB_USERNAME}" \
-              --arg secret "${DOCKERHUB_TOKEN}" \
-              '{identifier: $identifier, secret: $secret}'
-          } | curl -fsS -X POST \
-            -H 'Content-Type: application/json' \
-            --data-binary @- \
-            https://hub.docker.com/v2/auth/token | jq -er '.access_token')"
-
-          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
-            | curl -fsS -X PATCH \
-              -H "Authorization: Bearer ${TOKEN}" \
-              -H 'Content-Type: application/json' \
-              --data-binary @- \
-              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/spring-authorization-server-samples"
-
-  deploy-render:
-    name: Deploy to Render
-    needs:
-      - infrastructure-validation
-      - build
-    if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-
-    steps:
-      - name: Skip Render deploy when hook is not configured
-        if: ${{ env.RENDER_DEPLOY_HOOK_URL == '' }}
-        run: echo "RENDER_DEPLOY_HOOK_URL is not configured; skipping Render deployment."
-
-      - name: Trigger Render deploy
-        if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' }}
-        run: |
-          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
-            --request POST \
-            --get \
-            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/spring-authorization-server-samples:latest-native" \
-            "${RENDER_DEPLOY_HOOK_URL}"

@@ -1,105 +1,103 @@
-# Spring Authorization Server Samples (Spring Boot 4 + Native)
+# Kitezh container image
 
-OAuth2 Authorization Server and OpenID Connect sample application built with Spring Boot 4, Spring Security Authorization Server, Spring Data JPA, Liquibase, H2/PostgreSQL, Spring Security, and Hibernate second-level cache backed by Caffeine/JCache.
-This image runs the app as a GraalVM native executable for fast startup and low memory usage.
+Kitezh is an OAuth2 and OpenID Connect identity platform built with Spring Boot 4.1, Java 25, and Spring Security 7. The published Docker image is a statically linked GraalVM native executable available for `linux/amd64` and `linux/arm64`.
 
-This image exposes an HTTP-based authorization server on port `9090`. It serves OpenID Provider metadata, JWK Set, OAuth2 token and authorization endpoints, and actuator health probes.
+The image includes the authorization server, localized login and consent pages, the Administration Console, and the Account Console. It listens on port `9090` by default.
 
-## Features
-
-- Custom Next.js/React-Bootstrap login, Administration Console, and Account Console UIs bundled into the Spring Boot image
-
-- OAuth2 Authorization Server with OIDC enabled
-- Authorization Code, Refresh Token, and Client Credentials grants
-- RSA-signed JWT access and ID tokens
-- Database-backed RSA JWK signing keys with active/passive key support
-- JPA-backed registered client storage
-- JPA-backed authorization and consent storage
-- H2 in-memory database for local use
-- PostgreSQL support for production-style runs
-- XML-based Liquibase schema migrations
-- CSV seed data for users, authorities, and OAuth2 clients
-- JPA auditing with `Instant` `created_at` and `updated_at`
-- Hibernate second-level cache via JCache + Caffeine
-- Actuator liveness and readiness endpoints
-- GraalVM native executable
-
-## How to use this image
-
-### 1. Start a PostgreSQL server
+## Image
 
 ```bash
-docker run --name postgresql --rm -d \
-  -e POSTGRES_USER=appuser \
-  -e POSTGRES_PASSWORD=appuser \
-  -e POSTGRES_DB=authserversamples \
-  -p 127.0.0.1:5432:5432 \
-  postgres:18-alpine
+docker pull suayb/kitezh:latest
 ```
 
-### 2. Start the application (prod mode with PostgreSQL)
+Official links:
+
+- Source: [github.com/susimsek/kitezh](https://github.com/susimsek/kitezh)
+- Docker Hub: [hub.docker.com/r/suayb/kitezh](https://hub.docker.com/r/suayb/kitezh)
+- Releases: [Kitezh releases](https://github.com/susimsek/kitezh/releases)
+- Live demo: [kitezh.onrender.com](https://kitezh.onrender.com)
+
+The `latest` image is a multi-architecture manifest. Docker selects the matching `linux/amd64` or `linux/arm64` image for the host automatically.
+
+The `latest` tag is published to Docker Hub only by validated `v*` releases after the native builds pass. Each release also publishes immutable architecture tags such as `0.1.0-amd64` and `0.1.0-arm64`, plus the versioned multi-architecture tag `0.1.0`. The image is suitable for local evaluation and deployments; configure an external PostgreSQL database before using it outside local testing.
+
+## Included capabilities
+
+- OAuth2 Authorization Server with OpenID Connect 1.0
+- Authorization Code + PKCE, Refresh Token, Client Credentials, Token Exchange, and CIBA grants
+- Token introspection, revocation, DPoP support, and OIDC logout
+- Database-backed RSA JWK signing keys with passive public-key publication
+- JPA-backed users, groups, roles, registered clients, consents, sessions, and audit events
+- PostgreSQL production profile and Liquibase XML migrations with CSV seed data
+- Hibernate second-level cache backed by JCache and Caffeine
+- Administration Console and Account Console using public OIDC clients with PKCE
+- User profile attributes, avatar management, TOTP MFA, recovery codes, and WebAuthn passkeys
+- Optional Google, GitHub, LinkedIn, and Microsoft social login
+- Actuator liveness, readiness, metrics, and Prometheus endpoints
+- Optional OTLP metrics, traces, and logs for Grafana Cloud or a local LGTM stack
+
+## Start with the Kitezh Compose stack
+
+From a Kitezh checkout, the prebuilt image can be started with PostgreSQL and the separate Liquibase migration container:
 
 ```bash
-docker run --rm -p 9090:9090 \
-  -e SPRING_PROFILES_ACTIVE=prod \
-  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/authserversamples \
-  -e SPRING_DATASOURCE_USERNAME=appuser \
-  -e SPRING_DATASOURCE_PASSWORD=appuser \
-  -e APP_AUTHORIZATION_SERVER_ISSUER=http://localhost:9090 \
-  suayb/spring-authorization-server-samples:latest-native
+docker compose -f src/main/docker/app.yml up -d
 ```
 
-Or with H2 in-memory:
-
-```bash
-docker run --rm -p 9090:9090 \
-  suayb/spring-authorization-server-samples:latest-native
-```
-
-The server is available at:
-
-```text
-localhost:9090
-```
-
-### Browser consoles
-
-The image includes two static OIDC clients. Open either URL in a browser; it redirects to the localized Spring Security login screen when necessary.
-
-| Console | URL | Seeded login | Required scope |
-| --- | --- | --- | --- |
-| Administration | `http://localhost:9090/admin` | `admin/admin` | `admin-api` and the required administrative authority |
-| Account | `http://localhost:9090/account` | `admin/admin`, `user/user`, `user2/user2`, `user3/user3`, `user4/user4`, `user5/user5`, or `user6/user6` | `account-api` |
-
-Both consoles are public OAuth2 clients (`admin-console` and `account-console`) using Authorization Code + PKCE, refresh-token rotation, and OIDC logout. They share the authorization server's browser SSO session. Set `APP_AUTHORIZATION_SERVER_ISSUER` to the exact public browser address of the container and use redirect URIs registered for that address; the supplied Docker command uses `http://localhost:9090`, which is included in the seed data.
-
-### 3. Check health
+Kitezh is available at `http://localhost:9090`. Check readiness with:
 
 ```bash
 curl http://localhost:9090/actuator/health/readiness
 ```
 
-Expected response contains:
+Stop the stack with:
 
-```json
-{"status":"UP"}
+```bash
+docker compose -f src/main/docker/app.yml down
 ```
 
-### 4. Fetch discovery metadata
+The Compose fixture is for development. PostgreSQL data is ephemeral unless the commented volume in `src/main/docker/postgresql.yml` is enabled.
+
+## Run Kitezh with an external PostgreSQL database
+
+The published image is built with the `prod` profile and requires PostgreSQL settings:
+
+```bash
+docker run --rm -p 9090:9090 \
+  -e SPRING_PROFILES_ACTIVE=prod \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/kitezh \
+  -e SPRING_DATASOURCE_USERNAME=appuser \
+  -e SPRING_DATASOURCE_PASSWORD=appuser \
+  -e APP_AUTHORIZATIONSERVER_ISSUER=http://localhost:9090 \
+  suayb/kitezh:latest
+```
+
+Kitezh runs Liquibase migrations on startup. Set `SPRING_LIQUIBASE_DROP_FIRST=true` only for an intentionally disposable demo database because it removes existing objects before applying the changelog.
+
+## Kitezh browser consoles
+
+Open the following URLs after the application starts:
+
+| Console | URL | Seeded users | Scope |
+| --- | --- | --- | --- |
+| Administration | `http://localhost:9090/admin` | `admin/admin` | `admin-api` plus the required administrative authority |
+| Account | `http://localhost:9090/account` | `admin/admin`, `user/user`, `user2/user2`, `user3/user3`, `user4/user4`, `user5/user5`, `user6/user6` | `account-api` |
+
+Both consoles use Authorization Code + PKCE, refresh-token rotation, and OIDC logout. The issuer and redirect URIs must use the same public address when the image is exposed through another hostname.
+
+The public demo is available at [kitezh.onrender.com](https://kitezh.onrender.com).
+
+## OAuth2 and OIDC checks
+
+Fetch provider metadata and public signing keys:
 
 ```bash
 curl http://localhost:9090/.well-known/openid-configuration
+curl http://localhost:9090/.well-known/oauth-authorization-server
+curl http://localhost:9090/oauth2/jwks
 ```
 
-### 5. Request a token
-
-Seeded OAuth2 client:
-
-| Client ID | Client Secret |
-| --- | --- |
-| `demo-client` | `demo-secret` |
-
-Request a client credentials token:
+Request a client-credentials token with the seeded client:
 
 ```bash
 curl -u demo-client:demo-secret \
@@ -110,119 +108,113 @@ curl -u demo-client:demo-secret \
   http://localhost:9090/oauth2/token
 ```
 
-Fetch the JWK Set:
-
-```bash
-curl http://localhost:9090/oauth2/jwks
-```
-
-Capture the access token:
+Inspect or revoke a token:
 
 ```bash
 TOKEN=$(curl -s -u demo-client:demo-secret \
-  -H 'Accept-Language: en' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d grant_type=client_credentials \
   -d scope=openid \
   http://localhost:9090/oauth2/token | jq -r '.access_token')
-```
 
-Introspect the access token:
-
-```bash
 curl -u demo-client:demo-secret \
-  -H 'Accept-Language: en' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d token="${TOKEN}" \
   http://localhost:9090/oauth2/introspect
-```
 
-Revoke the access token:
-
-```bash
 curl -u demo-client:demo-secret \
-  -H 'Accept-Language: en' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d token="${TOKEN}" \
   -d token_type_hint=access_token \
   http://localhost:9090/oauth2/revoke
 ```
 
-## Environment variables
+The seeded `ciba-client` supports the CIBA grant with poll delivery. The seeded `demo-client` also includes token exchange and CIBA grant types.
 
-| Name | Default | Description |
+## Configuration
+
+The most relevant environment variables are:
+
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | `default` | Active Spring profile |
-| `SERVER_PORT` | `9090` | HTTP server port |
-| `SPRING_DATASOURCE_URL` | `jdbc:h2:mem:authserversamples;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` | JDBC URL |
-| `SPRING_DATASOURCE_USERNAME` | `sa` | Database username |
-| `SPRING_DATASOURCE_PASSWORD` | (empty) | Database password |
-| `SPRING_LIQUIBASE_ENABLED` | `true` | Enable or disable Liquibase migrations |
-| `APP_AUTHORIZATION_SERVER_ISSUER` | `https://spring-authorization-server-samples.local` | OAuth2/OIDC issuer |
+| `SPRING_PROFILES_ACTIVE` | `prod` in the published image | Select the Spring profile |
+| `SERVER_PORT` | `9090` | HTTP listen port; Render sets this to `10000` |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/kitezh` in `prod` | PostgreSQL JDBC URL |
+| `SPRING_DATASOURCE_USERNAME` | none in `prod` | Database username |
+| `SPRING_DATASOURCE_PASSWORD` | none in `prod` | Database password |
+| `SPRING_LIQUIBASE_ENABLED` | `true` | Enable Liquibase migrations |
+| `SPRING_LIQUIBASE_DROP_FIRST` | `false` | Drop database objects before migration; use only for disposable demos |
+| `APP_AUTHORIZATIONSERVER_ISSUER` | `https://kitezh.local` | Public OAuth2/OIDC issuer |
+| `APP_DPOP_NONCE_REQUIRED` | `false` | Require DPoP nonce validation |
+| `MANAGEMENT_OPENTELEMETRY_ENABLED` | `false` | Enable OpenTelemetry resource/export configuration |
+| `MANAGEMENT_TRACING_EXPORT_ENABLED` | `false` | Enable trace export |
+| `MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED` | `false` | Enable OTLP trace export |
+| `MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED` | `false` | Enable OTLP log export |
+| `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `false` | Enable OTLP metric export |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | empty | OTLP trace endpoint |
+| `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT` | empty | OTLP log endpoint |
+| `MANAGEMENT_OTLP_METRICS_EXPORT_URL` | empty | OTLP metric endpoint |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | Trace sampling probability |
 
-## RSA signing keys
+Keep OTLP authorization headers and database credentials in deployment secrets. Do not commit them to the repository or bake them into the image.
 
-RSA signing keys are stored in the `oauth2_key` table. The initial sample key is seeded by Liquibase from `db/data/oauth2-keys.csv`.
+### Social login
 
-Exactly one key must be marked `active=true`. The active key is used for signing, while inactive keys are exposed as public-only JWKs for verification of tokens issued before key rotation. All rows remain in the published JWK Set until removed from the table.
+Social providers are configured from **Administration → Settings → Login**. The provider enablement, Client ID, and Client Secret are stored in the database; secrets are encrypted before persistence. Keep `SOCIAL_LOGIN_ENCRYPTION_KEY` stable across restarts and deployments. Provider credentials are intentionally not read from application YAML or environment variables.
 
-## HTTP endpoints
+The callback URI is `https://<public-host>/login/oauth2/code/{registrationId}`. Register the exact callback URI with each provider.
 
-Authorization Server:
+## Health and management endpoints
 
-- `GET /.well-known/openid-configuration`
-- `GET /.well-known/oauth-authorization-server`
-- `GET /oauth2/jwks`
-- `GET /oauth2/authorize`
-- `POST /oauth2/token`
-- `POST /oauth2/revoke`
-- `POST /oauth2/introspect`
+```text
+GET /actuator/health
+GET /actuator/health/liveness
+GET /actuator/health/readiness
+GET /actuator/metrics
+GET /actuator/prometheus
+```
 
-OIDC:
+Kitezh exposes liveness and readiness probes with the database included in readiness. Management endpoints should remain private to the cluster or deployment platform.
 
-- `GET /connect/logout`
+## Deploy Kitezh
 
-Browser UIs:
+The Render Blueprint in `render.yaml` deploys the same Docker Hub image with:
 
-- `GET /en/admin/`, `GET /tr/admin/`
-- `GET /en/account/`, `GET /tr/account/`
+- image: `docker.io/suayb/kitezh:latest`
+- region: Frankfurt
+- health check: `/actuator/health/readiness`
+- port: `10000` through `SERVER_PORT`
+- PostgreSQL and OTLP values supplied as Render environment variables
 
-Health:
+The GitHub Actions workflow builds amd64 and arm64 native images with GraalVM, publishes versioned architecture-specific tags through Jib, combines them into the `latest` and versioned multi-arch manifests for `v*` tags, and optionally triggers the matching Render Deploy Hook.
 
-- `GET /actuator/health`
-- `GET /actuator/health/liveness`
-- `GET /actuator/health/readiness`
+## Build and publish locally
 
-## Health checks
+Build the native executable:
 
-The image exposes standard HTTP actuator probes.
+```bash
+./mvnw -Pprod,native -DskipTests native:compile
+```
 
-Kubernetes example:
+Build a local native image with Jib:
 
-```yaml
-livenessProbe:
-  httpGet:
-    path: /actuator/health/liveness
-    port: 9090
-  initialDelaySeconds: 10
-  periodSeconds: 10
-readinessProbe:
-  httpGet:
-    path: /actuator/health/readiness
-    port: 9090
-  initialDelaySeconds: 10
-  periodSeconds: 10
+```bash
+./mvnw -Pprod,native -DskipTests jib:dockerBuild \
+  -Djib-maven-plugin.architecture=amd64 \
+  -Djib.to.image=kitezh:latest
+```
+
+The CI publish command uses the Docker Hub repository and tag below:
+
+```text
+docker.io/suayb/kitezh:latest
 ```
 
 ## Notes
 
-- This is an HTTP OAuth2/OIDC authorization server sample; it is not a gRPC service.
-- The default database is in-memory H2, so data is reset when the container stops.
-- Liquibase migrations and CSV seed data run on startup by default.
-- Hibernate second-level cache is enabled in the application configuration.
-- Registered OAuth2 clients are seeded from Liquibase CSV, not created dynamically at startup.
-- RSA signing keys should remain stable across restarts; changing the key invalidates signature verification for tokens signed with the previous key unless the previous public key remains available.
-- Never commit production private keys to source control or bake them into the container image.
-- OAuth2 error responses honor `Accept-Language`; use headers such as `Accept-Language: en` on token-oriented requests when you want localized error messages.
-- `authorization_code` flow requires a browser login and redirect handling, so it is not shown as a curl-only example here.
-- The console clients are registered for `localhost:9090` and `https://spring-authorization-server-samples.local`; register additional callback and post-logout redirect URIs before exposing the image through another public address.
+- The `latest` tag selects the `linux/amd64` or `linux/arm64` image automatically; versioned architecture-specific tags are available as `<version>-amd64` and `<version>-arm64`.
+- The image uses a static native executable and does not contain a shell or package manager.
+- H2 is a development dependency and is not included in the published `prod,native` image.
+- Liquibase seed data is the source of truth for users, groups, authorities, and registered clients.
+- Keep at least one active RSA signing key and retain old public keys during key rotation.
+- Use the Kitezh README for the full API, Helm, Terraform, observability, and development documentation.

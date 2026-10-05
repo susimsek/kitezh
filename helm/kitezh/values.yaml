@@ -1,0 +1,185 @@
+# Default values for kitezh.
+
+replicaCount: 2
+terminationGracePeriodSeconds: 30
+revisionHistoryLimit: 10
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+image:
+  repository: docker.io/suayb/kitezh
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+initContainers:
+  waitForDb:
+    enabled: true
+    image:
+      repository: busybox
+      pullPolicy: IfNotPresent
+      tag: "1.37.0"
+  liquibase:
+    enabled: true
+    image:
+      repository: docker.io/suayb/liquibase-postgresql
+      pullPolicy: IfNotPresent
+      tag: "5.0.1"
+    changeLogFile: db/changelog/db.changelog-master.xml
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+containerPort: 9090
+
+# Keep actuator, health, and Prometheus endpoints on a cluster-internal port.
+management:
+  port: 9091
+
+spring:
+  profiles:
+    active: prod
+  datasource:
+    url: jdbc:postgresql://postgresql:5432/kitezh
+    username: appuser
+    password: "appuser"
+  liquibase:
+    enabled: false
+
+app:
+  authorizationServer:
+    issuer: https://kitezh.local
+    offlineSessionIdle: P30D
+
+existingSecret:
+  enabled: false
+  name: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+dnsPolicy: ""
+dnsConfig: {}
+
+enableServiceLinks: true
+
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 9090
+
+# Optional Prometheus Operator integration. Enable this when the cluster runs
+# kube-prometheus-stack or another Prometheus Operator installation.
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  port: management
+  path: /actuator/prometheus
+  scheme: http
+  labels: {}
+  annotations: {}
+
+probes:
+  startup:
+    enabled: true
+    path: /actuator/health/liveness
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 60
+  liveness:
+    enabled: true
+    path: /actuator/health/liveness
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /actuator/health/readiness
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 3
+
+ingress:
+  enabled: false
+  className: ""
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: kitezh.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "256Mi"
+  limits:
+    cpu: "1"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+postgresql:
+  fullnameOverride: postgresql
+  enabled: true
+  architecture: standalone
+  auth:
+    username: appuser
+    database: kitezh
+    password: "appuser"
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+  primary:
+    networkPolicy:
+      enabled: false
+    persistence:
+      enabled: false
+      size: 8Gi
+  metrics:
+    enabled: false
+  backup:
+    enabled: false

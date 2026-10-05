@@ -110,7 +110,7 @@ describe("authentication components", () => {
 
     expect(screen.getByRole("link", { name: dictionary.brand.product })).toHaveAttribute(
       "href",
-      "/login",
+      "/",
     );
     expect(screen.getByText(dictionary.login.invalidCredentials)).toBeVisible();
     expect(screen.getByText(dictionary.login.loggedOut)).toBeVisible();

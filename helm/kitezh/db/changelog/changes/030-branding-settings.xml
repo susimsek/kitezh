@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="030-01-create-branding-settings" author="susimsek">
+        <createTable tableName="branding_settings">
+            <column name="id" type="bigint">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_branding_settings"/>
+            </column>
+            <column name="application_name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="logo_path" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="favicon_path" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="apple_touch_icon_path" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="primary_color" type="varchar(7)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="accent_color" type="varchar(7)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="background_color" type="varchar(7)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <loadData encoding="UTF-8" file="db/data/branding-settings.csv" separator=";" tableName="branding_settings" usePreparedStatements="true">
+            <column header="id" type="numeric"/>
+            <column header="application_name" type="string"/>
+            <column header="logo_path" type="string"/>
+            <column header="favicon_path" type="string"/>
+            <column header="apple_touch_icon_path" type="string"/>
+            <column header="primary_color" type="string"/>
+            <column header="accent_color" type="string"/>
+            <column header="background_color" type="string"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

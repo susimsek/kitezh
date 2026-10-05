@@ -1,11 +1,12 @@
 services:
   - type: web
-    name: spring-authorization-server-samples
+    name: kitezh
     runtime: image
     plan: free
     region: frankfurt
+    autoDeploy: false
     image:
-      url: docker.io/suayb/spring-authorization-server-samples:latest-native
+      url: docker.io/suayb/kitezh:latest
     healthCheckPath: /actuator/health/readiness
     envVars:
       - key: SPRING_PROFILES_ACTIVE
@@ -37,7 +38,7 @@ services:
       - key: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
         value: "1.0"
       - key: OTEL_SERVICE_NAME
-        value: spring-authorization-server-samples
+        value: kitezh
       - key: SERVER_PORT
         value: "10000"
       # Render prompts for these database values when the Blueprint is first created.
@@ -47,5 +48,7 @@ services:
         sync: false
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
-      - key: APP_AUTHORIZATION_SERVER_ISSUER
-        value: https://spring-authorization-server-samples.onrender.com
+      - key: APP_AUTHORIZATIONSERVER_ISSUER
+        value: https://kitezh.onrender.com
+      - key: GITHUB_API_TOKEN
+        sync: false

@@ -25,5 +25,5 @@ output "openid_configuration_url" {
 
 output "port_forward_command" {
   description = "Fallback command to expose the ClusterIP service on localhost:9090."
-  value       = "kubectl --kubeconfig=${local.kubeconfig_absolute_path} -n ${var.namespace} port-forward svc/spring-authorization-server-samples 9090:9090"
+  value       = "kubectl --kubeconfig=${local.kubeconfig_absolute_path} -n ${var.namespace} port-forward svc/kitezh 9090:9090"
 }
