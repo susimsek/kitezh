@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   settings: {
     close: () => ipcRenderer.invoke("desktop:settings-close"),
+    ready: () => ipcRenderer.invoke("desktop:settings-ready"),
   },
   updates: {
     check: () => ipcRenderer.invoke("desktop:update-check"),

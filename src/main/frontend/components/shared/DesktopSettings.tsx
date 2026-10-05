@@ -65,6 +65,7 @@ export function DesktopSettings() {
   useEffect(() => {
     if (!isDesktopRuntime() || !window.desktopApi) return undefined;
     const desktopApi = window.desktopApi;
+    void desktopApi.settings.ready();
     void desktopApi.preferences
       .get()
       .then(setPreferences)
@@ -507,12 +508,6 @@ export function DesktopSettings() {
                   )}
                 </section>
               </div>
-            </div>
-
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <Button variant="secondary" onClick={() => void window.desktopApi!.settings.close()}>
-                {dictionary.desktop.settings.done}
-              </Button>
             </div>
           </Card.Body>
         </Card>

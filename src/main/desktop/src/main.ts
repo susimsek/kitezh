@@ -495,6 +495,7 @@ async function showSettingsWindow() {
     minHeight: 560,
     title: `${DESKTOP_APP_NAME} Settings`,
     backgroundColor: "#202124",
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -515,8 +516,6 @@ async function showSettingsWindow() {
   await settingsWindow.loadURL(
     `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-settings`,
   );
-  settingsWindow.center();
-  settingsWindow.show();
 }
 
 function updatePreferencesPath() {
@@ -1305,6 +1304,13 @@ function registerIpc() {
   ipcMain.handle("desktop:settings-close", (event) => {
     assertTrustedSender(event);
     if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
+  });
+  ipcMain.handle("desktop:settings-ready", (event) => {
+    assertTrustedSender(event);
+    if (!settingsWindow || settingsWindow.isDestroyed()) return;
+    settingsWindow.center();
+    settingsWindow.show();
+    settingsWindow.focus();
   });
   ipcMain.handle(
     "desktop:auth-start-login",

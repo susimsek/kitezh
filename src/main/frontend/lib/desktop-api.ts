@@ -82,6 +82,7 @@ export type DesktopApi = {
   };
   settings: {
     close: () => Promise<void>;
+    ready: () => Promise<void>;
   };
   updates: {
     check: () => Promise<void>;

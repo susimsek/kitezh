@@ -130,10 +130,10 @@ test("opens settings in a separate window without requiring login", async () => 
         .count(),
       0,
     );
-    await Promise.all([
-      settingsWindow.waitForEvent("close"),
-      settingsWindow.getByRole("button", { name: "Done" }).click(),
-    ]);
+    assert.equal(
+      await settingsWindow.getByRole("button", { name: "Done" }).count(),
+      0,
+    );
     assert.equal(
       await mainWindow
         .getByRole("heading", { name: "Choose a console" })
