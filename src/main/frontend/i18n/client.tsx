@@ -82,6 +82,9 @@ function LocaleEffects() {
     dispatch(setLocale(locale));
     document.documentElement.lang = locale;
     persistLocale(locale);
+    if (isDesktopRuntime() && window.desktopApi) {
+      void window.desktopApi.language.set(locale);
+    }
   }, [dispatch, locale]);
   return null;
 }

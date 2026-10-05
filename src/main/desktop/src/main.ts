@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   globalShortcut,
   Menu,
+  nativeTheme,
   nativeImage,
   Notification,
   ipcMain,
@@ -57,6 +58,69 @@ const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 app.setName(DESKTOP_APP_NAME);
+
+type DesktopTheme = "system" | "light" | "dark";
+type DesktopLanguage = "en" | "tr";
+
+let desktopLanguage: DesktopLanguage = app
+  .getLocale()
+  .toLowerCase()
+  .startsWith("tr")
+  ? "tr"
+  : "en";
+
+function isTurkishDesktop() {
+  return desktopLanguage === "tr";
+}
+
+function desktopBackgroundColor() {
+  return nativeTheme.shouldUseDarkColors ? "#202124" : "#f8f9fa";
+}
+
+function applyDesktopTheme(value: unknown) {
+  const theme: DesktopTheme =
+    value === "light" || value === "dark" || value === "system"
+      ? value
+      : "system";
+  nativeTheme.themeSource = theme;
+  const backgroundColor = desktopBackgroundColor();
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.setBackgroundColor(backgroundColor);
+  }
+}
+
+function applyDesktopLanguage(value: unknown) {
+  desktopLanguage = value === "tr" ? "tr" : "en";
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    aboutWindow.setTitle(
+      isTurkishDesktop()
+        ? `${DESKTOP_APP_NAME} hakkında`
+        : `About ${DESKTOP_APP_NAME}`,
+    );
+  }
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.setTitle(
+      isTurkishDesktop()
+        ? `${DESKTOP_APP_NAME} ayarları`
+        : `${DESKTOP_APP_NAME} Settings`,
+    );
+  }
+  installApplicationMenu();
+  updateTrayMenu();
+}
+
+function nativeDialogThemeCss() {
+  const dark = nativeTheme.shouldUseDarkColors;
+  return `:root {
+        color-scheme: ${dark ? "dark" : "light"};
+        --dialog-background: ${dark ? "#202124" : "#f8f9fa"};
+        --dialog-foreground: ${dark ? "#f1f3f4" : "#202124"};
+        --dialog-secondary: ${dark ? "#d4d8da" : "#5f6368"};
+        --dialog-button: ${dark ? "#343d42" : "#e8eaed"};
+        --dialog-button-hover: ${dark ? "#414c52" : "#dfe1e5"};
+        --dialog-border: ${dark ? "#3a4246" : "#dadce0"};
+      }`;
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -164,7 +228,10 @@ function redactDiagnosticText(value: string) {
     .slice(0, 500);
 }
 
-async function appendDiagnosticEvent(name: string, details?: Record<string, unknown>) {
+async function appendDiagnosticEvent(
+  name: string,
+  details?: Record<string, unknown>,
+) {
   const safeDetails = Object.fromEntries(
     Object.entries(details ?? {})
       .filter(([, value]) => value !== undefined)
@@ -172,10 +239,15 @@ async function appendDiagnosticEvent(name: string, details?: Record<string, unkn
   );
   const line = `${new Date().toISOString()} ${name}${Object.keys(safeDetails).length ? ` ${JSON.stringify(safeDetails)}` : ""}\n`;
   try {
-    const current = await readFile(diagnosticsLogPath(), "utf8").catch(() => "");
+    const current = await readFile(diagnosticsLogPath(), "utf8").catch(
+      () => "",
+    );
     const next = `${current}${line}`.slice(-MAX_DIAGNOSTICS_LOG_BYTES);
     await mkdir(path.dirname(diagnosticsLogPath()), { recursive: true });
-    await writeFile(diagnosticsLogPath(), next, { encoding: "utf8", mode: 0o600 });
+    await writeFile(diagnosticsLogPath(), next, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
   } catch {
     // Diagnostics must never interfere with the desktop application.
   }
@@ -428,6 +500,7 @@ async function showAboutDialog() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  const isTurkish = isTurkishDesktop();
   aboutWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: false,
@@ -436,8 +509,10 @@ async function showAboutDialog() {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    title: `About ${DESKTOP_APP_NAME}`,
-    backgroundColor: "#202124",
+    title: isTurkish
+      ? `${DESKTOP_APP_NAME} hakkında`
+      : `About ${DESKTOP_APP_NAME}`,
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -448,28 +523,29 @@ async function showAboutDialog() {
     aboutWindow = null;
   });
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${isTurkish ? "tr" : "en"}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>About ${DESKTOP_APP_NAME}</title>
+    <title>${isTurkish ? `${DESKTOP_APP_NAME} hakkında` : `About ${DESKTOP_APP_NAME}`}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #202124; color: #f1f3f4; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; box-sizing: border-box; padding: 2rem 2rem 1.75rem; text-align: center; }
       img { width: 112px; height: 112px; border-radius: 24px; margin-bottom: 1.5rem; }
       h1 { margin: 0 0 1.25rem; font-size: 2rem; font-weight: 700; }
-      p { margin: 0.5rem 0; font-size: 1.1rem; line-height: 1.45; color: #c4c7c5; }
+      p { margin: 0.5rem 0; font-size: 1.1rem; line-height: 1.45; color: var(--dialog-secondary); }
       .version { margin-top: 1rem; font-size: 1rem; }
-      footer { margin-top: 1.5rem; font-size: 0.95rem; color: #c4c7c5; }
+      footer { margin-top: 1.5rem; font-size: 0.95rem; color: var(--dialog-secondary); }
     </style>
   </head>
   <body>
     <main>
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <h1>${DESKTOP_APP_NAME}</h1>
-      <p>Secure identity and access console</p>
-      <p class="version">Version ${app.getVersion()}</p>
+      <p>${isTurkish ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console"}</p>
+      <p class="version">${isTurkish ? "Sürüm" : "Version"} ${app.getVersion()}</p>
       <footer>© 2026 ${DESKTOP_APP_NAME}</footer>
     </main>
   </body>
@@ -493,8 +569,10 @@ async function showSettingsWindow() {
     height: 640,
     minWidth: 900,
     minHeight: 560,
-    title: `${DESKTOP_APP_NAME} Settings`,
-    backgroundColor: "#202124",
+    title: isTurkishDesktop()
+      ? `${DESKTOP_APP_NAME} ayarları`
+      : `${DESKTOP_APP_NAME} Settings`,
+    backgroundColor: desktopBackgroundColor(),
     show: false,
     webPreferences: {
       contextIsolation: true,
@@ -660,22 +738,38 @@ function createTray() {
   );
   tray = new Tray(icon);
   tray.setToolTip(DESKTOP_APP_NAME);
+  updateTrayMenu();
+  tray.on("click", focusMainWindow);
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const isTurkish = isTurkishDesktop();
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: `Open ${DESKTOP_APP_NAME}`, click: focusMainWindow },
       {
-        label: "Settings…",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME} uygulamasını aç`
+          : `Open ${DESKTOP_APP_NAME}`,
+        click: focusMainWindow,
+      },
+      {
+        label: isTurkish ? "Ayarlar…" : "Settings…",
         click: () => void showSettingsWindow(),
       },
       {
-        label: "Check for Updates…",
+        label: isTurkish ? "Güncellemeleri denetle…" : "Check for Updates…",
         click: () => void requestUpdateCheck(),
       },
       { type: "separator" },
-      { role: "quit", label: `Quit ${DESKTOP_APP_NAME}` },
+      {
+        role: "quit",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME}'ten çık`
+          : `Quit ${DESKTOP_APP_NAME}`,
+      },
     ]),
   );
-  tray.on("click", focusMainWindow);
 }
 
 function notifyDesktop(title: string, body: string, onClick?: () => void) {
@@ -748,7 +842,7 @@ async function showUpdateCheckWindow() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
+  const isTurkish = isTurkishDesktop();
   const checkingLabel = isTurkish
     ? "Güncellemeler denetleniyor…"
     : "Checking for updates…";
@@ -761,7 +855,7 @@ async function showUpdateCheckWindow() {
     height: 300,
     resizable: false,
     title: windowTitle,
-    backgroundColor: "#202124",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -778,17 +872,18 @@ async function showUpdateCheckWindow() {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${windowTitle}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #202124; color: #f1f3f4; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
-      .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: #3a4246; }
+      .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: var(--dialog-border); }
       .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: #1683ff; transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
       @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
-      button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button:hover { background: #414c52; }
+      button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--dialog-button-hover); }
     </style>
   </head>
   <body>
@@ -836,7 +931,7 @@ async function showUpdateConfirmation() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
+  const isTurkish = isTurkishDesktop();
   const title = isTurkish
     ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`
     : `Update ${DESKTOP_APP_NAME} now?`;
@@ -852,7 +947,7 @@ async function showUpdateConfirmation() {
     height: 430,
     resizable: false,
     title,
-    backgroundColor: "#202124",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -884,15 +979,16 @@ async function showUpdateConfirmation() {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #202124; color: #f1f3f4; }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { padding: 26px 28px 14px; }
       .warning { width: 88px; height: 80px; display: grid; place-items: center; padding-top: 12px; margin: 0 0 18px 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #f3c438; color: #fff; font-size: 48px; line-height: 1; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
       h1 { margin: 0 0 16px; font-size: 25px; line-height: 1.2; font-weight: 700; }
-      p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: #d4d8da; }
+      p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: var(--dialog-secondary); }
       footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
-      button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
+      button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
       button.primary { background: #1683ff; }
       button:hover { filter: brightness(1.12); }
     </style>
@@ -928,7 +1024,7 @@ async function showUpdateDialog(version: string, force = false) {
   promptedUpdateVersion = version;
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
+  const isTurkish = isTurkishDesktop();
   const title = isTurkish
     ? `Yeni bir ${DESKTOP_APP_NAME} sürümü var!`
     : `A new version of ${DESKTOP_APP_NAME} is available!`;
@@ -948,7 +1044,7 @@ async function showUpdateDialog(version: string, force = false) {
     height: 360,
     resizable: false,
     title,
-    backgroundColor: "#202124",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1001,17 +1097,18 @@ async function showUpdateDialog(version: string, force = false) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #202124; color: #f1f3f4; }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 24px 28px 18px; }
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
-      p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: #d4d8da; }
-      label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: #e2e5e7; }
+      p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: var(--dialog-secondary); }
+      label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: var(--dialog-foreground); }
       input { width: 25px; height: 25px; accent-color: #1683ff; }
       footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
-      button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
+      button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
       button.primary { background: #1683ff; }
       button:hover { filter: brightness(1.12); }
     </style>
@@ -1060,26 +1157,29 @@ function toggleDeveloperTools() {
 }
 
 function installApplicationMenu() {
+  const isTurkish = isTurkishDesktop();
   const applicationMenu: MenuItemConstructorOptions = {
     label: DESKTOP_APP_NAME,
     submenu: [
       {
-        label: `About ${DESKTOP_APP_NAME}`,
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME} hakkında`
+          : `About ${DESKTOP_APP_NAME}`,
         click: () => void showAboutDialog(),
       },
       { type: "separator" },
       {
-        label: "Settings…",
+        label: isTurkish ? "Ayarlar…" : "Settings…",
         click: () => void showSettingsWindow(),
       },
       {
-        label: "Check for Updates…",
+        label: isTurkish ? "Güncellemeleri denetle…" : "Check for Updates…",
         click: () => void requestUpdateCheck(),
       },
       { type: "separator" },
       {
         id: "desktop-logout",
-        label: "Log Out",
+        label: isTurkish ? "Oturumu kapat" : "Log Out",
         click: () => {
           void writeVault({}).catch(() => undefined);
           mainWindow?.webContents.send("desktop:menu-logout");
@@ -1088,11 +1188,24 @@ function installApplicationMenu() {
       { type: "separator" },
       { role: "services", submenu: [] },
       { type: "separator" },
-      { role: "hide", label: `Hide ${DESKTOP_APP_NAME}` },
-      { role: "hideOthers", label: "Hide Others" },
-      { role: "unhide", label: "Show All" },
+      {
+        role: "hide",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME} uygulamasını gizle`
+          : `Hide ${DESKTOP_APP_NAME}`,
+      },
+      {
+        role: "hideOthers",
+        label: isTurkish ? "Diğerlerini gizle" : "Hide Others",
+      },
+      { role: "unhide", label: isTurkish ? "Tümünü göster" : "Show All" },
       { type: "separator" },
-      { role: "quit", label: `Quit ${DESKTOP_APP_NAME}` },
+      {
+        role: "quit",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME}'ten çık`
+          : `Quit ${DESKTOP_APP_NAME}`,
+      },
     ],
   };
   const viewSubmenu: MenuItemConstructorOptions[] = [
@@ -1102,7 +1215,9 @@ function installApplicationMenu() {
     ...(process.env.DESKTOP_DEVTOOLS === "true"
       ? [
           {
-            label: "Toggle Developer Tools",
+            label: isTurkish
+              ? "Geliştirici araçlarını aç/kapat"
+              : "Toggle Developer Tools",
             click: toggleDeveloperTools,
           },
           { type: "separator" as const },
@@ -1117,7 +1232,7 @@ function installApplicationMenu() {
   const template: MenuItemConstructorOptions[] = [
     applicationMenu,
     { role: "editMenu" },
-    { label: "View", submenu: viewSubmenu },
+    { label: isTurkish ? "Görünüm" : "View", submenu: viewSubmenu },
     { role: "windowMenu" },
     { role: "help" },
   ];
@@ -1137,7 +1252,7 @@ async function createWindow() {
     height: state?.height ?? 960,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1166,8 +1281,14 @@ async function createWindow() {
     if (saveTimer) clearTimeout(saveTimer);
     void saveWindowState(mainWindow!);
   });
-  mainWindow.on("unresponsive", () => void appendDiagnosticEvent("window-unresponsive"));
-  mainWindow.on("responsive", () => void appendDiagnosticEvent("window-responsive"));
+  mainWindow.on(
+    "unresponsive",
+    () => void appendDiagnosticEvent("window-unresponsive"),
+  );
+  mainWindow.on(
+    "responsive",
+    () => void appendDiagnosticEvent("window-responsive"),
+  );
   mainWindow.webContents.on("render-process-gone", (_event, details) => {
     void appendDiagnosticEvent("renderer-process-gone", {
       reason: details.reason,
@@ -1231,13 +1352,23 @@ function registerIpc() {
       architecture: process.arch,
       apiHost,
       packaged: app.isPackaged,
-      secureStorage: safeStorage.isEncryptionAvailable() ? "available" : "unavailable",
+      secureStorage: safeStorage.isEncryptionAvailable()
+        ? "available"
+        : "unavailable",
       autoUpdatesSupported:
         app.isPackaged &&
         process.env.DESKTOP_AUTO_UPDATE !== "false" &&
         (process.platform !== "linux" || Boolean(process.env.APPIMAGE)),
       events: await readDiagnosticEvents(),
     };
+  });
+  ipcMain.handle("desktop:theme-set", (event, value: unknown) => {
+    assertTrustedSender(event);
+    applyDesktopTheme(value);
+  });
+  ipcMain.handle("desktop:language-set", (event, value: unknown) => {
+    assertTrustedSender(event);
+    applyDesktopLanguage(value);
   });
   ipcMain.handle("desktop:preferences-get", async (event) => {
     assertTrustedSender(event);
@@ -1498,8 +1629,12 @@ if (!hasLock) {
         const manualCheck = manualUpdateCheckRequested;
         if (!manualCheck && isMainWindowInBackground()) {
           notifyDesktop(
-            `${DESKTOP_APP_NAME} update available`,
-            `Version ${status.version} is ready to download.`,
+            isTurkishDesktop()
+              ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
+              : `${DESKTOP_APP_NAME} update available`,
+            isTurkishDesktop()
+              ? `${status.version} sürümü indirilmeye hazır.`
+              : `Version ${status.version} is ready to download.`,
             () => void showUpdateDialog(status.version, true),
           );
         }
@@ -1511,8 +1646,12 @@ if (!hasLock) {
         suppressNextUpdateNotification = false;
         if (!suppressNotification && isMainWindowInBackground()) {
           notifyDesktop(
-            `${DESKTOP_APP_NAME} update ready`,
-            `Version ${status.version} will be installed when you restart.`,
+            isTurkishDesktop()
+              ? `${DESKTOP_APP_NAME} güncellemesi hazır`
+              : `${DESKTOP_APP_NAME} update ready`,
+            isTurkishDesktop()
+              ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
+              : `Version ${status.version} will be installed when you restart.`,
             () => void showUpdateConfirmation(),
           );
         }
@@ -1529,7 +1668,9 @@ if (!hasLock) {
       );
   });
   process.on("uncaughtExceptionMonitor", (error) => {
-    void appendDiagnosticEvent("uncaught-exception", { message: error.message });
+    void appendDiagnosticEvent("uncaught-exception", {
+      message: error.message,
+    });
   });
   process.on("unhandledRejection", (reason) => {
     void appendDiagnosticEvent("unhandled-rejection", { reason });

@@ -80,6 +80,12 @@ export type DesktopApi = {
   diagnostics: {
     get: () => Promise<DesktopDiagnostics>;
   };
+  theme: {
+    set: (value: "system" | "light" | "dark") => Promise<void>;
+  };
+  language: {
+    set: (value: "en" | "tr") => Promise<void>;
+  };
   settings: {
     close: () => Promise<void>;
     ready: () => Promise<void>;

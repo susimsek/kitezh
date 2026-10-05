@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld("desktopApi", {
   diagnostics: {
     get: () => ipcRenderer.invoke("desktop:diagnostics-get"),
   },
+  theme: {
+    set: (value: unknown) => ipcRenderer.invoke("desktop:theme-set", value),
+  },
+  language: {
+    set: (value: unknown) => ipcRenderer.invoke("desktop:language-set", value),
+  },
   settings: {
     close: () => ipcRenderer.invoke("desktop:settings-close"),
     ready: () => ipcRenderer.invoke("desktop:settings-ready"),

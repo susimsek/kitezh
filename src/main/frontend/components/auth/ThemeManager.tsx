@@ -33,6 +33,7 @@ export function ThemeManager() {
         "data-bs-theme",
         resolveTheme(theme, mediaQuery.matches),
       );
+      if (window.desktopApi) void window.desktopApi.theme.set(theme);
     };
 
     applyTheme();
