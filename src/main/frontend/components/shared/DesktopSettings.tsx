@@ -1,24 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { Alert, Button, Card, Container, Form, Spinner, Stack } from "react-bootstrap";
 
 import { Icon, type IconName } from "@/components/shared/Icon";
 import { useDictionary } from "@/i18n/client";
-import { isDesktopRuntime, type DesktopPreferences } from "@/lib/desktop-api";
+import {
+  isDesktopRuntime,
+  type DesktopDiagnostics,
+  type DesktopPreferences,
+} from "@/lib/desktop-api";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setTheme } from "@/store/theme-slice";
 
 import { THEME_STORAGE_KEY, type Theme } from "../auth/theme";
 
-type PreferenceKey = "launchAtLogin" | "notifications" | "automaticDownload";
-type SettingsSection = "general" | "notifications" | "appearance" | "updates";
+type PreferenceKey = "launchAtLogin" | "notifications" | "automaticDownload" | "globalShortcut";
+type SettingsSection = "general" | "notifications" | "appearance" | "updates" | "diagnostics";
 
 const sectionIcons: Record<SettingsSection, IconName> = {
   general: "sliders",
   notifications: "heartPulse",
   appearance: "sun",
   updates: "clockRotateLeft",
+  diagnostics: "circleInfo",
 };
 
 export function DesktopSettings() {
@@ -27,17 +32,25 @@ export function DesktopSettings() {
   const theme = useAppSelector((state) => state.theme.value) as Theme;
   const [section, setSection] = useState<SettingsSection>("general");
   const [preferences, setPreferences] = useState<DesktopPreferences | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DesktopDiagnostics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [pending, setPending] = useState<PreferenceKey | null>(null);
+  const [recordingShortcut, setRecordingShortcut] = useState(false);
+  const [copyingDiagnostics, setCopyingDiagnostics] = useState(false);
 
   useEffect(() => {
     if (!isDesktopRuntime() || !window.desktopApi) return undefined;
-    void window.desktopApi.preferences
+    const desktopApi = window.desktopApi;
+    void desktopApi.preferences
       .get()
       .then(setPreferences)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+    void desktopApi.diagnostics
+      .get()
+      .then(setDiagnostics)
+      .catch(() => undefined);
   }, []);
 
   if (loading) {
@@ -69,6 +82,39 @@ export function DesktopSettings() {
     }
   };
 
+  const updateShortcut = async (accelerator: string) => {
+    setPending("globalShortcut");
+    setError(false);
+    try {
+      const next = await window.desktopApi!.preferences.set({ globalShortcut: accelerator });
+      setPreferences(next);
+      setRecordingShortcut(false);
+    } catch {
+      setError(true);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const shortcutFromKeyEvent = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setRecordingShortcut(false);
+      return null;
+    }
+    if (["Control", "Alt", "Shift", "Meta"].includes(event.key)) return null;
+
+    const modifiers: string[] = [];
+    if (event.ctrlKey || event.metaKey) modifiers.push("CommandOrControl");
+    if (event.altKey) modifiers.push("Alt");
+    if (event.shiftKey) modifiers.push("Shift");
+    if (modifiers.length === 0) return null;
+
+    const key =
+      event.key === " " ? "Space" : event.key.length === 1 ? event.key.toUpperCase() : event.key;
+    return [...modifiers, key].join("+");
+  };
+
   const changeTheme = (nextTheme: Theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     dispatch(setTheme(nextTheme));
@@ -82,12 +128,39 @@ export function DesktopSettings() {
     },
     { id: "appearance", label: dictionary.desktop.settings.sections.appearance },
     { id: "updates", label: dictionary.desktop.settings.sections.updates },
+    { id: "diagnostics", label: dictionary.desktop.settings.sections.diagnostics },
   ];
 
   const themeLabels: Record<Theme, string> = {
     system: dictionary.theme.system,
     light: dictionary.theme.light,
     dark: dictionary.theme.dark,
+  };
+
+  const copyDiagnostics = async () => {
+    if (!diagnostics) return;
+    setCopyingDiagnostics(true);
+    try {
+      const text = [
+        `Kitezh ${diagnostics.appVersion}`,
+        `Electron ${diagnostics.electronVersion}`,
+        `Chrome ${diagnostics.chromeVersion}`,
+        `Node ${diagnostics.nodeVersion}`,
+        `Platform ${diagnostics.platform} (${diagnostics.architecture})`,
+        `API host ${diagnostics.apiHost}`,
+        `Packaged ${diagnostics.packaged}`,
+        `Secure storage ${diagnostics.secureStorage}`,
+        `Auto updates ${diagnostics.autoUpdatesSupported}`,
+        "",
+        "Recent events:",
+        ...diagnostics.events,
+      ].join("\n");
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setError(true);
+    } finally {
+      setCopyingDiagnostics(false);
+    }
   };
 
   return (
@@ -161,8 +234,20 @@ export function DesktopSettings() {
                         </Form.Label>
                         <Form.Control
                           id="desktop-global-shortcut"
-                          value={preferences.globalShortcut}
+                          value={
+                            recordingShortcut
+                              ? dictionary.desktop.settings.globalShortcutCapture
+                              : preferences.globalShortcut
+                          }
                           readOnly
+                          disabled={pending !== null}
+                          onFocus={() => setRecordingShortcut(true)}
+                          onBlur={() => setRecordingShortcut(false)}
+                          onKeyDown={(event) => {
+                            event.preventDefault();
+                            const accelerator = shortcutFromKeyEvent(event);
+                            if (accelerator) void updateShortcut(accelerator);
+                          }}
                           aria-describedby="desktop-global-shortcut-help"
                         />
                         <Form.Text
@@ -227,6 +312,83 @@ export function DesktopSettings() {
                       <Alert variant="info" className="mb-0">
                         {dictionary.desktop.settings.updateCheckDescription}
                       </Alert>
+                    </Stack>
+                  )}
+
+                  {section === "diagnostics" && (
+                    <Stack gap={3}>
+                      {diagnostics ? (
+                        <>
+                          <dl className="row mb-0">
+                            <dt className="col-sm-5">
+                              {dictionary.desktop.settings.diagnostics.appVersion}
+                            </dt>
+                            <dd className="col-sm-7">{diagnostics.appVersion}</dd>
+                            <dt className="col-sm-5">
+                              {dictionary.desktop.settings.diagnostics.platform}
+                            </dt>
+                            <dd className="col-sm-7">
+                              {diagnostics.platform} ({diagnostics.architecture})
+                            </dd>
+                            <dt className="col-sm-5">
+                              {dictionary.desktop.settings.diagnostics.runtime}
+                            </dt>
+                            <dd className="col-sm-7">
+                              Electron {diagnostics.electronVersion}, Chrome{" "}
+                              {diagnostics.chromeVersion}
+                            </dd>
+                            <dt className="col-sm-5">
+                              {dictionary.desktop.settings.diagnostics.apiHost}
+                            </dt>
+                            <dd className="col-sm-7">{diagnostics.apiHost}</dd>
+                            <dt className="col-sm-5">
+                              {dictionary.desktop.settings.diagnostics.secureStorage}
+                            </dt>
+                            <dd className="col-sm-7">
+                              {diagnostics.secureStorage === "available"
+                                ? dictionary.desktop.settings.diagnostics.available
+                                : dictionary.desktop.settings.diagnostics.unavailable}
+                            </dd>
+                          </dl>
+                          <Form.Group>
+                            <Form.Label htmlFor="desktop-diagnostic-events">
+                              {dictionary.desktop.settings.diagnostics.recentEvents}
+                            </Form.Label>
+                            <Form.Control
+                              as="textarea"
+                              id="desktop-diagnostic-events"
+                              rows={7}
+                              readOnly
+                              value={
+                                diagnostics.events.length > 0
+                                  ? diagnostics.events.join("\n")
+                                  : dictionary.desktop.settings.diagnostics.noEvents
+                              }
+                            />
+                          </Form.Group>
+                          <div className="d-flex justify-content-end">
+                            <Button
+                              variant="secondary"
+                              disabled={copyingDiagnostics}
+                              onClick={() => void copyDiagnostics()}
+                            >
+                              {copyingDiagnostics && (
+                                <Spinner
+                                  animation="border"
+                                  size="sm"
+                                  className="me-2"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              {dictionary.desktop.settings.diagnostics.copy}
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <Alert variant="secondary" className="mb-0">
+                          {dictionary.desktop.settings.diagnostics.unavailable}
+                        </Alert>
+                      )}
                     </Stack>
                   )}
                 </section>

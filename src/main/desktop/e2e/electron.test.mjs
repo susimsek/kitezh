@@ -79,18 +79,42 @@ test("opens settings in a separate window without requiring login", async () => 
       .getByRole("heading", { name: "Kitezh settings" })
       .waitFor();
 
-    for (const section of ["General", "Notifications", "Appearance", "Updates"]) {
+    for (const section of [
+      "General",
+      "Notifications",
+      "Appearance",
+      "Updates",
+      "Diagnostics",
+    ]) {
       assert.equal(
         await settingsWindow.getByRole("button", { name: section }).count(),
         1,
       );
     }
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
-    await settingsWindow
-      .getByRole("heading", { name: "Appearance" })
-      .waitFor();
+    await settingsWindow.getByRole("heading", { name: "Appearance" }).waitFor();
     assert.equal(
       await settingsWindow.getByRole("radio", { name: "System" }).count(),
+      1,
+    );
+    await settingsWindow.getByRole("button", { name: "General" }).click();
+    const shortcut = settingsWindow.locator("#desktop-global-shortcut");
+    await shortcut.click();
+    await shortcut.press("Control+Shift+K");
+    await settingsWindow.waitForFunction(
+      () =>
+        document.querySelector("#desktop-global-shortcut")?.value ===
+        "CommandOrControl+Shift+K",
+    );
+    assert.equal(await shortcut.inputValue(), "CommandOrControl+Shift+K");
+    await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
+    await settingsWindow
+      .getByRole("heading", { name: "Diagnostics" })
+      .waitFor();
+    assert.equal(
+      await settingsWindow
+        .getByRole("button", { name: "Copy diagnostics" })
+        .count(),
       1,
     );
 

@@ -53,6 +53,8 @@ import {
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
+const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
+const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 app.setName(DESKTOP_APP_NAME);
 
@@ -95,6 +97,39 @@ type DesktopPreferences = {
   globalShortcut: string;
 };
 const DEFAULT_GLOBAL_SHORTCUT = "Alt+Space";
+const GLOBAL_SHORTCUT_MODIFIERS = new Set([
+  "Command",
+  "CommandOrControl",
+  "Control",
+  "Alt",
+  "AltGr",
+  "Shift",
+  "Super",
+  "Meta",
+]);
+const GLOBAL_SHORTCUT_SPECIAL_KEYS = new Set([
+  "Space",
+  "Tab",
+  "Enter",
+  "Escape",
+  "Backspace",
+  "Delete",
+  "Insert",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+  "Up",
+  "Down",
+  "Left",
+  "Right",
+  "Plus",
+  "PrintScreen",
+  "MediaPlayPause",
+  "MediaNextTrack",
+  "MediaPreviousTrack",
+  "MediaStop",
+]);
 type WindowState = {
   x?: number;
   y?: number;
@@ -102,6 +137,58 @@ type WindowState = {
   height: number;
   maximized: boolean;
 };
+
+function diagnosticsLogPath() {
+  return path.join(app.getPath("userData"), DIAGNOSTICS_LOG_FILE);
+}
+
+function redactDiagnosticText(value: string) {
+  return value
+    .replace(
+      /((?:access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|cookie|code)=)[^\s&]+/gi,
+      "$1[redacted]",
+    )
+    .replace(
+      /((?:"|'?)(?:access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|cookie|code)(?:"|'?)\s*:\s*["'])([^"']*)(["'])/gi,
+      "$1[redacted]$3",
+    )
+    .replace(/https?:\/\/[^\s]+/gi, (value) => {
+      try {
+        const url = new URL(value);
+        return `${url.origin}${url.pathname}`;
+      } catch {
+        return "[redacted-url]";
+      }
+    })
+    .replace(/(?:\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\s]+/g, "[user-path]")
+    .slice(0, 500);
+}
+
+async function appendDiagnosticEvent(name: string, details?: Record<string, unknown>) {
+  const safeDetails = Object.fromEntries(
+    Object.entries(details ?? {})
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, redactDiagnosticText(String(value))]),
+  );
+  const line = `${new Date().toISOString()} ${name}${Object.keys(safeDetails).length ? ` ${JSON.stringify(safeDetails)}` : ""}\n`;
+  try {
+    const current = await readFile(diagnosticsLogPath(), "utf8").catch(() => "");
+    const next = `${current}${line}`.slice(-MAX_DIAGNOSTICS_LOG_BYTES);
+    await mkdir(path.dirname(diagnosticsLogPath()), { recursive: true });
+    await writeFile(diagnosticsLogPath(), next, { encoding: "utf8", mode: 0o600 });
+  } catch {
+    // Diagnostics must never interfere with the desktop application.
+  }
+}
+
+async function readDiagnosticEvents() {
+  try {
+    const content = await readFile(diagnosticsLogPath(), "utf8");
+    return content.trim().split("\n").filter(Boolean).slice(-50);
+  } catch {
+    return [];
+  }
+}
 
 function rendererRoot() {
   return path.resolve(__dirname, "../renderer");
@@ -535,11 +622,40 @@ function toggleQuickAccess() {
   focusMainWindow();
 }
 
+function isValidGlobalShortcut(accelerator: string) {
+  const parts = accelerator.split("+");
+  if (parts.length < 2 || parts.length > 5 || parts.some((part) => !part)) {
+    return false;
+  }
+  const modifiers = parts.slice(0, -1);
+  const key = parts.at(-1)!;
+  if (
+    modifiers.some(
+      (modifier, index) =>
+        !GLOBAL_SHORTCUT_MODIFIERS.has(modifier) ||
+        modifiers.indexOf(modifier) !== index,
+    )
+  ) {
+    return false;
+  }
+  return (
+    GLOBAL_SHORTCUT_SPECIAL_KEYS.has(key) ||
+    /^[A-Z0-9]$/.test(key) ||
+    /^F(?:[1-9]|1[0-9]|2[0-4])$/.test(key)
+  );
+}
+
 function registerGlobalShortcut(accelerator: string) {
   globalShortcut.unregisterAll();
-  if (!globalShortcut.register(accelerator, toggleQuickAccess)) {
-    globalShortcut.register(DEFAULT_GLOBAL_SHORTCUT, toggleQuickAccess);
+  try {
+    if (globalShortcut.register(accelerator, toggleQuickAccess)) return true;
+  } catch {
+    // Invalid or unavailable accelerators fall back to the default shortcut.
   }
+  if (!globalShortcut.register(DEFAULT_GLOBAL_SHORTCUT, toggleQuickAccess)) {
+    return false;
+  }
+  return false;
 }
 
 function createTray() {
@@ -1055,6 +1171,14 @@ async function createWindow() {
     if (saveTimer) clearTimeout(saveTimer);
     void saveWindowState(mainWindow!);
   });
+  mainWindow.on("unresponsive", () => void appendDiagnosticEvent("window-unresponsive"));
+  mainWindow.on("responsive", () => void appendDiagnosticEvent("window-responsive"));
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    void appendDiagnosticEvent("renderer-process-gone", {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+  });
   void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/`);
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -1095,6 +1219,31 @@ function registerIpc() {
     assertTrustedSender(event);
     return app.getVersion();
   });
+  ipcMain.handle("desktop:diagnostics-get", async (event) => {
+    assertTrustedSender(event);
+    let apiHost = "unknown";
+    try {
+      apiHost = new URL(getApiBaseUrl()).host;
+    } catch {
+      // The configured origin is validated elsewhere; keep diagnostics safe if it is unavailable.
+    }
+    return {
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron,
+      chromeVersion: process.versions.chrome,
+      nodeVersion: process.versions.node,
+      platform: process.platform,
+      architecture: process.arch,
+      apiHost,
+      packaged: app.isPackaged,
+      secureStorage: safeStorage.isEncryptionAvailable() ? "available" : "unavailable",
+      autoUpdatesSupported:
+        app.isPackaged &&
+        process.env.DESKTOP_AUTO_UPDATE !== "false" &&
+        (process.platform !== "linux" || Boolean(process.env.APPIMAGE)),
+      events: await readDiagnosticEvents(),
+    };
+  });
   ipcMain.handle("desktop:preferences-get", async (event) => {
     assertTrustedSender(event);
     const preferences = await readDesktopPreferences();
@@ -1112,6 +1261,13 @@ function registerIpc() {
       automaticDownload?: boolean;
     };
     const current = await readDesktopPreferences();
+    if (
+      input.globalShortcut !== undefined &&
+      (typeof input.globalShortcut !== "string" ||
+        !isValidGlobalShortcut(input.globalShortcut))
+    ) {
+      throw new Error("Invalid global shortcut");
+    }
     const next: DesktopPreferences = {
       launchAtLogin:
         typeof input.launchAtLogin === "boolean"
@@ -1128,7 +1284,13 @@ function registerIpc() {
           : current.globalShortcut,
     };
     await applyLaunchAtLogin(next.launchAtLogin);
-    registerGlobalShortcut(next.globalShortcut);
+    if (
+      next.globalShortcut !== current.globalShortcut &&
+      !registerGlobalShortcut(next.globalShortcut)
+    ) {
+      registerGlobalShortcut(current.globalShortcut);
+      throw new Error("Global shortcut is unavailable");
+    }
     await writeDesktopPreferences(next);
     if (typeof input.automaticDownload === "boolean") {
       const updatePreferences = await readUpdatePreferences();
@@ -1321,6 +1483,10 @@ if (!hasLock) {
     await registerRendererProtocol();
     void createWindow();
     configureAutoUpdater((status: DesktopUpdateStatus) => {
+      void appendDiagnosticEvent(`update-${status.state}`, {
+        version: "version" in status ? status.version : undefined,
+        message: "message" in status ? status.message : undefined,
+      });
       if (status.state === "checking") {
         void showUpdateCheckWindow().catch(() => undefined);
       } else {
@@ -1359,6 +1525,12 @@ if (!hasLock) {
         "activate",
         () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
       );
+  });
+  process.on("uncaughtExceptionMonitor", (error) => {
+    void appendDiagnosticEvent("uncaught-exception", { message: error.message });
+  });
+  process.on("unhandledRejection", (reason) => {
+    void appendDiagnosticEvent("unhandled-rejection", { reason });
   });
   app.on("before-quit", () => {
     globalShortcut.unregisterAll();

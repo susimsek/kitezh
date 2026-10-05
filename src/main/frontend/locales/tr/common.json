@@ -75,13 +75,15 @@
         "general": "Genel",
         "notifications": "Bildirimler",
         "appearance": "Görünüm",
-        "updates": "Güncellemeler"
+        "updates": "Güncellemeler",
+        "diagnostics": "Tanı bilgileri"
       },
       "sectionDescriptions": {
         "general": "Kitezh’in nasıl başlayacağını ve hızlıca nasıl açılacağını yönetin.",
         "notifications": "Kitezh’in masaüstü bildirimleri gösterip göstermeyeceğini seçin.",
         "appearance": "Masaüstü uygulamasında kullanılacak temayı seçin.",
-        "updates": "Kitezh’in uygulama güncellemelerini nasıl indirip kuracağını yönetin."
+        "updates": "Kitezh’in uygulama güncellemelerini nasıl indirip kuracağını yönetin.",
+        "diagnostics": "Güvenli çalışma zamanı bilgilerini ve redakte edilmiş son uygulama olaylarını inceleyin."
       },
       "launchAtLogin": "Kitezh’i oturum açıldığında başlat",
       "launchAtLoginDescription": "Bilgisayarınızda oturum açtığınızda Kitezh’i otomatik olarak açar.",
@@ -90,9 +92,22 @@
       "automaticUpdates": "Güncellemeleri otomatik olarak indir ve kur",
       "automaticUpdatesDescription": "Güncellemeleri arka planda indirir ve Kitezh yeniden başladığında kurar.",
       "globalShortcut": "Hızlı erişim kısayolu",
-      "globalShortcutDescription": "Bu kısayola her yerden basarak Kitezh’i gösterin veya gizleyin.",
+      "globalShortcutDescription": "Kısayolu değiştirmek için alana tıklayıp bir tuş kombinasyonuna basın.",
+      "globalShortcutCapture": "Bir tuş kombinasyonuna basın…",
       "theme": "Uygulama teması",
       "updateCheckDescription": "Güncellemeleri elle denetlemek için uygulama menüsünden Kitezh → Güncellemeleri denetle… seçeneğini kullanın.",
+      "diagnostics": {
+        "appVersion": "Uygulama sürümü",
+        "platform": "Platform",
+        "runtime": "Çalışma zamanı",
+        "apiHost": "API ana bilgisayarı",
+        "secureStorage": "Güvenli depolama",
+        "available": "Kullanılabilir",
+        "unavailable": "Kullanılamıyor",
+        "recentEvents": "Son tanı olayları",
+        "noEvents": "Yakın zamanda tanı olayı yok.",
+        "copy": "Tanı bilgilerini kopyala"
+      },
       "done": "Bitti"
     }
   },

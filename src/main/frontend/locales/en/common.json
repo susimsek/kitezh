@@ -75,13 +75,15 @@
         "general": "General",
         "notifications": "Notifications",
         "appearance": "Appearance",
-        "updates": "Updates"
+        "updates": "Updates",
+        "diagnostics": "Diagnostics"
       },
       "sectionDescriptions": {
         "general": "Manage how Kitezh starts and how you open it quickly.",
         "notifications": "Choose whether Kitezh can show desktop notifications.",
         "appearance": "Choose the theme used by the desktop application.",
-        "updates": "Control how Kitezh downloads and installs application updates."
+        "updates": "Control how Kitezh downloads and installs application updates.",
+        "diagnostics": "Review safe runtime information and redacted recent application events."
       },
       "launchAtLogin": "Launch Kitezh at login",
       "launchAtLoginDescription": "Open Kitezh automatically when you sign in to your computer.",
@@ -90,9 +92,22 @@
       "automaticUpdates": "Automatically download and install updates",
       "automaticUpdatesDescription": "Download updates in the background and install them when Kitezh restarts.",
       "globalShortcut": "Quick access shortcut",
-      "globalShortcutDescription": "Press this shortcut anywhere to show or hide Kitezh.",
+      "globalShortcutDescription": "Click the field and press a key combination to change the shortcut.",
+      "globalShortcutCapture": "Press a key combination…",
       "theme": "Application theme",
       "updateCheckDescription": "To check for updates manually, use Kitezh → Check for Updates… from the application menu.",
+      "diagnostics": {
+        "appVersion": "Application version",
+        "platform": "Platform",
+        "runtime": "Runtime",
+        "apiHost": "API host",
+        "secureStorage": "Secure storage",
+        "available": "Available",
+        "unavailable": "Unavailable",
+        "recentEvents": "Recent diagnostic events",
+        "noEvents": "No recent diagnostic events.",
+        "copy": "Copy diagnostics"
+      },
       "done": "Done"
     }
   },

@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld("desktopApi", {
     set: (value: unknown) =>
       ipcRenderer.invoke("desktop:preferences-set", value),
   },
+  diagnostics: {
+    get: () => ipcRenderer.invoke("desktop:diagnostics-get"),
+  },
   settings: {
     close: () => ipcRenderer.invoke("desktop:settings-close"),
   },

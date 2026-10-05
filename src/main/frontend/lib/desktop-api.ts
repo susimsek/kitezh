@@ -29,6 +29,20 @@ export type DesktopPreferences = {
   automaticDownload: boolean;
 };
 
+export type DesktopDiagnostics = {
+  appVersion: string;
+  electronVersion: string;
+  chromeVersion: string;
+  nodeVersion: string;
+  platform: string;
+  architecture: string;
+  apiHost: string;
+  packaged: boolean;
+  secureStorage: "available" | "unavailable";
+  autoUpdatesSupported: boolean;
+  events: string[];
+};
+
 let desktopConnectivity: "unknown" | "online" | "offline" = "unknown";
 
 export class DesktopOfflineError extends Error {
@@ -62,6 +76,9 @@ export type DesktopApi = {
   preferences: {
     get: () => Promise<DesktopPreferences>;
     set: (value: Partial<DesktopPreferences>) => Promise<DesktopPreferences>;
+  };
+  diagnostics: {
+    get: () => Promise<DesktopDiagnostics>;
   };
   settings: {
     close: () => Promise<void>;
