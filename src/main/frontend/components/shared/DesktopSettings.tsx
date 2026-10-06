@@ -19,7 +19,13 @@ import { setTheme } from "@/store/theme-slice";
 import { THEME_STORAGE_KEY, type Theme } from "../auth/theme";
 import { ActionIcon } from "./ActionIcon";
 
-type PreferenceKey = "launchAtLogin" | "notifications" | "automaticDownload" | "globalShortcut";
+type PreferenceKey =
+  | "launchAtLogin"
+  | "showInMenuBar"
+  | "showInDock"
+  | "notifications"
+  | "automaticDownload"
+  | "globalShortcut";
 type SettingsSection = "general" | "notifications" | "appearance" | "updates" | "diagnostics";
 type LanguageMode = Locale | "system";
 
@@ -33,6 +39,8 @@ const sectionIcons: Record<SettingsSection, IconName> = {
 
 const defaultPreferences: DesktopPreferences = {
   launchAtLogin: false,
+  showInMenuBar: true,
+  showInDock: true,
   notifications: true,
   globalShortcut: "CommandOrControl+Shift+K",
   automaticDownload: false,
@@ -155,7 +163,7 @@ export function DesktopSettings() {
       id: "general",
       label: dictionary.desktop.settings.sections.general,
       description: dictionary.desktop.settings.sectionDescriptions.general,
-      keywords: `${dictionary.desktop.settings.launchAtLogin} ${dictionary.desktop.settings.globalShortcut} ${dictionary.desktop.settings.language}`,
+      keywords: `${dictionary.desktop.settings.launchAtLogin} ${dictionary.desktop.settings.showInMenuBar} ${dictionary.desktop.settings.showInDock} ${dictionary.desktop.settings.globalShortcut} ${dictionary.desktop.settings.language}`,
     },
     {
       id: "notifications",
@@ -307,6 +315,36 @@ export function DesktopSettings() {
                       <Form.Text className="text-body-secondary">
                         {dictionary.desktop.settings.launchAtLoginDescription}
                       </Form.Text>
+                      <Form.Check
+                        type="switch"
+                        id="desktop-show-in-menu-bar"
+                        label={dictionary.desktop.settings.showInMenuBar}
+                        checked={preferences.showInMenuBar}
+                        disabled={pending !== null}
+                        onChange={(event) =>
+                          void updatePreference("showInMenuBar", event.target.checked)
+                        }
+                      />
+                      <Form.Text className="text-body-secondary">
+                        {dictionary.desktop.settings.showInMenuBarDescription}
+                      </Form.Text>
+                      {diagnostics?.platform === "darwin" && (
+                        <>
+                          <Form.Check
+                            type="switch"
+                            id="desktop-show-in-dock"
+                            label={dictionary.desktop.settings.showInDock}
+                            checked={preferences.showInDock}
+                            disabled={pending !== null}
+                            onChange={(event) =>
+                              void updatePreference("showInDock", event.target.checked)
+                            }
+                          />
+                          <Form.Text className="text-body-secondary">
+                            {dictionary.desktop.settings.showInDockDescription}
+                          </Form.Text>
+                        </>
+                      )}
                       <Form.Group>
                         <Form.Label htmlFor="desktop-language">
                           {dictionary.desktop.settings.language}

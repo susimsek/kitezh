@@ -62,6 +62,7 @@ import { MfaChallengePage } from "@/components/auth/MfaChallengePage";
 import { DownloadPage } from "@/components/download/DownloadPage";
 import { HomePage } from "@/components/home/HomePage";
 import { DesktopConsoleChooser } from "@/components/shared/DesktopConsoleChooser";
+import { DesktopCompanion } from "@/components/shared/DesktopCompanion";
 import { DesktopSettings } from "@/components/shared/DesktopSettings";
 import { isDesktopRuntime } from "@/lib/desktop-api";
 import AdminEvents from "@/components/admin/AdminEvents";
@@ -233,6 +234,16 @@ export function AppRoutes() {
       <Route
         path="desktop-settings"
         element={isDesktopRuntime() ? <DesktopSettings /> : <Navigate to="/" replace />}
+      />
+      <Route
+        path="desktop-companion"
+        element={
+          isDesktopRuntime() ? (
+            <DesktopCompanion dictionary={dictionary} />
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
       />
       <Route element={<LandingLayout />}>
         <Route

@@ -42,6 +42,10 @@ contextBridge.exposeInMainWorld("desktopApi", {
     close: () => ipcRenderer.invoke("desktop:settings-close"),
     ready: () => ipcRenderer.invoke("desktop:settings-ready"),
   },
+  companion: {
+    openConsole: (consoleName: unknown) =>
+      ipcRenderer.invoke("desktop:companion-open-console", consoleName),
+  },
   updates: {
     check: () => ipcRenderer.invoke("desktop:update-check"),
     download: () => ipcRenderer.invoke("desktop:update-download"),

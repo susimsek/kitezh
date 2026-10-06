@@ -51,9 +51,11 @@ import {
   setAutomaticInstallOnAppQuit,
   type DesktopUpdateStatus,
 } from "./update";
+import { showDesktopNotification } from "./notifications";
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
+const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
 const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -105,6 +107,11 @@ function applyDesktopLanguage(value: unknown) {
         : `${DESKTOP_APP_NAME} Settings`,
     );
   }
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    companionWindow.setTitle(
+      isTurkishDesktop() ? "Hızlı erişim" : "Quick access",
+    );
+  }
   installApplicationMenu();
   updateTrayMenu();
 }
@@ -135,9 +142,11 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
+let companionWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let updateCheckWindow: BrowserWindow | null = null;
+let updateResultWindow: BrowserWindow | null = null;
 let updateAvailableWindow: BrowserWindow | null = null;
 let updateConfirmationWindow: BrowserWindow | null = null;
 let updateConfirmationResolver: ((confirmed: boolean) => void) | null = null;
@@ -157,6 +166,8 @@ type UpdatePreferences = {
 };
 type DesktopPreferences = {
   launchAtLogin: boolean;
+  showInMenuBar: boolean;
+  showInDock: boolean;
   notifications: boolean;
   globalShortcut: string;
 };
@@ -201,6 +212,7 @@ type WindowState = {
   height: number;
   maximized: boolean;
 };
+type CompanionWindowState = Pick<WindowState, "x" | "y" | "width" | "height">;
 
 function diagnosticsLogPath() {
   return path.join(app.getPath("userData"), DIAGNOSTICS_LOG_FILE);
@@ -365,6 +377,45 @@ function windowStatePath() {
   return path.join(app.getPath("userData"), "desktop-window.json");
 }
 
+function companionWindowStatePath() {
+  return path.join(app.getPath("userData"), COMPANION_WINDOW_STATE_FILE);
+}
+
+async function readCompanionWindowState(): Promise<CompanionWindowState | null> {
+  try {
+    const value = JSON.parse(
+      await readFile(companionWindowStatePath(), "utf8"),
+    ) as Partial<CompanionWindowState>;
+    if (
+      typeof value.width !== "number" ||
+      typeof value.height !== "number" ||
+      !Number.isInteger(value.width) ||
+      !Number.isInteger(value.height) ||
+      value.width < 360 ||
+      value.height < 320
+    ) {
+      return null;
+    }
+    const state: CompanionWindowState = {
+      width: value.width,
+      height: value.height,
+    };
+    if (typeof value.x === "number" && Number.isInteger(value.x))
+      state.x = value.x;
+    if (typeof value.y === "number" && Number.isInteger(value.y))
+      state.y = value.y;
+    if (
+      state.x !== undefined &&
+      state.y !== undefined &&
+      !isWindowVisible(state)
+    )
+      return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
 async function readWindowState(): Promise<WindowState | null> {
   const file = windowStatePath();
   if (!existsSync(file)) return null;
@@ -404,7 +455,9 @@ async function readWindowState(): Promise<WindowState | null> {
   }
 }
 
-function isWindowVisible(state: WindowState) {
+function isWindowVisible(
+  state: Pick<WindowState, "x" | "y" | "width" | "height">,
+) {
   return screen.getAllDisplays().some(({ bounds }) => {
     const right = state.x! + state.width;
     const bottom = state.y! + state.height;
@@ -426,6 +479,16 @@ async function saveWindowState(window: BrowserWindow) {
     JSON.stringify({ ...bounds, maximized: window.isMaximized() }),
     { encoding: "utf8", mode: 0o600 },
   );
+}
+
+async function saveCompanionWindowState(window: BrowserWindow) {
+  if (window.isDestroyed() || window.isMinimized()) return;
+  const bounds = window.getBounds();
+  await mkdir(path.dirname(companionWindowStatePath()), { recursive: true });
+  await writeFile(companionWindowStatePath(), JSON.stringify(bounds), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 function assertTrustedSender(event: Electron.IpcMainInvokeEvent) {
@@ -616,6 +679,8 @@ function launchAtLoginEnabled() {
 function defaultDesktopPreferences(): DesktopPreferences {
   return {
     launchAtLogin: launchAtLoginEnabled(),
+    showInMenuBar: true,
+    showInDock: true,
     notifications: true,
     globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   };
@@ -632,6 +697,14 @@ async function readDesktopPreferences(): Promise<DesktopPreferences> {
         typeof value.launchAtLogin === "boolean"
           ? value.launchAtLogin
           : defaults.launchAtLogin,
+      showInMenuBar:
+        typeof value.showInMenuBar === "boolean"
+          ? value.showInMenuBar
+          : defaults.showInMenuBar,
+      showInDock:
+        typeof value.showInDock === "boolean"
+          ? value.showInDock
+          : defaults.showInDock,
       notifications:
         typeof value.notifications === "boolean"
           ? value.notifications
@@ -686,13 +759,84 @@ function focusMainWindow() {
   mainWindow.focus();
 }
 
-function toggleQuickAccess() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isVisible() && mainWindow.isFocused()) {
-    mainWindow.hide();
+async function showCompanionWindow() {
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    if (companionWindow.isMinimized()) companionWindow.restore();
+    companionWindow.show();
+    companionWindow.focus();
     return;
   }
-  focusMainWindow();
+  const state = await readCompanionWindowState();
+  companionWindow = new BrowserWindow({
+    x: state?.x,
+    y: state?.y,
+    width: state?.width ?? 440,
+    height: state?.height ?? 560,
+    minWidth: 360,
+    minHeight: 320,
+    show: false,
+    skipTaskbar: true,
+    title: isTurkishDesktop() ? "Hızlı erişim" : "Quick access",
+    backgroundColor: desktopBackgroundColor(),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+  companionWindow.setAlwaysOnTop(true, "floating");
+  let saveTimer: NodeJS.Timeout | undefined;
+  const scheduleStateSave = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(
+      () => void saveCompanionWindowState(companionWindow!),
+      250,
+    );
+  };
+  companionWindow.on("resize", scheduleStateSave);
+  companionWindow.on("move", scheduleStateSave);
+  companionWindow.on("close", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    void saveCompanionWindowState(companionWindow!);
+  });
+  companionWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  companionWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isTrustedRendererUrl(url)) event.preventDefault();
+  });
+  companionWindow.on("closed", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    companionWindow = null;
+  });
+  await companionWindow.loadURL(
+    `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-companion`,
+  );
+  if (state?.x === undefined || state.y === undefined) companionWindow.center();
+  companionWindow.show();
+  companionWindow.focus();
+}
+
+function closeCompanionWindow() {
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    companionWindow.hide();
+  }
+}
+
+function toggleQuickAccess() {
+  void (async () => {
+    if (companionWindow && !companionWindow.isDestroyed()) {
+      if (companionWindow.isVisible()) {
+        closeCompanionWindow();
+      } else {
+        await showCompanionWindow();
+      }
+      return;
+    }
+    await showCompanionWindow();
+  })().catch(() => undefined);
 }
 
 function isValidGlobalShortcut(accelerator: string) {
@@ -742,6 +886,24 @@ function createTray() {
   tray.on("click", focusMainWindow);
 }
 
+function setTrayVisibility(visible: boolean) {
+  if (visible) {
+    createTray();
+    return;
+  }
+  tray?.destroy();
+  tray = null;
+}
+
+function setDockVisibility(visible: boolean) {
+  if (process.platform !== "darwin") return;
+  if (visible) {
+    app.dock?.show();
+  } else {
+    app.dock?.hide();
+  }
+}
+
 function updateTrayMenu() {
   if (!tray) return;
   const isTurkish = isTurkishDesktop();
@@ -776,9 +938,12 @@ function notifyDesktop(title: string, body: string, onClick?: () => void) {
   if (!Notification.isSupported()) return;
   void readDesktopPreferences().then((preferences) => {
     if (!preferences.notifications) return;
-    const notification = new Notification({ title, body });
-    if (onClick) notification.on("click", onClick);
-    notification.show();
+    showDesktopNotification(
+      (options) => new Notification(options),
+      title,
+      body,
+      onClick,
+    );
   });
 }
 
@@ -909,6 +1074,77 @@ function closeUpdateCheckWindow() {
     updateCheckWindow.close();
   }
   updateCheckWindow = null;
+}
+
+async function showUpdateNotAvailableWindow() {
+  if (updateResultWindow && !updateResultWindow.isDestroyed()) {
+    updateResultWindow.focus();
+    return;
+  }
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  const isTurkish = isTurkishDesktop();
+  const title = isTurkish
+    ? `${DESKTOP_APP_NAME} güncel`
+    : `${DESKTOP_APP_NAME} is up to date`;
+  const detail = isTurkish
+    ? `${DESKTOP_APP_NAME} için kullanılabilir yeni bir sürüm yok. ${app.getVersion()} sürümünü kullanıyorsunuz.`
+    : `There are no new updates available for ${DESKTOP_APP_NAME}. You are using version ${app.getVersion()}.`;
+  const doneLabel = isTurkish ? "Tamam" : "Done";
+  const windowTitle = isTurkish ? "Yazılım Güncellemesi" : "Software Update";
+  updateResultWindow = new BrowserWindow({
+    parent: mainWindow ?? undefined,
+    modal: true,
+    width: 720,
+    height: 280,
+    resizable: false,
+    title: windowTitle,
+    backgroundColor: desktopBackgroundColor(),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  updateResultWindow.on("closed", () => {
+    updateResultWindow = null;
+  });
+  const html = `<!doctype html>
+<html lang="${isTurkish ? "tr" : "en"}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${windowTitle}</title>
+    <style>
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { width: 100%; display: grid; grid-template-columns: 96px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
+      img { width: 88px; height: 88px; border-radius: 20px; }
+      h1 { margin: 0 0 10px; font-size: 25px; line-height: 1.15; font-weight: 700; }
+      p { margin: 0; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
+      footer { grid-column: 2; display: flex; justify-content: flex-end; margin-top: -4px; }
+      button { min-width: 112px; padding: 10px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--dialog-button-hover); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
+      <section>
+        <h1>${title}</h1>
+        <p>${detail}</p>
+      </section>
+      <footer><button type="button" onclick="window.close()">${doneLabel}</button></footer>
+    </main>
+  </body>
+</html>`;
+  await updateResultWindow.loadURL(
+    `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
+  );
+  updateResultWindow.center();
+  updateResultWindow.show();
 }
 
 async function confirmAndInstallUpdate() {
@@ -1297,6 +1533,9 @@ async function createWindow() {
   });
   void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/`);
   mainWindow.on("closed", () => {
+    if (companionWindow && !companionWindow.isDestroyed()) {
+      companionWindow.destroy();
+    }
     mainWindow = null;
   });
   if (state?.maximized) mainWindow.maximize();
@@ -1399,6 +1638,14 @@ function registerIpc() {
         typeof input.launchAtLogin === "boolean"
           ? input.launchAtLogin
           : current.launchAtLogin,
+      showInMenuBar:
+        typeof input.showInMenuBar === "boolean"
+          ? input.showInMenuBar
+          : current.showInMenuBar,
+      showInDock:
+        typeof input.showInDock === "boolean"
+          ? input.showInDock
+          : current.showInDock,
       notifications:
         typeof input.notifications === "boolean"
           ? input.notifications
@@ -1409,7 +1656,16 @@ function registerIpc() {
           ? input.globalShortcut
           : current.globalShortcut,
     };
+    if (
+      process.platform === "darwin" &&
+      !next.showInMenuBar &&
+      !next.showInDock
+    ) {
+      throw new Error("Keep the menu bar or Dock entry visible");
+    }
     await applyLaunchAtLogin(next.launchAtLogin);
+    setTrayVisibility(next.showInMenuBar);
+    setDockVisibility(next.showInDock);
     if (
       next.globalShortcut !== current.globalShortcut &&
       !registerGlobalShortcut(next.globalShortcut)
@@ -1443,6 +1699,19 @@ function registerIpc() {
     settingsWindow.show();
     settingsWindow.focus();
   });
+  ipcMain.handle(
+    "desktop:companion-open-console",
+    async (event, value: unknown) => {
+      assertTrustedSender(event);
+      assertConsole(value);
+      closeCompanionWindow();
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      await mainWindow.loadURL(
+        `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value}?desktopSignIn=1`,
+      );
+      focusMainWindow();
+    },
+  );
   ipcMain.handle(
     "desktop:auth-start-login",
     async (event, request: unknown) => {
@@ -1604,7 +1873,8 @@ if (!hasLock) {
     const desktopPreferences = await readDesktopPreferences();
     void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
     registerGlobalShortcut(desktopPreferences.globalShortcut);
-    createTray();
+    setTrayVisibility(desktopPreferences.showInMenuBar);
+    setDockVisibility(desktopPreferences.showInDock);
     const updatePreferences = await readUpdatePreferences();
     setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
     void readVault()
@@ -1656,8 +1926,12 @@ if (!hasLock) {
           );
         }
       } else if (status.state === "not-available" || status.state === "error") {
+        const manualCheck = manualUpdateCheckRequested;
         manualUpdateCheckRequested = false;
         suppressNextUpdateNotification = false;
+        if (status.state === "not-available" && manualCheck) {
+          void showUpdateNotAvailableWindow().catch(() => undefined);
+        }
       }
       sendUpdateStatus(status);
     });

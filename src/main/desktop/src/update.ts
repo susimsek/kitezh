@@ -206,6 +206,14 @@ function isUpdatePreviewEnabled() {
   return !app.isPackaged && process.env.DESKTOP_UPDATE_PREVIEW === "true";
 }
 
+type UpdatePreviewState = "available" | "not-available" | "error";
+
+function updatePreviewState(): UpdatePreviewState {
+  const value = process.env.DESKTOP_UPDATE_PREVIEW_STATE;
+  if (value === "not-available" || value === "error") return value;
+  return "available";
+}
+
 function publish(status: DesktopUpdateStatus) {
   listener?.(status);
 }
@@ -252,8 +260,21 @@ export async function checkForUpdates() {
     if (isUpdatePreviewEnabled()) {
       publish({ state: "checking" });
       const version =
-        process.env.DESKTOP_UPDATE_PREVIEW_VERSION ?? `${app.getVersion()}-preview`;
-      setTimeout(() => publish({ state: "available", version }), 600);
+        process.env.DESKTOP_UPDATE_PREVIEW_VERSION ??
+        `${app.getVersion()}-preview`;
+      setTimeout(() => {
+        const previewState = updatePreviewState();
+        if (previewState === "not-available") {
+          publish({ state: "not-available" });
+        } else if (previewState === "error") {
+          publish({
+            state: "error",
+            message: "Desktop update could not be checked.",
+          });
+        } else {
+          publish({ state: "available", version });
+        }
+      }, 600);
       return;
     }
     publish({ state: "unsupported" });

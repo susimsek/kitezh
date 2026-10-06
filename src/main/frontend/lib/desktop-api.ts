@@ -24,6 +24,8 @@ export type DesktopUpdateStatus =
 
 export type DesktopPreferences = {
   launchAtLogin: boolean;
+  showInMenuBar: boolean;
+  showInDock: boolean;
   notifications: boolean;
   globalShortcut: string;
   automaticDownload: boolean;
@@ -89,6 +91,9 @@ export type DesktopApi = {
   settings: {
     close: () => Promise<void>;
     ready: () => Promise<void>;
+  };
+  companion: {
+    openConsole: (consoleName: DesktopConsole) => Promise<void>;
   };
   updates: {
     check: () => Promise<void>;
