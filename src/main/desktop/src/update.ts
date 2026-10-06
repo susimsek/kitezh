@@ -252,7 +252,9 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
   );
 
   void initializeUpdateRecovery();
-  setTimeout(() => void checkForUpdates(), 5_000);
+  if (!isUpdatePreviewEnabled()) {
+    setTimeout(() => void checkForUpdates(), 5_000);
+  }
 }
 
 export async function checkForUpdates() {
