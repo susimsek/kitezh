@@ -44,6 +44,9 @@ export type AdminClient = {
   cibaDeliveryMode: "poll" | "ping" | "push";
   cibaNotificationEndpoint: string | null;
   cibaClientNotificationTokenConfigured: boolean;
+  tokenExchangeDownscopeOnly: boolean;
+  tokenExchangeAllowDelegation: boolean;
+  tokenExchangeAllowedAudiences: string[];
 };
 
 export function ClientsTable({ dictionary }: { locale: Locale; dictionary: Dictionary }) {

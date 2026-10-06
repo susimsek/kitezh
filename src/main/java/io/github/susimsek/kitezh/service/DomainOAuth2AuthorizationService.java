@@ -4,6 +4,8 @@ import io.github.susimsek.kitezh.domain.AuthorizationEntity;
 import io.github.susimsek.kitezh.mapper.AuthorizationMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
+import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
+import io.github.susimsek.kitezh.security.ClientSecuritySettings;
 import io.github.susimsek.kitezh.security.OfflineAccessSettings;
 import io.github.susimsek.kitezh.service.admin.OfflineAccessPolicyService;
 import java.time.Instant;
@@ -53,18 +55,45 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
             attributes.putIfAbsent(
                     OfflineAccessSettings.SESSION_STARTED_AT, Instant.now().toString());
             entity.setAttributes(mapperSupport.writeMap(attributes));
-        } else {
-            String sessionId = currentSessionId();
-            if (sessionId != null) {
-                entity.setSessionId(sessionId);
-            } else {
-                authorizationRepository
-                        .findById(authorization.getId())
-                        .map(AuthorizationEntity::getSessionId)
-                        .ifPresent(entity::setSessionId);
+        } else if (isTokenExchangeAuthorization(authorization)) {
+            Map<String, Object> attributes = mapperSupport.readMap(entity.getAttributes());
+            String sourceAuthorizationId = null;
+            if (attributes != null) {
+                Object sourceAuthorization =
+                        attributes.get(
+                                ClientSecuritySettings.TOKEN_EXCHANGE_SOURCE_AUTHORIZATION_ID);
+                if (sourceAuthorization instanceof String value) {
+                    sourceAuthorizationId = value;
+                }
             }
+            if (sourceAuthorizationId != null) {
+                authorizationRepository
+                        .findById(sourceAuthorizationId)
+                        .ifPresent(source -> entity.setSessionId(source.getSessionId()));
+            } else {
+                copyCurrentSession(entity, authorization);
+            }
+        } else {
+            copyCurrentSession(entity, authorization);
         }
         authorizationRepository.save(entity);
+    }
+
+    private void copyCurrentSession(AuthorizationEntity entity, OAuth2Authorization authorization) {
+        String sessionId = currentSessionId();
+        if (sessionId != null) {
+            entity.setSessionId(sessionId);
+        } else {
+            authorizationRepository
+                    .findById(authorization.getId())
+                    .map(AuthorizationEntity::getSessionId)
+                    .ifPresent(entity::setSessionId);
+        }
+    }
+
+    private static boolean isTokenExchangeAuthorization(OAuth2Authorization authorization) {
+        return AuthorizationGrantTypes.TOKEN_EXCHANGE.equals(
+                authorization.getAuthorizationGrantType().getValue());
     }
 
     @Override

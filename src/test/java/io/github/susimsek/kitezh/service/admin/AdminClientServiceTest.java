@@ -1195,7 +1195,10 @@ class AdminClientServiceTest {
                                                         null,
                                                         null,
                                                         Duration.ofDays(10),
-                                                        Duration.ofDays(1))))
+                                                        Duration.ofDays(1),
+                                                        false,
+                                                        false,
+                                                        Set.of())))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Offline session max must be greater than or equal to idle timeout");
     }

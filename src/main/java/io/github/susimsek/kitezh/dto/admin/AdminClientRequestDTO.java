@@ -237,7 +237,29 @@ public record AdminClientRequestDTO(
                         format = "duration",
                         nullable = true,
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                Duration offlineSessionMax) {
+                Duration offlineSessionMax,
+        @Schema(
+                        description =
+                                "Whether token exchange requests must not increase subject-token"
+                                        + " scopes.",
+                        example = "true",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Boolean tokenExchangeDownscopeOnly,
+        @Schema(
+                        description = "Whether this client may use RFC 8693 actor delegation.",
+                        example = "false",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Boolean tokenExchangeAllowDelegation,
+        @Schema(
+                        description =
+                                "Client identifiers that this client may target with token"
+                                        + " exchange.",
+                        example = "[\"reports-api\"]",
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Set<@NotBlank(message = "{app.api.problem.violation.selection}") String>
+                        tokenExchangeAllowedAudiences) {
 
     public AdminClientRequestDTO(
             String clientId,
@@ -292,7 +314,10 @@ public record AdminClientRequestDTO(
                 null,
                 null,
                 null,
-                null);
+                null,
+                false,
+                false,
+                java.util.Set.of());
     }
 
     public AdminClientRequestDTO(
@@ -396,6 +421,9 @@ public record AdminClientRequestDTO(
                 x509CertificateSubjectDN,
                 clientSecretGracePeriod,
                 null,
-                null);
+                null,
+                false,
+                false,
+                java.util.Set.of());
     }
 }

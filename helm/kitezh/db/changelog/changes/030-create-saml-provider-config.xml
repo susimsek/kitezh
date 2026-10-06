@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="030-create-saml-provider-config" author="susimsek">
+		<createTable tableName="saml_identity_provider_configs">
+			<column name="provider_id" type="varchar(36)">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_saml_provider_configs"/>
+			</column>
+			<column name="metadata_uri" type="varchar(2000)"/>
+			<column name="asserting_party_entity_id" type="varchar(1000)"/>
+			<column name="single_sign_on_service_url" type="varchar(2000)"/>
+			<column name="single_logout_service_url" type="varchar(2000)"/>
+			<column name="idp_certificate" type="varchar(12000)"/>
+			<column name="signing_private_key_encrypted" type="varchar(20000)"/>
+			<column name="signing_certificate" type="varchar(12000)"/>
+			<column name="decryption_private_key_encrypted" type="varchar(20000)"/>
+			<column name="decryption_certificate" type="varchar(12000)"/>
+			<column name="service_provider_entity_id" type="varchar(1000)"/>
+			<column name="sign_authn_requests" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="want_assertions_signed" type="boolean" defaultValueBoolean="true">
+				<constraints nullable="false"/>
+			</column>
+			<column name="signature_algorithm" type="varchar(500)"/>
+			<column name="authn_request_binding" type="varchar(20)" defaultValue="REDIRECT"/>
+			<column name="response_binding" type="varchar(20)" defaultValue="POST"/>
+			<column name="logout_binding" type="varchar(20)" defaultValue="REDIRECT"/>
+			<column name="force_authentication" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="pass_subject" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="name_id_format" type="varchar(200)"/>
+			<column name="principal_attribute" type="varchar(200)" defaultValue="NameID"/>
+			<column name="email_attribute" type="varchar(200)" defaultValue="email"/>
+			<column name="first_name_attribute" type="varchar(200)" defaultValue="givenName"/>
+			<column name="last_name_attribute" type="varchar(200)" defaultValue="sn"/>
+			<column name="groups_attribute" type="varchar(200)" defaultValue="groups"/>
+		</createTable>
+		<addForeignKeyConstraint
+			baseTableName="saml_identity_provider_configs"
+			baseColumnNames="provider_id"
+			constraintName="fk_saml_provider_config_provider"
+			referencedTableName="social_identity_providers"
+			referencedColumnNames="id"
+			onDelete="CASCADE"/>
+	</changeSet>
+</databaseChangeLog>

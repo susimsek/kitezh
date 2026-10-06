@@ -460,6 +460,7 @@ public class AdminClientService {
                 "client secret grace period",
                 request.clientSecretGracePeriod());
         validateCiba(request, request.authorizationGrantTypes());
+        validateTokenExchange(request);
     }
 
     private RegisteredClient save(RegisteredClient client) {
@@ -563,6 +564,7 @@ public class AdminClientService {
         applyOptionalLogoutSettings(values, request);
         applyOptionalAuthenticationSettings(values, request, existing);
         applyCibaSettings(values, request);
+        applyTokenExchangeSettings(values, request);
     }
 
     private static void applyOptionalUrls(
@@ -647,6 +649,19 @@ public class AdminClientService {
                     request.cibaNotificationEndpoint());
             values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
         }
+    }
+
+    private static void applyTokenExchangeSettings(
+            Map<String, Object> values, AdminClientRequestDTO request) {
+        values.put(
+                ClientSecuritySettings.TOKEN_EXCHANGE_DOWNSCOPE_ONLY,
+                Boolean.TRUE.equals(request.tokenExchangeDownscopeOnly()));
+        values.put(
+                ClientSecuritySettings.TOKEN_EXCHANGE_ALLOW_DELEGATION,
+                Boolean.TRUE.equals(request.tokenExchangeAllowDelegation()));
+        values.put(
+                ClientSecuritySettings.TOKEN_EXCHANGE_ALLOWED_AUDIENCES,
+                new HashSet<>(nullSafe(request.tokenExchangeAllowedAudiences())));
     }
 
     private static ClientSettings withDefaultScopes(
@@ -746,6 +761,29 @@ public class AdminClientService {
                     "CIBA notification endpoint",
                     request.cibaNotificationEndpoint());
         }
+    }
+
+    private static void validateTokenExchange(AdminClientRequestDTO request) {
+        if (!request.authorizationGrantTypes().contains(AuthorizationGrantTypes.TOKEN_EXCHANGE)) {
+            return;
+        }
+        if (request.clientAuthenticationMethods()
+                .contains(ClientAuthenticationMethod.NONE.getValue())) {
+            throw ApiException.badRequest(
+                    AUTHORIZATION_GRANT_TYPES_FIELD,
+                    ApiErrorCode.CLIENT_INVALID_GRANT_TYPES,
+                    "A public client cannot use the token exchange grant");
+        }
+        nullSafe(request.tokenExchangeAllowedAudiences())
+                .forEach(
+                        audience -> {
+                            if (!hasText(audience) || audience.contains(" ")) {
+                                throw ApiException.badRequest(
+                                        "tokenExchangeAllowedAudiences",
+                                        ApiErrorCode.CLIENT_INVALID_REQUEST,
+                                        "Token exchange audiences must be client identifiers");
+                            }
+                        });
     }
 
     private static String resolveCibaDeliveryMode(AdminClientRequestDTO request) {

@@ -66,7 +66,10 @@ public interface AdminClientMapper {
                                 .getName(),
                 client.getClientSettings().getX509CertificateSubjectDN(),
                 durationSetting(client, OfflineAccessSettings.OFFLINE_SESSION_IDLE),
-                durationSetting(client, OfflineAccessSettings.OFFLINE_SESSION_MAX));
+                durationSetting(client, OfflineAccessSettings.OFFLINE_SESSION_MAX),
+                ClientSecuritySettings.tokenExchangeDownscopeOnly(client),
+                ClientSecuritySettings.tokenExchangeAllowsDelegation(client),
+                ClientSecuritySettings.tokenExchangeAllowedAudiences(client));
     }
 
     private static java.time.Duration durationSetting(RegisteredClient client, String key) {

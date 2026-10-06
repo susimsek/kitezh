@@ -29,6 +29,14 @@ public final class ClientSecuritySettings {
             "settings.client.ciba-client-notification-token";
     public static final String CIBA_REQUEST_SIGNING_ALGORITHMS =
             "settings.client.ciba-request-signing-algorithms";
+    public static final String TOKEN_EXCHANGE_DOWNSCOPE_ONLY =
+            "settings.client.token-exchange-downscope-only";
+    public static final String TOKEN_EXCHANGE_ALLOW_DELEGATION =
+            "settings.client.token-exchange-allow-delegation";
+    public static final String TOKEN_EXCHANGE_ALLOWED_AUDIENCES =
+            "settings.client.token-exchange-allowed-audiences";
+    public static final String TOKEN_EXCHANGE_SOURCE_AUTHORIZATION_ID =
+            "settings.client.token-exchange-source-authorization-id";
     public static final Set<String> DEFAULT_DPOP_SIGNING_ALGORITHMS = Set.of("RS256", "ES256");
     public static final Set<String> DEFAULT_CIBA_REQUEST_SIGNING_ALGORITHMS =
             Set.of("RS256", "ES256");
@@ -120,5 +128,17 @@ public final class ClientSecuritySettings {
             }
         }
         return DEFAULT_CIBA_REQUEST_SIGNING_ALGORITHMS;
+    }
+
+    public static boolean tokenExchangeDownscopeOnly(RegisteredClient client) {
+        return booleanSetting(client, TOKEN_EXCHANGE_DOWNSCOPE_ONLY);
+    }
+
+    public static boolean tokenExchangeAllowsDelegation(RegisteredClient client) {
+        return booleanSetting(client, TOKEN_EXCHANGE_ALLOW_DELEGATION);
+    }
+
+    public static Set<String> tokenExchangeAllowedAudiences(RegisteredClient client) {
+        return stringSetSetting(client, TOKEN_EXCHANGE_ALLOWED_AUDIENCES);
     }
 }

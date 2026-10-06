@@ -35,6 +35,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.saml2.provider.service.web.HttpSessionSaml2AuthenticationRequestRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -71,6 +72,8 @@ class SecurityConfigTest {
         assertThat(config.browserSecurityContextRepository()).isNotNull();
         assertThat(config.authorizationServerSecurityContextRepository()).isNotNull();
         assertThat(config.authenticationEventPublisher(mock())).isNotNull();
+        assertThat(config.saml2AuthenticationRequestRepository())
+                .isInstanceOf(HttpSessionSaml2AuthenticationRequestRepository.class);
 
         ObjectProvider<ClientRegistrationRepository> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);

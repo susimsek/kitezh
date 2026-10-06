@@ -101,6 +101,7 @@ public class AuthorizationServerConfig {
             MfaAuthorizationFilter mfaAuthorizationFilter,
             PasswordEncoder passwordEncoder,
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            TokenExchangeAuthenticationProvider tokenExchangeAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             SecurityContextRepository securityContextRepository,
             ObservabilityMdcFilter observabilityMdcFilter) {}
@@ -133,6 +134,7 @@ public class AuthorizationServerConfig {
             RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
             MfaAuthorizationFilter mfaAuthorizationFilter,
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            TokenExchangeAuthenticationProvider tokenExchangeAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             @Qualifier("authorizationServerSecurityContextRepository")
                     SecurityContextRepository securityContextRepository,
@@ -146,6 +148,7 @@ public class AuthorizationServerConfig {
                         mfaAuthorizationFilter,
                         passwordEncoder,
                         cibaAuthenticationProvider,
+                        tokenExchangeAuthenticationProvider,
                         socialProviderLogoutSuccessHandler,
                         securityContextRepository,
                         new ObservabilityMdcFilter(loggingProperties)));
@@ -263,11 +266,14 @@ public class AuthorizationServerConfig {
                                                                         converters ->
                                                                                 converters.add(
                                                                                         new CibaAuthenticationGrantAuthenticationConverter()))
+                                                                .accessTokenRequestConverter(
+                                                                        new DefaultClientScopesClientCredentialsConverter())
                                                                 .authenticationProvider(
                                                                         dependencies
                                                                                 .cibaAuthenticationProvider())
-                                                                .accessTokenRequestConverter(
-                                                                        new DefaultClientScopesClientCredentialsConverter())
+                                                                .authenticationProvider(
+                                                                        dependencies
+                                                                                .tokenExchangeAuthenticationProvider())
                                                                 .errorResponseHandler(
                                                                         localizedOAuth2ErrorResponseHandler))
                                         .tokenIntrospectionEndpoint(
@@ -318,6 +324,7 @@ public class AuthorizationServerConfig {
                     builder,
             String issuer) {
         addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
+        builder.grantType(AuthorizationGrantTypes.TOKEN_EXCHANGE);
     }
 
     static void addCibaMetadata(
@@ -326,6 +333,7 @@ public class AuthorizationServerConfig {
                     builder,
             String issuer) {
         addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
+        builder.grantType(AuthorizationGrantTypes.TOKEN_EXCHANGE);
     }
 
     private static void addCibaMetadataClaims(
@@ -535,6 +543,7 @@ public class AuthorizationServerConfig {
             appendSessionIdClaim(context, dependencies.authorizationRepository());
             appendDpopConfirmationClaim(context);
             appendCibaAuthReqIdClaim(context);
+            appendTokenExchangeClaims(context);
         };
     }
 
@@ -1156,6 +1165,32 @@ public class AuthorizationServerConfig {
                         "urn:openid:params:jwt:claim:rt_hash",
                         CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE);
             }
+        }
+    }
+
+    private static void appendTokenExchangeClaims(JwtEncodingContext context) {
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                || !(context.getAuthorizationGrant()
+                        instanceof
+                        org.springframework.security.oauth2.server.authorization.authentication
+                                        .OAuth2TokenExchangeAuthenticationToken
+                                tokenExchange)) {
+            return;
+        }
+        List<String> audiences =
+                tokenExchange.getAudiences().isEmpty()
+                        ? List.of(context.getRegisteredClient().getClientId())
+                        : tokenExchange.getAudiences().stream().sorted().toList();
+        appendAudienceClaim(context, audiences);
+        if (context.getPrincipal()
+                instanceof
+                org.springframework.security.oauth2.server.authorization.authentication
+                                .OAuth2TokenExchangeCompositeAuthenticationToken
+                        composite) {
+            composite.getActors().stream()
+                    .findFirst()
+                    .map(actor -> new java.util.LinkedHashMap<String, Object>(actor.getClaims()))
+                    .ifPresent(actor -> context.getClaims().claim("act", actor));
         }
     }
 

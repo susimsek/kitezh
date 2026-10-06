@@ -13,6 +13,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.saml2.provider.service.authentication.AbstractSaml2AuthenticationRequest;
+import org.springframework.security.saml2.provider.service.authentication.Saml2PostAuthenticationRequest;
+import org.springframework.security.saml2.provider.service.authentication.Saml2RedirectAuthenticationRequest;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistration;
 import org.springframework.security.web.webauthn.api.AttestationConveyancePreference;
 import org.springframework.security.web.webauthn.api.AuthenticatorAttachment;
 import org.springframework.security.web.webauthn.api.AuthenticatorSelectionCriteria;
@@ -129,6 +133,76 @@ class SecurityJsonMapperTest {
 
         assertThat(mapper.readSessionAttribute(new ByteArrayInputStream(output.toByteArray())))
                 .isEqualTo("plain");
+    }
+
+    @Test
+    void preservesSamlAuthenticationRequestWhenReadingAnUntypedSessionAttribute() throws Exception {
+        RelyingPartyRegistration registration =
+                RelyingPartyRegistration.withRegistrationId("saml-e2e")
+                        .assertingPartyMetadata(
+                                party ->
+                                        party.entityId("https://idp.example.test/entity")
+                                                .singleSignOnServiceLocation(
+                                                        "https://idp.example.test/sso"))
+                        .build();
+        AbstractSaml2AuthenticationRequest request =
+                Saml2PostAuthenticationRequest.withRelyingPartyRegistration(registration)
+                        .id("request-id")
+                        .samlRequest("encoded-request")
+                        .relayState("relay-state")
+                        .authenticationRequestUri("https://idp.example.test/sso")
+                        .build();
+        SecurityJsonMapper mapper = new SecurityJsonMapper(getClass().getClassLoader());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        mapper.writeSessionAttribute(request, output);
+
+        Object restored =
+                mapper.readSessionAttribute(new ByteArrayInputStream(output.toByteArray()));
+        assertThat(restored).isInstanceOf(Saml2PostAuthenticationRequest.class);
+        Saml2PostAuthenticationRequest restoredRequest = (Saml2PostAuthenticationRequest) restored;
+        assertThat(restoredRequest.getId()).isEqualTo("request-id");
+        assertThat(restoredRequest.getRelyingPartyRegistrationId()).isEqualTo("saml-e2e");
+        assertThat(restoredRequest.getSamlRequest()).isEqualTo("encoded-request");
+        assertThat(restoredRequest.getRelayState()).isEqualTo("relay-state");
+    }
+
+    @Test
+    void preservesSamlRedirectAuthenticationRequestWhenReadingAnUntypedSessionAttribute()
+            throws Exception {
+        RelyingPartyRegistration registration =
+                RelyingPartyRegistration.withRegistrationId("saml-e2e")
+                        .assertingPartyMetadata(
+                                party ->
+                                        party.entityId("https://idp.example.test/entity")
+                                                .singleSignOnServiceLocation(
+                                                        "https://idp.example.test/sso"))
+                        .build();
+        AbstractSaml2AuthenticationRequest request =
+                Saml2RedirectAuthenticationRequest.withRelyingPartyRegistration(registration)
+                        .id("request-id")
+                        .samlRequest("encoded-request")
+                        .relayState("relay-state")
+                        .authenticationRequestUri("https://idp.example.test/sso")
+                        .sigAlg("algorithm")
+                        .signature("signature")
+                        .build();
+        SecurityJsonMapper mapper = new SecurityJsonMapper(getClass().getClassLoader());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        mapper.writeSessionAttribute(request, output);
+
+        Object restored =
+                mapper.readSessionAttribute(new ByteArrayInputStream(output.toByteArray()));
+        assertThat(restored).isInstanceOf(Saml2RedirectAuthenticationRequest.class);
+        Saml2RedirectAuthenticationRequest restoredRequest =
+                (Saml2RedirectAuthenticationRequest) restored;
+        assertThat(restoredRequest.getId()).isEqualTo("request-id");
+        assertThat(restoredRequest.getRelyingPartyRegistrationId()).isEqualTo("saml-e2e");
+        assertThat(restoredRequest.getSamlRequest()).isEqualTo("encoded-request");
+        assertThat(restoredRequest.getRelayState()).isEqualTo("relay-state");
+        assertThat(restoredRequest.getSigAlg()).isEqualTo("algorithm");
+        assertThat(restoredRequest.getSignature()).isEqualTo("signature");
     }
 
     @Test

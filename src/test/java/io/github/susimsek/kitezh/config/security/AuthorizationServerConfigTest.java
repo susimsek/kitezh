@@ -130,7 +130,11 @@ class AuthorizationServerConfigTest {
                         "backchannel_authentication_request_signing_alg_values_supported",
                         List.of("RS256", "ES256"))
                 .containsEntry("backchannel_user_code_parameter", true)
-                .containsEntry("grant_types_supported", List.of(AuthorizationGrantTypes.CIBA));
+                .containsEntry(
+                        "grant_types_supported",
+                        List.of(
+                                AuthorizationGrantTypes.CIBA,
+                                AuthorizationGrantTypes.TOKEN_EXCHANGE));
 
         OidcProviderConfiguration.Builder oidcBuilder =
                 OidcProviderConfiguration.builder()
@@ -191,6 +195,7 @@ class AuthorizationServerConfigTest {
                                         org.springframework.security.crypto.password.PasswordEncoder
                                                 .class),
                                 mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                                mock(TokenExchangeAuthenticationProvider.class),
                                 mock(SocialProviderLogoutSuccessHandler.class),
                                 mock(SecurityContextRepository.class),
                                 new ObservabilityMdcFilter()));
@@ -210,6 +215,7 @@ class AuthorizationServerConfigTest {
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
                         mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                        mock(TokenExchangeAuthenticationProvider.class),
                         mock(SocialProviderLogoutSuccessHandler.class),
                         mock(SecurityContextRepository.class),
                         new LoggingProperties());

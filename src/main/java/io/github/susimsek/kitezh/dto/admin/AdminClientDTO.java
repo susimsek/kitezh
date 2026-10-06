@@ -198,7 +198,26 @@ public record AdminClientDTO(
                         format = "duration",
                         nullable = true,
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                Duration offlineSessionMax) {
+                Duration offlineSessionMax,
+        @Schema(
+                        description =
+                                "Whether token exchange requests must not increase subject-token"
+                                        + " scopes.",
+                        example = "true",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean tokenExchangeDownscopeOnly,
+        @Schema(
+                        description = "Whether this client may use RFC 8693 actor delegation.",
+                        example = "false",
+                        requiredMode = Schema.RequiredMode.REQUIRED)
+                boolean tokenExchangeAllowDelegation,
+        @Schema(
+                        description =
+                                "Client identifiers that this client may target with token"
+                                        + " exchange.",
+                        example = "[\"reports-api\"]",
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                Set<String> tokenExchangeAllowedAudiences) {
 
     public AdminClientDTO(
             String id,
@@ -252,6 +271,9 @@ public record AdminClientDTO(
                 null,
                 null,
                 null,
-                null);
+                null,
+                false,
+                false,
+                java.util.Set.of());
     }
 }

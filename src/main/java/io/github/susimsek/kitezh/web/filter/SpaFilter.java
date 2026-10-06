@@ -35,6 +35,7 @@ public class SpaFilter extends OncePerRequestFilter {
             Set.of(
                     "/api",
                     "/oauth2",
+                    "/saml2",
                     "/account/social-links",
                     "/.well-known",
                     "/actuator",

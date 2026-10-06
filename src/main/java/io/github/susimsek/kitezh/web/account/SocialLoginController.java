@@ -24,8 +24,9 @@ public class SocialLoginController {
     @Operation(
             summary = "List enabled social login providers",
             description =
-                    "Returns enabled providers. An unconfigured provider remains visible but is"
-                            + " not usable until its Client ID and Client Secret are saved.")
+                    "Returns enabled providers. An unconfigured OAuth provider remains visible"
+                            + " but is not usable until its client credentials are saved; SAML"
+                            + " providers use their metadata or asserting-party configuration.")
     @ApiResponse(responseCode = "200", description = "Social provider availability returned.")
     java.util.List<SocialProviderDTO> providers() {
         return socialLoginService.availableProviders();

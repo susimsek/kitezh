@@ -289,6 +289,8 @@ export function IdentityProviderDetail({
               <Form.Select name="mapperType" defaultValue={mapper?.mapperType ?? "user-attribute"}>
                 <option value="user-attribute">user-attribute</option>
                 <option value="claim">claim</option>
+                <option value="role">role</option>
+                <option value="group">group</option>
               </Form.Select>
             </Form.Group>
             <Form.Group>

@@ -18,9 +18,7 @@ public class MessageSourceConfig {
     MessageSource bundledMessageSource(MessageSourceProperties properties) {
         ReloadableResourceBundleMessageSource source = new ReloadableResourceBundleMessageSource();
         source.setBasenames(properties.getBasename().toArray(String[]::new));
-        if (properties.getEncoding() != null) {
-            source.setDefaultEncoding(properties.getEncoding().name());
-        }
+        source.setDefaultEncoding(properties.getEncoding().name());
         source.setFallbackToSystemLocale(properties.isFallbackToSystemLocale());
         if (properties.getCacheDuration() != null) {
             source.setCacheMillis(properties.getCacheDuration().toMillis());

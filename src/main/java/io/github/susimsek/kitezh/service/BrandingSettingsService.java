@@ -22,7 +22,7 @@ public class BrandingSettingsService {
 
     @Transactional(readOnly = true)
     public BrandingSettingsDTO publicSettings() {
-        return adminSettings().toPublic();
+        return toAdminDTO(entity()).toPublic();
     }
 
     @Transactional(readOnly = true)

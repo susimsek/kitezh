@@ -1,5 +1,7 @@
 package io.github.susimsek.kitezh.dto.admin;
 
+import io.github.susimsek.kitezh.web.admin.validation.OptionalAbsoluteUri;
+import io.github.susimsek.kitezh.web.admin.validation.OptionalPem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -19,11 +21,13 @@ public record AdminIdentityProviderRequestDTO(
                 String registrationId,
         @Schema(
                         description =
-                                "Provider type: google, github, linkedin, microsoft, or oidc.",
+                                "Provider type: google, github, linkedin, microsoft, oidc, or"
+                                        + " saml.",
                         example = "oidc",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 @NotBlank
                 @Size(max = 50)
+                @Pattern(regexp = "(?i)google|github|linkedin|microsoft|oidc|saml")
                 String providerType,
         @Schema(
                         description = "Display name.",
@@ -51,8 +55,7 @@ public record AdminIdentityProviderRequestDTO(
         @Schema(description = "Preserve case when importing provider usernames.")
                 boolean caseSensitiveUsername,
         @Schema(description = "Whether the provider is enabled.") boolean enabled,
-        @Schema(description = "OAuth client id.", requiredMode = Schema.RequiredMode.REQUIRED)
-                @NotBlank
+        @Schema(description = "OAuth client id; not used by SAML providers.", nullable = true)
                 @Size(max = 500)
                 String clientId,
         @Schema(
@@ -97,4 +100,171 @@ public record AdminIdentityProviderRequestDTO(
                 String clientAuthenticationMethod,
         @Schema(description = "Comma-separated scopes.") @NotBlank @Size(max = 1000) String scopes,
         @Schema(description = "User-name claim.") @NotBlank @Size(max = 100)
-                String userNameAttribute) {}
+                String userNameAttribute,
+        @Schema(description = "SAML metadata URL.", format = "uri", nullable = true)
+                @OptionalAbsoluteUri
+                @Size(max = 2000)
+                String samlMetadataUri,
+        @Schema(description = "SAML asserting-party entity ID.", format = "uri", nullable = true)
+                @OptionalAbsoluteUri
+                @Size(max = 1000)
+                String samlAssertingPartyEntityId,
+        @Schema(description = "SAML single sign-on URL.", format = "uri", nullable = true)
+                @OptionalAbsoluteUri
+                @Size(max = 2000)
+                String samlSingleSignOnServiceUrl,
+        @Schema(description = "SAML single logout URL.", format = "uri", nullable = true)
+                @OptionalAbsoluteUri
+                @Size(max = 2000)
+                String samlSingleLogoutServiceUrl,
+        @Schema(description = "PEM encoded SAML identity-provider certificate.", nullable = true)
+                @OptionalPem(label = "CERTIFICATE")
+                @Size(max = 12000)
+                String samlIdpCertificate,
+        @Schema(
+                        description = "PKCS#8 PEM signing key; encrypted before persistence.",
+                        nullable = true)
+                @OptionalPem(label = "PRIVATE KEY")
+                @Size(max = 16000)
+                String samlSigningPrivateKey,
+        @Schema(description = "PEM encoded service-provider signing certificate.", nullable = true)
+                @OptionalPem(label = "CERTIFICATE")
+                @Size(max = 12000)
+                String samlSigningCertificate,
+        @Schema(description = "SAML service-provider entity ID.", format = "uri", nullable = true)
+                @OptionalAbsoluteUri
+                @Size(max = 1000)
+                String samlServiceProviderEntityId,
+        @Schema(description = "Sign SAML AuthnRequests.") boolean samlSignAuthnRequests,
+        @Schema(description = "Require signed SAML assertions.") boolean samlWantAssertionsSigned,
+        @Schema(description = "SAML NameID format.", nullable = true) @Size(max = 200)
+                String samlNameIdFormat,
+        @Schema(description = "SAML principal attribute name.", nullable = true) @Size(max = 200)
+                String samlPrincipalAttribute,
+        @Schema(description = "SAML email attribute name.", nullable = true) @Size(max = 200)
+                String samlEmailAttribute,
+        @Schema(description = "SAML first-name attribute name.", nullable = true) @Size(max = 200)
+                String samlFirstNameAttribute,
+        @Schema(description = "SAML last-name attribute name.", nullable = true) @Size(max = 200)
+                String samlLastNameAttribute,
+        @Schema(description = "SAML groups attribute name.", nullable = true) @Size(max = 200)
+                String samlGroupsAttribute,
+        @Schema(
+                        description = "PKCS#8 PEM decryption key; encrypted before persistence.",
+                        nullable = true)
+                @OptionalPem(label = "PRIVATE KEY")
+                @Size(max = 16000)
+                String samlDecryptionPrivateKey,
+        @Schema(
+                        description = "PEM encoded service-provider decryption certificate.",
+                        nullable = true)
+                @OptionalPem(label = "CERTIFICATE")
+                @Size(max = 12000)
+                String samlDecryptionCertificate,
+        @Schema(description = "SAML signature algorithm URI.", format = "uri", nullable = true)
+                @OptionalAbsoluteUri
+                @Size(max = 500)
+                String samlSignatureAlgorithm,
+        @Schema(
+                        description = "SAML AuthnRequest binding.",
+                        allowableValues = {"POST", "REDIRECT"})
+                @Pattern(regexp = "(?i)POST|REDIRECT")
+                String samlAuthnRequestBinding,
+        @Schema(
+                        description = "SAML response binding.",
+                        allowableValues = {"POST", "REDIRECT"})
+                @Pattern(regexp = "(?i)POST|REDIRECT")
+                String samlResponseBinding,
+        @Schema(
+                        description = "SAML logout binding.",
+                        allowableValues = {"POST", "REDIRECT"})
+                @Pattern(regexp = "(?i)POST|REDIRECT")
+                String samlLogoutBinding,
+        @Schema(description = "Force re-authentication at the SAML provider.")
+                boolean samlForceAuthentication,
+        @Schema(description = "Forward login_hint as the SAML Subject.") boolean samlPassSubject) {
+
+    public AdminIdentityProviderRequestDTO(
+            String registrationId,
+            String providerType,
+            String displayName,
+            String alias,
+            String iconKey,
+            boolean shortStateParameter,
+            boolean caseSensitiveUsername,
+            boolean enabled,
+            String clientId,
+            String clientSecret,
+            boolean hideOnLogin,
+            boolean accountLinkingOnly,
+            boolean trustEmail,
+            boolean mfaRequired,
+            String requiredClaims,
+            boolean storeTokens,
+            boolean storedTokensReadable,
+            int guiOrder,
+            String showInAccountConsole,
+            String syncMode,
+            String authorizationUri,
+            String tokenUri,
+            String userInfoUri,
+            String jwkSetUri,
+            String issuerUri,
+            String clientAuthenticationMethod,
+            String scopes,
+            String userNameAttribute) {
+        this(
+                registrationId,
+                providerType,
+                displayName,
+                alias,
+                iconKey,
+                shortStateParameter,
+                caseSensitiveUsername,
+                enabled,
+                clientId,
+                clientSecret,
+                hideOnLogin,
+                accountLinkingOnly,
+                trustEmail,
+                mfaRequired,
+                requiredClaims,
+                storeTokens,
+                storedTokensReadable,
+                guiOrder,
+                showInAccountConsole,
+                syncMode,
+                authorizationUri,
+                tokenUri,
+                userInfoUri,
+                jwkSetUri,
+                issuerUri,
+                clientAuthenticationMethod,
+                scopes,
+                userNameAttribute,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                true,
+                null,
+                "NameID",
+                "email",
+                "givenName",
+                "sn",
+                "groups",
+                null,
+                null,
+                null,
+                "REDIRECT",
+                "POST",
+                "REDIRECT",
+                false,
+                false);
+    }
+}

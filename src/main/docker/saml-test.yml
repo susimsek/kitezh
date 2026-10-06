@@ -1,0 +1,24 @@
+# Local test fixture only. Never deploy this password-based IdP in production.
+services:
+  saml-test-idp:
+    image: kenchan0130/simplesamlphp@sha256:3c6ed4b8c6bdc86bb131c802ddc35f6311cb91df7f8412f50b8f159c4c19fab0
+    container_name: saml-test-idp
+    ports:
+      - "127.0.0.1:8082:8080"
+    environment:
+      SIMPLESAMLPHP_IDP_BASE_URL: http://localhost:8082/simplesaml/
+    command: ["sh", "/saml-test/start.sh"]
+    volumes:
+      - ./saml-test/start.sh:/saml-test/start.sh:ro
+      - ./saml-test/logging.conf:/etc/apache2/conf-enabled/saml-test-logging.conf:ro
+      - ./saml-test/authsources.php:/var/www/simplesamlphp/config/authsources.php:ro
+      - ./saml-test/saml20-sp-remote.php:/var/www/simplesamlphp/metadata/saml20-sp-remote.php:ro
+      - saml-test-cert:/var/www/simplesamlphp/cert
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/simplesaml/saml2/idp/metadata.php"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  saml-test-cert:

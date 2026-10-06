@@ -74,7 +74,7 @@ public class AdminGlobalSearchService {
             results.addAll(userResults(normalizedQuery, pageRequest));
         }
         if (hasAny(authentication, CLIENT_AUTHORITIES)) {
-            results.addAll(clientResults(normalizedQuery, pageRequest));
+            results.addAll(clientResults(normalizedQuery));
         }
         if (hasAny(authentication, ROLE_AUTHORITIES)) {
             results.addAll(roleResults(normalizedQuery));
@@ -91,7 +91,7 @@ public class AdminGlobalSearchService {
                 .toList();
     }
 
-    private List<AdminSearchResultDTO> clientResults(String query, PageRequest pageRequest) {
+    private List<AdminSearchResultDTO> clientResults(String query) {
         PageRequest clientPageRequest =
                 PageRequest.of(0, RESULTS_PER_RESOURCE, Sort.by(Sort.Direction.ASC, "clientId"));
         return clientRepository

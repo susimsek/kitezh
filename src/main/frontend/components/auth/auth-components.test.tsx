@@ -137,10 +137,10 @@ describe("authentication components", () => {
 
     render(<LoginForm dictionary={dictionary} />);
 
-    const google = await screen.findByRole("button", {
+    const google = await screen.findByRole("link", {
       name: `${dictionary.login.socialLogin} Google`,
     });
-    const github = screen.getByRole("button", {
+    const github = screen.getByRole("link", {
       name: `${dictionary.login.socialLogin} GitHub`,
     });
     const microsoft = screen.getByRole("button", {
@@ -173,10 +173,35 @@ describe("authentication components", () => {
 
     render(<LoginForm dictionary={dictionary} />);
 
-    const provider = await screen.findByRole("button", {
+    const provider = await screen.findByRole("link", {
       name: `${dictionary.login.socialLogin} Google`,
     });
     expect(provider).toHaveAttribute("href", "/oauth2/authorization/acme-google");
+
+    delete (globalThis as { fetch?: typeof fetch }).fetch;
+  });
+
+  it("uses the SAML authentication endpoint for a configured SAML alias", async () => {
+    globalThis.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return {
+        ok: true,
+        json: async () =>
+          url.includes("social-providers")
+            ? [{ provider: "acme-saml", providerType: "saml", configured: true }]
+            : {},
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    render(<LoginForm dictionary={dictionary} />);
+
+    const provider = await screen.findByRole("link", {
+      name: `${dictionary.login.socialLogin} acme-saml`,
+    });
+    expect(provider).toHaveAttribute("href", "/saml2/authenticate/acme-saml");
+    fireEvent.click(provider);
+    expect(provider).toHaveAttribute("aria-disabled", "true");
+    expect(provider.querySelector(".spinner-border")).not.toBeNull();
 
     delete (globalThis as { fetch?: typeof fetch }).fetch;
   });
@@ -369,12 +394,12 @@ describe("authentication components", () => {
     render(<LoginForm dictionary={dictionary} />);
 
     expect(
-      await screen.findByRole("button", {
+      await screen.findByRole("link", {
         name: `${dictionary.login.socialLogin} GitHub`,
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: `${dictionary.login.socialLogin} acme` }),
+      screen.getByRole("link", { name: `${dictionary.login.socialLogin} acme` }),
     ).toBeVisible();
     expect(screen.queryByRole("link", { name: dictionary.login.register })).not.toBeInTheDocument();
     expect(
