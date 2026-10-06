@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Dropdown, Spinner } from "react-bootstrap";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon } from "@/components/shared/Icon";
@@ -22,13 +22,10 @@ export function ConsoleUserMenu({
   onLogout: () => void | Promise<void>;
   avatarSrc?: string | null;
 }) {
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [avatarFailedSrc, setAvatarFailedSrc] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const initial = username.trim().charAt(0).toUpperCase() || "?";
-
-  useEffect(() => {
-    setAvatarFailed(false);
-  }, [avatarSrc]);
+  const avatarFailed = Boolean(avatarSrc && avatarFailedSrc === avatarSrc);
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -56,7 +53,7 @@ export function ConsoleUserMenu({
               height={32}
               unoptimized
               className="console-user-avatar-image"
-              onError={() => setAvatarFailed(true)}
+              onError={() => setAvatarFailedSrc(avatarSrc)}
             />
           )}
           <span className={avatarFailed ? undefined : "visually-hidden"}>{initial}</span>
