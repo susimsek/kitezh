@@ -143,9 +143,10 @@ test("opens settings in a separate window without requiring login", async () => 
       await settingsWindow.locator("#desktop-show-in-menu-bar").count(),
       1,
     );
+    const platform = await application.evaluate(() => process.platform);
     assert.equal(
       await settingsWindow.locator("#desktop-show-in-dock").count(),
-      1,
+      platform === "darwin" ? 1 : 0,
     );
     const showInMenuBar = settingsWindow.locator("#desktop-show-in-menu-bar");
     assert.equal(await showInMenuBar.isChecked(), true);
