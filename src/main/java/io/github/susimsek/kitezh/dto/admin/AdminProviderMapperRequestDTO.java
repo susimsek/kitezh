@@ -22,7 +22,9 @@ public record AdminProviderMapperRequestDTO(
                 @NotBlank
                 @Size(max = 200)
                 String target,
-        @Schema(example = "user-attribute") @NotBlank @Pattern(regexp = "user-attribute|claim")
+        @Schema(example = "user-attribute")
+                @NotBlank
+                @Pattern(regexp = "user-attribute|claim|role|group")
                 String mapperType,
         @Schema(
                         example = "inherit",

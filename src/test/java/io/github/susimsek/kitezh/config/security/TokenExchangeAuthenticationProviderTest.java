@@ -10,6 +10,7 @@ import io.github.susimsek.kitezh.security.ClientSecuritySettings;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -62,6 +63,72 @@ class TokenExchangeAuthenticationProviderTest {
                                 assertThat(((OAuth2AuthenticationException) exception).getError())
                                         .extracting(OAuth2Error::getErrorCode)
                                         .isEqualTo("access_denied"));
+    }
+
+    @Test
+    void rejectsAnUnauthenticatedClientPrincipal() {
+        OAuth2TokenExchangeAuthenticationToken request =
+                new OAuth2TokenExchangeAuthenticationToken(
+                        "urn:ietf:params:oauth:token-type:refresh_token",
+                        "subject",
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        new TestingAuthenticationToken("not-a-client", "credentials"),
+                        null,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(),
+                        Map.of());
+        TokenExchangeAuthenticationProvider provider = provider();
+
+        assertThatThrownBy(() -> provider.authenticate(request))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("invalid_client"));
+    }
+
+    @Test
+    void rejectsResourceParameters() {
+        RegisteredClient client = client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        OAuth2TokenExchangeAuthenticationToken request =
+                new OAuth2TokenExchangeAuthenticationToken(
+                        "urn:ietf:params:oauth:token-type:refresh_token",
+                        "subject",
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        authenticatedClient(client),
+                        null,
+                        null,
+                        Set.of("resource"),
+                        Set.of(),
+                        Set.of(),
+                        Map.of());
+        TokenExchangeAuthenticationProvider provider = provider();
+
+        assertThatThrownBy(() -> provider.authenticate(request))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("invalid_request"));
+    }
+
+    @Test
+    void rejectsAnInvalidSubjectToken() {
+        RegisteredClient client = client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        OAuth2TokenExchangeAuthenticationToken request = request(client, null, Set.of());
+        TokenExchangeAuthenticationProvider provider = provider();
+
+        assertThatThrownBy(() -> provider.authenticate(request))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("invalid_grant"));
     }
 
     @Test

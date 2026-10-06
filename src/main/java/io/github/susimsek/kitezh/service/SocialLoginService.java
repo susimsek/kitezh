@@ -196,7 +196,7 @@ public class SocialLoginService {
         String normalizedProvider =
                 configuredProvider == null
                         ? normalizeProvider(provider)
-                        : configuredProvider.registrationId();
+                        : providerKey(configuredProvider);
         List<SocialIdentityEntity> identities =
                 socialIdentityRepository.findAllByUserUsernameAndProvider(
                         username, normalizedProvider);
@@ -230,9 +230,10 @@ public class SocialLoginService {
                         provider ->
                                 new SocialProviderDTO(
                                         provider.alias(),
-                                        provider.registrationId(),
+                                        provider.providerType(),
                                         provider.iconKey(),
-                                        provider.configured()))
+                                        "saml".equalsIgnoreCase(provider.providerType())
+                                                || provider.configured()))
                 .toList();
     }
 
@@ -242,8 +243,8 @@ public class SocialLoginService {
                 .sorted()
                 .filter(
                         provider ->
-                                (isProviderEnabled(provider.registrationId())
-                                                || linked.contains(provider.registrationId()))
+                                (isProviderEnabled(providerKey(provider))
+                                                || linked.contains(providerKey(provider)))
                                         && accountConsoleVisible(provider, linked))
                 .map(
                         provider ->
@@ -251,15 +252,20 @@ public class SocialLoginService {
                                         provider.alias(),
                                         provider.displayName(),
                                         provider.iconKey(),
-                                        linked.contains(provider.registrationId()),
-                                        provider.configured(),
-                                        isProviderEnabled(provider.registrationId())))
+                                        linked.contains(providerKey(provider)),
+                                        "saml".equalsIgnoreCase(provider.providerType())
+                                                || provider.configured(),
+                                        isProviderEnabled(providerKey(provider))))
                 .toList();
     }
 
     public boolean isProviderEnabled(String provider) {
         SocialProviderSettingsService.ProviderCredentials configuredProvider =
                 socialProviderSettingsService.provider(provider);
+        if (configuredProvider != null
+                && "saml".equalsIgnoreCase(configuredProvider.providerType())) {
+            return configuredProvider.enabled();
+        }
         return configuredProvider != null
                 ? configuredProvider.enabled()
                 : provider != null
@@ -323,11 +329,18 @@ public class SocialLoginService {
 
     private static boolean accountConsoleVisible(
             SocialProviderSettingsService.ProviderCredentials provider, Set<String> linked) {
+        String providerKey = providerKey(provider);
         return switch (provider.showInAccountConsole()) {
             case "never" -> false;
-            case "when-linked" -> linked.contains(provider.registrationId());
+            case "when-linked" -> linked.contains(providerKey);
             default -> true;
         };
+    }
+
+    private static String providerKey(SocialProviderSettingsService.ProviderCredentials provider) {
+        return "saml".equalsIgnoreCase(provider.providerType())
+                ? provider.alias()
+                : provider.registrationId();
     }
 
     private UserEntity link(String username, String provider, String subject) {

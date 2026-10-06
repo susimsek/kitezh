@@ -54,6 +54,8 @@ class SpaFilterTest {
                 "/api/admin/users",
                 "/oauth2/authorize",
                 "/oauth2/token",
+                "/saml2/authenticate/saml-e2e",
+                "/saml2/service-provider-metadata/saml-e2e",
                 "/.well-known/openid-configuration",
                 "/actuator/health",
                 "/_next/static/app.js",

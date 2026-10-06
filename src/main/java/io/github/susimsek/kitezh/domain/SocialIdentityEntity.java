@@ -1,6 +1,8 @@
 package io.github.susimsek.kitezh.domain;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -11,6 +13,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -59,6 +63,20 @@ public class SocialIdentityEntity {
 
     @Column(name = "mapped_claims", length = 8000)
     private String mappedClaims;
+
+    @ElementCollection
+    @CollectionTable(
+            name = "social_identity_synced_roles",
+            joinColumns = @JoinColumn(name = "identity_id"))
+    @Column(name = "role_name", nullable = false, length = 200)
+    private Set<String> syncedRoleNames = new HashSet<>();
+
+    @ElementCollection
+    @CollectionTable(
+            name = "social_identity_synced_groups",
+            joinColumns = @JoinColumn(name = "identity_id"))
+    @Column(name = "group_name", nullable = false, length = 100)
+    private Set<String> syncedGroupNames = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)

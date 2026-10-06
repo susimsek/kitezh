@@ -93,7 +93,7 @@ public class SocialLoginConfig {
             List<ClientRegistration> registrations,
             ProviderCredentials provider,
             java.util.function.Function<ProviderCredentials, ClientRegistration> factory) {
-        if (provider.configured()) {
+        if (provider.configured() && !"saml".equalsIgnoreCase(provider.providerType())) {
             registrations.add(factory.apply(provider));
         }
     }

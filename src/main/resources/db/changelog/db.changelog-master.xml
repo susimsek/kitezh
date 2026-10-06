@@ -41,4 +41,6 @@
 	<include file="db/changelog/changes/023-create-ciba-policy.xml"/>
 	<include file="db/changelog/changes/029-create-offline-access-policy.xml"/>
 	<include file="db/changelog/changes/030-branding-settings.xml"/>
+	<include file="db/changelog/changes/030-create-saml-provider-config.xml"/>
+	<include file="db/changelog/changes/031-create-social-identity-mapping-state.xml"/>
 </databaseChangeLog>

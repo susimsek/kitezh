@@ -317,13 +317,19 @@ function SocialLoginButtons({
             <Button
               key={provider.provider}
               as="a"
-              href={provider.configured ? `/oauth2/authorization/${provider.provider}` : undefined}
-              role="button"
+              href={
+                provider.configured
+                  ? provider.providerType === "saml"
+                    ? `/saml2/authenticate/${provider.provider}`
+                    : `/oauth2/authorization/${provider.provider}`
+                  : undefined
+              }
               variant="secondary"
               size="lg"
               className="social-login-button p-0"
               title={`${dictionary.login.socialLogin} ${label}`}
               aria-label={`${dictionary.login.socialLogin} ${label}`}
+              role={provider.configured ? undefined : "button"}
               disabled={!provider.configured || submittingProvider !== null}
               aria-disabled={!provider.configured || submittingProvider !== null}
               onClick={(event) => {

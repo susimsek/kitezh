@@ -527,6 +527,26 @@ class SocialLoginServiceTest {
     }
 
     @Test
+    void exposesSamlProviderTypeForLoginRouting() {
+        SocialProviderSettingsService.ProviderCredentials provider = mock();
+        when(provider.registrationId()).thenReturn("saml-e2e");
+        when(provider.alias()).thenReturn("saml-e2e");
+        when(provider.providerType()).thenReturn("saml");
+        when(provider.iconKey()).thenReturn("generic");
+        when(socialProviderSettingsService.effectiveProviders())
+                .thenReturn(java.util.List.of(provider));
+
+        assertThat(service().availableProviders())
+                .singleElement()
+                .satisfies(
+                        result -> {
+                            assertThat(result.provider()).isEqualTo("saml-e2e");
+                            assertThat(result.providerType()).isEqualTo("saml");
+                            assertThat(result.configured()).isTrue();
+                        });
+    }
+
+    @Test
     void hidesProvidersWhenProviderIsDisabled() {
         when(socialProviderSettingsService.effectiveProviders())
                 .thenReturn(

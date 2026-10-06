@@ -7,6 +7,7 @@ import { ClientScopeCreateForm } from "./ClientScopeCreateForm";
 import { GroupCreateForm } from "./GroupCreateForm";
 import { RoleCreateForm } from "./RoleCreateForm";
 import { UserProfileAttributeForm } from "./UserProfileAttributeForm";
+import { IdentityProviderForm } from "./IdentityProviderForm";
 
 const mockPush = jest.fn();
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
@@ -195,6 +196,48 @@ describe("dedicated administration creation forms", () => {
     await waitFor(() =>
       expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.clientScopes.operationError),
     );
+  });
+
+  it("validates SAML metadata URI before submitting the provider form", async () => {
+    render(<IdentityProviderForm dictionary={dictionary} />);
+
+    fireEvent.change(
+      screen.getByRole("textbox", { name: dictionary.admin.identityProviders.name }),
+      {
+        target: { value: "Acme SAML" },
+      },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: dictionary.admin.identityProviders.registrationId }),
+      { target: { value: "acme-saml" } },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: dictionary.admin.identityProviders.alias }),
+      {
+        target: { value: "acme-saml" },
+      },
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: dictionary.admin.identityProviders.type }),
+      {
+        target: { value: "saml" },
+      },
+    );
+    expect(
+      screen.getByRole("textbox", {
+        name: dictionary.admin.identityProviders.samlIdpCertificate,
+      }),
+    ).toHaveAttribute("rows", "6");
+    fireEvent.change(
+      screen.getByRole("textbox", { name: dictionary.admin.identityProviders.samlMetadataUri }),
+      { target: { value: "not-a-uri" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.identityProviders.create }),
+    );
+
+    expect(await screen.findByText(dictionary.admin.identityProviders.uriInvalid)).toBeVisible();
+    expect(mockAdminRequest).not.toHaveBeenCalled();
   });
 
   it("renders the profile edit branch, handles load errors, and respects permissions", async () => {

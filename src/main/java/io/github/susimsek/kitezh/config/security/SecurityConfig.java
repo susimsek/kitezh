@@ -5,6 +5,7 @@ import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.kitezh.security.LocalizedAuthenticationEntryPoint;
+import io.github.susimsek.kitezh.service.SamlLoginService;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialProviderSettingsService;
 import io.github.susimsek.kitezh.service.SocialTokenService;
@@ -44,6 +45,12 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepo
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.saml2.core.Saml2Error;
+import org.springframework.security.saml2.core.Saml2ResponseValidatorResult;
+import org.springframework.security.saml2.provider.service.authentication.AbstractSaml2AuthenticationRequest;
+import org.springframework.security.saml2.provider.service.authentication.OpenSaml5AuthenticationProvider;
+import org.springframework.security.saml2.provider.service.web.HttpSessionSaml2AuthenticationRequestRepository;
+import org.springframework.security.saml2.provider.service.web.Saml2AuthenticationRequestRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -66,6 +73,7 @@ import org.springframework.web.client.RestClient;
 public class SecurityConfig {
 
     private static final String LOGIN_PATH = "/login";
+    private static final String LOGIN_ERROR_PATH = LOGIN_PATH + "?" + OAuth2ParameterNames.ERROR;
 
     private static final SecureRandom SOCIAL_STATE_RANDOM = new SecureRandom();
 
@@ -120,12 +128,18 @@ public class SecurityConfig {
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies,
+            SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
+            SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
+            SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
             LoggingProperties loggingProperties) {
         return defaultSecurityFilterChain(
                 http,
                 applicationProperties,
                 browserDependencies,
                 socialDependencies,
+                samlRegistrationRepository,
+                samlLoginSuccessHandler,
+                samlAuthenticationRequestResolver,
                 new ObservabilityMdcFilter(loggingProperties));
     }
 
@@ -139,6 +153,9 @@ public class SecurityConfig {
                 applicationProperties,
                 browserDependencies,
                 socialDependencies,
+                null,
+                null,
+                null,
                 new ObservabilityMdcFilter());
     }
 
@@ -147,6 +164,9 @@ public class SecurityConfig {
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies,
+            SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
+            SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
+            SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
             ObservabilityMdcFilter observabilityMdcFilter) {
         http.authenticationManager(browserDependencies.formAuthenticationManager());
         http.securityContext(
@@ -216,6 +236,10 @@ public class SecurityConfig {
                                                 "/v3/api-docs/**",
                                                 "/swagger-ui.html",
                                                 "/swagger-ui/**",
+                                                "/saml2/authenticate/**",
+                                                "/saml2/metadata/**",
+                                                "/saml2/service-provider-metadata/**",
+                                                "/login/saml2/sso/**",
                                                 "/actuator/health",
                                                 "/actuator/health/**",
                                                 "/actuator/metrics",
@@ -279,7 +303,7 @@ public class SecurityConfig {
                             .onAuthenticationSuccess(request, response, authentication);
                 });
         authenticationFilter.setAuthenticationFailureHandler(
-                new SimpleUrlAuthenticationFailureHandler("/login?error"));
+                new SimpleUrlAuthenticationFailureHandler(LOGIN_ERROR_PATH));
 
         http.addFilterBefore(requestOptionsFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -316,7 +340,36 @@ public class SecurityConfig {
                                                                     .socialTokenResponseClient()))
                                     .failureHandler(
                                             new SimpleUrlAuthenticationFailureHandler(
-                                                    "/login?error"))
+                                                    LOGIN_ERROR_PATH))
+                                    .permitAll());
+        }
+
+        if (samlRegistrationRepository != null && samlLoginSuccessHandler != null) {
+            http.saml2Metadata(Customizer.withDefaults());
+            http.saml2Logout(
+                    saml2 ->
+                            saml2.logoutRequest(
+                                            request ->
+                                                    request.logoutUrl(
+                                                            "/logout/saml2/slo/{registrationId}"))
+                                    .logoutResponse(
+                                            response ->
+                                                    response.logoutUrl(
+                                                            "/logout/saml2/slo/{registrationId}")));
+            http.saml2Login(
+                    saml2 ->
+                            saml2.loginPage(LOGIN_PATH)
+                                    .relyingPartyRegistrationRepository(samlRegistrationRepository)
+                                    .authenticationManager(
+                                            new ProviderManager(
+                                                    samlAuthenticationProvider(
+                                                            samlRegistrationRepository)))
+                                    .authenticationRequestResolver(
+                                            samlAuthenticationRequestResolver)
+                                    .successHandler(samlLoginSuccessHandler)
+                                    .failureHandler(
+                                            new SimpleUrlAuthenticationFailureHandler(
+                                                    LOGIN_ERROR_PATH))
                                     .permitAll());
         }
 
@@ -356,6 +409,31 @@ public class SecurityConfig {
                                         }));
 
         return http.build();
+    }
+
+    private static OpenSaml5AuthenticationProvider samlAuthenticationProvider(
+            SamlRelyingPartyRegistrationRepository registrationRepository) {
+        OpenSaml5AuthenticationProvider provider = new OpenSaml5AuthenticationProvider();
+        OpenSaml5AuthenticationProvider.AssertionValidator defaultValidator =
+                OpenSaml5AuthenticationProvider.AssertionValidator.withDefaults();
+        provider.setAssertionValidator(
+                assertionToken -> {
+                    Saml2ResponseValidatorResult result = defaultValidator.convert(assertionToken);
+                    if (result.hasErrors()
+                            || !registrationRepository.requiresSignedAssertions(
+                                    assertionToken
+                                            .getToken()
+                                            .getRelyingPartyRegistration()
+                                            .getRegistrationId())
+                            || assertionToken.getAssertion().getSignature() != null) {
+                        return result;
+                    }
+                    return result.concat(
+                            new Saml2Error(
+                                    "invalid_assertion",
+                                    "The SAML assertion must contain a signature"));
+                });
+        return provider;
     }
 
     @Bean
@@ -552,6 +630,12 @@ public class SecurityConfig {
     }
 
     @Bean
+    Saml2AuthenticationRequestRepository<AbstractSaml2AuthenticationRequest>
+            saml2AuthenticationRequestRepository() {
+        return new HttpSessionSaml2AuthenticationRequestRepository();
+    }
+
+    @Bean
     SocialLoginAuthenticationSuccessHandler socialLoginAuthenticationSuccessHandler(
             SocialLoginService socialLoginService,
             org.springframework.security.core.userdetails.UserDetailsService userDetailsService,
@@ -567,6 +651,17 @@ public class SecurityConfig {
                 socialAuthorizedClientRepository,
                 socialTokenService,
                 mfaService);
+    }
+
+    @Bean
+    SamlLoginAuthenticationSuccessHandler samlLoginAuthenticationSuccessHandler(
+            SamlLoginService samlLoginService,
+            org.springframework.security.core.userdetails.UserDetailsService userDetailsService,
+            @Qualifier("browserSecurityContextRepository")
+                    SecurityContextRepository securityContextRepository,
+            MfaService mfaService) {
+        return new SamlLoginAuthenticationSuccessHandler(
+                samlLoginService, userDetailsService, securityContextRepository, mfaService);
     }
 
     @Bean(name = "formAuthenticationManager")

@@ -55,6 +55,37 @@ class ObservabilityMdcFilterTest {
     }
 
     @Test
+    void masksSamlBindingParametersAndFormBody() throws Exception {
+        LoggingProperties.Server access = new LoggingProperties.Server();
+        access.setLevel(HttpLoggingLevel.FULL);
+        ObservabilityMdcFilter samlFilter = new ObservabilityMdcFilter(access);
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/login/saml2/sso/test");
+        request.setContentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE);
+        request.setQueryString("SAMLRequest=secret-request&RelayState=secret-state");
+        request.setContent("SAMLResponse=secret-assertion&RelayState=secret-state".getBytes());
+
+        samlFilter.doFilterInternal(
+                request,
+                new MockHttpServletResponse(),
+                (req, res) -> req.getInputStream().readAllBytes());
+
+        assertThat(accessAppender.list)
+                .singleElement()
+                .satisfies(
+                        event ->
+                                assertThat(event.getFormattedMessage())
+                                        .contains(
+                                                "SAMLRequest=***",
+                                                "RelayState=***",
+                                                "SAMLResponse=***")
+                                        .doesNotContain(
+                                                "secret-request",
+                                                "secret-state",
+                                                "secret-assertion"));
+    }
+
+    @Test
     void addsBrowserRequestContextAndRestoresMdcAfterRequest() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin");
         request.setRemoteAddr("192.0.2.10");

@@ -21,7 +21,9 @@ public record SocialProviderDTO(
                 String iconKey,
         @Schema(
                         description =
-                                "Whether the provider has a usable Client ID and Client Secret.",
+                                "Whether the provider has usable login configuration. SAML uses"
+                                        + " metadata or asserting-party configuration instead of"
+                                        + " OAuth client credentials.",
                         example = "false",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 boolean configured) {}

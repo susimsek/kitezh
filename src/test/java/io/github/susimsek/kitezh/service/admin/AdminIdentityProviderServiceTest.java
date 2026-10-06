@@ -10,13 +10,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.kitezh.config.security.SamlRelyingPartyRegistrationRepository;
 import io.github.susimsek.kitezh.config.security.SocialLoginSecretCipher;
+import io.github.susimsek.kitezh.domain.SamlProviderConfigEntity;
 import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperRequestDTO;
+import io.github.susimsek.kitezh.repository.SamlProviderConfigRepository;
 import io.github.susimsek.kitezh.repository.SocialIdentityRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
@@ -36,6 +39,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 @SuppressWarnings("java:S5778")
 class AdminIdentityProviderServiceTest {
@@ -47,6 +52,10 @@ class AdminIdentityProviderServiceTest {
     private final SocialIdentityRepository identityRepository =
             mock(SocialIdentityRepository.class);
     private final SocialLoginSecretCipher secretCipher = mock(SocialLoginSecretCipher.class);
+    private final SamlProviderConfigRepository samlConfigRepository =
+            mock(SamlProviderConfigRepository.class);
+    private final SamlRelyingPartyRegistrationRepository samlRegistrationRepository =
+            mock(SamlRelyingPartyRegistrationRepository.class);
     private final SocialProviderSettingsService settingsService =
             mock(SocialProviderSettingsService.class);
     private final AdminAuditEventService auditEventService = mock(AdminAuditEventService.class);
@@ -57,6 +66,17 @@ class AdminIdentityProviderServiceTest {
                     identityRepository,
                     secretCipher,
                     settingsService,
+                    auditEventService);
+
+    private final AdminIdentityProviderService samlService =
+            new AdminIdentityProviderService(
+                    providerRepository,
+                    samlConfigRepository,
+                    mapperRepository,
+                    identityRepository,
+                    secretCipher,
+                    settingsService,
+                    samlRegistrationRepository,
                     auditEventService);
 
     @BeforeEach
@@ -495,6 +515,86 @@ class AdminIdentityProviderServiceTest {
     }
 
     @Test
+    void createsManualSamlProviderAndPersistsApplicationWideConfiguration() {
+        when(providerRepository.existsByRegistrationId("acme")).thenReturn(false);
+        when(providerRepository.existsByAliasIgnoreCase("acme")).thenReturn(false);
+        when(providerRepository.save(any()))
+                .thenAnswer(
+                        invocation -> {
+                            SocialProviderEntity entity = invocation.getArgument(0);
+                            entity.setId("provider-saml");
+                            return entity;
+                        });
+        when(samlConfigRepository.findById("provider-saml")).thenReturn(Optional.empty());
+        when(samlConfigRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminIdentityProviderDTO result = samlService.create(samlRequest(null, false, null));
+
+        assertThat(result.providerType()).isEqualTo("saml");
+        verify(samlConfigRepository).save(any(SamlProviderConfigEntity.class));
+        verify(samlRegistrationRepository).refresh();
+    }
+
+    @Test
+    void refreshesSamlRegistrationsAfterTransactionCommit() {
+        when(providerRepository.existsByRegistrationId("acme")).thenReturn(false);
+        when(providerRepository.existsByAliasIgnoreCase("acme")).thenReturn(false);
+        when(providerRepository.save(any()))
+                .thenAnswer(
+                        invocation -> {
+                            SocialProviderEntity entity = invocation.getArgument(0);
+                            entity.setId("provider-saml");
+                            return entity;
+                        });
+        when(samlConfigRepository.findById("provider-saml")).thenReturn(Optional.empty());
+        when(samlConfigRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            samlService.create(samlRequest(null, false, null));
+
+            verify(samlRegistrationRepository, never()).refresh();
+            TransactionSynchronizationUtils.triggerAfterCommit();
+            verify(samlRegistrationRepository).refresh();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void createsMetadataSamlProviderWithSigningAndDecryptionMaterial() {
+        when(providerRepository.existsByRegistrationId("acme")).thenReturn(false);
+        when(providerRepository.existsByAliasIgnoreCase("acme")).thenReturn(false);
+        when(providerRepository.save(any()))
+                .thenAnswer(
+                        invocation -> {
+                            SocialProviderEntity entity = invocation.getArgument(0);
+                            entity.setId("provider-saml");
+                            return entity;
+                        });
+        when(samlConfigRepository.findById("provider-saml")).thenReturn(Optional.empty());
+        when(samlConfigRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(secretCipher.encrypt("signing-key")).thenReturn("encrypted-signing-key");
+        when(secretCipher.encrypt("decryption-key")).thenReturn("encrypted-decryption-key");
+
+        samlService.create(samlRequest("https://idp.example/metadata", true, "signing-key"));
+
+        verify(secretCipher).encrypt("signing-key");
+        verify(secretCipher).encrypt("decryption-key");
+        verify(samlConfigRepository).save(any(SamlProviderConfigEntity.class));
+    }
+
+    @Test
+    void rejectsSamlProviderWithoutMetadataOrManualPartyDetails() {
+        when(providerRepository.existsByRegistrationId("acme")).thenReturn(false);
+        when(providerRepository.existsByAliasIgnoreCase("acme")).thenReturn(false);
+
+        assertThatThrownBy(() -> samlService.create(samlRequest("", false, null)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("SAML metadata");
+    }
+
+    @Test
     void reportsProviderWithoutConfiguredClientSecretAndRejectsInvalidIcon() {
         SocialProviderEntity provider = provider();
         provider.setClientId(" ");
@@ -602,6 +702,63 @@ class AdminIdentityProviderServiceTest {
                 " client_secret_basic ",
                 "openid profile email",
                 " sub ");
+    }
+
+    private static AdminIdentityProviderRequestDTO samlRequest(
+            String metadataUri, boolean signAuthnRequests, String signingPrivateKey) {
+        return new AdminIdentityProviderRequestDTO(
+                "Acme",
+                "saml",
+                "Acme SAML",
+                "Acme",
+                "GENERIC",
+                false,
+                false,
+                true,
+                null,
+                null,
+                false,
+                false,
+                true,
+                false,
+                "sub,email",
+                false,
+                false,
+                4,
+                "ALWAYS",
+                "IMPORT",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "client_secret_basic",
+                "openid",
+                "sub",
+                metadataUri,
+                metadataUri == null ? "https://idp.example/entity" : null,
+                metadataUri == null ? "https://idp.example/sso" : null,
+                null,
+                metadataUri == null ? "certificate" : null,
+                signingPrivateKey,
+                signAuthnRequests ? "signing-certificate" : null,
+                "https://sp.example/entity",
+                signAuthnRequests,
+                true,
+                null,
+                "NameID",
+                "email",
+                "givenName",
+                "sn",
+                "groups",
+                signAuthnRequests ? "decryption-key" : null,
+                signAuthnRequests ? "decryption-certificate" : null,
+                "https://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+                "REDIRECT",
+                "POST",
+                "REDIRECT",
+                false,
+                false);
     }
 
     private static AdminIdentityProviderRequestDTO requestWithAlias(

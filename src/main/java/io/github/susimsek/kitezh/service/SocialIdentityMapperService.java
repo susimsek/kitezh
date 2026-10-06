@@ -1,7 +1,10 @@
 package io.github.susimsek.kitezh.service;
 
+import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.repository.AuthorityRepository;
+import io.github.susimsek.kitezh.repository.GroupRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -10,18 +13,37 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Applies the configured identity-provider mappers during broker login. */
 @Service
-@RequiredArgsConstructor
 @SuppressWarnings("java:S107")
 public class SocialIdentityMapperService {
 
     private final SocialProviderMapperRepository mapperRepository;
     private final UserProfileService userProfileService;
+    private final AuthorityRepository authorityRepository;
+    private final GroupRepository groupRepository;
+
+    @Autowired
+    public SocialIdentityMapperService(
+            SocialProviderMapperRepository mapperRepository,
+            UserProfileService userProfileService,
+            AuthorityRepository authorityRepository,
+            GroupRepository groupRepository) {
+        this.mapperRepository = mapperRepository;
+        this.userProfileService = userProfileService;
+        this.authorityRepository = authorityRepository;
+        this.groupRepository = groupRepository;
+    }
+
+    public SocialIdentityMapperService(
+            SocialProviderMapperRepository mapperRepository,
+            UserProfileService userProfileService) {
+        this(mapperRepository, userProfileService, null, null);
+    }
 
     @Transactional
     public Map<String, Map<String, Object>> apply(
@@ -52,6 +74,25 @@ public class SocialIdentityMapperService {
                 providerAlias, claims, user, firstLogin, caseSensitiveUsername, providerSyncMode);
     }
 
+    @Transactional
+    public Map<String, Map<String, Object>> apply(
+            String providerAlias,
+            Map<String, Object> claims,
+            UserEntity user,
+            boolean firstLogin,
+            boolean caseSensitiveUsername,
+            String providerSyncMode,
+            SocialIdentityEntity identity) {
+        return applyInternal(
+                providerAlias,
+                claims,
+                user,
+                firstLogin,
+                caseSensitiveUsername,
+                providerSyncMode,
+                identity);
+    }
+
     private Map<String, Map<String, Object>> applyInternal(
             String providerAlias,
             Map<String, Object> claims,
@@ -59,10 +100,33 @@ public class SocialIdentityMapperService {
             boolean firstLogin,
             boolean caseSensitiveUsername,
             String providerSyncMode) {
+        return applyInternal(
+                providerAlias,
+                claims,
+                user,
+                firstLogin,
+                caseSensitiveUsername,
+                providerSyncMode,
+                null);
+    }
+
+    private Map<String, Map<String, Object>> applyInternal(
+            String providerAlias,
+            Map<String, Object> claims,
+            UserEntity user,
+            boolean firstLogin,
+            boolean caseSensitiveUsername,
+            String providerSyncMode,
+            SocialIdentityEntity identity) {
         String effectiveProviderSyncMode =
                 providerSyncMode == null || providerSyncMode.isBlank()
                         ? SocialProviderSyncMode.IMPORT.value()
                         : providerSyncMode;
+        if (identity != null
+                && !firstLogin
+                && SocialProviderSyncMode.from(effectiveProviderSyncMode).updatesExistingUser()) {
+            resetAuthorizationMappings(identity, user);
+        }
         if (providerAlias == null || providerAlias.isBlank()) {
             return Map.of();
         }
@@ -84,7 +148,8 @@ public class SocialIdentityMapperService {
                             caseSensitiveUsername,
                             effectiveProviderSyncMode,
                             profileValues,
-                            mappedClaims);
+                            mappedClaims,
+                            identity);
         }
         if (userChanged) {
             userProfileService.saveMappedUser(user, firstLogin);
@@ -95,7 +160,7 @@ public class SocialIdentityMapperService {
         return mappedClaims;
     }
 
-    private static boolean applyMapper(
+    private boolean applyMapper(
             SocialProviderMapperEntity mapper,
             Map<String, Object> claims,
             UserEntity user,
@@ -103,7 +168,8 @@ public class SocialIdentityMapperService {
             boolean caseSensitiveUsername,
             String providerSyncMode,
             Map<String, List<String>> profileValues,
-            Map<String, Map<String, Object>> mappedClaims) {
+            Map<String, Map<String, Object>> mappedClaims,
+            SocialIdentityEntity identity) {
         if (!isApplicable(mapper, firstLogin, providerSyncMode)) {
             return false;
         }
@@ -118,8 +184,62 @@ public class SocialIdentityMapperService {
         boolean userChanged =
                 applyUserAttribute(
                         mapper, user, target, values, caseSensitiveUsername, profileValues);
+        applyAuthorizationMapper(mapper, values, user, identity);
         addTokenClaims(mapper, target, values, mappedClaims);
         return userChanged;
+    }
+
+    private void applyAuthorizationMapper(
+            SocialProviderMapperEntity mapper,
+            List<String> values,
+            UserEntity user,
+            SocialIdentityEntity identity) {
+        if (identity == null || !isAuthorizationMapper(mapper.getMapperType())) {
+            return;
+        }
+        String target = mapper.getTarget().trim();
+        if (values.stream().noneMatch(value -> value.equalsIgnoreCase(target))) {
+            return;
+        }
+        if ("role".equalsIgnoreCase(mapper.getMapperType())) {
+            authorityRepository
+                    .findByName(target)
+                    .ifPresent(
+                            authority -> {
+                                user.getAuthorities().add(authority);
+                                identity.getSyncedRoleNames().add(authority.getName());
+                            });
+        } else {
+            groupRepository
+                    .findByNameIgnoreCase(target)
+                    .ifPresent(
+                            group -> {
+                                user.getGroups().add(group);
+                                identity.getSyncedGroupNames().add(group.getName());
+                            });
+        }
+    }
+
+    private static boolean isAuthorizationMapper(String mapperType) {
+        return "role".equalsIgnoreCase(mapperType) || "group".equalsIgnoreCase(mapperType);
+    }
+
+    private static void resetAuthorizationMappings(SocialIdentityEntity identity, UserEntity user) {
+        user.getAuthorities()
+                .removeIf(
+                        authority ->
+                                identity.getSyncedRoleNames().stream()
+                                        .anyMatch(
+                                                role ->
+                                                        role.equalsIgnoreCase(
+                                                                authority.getName())));
+        user.getGroups()
+                .removeIf(
+                        group ->
+                                identity.getSyncedGroupNames().stream()
+                                        .anyMatch(name -> name.equalsIgnoreCase(group.getName())));
+        identity.getSyncedRoleNames().clear();
+        identity.getSyncedGroupNames().clear();
     }
 
     private static boolean applyUserAttribute(
