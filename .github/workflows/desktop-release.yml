@@ -123,6 +123,14 @@ jobs:
         shell: bash
         run: node src/main/desktop/scripts/write-update-manifest-public-key.mjs
 
+      - name: Prepare electron-builder cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          cache_dir="${RUNNER_TEMP}/electron-builder"
+          mkdir -p "${cache_dir}"
+          echo "ELECTRON_BUILDER_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
+
       - name: Test desktop shell
         working-directory: src/main/desktop
         run: pnpm test

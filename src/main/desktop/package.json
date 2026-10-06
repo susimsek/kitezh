@@ -4,7 +4,11 @@
   "private": true,
   "license": "Apache-2.0",
   "description": "Electron desktop console for Kitezh",
-  "author": "Kitezh",
+  "author": {
+    "name": "Kitezh",
+    "email": "suayb.simsek@ykteknoloji.com.tr"
+  },
+  "desktopName": "kitezh",
   "homepage": "https://github.com/susimsek/kitezh",
   "repository": {
     "type": "git",
@@ -63,6 +67,8 @@
       ]
     },
     "linux": {
+      "maintainer": "suayb.simsek@ykteknoloji.com.tr",
+      "syncDesktopName": true,
       "artifactName": "kitezh-${version}-linux-${arch}.${ext}",
       "target": [
         "AppImage",

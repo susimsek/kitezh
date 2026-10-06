@@ -1,6 +1,8 @@
 import config from "@/i18n.config";
 import { defaultLocale, isLocale, type Locale } from "./config";
 
+export const DESKTOP_LANGUAGE_MODE_KEY = "KITEZH_DESKTOP_LANGUAGE_MODE";
+
 export function detectLocale(cookie: string, browserLanguages: readonly string[]): Locale {
   const value = cookie
     .split(";")

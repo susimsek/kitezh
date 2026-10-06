@@ -12,6 +12,7 @@ import { BrandLogo } from "@/components/shared/BrandLogo";
 import { DesktopUpdateControl } from "@/components/shared/DesktopUpdateControl";
 import { useBranding } from "@/components/auth/BrandingProvider";
 import { Icon, type IconName } from "@/components/shared/Icon";
+import { isDesktopRuntime } from "@/lib/desktop-api";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { useAccountAuth } from "./AccountAuthProvider";
@@ -63,12 +64,16 @@ export function AccountShell({
               </Navbar.Brand>
             </div>
             <div className="admin-navbar-actions d-flex align-items-center gap-2">
-              <LanguageSwitcher
-                locale={locale}
-                label={dictionary.navbar.language}
-                accessToken={accessToken}
-              />
-              <ThemeSwitcher dictionary={dictionary} />
+              {!isDesktopRuntime() && (
+                <>
+                  <LanguageSwitcher
+                    locale={locale}
+                    label={dictionary.navbar.language}
+                    accessToken={accessToken}
+                  />
+                  <ThemeSwitcher dictionary={dictionary} />
+                </>
+              )}
               <DesktopUpdateControl />
               <ConsoleUserMenu
                 username={username ?? "…"}

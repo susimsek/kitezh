@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   globalShortcut,
   Menu,
+  nativeTheme,
   nativeImage,
   Notification,
   ipcMain,
@@ -50,11 +51,83 @@ import {
   setAutomaticInstallOnAppQuit,
   type DesktopUpdateStatus,
 } from "./update";
+import { showDesktopNotification } from "./notifications";
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
+const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
+const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
+const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 app.setName(DESKTOP_APP_NAME);
+
+type DesktopTheme = "system" | "light" | "dark";
+type DesktopLanguage = "en" | "tr";
+
+let desktopLanguage: DesktopLanguage = app
+  .getLocale()
+  .toLowerCase()
+  .startsWith("tr")
+  ? "tr"
+  : "en";
+
+function isTurkishDesktop() {
+  return desktopLanguage === "tr";
+}
+
+function desktopBackgroundColor() {
+  return nativeTheme.shouldUseDarkColors ? "#202124" : "#f8f9fa";
+}
+
+function applyDesktopTheme(value: unknown) {
+  const theme: DesktopTheme =
+    value === "light" || value === "dark" || value === "system"
+      ? value
+      : "system";
+  nativeTheme.themeSource = theme;
+  const backgroundColor = desktopBackgroundColor();
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.setBackgroundColor(backgroundColor);
+  }
+}
+
+function applyDesktopLanguage(value: unknown) {
+  desktopLanguage = value === "tr" ? "tr" : "en";
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    aboutWindow.setTitle(
+      isTurkishDesktop()
+        ? `${DESKTOP_APP_NAME} hakkında`
+        : `About ${DESKTOP_APP_NAME}`,
+    );
+  }
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.setTitle(
+      isTurkishDesktop()
+        ? `${DESKTOP_APP_NAME} ayarları`
+        : `${DESKTOP_APP_NAME} Settings`,
+    );
+  }
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    companionWindow.setTitle(
+      isTurkishDesktop() ? "Hızlı erişim" : "Quick access",
+    );
+  }
+  installApplicationMenu();
+  updateTrayMenu();
+}
+
+function nativeDialogThemeCss() {
+  const dark = nativeTheme.shouldUseDarkColors;
+  return `:root {
+        color-scheme: ${dark ? "dark" : "light"};
+        --dialog-background: ${dark ? "#202124" : "#f8f9fa"};
+        --dialog-foreground: ${dark ? "#f1f3f4" : "#202124"};
+        --dialog-secondary: ${dark ? "#d4d8da" : "#5f6368"};
+        --dialog-button: ${dark ? "#343d42" : "#e8eaed"};
+        --dialog-button-hover: ${dark ? "#414c52" : "#dfe1e5"};
+        --dialog-border: ${dark ? "#3a4246" : "#dadce0"};
+      }`;
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -69,9 +142,11 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
+let companionWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let updateCheckWindow: BrowserWindow | null = null;
+let updateResultWindow: BrowserWindow | null = null;
 let updateAvailableWindow: BrowserWindow | null = null;
 let updateConfirmationWindow: BrowserWindow | null = null;
 let updateConfirmationResolver: ((confirmed: boolean) => void) | null = null;
@@ -79,6 +154,7 @@ let tray: Tray | null = null;
 let pendingDeepLink: string | null = null;
 let promptedUpdateVersion: string | null = null;
 let manualUpdateCheckRequested = false;
+let suppressNextUpdateNotification = false;
 let logoutMenuItem: MenuItem | null = null;
 type ConsoleName = "admin" | "account";
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
@@ -90,10 +166,45 @@ type UpdatePreferences = {
 };
 type DesktopPreferences = {
   launchAtLogin: boolean;
+  showInMenuBar: boolean;
+  showInDock: boolean;
   notifications: boolean;
   globalShortcut: string;
 };
 const DEFAULT_GLOBAL_SHORTCUT = "Alt+Space";
+const GLOBAL_SHORTCUT_MODIFIERS = new Set([
+  "Command",
+  "CommandOrControl",
+  "Control",
+  "Alt",
+  "AltGr",
+  "Shift",
+  "Super",
+  "Meta",
+]);
+const GLOBAL_SHORTCUT_SPECIAL_KEYS = new Set([
+  "Space",
+  "Tab",
+  "Enter",
+  "Escape",
+  "Backspace",
+  "Delete",
+  "Insert",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+  "Up",
+  "Down",
+  "Left",
+  "Right",
+  "Plus",
+  "PrintScreen",
+  "MediaPlayPause",
+  "MediaNextTrack",
+  "MediaPreviousTrack",
+  "MediaStop",
+]);
 type WindowState = {
   x?: number;
   y?: number;
@@ -101,6 +212,67 @@ type WindowState = {
   height: number;
   maximized: boolean;
 };
+type CompanionWindowState = Pick<WindowState, "x" | "y" | "width" | "height">;
+
+function diagnosticsLogPath() {
+  return path.join(app.getPath("userData"), DIAGNOSTICS_LOG_FILE);
+}
+
+function redactDiagnosticText(value: string) {
+  return value
+    .replace(
+      /((?:access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|cookie|code)=)[^\s&]+/gi,
+      "$1[redacted]",
+    )
+    .replace(
+      /((?:"|'?)(?:access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|cookie|code)(?:"|'?)\s*:\s*["'])([^"']*)(["'])/gi,
+      "$1[redacted]$3",
+    )
+    .replace(/https?:\/\/[^\s]+/gi, (value) => {
+      try {
+        const url = new URL(value);
+        return `${url.origin}${url.pathname}`;
+      } catch {
+        return "[redacted-url]";
+      }
+    })
+    .replace(/(?:\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\s]+/g, "[user-path]")
+    .slice(0, 500);
+}
+
+async function appendDiagnosticEvent(
+  name: string,
+  details?: Record<string, unknown>,
+) {
+  const safeDetails = Object.fromEntries(
+    Object.entries(details ?? {})
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, redactDiagnosticText(String(value))]),
+  );
+  const line = `${new Date().toISOString()} ${name}${Object.keys(safeDetails).length ? ` ${JSON.stringify(safeDetails)}` : ""}\n`;
+  try {
+    const current = await readFile(diagnosticsLogPath(), "utf8").catch(
+      () => "",
+    );
+    const next = `${current}${line}`.slice(-MAX_DIAGNOSTICS_LOG_BYTES);
+    await mkdir(path.dirname(diagnosticsLogPath()), { recursive: true });
+    await writeFile(diagnosticsLogPath(), next, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  } catch {
+    // Diagnostics must never interfere with the desktop application.
+  }
+}
+
+async function readDiagnosticEvents() {
+  try {
+    const content = await readFile(diagnosticsLogPath(), "utf8");
+    return content.trim().split("\n").filter(Boolean).slice(-50);
+  } catch {
+    return [];
+  }
+}
 
 function rendererRoot() {
   return path.resolve(__dirname, "../renderer");
@@ -205,6 +377,45 @@ function windowStatePath() {
   return path.join(app.getPath("userData"), "desktop-window.json");
 }
 
+function companionWindowStatePath() {
+  return path.join(app.getPath("userData"), COMPANION_WINDOW_STATE_FILE);
+}
+
+async function readCompanionWindowState(): Promise<CompanionWindowState | null> {
+  try {
+    const value = JSON.parse(
+      await readFile(companionWindowStatePath(), "utf8"),
+    ) as Partial<CompanionWindowState>;
+    if (
+      typeof value.width !== "number" ||
+      typeof value.height !== "number" ||
+      !Number.isInteger(value.width) ||
+      !Number.isInteger(value.height) ||
+      value.width < 360 ||
+      value.height < 320
+    ) {
+      return null;
+    }
+    const state: CompanionWindowState = {
+      width: value.width,
+      height: value.height,
+    };
+    if (typeof value.x === "number" && Number.isInteger(value.x))
+      state.x = value.x;
+    if (typeof value.y === "number" && Number.isInteger(value.y))
+      state.y = value.y;
+    if (
+      state.x !== undefined &&
+      state.y !== undefined &&
+      !isWindowVisible(state)
+    )
+      return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
 async function readWindowState(): Promise<WindowState | null> {
   const file = windowStatePath();
   if (!existsSync(file)) return null;
@@ -244,7 +455,9 @@ async function readWindowState(): Promise<WindowState | null> {
   }
 }
 
-function isWindowVisible(state: WindowState) {
+function isWindowVisible(
+  state: Pick<WindowState, "x" | "y" | "width" | "height">,
+) {
   return screen.getAllDisplays().some(({ bounds }) => {
     const right = state.x! + state.width;
     const bottom = state.y! + state.height;
@@ -266,6 +479,16 @@ async function saveWindowState(window: BrowserWindow) {
     JSON.stringify({ ...bounds, maximized: window.isMaximized() }),
     { encoding: "utf8", mode: 0o600 },
   );
+}
+
+async function saveCompanionWindowState(window: BrowserWindow) {
+  if (window.isDestroyed() || window.isMinimized()) return;
+  const bounds = window.getBounds();
+  await mkdir(path.dirname(companionWindowStatePath()), { recursive: true });
+  await writeFile(companionWindowStatePath(), JSON.stringify(bounds), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 function assertTrustedSender(event: Electron.IpcMainInvokeEvent) {
@@ -340,16 +563,19 @@ async function showAboutDialog() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  const isTurkish = isTurkishDesktop();
   aboutWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: false,
     width: 520,
-    height: 470,
+    height: 520,
     resizable: false,
     minimizable: false,
     maximizable: false,
-    title: `About ${DESKTOP_APP_NAME}`,
-    backgroundColor: "#202124",
+    title: isTurkish
+      ? `${DESKTOP_APP_NAME} hakkında`
+      : `About ${DESKTOP_APP_NAME}`,
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -360,32 +586,29 @@ async function showAboutDialog() {
     aboutWindow = null;
   });
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${isTurkish ? "tr" : "en"}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>About ${DESKTOP_APP_NAME}</title>
+    <title>${isTurkish ? `${DESKTOP_APP_NAME} hakkında` : `About ${DESKTOP_APP_NAME}`}</title>
     <style>
-      :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8f9fa; color: #202124; }
-      main { width: 100%; box-sizing: border-box; padding: 2.5rem 2rem 2rem; text-align: center; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { width: 100%; box-sizing: border-box; padding: 2rem 2rem 1.75rem; text-align: center; }
       img { width: 112px; height: 112px; border-radius: 24px; margin-bottom: 1.5rem; }
       h1 { margin: 0 0 1.25rem; font-size: 2rem; font-weight: 700; }
-      p { margin: 0.5rem 0; font-size: 1.1rem; line-height: 1.45; color: #5f6368; }
+      p { margin: 0.5rem 0; font-size: 1.1rem; line-height: 1.45; color: var(--dialog-secondary); }
       .version { margin-top: 1rem; font-size: 1rem; }
-      footer { margin-top: 1.5rem; font-size: 0.95rem; color: #6b7280; }
-      @media (prefers-color-scheme: dark) {
-        body { background: #202124; color: #f1f3f4; }
-        p, footer { color: #c4c7c5; }
-      }
+      footer { margin-top: 1.5rem; font-size: 0.95rem; color: var(--dialog-secondary); }
     </style>
   </head>
   <body>
     <main>
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <h1>${DESKTOP_APP_NAME}</h1>
-      <p>Secure identity and access console</p>
-      <p class="version">Version ${app.getVersion()}</p>
+      <p>${isTurkish ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console"}</p>
+      <p class="version">${isTurkish ? "Sürüm" : "Version"} ${app.getVersion()}</p>
       <footer>© 2026 ${DESKTOP_APP_NAME}</footer>
     </main>
   </body>
@@ -405,12 +628,15 @@ async function showSettingsWindow() {
   settingsWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: false,
-    width: 900,
-    height: 760,
-    minWidth: 720,
-    minHeight: 620,
-    title: `${DESKTOP_APP_NAME} Settings`,
-    backgroundColor: "#f8f9fa",
+    width: 1100,
+    height: 640,
+    minWidth: 900,
+    minHeight: 560,
+    title: isTurkishDesktop()
+      ? `${DESKTOP_APP_NAME} ayarları`
+      : `${DESKTOP_APP_NAME} Settings`,
+    backgroundColor: desktopBackgroundColor(),
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -431,8 +657,6 @@ async function showSettingsWindow() {
   await settingsWindow.loadURL(
     `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-settings`,
   );
-  settingsWindow.center();
-  settingsWindow.show();
 }
 
 function updatePreferencesPath() {
@@ -455,6 +679,8 @@ function launchAtLoginEnabled() {
 function defaultDesktopPreferences(): DesktopPreferences {
   return {
     launchAtLogin: launchAtLoginEnabled(),
+    showInMenuBar: true,
+    showInDock: true,
     notifications: true,
     globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   };
@@ -471,6 +697,14 @@ async function readDesktopPreferences(): Promise<DesktopPreferences> {
         typeof value.launchAtLogin === "boolean"
           ? value.launchAtLogin
           : defaults.launchAtLogin,
+      showInMenuBar:
+        typeof value.showInMenuBar === "boolean"
+          ? value.showInMenuBar
+          : defaults.showInMenuBar,
+      showInDock:
+        typeof value.showInDock === "boolean"
+          ? value.showInDock
+          : defaults.showInDock,
       notifications:
         typeof value.notifications === "boolean"
           ? value.notifications
@@ -525,20 +759,120 @@ function focusMainWindow() {
   mainWindow.focus();
 }
 
-function toggleQuickAccess() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isVisible() && mainWindow.isFocused()) {
-    mainWindow.hide();
+async function showCompanionWindow() {
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    if (companionWindow.isMinimized()) companionWindow.restore();
+    companionWindow.show();
+    companionWindow.focus();
     return;
   }
-  focusMainWindow();
+  const state = await readCompanionWindowState();
+  companionWindow = new BrowserWindow({
+    x: state?.x,
+    y: state?.y,
+    width: state?.width ?? 440,
+    height: state?.height ?? 560,
+    minWidth: 360,
+    minHeight: 320,
+    show: false,
+    skipTaskbar: true,
+    title: isTurkishDesktop() ? "Hızlı erişim" : "Quick access",
+    backgroundColor: desktopBackgroundColor(),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+  companionWindow.setAlwaysOnTop(true, "floating");
+  let saveTimer: NodeJS.Timeout | undefined;
+  const scheduleStateSave = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(
+      () => void saveCompanionWindowState(companionWindow!),
+      250,
+    );
+  };
+  companionWindow.on("resize", scheduleStateSave);
+  companionWindow.on("move", scheduleStateSave);
+  companionWindow.on("close", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    void saveCompanionWindowState(companionWindow!);
+  });
+  companionWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  companionWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isTrustedRendererUrl(url)) event.preventDefault();
+  });
+  companionWindow.on("closed", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    companionWindow = null;
+  });
+  await companionWindow.loadURL(
+    `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-companion`,
+  );
+  if (state?.x === undefined || state.y === undefined) companionWindow.center();
+  companionWindow.show();
+  companionWindow.focus();
+}
+
+function closeCompanionWindow() {
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    companionWindow.hide();
+  }
+}
+
+function toggleQuickAccess() {
+  void (async () => {
+    if (companionWindow && !companionWindow.isDestroyed()) {
+      if (companionWindow.isVisible()) {
+        closeCompanionWindow();
+      } else {
+        await showCompanionWindow();
+      }
+      return;
+    }
+    await showCompanionWindow();
+  })().catch(() => undefined);
+}
+
+function isValidGlobalShortcut(accelerator: string) {
+  const parts = accelerator.split("+");
+  if (parts.length < 2 || parts.length > 5 || parts.some((part) => !part)) {
+    return false;
+  }
+  const modifiers = parts.slice(0, -1);
+  const key = parts.at(-1)!;
+  if (
+    modifiers.some(
+      (modifier, index) =>
+        !GLOBAL_SHORTCUT_MODIFIERS.has(modifier) ||
+        modifiers.indexOf(modifier) !== index,
+    )
+  ) {
+    return false;
+  }
+  return (
+    GLOBAL_SHORTCUT_SPECIAL_KEYS.has(key) ||
+    /^[A-Z0-9]$/.test(key) ||
+    /^F(?:[1-9]|1[0-9]|2[0-4])$/.test(key)
+  );
 }
 
 function registerGlobalShortcut(accelerator: string) {
   globalShortcut.unregisterAll();
-  if (!globalShortcut.register(accelerator, toggleQuickAccess)) {
-    globalShortcut.register(DEFAULT_GLOBAL_SHORTCUT, toggleQuickAccess);
+  try {
+    if (globalShortcut.register(accelerator, toggleQuickAccess)) return true;
+  } catch {
+    // Invalid or unavailable accelerators fall back to the default shortcut.
   }
+  if (!globalShortcut.register(DEFAULT_GLOBAL_SHORTCUT, toggleQuickAccess)) {
+    return false;
+  }
+  return false;
 }
 
 function createTray() {
@@ -548,30 +882,78 @@ function createTray() {
   );
   tray = new Tray(icon);
   tray.setToolTip(DESKTOP_APP_NAME);
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: `Open ${DESKTOP_APP_NAME}`, click: focusMainWindow },
-      {
-        label: "Settings…",
-        click: () => void showSettingsWindow(),
-      },
-      {
-        label: "Check for Updates…",
-        click: () => void requestUpdateCheck(),
-      },
-      { type: "separator" },
-      { role: "quit", label: `Quit ${DESKTOP_APP_NAME}` },
-    ]),
-  );
+  updateTrayMenu();
   tray.on("click", focusMainWindow);
 }
 
-function notifyDesktop(title: string, body: string) {
+function setTrayVisibility(visible: boolean) {
+  if (visible) {
+    createTray();
+    return;
+  }
+  tray?.destroy();
+  tray = null;
+}
+
+function setDockVisibility(visible: boolean) {
+  if (process.platform !== "darwin") return;
+  if (visible) {
+    app.dock?.show();
+  } else {
+    app.dock?.hide();
+  }
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const isTurkish = isTurkishDesktop();
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME} uygulamasını aç`
+          : `Open ${DESKTOP_APP_NAME}`,
+        click: focusMainWindow,
+      },
+      {
+        label: isTurkish ? "Ayarlar…" : "Settings…",
+        click: () => void showSettingsWindow(),
+      },
+      {
+        label: isTurkish ? "Güncellemeleri denetle…" : "Check for Updates…",
+        click: () => void requestUpdateCheck(),
+      },
+      { type: "separator" },
+      {
+        role: "quit",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME}'ten çık`
+          : `Quit ${DESKTOP_APP_NAME}`,
+      },
+    ]),
+  );
+}
+
+function notifyDesktop(title: string, body: string, onClick?: () => void) {
   if (!Notification.isSupported()) return;
   void readDesktopPreferences().then((preferences) => {
     if (!preferences.notifications) return;
-    new Notification({ title, body }).show();
+    showDesktopNotification(
+      (options) => new Notification(options),
+      title,
+      body,
+      onClick,
+    );
   });
+}
+
+function isMainWindowInBackground() {
+  return (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    !mainWindow.isVisible() ||
+    !mainWindow.isFocused()
+  );
 }
 
 async function readUpdatePreferences(): Promise<UpdatePreferences> {
@@ -601,6 +983,7 @@ async function handleAvailableUpdate(version: string) {
   const preferences = await readUpdatePreferences();
   const manualCheck = manualUpdateCheckRequested;
   manualUpdateCheckRequested = false;
+  suppressNextUpdateNotification = manualCheck;
   const skipped = preferences.skippedVersion === version;
   const reminded =
     typeof preferences.remindUntil === "number" &&
@@ -624,7 +1007,7 @@ async function showUpdateCheckWindow() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
+  const isTurkish = isTurkishDesktop();
   const checkingLabel = isTurkish
     ? "Güncellemeler denetleniyor…"
     : "Checking for updates…";
@@ -637,7 +1020,7 @@ async function showUpdateCheckWindow() {
     height: 300,
     resizable: false,
     title: windowTitle,
-    backgroundColor: "#20272b",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -654,17 +1037,18 @@ async function showUpdateCheckWindow() {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${windowTitle}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #20272b; color: #f1f3f4; }
-      main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 28px 48px; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
-      .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: #3a4246; }
+      .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: var(--dialog-border); }
       .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: #1683ff; transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
       @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
-      button { display: block; margin: 28px 0 0 auto; min-width: 200px; padding: 14px 28px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 20px; font-weight: 600; cursor: pointer; }
-      button:hover { background: #414c52; }
+      button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--dialog-button-hover); }
     </style>
   </head>
   <body>
@@ -692,6 +1076,77 @@ function closeUpdateCheckWindow() {
   updateCheckWindow = null;
 }
 
+async function showUpdateNotAvailableWindow() {
+  if (updateResultWindow && !updateResultWindow.isDestroyed()) {
+    updateResultWindow.focus();
+    return;
+  }
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  const isTurkish = isTurkishDesktop();
+  const title = isTurkish
+    ? `${DESKTOP_APP_NAME} güncel`
+    : `${DESKTOP_APP_NAME} is up to date`;
+  const detail = isTurkish
+    ? `${DESKTOP_APP_NAME} için kullanılabilir yeni bir sürüm yok. ${app.getVersion()} sürümünü kullanıyorsunuz.`
+    : `There are no new updates available for ${DESKTOP_APP_NAME}. You are using version ${app.getVersion()}.`;
+  const doneLabel = isTurkish ? "Tamam" : "Done";
+  const windowTitle = isTurkish ? "Yazılım Güncellemesi" : "Software Update";
+  updateResultWindow = new BrowserWindow({
+    parent: mainWindow ?? undefined,
+    modal: true,
+    width: 720,
+    height: 280,
+    resizable: false,
+    title: windowTitle,
+    backgroundColor: desktopBackgroundColor(),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  updateResultWindow.on("closed", () => {
+    updateResultWindow = null;
+  });
+  const html = `<!doctype html>
+<html lang="${isTurkish ? "tr" : "en"}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${windowTitle}</title>
+    <style>
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { width: 100%; display: grid; grid-template-columns: 96px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
+      img { width: 88px; height: 88px; border-radius: 20px; }
+      h1 { margin: 0 0 10px; font-size: 25px; line-height: 1.15; font-weight: 700; }
+      p { margin: 0; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
+      footer { grid-column: 2; display: flex; justify-content: flex-end; margin-top: -4px; }
+      button { min-width: 112px; padding: 10px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--dialog-button-hover); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
+      <section>
+        <h1>${title}</h1>
+        <p>${detail}</p>
+      </section>
+      <footer><button type="button" onclick="window.close()">${doneLabel}</button></footer>
+    </main>
+  </body>
+</html>`;
+  await updateResultWindow.loadURL(
+    `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
+  );
+  updateResultWindow.center();
+  updateResultWindow.show();
+}
+
 async function confirmAndInstallUpdate() {
   if (!(await showUpdateConfirmation())) return;
   if (await downloadUpdate()) installUpdate();
@@ -712,7 +1167,7 @@ async function showUpdateConfirmation() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
+  const isTurkish = isTurkishDesktop();
   const title = isTurkish
     ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`
     : `Update ${DESKTOP_APP_NAME} now?`;
@@ -728,7 +1183,7 @@ async function showUpdateConfirmation() {
     height: 430,
     resizable: false,
     title,
-    backgroundColor: "#20272b",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -760,15 +1215,16 @@ async function showUpdateConfirmation() {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #20272b; color: #f1f3f4; }
-      main { padding: 30px 42px 18px; }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { padding: 26px 28px 14px; }
       .warning { width: 88px; height: 80px; display: grid; place-items: center; padding-top: 12px; margin: 0 0 18px 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #f3c438; color: #fff; font-size: 48px; line-height: 1; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
       h1 { margin: 0 0 16px; font-size: 25px; line-height: 1.2; font-weight: 700; }
-      p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: #d4d8da; }
-      footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 42px 30px; }
-      button { min-width: 150px; padding: 13px 24px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
+      p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: var(--dialog-secondary); }
+      footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
+      button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
       button.primary { background: #1683ff; }
       button:hover { filter: brightness(1.12); }
     </style>
@@ -795,16 +1251,16 @@ async function showUpdateConfirmation() {
   });
 }
 
-async function showUpdateDialog(version: string) {
-  if (promptedUpdateVersion === version) return;
-  promptedUpdateVersion = version;
+async function showUpdateDialog(version: string, force = false) {
   if (updateAvailableWindow && !updateAvailableWindow.isDestroyed()) {
     updateAvailableWindow.focus();
     return;
   }
+  if (!force && promptedUpdateVersion === version) return;
+  promptedUpdateVersion = version;
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = app.getLocale().toLowerCase().startsWith("tr");
+  const isTurkish = isTurkishDesktop();
   const title = isTurkish
     ? `Yeni bir ${DESKTOP_APP_NAME} sürümü var!`
     : `A new version of ${DESKTOP_APP_NAME} is available!`;
@@ -824,7 +1280,7 @@ async function showUpdateDialog(version: string) {
     height: 360,
     resizable: false,
     title,
-    backgroundColor: "#20272b",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -877,17 +1333,18 @@ async function showUpdateDialog(version: string) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title}</title>
     <style>
-      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #20272b; color: #f1f3f4; }
-      main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 28px 48px 24px; }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 24px 28px 18px; }
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
-      p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: #d4d8da; }
-      label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: #e2e5e7; }
+      p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: var(--dialog-secondary); }
+      label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: var(--dialog-foreground); }
       input { width: 25px; height: 25px; accent-color: #1683ff; }
-      footer { display: flex; justify-content: flex-end; gap: 18px; padding: 0 48px 30px; }
-      button { min-width: 250px; padding: 14px 28px; border: 0; border-radius: 999px; background: #343d42; color: #f1f3f4; font: inherit; font-size: 20px; font-weight: 600; cursor: pointer; }
+      footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
+      button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
       button.primary { background: #1683ff; }
       button:hover { filter: brightness(1.12); }
     </style>
@@ -936,26 +1393,29 @@ function toggleDeveloperTools() {
 }
 
 function installApplicationMenu() {
+  const isTurkish = isTurkishDesktop();
   const applicationMenu: MenuItemConstructorOptions = {
     label: DESKTOP_APP_NAME,
     submenu: [
       {
-        label: `About ${DESKTOP_APP_NAME}`,
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME} hakkında`
+          : `About ${DESKTOP_APP_NAME}`,
         click: () => void showAboutDialog(),
       },
       { type: "separator" },
       {
-        label: "Settings…",
+        label: isTurkish ? "Ayarlar…" : "Settings…",
         click: () => void showSettingsWindow(),
       },
       {
-        label: "Check for Updates…",
+        label: isTurkish ? "Güncellemeleri denetle…" : "Check for Updates…",
         click: () => void requestUpdateCheck(),
       },
       { type: "separator" },
       {
         id: "desktop-logout",
-        label: "Log Out",
+        label: isTurkish ? "Oturumu kapat" : "Log Out",
         click: () => {
           void writeVault({}).catch(() => undefined);
           mainWindow?.webContents.send("desktop:menu-logout");
@@ -964,11 +1424,24 @@ function installApplicationMenu() {
       { type: "separator" },
       { role: "services", submenu: [] },
       { type: "separator" },
-      { role: "hide", label: `Hide ${DESKTOP_APP_NAME}` },
-      { role: "hideOthers", label: "Hide Others" },
-      { role: "unhide", label: "Show All" },
+      {
+        role: "hide",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME} uygulamasını gizle`
+          : `Hide ${DESKTOP_APP_NAME}`,
+      },
+      {
+        role: "hideOthers",
+        label: isTurkish ? "Diğerlerini gizle" : "Hide Others",
+      },
+      { role: "unhide", label: isTurkish ? "Tümünü göster" : "Show All" },
       { type: "separator" },
-      { role: "quit", label: `Quit ${DESKTOP_APP_NAME}` },
+      {
+        role: "quit",
+        label: isTurkish
+          ? `${DESKTOP_APP_NAME}'ten çık`
+          : `Quit ${DESKTOP_APP_NAME}`,
+      },
     ],
   };
   const viewSubmenu: MenuItemConstructorOptions[] = [
@@ -978,7 +1451,9 @@ function installApplicationMenu() {
     ...(process.env.DESKTOP_DEVTOOLS === "true"
       ? [
           {
-            label: "Toggle Developer Tools",
+            label: isTurkish
+              ? "Geliştirici araçlarını aç/kapat"
+              : "Toggle Developer Tools",
             click: toggleDeveloperTools,
           },
           { type: "separator" as const },
@@ -993,7 +1468,7 @@ function installApplicationMenu() {
   const template: MenuItemConstructorOptions[] = [
     applicationMenu,
     { role: "editMenu" },
-    { label: "View", submenu: viewSubmenu },
+    { label: isTurkish ? "Görünüm" : "View", submenu: viewSubmenu },
     { role: "windowMenu" },
     { role: "help" },
   ];
@@ -1013,7 +1488,7 @@ async function createWindow() {
     height: state?.height ?? 960,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1042,8 +1517,25 @@ async function createWindow() {
     if (saveTimer) clearTimeout(saveTimer);
     void saveWindowState(mainWindow!);
   });
+  mainWindow.on(
+    "unresponsive",
+    () => void appendDiagnosticEvent("window-unresponsive"),
+  );
+  mainWindow.on(
+    "responsive",
+    () => void appendDiagnosticEvent("window-responsive"),
+  );
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    void appendDiagnosticEvent("renderer-process-gone", {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+  });
   void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/`);
   mainWindow.on("closed", () => {
+    if (companionWindow && !companionWindow.isDestroyed()) {
+      companionWindow.destroy();
+    }
     mainWindow = null;
   });
   if (state?.maximized) mainWindow.maximize();
@@ -1082,6 +1574,41 @@ function registerIpc() {
     assertTrustedSender(event);
     return app.getVersion();
   });
+  ipcMain.handle("desktop:diagnostics-get", async (event) => {
+    assertTrustedSender(event);
+    let apiHost = "unknown";
+    try {
+      apiHost = new URL(getApiBaseUrl()).host;
+    } catch {
+      // The configured origin is validated elsewhere; keep diagnostics safe if it is unavailable.
+    }
+    return {
+      appVersion: app.getVersion(),
+      electronVersion: process.versions.electron,
+      chromeVersion: process.versions.chrome,
+      nodeVersion: process.versions.node,
+      platform: process.platform,
+      architecture: process.arch,
+      apiHost,
+      packaged: app.isPackaged,
+      secureStorage: safeStorage.isEncryptionAvailable()
+        ? "available"
+        : "unavailable",
+      autoUpdatesSupported:
+        app.isPackaged &&
+        process.env.DESKTOP_AUTO_UPDATE !== "false" &&
+        (process.platform !== "linux" || Boolean(process.env.APPIMAGE)),
+      events: await readDiagnosticEvents(),
+    };
+  });
+  ipcMain.handle("desktop:theme-set", (event, value: unknown) => {
+    assertTrustedSender(event);
+    applyDesktopTheme(value);
+  });
+  ipcMain.handle("desktop:language-set", (event, value: unknown) => {
+    assertTrustedSender(event);
+    applyDesktopLanguage(value);
+  });
   ipcMain.handle("desktop:preferences-get", async (event) => {
     assertTrustedSender(event);
     const preferences = await readDesktopPreferences();
@@ -1099,11 +1626,26 @@ function registerIpc() {
       automaticDownload?: boolean;
     };
     const current = await readDesktopPreferences();
+    if (
+      input.globalShortcut !== undefined &&
+      (typeof input.globalShortcut !== "string" ||
+        !isValidGlobalShortcut(input.globalShortcut))
+    ) {
+      throw new Error("Invalid global shortcut");
+    }
     const next: DesktopPreferences = {
       launchAtLogin:
         typeof input.launchAtLogin === "boolean"
           ? input.launchAtLogin
           : current.launchAtLogin,
+      showInMenuBar:
+        typeof input.showInMenuBar === "boolean"
+          ? input.showInMenuBar
+          : current.showInMenuBar,
+      showInDock:
+        typeof input.showInDock === "boolean"
+          ? input.showInDock
+          : current.showInDock,
       notifications:
         typeof input.notifications === "boolean"
           ? input.notifications
@@ -1114,8 +1656,23 @@ function registerIpc() {
           ? input.globalShortcut
           : current.globalShortcut,
     };
+    if (
+      process.platform === "darwin" &&
+      !next.showInMenuBar &&
+      !next.showInDock
+    ) {
+      throw new Error("Keep the menu bar or Dock entry visible");
+    }
     await applyLaunchAtLogin(next.launchAtLogin);
-    registerGlobalShortcut(next.globalShortcut);
+    setTrayVisibility(next.showInMenuBar);
+    setDockVisibility(next.showInDock);
+    if (
+      next.globalShortcut !== current.globalShortcut &&
+      !registerGlobalShortcut(next.globalShortcut)
+    ) {
+      registerGlobalShortcut(current.globalShortcut);
+      throw new Error("Global shortcut is unavailable");
+    }
     await writeDesktopPreferences(next);
     if (typeof input.automaticDownload === "boolean") {
       const updatePreferences = await readUpdatePreferences();
@@ -1135,6 +1692,26 @@ function registerIpc() {
     assertTrustedSender(event);
     if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
   });
+  ipcMain.handle("desktop:settings-ready", (event) => {
+    assertTrustedSender(event);
+    if (!settingsWindow || settingsWindow.isDestroyed()) return;
+    settingsWindow.center();
+    settingsWindow.show();
+    settingsWindow.focus();
+  });
+  ipcMain.handle(
+    "desktop:companion-open-console",
+    async (event, value: unknown) => {
+      assertTrustedSender(event);
+      assertConsole(value);
+      closeCompanionWindow();
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      await mainWindow.loadURL(
+        `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value}?desktopSignIn=1`,
+      );
+      focusMainWindow();
+    },
+  );
   ipcMain.handle(
     "desktop:auth-start-login",
     async (event, request: unknown) => {
@@ -1277,10 +1854,11 @@ if (!hasLock) {
   app.quit();
 } else {
   app.on("second-instance", (_event, commandLine) => {
-    void sendDeepLink(
-      commandLine.find((value) => value.startsWith(`${DESKTOP_PROTOCOL}://`)) ??
-        "",
+    focusMainWindow();
+    const deepLink = commandLine.find((value) =>
+      value.startsWith(`${DESKTOP_PROTOCOL}://`),
     );
+    if (deepLink) void sendDeepLink(deepLink);
   });
   app.on("open-url", (event, url) => {
     event.preventDefault();
@@ -1295,7 +1873,8 @@ if (!hasLock) {
     const desktopPreferences = await readDesktopPreferences();
     void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
     registerGlobalShortcut(desktopPreferences.globalShortcut);
-    createTray();
+    setTrayVisibility(desktopPreferences.showInMenuBar);
+    setDockVisibility(desktopPreferences.showInDock);
     const updatePreferences = await readUpdatePreferences();
     setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
     void readVault()
@@ -1307,26 +1886,52 @@ if (!hasLock) {
     await registerRendererProtocol();
     void createWindow();
     configureAutoUpdater((status: DesktopUpdateStatus) => {
+      void appendDiagnosticEvent(`update-${status.state}`, {
+        version: "version" in status ? status.version : undefined,
+        message: "message" in status ? status.message : undefined,
+      });
       if (status.state === "checking") {
         void showUpdateCheckWindow().catch(() => undefined);
       } else {
         closeUpdateCheckWindow();
       }
       if (status.state === "available") {
-        notifyDesktop(
-          `${DESKTOP_APP_NAME} update available`,
-          `Version ${status.version} is ready to download.`,
-        );
+        const manualCheck = manualUpdateCheckRequested;
+        if (!manualCheck && isMainWindowInBackground()) {
+          notifyDesktop(
+            isTurkishDesktop()
+              ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
+              : `${DESKTOP_APP_NAME} update available`,
+            isTurkishDesktop()
+              ? `${status.version} sürümü indirilmeye hazır.`
+              : `Version ${status.version} is ready to download.`,
+            () => void showUpdateDialog(status.version, true),
+          );
+        }
         void handleAvailableUpdate(status.version);
         return;
       }
       if (status.state === "downloaded") {
-        notifyDesktop(
-          `${DESKTOP_APP_NAME} update ready`,
-          `Version ${status.version} will be installed when you restart.`,
-        );
-      } else if (status.state === "error") {
-        notifyDesktop(`${DESKTOP_APP_NAME} update failed`, status.message);
+        const suppressNotification = suppressNextUpdateNotification;
+        suppressNextUpdateNotification = false;
+        if (!suppressNotification && isMainWindowInBackground()) {
+          notifyDesktop(
+            isTurkishDesktop()
+              ? `${DESKTOP_APP_NAME} güncellemesi hazır`
+              : `${DESKTOP_APP_NAME} update ready`,
+            isTurkishDesktop()
+              ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
+              : `Version ${status.version} will be installed when you restart.`,
+            () => void showUpdateConfirmation(),
+          );
+        }
+      } else if (status.state === "not-available" || status.state === "error") {
+        const manualCheck = manualUpdateCheckRequested;
+        manualUpdateCheckRequested = false;
+        suppressNextUpdateNotification = false;
+        if (status.state === "not-available" && manualCheck) {
+          void showUpdateNotAvailableWindow().catch(() => undefined);
+        }
       }
       sendUpdateStatus(status);
     });
@@ -1335,6 +1940,14 @@ if (!hasLock) {
         "activate",
         () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
       );
+  });
+  process.on("uncaughtExceptionMonitor", (error) => {
+    void appendDiagnosticEvent("uncaught-exception", {
+      message: error.message,
+    });
+  });
+  process.on("unhandledRejection", (reason) => {
+    void appendDiagnosticEvent("unhandled-rejection", { reason });
   });
   app.on("before-quit", () => {
     globalShortcut.unregisterAll();

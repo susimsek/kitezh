@@ -17,7 +17,11 @@ const packageVersion = JSON.parse(
   await readFile(path.join(desktopDirectory, "package.json"), "utf8"),
 ).version;
 
-async function launchDesktop({ devTools = false } = {}) {
+async function launchDesktop({
+  devTools = false,
+  updatePreviewState,
+  updatePreviewVersion = "0.1.1",
+} = {}) {
   return electron.launch({
     args: [desktopDirectory],
     cwd: desktopDirectory,
@@ -26,9 +30,47 @@ async function launchDesktop({ devTools = false } = {}) {
       DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
       DESKTOP_AUTO_UPDATE: "false",
       DESKTOP_DEVTOOLS: devTools ? "true" : "false",
+      ...(updatePreviewState
+        ? {
+            DESKTOP_UPDATE_PREVIEW: "true",
+            DESKTOP_UPDATE_PREVIEW_STATE: updatePreviewState,
+            DESKTOP_UPDATE_PREVIEW_VERSION: updatePreviewVersion,
+          }
+        : {}),
     },
     executablePath: electronExecutable,
   });
+}
+
+async function clickApplicationMenuItem(application, label) {
+  const clicked = await application.evaluate(({ Menu }, itemLabel) => {
+    const menu = Menu.getApplicationMenu();
+    const item = menu?.items[0]?.submenu?.items.find(
+      (candidate) => candidate.label === itemLabel,
+    );
+    item?.click();
+    return Boolean(item);
+  }, label);
+  assert.equal(clicked, true, `Could not find application menu item: ${label}`);
+}
+
+async function openManualUpdateCheck(
+  application,
+  label = "Check for Updates…",
+  expectNextWindow = true,
+) {
+  const checkingWindowPromise = application.waitForEvent("window");
+  await clickApplicationMenuItem(application, label);
+  const checkingWindow = await checkingWindowPromise;
+  const nextWindowPromise = expectNextWindow
+    ? application.waitForEvent("window")
+    : null;
+  await checkingWindow
+    .getByRole("heading", {
+      name: /Checking for updates|Güncellemeler denetleniyor/,
+    })
+    .waitFor();
+  return { checkingWindow, nextWindowPromise };
 }
 
 test("opens the trusted renderer and exposes the narrow desktop bridge", async () => {
@@ -75,9 +117,71 @@ test("opens settings in a separate window without requiring login", async () => 
       settings?.click();
     });
     const settingsWindow = await settingsWindowPromise;
+    await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+
+    for (const section of [
+      "General",
+      "Notifications",
+      "Appearance",
+      "Updates",
+      "Diagnostics",
+    ]) {
+      assert.equal(
+        await settingsWindow.getByRole("button", { name: section }).count(),
+        1,
+      );
+    }
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("heading", { name: "Appearance" }).waitFor();
+    assert.equal(
+      await settingsWindow.getByRole("radio", { name: "System" }).count(),
+      1,
+    );
+    await settingsWindow.getByRole("button", { name: "General" }).click();
+    assert.equal(await settingsWindow.locator("#desktop-language").count(), 1);
+    assert.equal(
+      await settingsWindow.locator("#desktop-show-in-menu-bar").count(),
+      1,
+    );
+    assert.equal(
+      await settingsWindow.locator("#desktop-show-in-dock").count(),
+      1,
+    );
+    const showInMenuBar = settingsWindow.locator("#desktop-show-in-menu-bar");
+    assert.equal(await showInMenuBar.isChecked(), true);
+    await showInMenuBar.click();
+    await settingsWindow.waitForFunction(
+      () => !document.querySelector("#desktop-show-in-menu-bar")?.checked,
+    );
+    await showInMenuBar.click();
+    await settingsWindow.waitForFunction(
+      () => document.querySelector("#desktop-show-in-menu-bar")?.checked,
+    );
+    assert.deepEqual(
+      await settingsWindow
+        .locator("#desktop-language option")
+        .allTextContents(),
+      ["System", "English", "Türkçe"],
+    );
+    const shortcut = settingsWindow.locator("#desktop-global-shortcut");
+    await shortcut.click();
+    await shortcut.press("Control+Shift+K");
+    await settingsWindow.waitForFunction(
+      () =>
+        document.querySelector("#desktop-global-shortcut")?.value ===
+        "CommandOrControl+Shift+K",
+    );
+    assert.equal(await shortcut.inputValue(), "CommandOrControl+Shift+K");
+    await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
     await settingsWindow
-      .getByRole("heading", { name: "Kitezh settings" })
+      .getByRole("heading", { name: "Diagnostics" })
       .waitFor();
+    assert.equal(
+      await settingsWindow
+        .getByRole("button", { name: "Copy diagnostics" })
+        .count(),
+      1,
+    );
 
     assert.equal(await settingsWindow.url(), "app://renderer/desktop-settings");
     assert.equal(
@@ -86,15 +190,49 @@ test("opens settings in a separate window without requiring login", async () => 
         .count(),
       0,
     );
-    await Promise.all([
-      settingsWindow.waitForEvent("close"),
-      settingsWindow.getByRole("button", { name: "Done" }).click(),
-    ]);
+    assert.equal(
+      await settingsWindow.getByRole("button", { name: "Done" }).count(),
+      0,
+    );
     assert.equal(
       await mainWindow
         .getByRole("heading", { name: "Choose a console" })
         .count(),
       1,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("brings the existing window forward on a second launch", async () => {
+  const application = await launchDesktop();
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow.waitForLoadState("domcontentloaded");
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+
+    await application.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.hide();
+    });
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.isVisible(),
+      ),
+      false,
+    );
+
+    await application.evaluate(({ app }) => {
+      app.emit("second-instance", {}, []);
+    });
+    await mainWindow.waitForTimeout(100);
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.isVisible(),
+      ),
+      true,
     );
   } finally {
     await application.close();
@@ -137,6 +275,135 @@ test("keeps developer tools closed until toggled from View", async () => {
         ),
       ),
       true,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("shows the available update dialog from the application menu", async () => {
+  const application = await launchDesktop({
+    updatePreviewState: "available",
+  });
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const { nextWindowPromise: availableWindowPromise } =
+      await openManualUpdateCheck(application);
+    const availableWindow = await availableWindowPromise;
+    await availableWindow
+      .getByRole("heading", {
+        name: "A new version of Kitezh is available!",
+      })
+      .waitFor();
+    assert.equal(
+      await availableWindow
+        .getByRole("button", { name: "Skip This Version" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await availableWindow
+        .getByRole("button", { name: "Remind Me Later" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await availableWindow
+        .getByRole("button", { name: "Install Update" })
+        .count(),
+      1,
+    );
+    await availableWindow
+      .getByRole("button", { name: "Skip This Version" })
+      .click();
+  } finally {
+    await application.close();
+  }
+});
+
+test("shows an up-to-date result when no update is available", async () => {
+  const application = await launchDesktop({
+    updatePreviewState: "not-available",
+  });
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const { nextWindowPromise: resultWindowPromise } =
+      await openManualUpdateCheck(application);
+    const resultWindow = await resultWindowPromise;
+    await resultWindow
+      .getByRole("heading", { name: "Kitezh is up to date" })
+      .waitFor();
+    assert.match(
+      await resultWindow.locator("p").textContent(),
+      /There are no new updates available/,
+    );
+    await resultWindow.getByRole("button", { name: "Done" }).click();
+  } finally {
+    await application.close();
+  }
+});
+
+test("shows the update error in the renderer when checking fails", async () => {
+  const application = await launchDesktop({ updatePreviewState: "error" });
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    await openManualUpdateCheck(application, "Check for Updates…", false);
+    await mainWindow
+      .getByRole("status")
+      .filter({ hasText: "The desktop update could not be completed" })
+      .waitFor();
+  } finally {
+    await application.close();
+  }
+});
+
+test("localizes and themes the update dialog with desktop preferences", async () => {
+  const application = await launchDesktop({ updatePreviewState: "available" });
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const settingsWindowPromise = application.waitForEvent("window");
+    await clickApplicationMenuItem(application, "Settings…");
+    const settingsWindow = await settingsWindowPromise;
+    await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("radio", { name: "Dark" }).click();
+    await settingsWindow.getByRole("button", { name: "General" }).click();
+    await settingsWindow.locator("#desktop-language").selectOption("tr");
+    await settingsWindow.waitForTimeout(100);
+    const checkingWindowPromise = application.waitForEvent("window");
+    await clickApplicationMenuItem(application, "Güncellemeleri denetle…");
+    const checkingWindow = await checkingWindowPromise;
+    const availableWindowPromise = application.waitForEvent("window");
+    await checkingWindow
+      .getByRole("heading", { name: "Güncellemeler denetleniyor…" })
+      .waitFor();
+    const availableWindow = await availableWindowPromise;
+    await availableWindow
+      .getByRole("heading", { name: "Yeni bir Kitezh sürümü var!" })
+      .waitFor();
+    assert.equal(
+      await availableWindow
+        .getByRole("button", { name: "Bu sürümü atla" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await availableWindow.evaluate(
+        () => getComputedStyle(document.body).backgroundColor,
+      ),
+      "rgb(32, 33, 36)",
     );
   } finally {
     await application.close();

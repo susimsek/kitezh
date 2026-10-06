@@ -24,9 +24,25 @@ export type DesktopUpdateStatus =
 
 export type DesktopPreferences = {
   launchAtLogin: boolean;
+  showInMenuBar: boolean;
+  showInDock: boolean;
   notifications: boolean;
   globalShortcut: string;
   automaticDownload: boolean;
+};
+
+export type DesktopDiagnostics = {
+  appVersion: string;
+  electronVersion: string;
+  chromeVersion: string;
+  nodeVersion: string;
+  platform: string;
+  architecture: string;
+  apiHost: string;
+  packaged: boolean;
+  secureStorage: "available" | "unavailable";
+  autoUpdatesSupported: boolean;
+  events: string[];
 };
 
 let desktopConnectivity: "unknown" | "online" | "offline" = "unknown";
@@ -63,8 +79,21 @@ export type DesktopApi = {
     get: () => Promise<DesktopPreferences>;
     set: (value: Partial<DesktopPreferences>) => Promise<DesktopPreferences>;
   };
+  diagnostics: {
+    get: () => Promise<DesktopDiagnostics>;
+  };
+  theme: {
+    set: (value: "system" | "light" | "dark") => Promise<void>;
+  };
+  language: {
+    set: (value: "en" | "tr") => Promise<void>;
+  };
   settings: {
     close: () => Promise<void>;
+    ready: () => Promise<void>;
+  };
+  companion: {
+    openConsole: (consoleName: DesktopConsole) => Promise<void>;
   };
   updates: {
     check: () => Promise<void>;

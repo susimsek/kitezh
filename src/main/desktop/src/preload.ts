@@ -29,8 +29,22 @@ contextBridge.exposeInMainWorld("desktopApi", {
     set: (value: unknown) =>
       ipcRenderer.invoke("desktop:preferences-set", value),
   },
+  diagnostics: {
+    get: () => ipcRenderer.invoke("desktop:diagnostics-get"),
+  },
+  theme: {
+    set: (value: unknown) => ipcRenderer.invoke("desktop:theme-set", value),
+  },
+  language: {
+    set: (value: unknown) => ipcRenderer.invoke("desktop:language-set", value),
+  },
   settings: {
     close: () => ipcRenderer.invoke("desktop:settings-close"),
+    ready: () => ipcRenderer.invoke("desktop:settings-ready"),
+  },
+  companion: {
+    openConsole: (consoleName: unknown) =>
+      ipcRenderer.invoke("desktop:companion-open-console", consoleName),
   },
   updates: {
     check: () => ipcRenderer.invoke("desktop:update-check"),
