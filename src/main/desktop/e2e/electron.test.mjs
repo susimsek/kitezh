@@ -173,6 +173,21 @@ test("opens settings in a separate window without requiring login", async () => 
         "CommandOrControl+Shift+K",
     );
     assert.equal(await shortcut.inputValue(), "CommandOrControl+Shift+K");
+    const resetDefaults = settingsWindow.getByRole("button", {
+      name: "Reset to defaults",
+    });
+    assert.equal(await resetDefaults.count(), 1);
+    await resetDefaults.click();
+    await settingsWindow.waitForFunction(
+      () =>
+        document.querySelector("#desktop-global-shortcut")?.value ===
+        "Alt+Space",
+    );
+    assert.equal(await showInMenuBar.isChecked(), true);
+    assert.equal(
+      await settingsWindow.locator("#desktop-language").inputValue(),
+      "system",
+    );
     await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
     await settingsWindow
       .getByRole("heading", { name: "Diagnostics" })
@@ -299,6 +314,20 @@ test("shows the available update dialog from the application menu", async () => 
         name: "A new version of Kitezh is available!",
       })
       .waitFor();
+    const replayedStatus = await mainWindow.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let remove;
+          remove = window.desktopApi?.updates.onStatus((status) => {
+            remove?.();
+            resolve(status);
+          });
+        }),
+    );
+    assert.deepEqual(replayedStatus, {
+      state: "available",
+      version: "0.1.1",
+    });
     assert.equal(
       await availableWindow
         .getByRole("button", { name: "Skip This Version" })

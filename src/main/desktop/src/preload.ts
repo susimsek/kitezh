@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("desktopApi", {
     get: () => ipcRenderer.invoke("desktop:preferences-get"),
     set: (value: unknown) =>
       ipcRenderer.invoke("desktop:preferences-set", value),
+    reset: () => ipcRenderer.invoke("desktop:preferences-reset"),
   },
   diagnostics: {
     get: () => ipcRenderer.invoke("desktop:diagnostics-get"),
@@ -51,11 +52,20 @@ contextBridge.exposeInMainWorld("desktopApi", {
     download: () => ipcRenderer.invoke("desktop:update-download"),
     install: () => ipcRenderer.invoke("desktop:update-install"),
     onStatus: (listener: (status: unknown) => void) => {
+      let active = true;
       const callback = (_event: Electron.IpcRendererEvent, status: unknown) =>
-        listener(status);
+        active && listener(status);
       ipcRenderer.on("desktop:update-status", callback);
-      return () =>
+      void ipcRenderer
+        .invoke("desktop:update-status-get")
+        .then((status: unknown) => {
+          if (active && status) listener(status);
+        })
+        .catch(() => undefined);
+      return () => {
+        active = false;
         ipcRenderer.removeListener("desktop:update-status", callback);
+      };
     },
   },
   openExternal: (url: string) =>

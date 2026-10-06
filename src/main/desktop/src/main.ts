@@ -155,6 +155,7 @@ let pendingDeepLink: string | null = null;
 let promptedUpdateVersion: string | null = null;
 let manualUpdateCheckRequested = false;
 let suppressNextUpdateNotification = false;
+let latestUpdateStatus: DesktopUpdateStatus | null = null;
 let logoutMenuItem: MenuItem | null = null;
 type ConsoleName = "admin" | "account";
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
@@ -974,6 +975,7 @@ async function writeUpdatePreferences(preferences: UpdatePreferences) {
 }
 
 function sendUpdateStatus(status: DesktopUpdateStatus) {
+  latestUpdateStatus = status;
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("desktop:update-status", status);
   }
@@ -1688,6 +1690,26 @@ function registerIpc() {
       automaticDownload: updatePreferences.automaticDownload === true,
     };
   });
+  ipcMain.handle("desktop:preferences-reset", async (event) => {
+    assertTrustedSender(event);
+    const next: DesktopPreferences = {
+      launchAtLogin: false,
+      showInMenuBar: true,
+      showInDock: true,
+      notifications: true,
+      globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
+    };
+    await applyLaunchAtLogin(next.launchAtLogin);
+    setTrayVisibility(next.showInMenuBar);
+    setDockVisibility(next.showInDock);
+    if (!registerGlobalShortcut(next.globalShortcut)) {
+      throw new Error("Global shortcut is unavailable");
+    }
+    await writeDesktopPreferences(next);
+    await writeUpdatePreferences({});
+    setAutomaticInstallOnAppQuit(false);
+    return { ...next, automaticDownload: false };
+  });
   ipcMain.handle("desktop:settings-close", (event) => {
     assertTrustedSender(event);
     if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
@@ -1819,6 +1841,10 @@ function registerIpc() {
   ipcMain.handle("desktop:update-install", (event) => {
     assertTrustedSender(event);
     installUpdate();
+  });
+  ipcMain.handle("desktop:update-status-get", (event) => {
+    assertTrustedSender(event);
+    return latestUpdateStatus;
   });
 }
 

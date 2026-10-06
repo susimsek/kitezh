@@ -107,6 +107,7 @@
       "theme": "Uygulama teması",
       "themeMode": "Mod",
       "updateCheckDescription": "Güncellemeleri elle denetlemek için uygulama menüsünden Kitezh → Güncellemeleri denetle… seçeneğini kullanın.",
+      "resetDefaults": "Varsayılanlara sıfırla",
       "diagnostics": {
         "appVersion": "Uygulama sürümü",
         "platform": "Platform",

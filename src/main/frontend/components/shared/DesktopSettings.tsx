@@ -59,6 +59,7 @@ export function DesktopSettings() {
   const [pending, setPending] = useState<PreferenceKey | null>(null);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [copyingDiagnostics, setCopyingDiagnostics] = useState(false);
+  const [resettingDefaults, setResettingDefaults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [languageMode, setLanguageMode] = useState<LanguageMode>(() => {
     if (
@@ -151,6 +152,21 @@ export function DesktopSettings() {
     localStorage.removeItem(DESKTOP_LANGUAGE_MODE_KEY);
     persistLocale(nextMode);
     void i18n.changeLanguage(nextMode);
+  };
+
+  const resetDefaults = async () => {
+    setResettingDefaults(true);
+    setError(false);
+    try {
+      const next = await window.desktopApi!.preferences.reset();
+      setPreferences(next);
+      changeTheme("system");
+      changeLocale("system");
+    } catch {
+      setError(true);
+    } finally {
+      setResettingDefaults(false);
+    }
   };
 
   const sections: Array<{
@@ -546,6 +562,19 @@ export function DesktopSettings() {
                   )}
                 </section>
               </div>
+            </div>
+            <div className="d-flex justify-content-end mt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={pending !== null || resettingDefaults}
+                onClick={() => void resetDefaults()}
+              >
+                {resettingDefaults && (
+                  <Spinner animation="border" size="sm" className="me-2" aria-hidden="true" />
+                )}
+                {dictionary.desktop.settings.resetDefaults}
+              </Button>
             </div>
           </Card.Body>
         </Card>

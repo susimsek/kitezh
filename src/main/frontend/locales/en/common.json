@@ -107,6 +107,7 @@
       "theme": "Application theme",
       "themeMode": "Mode",
       "updateCheckDescription": "To check for updates manually, use Kitezh → Check for Updates… from the application menu.",
+      "resetDefaults": "Reset to defaults",
       "diagnostics": {
         "appVersion": "Application version",
         "platform": "Platform",

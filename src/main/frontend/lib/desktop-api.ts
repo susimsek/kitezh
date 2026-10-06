@@ -78,6 +78,7 @@ export type DesktopApi = {
   preferences: {
     get: () => Promise<DesktopPreferences>;
     set: (value: Partial<DesktopPreferences>) => Promise<DesktopPreferences>;
+    reset: () => Promise<DesktopPreferences>;
   };
   diagnostics: {
     get: () => Promise<DesktopDiagnostics>;
