@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Dropdown, Spinner } from "react-bootstrap";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon } from "@/components/shared/Icon";
+import { apiUrl } from "@/lib/desktop-api";
 
 export function ConsoleUserMenu({
   username,
@@ -44,7 +45,7 @@ export function ConsoleUserMenu({
         <span className="console-user-avatar" aria-hidden="true">
           {avatarSrc && !avatarFailed && (
             <Image
-              src={avatarSrc}
+              src={apiUrl(avatarSrc)}
               alt=""
               width={32}
               height={32}

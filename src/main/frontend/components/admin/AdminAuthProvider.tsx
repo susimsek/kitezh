@@ -5,7 +5,12 @@ import { createContext, useCallback, useContext, useMemo } from "react";
 import type { Locale } from "@/i18n/config";
 import { CONSOLE_TRANSACTION_KEYS, type JwtPayload, useConsoleAuth } from "@/lib/console-auth";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { setAdminAccess, setConsoleUsername, type AdminAccess } from "@/store/auth-slice";
+import {
+  setAdminAccess,
+  setConsoleAvatar,
+  setConsoleUsername,
+  type AdminAccess,
+} from "@/store/auth-slice";
 
 type AdminAuthRuntime = {
   refreshAccessToken: (minValidity?: number) => Promise<string | null>;
@@ -27,8 +32,10 @@ type AdminAuthValue = AdminAuthRuntime & {
   refreshTokenParsed: JwtPayload | null;
   access: AdminAccess | null;
   username: string | null;
+  avatarUrl: string | null;
   setAccess: (access: AdminAccess | null) => void;
   setUsername: (username: string | null) => void;
+  setAvatarUrl: (avatarUrl: string | null) => void;
 };
 
 export type { AdminAccess } from "@/store/auth-slice";
@@ -80,11 +87,16 @@ export function useAdminAuth(): AdminAuthValue {
     (value: string | null) => dispatch(setConsoleUsername({ console: "admin", username: value })),
     [dispatch],
   );
+  const setAvatarUrl = useCallback(
+    (value: string | null) => dispatch(setConsoleAvatar({ console: "admin", avatarUrl: value })),
+    [dispatch],
+  );
 
   return {
     ...auth,
     ...runtime,
     setAccess,
     setUsername,
+    setAvatarUrl,
   };
 }

@@ -14,6 +14,7 @@ import type { Dictionary } from "@/i18n/get-dictionary";
 import { adminRequest } from "@/lib/admin-api";
 import type { PageResponse } from "@/lib/api-types";
 import { applyProblemToForm, problemViolations } from "@/lib/problem-detail";
+import { apiUrl } from "@/lib/desktop-api";
 
 import { useAdminAuth } from "./AdminAuthProvider";
 import { AdminActionIcon } from "./AdminActionIcon";
@@ -1017,7 +1018,7 @@ export function UserForm({
                       alt=""
                       className="rounded-circle object-fit-cover admin-user-avatar"
                       height={64}
-                      src={avatarUrl}
+                      src={apiUrl(avatarUrl)}
                       unoptimized
                       width={64}
                     />

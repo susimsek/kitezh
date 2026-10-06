@@ -18,6 +18,7 @@ import { type AdminAccess, useAdminAuth } from "./AdminAuthProvider";
 
 type AdminWhoAmI = {
   username: string;
+  avatarUrl?: string | null;
   authorities: string[];
   access: AdminAccess;
 };
@@ -45,6 +46,7 @@ export function AdminAuthGuard({
     isLoggingOut,
     refreshAccessToken,
     setAccess,
+    setAvatarUrl,
     setUsername,
   } = useAdminAuth();
   const isAuthorizationCallback = pathname.replace(/\/+$/, "").endsWith("/callback");
@@ -111,6 +113,7 @@ export function AdminAuthGuard({
 
         setAccess(admin.access);
         setUsername(admin.username);
+        setAvatarUrl(admin.avatarUrl ?? null);
         setAuthorized(true);
       })
       .catch((error: unknown) => {
@@ -132,6 +135,7 @@ export function AdminAuthGuard({
     router,
     startLogin,
     setAccess,
+    setAvatarUrl,
     setUsername,
     desktopSignInRequested,
   ]);

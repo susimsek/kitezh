@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { useBranding } from "@/components/auth/BrandingProvider";
+import { apiUrl } from "@/lib/desktop-api";
 
 export function BrandLogo({ className, size = 36 }: { className?: string; size?: number }) {
   const branding = useBranding();
@@ -28,7 +29,7 @@ export function BrandLogo({ className, size = 36 }: { className?: string; size?:
 
   return (
     <Image
-      src={logoPath}
+      src={apiUrl(logoPath)}
       alt=""
       aria-hidden="true"
       className={className}

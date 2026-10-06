@@ -40,6 +40,7 @@ export type ConsoleAuthState = {
   idTokenParsed: JwtPayload | null;
   refreshTokenParsed: JwtPayload | null;
   username: string | null;
+  avatarUrl: string | null;
 };
 
 type AuthState = {
@@ -59,6 +60,7 @@ const emptyConsole = (): ConsoleAuthState => ({
   idTokenParsed: null,
   refreshTokenParsed: null,
   username: null,
+  avatarUrl: null,
 });
 
 const initialState: AuthState = {
@@ -118,6 +120,12 @@ const authSlice = createSlice({
     ) {
       state[action.payload.console].username = action.payload.username;
     },
+    setConsoleAvatar(
+      state,
+      action: PayloadAction<{ console: ConsoleKind; avatarUrl: string | null }>,
+    ) {
+      state[action.payload.console].avatarUrl = action.payload.avatarUrl;
+    },
     setAdminAccess(state, action: PayloadAction<AdminAccess | null>) {
       state.admin.access = action.payload;
     },
@@ -129,6 +137,7 @@ export const {
   clearConsoleAuth,
   setConsoleInitialized,
   setConsoleUsername,
+  setConsoleAvatar,
   setAdminAccess,
 } = authSlice.actions;
 

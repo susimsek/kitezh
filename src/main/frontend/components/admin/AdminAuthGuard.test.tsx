@@ -13,6 +13,7 @@ const mockReplace = jest.fn();
 const mockRefreshAccessToken = jest.fn().mockResolvedValue("new-token");
 const mockSetAccess = jest.fn();
 const mockSetUsername = jest.fn();
+const mockSetAvatarUrl = jest.fn();
 let pathname = "/admin";
 let auth = {
   accessToken: "token" as string | null,
@@ -23,6 +24,7 @@ let auth = {
   refreshAccessToken: mockRefreshAccessToken,
   setAccess: mockSetAccess,
   setUsername: mockSetUsername,
+  setAvatarUrl: mockSetAvatarUrl,
 };
 
 jest.mock("@/lib/admin-api", () => ({
@@ -55,6 +57,7 @@ describe("AdminAuthGuard", () => {
       refreshAccessToken: mockRefreshAccessToken,
       setAccess: mockSetAccess,
       setUsername: mockSetUsername,
+      setAvatarUrl: mockSetAvatarUrl,
     };
   });
 
@@ -75,6 +78,7 @@ describe("AdminAuthGuard", () => {
     expect(await screen.findByText("Dashboard")).toBeVisible();
     expect(mockSetAccess).toHaveBeenCalledWith({ viewClients: true });
     expect(mockSetUsername).toHaveBeenCalledWith("admin");
+    expect(mockSetAvatarUrl).toHaveBeenCalledWith(null);
     expect(registerAdminTokenHandlers).toHaveBeenCalledWith({
       refresh: mockRefreshAccessToken,
       unauthorized: expect.any(Function),

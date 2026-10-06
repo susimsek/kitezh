@@ -64,6 +64,7 @@ describe("Redux application store", () => {
       idToken: "admin-id",
       authenticated: true,
       username: "administrator",
+      avatarUrl: null,
       access: { viewClients: true },
     });
     expect(store.getState().auth.account.authenticated).toBe(false);
@@ -74,6 +75,7 @@ describe("Redux application store", () => {
       authenticated: false,
       isLoggingOut: true,
       username: null,
+      avatarUrl: null,
       access: null,
     });
   });

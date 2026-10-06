@@ -1855,7 +1855,7 @@ function enforceContentSecurityPolicy() {
         responseHeaders: {
           ...details.responseHeaders,
           "Content-Security-Policy": [
-            "default-src 'self'; connect-src 'self' https://kitezh.onrender.com http://localhost:9090; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:",
+            "default-src 'self'; connect-src 'self' https://kitezh.onrender.com http://localhost:9090; img-src 'self' https://kitezh.onrender.com http://localhost:9090 data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:",
           ],
         },
       });

@@ -12,6 +12,7 @@ import type { Dictionary } from "@/i18n/get-dictionary";
 import { adminRequest } from "@/lib/admin-api";
 import type { PageResponse } from "@/lib/api-types";
 import { encodeConsentRouteKey } from "@/lib/consent-route";
+import { apiUrl } from "@/lib/desktop-api";
 
 import { useAdminAuth } from "./AdminAuthProvider";
 import { AdminActionIcon } from "./AdminActionIcon";
@@ -588,7 +589,7 @@ function UsersTable({
                     alt=""
                     className="rounded-circle object-fit-cover"
                     height={32}
-                    src={user.avatarUrl}
+                    src={apiUrl(user.avatarUrl)}
                     unoptimized
                     width={32}
                   />

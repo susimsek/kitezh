@@ -29,7 +29,8 @@ type Props = {
 export function AdminShell({ locale, dictionary, children }: Props) {
   const pathname = usePathname();
   const branding = useBranding();
-  const { access, accessToken, idTokenParsed, logout, tokenParsed, username } = useAdminAuth();
+  const { access, accessToken, avatarUrl, idTokenParsed, logout, tokenParsed, username } =
+    useAdminAuth();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const items: ReadonlyArray<readonly [string, string, IconName, boolean | undefined]> = [
     ["", dictionary.admin.nav.dashboard, "gaugeHigh", access?.isAdmin],
@@ -109,7 +110,7 @@ export function AdminShell({ locale, dictionary, children }: Props) {
               <DesktopUpdateControl />
               <ConsoleUserMenu
                 username={username ?? "…"}
-                avatarSrc={idTokenParsed?.picture ?? tokenParsed?.picture}
+                avatarSrc={avatarUrl ?? idTokenParsed?.picture ?? tokenParsed?.picture}
                 accountHref={`/account/personal-info`}
                 accountLabel={dictionary.account.product}
                 logoutLabel={dictionary.admin.common.logout}

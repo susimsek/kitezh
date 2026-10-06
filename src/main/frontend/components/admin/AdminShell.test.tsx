@@ -32,10 +32,12 @@ jest.mock("@/routing/Link", () => ({ children, href, ...props }: React.Component
 jest.mock("./AdminAuthProvider", () => ({
   useAdminAuth: () => ({
     access: mockAdminAccess,
+    avatarUrl: null,
     idTokenParsed: { picture: "/avatars/admin?v=1" },
     logout: mockLogout,
     tokenParsed: null,
     username: "admin",
+    setAvatarUrl: jest.fn(),
   }),
 }));
 jest.mock("@/components/auth/ConsoleUserMenu", () => ({

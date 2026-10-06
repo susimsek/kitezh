@@ -25,6 +25,7 @@ import {
   type AccountAvatar,
   type AccountProfile,
 } from "@/lib/account-api";
+import { apiUrl } from "@/lib/desktop-api";
 
 import { useAccountAuth } from "./AccountAuthProvider";
 import { PasswordField } from "../auth/PasswordField";
@@ -435,7 +436,7 @@ export function AccountProfileForm({ dictionary }: { dictionary: Dictionary }) {
                     alt=""
                     className="rounded-circle object-fit-cover admin-user-avatar"
                     height={72}
-                    src={avatarUrl}
+                    src={apiUrl(avatarUrl)}
                     unoptimized
                     width={72}
                   />

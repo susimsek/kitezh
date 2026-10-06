@@ -137,9 +137,28 @@ export function assertDesktopOnline(method?: string) {
 
 export function getApiUrl(pathOrUrl: string | URL) {
   const value = pathOrUrl.toString();
-  if (/^(https?|app|kitezh):/i.test(value)) return value;
+  if (/^(https?|app|kitezh):/i.test(value)) {
+    const url = new URL(value);
+    if (isLocalAssetUrl(url)) {
+      const assetPath = `${url.pathname}${url.search}${url.hash}`;
+      if (isDesktopRuntime() && window.desktopApi) {
+        return new URL(assetPath, window.desktopApi.apiBaseUrl).toString();
+      }
+      if (typeof window !== "undefined") {
+        return new URL(assetPath, window.location.origin).toString();
+      }
+    }
+    return value;
+  }
   if (!isDesktopRuntime() || !window.desktopApi) return value;
   return new URL(value, window.desktopApi.apiBaseUrl).toString();
+}
+
+function isLocalAssetUrl(url: URL) {
+  return (
+    ["localhost", "127.0.0.1", "kitezh.local"].includes(url.hostname) &&
+    (url.pathname.startsWith("/avatars/") || url.pathname.startsWith("/brand/"))
+  );
 }
 
 export async function loadDesktopConfig() {

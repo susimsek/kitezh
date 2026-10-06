@@ -1,7 +1,10 @@
 package io.github.susimsek.kitezh.web.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import io.github.susimsek.kitezh.service.admin.AdminUserService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -9,10 +12,12 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 class AdminWhoAmIControllerTest {
 
-    private final AdminWhoAmIController controller = new AdminWhoAmIController();
+    private final AdminUserService adminUserService = mock(AdminUserService.class);
+    private final AdminWhoAmIController controller = new AdminWhoAmIController(adminUserService);
 
     @Test
     void returnsCurrentAdminIdentityAndAccess() {
+        when(adminUserService.currentAvatarUrl("admin")).thenReturn("/avatars/admin?v=1");
         var authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         "admin", "ignored", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -20,6 +25,7 @@ class AdminWhoAmIControllerTest {
         var response = controller.whoAmI(authentication);
 
         assertThat(response.username()).isEqualTo("admin");
+        assertThat(response.avatarUrl()).isEqualTo("/avatars/admin?v=1");
         assertThat(response.authorities()).containsExactly("ROLE_ADMIN");
         assertThat(response.access())
                 .containsEntry("queryClients", true)
