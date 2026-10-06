@@ -113,7 +113,10 @@ export function AdminAuthGuard({
 
         setAccess(admin.access);
         setUsername(admin.username);
-        setAvatarUrl(admin.avatarUrl ?? null);
+        // Desktop renders the avatar from the token claim. The desktop callback already
+        // carries the profile picture, so do not replace it with a whoami response that may
+        // be delayed or point at an expired asset URL.
+        setAvatarUrl(isDesktopRuntime() ? null : (admin.avatarUrl ?? null));
         setAuthorized(true);
       })
       .catch((error: unknown) => {

@@ -19,9 +19,11 @@ let auth = {
   accessToken: "token" as string | null,
   beginAuthorization: mockBeginAuthorization,
   expiresAt: null as number | null,
+  idTokenParsed: null as { picture?: string } | null,
   isLoggingOut: false,
   initialized: true,
   refreshAccessToken: mockRefreshAccessToken,
+  tokenParsed: null as { picture?: string } | null,
   setAccess: mockSetAccess,
   setUsername: mockSetUsername,
   setAvatarUrl: mockSetAvatarUrl,
@@ -52,9 +54,11 @@ describe("AdminAuthGuard", () => {
       accessToken: "token",
       beginAuthorization: mockBeginAuthorization,
       expiresAt: null,
+      idTokenParsed: null as { picture?: string } | null,
       isLoggingOut: false,
       initialized: true,
       refreshAccessToken: mockRefreshAccessToken,
+      tokenParsed: null as { picture?: string } | null,
       setAccess: mockSetAccess,
       setUsername: mockSetUsername,
       setAvatarUrl: mockSetAvatarUrl,
@@ -83,6 +87,32 @@ describe("AdminAuthGuard", () => {
       refresh: mockRefreshAccessToken,
       unauthorized: expect.any(Function),
     });
+  });
+
+  it("keeps the desktop avatar sourced from the token instead of whoami", async () => {
+    Object.defineProperty(window, "desktopApi", {
+      configurable: true,
+      value: { isDesktop: true },
+    });
+    auth = {
+      ...auth,
+      idTokenParsed: null,
+      tokenParsed: { picture: "/avatars/token?v=1" },
+    };
+    mockAdminRequest.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        username: "admin",
+        avatarUrl: "/avatars/whoami?v=2",
+        authorities: ["ROLE_ADMIN"],
+        access: { viewClients: true },
+      },
+    } as never);
+
+    render(<AdminAuthGuard locale="en">Dashboard</AdminAuthGuard>);
+    expect(await screen.findByText("Dashboard")).toBeVisible();
+    expect(mockSetAvatarUrl).toHaveBeenCalledWith(null);
+    delete (window as { desktopApi?: unknown }).desktopApi;
   });
 
   it("reauthorizes through the token handler and cleans it up on unmount", async () => {

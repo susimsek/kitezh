@@ -178,6 +178,40 @@ describe("registration and account action forms", () => {
     await waitFor(() => expect(onLogout).toHaveBeenCalled());
   });
 
+  it("retries a new avatar URL after the previous image failed", async () => {
+    const { container, rerender } = render(
+      <ConsoleUserMenu
+        accountHref="/account"
+        accountLabel="Account"
+        avatarSrc="/avatars/old?v=1"
+        logoutLabel="Sign out"
+        onLogout={jest.fn()}
+        signedInAsLabel="Signed in as"
+        username="admin"
+      />,
+    );
+
+    const image = container.querySelector("img");
+    expect(image).not.toBeNull();
+    if (!image) throw new Error("Expected avatar image");
+    fireEvent.error(image);
+    expect(screen.getByText("A")).toBeVisible();
+
+    rerender(
+      <ConsoleUserMenu
+        accountHref="/account"
+        accountLabel="Account"
+        avatarSrc="/avatars/current?v=2"
+        logoutLabel="Sign out"
+        onLogout={jest.fn()}
+        signedInAsLabel="Signed in as"
+        username="admin"
+      />,
+    );
+
+    await waitFor(() => expect(container.querySelector("img")).toBeVisible());
+  });
+
   it("handles reset-password validation, OTP configuration, and success", async () => {
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({

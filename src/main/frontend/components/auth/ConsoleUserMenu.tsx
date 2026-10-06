@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dropdown, Spinner } from "react-bootstrap";
 import { ActionIcon } from "@/components/shared/ActionIcon";
 import { Icon } from "@/components/shared/Icon";
@@ -25,6 +25,11 @@ export function ConsoleUserMenu({
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const initial = username.trim().charAt(0).toUpperCase() || "?";
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarSrc]);
+
   const handleLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
