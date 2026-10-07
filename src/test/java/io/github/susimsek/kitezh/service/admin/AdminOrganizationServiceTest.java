@@ -127,6 +127,7 @@ class AdminOrganizationServiceTest {
         PageRequest pageable = PageRequest.of(0, 20);
         OrganizationEntity organization = organization(10L, "acme");
         stubOrganizationView(organization);
+        when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
         when(organizationRepository.search("", pageable))
                 .thenReturn(new PageImpl<>(List.of(organization), pageable, 1));
 
