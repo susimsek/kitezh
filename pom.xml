@@ -55,7 +55,7 @@
 		<node.version>v24.18.0</node.version>
 		<skip.frontend>false</skip.frontend>
 		<native-image-name>native-executable</native-image-name>
-		<start-class>io.github.susimsek.kitezh.SpringAuthorizationServerSamplesApplication</start-class>
+		<start-class>io.github.susimsek.kitezh.KitezhApplication</start-class>
 </properties>
 
 	<dependencies>
