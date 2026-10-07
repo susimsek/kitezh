@@ -23,12 +23,23 @@ const settings = {
   adminEventsDetailsEnabled: true,
   eventsExpirationDays: 0,
 };
+const userSettings = {
+  eventsEnabled: true,
+  eventTypes: ["LOGIN_SUCCESS", "LOGIN_FAILURE"],
+  eventsExpirationDays: 30,
+};
 
 describe("AdminEventSettings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAdminRequest.mockImplementation((_token, config) => {
+      if (config.url === "/api/admin/user-events/config") {
+        return Promise.resolve({ status: 200, data: userSettings }) as never;
+      }
       if (config.method === "PUT") {
+        if (config.url === "/api/admin/user-events/config") {
+          return Promise.resolve({ status: 200, data: userSettings }) as never;
+        }
         return Promise.resolve({ status: 200, data: settings }) as never;
       }
       return Promise.resolve({ status: 200, data: settings }) as never;
@@ -54,6 +65,9 @@ describe("AdminEventSettings", () => {
 
   it("shows an error when settings cannot be saved", async () => {
     mockAdminRequest.mockImplementation((_token, config) => {
+      if (config.url === "/api/admin/user-events/config") {
+        return Promise.resolve({ status: 200, data: userSettings }) as never;
+      }
       if (config.method === "PUT") {
         return Promise.resolve({ status: 500, data: null }) as never;
       }

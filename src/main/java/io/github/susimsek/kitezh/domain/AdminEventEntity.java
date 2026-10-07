@@ -23,6 +23,12 @@ public class AdminEventEntity {
     @Column(name = "actor", nullable = false, length = 100)
     private String actor;
 
+    @Column(name = "client_id", length = 100)
+    private String clientId;
+
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
     @Column(name = "action", nullable = false, length = 100)
     private String action;
 

@@ -7,6 +7,7 @@ import io.github.susimsek.kitezh.dto.account.ResetPasswordRequestDTO;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
 import io.github.susimsek.kitezh.service.account.AccountRegistrationService;
 import io.github.susimsek.kitezh.service.account.UserActionService;
+import io.github.susimsek.kitezh.service.admin.AdminOrganizationInvitationService;
 import io.github.susimsek.kitezh.service.error.ApiException;
 import io.github.susimsek.kitezh.service.security.RegistrationCaptchaService;
 import io.github.susimsek.kitezh.web.ApiController;
@@ -18,6 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,6 +40,9 @@ public class AccountActionController {
     private final AccountRegistrationService accountRegistrationService;
     private final LoginSettingsService loginSettingsService;
     private final RegistrationCaptchaService registrationCaptchaService;
+
+    @Autowired(required = false)
+    private AdminOrganizationInvitationService organizationInvitationService;
 
     @PostMapping("/register")
     @Operation(
@@ -70,6 +75,9 @@ public class AccountActionController {
                 request.password(),
                 request.confirmPassword(),
                 emailLocale);
+        if (request.invitationToken() != null && !request.invitationToken().isBlank()) {
+            organizationInvitationService.accept(request.invitationToken(), request.username());
+        }
         return ResponseEntity.status(201).build();
     }
 

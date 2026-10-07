@@ -18,11 +18,14 @@ import io.github.susimsek.kitezh.domain.LocalizationSettingsEntity;
 import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
 import io.github.susimsek.kitezh.domain.OAuth2KeyEntity;
 import io.github.susimsek.kitezh.domain.OfflineAccessPolicyEntity;
+import io.github.susimsek.kitezh.domain.OrganizationEntity;
+import io.github.susimsek.kitezh.domain.OrganizationGroupEntity;
 import io.github.susimsek.kitezh.domain.RegisteredClientEntity;
 import io.github.susimsek.kitezh.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.domain.UserEventSettingsEntity;
 import io.github.susimsek.kitezh.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.kitezh.repository.AdminEventSettingsRepository;
 import io.github.susimsek.kitezh.repository.AuthorityRepository;
@@ -37,6 +40,7 @@ import io.github.susimsek.kitezh.repository.LocalizationSettingsRepository;
 import io.github.susimsek.kitezh.repository.LoginSettingsRepository;
 import io.github.susimsek.kitezh.repository.OAuth2KeyRepository;
 import io.github.susimsek.kitezh.repository.OfflineAccessPolicyRepository;
+import io.github.susimsek.kitezh.repository.OrganizationRepository;
 import io.github.susimsek.kitezh.repository.RequiredActionDefinitionRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
@@ -113,6 +117,7 @@ public class CacheConfig {
                 OfflineAccessPolicyRepository.OFFLINE_ACCESS_POLICY_BY_ID_CACHE,
                 ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
                 ClientScopeRepository.CLIENT_SCOPE_BY_NAME_CACHE,
+                OrganizationRepository.ORGANIZATION_BY_ALIAS_CACHE,
                 EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE,
                 GroupRepository.DEFAULT_GROUPS_CACHE,
                 LocalizationMessageOverrideRepository.LOCALIZATION_MESSAGE_OVERRIDE_BY_KEY_CACHE,
@@ -211,11 +216,17 @@ public class CacheConfig {
                         cacheManager, AuthorityEntity.class.getName() + ".compositeClientRoles");
                 createCache(cacheManager, OAuth2KeyEntity.class.getName());
                 createCache(cacheManager, OfflineAccessPolicyEntity.class.getName());
+                createCache(cacheManager, OrganizationEntity.class.getName());
+                createCache(cacheManager, OrganizationEntity.class.getName() + ".attributes");
+                createCache(cacheManager, OrganizationGroupEntity.class.getName());
+                createCache(cacheManager, OrganizationGroupEntity.class.getName() + ".roles");
                 createCache(cacheManager, RegisteredClientEntity.class.getName());
                 createCache(cacheManager, UserEntity.class.getName());
                 createCache(cacheManager, UserEntity.class.getName() + ".authorities");
                 createCache(cacheManager, UserEntity.class.getName() + ".groups");
                 createCache(cacheManager, UserEntity.class.getName() + ".clientRoles");
+                createCache(cacheManager, UserEventSettingsEntity.class.getName());
+                createCache(cacheManager, UserEventSettingsEntity.class.getName() + ".eventTypes");
                 createCache(cacheManager, GroupEntity.class.getName() + ".clientRoles");
                 createCache(cacheManager, UserProfileAttributeDefinitionEntity.class.getName());
                 createCache(cacheManager, RequiredActionDefinitionEntity.class.getName());

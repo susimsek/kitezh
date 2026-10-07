@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="032-organization-identity-providers" author="susimsek">
+		<createSequence sequenceName="organization_idp_seq" startValue="1" incrementBy="1" minValue="1" maxValue="9999999999999999" cacheSize="100" cycle="false"/>
+		<createTable tableName="organization_identity_providers">
+			<column name="id" type="bigint" defaultValueSequenceNext="organization_idp_seq"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_organization_identity_providers"/></column>
+			<column name="organization_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="provider_alias" type="varchar(50)"><constraints nullable="false"/></column>
+			<column name="enabled" type="boolean" defaultValueBoolean="true"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="organization_identity_providers" columnNames="organization_id,provider_alias" constraintName="uk_organization_identity_providers_provider"/>
+		<addForeignKeyConstraint baseTableName="organization_identity_providers" baseColumnNames="organization_id" constraintName="fk_organization_identity_providers_organization" referencedTableName="organizations" referencedColumnNames="id"/>
+		<createIndex indexName="idx_organization_identity_providers_organization" tableName="organization_identity_providers"><column name="organization_id"/><column name="enabled"/></createIndex>
+	</changeSet>
+</databaseChangeLog>

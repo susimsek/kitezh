@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="026-01-admin-event-request-context" author="susimsek">
+        <addColumn tableName="admin_events">
+            <column name="client_id" type="varchar(100)"/>
+            <column name="ip_address" type="varchar(45)"/>
+        </addColumn>
+        <dropForeignKeyConstraint
+                baseTableName="event_listener_deliveries"
+                constraintName="fk_event_listener_deliveries_provider"/>
+        <dropNotNullConstraint
+                tableName="event_listener_deliveries"
+                columnName="provider_id"
+                columnDataType="varchar(36)"/>
+        <addForeignKeyConstraint
+                baseTableName="event_listener_deliveries"
+                baseColumnNames="provider_id"
+                referencedTableName="event_listener_providers"
+                referencedColumnNames="id"
+                constraintName="fk_event_listener_deliveries_provider"
+                onDelete="SET NULL"/>
+        <createIndex indexName="idx_admin_events_actor_occurred_at" tableName="admin_events">
+            <column name="actor"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_admin_events_client_occurred_at" tableName="admin_events">
+            <column name="client_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_admin_events_ip_occurred_at" tableName="admin_events">
+            <column name="ip_address"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex indexName="idx_user_events_username_occurred_at" tableName="user_events">
+            <column name="username"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

@@ -5,6 +5,8 @@ ROLE_USER_VIEWER;View user accounts and user details.
 ROLE_USER_MANAGER;Manage user accounts and credentials.
 ROLE_GROUP_VIEWER;View group resources and group-scoped permissions.
 ROLE_GROUP_MANAGER;Manage group membership, mappings, and scoped resources.
+ROLE_ORGANIZATION_VIEWER;View organizations and organization-scoped resources.
+ROLE_ORGANIZATION_MANAGER;Manage organizations and organization-scoped resources.
 ROLE_CLIENT_VIEWER;View registered OAuth2 clients.
 ROLE_CLIENT_MANAGER;Manage registered OAuth2 clients.
 ROLE_EVENT_VIEWER;View administrative audit events.

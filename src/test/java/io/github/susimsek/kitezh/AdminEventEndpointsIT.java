@@ -7,6 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.susimsek.kitezh.domain.AdminEventEntity;
+import io.github.susimsek.kitezh.repository.AdminEventRepository;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -17,6 +21,52 @@ import org.springframework.test.web.servlet.MockMvc;
 class AdminEventEndpointsIT {
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private AdminEventRepository adminEventRepository;
+
+    @Test
+    void eventViewerCanReadEventHistoryAndDetails() throws Exception {
+        String eventId = UUID.randomUUID().toString();
+        AdminEventEntity event = new AdminEventEntity();
+        event.setId(eventId);
+        event.setActor("admin");
+        event.setAction("client.updated");
+        event.setTargetType("client");
+        event.setTargetId("demo-client");
+        event.setDetails("enabled=true");
+        event.setOccurredAt(Instant.now());
+        adminEventRepository.save(event);
+
+        try {
+            mockMvc.perform(
+                            get("/api/admin/events")
+                                    .with(
+                                            jwt().authorities(
+                                                            new SimpleGrantedAuthority(
+                                                                    "ROLE_EVENT_VIEWER"))))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(
+                            get("/api/admin/events/{id}", eventId)
+                                    .with(
+                                            jwt().authorities(
+                                                            new SimpleGrantedAuthority(
+                                                                    "ROLE_EVENT_VIEWER"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(eventId))
+                    .andExpect(jsonPath("$.details").value("enabled=true"));
+
+            mockMvc.perform(
+                            get("/api/admin/events/{id}", "missing-event")
+                                    .with(
+                                            jwt().authorities(
+                                                            new SimpleGrantedAuthority(
+                                                                    "ROLE_EVENT_VIEWER"))))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("resource_not_found"));
+        } finally {
+            adminEventRepository.deleteById(eventId);
+        }
+    }
 
     @Test
     void eventViewerCanReadButCannotManageEvents() throws Exception {

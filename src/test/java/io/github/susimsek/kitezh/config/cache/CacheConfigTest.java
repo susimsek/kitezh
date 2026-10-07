@@ -17,11 +17,14 @@ import io.github.susimsek.kitezh.domain.LocalizationSettingsEntity;
 import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
 import io.github.susimsek.kitezh.domain.OAuth2KeyEntity;
 import io.github.susimsek.kitezh.domain.OfflineAccessPolicyEntity;
+import io.github.susimsek.kitezh.domain.OrganizationEntity;
+import io.github.susimsek.kitezh.domain.OrganizationGroupEntity;
 import io.github.susimsek.kitezh.domain.RegisteredClientEntity;
 import io.github.susimsek.kitezh.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.domain.UserEventSettingsEntity;
 import io.github.susimsek.kitezh.domain.UserProfileAttributeDefinitionEntity;
 import io.github.susimsek.kitezh.repository.AdminEventSettingsRepository;
 import io.github.susimsek.kitezh.repository.AuthorityRepository;
@@ -207,6 +210,12 @@ class CacheConfigTest {
                                 LocalizationSettingsRepository.LOCALIZATION_SETTINGS_BY_ID_CACHE))
                 .isNotNull();
         assertThat(cacheManager.getCache(OAuth2KeyEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OrganizationEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OrganizationEntity.class.getName() + ".attributes"))
+                .isNotNull();
+        assertThat(cacheManager.getCache(OrganizationGroupEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OrganizationGroupEntity.class.getName() + ".roles"))
+                .isNotNull();
         assertThat(cacheManager.getCache(OfflineAccessPolicyEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(RegisteredClientEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(RequiredActionDefinitionEntity.class.getName()))
@@ -216,6 +225,9 @@ class CacheConfigTest {
         assertThat(cacheManager.getCache(UserEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(UserEntity.class.getName() + ".authorities")).isNotNull();
         assertThat(cacheManager.getCache(UserEntity.class.getName() + ".groups")).isNotNull();
+        assertThat(cacheManager.getCache(UserEventSettingsEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(UserEventSettingsEntity.class.getName() + ".eventTypes"))
+                .isNotNull();
         assertThat(cacheManager.getCache(UserProfileAttributeDefinitionEntity.class.getName()))
                 .isNotNull();
         assertThat(cacheManager.getCache(ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE))

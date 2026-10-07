@@ -93,6 +93,21 @@ class AdminAuditEventServiceTest {
     }
 
     @Test
+    void redactsSensitiveDetailsAndBoundsTheirStoredLength() {
+        String details =
+                "{\"accessToken\":\"secret-value\",\"password\":\"password-value\",\"note\":\""
+                        + "x".repeat(2_100)
+                        + "\"}";
+
+        String sanitized = AdminAuditEventService.sanitizeDetails(details);
+
+        assertThat(sanitized)
+                .contains("\"accessToken\":\"[REDACTED]\"")
+                .contains("\"password\":\"[REDACTED]\"")
+                .hasSize(2_000);
+    }
+
+    @Test
     void recordsExplicitActorAndAvatarChanges() {
         service.recordAs("system-job", "user.avatar.updated", "user", "7", "updated");
         service.avatarUpdated(8L);
