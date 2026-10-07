@@ -40,6 +40,7 @@ import io.github.susimsek.kitezh.repository.LocalizationSettingsRepository;
 import io.github.susimsek.kitezh.repository.LoginSettingsRepository;
 import io.github.susimsek.kitezh.repository.OAuth2KeyRepository;
 import io.github.susimsek.kitezh.repository.OfflineAccessPolicyRepository;
+import io.github.susimsek.kitezh.repository.OrganizationRepository;
 import io.github.susimsek.kitezh.repository.RequiredActionDefinitionRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
@@ -116,6 +117,7 @@ public class CacheConfig {
                 OfflineAccessPolicyRepository.OFFLINE_ACCESS_POLICY_BY_ID_CACHE,
                 ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
                 ClientScopeRepository.CLIENT_SCOPE_BY_NAME_CACHE,
+                OrganizationRepository.ORGANIZATION_BY_ALIAS_CACHE,
                 EmailSettingsRepository.EMAIL_SETTINGS_BY_ID_CACHE,
                 GroupRepository.DEFAULT_GROUPS_CACHE,
                 LocalizationMessageOverrideRepository.LOCALIZATION_MESSAGE_OVERRIDE_BY_KEY_CACHE,

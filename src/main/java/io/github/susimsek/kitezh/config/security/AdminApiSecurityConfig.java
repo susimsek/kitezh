@@ -7,6 +7,7 @@ import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.security.AuthoritiesConstants;
+import io.github.susimsek.kitezh.service.admin.OrganizationPermissionService;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.context.annotation.Bean;
@@ -34,12 +35,14 @@ public class AdminApiSecurityConfig {
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
             ApplicationProperties applicationProperties,
-            LoggingProperties loggingProperties) {
+            LoggingProperties loggingProperties,
+            OrganizationPermissionService organizationPermissionService) {
         return adminApiSecurityFilterChain(
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(applicationProperties.dpop()),
-                new ObservabilityMdcFilter(loggingProperties));
+                new ObservabilityMdcFilter(loggingProperties),
+                organizationPermissionService);
     }
 
     SecurityFilterChain adminApiSecurityFilterChain(
@@ -48,14 +51,16 @@ public class AdminApiSecurityConfig {
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(new ApplicationProperties().dpop()),
-                new ObservabilityMdcFilter());
+                new ObservabilityMdcFilter(),
+                null);
     }
 
     private SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
             DpopNonceService nonceService,
-            ObservabilityMdcFilter observabilityMdcFilter) {
+            ObservabilityMdcFilter observabilityMdcFilter,
+            OrganizationPermissionService organizationPermissionService) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
                 .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class)
@@ -306,6 +311,10 @@ public class AdminApiSecurityConfig {
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.USER_MANAGER)
+                                        .requestMatchers(
+                                                new OrganizationPermissionRequestMatcher(
+                                                        organizationPermissionService))
+                                        .permitAll()
                                         .requestMatchers("/api/admin/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN))
                 .oauth2ResourceServer(
