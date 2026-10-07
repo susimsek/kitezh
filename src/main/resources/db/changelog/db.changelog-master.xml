@@ -43,13 +43,13 @@
 	<include file="db/changelog/changes/030-branding-settings.xml"/>
 	<include file="db/changelog/changes/030-create-saml-provider-config.xml"/>
 	<include file="db/changelog/changes/031-create-social-identity-mapping-state.xml"/>
-	<include file="db/changelog/changes/024-create-user-events.xml"/>
-	<include file="db/changelog/changes/025-create-event-listeners.xml"/>
-	<include file="db/changelog/changes/026-admin-event-request-context.xml"/>
-	<include file="db/changelog/changes/027-create-organizations.xml"/>
-	<include file="db/changelog/changes/028-organization-members-and-domains.xml"/>
-	<include file="db/changelog/changes/029-organization-invitations.xml"/>
-	<include file="db/changelog/changes/030-organization-client-scope.xml"/>
-	<include file="db/changelog/changes/031-organization-groups.xml"/>
-	<include file="db/changelog/changes/032-organization-identity-providers.xml"/>
+	<include file="db/changelog/changes/032-create-user-events.xml"/>
+	<include file="db/changelog/changes/033-create-event-listeners.xml"/>
+	<include file="db/changelog/changes/034-admin-event-request-context.xml"/>
+	<include file="db/changelog/changes/035-create-organizations.xml"/>
+	<include file="db/changelog/changes/036-organization-members-and-domains.xml"/>
+	<include file="db/changelog/changes/037-organization-invitations.xml"/>
+	<include file="db/changelog/changes/038-organization-client-scope.xml"/>
+	<include file="db/changelog/changes/039-organization-groups.xml"/>
+	<include file="db/changelog/changes/040-organization-identity-providers.xml"/>
 </databaseChangeLog>

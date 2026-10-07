@@ -19,6 +19,5 @@ public interface OrganizationPermissionRepository
     boolean existsByOrganizationIdAndUserIdAndPermissionLevel(
             Long organizationId,
             Long userId,
-            io.github.susimsek.kitezh.domain.OrganizationPermissionLevel
-                    permissionLevel);
+            io.github.susimsek.kitezh.domain.OrganizationPermissionLevel permissionLevel);
 }

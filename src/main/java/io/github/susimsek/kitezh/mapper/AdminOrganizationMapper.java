@@ -40,12 +40,10 @@ public interface AdminOrganizationMapper {
         organization.getAttributes().stream()
                 .sorted(
                         java.util.Comparator.comparing(
-                                        io.github.susimsek.kitezh.domain
-                                                        .OrganizationAttribute
+                                        io.github.susimsek.kitezh.domain.OrganizationAttribute
                                                 ::getName)
                                 .thenComparing(
-                                        io.github.susimsek.kitezh.domain
-                                                        .OrganizationAttribute
+                                        io.github.susimsek.kitezh.domain.OrganizationAttribute
                                                 ::getValue))
                 .forEach(
                         attribute ->
@@ -75,8 +73,8 @@ public interface AdminOrganizationMapper {
                                 .filter(value -> value != null && !value.isBlank())
                                 .map(
                                         value ->
-                                                new io.github.susimsek.kitezh
-                                                        .domain.OrganizationAttribute(
+                                                new io.github.susimsek.kitezh.domain
+                                                        .OrganizationAttribute(
                                                         name.strip(), value.strip()))
                                 .forEach(target.getAttributes()::add);
                     }

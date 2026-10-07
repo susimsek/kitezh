@@ -34,8 +34,7 @@ public class SocialLoginController {
     @Autowired
     public SocialLoginController(
             SocialLoginService socialLoginService,
-            io.github.susimsek.kitezh.repository.OrganizationRepository
-                    organizationRepository,
+            io.github.susimsek.kitezh.repository.OrganizationRepository organizationRepository,
             OrganizationIdentityProviderRepository organizationIdentityProviderRepository) {
         this.socialLoginService = socialLoginService;
         this.organizationRepository = organizationRepository;

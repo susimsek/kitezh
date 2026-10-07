@@ -76,8 +76,7 @@ public class UserEventService {
                         Instant.now()));
         if (eventListenerDeliveryService != null) {
             eventListenerDeliveryService.dispatch(
-                    io.github.susimsek.kitezh.domain.EventListenerEventType
-                            .USER_EVENT,
+                    io.github.susimsek.kitezh.domain.EventListenerEventType.USER_EVENT,
                     eventId,
                     Map.of(
                             "eventType",

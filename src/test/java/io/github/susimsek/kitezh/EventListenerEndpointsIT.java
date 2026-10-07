@@ -1,4 +1,4 @@
-package io.github.susimsek.springauthserversamples;
+package io.github.susimsek.kitezh;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -8,11 +8,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.github.susimsek.springauthserversamples.domain.EventListenerDeliveryEntity;
-import io.github.susimsek.springauthserversamples.domain.EventListenerDeliveryStatus;
-import io.github.susimsek.springauthserversamples.domain.EventListenerEventType;
-import io.github.susimsek.springauthserversamples.repository.EventListenerDeliveryRepository;
-import io.github.susimsek.springauthserversamples.repository.EventListenerProviderRepository;
+import io.github.susimsek.kitezh.domain.EventListenerDeliveryEntity;
+import io.github.susimsek.kitezh.domain.EventListenerDeliveryStatus;
+import io.github.susimsek.kitezh.domain.EventListenerEventType;
+import io.github.susimsek.kitezh.repository.EventListenerDeliveryRepository;
+import io.github.susimsek.kitezh.repository.EventListenerProviderRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

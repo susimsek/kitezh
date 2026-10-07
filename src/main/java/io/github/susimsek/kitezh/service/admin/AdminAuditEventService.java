@@ -110,8 +110,7 @@ public class AdminAuditEventService {
                                 Instant.now())));
         if (eventListenerDeliveryService != null) {
             eventListenerDeliveryService.dispatch(
-                    io.github.susimsek.kitezh.domain.EventListenerEventType
-                            .ADMIN_EVENT,
+                    io.github.susimsek.kitezh.domain.EventListenerEventType.ADMIN_EVENT,
                     eventId,
                     Map.of(
                             ACTION,

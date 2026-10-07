@@ -1,18 +1,18 @@
-package io.github.susimsek.springauthserversamples;
+package io.github.susimsek.kitezh;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.susimsek.springauthserversamples.domain.SocialIdentityEntity;
-import io.github.susimsek.springauthserversamples.domain.SocialProviderEntity;
-import io.github.susimsek.springauthserversamples.domain.SocialProviderMapperEntity;
-import io.github.susimsek.springauthserversamples.domain.UserEntity;
-import io.github.susimsek.springauthserversamples.repository.SocialIdentityRepository;
-import io.github.susimsek.springauthserversamples.repository.SocialProviderMapperRepository;
-import io.github.susimsek.springauthserversamples.repository.SocialProviderRepository;
-import io.github.susimsek.springauthserversamples.repository.UserRepository;
-import io.github.susimsek.springauthserversamples.service.SocialAccountLinkRequiredException;
-import io.github.susimsek.springauthserversamples.service.SocialLoginService;
+import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
+import io.github.susimsek.kitezh.domain.SocialProviderEntity;
+import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
+import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.repository.SocialIdentityRepository;
+import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
+import io.github.susimsek.kitezh.repository.SocialProviderRepository;
+import io.github.susimsek.kitezh.repository.UserRepository;
+import io.github.susimsek.kitezh.service.SocialAccountLinkRequiredException;
+import io.github.susimsek.kitezh.service.SocialLoginService;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;

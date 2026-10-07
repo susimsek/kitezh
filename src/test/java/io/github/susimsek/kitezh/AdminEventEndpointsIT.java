@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.github.susimsek.springauthserversamples.domain.AdminEventEntity;
-import io.github.susimsek.springauthserversamples.repository.AdminEventRepository;
+import io.github.susimsek.kitezh.domain.AdminEventEntity;
+import io.github.susimsek.kitezh.repository.AdminEventRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

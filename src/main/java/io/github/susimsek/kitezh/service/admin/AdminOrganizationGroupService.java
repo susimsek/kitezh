@@ -214,7 +214,6 @@ public class AdminOrganizationGroupService {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                io.github.susimsek.kitezh.domain.OrganizationMembershipType
-                        .UNMANAGED);
+                io.github.susimsek.kitezh.domain.OrganizationMembershipType.UNMANAGED);
     }
 }

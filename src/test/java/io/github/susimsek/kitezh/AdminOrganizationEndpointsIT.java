@@ -1,4 +1,4 @@
-package io.github.susimsek.springauthserversamples;
+package io.github.susimsek.kitezh;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
