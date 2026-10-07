@@ -29,9 +29,6 @@ public class MailService {
     private static final Logger LOG = LoggerFactory.getLogger(MailService.class);
     private static final String VERIFICATION_TEMPLATE = "mail/emailVerification";
     private static final String PASSWORD_RESET_TEMPLATE = "mail/passwordReset";
-    private static final String ORGANIZATION_INVITATION_TEMPLATE = "mail/organizationInvitation";
-    private static final String ORGANIZATION_DOMAIN_VERIFICATION_TEMPLATE =
-            "mail/organizationDomainVerification";
 
     private final ApplicationProperties applicationProperties;
     private final JavaMailSender mailSender;
@@ -61,42 +58,6 @@ public class MailService {
                 resetUrl,
                 PASSWORD_RESET_TEMPLATE,
                 "mail.password-reset.subject");
-    }
-
-    @Async
-    public void sendOrganizationInvitation(
-            String recipient,
-            String inviteeName,
-            String organizationName,
-            String invitationToken,
-            Locale locale) {
-        String invitationUrl =
-                configuration().baseUrl() + "/register?invitation_token=" + invitationToken;
-        sendOrganizationTemplate(
-                recipient,
-                inviteeName,
-                organizationName,
-                invitationUrl,
-                locale,
-                ORGANIZATION_INVITATION_TEMPLATE,
-                "mail.organization.invitation.subject");
-    }
-
-    @Async
-    public void sendOrganizationDomainVerification(
-            String recipient, String domain, String verificationToken, Locale locale) {
-        String verificationUrl =
-                configuration().baseUrl()
-                        + "/api/auth/organization-domains/verify?token="
-                        + verificationToken;
-        sendOrganizationTemplate(
-                recipient,
-                domain,
-                domain,
-                verificationUrl,
-                locale,
-                ORGANIZATION_DOMAIN_VERIFICATION_TEMPLATE,
-                "mail.organization.domain.subject");
     }
 
     @Async
@@ -150,31 +111,6 @@ public class MailService {
 
         String content = templateEngine.process(templateName, context);
         String subject = messageSource.getMessage(subjectKey, null, locale);
-        sendEmailSync(recipient, subject, content, true);
-    }
-
-    private void sendOrganizationTemplate(
-            String recipient,
-            String username,
-            String organizationName,
-            String actionUrl,
-            Locale locale,
-            String templateName,
-            String subjectKey) {
-        EmailSettingsService.EmailConfiguration configuration = configuration();
-        if (!configuration.enabled()) {
-            LOG.debug("Email delivery is disabled; skipping message to '{}'", recipient);
-            return;
-        }
-        Context context = new Context(locale == null ? Locale.ENGLISH : locale);
-        context.setVariable("username", username);
-        context.setVariable("organizationName", organizationName);
-        context.setVariable("actionUrl", actionUrl);
-        context.setVariable("baseUrl", configuration.baseUrl());
-        String content = templateEngine.process(templateName, context);
-        String subject =
-                messageSource.getMessage(
-                        subjectKey, null, "Organization notification", context.getLocale());
         sendEmailSync(recipient, subject, content, true);
     }
 

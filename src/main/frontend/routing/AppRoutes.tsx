@@ -21,11 +21,6 @@ import { ClientEntityRoute } from "@/components/admin/ClientEntityRoute";
 import { UserForm } from "@/components/admin/UserForm";
 import { UserEntityRoute } from "@/components/admin/UserEntityRoute";
 import { GroupsTable } from "@/components/admin/GroupsTable";
-import { OrganizationsTable } from "@/components/admin/OrganizationsTable";
-import {
-  OrganizationDetail,
-  type OrganizationDetailTab,
-} from "@/components/admin/OrganizationDetail";
 import { GroupCreateForm } from "@/components/admin/GroupCreateForm";
 import { GroupDetail } from "@/components/admin/GroupDetail";
 import { GroupEntityRoute } from "@/components/admin/GroupEntityRoute";
@@ -71,7 +66,6 @@ import { DesktopCompanion } from "@/components/shared/DesktopCompanion";
 import { DesktopSettings } from "@/components/shared/DesktopSettings";
 import { isDesktopRuntime } from "@/lib/desktop-api";
 import AdminEvents from "@/components/admin/AdminEvents";
-import AdminUserEvents from "@/components/admin/AdminUserEvents";
 import ServerInfo from "@/components/admin/ServerInfo";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminAuthentication from "@/components/admin/AdminAuthentication";
@@ -231,30 +225,6 @@ function IdentityProviderRoute({ dictionary, locale }: { dictionary: Dictionary;
   );
 }
 
-function OrganizationRoute({ dictionary, locale }: { dictionary: Dictionary; locale: Locale }) {
-  const { id = "", section: candidate } = useParams<{ id: string; section: string }>();
-  const sections: OrganizationDetailTab[] = [
-    "overview",
-    "members",
-    "domains",
-    "groups",
-    "identity-providers",
-    "invitations",
-  ];
-  const section = sections.includes(candidate as OrganizationDetailTab)
-    ? (candidate as OrganizationDetailTab)
-    : "overview";
-  return (
-    <OrganizationDetail
-      key={`${id}-${section}`}
-      dictionary={dictionary}
-      locale={locale}
-      id={id}
-      tab={section}
-    />
-  );
-}
-
 export function AppRoutes() {
   const dictionary = useDictionary();
   const locale = useLocale();
@@ -371,8 +341,6 @@ export function AppRoutes() {
         />
         <Route path="users/:id/:section?" element={<UserEntityRoute {...props} />} />
         <Route path="groups" element={<GroupsTable dictionary={dictionary} />} />
-        <Route path="organizations" element={<OrganizationsTable dictionary={dictionary} />} />
-        <Route path="organizations/:id/:section?" element={<OrganizationRoute {...props} />} />
         <Route
           path="groups/new"
           element={
@@ -482,7 +450,6 @@ export function AppRoutes() {
           }
         />
         <Route path="events" element={<AdminEvents />} />
-        <Route path="events/user" element={<AdminUserEvents />} />
         <Route path="server-info" element={<ServerInfo />} />
         <Route path="authentication" element={<AdminAuthentication />} />
         <Route path="authentication/policies/:policy" element={<AdminAuthentication />} />

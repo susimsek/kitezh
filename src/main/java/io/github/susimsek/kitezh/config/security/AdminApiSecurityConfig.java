@@ -7,7 +7,6 @@ import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.security.AuthoritiesConstants;
-import io.github.susimsek.kitezh.service.admin.OrganizationPermissionService;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.context.annotation.Bean;
@@ -35,14 +34,12 @@ public class AdminApiSecurityConfig {
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
             ApplicationProperties applicationProperties,
-            LoggingProperties loggingProperties,
-            OrganizationPermissionService organizationPermissionService) {
+            LoggingProperties loggingProperties) {
         return adminApiSecurityFilterChain(
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(applicationProperties.dpop()),
-                new ObservabilityMdcFilter(loggingProperties),
-                organizationPermissionService);
+                new ObservabilityMdcFilter(loggingProperties));
     }
 
     SecurityFilterChain adminApiSecurityFilterChain(
@@ -51,16 +48,14 @@ public class AdminApiSecurityConfig {
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(new ApplicationProperties().dpop()),
-                new ObservabilityMdcFilter(),
-                null);
+                new ObservabilityMdcFilter());
     }
 
     private SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
             DpopNonceService nonceService,
-            ObservabilityMdcFilter observabilityMdcFilter,
-            OrganizationPermissionService organizationPermissionService) {
+            ObservabilityMdcFilter observabilityMdcFilter) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
                 .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class)
@@ -94,28 +89,18 @@ public class AdminApiSecurityConfig {
                                         .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/api/admin/users/*/events",
-                                                "/api/admin/users/*/user-events",
                                                 "/api/admin/clients/*/events",
                                                 "/api/admin/events",
-                                                "/api/admin/events/*",
-                                                "/api/admin/events/config",
-                                                "/api/admin/user-events",
-                                                "/api/admin/user-events/*")
+                                                "/api/admin/events/config")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_VIEWER,
                                                 AuthoritiesConstants.EVENT_MANAGER)
-                                        .requestMatchers(
-                                                HttpMethod.DELETE,
-                                                "/api/admin/events",
-                                                "/api/admin/user-events")
+                                        .requestMatchers(HttpMethod.DELETE, "/api/admin/events")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_MANAGER)
-                                        .requestMatchers(
-                                                HttpMethod.PUT,
-                                                "/api/admin/events/config",
-                                                "/api/admin/user-events/config")
+                                        .requestMatchers(HttpMethod.PUT, "/api/admin/events/config")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_MANAGER)
@@ -131,22 +116,6 @@ public class AdminApiSecurityConfig {
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.CLIENT_VIEWER,
                                                 AuthoritiesConstants.CLIENT_MANAGER)
-                                        .requestMatchers(
-                                                HttpMethod.GET, "/api/admin/event-listeners/**")
-                                        .hasAnyAuthority(
-                                                AuthoritiesConstants.ADMIN,
-                                                AuthoritiesConstants.EVENT_VIEWER,
-                                                AuthoritiesConstants.EVENT_MANAGER)
-                                        .requestMatchers(
-                                                HttpMethod.POST,
-                                                "/api/admin/event-listeners/deliveries/*/retry")
-                                        .hasAnyAuthority(
-                                                AuthoritiesConstants.ADMIN,
-                                                AuthoritiesConstants.EVENT_MANAGER)
-                                        .requestMatchers("/api/admin/event-listeners/**")
-                                        .hasAnyAuthority(
-                                                AuthoritiesConstants.ADMIN,
-                                                AuthoritiesConstants.EVENT_MANAGER)
                                         .requestMatchers("/api/admin/client-scopes/**")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
@@ -311,10 +280,6 @@ public class AdminApiSecurityConfig {
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.USER_MANAGER)
-                                        .requestMatchers(
-                                                new OrganizationPermissionRequestMatcher(
-                                                        organizationPermissionService))
-                                        .permitAll()
                                         .requestMatchers("/api/admin/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN))
                 .oauth2ResourceServer(

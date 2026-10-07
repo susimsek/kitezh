@@ -24,8 +24,6 @@ export type AdminAccess = {
   manageEvents?: boolean;
   viewKeys: boolean;
   manageKeys: boolean;
-  viewOrganizations?: boolean;
-  manageOrganizations?: boolean;
 };
 
 export type { ConsoleKind } from "@/lib/console-auth-types";

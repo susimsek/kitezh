@@ -33,9 +33,6 @@ class ControllerMethodCoverageTest {
         "io.github.susimsek.kitezh.web.admin.AdminDashboardController",
         "io.github.susimsek.kitezh.web.admin.AdminEmailSettingsController",
         "io.github.susimsek.kitezh.web.admin.AdminEventController",
-        "io.github.susimsek.kitezh.web.admin.AdminUserEventController",
-        "io.github.susimsek.kitezh.web.admin.AdminUserEventHistoryController",
-        "io.github.susimsek.kitezh.web.admin.AdminEventListenerController",
         "io.github.susimsek.kitezh.web.admin.AdminRoleController",
         "io.github.susimsek.kitezh.web.admin.AdminUserProfileSettingsController",
         "io.github.susimsek.kitezh.web.AvatarController"

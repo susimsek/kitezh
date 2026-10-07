@@ -5,14 +5,14 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.1</version>
+		<version>4.1.0</version>
 		<relativePath/>
 	</parent>
 	<groupId>io.github.susimsek</groupId>
-	<artifactId>spring-authorization-server-samples</artifactId>
+	<artifactId>kitezh</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-authorization-server-samples</name>
-	<description>Spring Authorization Server sample</description>
+	<name>kitezh</name>
+	<description>Kitezh identity and access platform</description>
 
 	<repositories>
 		<repository>
@@ -38,9 +38,7 @@
 			<checkstyle.version>13.9.0</checkstyle.version>
 			<properties-maven-plugin.version>1.2.1</properties-maven-plugin.version>
 			<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
-			<gatling.version>3.16.0</gatling.version>
-			<testcontainers.version>1.21.3</testcontainers.version>
-			<netty.version>4.2.18.Final</netty.version>
+			<gatling.version>3.15.1</gatling.version>
 		<gatling-maven-plugin.version>4.21.10</gatling-maven-plugin.version>
 		<springdoc-openapi.version>3.1.0</springdoc-openapi.version>
 		<opentelemetry-logback-appender.version>2.28.1-alpha</opentelemetry-logback-appender.version>
@@ -64,12 +62,12 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-opentelemetry</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-opentelemetry</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.opentelemetry.instrumentation</groupId>
@@ -120,11 +118,6 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.security</groupId>
@@ -178,28 +171,6 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-testcontainers</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<version>${testcontainers.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>postgresql</artifactId>
-			<version>${testcontainers.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -407,7 +378,7 @@
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>${jacoco.version}</version>
 				<configuration>
-					<destFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</destFile>
+					<destFile>${java.io.tmpdir}/kitezh-jacoco.exec</destFile>
 					<excludes>
 						<exclude>io/github/susimsek/kitezh/mapper/*MapperImpl.class</exclude>
 					</excludes>
@@ -426,7 +397,7 @@
 							<goal>report</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/kitezh-jacoco.exec</dataFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -435,7 +406,7 @@
 							<goal>prepare-agent-integration</goal>
 						</goals>
 						<configuration>
-							<destFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco-it.exec</destFile>
+							<destFile>${java.io.tmpdir}/kitezh-jacoco-it.exec</destFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -445,7 +416,7 @@
 							<goal>report-integration</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco-it.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/kitezh-jacoco-it.exec</dataFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -455,7 +426,7 @@
 							<goal>check</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/spring-authorization-server-samples-jacoco.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/kitezh-jacoco.exec</dataFile>
 							<rules>
 								<rule>
 									<element>BUNDLE</element>
@@ -600,6 +571,11 @@
 				<dependency>
 					<groupId>org.springframework.boot</groupId>
 					<artifactId>spring-boot-h2console</artifactId>
+					<scope>runtime</scope>
+				</dependency>
+				<dependency>
+					<groupId>com.h2database</groupId>
+					<artifactId>h2</artifactId>
 					<scope>runtime</scope>
 				</dependency>
 			</dependencies>

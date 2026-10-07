@@ -92,7 +92,6 @@ describe("registration and account action forms", () => {
         confirmPassword: "Change-me12!",
         captchaToken: "",
         locale: "tr",
-        invitationToken: "",
       }),
     );
     expect(await screen.findByText(dictionary.registration.created)).toBeVisible();

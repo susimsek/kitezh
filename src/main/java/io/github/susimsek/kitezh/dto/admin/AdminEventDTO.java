@@ -16,16 +16,6 @@ public record AdminEventDTO(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 String actor,
         @Schema(
-                        description = "OAuth client identifier associated with the request.",
-                        example = "admin-console",
-                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                String clientId,
-        @Schema(
-                        description = "Source IP address associated with the request.",
-                        example = "192.0.2.10",
-                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                String ipAddress,
-        @Schema(
                         description = "Stable action name.",
                         example = "user.updated",
                         requiredMode = Schema.RequiredMode.REQUIRED)

@@ -81,46 +81,6 @@ public enum ApiErrorCode {
     GROUP_INVALID_ROLES("group_invalid_roles", "One or more roles are invalid."),
     GROUP_INVALID_ATTRIBUTES("group_invalid_attributes", "Group attributes are invalid."),
     GROUP_INVALID_PERMISSION("group_invalid_permission", "The group permission is invalid."),
-    ORGANIZATION_DUPLICATE_ALIAS(
-            "organization_duplicate_alias", "Organization alias is already registered."),
-    ORGANIZATION_ALIAS_IMMUTABLE(
-            "organization_alias_immutable", "Organization alias cannot be changed."),
-    ORGANIZATION_INVALID_ALIAS(
-            "organization_invalid_alias", "Organization alias has an invalid format."),
-    ORGANIZATION_INVALID_REDIRECT_URL(
-            "organization_invalid_redirect_url", "Organization redirect URL is invalid."),
-    ORGANIZATION_MEMBER_ALREADY_EXISTS(
-            "organization_member_already_exists", "User is already an organization member."),
-    ORGANIZATION_DUPLICATE_DOMAIN(
-            "organization_duplicate_domain", "Domain is already associated with an organization."),
-    ORGANIZATION_INVALID_DOMAIN("organization_invalid_domain", "Organization domain is invalid."),
-    ORGANIZATION_DOMAIN_VERIFICATION_EMAIL_REQUIRED(
-            "organization_domain_verification_email_required",
-            "The administrator must have an email address to verify the domain."),
-    ORGANIZATION_INVITATION_ALREADY_EXISTS(
-            "organization_invitation_already_exists",
-            "A pending invitation already exists for this email."),
-    ORGANIZATION_INVITATION_NOT_PENDING(
-            "organization_invitation_not_pending", "Invitation is no longer pending."),
-    ORGANIZATION_INVITATION_EMAIL_MISMATCH(
-            "organization_invitation_email_mismatch",
-            "Invitation email does not match the authenticated user."),
-    ORGANIZATION_GROUP_ALREADY_EXISTS(
-            "organization_group_already_exists", "Organization group name is already registered."),
-    ORGANIZATION_GROUP_MEMBER_ALREADY_EXISTS(
-            "organization_group_member_already_exists",
-            "User is already in the organization group."),
-    ORGANIZATION_GROUP_MEMBER_REQUIRED(
-            "organization_group_member_required",
-            "User must be an organization member before joining a group."),
-    ORGANIZATION_IDP_ALREADY_EXISTS(
-            "organization_idp_already_exists",
-            "Identity provider is already bound to the organization."),
-    ORGANIZATION_IDP_NOT_FOUND(
-            "organization_idp_not_found",
-            "The organization identity-provider binding was not found."),
-    ORGANIZATION_IDP_PROVIDER_NOT_FOUND(
-            "organization_idp_provider_not_found", "The identity provider was not found."),
     KEY_ROTATION_FAILED("key_rotation_failed", "The signing key could not be rotated."),
     LAST_ADMIN_PROTECTED("last_admin_protected", "The last administrator must be retained."),
     ROLE_ASSIGNED("role_assigned", "This role is assigned to one or more users."),

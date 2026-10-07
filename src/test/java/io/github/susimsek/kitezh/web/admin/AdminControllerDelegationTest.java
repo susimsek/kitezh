@@ -69,8 +69,7 @@ class AdminControllerDelegationTest {
         when(dashboardService.dashboard()).thenReturn(dashboard);
         when(roleService.roles("", pageable)).thenReturn(roles);
         when(roleService.createRole("ROLE_AUDITOR")).thenReturn(new AdminRoleDTO("ROLE_AUDITOR"));
-        when(eventService.events("", "", "", "", "", "", "", null, null, pageable))
-                .thenReturn(events);
+        when(eventService.events("", "", "", "", null, null, pageable)).thenReturn(events);
 
         assertThat(dashboardController.dashboard()).isSameAs(dashboard);
         assertThat(roleController.roles("", pageable)).isSameAs(roles);

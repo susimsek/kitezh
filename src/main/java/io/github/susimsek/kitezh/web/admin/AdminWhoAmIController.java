@@ -165,20 +165,7 @@ public class AdminWhoAmIController {
                                         AuthoritiesConstants.ADMIN,
                                         AuthoritiesConstants.EVENT_MANAGER)),
                         Map.entry("viewKeys", hasAny(authorities, AuthoritiesConstants.ADMIN)),
-                        Map.entry("manageKeys", hasAny(authorities, AuthoritiesConstants.ADMIN)),
-                        Map.entry(
-                                "viewOrganizations",
-                                hasAny(
-                                        authorities,
-                                        AuthoritiesConstants.ADMIN,
-                                        AuthoritiesConstants.ORGANIZATION_VIEWER,
-                                        AuthoritiesConstants.ORGANIZATION_MANAGER)),
-                        Map.entry(
-                                "manageOrganizations",
-                                hasAny(
-                                        authorities,
-                                        AuthoritiesConstants.ADMIN,
-                                        AuthoritiesConstants.ORGANIZATION_MANAGER))));
+                        Map.entry("manageKeys", hasAny(authorities, AuthoritiesConstants.ADMIN))));
     }
 
     private static boolean hasAny(Set<String> authorities, String... candidates) {

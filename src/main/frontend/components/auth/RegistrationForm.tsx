@@ -7,7 +7,6 @@ import { useForm } from "@/lib/form";
 import { z } from "zod";
 
 import Link from "@/routing/Link";
-import { useSearchParams } from "@/routing/navigation";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { accountActionError, submitAccountAction } from "@/lib/account-actions-api";
 import { applyProblemToForm } from "@/lib/problem-detail";
@@ -25,7 +24,6 @@ type Values = {
   password: string;
   confirmPassword: string;
   captchaToken: string;
-  invitationToken: string;
 };
 
 const captchaDisabled: RegistrationCaptchaSettings = {
@@ -39,8 +37,6 @@ const captchaDisabled: RegistrationCaptchaSettings = {
 
 export function RegistrationForm({ dictionary }: RegistrationFormProps) {
   const copy = dictionary.registration;
-  const searchParams = useSearchParams();
-  const invitationToken = searchParams.get("invitation_token") ?? "";
   const [created, setCreated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captcha, setCaptcha] = useState<RegistrationCaptchaSettings>(captchaDisabled);
@@ -85,7 +81,6 @@ export function RegistrationForm({ dictionary }: RegistrationFormProps) {
       password: z.string().min(12, copy.validation.password).max(128, copy.validation.max200),
       confirmPassword: z.string().min(1, copy.validation.required).max(200, copy.validation.max200),
       captchaToken: z.string(),
-      invitationToken: z.string().max(256),
     })
     .refine((values) => values.password === values.confirmPassword, {
       path: ["confirmPassword"],
@@ -107,7 +102,6 @@ export function RegistrationForm({ dictionary }: RegistrationFormProps) {
       password: "",
       confirmPassword: "",
       captchaToken: "",
-      invitationToken,
     },
   });
 

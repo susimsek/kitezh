@@ -13,13 +13,10 @@ import { PaginationControls } from "@/components/admin/PaginationControls";
 import { useAdminTableState } from "@/components/admin/useAdminTableState";
 import { ViewHeader } from "@/components/admin/ViewHeader";
 import { ActionIcon } from "@/components/shared/ActionIcon";
-import { DetailTabs } from "./DetailTabs";
 
 export type Event = {
   id: string;
   actor: string;
-  clientId?: string | null;
-  ipAddress?: string | null;
   action: string;
   targetType: string;
   targetId: string;
@@ -42,17 +39,13 @@ export default function AdminEventsPage() {
   const [clearSucceeded, setClearSucceeded] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
-  const [actor, setActor] = useState("");
-  const [ipAddress, setIpAddress] = useState("");
   const {
     action,
-    clientId,
     clearFilters,
     from,
     page,
     query,
     setAction,
-    setClientId,
     setFrom,
     setPage,
     setQuery,
@@ -77,9 +70,6 @@ export default function AdminEventsPage() {
     });
     if (query.trim()) search.set("q", query.trim());
     if (action) search.set("action", action);
-    if (clientId.trim()) search.set("clientId", clientId.trim());
-    if (actor.trim()) search.set("actor", actor.trim());
-    if (ipAddress.trim()) search.set("ipAddress", ipAddress.trim());
     if (targetType) search.set("targetType", targetType);
     if (targetId.trim()) search.set("targetId", targetId.trim());
     if (from) search.set("from", new Date(`${from}T00:00:00`).toISOString());
@@ -93,22 +83,7 @@ export default function AdminEventsPage() {
         setTotalPages(r.data.totalPages);
       }
     });
-  }, [
-    accessToken,
-    action,
-    actor,
-    clientId,
-    from,
-    ipAddress,
-    page,
-    query,
-    reloadVersion,
-    size,
-    sort,
-    targetId,
-    targetType,
-    to,
-  ]);
+  }, [accessToken, action, from, page, query, reloadVersion, size, sort, targetId, targetType, to]);
 
   const clearEvents = async () => {
     if (!accessToken) return;
@@ -137,9 +112,6 @@ export default function AdminEventsPage() {
   const activeFilters = [
     query && { label: copy.search, value: query, onRemove: () => setQuery("") },
     action && { label: copy.action, value: action, onRemove: () => setAction("") },
-    actor && { label: copy.actor, value: actor, onRemove: () => setActor("") },
-    clientId && { label: copy.clientId, value: clientId, onRemove: () => setClientId("") },
-    ipAddress && { label: copy.ipAddress, value: ipAddress, onRemove: () => setIpAddress("") },
     targetType && { label: copy.targetType, value: targetType, onRemove: () => setTargetType("") },
     targetId && { label: copy.targetId, value: targetId, onRemove: () => setTargetId("") },
     from && { label: copy.from, value: from, onRemove: () => setFrom("") },
@@ -155,13 +127,6 @@ export default function AdminEventsPage() {
             {total} {copy.records}
           </Badge>
         }
-      />
-      <DetailTabs
-        tabs={[
-          { key: "admin", label: copy.adminTab, href: "/admin/events" },
-          { key: "user", label: copy.userTab, href: "/admin/events/user" },
-        ]}
-        active="admin"
       />
       {clearSucceeded && (
         <Alert variant="success" className="mb-4">
@@ -192,11 +157,7 @@ export default function AdminEventsPage() {
         }}
         activeFilters={activeFilters}
         clearFiltersLabel={copy.clearFilters}
-        onClearFilters={() => {
-          clearFilters();
-          setActor("");
-          setIpAddress("");
-        }}
+        onClearFilters={clearFilters}
         resultCount={total}
         recordsLabel={copy.records}
         filterToggle={
@@ -225,27 +186,6 @@ export default function AdminEventsPage() {
                 <option key={item}>{item}</option>
               ))}
             </Form.Select>
-            <Form.Control
-              className="admin-resource-filter-control"
-              value={actor}
-              onChange={(event) => setActor(event.target.value)}
-              placeholder={copy.actor}
-              aria-label={copy.actor}
-            />
-            <Form.Control
-              className="admin-resource-filter-control"
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
-              placeholder={copy.clientId}
-              aria-label={copy.clientId}
-            />
-            <Form.Control
-              className="admin-resource-filter-control"
-              value={ipAddress}
-              onChange={(event) => setIpAddress(event.target.value)}
-              placeholder={copy.ipAddress}
-              aria-label={copy.ipAddress}
-            />
             <Form.Select
               aria-label={copy.targetType}
               className="admin-resource-filter-control"
@@ -310,8 +250,6 @@ export default function AdminEventsPage() {
             <th>{copy.time}</th>
             <th>{copy.action}</th>
             <th>{copy.actor}</th>
-            <th>{copy.clientId}</th>
-            <th>{copy.ipAddress}</th>
             <th>{copy.target}</th>
             <th />
           </tr>
@@ -326,8 +264,6 @@ export default function AdminEventsPage() {
                 </Badge>
               </td>
               <td>{e.actor}</td>
-              <td>{e.clientId || "—"}</td>
-              <td>{e.ipAddress || "—"}</td>
               <td>
                 <div>{e.targetType}</div>
                 <div className="small text-body-secondary text-break">{e.targetId}</div>
@@ -359,10 +295,6 @@ export default function AdminEventsPage() {
               </dd>
               <dt>{copy.actor}</dt>
               <dd>{selected.actor}</dd>
-              <dt>{copy.clientId}</dt>
-              <dd>{selected.clientId || "—"}</dd>
-              <dt>{copy.ipAddress}</dt>
-              <dd>{selected.ipAddress || "—"}</dd>
               <dt>{copy.targetType}</dt>
               <dd>{selected.targetType}</dd>
               <dt>{copy.target}</dt>

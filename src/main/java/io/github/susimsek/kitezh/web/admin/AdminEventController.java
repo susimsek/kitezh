@@ -64,15 +64,6 @@ class AdminEventController {
             @Parameter(description = "Target resource identifier filter.", example = "2")
                     @RequestParam(defaultValue = "")
                     String targetId,
-            @Parameter(description = "Exact authenticated actor username.", example = "admin")
-                    @RequestParam(defaultValue = "")
-                    String actor,
-            @Parameter(description = "Exact OAuth client identifier.", example = "admin-console")
-                    @RequestParam(defaultValue = "")
-                    String clientId,
-            @Parameter(description = "Exact source IP address.", example = "192.0.2.10")
-                    @RequestParam(defaultValue = "")
-                    String ipAddress,
             @Parameter(
                             description = "Inclusive start timestamp in ISO-8601 format.",
                             example = "2026-09-01T00:00:00Z")
@@ -88,41 +79,7 @@ class AdminEventController {
                             sort = "occurredAt",
                             direction = org.springframework.data.domain.Sort.Direction.DESC)
                     Pageable pageable) {
-        return adminAuditEventService.events(
-                q, action, targetType, targetId, actor, clientId, ipAddress, from, to, pageable);
-    }
-
-    Page<AdminEventDTO> events(
-            String q,
-            String action,
-            String targetType,
-            String targetId,
-            Instant from,
-            Instant to,
-            Pageable pageable) {
-        return events(q, action, targetType, targetId, "", "", "", from, to, pageable);
-    }
-
-    @GetMapping("/events/{id}")
-    @Operation(
-            summary = "Get administrative event",
-            description =
-                    "Returns one administrative audit event, including stored details when"
-                            + " available.")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Administrative audit event returned.",
-            content = @Content(schema = @Schema(implementation = AdminEventDTO.class)))
-    @ApiResponse(responseCode = "403", description = "The administrator cannot view events.")
-    @ApiResponse(responseCode = "404", description = "Administrative audit event not found.")
-    AdminEventDTO event(
-            @Parameter(
-                            description = "Audit event identifier.",
-                            example = "evt-20260904-0001",
-                            required = true)
-                    @PathVariable
-                    String id) {
-        return adminAuditEventService.event(id);
+        return adminAuditEventService.events(q, action, targetType, targetId, from, to, pageable);
     }
 
     @GetMapping("/users/{id}/events")

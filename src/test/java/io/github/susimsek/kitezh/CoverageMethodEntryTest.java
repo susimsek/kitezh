@@ -36,8 +36,6 @@ class CoverageMethodEntryTest {
         "io.github.susimsek.kitezh.service.admin.AdminClientScopeEvaluationService",
         "io.github.susimsek.kitezh.service.admin.AdminRoleService",
         "io.github.susimsek.kitezh.service.admin.AdminEventSettingsService",
-        "io.github.susimsek.kitezh.service.admin.UserEventSettingsService",
-        "io.github.susimsek.kitezh.service.admin.UserEventService",
         "io.github.susimsek.kitezh.service.admin.AdminSessionService",
         "io.github.susimsek.kitezh.service.admin.AdminConsentService",
         "io.github.susimsek.kitezh.service.admin.AdminAvatarService",

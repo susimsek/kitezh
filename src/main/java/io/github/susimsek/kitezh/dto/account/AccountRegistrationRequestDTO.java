@@ -67,10 +67,4 @@ public record AccountRegistrationRequestDTO(
                         description = "Optional BCP 47 locale used for account emails.",
                         example = "en",
                         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                String locale,
-        @Size(max = 256)
-                @Schema(
-                        description =
-                                "Optional organization invitation token from an invitation email.",
-                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-                String invitationToken) {}
+                String locale) {}
