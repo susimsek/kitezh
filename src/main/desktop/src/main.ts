@@ -1012,8 +1012,6 @@ async function showUpdateCheckWindow() {
     updateCheckWindow.focus();
     return;
   }
-  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
-  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   const isTurkish = isTurkishDesktop();
   const checkingLabel = isTurkish
     ? "Güncellemeler denetleniyor…"
@@ -1034,9 +1032,13 @@ async function showUpdateCheckWindow() {
       sandbox: true,
     },
   });
-  updateCheckWindow.on("closed", () => {
-    updateCheckWindow = null;
+  const checkingWindow = updateCheckWindow;
+  checkingWindow.on("closed", () => {
+    if (updateCheckWindow === checkingWindow) updateCheckWindow = null;
   });
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow) return;
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   const html = `<!doctype html>
 <html lang="${isTurkish ? "tr" : "en"}">
   <head>
@@ -1069,11 +1071,12 @@ async function showUpdateCheckWindow() {
     </main>
   </body>
 </html>`;
-  await updateCheckWindow.loadURL(
+  await checkingWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
-  updateCheckWindow.center();
-  updateCheckWindow.show();
+  if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow) return;
+  checkingWindow.center();
+  checkingWindow.show();
 }
 
 function closeUpdateCheckWindow() {

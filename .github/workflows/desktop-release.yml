@@ -30,6 +30,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     outputs:
       release_tag: ${{ steps.resolve_release_tag.outputs.release_tag }}
+      release_sha: ${{ steps.resolve_release_tag.outputs.release_sha }}
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +92,7 @@ jobs:
             exit 1
           fi
           echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          echo "release_sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
 
       - name: Set desktop release version
         env:
@@ -333,7 +335,7 @@ jobs:
       - name: Check out release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ needs.package.outputs.release_tag }}
+          ref: ${{ needs.package.outputs.release_sha }}
 
       - name: Download desktop packages
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
