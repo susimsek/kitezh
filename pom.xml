@@ -378,7 +378,7 @@
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>${jacoco.version}</version>
 				<configuration>
-					<destFile>${java.io.tmpdir}/kitezh-jacoco.exec</destFile>
+					<destFile>${java.io.tmpdir}/${project.artifactId}-jacoco.exec</destFile>
 					<excludes>
 						<exclude>io/github/susimsek/kitezh/mapper/*MapperImpl.class</exclude>
 					</excludes>
@@ -397,7 +397,7 @@
 							<goal>report</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/kitezh-jacoco.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/${project.artifactId}-jacoco.exec</dataFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -406,7 +406,7 @@
 							<goal>prepare-agent-integration</goal>
 						</goals>
 						<configuration>
-							<destFile>${java.io.tmpdir}/kitezh-jacoco-it.exec</destFile>
+							<destFile>${java.io.tmpdir}/${project.artifactId}-jacoco-it.exec</destFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -416,7 +416,7 @@
 							<goal>report-integration</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/kitezh-jacoco-it.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/${project.artifactId}-jacoco-it.exec</dataFile>
 						</configuration>
 					</execution>
 					<execution>
@@ -426,7 +426,7 @@
 							<goal>check</goal>
 						</goals>
 						<configuration>
-							<dataFile>${java.io.tmpdir}/kitezh-jacoco.exec</dataFile>
+							<dataFile>${java.io.tmpdir}/${project.artifactId}-jacoco.exec</dataFile>
 							<rules>
 								<rule>
 									<element>BUNDLE</element>
