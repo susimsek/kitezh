@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
+import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.kitezh.security.LocalizedAuthenticationEntryPoint;
 import io.github.susimsek.kitezh.service.SocialLoginService;
@@ -196,6 +197,48 @@ class SecurityConfigTest {
                                 .getSession()
                                 .getAttribute(MfaAuthorizationFilter.MFA_PENDING_REQUEST))
                 .isNull();
+    }
+
+    @Test
+    void buildsDefaultSecurityFilterChainWithSamlProvider() {
+        SamlRelyingPartyRegistrationRepository registrationRepository =
+                mock(SamlRelyingPartyRegistrationRepository.class);
+        SamlLoginAuthenticationSuccessHandler successHandler =
+                mock(SamlLoginAuthenticationSuccessHandler.class);
+        SamlAuthenticationRequestResolver requestResolver =
+                mock(SamlAuthenticationRequestResolver.class);
+        assertThat(
+                        config.defaultSecurityFilterChain(
+                                httpSecurity(),
+                                new ApplicationProperties(),
+                                browserDependencies(),
+                                socialDependencies(),
+                                config.defaultSecurityDependencies(
+                                        registrationRepository,
+                                        successHandler,
+                                        requestResolver,
+                                        new LoggingProperties())))
+                .isNotNull();
+        assertThat(
+                        config.defaultSecurityFilterChain(
+                                httpSecurity(),
+                                new ApplicationProperties(),
+                                browserDependencies(),
+                                socialDependencies(),
+                                config.defaultSecurityDependencies(
+                                        registrationRepository,
+                                        null,
+                                        requestResolver,
+                                        new LoggingProperties())))
+                .isNotNull();
+    }
+
+    @Test
+    void createsSamlAuthenticationProvider() {
+        assertThat(
+                        SecurityConfig.samlAuthenticationProvider(
+                                mock(SamlRelyingPartyRegistrationRepository.class)))
+                .isNotNull();
     }
 
     @Test

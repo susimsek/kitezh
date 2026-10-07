@@ -86,6 +86,12 @@ public class SecurityConfig {
     private final LocalizedAccessDeniedHandler localizedAccessDeniedHandler;
     private final DynamicRememberMeServices rememberMeServices;
 
+    private record DefaultSecurityDependencies(
+            SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
+            SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
+            SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
+            ObservabilityMdcFilter observabilityMdcFilter) {}
+
     @org.springframework.beans.factory.annotation.Autowired
     public SecurityConfig(
             LocalizedAuthenticationEntryPoint localizedAuthenticationEntryPoint,
@@ -128,19 +134,13 @@ public class SecurityConfig {
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies,
-            SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
-            SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
-            SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
-            LoggingProperties loggingProperties) {
-        return defaultSecurityFilterChain(
+            DefaultSecurityDependencies securityDependencies) {
+        return buildDefaultSecurityFilterChain(
                 http,
                 applicationProperties,
                 browserDependencies,
                 socialDependencies,
-                samlRegistrationRepository,
-                samlLoginSuccessHandler,
-                samlAuthenticationRequestResolver,
-                new ObservabilityMdcFilter(loggingProperties));
+                securityDependencies);
     }
 
     SecurityFilterChain defaultSecurityFilterChain(
@@ -148,26 +148,33 @@ public class SecurityConfig {
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies) {
-        return defaultSecurityFilterChain(
+        return buildDefaultSecurityFilterChain(
                 http,
                 applicationProperties,
                 browserDependencies,
                 socialDependencies,
-                null,
-                null,
-                null,
-                new ObservabilityMdcFilter());
+                new DefaultSecurityDependencies(null, null, null, new ObservabilityMdcFilter()));
     }
 
-    private SecurityFilterChain defaultSecurityFilterChain(
+    @Bean
+    DefaultSecurityDependencies defaultSecurityDependencies(
+            SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
+            SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
+            SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
+            LoggingProperties loggingProperties) {
+        return new DefaultSecurityDependencies(
+                samlRegistrationRepository,
+                samlLoginSuccessHandler,
+                samlAuthenticationRequestResolver,
+                new ObservabilityMdcFilter(loggingProperties));
+    }
+
+    private SecurityFilterChain buildDefaultSecurityFilterChain(
             HttpSecurity http,
             ApplicationProperties applicationProperties,
             BrowserSecurityDependencies browserDependencies,
             SocialSecurityDependencies socialDependencies,
-            SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
-            SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
-            SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
-            ObservabilityMdcFilter observabilityMdcFilter) {
+            DefaultSecurityDependencies securityDependencies) {
         http.authenticationManager(browserDependencies.formAuthenticationManager());
         http.securityContext(
                         securityContext ->
@@ -291,13 +298,10 @@ public class SecurityConfig {
                 browserDependencies.webAuthnRequestOptionsRepository());
         authenticationFilter.setAuthenticationSuccessHandler(
                 (request, response, authentication) -> {
-                    MfaAuthorizationFilter.markCredentialVerified(request.getSession(true));
-                    if (request.getSession(false) != null
-                            && request.getSession(false)
-                                            .getAttribute(
-                                                    MfaAuthorizationFilter.MFA_PENDING_REQUEST)
-                                    != null) {
-                        MfaAuthorizationFilter.markVerified(request.getSession(false));
+                    var session = request.getSession(true);
+                    MfaAuthorizationFilter.markCredentialVerified(session);
+                    if (session.getAttribute(MfaAuthorizationFilter.MFA_PENDING_REQUEST) != null) {
+                        MfaAuthorizationFilter.markVerified(session);
                     }
                     new WebAuthnAuthenticationSuccessHandler()
                             .onAuthenticationSuccess(request, response, authentication);
@@ -314,7 +318,8 @@ public class SecurityConfig {
                 .addFilterBefore(
                         browserDependencies.loginCaptchaFilter(),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class);
+                .addFilterBefore(
+                        securityDependencies.observabilityMdcFilter(), AuthorizationFilter.class);
 
         if (socialDependencies.clientRegistrationRepository().getIfAvailable() != null) {
             http.oauth2Login(
@@ -344,7 +349,8 @@ public class SecurityConfig {
                                     .permitAll());
         }
 
-        if (samlRegistrationRepository != null && samlLoginSuccessHandler != null) {
+        if (securityDependencies.samlRegistrationRepository() != null
+                && securityDependencies.samlLoginSuccessHandler() != null) {
             http.saml2Metadata(Customizer.withDefaults());
             http.saml2Logout(
                     saml2 ->
@@ -359,14 +365,17 @@ public class SecurityConfig {
             http.saml2Login(
                     saml2 ->
                             saml2.loginPage(LOGIN_PATH)
-                                    .relyingPartyRegistrationRepository(samlRegistrationRepository)
+                                    .relyingPartyRegistrationRepository(
+                                            securityDependencies.samlRegistrationRepository())
                                     .authenticationManager(
                                             new ProviderManager(
                                                     samlAuthenticationProvider(
-                                                            samlRegistrationRepository)))
+                                                            securityDependencies
+                                                                    .samlRegistrationRepository())))
                                     .authenticationRequestResolver(
-                                            samlAuthenticationRequestResolver)
-                                    .successHandler(samlLoginSuccessHandler)
+                                            securityDependencies
+                                                    .samlAuthenticationRequestResolver())
+                                    .successHandler(securityDependencies.samlLoginSuccessHandler())
                                     .failureHandler(
                                             new SimpleUrlAuthenticationFailureHandler(
                                                     LOGIN_ERROR_PATH))
@@ -411,7 +420,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    private static OpenSaml5AuthenticationProvider samlAuthenticationProvider(
+    static OpenSaml5AuthenticationProvider samlAuthenticationProvider(
             SamlRelyingPartyRegistrationRepository registrationRepository) {
         OpenSaml5AuthenticationProvider provider = new OpenSaml5AuthenticationProvider();
         OpenSaml5AuthenticationProvider.AssertionValidator defaultValidator =

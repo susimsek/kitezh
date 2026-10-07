@@ -53,6 +53,11 @@ export default function AdminAuthentication() {
             label: dictionary.admin.authentication.policies,
             href: "/admin/authentication",
           },
+          {
+            key: "flows",
+            label: dictionary.admin.authentication.flows,
+            href: "/admin/authentication/flows",
+          },
         ]}
         active="policies"
       />
