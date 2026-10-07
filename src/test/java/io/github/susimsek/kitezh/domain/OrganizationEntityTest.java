@@ -9,18 +9,19 @@ class OrganizationEntityTest {
 
     @Test
     void organizationEntitiesExposeTheirState() {
-        Instant joinedAt = Instant.EPOCH;
-        Instant verifiedAt = joinedAt.plusSeconds(1);
-        OrganizationEntity organization = new OrganizationEntity();
-        UserEntity user = new UserEntity();
-        OrganizationGroupEntity parent = new OrganizationGroupEntity();
-        OrganizationGroupEntity group = new OrganizationGroupEntity();
-        OrganizationMemberEntity member = new OrganizationMemberEntity();
-        OrganizationDomainEntity domain = new OrganizationDomainEntity();
-        OrganizationInvitationEntity invitation = new OrganizationInvitationEntity();
-        OrganizationGroupMemberEntity groupMember = new OrganizationGroupMemberEntity();
-        OrganizationClaimEntity claim = new OrganizationClaimEntity();
-        OrganizationIdentityProviderEntity provider = new OrganizationIdentityProviderEntity();
+        final Instant joinedAt = Instant.EPOCH;
+        final Instant verifiedAt = joinedAt.plusSeconds(1);
+        final OrganizationEntity organization = new OrganizationEntity();
+        final UserEntity user = new UserEntity();
+        final OrganizationGroupEntity parent = new OrganizationGroupEntity();
+        final OrganizationGroupEntity group = new OrganizationGroupEntity();
+        final OrganizationMemberEntity member = new OrganizationMemberEntity();
+        final OrganizationDomainEntity domain = new OrganizationDomainEntity();
+        final OrganizationInvitationEntity invitation = new OrganizationInvitationEntity();
+        final OrganizationGroupMemberEntity groupMember = new OrganizationGroupMemberEntity();
+        final OrganizationClaimEntity claim = new OrganizationClaimEntity();
+        final OrganizationIdentityProviderEntity provider =
+                new OrganizationIdentityProviderEntity();
 
         organization.setId(1L);
         organization.setAlias("acme");

@@ -88,24 +88,24 @@ class AdminOrganizationControllerTest {
         AdminOrganizationIdentityProviderDTO provider =
                 mock(AdminOrganizationIdentityProviderDTO.class);
 
-        when(service.updateMember(7L, 20L, any(AdminOrganizationMemberRequestDTO.class)))
+        when(service.updateMember(eq(7L), eq(20L), any(AdminOrganizationMemberRequestDTO.class)))
                 .thenReturn(member);
-        when(service.addDomain(7L, any(AdminOrganizationDomainRequestDTO.class)))
+        when(service.addDomain(eq(7L), any(AdminOrganizationDomainRequestDTO.class)))
                 .thenReturn(domain);
-        when(service.verifyDomain(7L, 8L)).thenReturn(domain);
+        when(service.verifyDomain(eq(7L), eq(8L))).thenReturn(domain);
         when(service.invitations(7L, pageable)).thenReturn(Page.empty(pageable));
-        when(service.createInvitation(7L, any(AdminOrganizationInvitationRequestDTO.class)))
+        when(service.createInvitation(eq(7L), any(AdminOrganizationInvitationRequestDTO.class)))
                 .thenReturn(invitation);
         when(service.groups(7L, "eng", pageable)).thenReturn(Page.empty(pageable));
-        when(service.createGroup(7L, any(AdminOrganizationGroupRequestDTO.class)))
+        when(service.createGroup(eq(7L), any(AdminOrganizationGroupRequestDTO.class)))
                 .thenReturn(group);
-        when(service.updateGroup(7L, 9L, any(AdminOrganizationGroupRequestDTO.class)))
+        when(service.updateGroup(eq(7L), eq(9L), any(AdminOrganizationGroupRequestDTO.class)))
                 .thenReturn(group);
         when(service.groupMembers(7L, 9L, "alice", pageable)).thenReturn(Page.empty(pageable));
         when(service.availableGroupMembers(7L, 9L, "", pageable)).thenReturn(Page.empty(pageable));
-        when(service.createClaim(7L, any(AdminOrganizationClaimRequestDTO.class)))
+        when(service.createClaim(eq(7L), any(AdminOrganizationClaimRequestDTO.class)))
                 .thenReturn(claim);
-        when(service.updateClaim(7L, 10L, any(AdminOrganizationClaimRequestDTO.class)))
+        when(service.updateClaim(eq(7L), eq(10L), any(AdminOrganizationClaimRequestDTO.class)))
                 .thenReturn(claim);
         when(service.addIdentityProvider(7L, "google")).thenReturn(provider);
 
