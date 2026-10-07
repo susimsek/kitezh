@@ -195,6 +195,22 @@ public class AdminApiSecurityConfig {
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.USER_MANAGER,
                                                 AuthoritiesConstants.GROUP_MANAGER)
+                                        .requestMatchers(HttpMethod.GET, "/api/admin/organizations")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.ORGANIZATION_QUERY,
+                                                AuthoritiesConstants.ORGANIZATION_VIEWER,
+                                                AuthoritiesConstants.ORGANIZATION_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/api/admin/organizations/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.ORGANIZATION_VIEWER,
+                                                AuthoritiesConstants.ORGANIZATION_MANAGER)
+                                        .requestMatchers("/api/admin/organizations/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.ORGANIZATION_MANAGER)
                                         .requestMatchers(
                                                 HttpMethod.GET, "/api/admin/required-actions/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN)
