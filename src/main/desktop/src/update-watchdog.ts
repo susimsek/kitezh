@@ -2,7 +2,11 @@ import { spawn } from "node:child_process";
 import { cp, readFile, rm, rename } from "node:fs/promises";
 import path from "node:path";
 
-const HEALTH_WINDOW_MS = 15_000;
+// Keep the watchdog window longer than the app's health confirmation window.
+// The new process removes the recovery marker after 15 seconds; waiting an
+// additional window avoids racing that cleanup and rolling back a healthy
+// Windows installation.
+const HEALTH_WINDOW_MS = 30_000;
 const RETRY_DELAY_MS = 500;
 const MAX_RESTORE_ATTEMPTS = 30;
 

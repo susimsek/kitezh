@@ -80,6 +80,24 @@ function LocaleEffects() {
   const locale = useLocale();
   const dispatch = useAppDispatch();
   useEffect(() => {
+    if (!isDesktopRuntime() || !window.desktopApi?.language.get) {
+      return undefined;
+    }
+    let cancelled = false;
+    void window.desktopApi.language
+      .get()
+      .then((nextLocale) => {
+        if (!cancelled && nextLocale !== locale) {
+          return i18n.changeLanguage(nextLocale);
+        }
+        return undefined;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [i18n, locale]);
+  useEffect(() => {
     if (!isDesktopRuntime() || !window.desktopApi?.language.onChanged) {
       return undefined;
     }
@@ -94,9 +112,6 @@ function LocaleEffects() {
     dispatch(setLocale(locale));
     document.documentElement.lang = locale;
     persistLocale(locale);
-    if (isDesktopRuntime() && window.desktopApi) {
-      void window.desktopApi.language.set(locale);
-    }
   }, [dispatch, locale]);
   return null;
 }

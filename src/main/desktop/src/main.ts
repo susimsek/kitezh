@@ -55,6 +55,7 @@ import { showDesktopNotification } from "./notifications";
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
+const DESKTOP_LANGUAGE_FILE = "desktop-language.json";
 const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
 const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
@@ -91,8 +92,9 @@ function applyDesktopTheme(value: unknown) {
   }
 }
 
-function applyDesktopLanguage(value: unknown) {
+async function applyDesktopLanguage(value: unknown) {
   desktopLanguage = value === "tr" ? "tr" : "en";
+  await writeDesktopLanguage(desktopLanguage);
   if (aboutWindow && !aboutWindow.isDestroyed()) {
     aboutWindow.setTitle(
       isTurkishDesktop()
@@ -671,6 +673,27 @@ function updatePreferencesPath() {
 
 function desktopPreferencesPath() {
   return path.join(app.getPath("userData"), "desktop-preferences.json");
+}
+
+function desktopLanguagePath() {
+  return path.join(app.getPath("userData"), DESKTOP_LANGUAGE_FILE);
+}
+
+async function readDesktopLanguage(): Promise<DesktopLanguage> {
+  try {
+    const value = await readFile(desktopLanguagePath(), "utf8");
+    return value.trim() === "tr" ? "tr" : "en";
+  } catch {
+    return desktopLanguage;
+  }
+}
+
+async function writeDesktopLanguage(language: DesktopLanguage) {
+  await mkdir(path.dirname(desktopLanguagePath()), { recursive: true });
+  await writeFile(desktopLanguagePath(), language, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 function linuxAutostartPath() {
@@ -1615,9 +1638,13 @@ function registerIpc() {
     assertTrustedSender(event);
     applyDesktopTheme(value);
   });
-  ipcMain.handle("desktop:language-set", (event, value: unknown) => {
+  ipcMain.handle("desktop:language-set", async (event, value: unknown) => {
     assertTrustedSender(event);
-    applyDesktopLanguage(value);
+    await applyDesktopLanguage(value);
+  });
+  ipcMain.handle("desktop:language-get", async (event) => {
+    assertTrustedSender(event);
+    return desktopLanguage;
   });
   ipcMain.handle("desktop:preferences-get", async (event) => {
     assertTrustedSender(event);
@@ -1900,6 +1927,7 @@ if (!hasLock) {
   });
   app.whenReady().then(async () => {
     app.setName(DESKTOP_APP_NAME);
+    desktopLanguage = await readDesktopLanguage();
     installApplicationMenu();
     pendingDeepLink = findDesktopDeepLink();
     registerDesktopProtocol();
@@ -1959,13 +1987,18 @@ if (!hasLock) {
             () => void showUpdateConfirmation(),
           );
         }
-      } else if (status.state === "not-available" || status.state === "error") {
+      } else if (status.state === "not-available") {
         const manualCheck = manualUpdateCheckRequested;
         manualUpdateCheckRequested = false;
         suppressNextUpdateNotification = false;
-        if (status.state === "not-available" && manualCheck) {
+        if (manualCheck) {
           void showUpdateNotAvailableWindow().catch(() => undefined);
         }
+      } else if (status.state === "error") {
+        // Keep the retry interactive so a recovered check can reopen the
+        // update dialog without requiring the user to restart the app.
+        manualUpdateCheckRequested = true;
+        suppressNextUpdateNotification = false;
       }
       sendUpdateStatus(status);
     });

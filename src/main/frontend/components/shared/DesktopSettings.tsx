@@ -72,6 +72,14 @@ export function DesktopSettings() {
   });
 
   useEffect(() => {
+    setLanguageMode(
+      localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system"
+        ? "system"
+        : locale,
+    );
+  }, [locale]);
+
+  useEffect(() => {
     if (!isDesktopRuntime() || !window.desktopApi) return undefined;
     const desktopApi = window.desktopApi;
     void desktopApi.settings.ready();
@@ -147,11 +155,13 @@ export function DesktopSettings() {
       const systemLocale = detectLocale("", navigator.languages);
       persistLocale(systemLocale);
       void i18n.changeLanguage(systemLocale);
+      void window.desktopApi?.language.set(systemLocale);
       return;
     }
     localStorage.removeItem(DESKTOP_LANGUAGE_MODE_KEY);
     persistLocale(nextMode);
     void i18n.changeLanguage(nextMode);
+    void window.desktopApi?.language.set(nextMode);
   };
 
   const resetDefaults = async () => {

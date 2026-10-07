@@ -68,6 +68,7 @@ export function LanguageSwitcher({ label, accessToken }: LanguageSwitcherProps) 
   function changeLanguage(nextLocale: Locale) {
     persistLocale(nextLocale);
     void i18n.changeLanguage(nextLocale);
+    if (window.desktopApi) void window.desktopApi.language.set(nextLocale);
     if (accessToken && typeof fetch === "function") {
       void fetch("/api/auth/localization/me", {
         method: "PUT",

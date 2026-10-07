@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("desktopApi", {
     set: (value: unknown) => ipcRenderer.invoke("desktop:theme-set", value),
   },
   language: {
+    get: () => ipcRenderer.invoke("desktop:language-get"),
     set: (value: unknown) => ipcRenderer.invoke("desktop:language-set", value),
     onChanged: (listener: (locale: "en" | "tr") => void) => {
       const callback = (
