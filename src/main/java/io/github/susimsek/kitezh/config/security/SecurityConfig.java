@@ -86,7 +86,7 @@ public class SecurityConfig {
     private final LocalizedAccessDeniedHandler localizedAccessDeniedHandler;
     private final DynamicRememberMeServices rememberMeServices;
 
-    private record DefaultSecurityDependencies(
+    record DefaultSecurityDependencies(
             SamlRelyingPartyRegistrationRepository samlRegistrationRepository,
             SamlLoginAuthenticationSuccessHandler samlLoginSuccessHandler,
             SamlAuthenticationRequestResolver samlAuthenticationRequestResolver,
