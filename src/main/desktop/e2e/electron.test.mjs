@@ -82,6 +82,17 @@ test("opens the trusted renderer and exposes the narrow desktop bridge", async (
 
     assert.equal(await window.url(), "app://renderer/");
     assert.equal(await window.locator(".desktop-console-option").count(), 2);
+    assert.ok(
+      (await window.locator('img[aria-hidden="true"]').evaluateAll((images) =>
+        images.every(
+          (image) =>
+            image.complete &&
+            image.naturalWidth > 0 &&
+            image.src.startsWith("app://renderer/brand/"),
+        ),
+      )),
+      "Desktop brand logos should load from the packaged renderer",
+    );
     assert.deepEqual(
       await window.evaluate(async () => ({
         apiBaseUrl: window.desktopApi?.apiBaseUrl,

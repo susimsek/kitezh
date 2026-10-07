@@ -26,10 +26,11 @@ export function BrandLogo({ className, size = 36 }: { className?: string; size?:
       ? "/brand/logo-dark.svg"
       : "/brand/logo-light.svg"
     : branding.logoPath;
+  const logoSource = isDefaultLogo ? logoPath : apiUrl(logoPath);
 
   return (
     <Image
-      src={apiUrl(logoPath)}
+      src={logoSource}
       alt=""
       aria-hidden="true"
       className={className}
