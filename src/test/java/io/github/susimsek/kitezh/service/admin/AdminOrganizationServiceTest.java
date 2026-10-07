@@ -424,6 +424,175 @@ class AdminOrganizationServiceTest {
         verify(providerRepository).delete(link);
     }
 
+    @Test
+    void rejectsDuplicateOrganizationMutations() {
+        OrganizationEntity organization = organization(10L, "acme");
+        when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
+        when(organizationRepository.existsByAliasIgnoreCase("other")).thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service.update(
+                                        10L,
+                                        new AdminOrganizationRequestDTO(
+                                                "other", "Acme", null, null, true)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_DUPLICATE_ALIAS);
+
+        when(memberRepository.existsByOrganizationIdAndUserId(10L, 20L)).thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service.addMember(
+                                        10L, new AdminOrganizationMemberRequestDTO(20L, "member")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_MEMBER_EXISTS);
+
+        when(domainRepository.existsByDomainIgnoreCase("acme.example.com")).thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service.addDomain(
+                                        10L,
+                                        new AdminOrganizationDomainRequestDTO("acme.example.com")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_DUPLICATE_DOMAIN);
+
+        when(claimRepository.existsByOrganizationIdAndClaimNameIgnoreCase(10L, "organization"))
+                .thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service.createClaim(
+                                        10L,
+                                        new AdminOrganizationClaimRequestDTO(
+                                                "organization", "acme", null, null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_CLAIM_DUPLICATE);
+
+        SocialProviderEntity provider = new SocialProviderEntity();
+        provider.setAlias("google");
+        when(socialProviderRepository.findByAliasIgnoreCase("google"))
+                .thenReturn(Optional.of(provider));
+        when(providerRepository.findByOrganizationIdAndProviderAliasIgnoreCase(10L, "google"))
+                .thenReturn(Optional.of(new OrganizationIdentityProviderEntity()));
+        assertThatThrownBy(() -> service.addIdentityProvider(10L, "google"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_PROVIDER_EXISTS);
+    }
+
+    @Test
+    void rejectsInvalidInvitationStates() {
+        OrganizationEntity organization = organization(10L, "acme");
+        OrganizationInvitationEntity invitation = new OrganizationInvitationEntity();
+        invitation.setId(50L);
+        invitation.setOrganization(organization);
+        invitation.setExpiresAt(Instant.now().plusSeconds(3600));
+        invitation.setRevokedAt(Instant.now());
+        when(invitationRepository.findByTokenHash(any())).thenReturn(Optional.of(invitation));
+
+        assertThatThrownBy(() -> service.acceptInvitation("token", "alice"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_INVITATION_USED);
+
+        invitation.setRevokedAt(null);
+        invitation.setExpiresAt(Instant.now().minusSeconds(1));
+        assertThatThrownBy(() -> service.acceptInvitation("token", "alice"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_INVITATION_EXPIRED);
+
+        invitation.setExpiresAt(Instant.now().plusSeconds(3600));
+        UserEntity user = user(20L, "alice", "wrong@example.com");
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        invitation.setEmail("alice@example.com");
+        assertThatThrownBy(() -> service.acceptInvitation("token", "alice"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_INVITATION_EMAIL_MISMATCH);
+    }
+
+    @Test
+    void rejectsInvalidOrganizationGroupMutations() {
+        OrganizationEntity organization = organization(10L, "acme");
+        OrganizationGroupEntity group = new OrganizationGroupEntity();
+        group.setId(60L);
+        group.setOrganization(organization);
+        group.setName("engineering");
+        UserEntity user = user(20L, "alice", "alice@example.com");
+        when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
+        when(groupRepository.findByIdAndOrganizationId(60L, 10L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByOrganizationIdAndNameIgnoreCase(10L, "engineering"))
+                .thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service.createGroup(
+                                        10L,
+                                        new AdminOrganizationGroupRequestDTO("engineering", null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_DUPLICATE);
+
+        when(groupRepository.existsByOrganizationIdAndNameIgnoreCase(10L, "platform"))
+                .thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service.updateGroup(
+                                        10L,
+                                        60L,
+                                        new AdminOrganizationGroupRequestDTO("platform", null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_DUPLICATE);
+
+        assertThatThrownBy(
+                        () ->
+                                service.updateGroup(
+                                        10L,
+                                        60L,
+                                        new AdminOrganizationGroupRequestDTO("engineering", 60L)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_INVALID_PARENT);
+
+        when(groupRepository.existsByOrganizationIdAndParentId(10L, 60L)).thenReturn(true);
+        assertThatThrownBy(() -> service.deleteGroup(10L, 60L))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_HAS_CHILDREN);
+
+        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
+        when(memberRepository.existsByOrganizationIdAndUserId(10L, 20L)).thenReturn(false);
+        assertThatThrownBy(() -> service.addGroupMember(10L, 60L, 20L))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_MEMBER_REQUIRED);
+
+        when(memberRepository.existsByOrganizationIdAndUserId(10L, 20L)).thenReturn(true);
+        when(groupMemberRepository.findByGroupIdAndUserId(60L, 20L))
+                .thenReturn(Optional.of(new OrganizationGroupMemberEntity()));
+        assertThatThrownBy(() -> service.addGroupMember(10L, 60L, 20L))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_MEMBER_EXISTS);
+    }
+
     private static OrganizationEntity organization(Long id, String alias) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.setId(id);
