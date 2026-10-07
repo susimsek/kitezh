@@ -17,6 +17,8 @@ import io.github.susimsek.kitezh.domain.LocalizationSettingsEntity;
 import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
 import io.github.susimsek.kitezh.domain.OAuth2KeyEntity;
 import io.github.susimsek.kitezh.domain.OfflineAccessPolicyEntity;
+import io.github.susimsek.kitezh.domain.OrganizationEntity;
+import io.github.susimsek.kitezh.domain.OrganizationGroupEntity;
 import io.github.susimsek.kitezh.domain.RegisteredClientEntity;
 import io.github.susimsek.kitezh.domain.RequiredActionDefinitionEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
@@ -208,6 +210,12 @@ class CacheConfigTest {
                                 LocalizationSettingsRepository.LOCALIZATION_SETTINGS_BY_ID_CACHE))
                 .isNotNull();
         assertThat(cacheManager.getCache(OAuth2KeyEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OrganizationEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OrganizationEntity.class.getName() + ".attributes"))
+                .isNotNull();
+        assertThat(cacheManager.getCache(OrganizationGroupEntity.class.getName())).isNotNull();
+        assertThat(cacheManager.getCache(OrganizationGroupEntity.class.getName() + ".roles"))
+                .isNotNull();
         assertThat(cacheManager.getCache(OfflineAccessPolicyEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(RegisteredClientEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(RequiredActionDefinitionEntity.class.getName()))

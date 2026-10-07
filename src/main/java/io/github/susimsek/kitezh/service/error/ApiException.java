@@ -53,6 +53,10 @@ public class ApiException extends RuntimeException {
                 HttpStatus.NOT_FOUND, ApiErrorCode.RESOURCE_NOT_FOUND, null, message);
     }
 
+    public static ApiException notFound(ApiErrorCode errorCode, String message) {
+        return new ApiException(HttpStatus.NOT_FOUND, errorCode, null, message);
+    }
+
     public static ApiException conflict(ApiErrorCode errorCode, String message) {
         return conflict(null, errorCode, message);
     }

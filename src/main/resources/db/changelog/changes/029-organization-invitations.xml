@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="029-organization-invitations" author="susimsek">
+		<createSequence
+			sequenceName="organization_invitation_seq"
+			startValue="1"
+			incrementBy="1"
+			minValue="1"
+			maxValue="9999999999999999"
+			cacheSize="100"
+			cycle="false"/>
+		<createTable tableName="organization_invitations">
+			<column name="id" type="bigint" defaultValueSequenceNext="organization_invitation_seq">
+				<constraints nullable="false" primaryKey="true" primaryKeyName="pk_organization_invitations"/>
+			</column>
+			<column name="organization_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="email" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="name" type="varchar(200)"/>
+			<column name="token_hash" type="varchar(64)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="uk_organization_invitations_token"/>
+			</column>
+			<column name="expires_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="accepted_at" type="timestamp"/>
+			<column name="status" type="varchar(20)" defaultValue="PENDING"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addForeignKeyConstraint
+			baseTableName="organization_invitations"
+			baseColumnNames="organization_id"
+			constraintName="fk_organization_invitations_organization"
+			referencedTableName="organizations"
+			referencedColumnNames="id"/>
+		<createIndex indexName="idx_organization_invitations_organization" tableName="organization_invitations">
+			<column name="organization_id"/>
+		</createIndex>
+		<createIndex indexName="idx_organization_invitations_email" tableName="organization_invitations">
+			<column name="email"/>
+			<column name="status"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

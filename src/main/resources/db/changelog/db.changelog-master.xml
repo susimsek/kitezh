@@ -46,4 +46,10 @@
 	<include file="db/changelog/changes/024-create-user-events.xml"/>
 	<include file="db/changelog/changes/025-create-event-listeners.xml"/>
 	<include file="db/changelog/changes/026-admin-event-request-context.xml"/>
+	<include file="db/changelog/changes/027-create-organizations.xml"/>
+	<include file="db/changelog/changes/028-organization-members-and-domains.xml"/>
+	<include file="db/changelog/changes/029-organization-invitations.xml"/>
+	<include file="db/changelog/changes/030-organization-client-scope.xml"/>
+	<include file="db/changelog/changes/031-organization-groups.xml"/>
+	<include file="db/changelog/changes/032-organization-identity-providers.xml"/>
 </databaseChangeLog>
