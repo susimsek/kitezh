@@ -38,6 +38,16 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   language: {
     set: (value: unknown) => ipcRenderer.invoke("desktop:language-set", value),
+    onChanged: (listener: (locale: "en" | "tr") => void) => {
+      const callback = (
+        _event: Electron.IpcRendererEvent,
+        value: unknown,
+      ) => {
+        if (value === "en" || value === "tr") listener(value);
+      };
+      ipcRenderer.on("desktop:language-changed", callback);
+      return () => ipcRenderer.removeListener("desktop:language-changed", callback);
+    },
   },
   settings: {
     close: () => ipcRenderer.invoke("desktop:settings-close"),

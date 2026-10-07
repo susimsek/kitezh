@@ -88,6 +88,7 @@ export type DesktopApi = {
   };
   language: {
     set: (value: "en" | "tr") => Promise<void>;
+    onChanged: (listener: (locale: "en" | "tr") => void) => () => void;
   };
   settings: {
     close: () => Promise<void>;

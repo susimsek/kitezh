@@ -114,6 +114,11 @@ function applyDesktopLanguage(value: unknown) {
   }
   installApplicationMenu();
   updateTrayMenu();
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send("desktop:language-changed", desktopLanguage);
+    }
+  }
 }
 
 function nativeDialogThemeCss() {

@@ -76,8 +76,20 @@ function LocaleOverrideEffects() {
 }
 
 function LocaleEffects() {
+  const { i18n } = useTranslation("common");
   const locale = useLocale();
   const dispatch = useAppDispatch();
+  useEffect(() => {
+    if (!isDesktopRuntime() || !window.desktopApi?.language.onChanged) {
+      return undefined;
+    }
+    return window.desktopApi.language.onChanged((nextLocale) => {
+      if (nextLocale !== locale) {
+        void i18n.changeLanguage(nextLocale);
+      }
+    });
+  }, [i18n, locale]);
+
   useEffect(() => {
     dispatch(setLocale(locale));
     document.documentElement.lang = locale;

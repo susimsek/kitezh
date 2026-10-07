@@ -411,7 +411,8 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await settingsWindow.getByRole("radio", { name: "Dark" }).click();
     await settingsWindow.getByRole("button", { name: "General" }).click();
     await settingsWindow.locator("#desktop-language").selectOption("tr");
-    await settingsWindow.waitForTimeout(100);
+    await mainWindow.getByRole("heading", { name: "Bir konsol seçin" }).waitFor();
+    await settingsWindow.getByRole("heading", { name: "Ayarlar" }).waitFor();
     const checkingWindowPromise = application.waitForEvent("window");
     await clickApplicationMenuItem(application, "Güncellemeleri denetle…");
     const checkingWindow = await checkingWindowPromise;
