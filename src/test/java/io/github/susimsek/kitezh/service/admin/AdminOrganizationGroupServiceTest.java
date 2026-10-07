@@ -120,6 +120,43 @@ class AdminOrganizationGroupServiceTest {
         assertThatThrownBy(() -> service().findById(8L, 9L)).isInstanceOf(ApiException.class);
     }
 
+    @Test
+    void handlesEmptyQueriesDuplicateMembersAndMismatchedGroups() {
+        OrganizationEntity organization = organization(8L);
+        OrganizationEntity otherOrganization = organization(9L);
+        OrganizationGroupEntity group = group(4L, organization);
+        UserEntity user = user(2L);
+        when(organizationRepository.findById(8L)).thenReturn(Optional.of(organization));
+        when(groupRepository.findById(4L)).thenReturn(Optional.of(group));
+        when(groupRepository.searchByOrganizationId(8L, "", Pageable.ofSize(20)))
+                .thenReturn(new PageImpl<>(List.of(group)));
+        when(memberRepository.searchByGroupId(4L, "", Pageable.ofSize(20)))
+                .thenReturn(new PageImpl<>(List.of()));
+        assertThat(service().findById(8L, 4L).name()).isEqualTo("Finance");
+        assertThat(service().findAll(8L, null, Pageable.ofSize(20)).getContent()).hasSize(1);
+        assertThat(service().findMembers(8L, 4L, null, Pageable.ofSize(20)).getContent()).isEmpty();
+
+        when(groupRepository.existsByOrganizationIdAndNameIgnoreCaseAndIdNot(8L, "Other", 4L))
+                .thenReturn(true);
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .update(
+                                                8L,
+                                                4L,
+                                                new AdminOrganizationGroupRequestDTO(
+                                                        "Other", null, true, null)))
+                .isInstanceOf(ApiException.class);
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(organizationMemberRepository.existsByOrganizationIdAndUserId(8L, 2L)).thenReturn(true);
+        when(memberRepository.existsByGroupIdAndUserId(4L, 2L)).thenReturn(true);
+        assertThatThrownBy(() -> service().addMember(8L, 4L, 2L)).isInstanceOf(ApiException.class);
+
+        group.setOrganization(otherOrganization);
+        assertThatThrownBy(() -> service().findById(8L, 4L)).isInstanceOf(ApiException.class);
+    }
+
     private AdminOrganizationGroupService service() {
         return new AdminOrganizationGroupService(
                 organizationRepository,

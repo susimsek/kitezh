@@ -18,6 +18,7 @@ import io.github.susimsek.kitezh.repository.OrganizationMemberRepository;
 import io.github.susimsek.kitezh.repository.OrganizationRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.mail.MailService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AdminOrganizationInvitationServiceTest {
@@ -37,6 +39,7 @@ class AdminOrganizationInvitationServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private UserAccessInvalidationService userAccessInvalidationService;
     @Mock private AdminAuditEventService adminAuditEventService;
+    @Mock private MailService mailService;
 
     @Test
     void createsAndListsInvitationWithOneTimeToken() {
@@ -198,6 +201,78 @@ class AdminOrganizationInvitationServiceTest {
                         "organization",
                         "8",
                         "email=alice@example.com");
+    }
+
+    @Test
+    void validatesResendAndCancelStatesAndSendsEmail() {
+        OrganizationEntity organization = organization(8L);
+        OrganizationInvitationEntity invitation =
+                invitation(12L, organization, "alice@example.com", Instant.now().plusSeconds(300));
+        when(organizationRepository.findById(8L)).thenReturn(Optional.of(organization));
+        when(invitationRepository.findByOrganizationIdAndId(8L, 12L))
+                .thenReturn(Optional.of(invitation));
+        when(invitationRepository.save(any(OrganizationInvitationEntity.class)))
+                .thenReturn(invitation);
+        var service = service();
+        ReflectionTestUtils.setField(service, "mailService", mailService);
+
+        service.create(
+                8L, new AdminOrganizationInvitationRequestDTO("alice@example.com", null, 24));
+        verify(mailService)
+                .sendOrganizationInvitation(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.isNull(),
+                        anyString(),
+                        anyString(),
+                        org.mockito.ArgumentMatchers.any());
+
+        assertThatThrownBy(
+                        () ->
+                                service.resend(
+                                        8L,
+                                        12L,
+                                        new AdminOrganizationInvitationRequestDTO(
+                                                "other@example.com", null, 24)))
+                .isInstanceOf(ApiException.class);
+
+        invitation.setStatus(OrganizationInvitationStatus.ACCEPTED);
+        assertThatThrownBy(
+                        () ->
+                                service.resend(
+                                        8L,
+                                        12L,
+                                        new AdminOrganizationInvitationRequestDTO(
+                                                "alice@example.com", null, 24)))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.cancel(8L, 12L)).isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void marksExpiredInvitationsWhenListing() {
+        OrganizationEntity organization = organization(8L);
+        OrganizationInvitationEntity expired =
+                invitation(12L, organization, "alice@example.com", Instant.now().minusSeconds(1));
+        when(organizationRepository.findById(8L)).thenReturn(Optional.of(organization));
+        when(invitationRepository.findByOrganizationId(8L, Pageable.ofSize(20)))
+                .thenReturn(new PageImpl<>(List.of(expired)));
+
+        assertThat(service().findAll(8L, Pageable.ofSize(20)).getContent().getFirst().status())
+                .isEqualTo(OrganizationInvitationStatus.EXPIRED);
+
+        when(invitationRepository.findByOrganizationIdAndId(99L, 12L)).thenReturn(Optional.empty());
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .resend(
+                                                99L,
+                                                12L,
+                                                new AdminOrganizationInvitationRequestDTO(
+                                                        "alice@example.com", null, 24)))
+                .isInstanceOf(ApiException.class);
+
+        when(organizationRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service().findAll(99L, Pageable.ofSize(20)))
+                .isInstanceOf(ApiException.class);
     }
 
     private AdminOrganizationInvitationService service() {

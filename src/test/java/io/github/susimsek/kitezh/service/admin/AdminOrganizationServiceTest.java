@@ -112,6 +112,45 @@ class AdminOrganizationServiceTest {
         assertThatThrownBy(() -> service().findById(99L)).isInstanceOf(ApiException.class);
     }
 
+    @Test
+    void findsAndUpdatesOrganizationWithOptionalValues() {
+        OrganizationEntity entity = organization(7L, "acme", "Acme");
+        Pageable pageable = Pageable.ofSize(20);
+        when(organizationRepository.findById(7L)).thenReturn(Optional.of(entity));
+        when(organizationRepository.findByAliasContainingIgnoreCaseOrNameContainingIgnoreCase(
+                        "", "", pageable))
+                .thenReturn(new PageImpl<>(List.of(entity), pageable, 1));
+
+        assertThat(service().findById(7L).alias()).isEqualTo("acme");
+        assertThat(service().findAll(null, pageable).getContent()).hasSize(1);
+
+        var updated =
+                service()
+                        .update(
+                                7L,
+                                new AdminOrganizationRequestDTO(
+                                        " ACME ", "Updated", "", null, false, Map.of()));
+        assertThat(updated.name()).isEqualTo("Updated");
+        assertThat(updated.enabled()).isFalse();
+        verify(adminAuditEventService).record("organization.updated", "organization", "7");
+    }
+
+    @Test
+    void rejectsMalformedAliases() {
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                new AdminOrganizationRequestDTO(
+                                                        "bad alias",
+                                                        "Bad",
+                                                        null,
+                                                        null,
+                                                        true,
+                                                        Map.of())))
+                .isInstanceOf(ApiException.class);
+    }
+
     private AdminOrganizationService service() {
         return new AdminOrganizationService(
                 organizationRepository,

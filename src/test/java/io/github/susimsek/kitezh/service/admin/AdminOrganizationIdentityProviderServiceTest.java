@@ -96,6 +96,40 @@ class AdminOrganizationIdentityProviderServiceTest {
                 .isInstanceOf(ApiException.class);
     }
 
+    @Test
+    void resolvesRegistrationIdAndRejectsConflictingOrForeignBindings() {
+        OrganizationEntity organization = organization(8L);
+        when(organizationRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service().findAll(99L, Pageable.ofSize(20)))
+                .isInstanceOf(ApiException.class);
+
+        SocialProviderEntity provider = provider("google", "google-registration");
+        OrganizationIdentityProviderEntity binding = binding(4L, organization, "other");
+        when(organizationRepository.findById(8L)).thenReturn(Optional.of(organization));
+        when(providerRepository.findByAliasIgnoreCase("google-registration"))
+                .thenReturn(Optional.empty());
+        when(providerRepository.findByRegistrationId("google-registration"))
+                .thenReturn(Optional.of(provider));
+        when(bindingRepository.findById(4L)).thenReturn(Optional.of(binding));
+        when(bindingRepository.findById(99L)).thenReturn(Optional.empty());
+        when(bindingRepository.existsByOrganizationIdAndProviderAliasIgnoreCase(8L, "google"))
+                .thenReturn(true);
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .update(
+                                                8L,
+                                                4L,
+                                                new AdminOrganizationIdentityProviderRequestDTO(
+                                                        "google-registration", true)))
+                .isInstanceOf(ApiException.class);
+
+        binding.setOrganization(organization(9L));
+        assertThatThrownBy(() -> service().remove(8L, 4L)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service().remove(8L, 99L)).isInstanceOf(ApiException.class);
+    }
+
     private AdminOrganizationIdentityProviderService service() {
         return new AdminOrganizationIdentityProviderService(
                 organizationRepository,
