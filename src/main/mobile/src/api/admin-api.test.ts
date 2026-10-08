@@ -5,6 +5,7 @@ import {
   AdminApiError,
   getAdminDashboard,
   listAdminUsers,
+  listAdminClients,
   deleteAdminUser,
   setAdminUserEnabled,
 } from "./admin-api.ts";
@@ -116,6 +117,27 @@ test("admin user mutations use protected HTTP methods and JSON state", async () 
         url: "https://kitezh.onrender.com/api/admin/users/7",
       },
     ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin clients request uses a bounded sorted page", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  globalThis.fetch = async (input) => {
+    request = input.toString();
+    return new Response(
+      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminClients("access-token", "mobile", 0, 10);
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/clients?q=mobile&page=0&size=10&sort=clientId%2Casc",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

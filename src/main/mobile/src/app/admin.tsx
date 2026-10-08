@@ -16,9 +16,11 @@ import {
   AdminApiError,
   deleteAdminUser,
   getAdminDashboard,
+  listAdminClients,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
+  type AdminClient,
   type AdminPage,
   type AdminUser,
 } from "@/api/admin-api";
@@ -55,6 +57,13 @@ function AdminConsole() {
   const [userQuery, setUserQuery] = useState("");
   const [userPage, setUserPage] = useState(0);
   const [userActionKey, setUserActionKey] = useState<string | null>(null);
+  const [clients, setClients] = useState<AdminPage<AdminClient> | null>(null);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientsErrorStatus, setClientsErrorStatus] = useState<number | null>(
+    null,
+  );
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientPage, setClientPage] = useState(0);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -141,6 +150,39 @@ function AdminConsole() {
     [dictionary.adminForbidden, dictionary.adminUserActionError, dictionary.adminUserUpdated, loadUsers, refreshSession, session, showNotice, userActionKey],
   );
 
+  const loadClients = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setClientsLoading(true);
+      setClientsErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setClients(
+          await listAdminClients(
+            currentSession.accessToken,
+            clientQuery,
+            clientPage,
+            10,
+            {
+              refreshAccessToken: async () =>
+                (await refreshSession(true))?.accessToken ?? null,
+            },
+          ),
+        );
+      } catch (cause) {
+        setClientsErrorStatus(
+          cause instanceof AdminApiError ? cause.status : 0,
+        );
+      } finally {
+        setClientsLoading(false);
+      }
+    },
+    [clientPage, clientQuery, refreshSession, session],
+  );
+
   const deleteUser = useCallback(
     (user: AdminUser) => {
       if (!session || userActionKey) return;
@@ -188,6 +230,12 @@ function AdminConsole() {
   useEffect(() => {
     if (session && section === "users") queueMicrotask(() => void loadUsers());
   }, [loadUsers, section, session]);
+
+  useEffect(() => {
+    if (session && section === "clients") {
+      queueMicrotask(() => void loadClients());
+    }
+  }, [loadClients, section, session]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -289,6 +337,20 @@ function AdminConsole() {
                   setUserQuery(query);
                 }}
                 busyKey={userActionKey}
+              />
+            ) : section === "clients" ? (
+              <ClientsContent
+                errorStatus={clientsErrorStatus}
+                loading={clientsLoading}
+                onNext={() => setClientPage((page) => page + 1)}
+                onPrevious={() => setClientPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadClients(true)}
+                page={clients}
+                query={clientQuery}
+                setQuery={(query) => {
+                  setClientPage(0);
+                  setClientQuery(query);
+                }}
               />
             ) : null}
           </ScrollView>
@@ -488,6 +550,101 @@ function UsersContent({
         </View>
       ) : (
         <Text style={{ color: palette.textMuted }}>{dictionary.adminNoUsers}</Text>
+      )}
+    </View>
+  );
+}
+
+function ClientsContent({
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminClient> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchClients}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchClients}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminClientsLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((client) => (
+            <View
+              key={client.id}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <View style={styles.userCardHeader}>
+                <Text style={[styles.userName, { color: palette.text }]}>{client.clientName}</Text>
+                <Text style={{ color: client.enabled ? palette.success : palette.danger }}>
+                  {client.enabled ? dictionary.adminUserEnabled : dictionary.adminUserDisabled}
+                </Text>
+              </View>
+              <Text style={{ color: palette.textMuted }}>{client.clientId}</Text>
+              <Text style={[styles.roles, { color: palette.textMuted }]}>
+                {client.scopes.join(", ") || "—"}
+              </Text>
+            </View>
+          ))}
+          <View style={styles.pagination}>
+            <ActionButton
+              label={dictionary.adminPrevious}
+              busy={loading}
+              disabled={page.number === 0}
+              onPress={onPrevious}
+              palette={palette}
+              secondary
+            />
+            <Text style={{ color: palette.textMuted }}>
+              {dictionary.adminPage} {page.number + 1} / {Math.max(page.totalPages, 1)}
+            </Text>
+            <ActionButton
+              label={dictionary.adminNext}
+              busy={loading}
+              disabled={page.number + 1 >= page.totalPages}
+              onPress={onNext}
+              palette={palette}
+              secondary
+            />
+          </View>
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoClients}</Text>
       )}
     </View>
   );

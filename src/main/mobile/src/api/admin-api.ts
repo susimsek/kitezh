@@ -26,6 +26,15 @@ export type AdminPage<T> = {
   totalPages: number;
 };
 
+export type AdminClient = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  scopes: string[];
+  enabled: boolean;
+  serviceAccountEnabled: boolean;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -113,6 +122,27 @@ export function listAdminUsers(
   return requestAdmin<AdminPage<AdminUser>>(
     accessToken,
     `/api/admin/users?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function listAdminClients(
+  accessToken: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "clientId,asc",
+  });
+  return requestAdmin<AdminPage<AdminClient>>(
+    accessToken,
+    `/api/admin/clients?${params.toString()}`,
     options,
     false,
   );
