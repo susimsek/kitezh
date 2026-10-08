@@ -1,15 +1,25 @@
 import { authorizationServerIssuer } from "@/config";
-import type { SocialProviderAvailability } from "@kitezh/shared/contracts";
+import type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
+import {
+  classifyApiError,
+  parseProblemDetail,
+  type ApiErrorKind,
+  type ProblemDetail,
+} from "../../../shared/src/api.ts";
 
 export class PublicApiError extends Error {
   readonly status: number;
   readonly data: unknown;
+  readonly kind: ApiErrorKind;
+  readonly problem: ProblemDetail | undefined;
 
   constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.name = "PublicApiError";
     this.status = status;
     this.data = data;
+    this.kind = classifyApiError(status, data);
+    this.problem = parseProblemDetail(data);
   }
 }
 

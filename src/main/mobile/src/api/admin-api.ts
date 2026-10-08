@@ -1,4 +1,10 @@
 import { authorizationServerIssuer } from "../config.ts";
+import {
+  classifyApiError,
+  parseProblemDetail,
+  type ApiErrorKind,
+  type ProblemDetail,
+} from "../../../shared/src/api.ts";
 
 export type AdminDashboard = {
   clients: number;
@@ -95,11 +101,15 @@ export type AdminConsent = {
 
 export class AdminApiError extends Error {
   readonly status: number;
+  readonly kind: ApiErrorKind;
+  readonly problem: ProblemDetail | undefined;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.name = "AdminApiError";
     this.status = status;
+    this.kind = classifyApiError(status, data);
+    this.problem = parseProblemDetail(data);
   }
 }
 
@@ -132,7 +142,7 @@ async function requestAdmin<T>(
     });
   } catch (cause) {
     if (cause instanceof Error && cause.name === "AbortError") throw cause;
-    throw new AdminApiError(0, "Administration request failed");
+    throw new AdminApiError(0, "Administration request failed", cause);
   }
 
   if (response.status === 401 && !retried && options.refreshAccessToken) {
@@ -147,7 +157,15 @@ async function requestAdmin<T>(
       );
     }
   }
-  if (!response.ok) throw new AdminApiError(response.status, "Administration request failed");
+  if (!response.ok) {
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      data = undefined;
+    }
+    throw new AdminApiError(response.status, "Administration request failed", data);
+  }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }

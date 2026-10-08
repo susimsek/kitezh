@@ -4,16 +4,12 @@ import {
   sessionStorageKey,
   type MobileSessionNamespace,
 } from "./session-keys";
+import type { NativeSession } from "../../../shared/src/api.ts";
 
 export { sessionStorageKey } from "./session-keys";
 export type { MobileSessionNamespace } from "./session-keys";
 
-export type MobileSession = {
-  accessToken: string;
-  refreshToken: string | null;
-  idToken: string | null;
-  expiresAt: number;
-};
+export type MobileSession = NativeSession;
 
 export async function readSession(
   namespace: MobileSessionNamespace = "account",

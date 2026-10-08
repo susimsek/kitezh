@@ -7,10 +7,11 @@ Playwright runs are not native E2E evidence. The development build must use the 
 ## Required fixture boundary
 
 The fixture server must provide deterministic responses for the public API, mobile account client,
-PKCE callback, refresh, logout, 401, 403, timeout, and offline cases. Test credentials and tokens
-are injected by the fixture runner only; they are never committed, logged, or stored in the app
-bundle. A fixture must use a dedicated mobile client and SecureStore namespace so an E2E run cannot
-reuse a desktop or browser session.
+PKCE callback, refresh, logout, 401, 403, timeout, and offline cases. The checked-in
+`e2e/fixture-server.mjs` supplies discovery, browser callback, refresh-compatible token, logout,
+profile, and failure endpoints. Test credentials and tokens are generated at fixture startup; they
+are never committed, logged, or stored in the app bundle. A fixture must use a dedicated mobile
+client and SecureStore namespace so an E2E run cannot reuse a desktop or browser session.
 
 ## Required flow matrix
 
@@ -24,9 +25,9 @@ The first CI slice must cover:
 5. Turkish/English and system/light/dark persistence, including a large-text accessibility pass;
 6. native notice announcement, dismiss, and auto-dismiss behavior.
 
-The repository currently has the contract/unit checks and Expo config, but no installed Maestro
-runner, device build, or deterministic fixture server. Until those are supplied by CI, the native
-E2E item remains **In progress** and must not be reported as a passing device test.
+The repository has the fixture contract test and Expo config. Device builds remain a manually
+triggered CI concern; until an Android/iOS run completes, the native E2E item remains **In
+progress** and must not be reported as a passing device test.
 
 The first device flows are checked in under `e2e/maestro/`:
 
@@ -47,6 +48,13 @@ pnpm exec expo run:android
 maestro test e2e/maestro
 ```
 
-These flows deliberately avoid real credentials and token-bearing callbacks. Authenticated,
-offline, timeout, refresh, and deep-link flows still require the deterministic fixture server and
-an Android/iOS device runner before they can be marked complete.
+These flows deliberately avoid real credentials and token-bearing callbacks. The native workflow
+starts the fixture server without exposing its runtime token values. Authenticated, offline,
+timeout, refresh, and deep-link flows still require a completed Android/iOS device run before they
+can be marked complete.
+
+Validate the fixture contract locally with:
+
+```bash
+pnpm run test:fixture
+```

@@ -12,6 +12,7 @@
     "./theme": "./src/theme.ts",
     "./i18n": "./src/i18n.ts",
     "./icons": "./src/icons.ts",
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./api": "./src/api.ts"
   }
 }

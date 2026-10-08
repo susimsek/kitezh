@@ -1,5 +1,11 @@
 import { authorizationServerIssuer } from "@/config";
-import type { AccountSocialLink } from "@kitezh/shared/contracts";
+import type { AccountSocialLink } from "../../../shared/src/contracts.ts";
+import {
+  classifyApiError,
+  parseProblemDetail,
+  type ApiErrorKind,
+  type ProblemDetail,
+} from "../../../shared/src/api.ts";
 
 export type { AccountSocialLink };
 
@@ -84,12 +90,16 @@ export type SocialLink = AccountSocialLink;
 export class AccountApiError extends Error {
   readonly status: number;
   readonly data: unknown;
+  readonly kind: ApiErrorKind;
+  readonly problem: ProblemDetail | undefined;
 
   constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.name = "AccountApiError";
     this.status = status;
     this.data = data;
+    this.kind = classifyApiError(status, data);
+    this.problem = parseProblemDetail(data);
   }
 }
 

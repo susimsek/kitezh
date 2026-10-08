@@ -14,6 +14,10 @@ import type {
   DesktopLanguageMode,
   SocialProviderAvailability,
 } from "../../shared/src/contracts.ts";
+import {
+  classifyApiError,
+  parseProblemDetail,
+} from "../../shared/src/api.ts";
 
 test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
@@ -61,4 +65,19 @@ test("mobile console contracts isolate account and admin sessions", () => {
   assert.deepEqual(admin.scopes, ["openid", "profile", "email", "admin-api"]);
   assert.equal(admin.redirectUri, "kitezh://admin/oauth/callback");
   assert.notEqual(sessionStorageKey("account"), sessionStorageKey("admin"));
+});
+
+test("shared API errors preserve native status semantics without transport details", () => {
+  const problem = parseProblemDetail({
+    type: "https://kitezh.dev/problems/validation",
+    status: 422,
+    violations: [{ field: "email", message: "Enter a valid email address." }],
+  });
+  assert.deepEqual(problem?.violations, [
+    { field: "email", message: "Enter a valid email address." },
+  ]);
+  assert.equal(classifyApiError(401), "unauthorized");
+  assert.equal(classifyApiError(403), "forbidden");
+  assert.equal(classifyApiError(0, new DOMException("timeout", "AbortError")), "timeout");
+  assert.equal(classifyApiError(0, new Error("network")), "offline");
 });

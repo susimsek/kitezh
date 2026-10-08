@@ -54,10 +54,22 @@ jobs:
             unzip -q "${RUNNER_TEMP}/maestro.zip" -d "${maestro_dir}"
             export PATH="${maestro_dir}/maestro/bin:${PATH}"
             cd src/main/mobile
-            pnpm exec expo prebuild --platform android --non-interactive
+            node e2e/fixture-server.mjs --host 0.0.0.0 --port 8081 > "${RUNNER_TEMP}/mobile-fixture.log" 2>&1 &
+            fixture_pid=$!
+            export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://10.0.2.2:8081"
             pnpm exec expo start --localhost > "${RUNNER_TEMP}/mobile-metro.log" 2>&1 &
             metro_pid=$!
-            trap 'kill "${metro_pid}" 2>/dev/null || true' EXIT
+            trap 'kill "${metro_pid}" "${fixture_pid}" 2>/dev/null || true' EXIT
+            fixture_ready=false
+            for attempt in $(seq 1 20); do
+              if curl --fail --silent http://127.0.0.1:8081/health; then
+                fixture_ready=true
+                break
+              fi
+              sleep 1
+            done
+            test "${fixture_ready}" = true
+            CI=1 pnpm exec expo prebuild --platform android
             sleep 10
             pnpm exec expo run:android --no-bundler
             maestro test e2e/maestro
@@ -95,10 +107,22 @@ jobs:
           unzip -q "${RUNNER_TEMP}/maestro.zip" -d "${maestro_dir}"
           export PATH="${maestro_dir}/maestro/bin:${PATH}"
           cd src/main/mobile
-          pnpm exec expo prebuild --platform ios --non-interactive
+          node e2e/fixture-server.mjs --host 0.0.0.0 --port 8081 > "${RUNNER_TEMP}/mobile-fixture.log" 2>&1 &
+          fixture_pid=$!
+          export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://127.0.0.1:8081"
           pnpm exec expo start --localhost > "${RUNNER_TEMP}/mobile-metro.log" 2>&1 &
           metro_pid=$!
-          trap 'kill "${metro_pid}" 2>/dev/null || true' EXIT
+          trap 'kill "${metro_pid}" "${fixture_pid}" 2>/dev/null || true' EXIT
+          fixture_ready=false
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:8081/health; then
+              fixture_ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "${fixture_ready}" = true
+          CI=1 pnpm exec expo prebuild --platform ios
           sleep 10
           pnpm exec expo run:ios --simulator --no-bundler
           maestro test e2e/maestro

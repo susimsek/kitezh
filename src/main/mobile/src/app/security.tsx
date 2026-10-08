@@ -27,6 +27,7 @@ import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
+import type { ProblemViolation } from "../../../shared/src/api.ts";
 
 type PasswordField = "currentPassword" | "newPassword" | "confirmPassword";
 type PasswordErrors = Partial<Record<PasswordField, string>>;
@@ -52,6 +53,22 @@ function apiFieldErrors(data: unknown): PasswordErrors {
       typeof message === "string"
     ) {
       errors[field as PasswordField] = message;
+    }
+    return errors;
+  }, {});
+}
+
+function problemFieldErrors(
+  violations: ProblemViolation[] | undefined,
+): PasswordErrors {
+  return (violations ?? []).reduce<PasswordErrors>((errors, violation) => {
+    if (
+      (violation.field === "currentPassword" ||
+        violation.field === "newPassword" ||
+        violation.field === "confirmPassword") &&
+      violation.message
+    ) {
+      errors[violation.field as PasswordField] = violation.message;
     }
     return errors;
   }, {});
@@ -165,8 +182,9 @@ export default function SecurityScreen() {
       setPasswordErrors(
         cause instanceof AccountApiError
           ? {
-              ...apiFieldErrors(cause.data),
-              ...(Object.keys(apiFieldErrors(cause.data)).length === 0
+              ...problemFieldErrors(cause.problem?.violations),
+              ...((cause.problem?.violations?.length ?? 0) === 0 &&
+              Object.keys(apiFieldErrors(cause.data)).length === 0
                 ? { currentPassword: dictionary.passwordSaveError }
                 : {}),
             }

@@ -175,6 +175,10 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm run test
 
+      - name: Test native fixture contract
+        working-directory: src/main/mobile
+        run: pnpm run test:fixture
+
       - name: Build mobile web export
         working-directory: src/main/mobile
         run: pnpm run build:web

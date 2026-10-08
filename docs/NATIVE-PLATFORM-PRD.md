@@ -283,7 +283,7 @@ acceptance evidence is linked in the feature matrix.
 - [~] Mobile store-first release and rollback strategy documented in `src/main/mobile/README.md` and `eas.json`; EAS project, staged rollout, and OTA configuration remain
 - [~] Mobile in-app notification adapter with localized auto-dismiss feedback (`MobileNoticeProvider`); OS permission and authenticated action-routing remain blocked until a backend event contract and native E2E harness are available
 - [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; GitHub CI now runs the mobile quality gate, while EAS signing, native device builds, staged rollout evidence, and store metadata remain
-- [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; device build, fixture server, and CI matrix remain
+- [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; deterministic fixture contract test and CI fixture health are present, while a completed device run and authenticated Maestro flow remain
 - [~] Desktop package metadata smoke check added in `src/main/desktop/test/package-metadata.test.mjs`; macOS/Windows/Linux packaged startup, protocol, storage, asset, and signed-artifact runs remain
 - [~] Linux system-package handoff is enforced by `supportsAutoUpdate` and covered by desktop tests; packaged AppImage rollback and `.deb`/`.rpm`/`.snap` smoke evidence remain
 - [~] Desktop update-manifest signature verification is covered by `src/main/desktop/test/update-signature.test.mjs` and CI Sigstore/checksum steps; cross-platform signed release evidence remains
@@ -291,13 +291,13 @@ acceptance evidence is linked in the feature matrix.
 - [~] Desktop accessibility behavior: focus, keyboard, ARIA, high contrast, and reduced motion
 - [~] Companion/global shortcut conflict handling and privacy behavior
 - [~] Authenticated desktop native E2E fixture and cross-platform protocol coverage
-- [ ] Native screen/navigation ownership gate
-- [ ] Typed adapter and shared error/session contract gate
+- [~] Native screen/navigation ownership gate: `check-native-boundaries.mjs` rejects Web/DOM/Electron/browser-storage imports in native source, and Maestro owns cold-start/settings navigation flows
+- [~] Typed adapter and shared error/session contract gate: `src/main/shared/src/api.ts` defines Problem Detail, status classification, and native session contracts consumed by mobile adapters; full authenticated refresh/logout evidence remains
 - [ ] Auth callback, refresh, logout, deep-link, offline, and restart test gate
 - [ ] Localization, theme, accessibility, loading, and error-state gate
 - [ ] Secret, log, diagnostics, and external-navigation security gate
-- [ ] Focused CI and packaged smoke-test gate
-- [ ] Feature-matrix evidence and explicit blocker gate
+- [~] Focused CI and packaged smoke-test gate: mobile typecheck, lint, unit tests, boundary checks, web build, and fixture contract run in `mobile-quality`; Android/iOS packaged device evidence remains manual
+- [~] Feature-matrix evidence and explicit blocker gate: PRD and mobile matrix link boundary, fixture, Maestro, and workflow evidence; authenticated callback/offline/device results remain explicit blockers
 
 ## Shared/native architecture contract
 
