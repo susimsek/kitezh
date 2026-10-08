@@ -161,6 +161,10 @@ class AdminClientEndpointsIT {
             mockMvc.perform(get("/api/admin/clients/{id}/sessions", id).with(admin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content").isArray());
+            mockMvc.perform(delete("/api/admin/clients/{id}/sessions", id).with(admin()))
+                    .andExpect(status().isNoContent());
+            mockMvc.perform(post("/api/admin/clients/{id}/revoke-tokens", id).with(admin()))
+                    .andExpect(status().isNoContent());
             mockMvc.perform(get("/api/admin/clients/{id}/consents", id).with(admin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content").isArray());

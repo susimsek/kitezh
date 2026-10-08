@@ -44,4 +44,5 @@
 	<include file="db/changelog/changes/030-create-saml-provider-config.xml"/>
 	<include file="db/changelog/changes/031-create-social-identity-mapping-state.xml"/>
 	<include file="db/changelog/changes/032-create-authentication-flows.xml"/>
+	<include file="db/changelog/changes/033-create-authorization-revocation-policy.xml"/>
 </databaseChangeLog>

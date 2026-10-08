@@ -20,6 +20,7 @@ import io.github.susimsek.kitezh.mapper.AdminSessionMapper;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.ClientRepository;
 import io.github.susimsek.kitezh.repository.UserSessionRepository;
+import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import io.github.susimsek.kitezh.service.SessionInvalidationService;
 import io.github.susimsek.kitezh.service.error.ApiException;
 import java.time.Instant;
@@ -42,6 +43,7 @@ class AdminSessionServiceTest {
     @Mock private ClientRepository clientRepository;
     @Mock private AdminAuditEventService adminAuditEventService;
     @Mock private SessionInvalidationService sessionInvalidationService;
+    @Mock private AuthorizationRevocationPolicyService revocationPolicyService;
 
     @Test
     void returnsSessionsWithAuthorizationCounts() {
@@ -193,6 +195,54 @@ class AdminSessionServiceTest {
     }
 
     @Test
+    void deletesAllApplicationSessionsAndRecordsAnAuditEvent() {
+        service().deleteAllSessions();
+
+        verify(sessionInvalidationService).invalidateAll();
+        verify(adminAuditEventService).record("sessions.deleted", "application", "default");
+    }
+
+    @Test
+    void deletesOnlyAClientSessionAndRecordsAnAuditEvent() {
+        when(clientRepository.existsById("client-1")).thenReturn(true);
+        when(authorizationRepository.existsByRegisteredClientIdAndSessionId(
+                        "client-1", "session-1"))
+                .thenReturn(true);
+
+        service().deleteClientSession("client-1", "session-1");
+
+        verify(sessionInvalidationService).invalidateClientSession("client-1", "session-1");
+        verify(adminAuditEventService).record("client.session.deleted", "client", "client-1");
+    }
+
+    @Test
+    void deletesAllSessionsForAClientAndRecordsAnAuditEvent() {
+        when(clientRepository.existsById("client-1")).thenReturn(true);
+
+        service().deleteClientSessions("client-1");
+
+        verify(sessionInvalidationService).invalidateClientSessions("client-1");
+        verify(adminAuditEventService).record("client.sessions.deleted", "client", "client-1");
+    }
+
+    @Test
+    void revokesApplicationUserAndClientTokens() {
+        RegisteredClientEntity client = client("registered-1", "console", "Console");
+        when(clientRepository.findById("registered-1")).thenReturn(Optional.of(client));
+
+        service().revokeAllTokens();
+        service().revokeUserTokens("alice", "admin");
+        service().revokeClientTokens("registered-1");
+
+        verify(revocationPolicyService).revokeApplication();
+        verify(revocationPolicyService).revokeUser("alice");
+        verify(revocationPolicyService).revokeClient("console");
+        verify(adminAuditEventService).record("tokens.revoked", "application", "default");
+        verify(adminAuditEventService).record("user.tokens.revoked", "user", "alice");
+        verify(adminAuditEventService).record("client.tokens.revoked", "client", "registered-1");
+    }
+
+    @Test
     void loadsUserAndClientSessionsAndHandlesMissingClient() {
         UserSessionEntity session = session("session-1", "alice", 1_000L);
         Pageable pageable = Pageable.ofSize(20);
@@ -276,6 +326,7 @@ class AdminSessionServiceTest {
                 clientRepository,
                 adminAuditEventService,
                 sessionInvalidationService,
+                revocationPolicyService,
                 Mappers.getMapper(AdminSessionMapper.class));
     }
 }

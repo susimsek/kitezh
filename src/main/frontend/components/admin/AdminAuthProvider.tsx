@@ -3,13 +3,18 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
 
 import type { Locale } from "@/i18n/config";
-import { CONSOLE_TRANSACTION_KEYS, type JwtPayload, useConsoleAuth } from "@/lib/console-auth";
+import {
+  CONSOLE_TRANSACTION_KEYS,
+  type ConsoleLogoutOptions,
+  type JwtPayload,
+  useConsoleAuth,
+} from "@/lib/console-auth";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setAdminAccess, setConsoleUsername, type AdminAccess } from "@/store/auth-slice";
 
 type AdminAuthRuntime = {
   refreshAccessToken: (minValidity?: number) => Promise<string | null>;
-  logout: (locale: Locale) => Promise<void>;
+  logout: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
   beginAuthorization: (locale: Locale, returnTo: string) => Promise<void>;
   completeAuthorization: (code: string, state: string) => Promise<string>;
 };

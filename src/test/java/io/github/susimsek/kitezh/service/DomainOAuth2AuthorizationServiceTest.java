@@ -42,6 +42,7 @@ class DomainOAuth2AuthorizationServiceTest {
     @Mock private AuthorizationMapper authorizationMapper;
     @Mock private AuthorizationServerMapperSupport mapperSupport;
     @Mock private OfflineAccessPolicyService offlineAccessPolicyService;
+    @Mock private AuthorizationRevocationPolicyService revocationPolicyService;
 
     private DomainOAuth2AuthorizationService service;
 
@@ -53,7 +54,8 @@ class DomainOAuth2AuthorizationServiceTest {
                         registeredClientRepository,
                         authorizationMapper,
                         mapperSupport,
-                        offlineAccessPolicyService);
+                        offlineAccessPolicyService,
+                        revocationPolicyService);
     }
 
     @AfterEach
@@ -159,7 +161,8 @@ class DomainOAuth2AuthorizationServiceTest {
                         registeredClientRepository,
                         authorizationMapper,
                         mapperSupport,
-                        offlineAccessPolicyService);
+                        offlineAccessPolicyService,
+                        revocationPolicyService);
 
         assertThat(policyService.findByToken("token", null)).isNull();
     }
@@ -182,7 +185,8 @@ class DomainOAuth2AuthorizationServiceTest {
                         registeredClientRepository,
                         authorizationMapper,
                         mapperSupport,
-                        offlineAccessPolicyService);
+                        offlineAccessPolicyService,
+                        revocationPolicyService);
 
         assertThat(policyService.findByToken("token", null)).isSameAs(authorization);
 

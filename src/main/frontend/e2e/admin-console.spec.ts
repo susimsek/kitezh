@@ -37,6 +37,38 @@ test.describe("administration console", () => {
     await expect(page.locator('input[name="username"]')).toHaveValue(/.+/);
   });
 
+  test("opens session administration and exposes the global revoke action", async ({ page }) => {
+    await visitConsole(page, "admin", "/sessions");
+    await expect(page.getByRole("heading", { name: /Sessions|Oturumlar/i })).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: /Sign out all active sessions|Tüm aktif oturumları kapat/i,
+      }),
+    ).toBeVisible();
+  });
+
+  test("revokes active sessions and logs out the current browser session", async ({ page }) => {
+    await visitConsole(page, "admin", "/sessions");
+    const revokeAll = page.getByRole("button", {
+      name: /Sign out all active sessions|Tüm aktif oturumları kapat/i,
+    });
+    await revokeAll.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /Sign out all active sessions|Tüm aktif oturumları kapat/i })
+      .click();
+
+    await expect(page).toHaveURL(/\/login\?logout$/);
+    await expect(
+      page.getByText(
+        /Successfully signed out|You have signed out successfully|Başarıyla çıkış yaptınız/i,
+      ),
+    ).toBeVisible();
+    await page.goto("/admin/sessions");
+    await expect(page.locator('input[name="username"]')).toBeVisible();
+  });
+
   test("keeps mobile navigation usable", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await visitConsole(page, "admin");

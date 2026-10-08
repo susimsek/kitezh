@@ -51,6 +51,7 @@ export function EntityRelatedData({
   locale,
   dictionary,
   canManage = false,
+  deleteUrl,
   refreshKey = 0,
 }: {
   resource: RelatedResource;
@@ -58,6 +59,7 @@ export function EntityRelatedData({
   locale: Locale;
   dictionary: Dictionary;
   canManage?: boolean;
+  deleteUrl?: (id: string) => string;
   refreshKey?: number;
 }) {
   const { accessToken } = useAdminAuth();
@@ -95,7 +97,7 @@ export function EntityRelatedData({
     try {
       const response = await adminRequest(accessToken, {
         method: "DELETE",
-        url: `/api/admin/sessions/${encodeURIComponent(session.id)}`,
+        url: deleteUrl?.(session.id) ?? `/api/admin/sessions/${encodeURIComponent(session.id)}`,
       });
       if (response.status >= 300) {
         alerts.addError(copy.operationError);
@@ -104,6 +106,8 @@ export function EntityRelatedData({
       alerts.addAlert(copy.sessionTerminated);
       setLoading(true);
       setVersion((current) => current + 1);
+    } catch {
+      alerts.addError(copy.operationError);
     } finally {
       setActionBusy(null);
     }
@@ -125,6 +129,8 @@ export function EntityRelatedData({
       alerts.addAlert(copy.consentRevoked);
       setLoading(true);
       setVersion((current) => current + 1);
+    } catch {
+      alerts.addError(copy.operationError);
     } finally {
       setActionBusy(null);
     }

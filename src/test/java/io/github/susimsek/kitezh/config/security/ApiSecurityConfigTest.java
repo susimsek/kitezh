@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
+import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +37,10 @@ class ApiSecurityConfigTest {
         AdminApiSecurityConfig config = new AdminApiSecurityConfig();
         JwtDecoder decoder =
                 config.adminApiJwtDecoder(
-                        mock(), new ApplicationProperties(), mock(AuthorizationRepository.class));
+                        mock(),
+                        new ApplicationProperties(),
+                        mock(AuthorizationRepository.class),
+                        mock(AuthorizationRevocationPolicyService.class));
 
         SecurityFilterChain chain = config.adminApiSecurityFilterChain(httpSecurity(), decoder);
 
@@ -63,7 +67,10 @@ class ApiSecurityConfigTest {
         AccountApiSecurityConfig config = new AccountApiSecurityConfig();
         JwtDecoder decoder =
                 config.accountApiJwtDecoder(
-                        mock(), new ApplicationProperties(), mock(AuthorizationRepository.class));
+                        mock(),
+                        new ApplicationProperties(),
+                        mock(AuthorizationRepository.class),
+                        mock(AuthorizationRevocationPolicyService.class));
 
         assertThat(decoder).isNotNull();
         assertThat(config.accountApiSecurityFilterChain(httpSecurity(), decoder)).isNotNull();

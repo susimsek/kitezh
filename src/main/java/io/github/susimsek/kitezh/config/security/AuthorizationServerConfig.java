@@ -497,6 +497,9 @@ public class AuthorizationServerConfig {
     private OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
             JwtTokenCustomizerDependencies dependencies) {
         return context -> {
+            if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+                context.getClaims().claim("client_id", context.getRegisteredClient().getClientId());
+            }
             boolean adminAccessToken = isAdminAccessToken(context);
             List<ClientScopeEntity> groupMappers =
                     groupMappers(context, dependencies.clientScopeRepository());
