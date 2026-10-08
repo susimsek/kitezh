@@ -15,12 +15,14 @@ import { useMobileAuth, MobileAuthProvider } from "@/auth/MobileAuthProvider";
 import {
   AdminApiError,
   deleteAdminUser,
+  deleteAdminSession,
   getAdminDashboard,
   listAdminClientScopes,
   listAdminClients,
   listAdminGroups,
   listAdminIdentityProviders,
   listAdminRoles,
+  listAdminSessions,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
@@ -30,6 +32,7 @@ import {
   type AdminIdentityProvider,
   type AdminPage,
   type AdminRole,
+  type AdminSession,
   type AdminUser,
 } from "@/api/admin-api";
 import { AppIcon } from "@/components/AppIcon";
@@ -46,6 +49,7 @@ type AdminSection =
   | "roles"
   | "groups"
   | "identity-providers"
+  | "sessions"
   | "settings";
 
 export default function AdminScreen() {
@@ -106,6 +110,13 @@ function AdminConsole() {
   );
   const [identityProviderQuery, setIdentityProviderQuery] = useState("");
   const [identityProviderPage, setIdentityProviderPage] = useState(0);
+  const [sessions, setSessions] = useState<AdminPage<AdminSession> | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsErrorStatus, setSessionsErrorStatus] = useState<number | null>(null);
+  const [sessionQuery, setSessionQuery] = useState("");
+  const [sessionStatus, setSessionStatus] = useState<"active" | "expired">("active");
+  const [sessionPage, setSessionPage] = useState(0);
+  const [sessionActionKey, setSessionActionKey] = useState<string | null>(null);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -341,6 +352,82 @@ function AdminConsole() {
     [identityProviderPage, identityProviderQuery, refreshSession, session],
   );
 
+  const loadSessions = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setSessionsLoading(true);
+      setSessionsErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setSessions(
+          await listAdminSessions(
+            currentSession.accessToken,
+            sessionQuery,
+            sessionStatus,
+            "",
+            sessionPage,
+            10,
+            {
+              refreshAccessToken: async () =>
+                (await refreshSession(true))?.accessToken ?? null,
+            },
+          ),
+        );
+      } catch (cause) {
+        setSessionsErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setSessionsLoading(false);
+      }
+    },
+    [refreshSession, session, sessionPage, sessionQuery, sessionStatus],
+  );
+
+  const deleteSession = useCallback(
+    (adminSession: AdminSession) => {
+      if (!session || sessionActionKey) return;
+      Alert.alert(
+        dictionary.adminSessionDelete,
+        dictionary.adminSessionDeleteConfirm,
+        [
+          { text: dictionary.cancel, style: "cancel" },
+          {
+            text: dictionary.adminSessionDelete,
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                setSessionActionKey(adminSession.id);
+                try {
+                  const currentSession = await refreshSession();
+                  if (!currentSession) throw new Error();
+                  await deleteAdminSession(currentSession.accessToken, adminSession.id, {
+                    refreshAccessToken: async () =>
+                      (await refreshSession(true))?.accessToken ?? null,
+                  });
+                  showNotice({ kind: "success", message: dictionary.adminSessionDeleted });
+                  await loadSessions(true);
+                } catch (cause) {
+                  showNotice({
+                    kind: "error",
+                    message:
+                      cause instanceof AdminApiError && cause.status === 403
+                        ? dictionary.adminForbidden
+                        : dictionary.adminSessionActionError,
+                  });
+                } finally {
+                  setSessionActionKey(null);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [dictionary, loadSessions, refreshSession, session, sessionActionKey, showNotice],
+  );
+
   const deleteUser = useCallback(
     (user: AdminUser) => {
       if (!session || userActionKey) return;
@@ -418,6 +505,12 @@ function AdminConsole() {
       queueMicrotask(() => void loadIdentityProviders());
     }
   }, [loadIdentityProviders, section, session]);
+
+  useEffect(() => {
+    if (session && section === "sessions") {
+      queueMicrotask(() => void loadSessions());
+    }
+  }, [loadSessions, section, session]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -497,7 +590,9 @@ function AdminConsole() {
                       ? dictionary.adminGroups
                         : section === "identity-providers"
                           ? dictionary.adminIdentityProviders
-                        : dictionary.adminSettings}
+                          : section === "sessions"
+                            ? dictionary.adminSessions
+                          : dictionary.adminSettings}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
               {section === "dashboard"
@@ -603,6 +698,27 @@ function AdminConsole() {
                   setIdentityProviderPage(0);
                   setIdentityProviderQuery(query);
                 }}
+              />
+            ) : section === "sessions" ? (
+              <SessionsContent
+                errorStatus={sessionsErrorStatus}
+                loading={sessionsLoading}
+                onDelete={deleteSession}
+                onNext={() => setSessionPage((page) => page + 1)}
+                onPrevious={() => setSessionPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadSessions(true)}
+                onStatusChange={(status) => {
+                  setSessionPage(0);
+                  setSessionStatus(status);
+                }}
+                page={sessions}
+                query={sessionQuery}
+                setQuery={(query) => {
+                  setSessionPage(0);
+                  setSessionQuery(query);
+                }}
+                status={sessionStatus}
+                busyKey={sessionActionKey}
               />
             ) : null}
           </ScrollView>
@@ -1250,6 +1366,127 @@ function IdentityProvidersContent({
   );
 }
 
+function SessionsContent({
+  busyKey,
+  errorStatus,
+  loading,
+  onDelete,
+  onNext,
+  onPrevious,
+  onRetry,
+  onStatusChange,
+  page,
+  query,
+  setQuery,
+  status,
+}: {
+  busyKey: string | null;
+  errorStatus: number | null;
+  loading: boolean;
+  onDelete: (session: AdminSession) => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  onStatusChange: (status: "active" | "expired") => void;
+  page: AdminPage<AdminSession> | null;
+  query: string;
+  setQuery: (query: string) => void;
+  status: "active" | "expired";
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchSessions}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchSessions}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      <View style={styles.filterRow}>
+        <ActionButton
+          label={dictionary.adminActive}
+          busy={loading && status === "active"}
+          disabled={status === "active"}
+          onPress={() => onStatusChange("active")}
+          palette={palette}
+          secondary={status !== "active"}
+        />
+        <ActionButton
+          label={dictionary.adminExpired}
+          busy={loading && status === "expired"}
+          disabled={status === "expired"}
+          onPress={() => onStatusChange("expired")}
+          palette={palette}
+          secondary={status !== "expired"}
+        />
+      </View>
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminSessionsLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((adminSession) => (
+            <View
+              key={adminSession.id}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <View style={styles.userCardHeader}>
+                <Text style={[styles.userName, { color: palette.text }]}>
+                  {adminSession.username}
+                </Text>
+                <Text style={{ color: adminSession.active ? palette.success : palette.textMuted }}>
+                  {adminSession.active ? dictionary.adminActive : dictionary.adminExpired}
+                </Text>
+              </View>
+              <Text style={{ color: palette.textMuted }}>
+                {adminSession.authorizationCount} {dictionary.adminAuthorizations}
+              </Text>
+              <Text style={[styles.roles, { color: palette.textMuted }]}>
+                {adminSession.lastAccessedAt}
+              </Text>
+              {adminSession.active ? (
+                <ActionButton
+                  label={dictionary.adminSessionDelete}
+                  busy={busyKey === adminSession.id}
+                  disabled={busyKey !== null && busyKey !== adminSession.id}
+                  onPress={() => onDelete(adminSession)}
+                  palette={palette}
+                  secondary
+                />
+              ) : null}
+            </View>
+          ))}
+          <Pagination
+            loading={loading}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            page={page}
+            palette={palette}
+          />
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoSessions}</Text>
+      )}
+    </View>
+  );
+}
+
 function Pagination<T>({
   loading,
   onNext,
@@ -1348,6 +1585,7 @@ function AdminTabBar({
     ["roles", dictionary.adminRoles, "shield"],
     ["groups", dictionary.adminGroups, "layers"],
     ["identity-providers", dictionary.adminIdentityProviders, "globe"],
+    ["sessions", dictionary.adminSessions, "shield"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
   return (
@@ -1419,5 +1657,6 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 13, lineHeight: 18 },
   cardValue: { fontSize: 30, fontWeight: "800", marginTop: spacing.sm },
   tabBar: { borderTopWidth: 1, padding: spacing.xs },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   tab: { alignItems: "center", borderRadius: radii.sm, gap: spacing.xs, justifyContent: "center", minHeight: 58, minWidth: 84, paddingHorizontal: spacing.sm },
 });

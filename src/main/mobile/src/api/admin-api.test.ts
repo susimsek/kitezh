@@ -9,6 +9,8 @@ import {
   listAdminClientScopes,
   listAdminGroups,
   listAdminIdentityProviders,
+  listAdminSessions,
+  deleteAdminSession,
   listAdminRoles,
   deleteAdminUser,
   setAdminUserEnabled,
@@ -206,6 +208,45 @@ test("admin identity providers request uses the login-order sort", async () => {
       request,
       "https://kitezh.onrender.com/api/admin/identity-providers?q=google&page=0&size=10&sort=guiOrder%2Casc",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin sessions request encodes status and client filters", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  globalThis.fetch = async (input) => {
+    request = input.toString();
+    return new Response(
+      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminSessions("access-token", "ada", "active", "account-console", 0, 10);
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/sessions?q=ada&clientId=account-console&status=active&page=0&size=10&sort=lastAccessTime%2Cdesc",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin session deletion uses the protected delete endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let method = "";
+  let request = "";
+  globalThis.fetch = async (input, init) => {
+    request = input.toString();
+    method = init?.method ?? "GET";
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await deleteAdminSession("access-token", "session/one");
+    assert.equal(method, "DELETE");
+    assert.equal(request, "https://kitezh.onrender.com/api/admin/sessions/session%2Fone");
   } finally {
     globalThis.fetch = originalFetch;
   }

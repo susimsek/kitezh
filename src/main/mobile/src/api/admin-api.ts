@@ -73,6 +73,16 @@ export type AdminIdentityProvider = {
   mapperCount: number;
 };
 
+export type AdminSession = {
+  id: string;
+  username: string;
+  createdAt: string;
+  lastAccessedAt: string;
+  expiresAt: string;
+  authorizationCount: number;
+  active: boolean;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -267,6 +277,45 @@ export function listAdminIdentityProviders(
     `/api/admin/identity-providers?${params.toString()}`,
     options,
     false,
+  );
+}
+
+export function listAdminSessions(
+  accessToken: string,
+  query = "",
+  status = "active",
+  clientId = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    clientId,
+    status,
+    page: String(page),
+    size: String(size),
+    sort: "lastAccessTime,desc",
+  });
+  return requestAdmin<AdminPage<AdminSession>>(
+    accessToken,
+    `/api/admin/sessions?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function deleteAdminSession(
+  accessToken: string,
+  sessionId: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<void>(
+    accessToken,
+    `/api/admin/sessions/${encodeURIComponent(sessionId)}`,
+    options,
+    false,
+    { method: "DELETE" },
   );
 }
 
