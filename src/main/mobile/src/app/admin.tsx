@@ -19,6 +19,7 @@ import {
   listAdminClientScopes,
   listAdminClients,
   listAdminGroups,
+  listAdminIdentityProviders,
   listAdminRoles,
   listAdminUsers,
   setAdminUserEnabled,
@@ -26,6 +27,7 @@ import {
   type AdminClient,
   type AdminClientScope,
   type AdminGroup,
+  type AdminIdentityProvider,
   type AdminPage,
   type AdminRole,
   type AdminUser,
@@ -43,6 +45,7 @@ type AdminSection =
   | "scopes"
   | "roles"
   | "groups"
+  | "identity-providers"
   | "settings";
 
 export default function AdminScreen() {
@@ -94,6 +97,15 @@ function AdminConsole() {
   const [groupsErrorStatus, setGroupsErrorStatus] = useState<number | null>(null);
   const [groupQuery, setGroupQuery] = useState("");
   const [groupPage, setGroupPage] = useState(0);
+  const [identityProviders, setIdentityProviders] = useState<
+    AdminPage<AdminIdentityProvider> | null
+  >(null);
+  const [identityProvidersLoading, setIdentityProvidersLoading] = useState(false);
+  const [identityProvidersErrorStatus, setIdentityProvidersErrorStatus] = useState<number | null>(
+    null,
+  );
+  const [identityProviderQuery, setIdentityProviderQuery] = useState("");
+  const [identityProviderPage, setIdentityProviderPage] = useState(0);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -296,6 +308,39 @@ function AdminConsole() {
     [groupPage, groupQuery, refreshSession, session],
   );
 
+  const loadIdentityProviders = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setIdentityProvidersLoading(true);
+      setIdentityProvidersErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setIdentityProviders(
+          await listAdminIdentityProviders(
+            currentSession.accessToken,
+            identityProviderQuery,
+            identityProviderPage,
+            10,
+            {
+              refreshAccessToken: async () =>
+                (await refreshSession(true))?.accessToken ?? null,
+            },
+          ),
+        );
+      } catch (cause) {
+        setIdentityProvidersErrorStatus(
+          cause instanceof AdminApiError ? cause.status : 0,
+        );
+      } finally {
+        setIdentityProvidersLoading(false);
+      }
+    },
+    [identityProviderPage, identityProviderQuery, refreshSession, session],
+  );
+
   const deleteUser = useCallback(
     (user: AdminUser) => {
       if (!session || userActionKey) return;
@@ -367,6 +412,12 @@ function AdminConsole() {
       queueMicrotask(() => void loadGroups());
     }
   }, [loadGroups, section, session]);
+
+  useEffect(() => {
+    if (session && section === "identity-providers") {
+      queueMicrotask(() => void loadIdentityProviders());
+    }
+  }, [loadIdentityProviders, section, session]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -443,7 +494,9 @@ function AdminConsole() {
                     : section === "roles"
                       ? dictionary.adminRoles
                       : section === "groups"
-                        ? dictionary.adminGroups
+                      ? dictionary.adminGroups
+                        : section === "identity-providers"
+                          ? dictionary.adminIdentityProviders
                         : dictionary.adminSettings}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
@@ -533,6 +586,22 @@ function AdminConsole() {
                 setQuery={(query) => {
                   setGroupPage(0);
                   setGroupQuery(query);
+                }}
+              />
+            ) : section === "identity-providers" ? (
+              <IdentityProvidersContent
+                errorStatus={identityProvidersErrorStatus}
+                loading={identityProvidersLoading}
+                onNext={() => setIdentityProviderPage((page) => page + 1)}
+                onPrevious={() =>
+                  setIdentityProviderPage((page) => Math.max(0, page - 1))
+                }
+                onRetry={() => void loadIdentityProviders(true)}
+                page={identityProviders}
+                query={identityProviderQuery}
+                setQuery={(query) => {
+                  setIdentityProviderPage(0);
+                  setIdentityProviderQuery(query);
                 }}
               />
             ) : null}
@@ -1092,6 +1161,95 @@ function GroupsContent({
   );
 }
 
+function IdentityProvidersContent({
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminIdentityProvider> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchIdentityProviders}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchIdentityProviders}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403
+              ? dictionary.adminForbidden
+              : dictionary.adminIdentityProvidersLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((provider) => (
+            <View
+              key={provider.id}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <View style={styles.userCardHeader}>
+                <Text style={[styles.userName, { color: palette.text }]}>
+                  {provider.displayName || provider.alias}
+                </Text>
+                <Text style={{ color: provider.enabled ? palette.success : palette.danger }}>
+                  {provider.enabled ? dictionary.adminUserEnabled : dictionary.adminUserDisabled}
+                </Text>
+              </View>
+              <Text style={{ color: palette.textMuted }}>
+                {provider.providerType} · {provider.registrationId}
+              </Text>
+              <Text style={[styles.roles, { color: palette.textMuted }]}>
+                {provider.configured ? dictionary.adminConfigured : dictionary.adminUnconfigured}
+                {provider.hideOnLogin ? ` · ${dictionary.adminHidden}` : ""}
+                {` · ${provider.mapperCount} mappers`}
+              </Text>
+            </View>
+          ))}
+          <Pagination
+            loading={loading}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            page={page}
+            palette={palette}
+          />
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoIdentityProviders}</Text>
+      )}
+    </View>
+  );
+}
+
 function Pagination<T>({
   loading,
   onNext,
@@ -1181,7 +1339,7 @@ function AdminTabBar({
   const tabs: readonly [
     AdminSection,
     string,
-    "home" | "shield" | "layers" | "gear",
+    "home" | "shield" | "layers" | "globe" | "gear",
   ][] = [
     ["dashboard", dictionary.adminDashboard, "home"],
     ["users", dictionary.adminUsers, "shield"],
@@ -1189,6 +1347,7 @@ function AdminTabBar({
     ["scopes", dictionary.adminClientScopes, "layers"],
     ["roles", dictionary.adminRoles, "shield"],
     ["groups", dictionary.adminGroups, "layers"],
+    ["identity-providers", dictionary.adminIdentityProviders, "globe"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
   return (

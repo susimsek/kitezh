@@ -61,6 +61,18 @@ export type AdminGroup = {
   userCount: number;
 };
 
+export type AdminIdentityProvider = {
+  id: string;
+  registrationId: string;
+  providerType: string;
+  displayName: string;
+  alias: string;
+  enabled: boolean;
+  configured: boolean;
+  hideOnLogin: boolean;
+  mapperCount: number;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -232,6 +244,27 @@ export function listAdminGroups(
   return requestAdmin<AdminPage<AdminGroup>>(
     accessToken,
     `/api/admin/groups?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function listAdminIdentityProviders(
+  accessToken: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "guiOrder,asc",
+  });
+  return requestAdmin<AdminPage<AdminIdentityProvider>>(
+    accessToken,
+    `/api/admin/identity-providers?${params.toString()}`,
     options,
     false,
   );

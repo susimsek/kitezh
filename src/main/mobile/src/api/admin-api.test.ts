@@ -8,6 +8,7 @@ import {
   listAdminClients,
   listAdminClientScopes,
   listAdminGroups,
+  listAdminIdentityProviders,
   listAdminRoles,
   deleteAdminUser,
   setAdminUserEnabled,
@@ -184,6 +185,27 @@ test("admin roles and groups requests use bounded sorted pages", async () => {
       "https://kitezh.onrender.com/api/admin/roles?q=admin&page=0&size=10&sort=name%2Casc",
       "https://kitezh.onrender.com/api/admin/groups?q=finance&page=1&size=10&sort=name%2Casc",
     ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin identity providers request uses the login-order sort", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  globalThis.fetch = async (input) => {
+    request = input.toString();
+    return new Response(
+      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminIdentityProviders("access-token", "google", 0, 10);
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/identity-providers?q=google&page=0&size=10&sort=guiOrder%2Casc",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
