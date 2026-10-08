@@ -194,15 +194,28 @@ async function initializeUpdateRecovery() {
   }
 }
 
+export function supportsAutoUpdate({
+  appImage,
+  autoUpdate,
+  packaged,
+  platform,
+}: {
+  appImage: boolean;
+  autoUpdate?: string;
+  packaged: boolean;
+  platform: NodeJS.Platform;
+}) {
+  if (!packaged || autoUpdate === "false") return false;
+  return platform !== "linux" || appImage;
+}
+
 function isSupported() {
-  if (!app.isPackaged) return false;
-  if (
-    !process.env.DESKTOP_AUTO_UPDATE ||
-    process.env.DESKTOP_AUTO_UPDATE === "true"
-  ) {
-    return process.platform !== "linux" || Boolean(process.env.APPIMAGE);
-  }
-  return false;
+  return supportsAutoUpdate({
+    appImage: Boolean(process.env.APPIMAGE),
+    autoUpdate: process.env.DESKTOP_AUTO_UPDATE,
+    packaged: app.isPackaged,
+    platform: process.platform,
+  });
 }
 
 function isUpdatePreviewEnabled() {

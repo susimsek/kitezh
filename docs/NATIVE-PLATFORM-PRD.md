@@ -285,7 +285,7 @@ acceptance evidence is linked in the feature matrix.
 - [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; CI signing, staged rollout evidence, and store metadata remain
 - [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; device build, fixture server, and CI matrix remain
 - [~] Desktop package metadata smoke check added in `src/main/desktop/test/package-metadata.test.mjs`; macOS/Windows/Linux packaged startup, protocol, storage, asset, and signed-artifact runs remain
-- [ ] Linux system-package handoff and AppImage rollback verification
+- [~] Linux system-package handoff is enforced by `supportsAutoUpdate` and covered by desktop tests; packaged AppImage rollback and `.deb`/`.rpm`/`.snap` smoke evidence remain
 - [ ] Desktop signing, Sigstore, checksum, and update-manifest verification
 - [~] Desktop accessibility screenshots and native control checks
 - [~] Desktop accessibility behavior: focus, keyboard, ARIA, high contrast, and reduced motion
