@@ -87,6 +87,7 @@ export const messages = {
     revokeApplication: "Revoke access",
     revokeApplicationConfirm: "Revoke this application's access?",
     revokeApplicationError: "We could not revoke this application. Try again.",
+    revokeApplicationSuccess: "Application access was revoked.",
     offlineSessions: "Offline sessions",
     offlineSessionsTitle: "Offline sessions",
     offlineSessionsHelp:
@@ -100,6 +101,7 @@ export const messages = {
     revokeOfflineSessionConfirm: "Revoke this offline session?",
     revokeOfflineSessionError:
       "We could not revoke this offline session. Try again.",
+    revokeOfflineSessionSuccess: "Offline session was revoked.",
     deleteAccount: "Delete account",
     deleteAccountWarning:
       "This permanently deletes your account and cannot be undone.",
@@ -141,6 +143,8 @@ export const messages = {
     socialRemoveConfirm: "Remove this social account link?",
     socialRemoveError:
       "We could not remove this social account link. Try again.",
+    socialRemoveSuccess: "Social account link was removed.",
+    close: "Close",
     systemLanguage: "System language",
     appearance: "Appearance",
     english: "English",
@@ -243,6 +247,7 @@ export const messages = {
     revokeApplicationConfirm: "Bu uygulamanın erişimi iptal edilsin mi?",
     revokeApplicationError:
       "Bu uygulamanın erişimi iptal edilemedi. Tekrar deneyin.",
+    revokeApplicationSuccess: "Uygulama erişimi iptal edildi.",
     offlineSessions: "Çevrimdışı oturumlar",
     offlineSessionsTitle: "Çevrimdışı oturumlar",
     offlineSessionsHelp:
@@ -256,6 +261,7 @@ export const messages = {
     revokeOfflineSessionConfirm: "Bu çevrimdışı oturum iptal edilsin mi?",
     revokeOfflineSessionError:
       "Bu çevrimdışı oturum iptal edilemedi. Tekrar deneyin.",
+    revokeOfflineSessionSuccess: "Çevrimdışı oturum iptal edildi.",
     deleteAccount: "Hesabı sil",
     deleteAccountWarning:
       "Bu işlem hesabınızı kalıcı olarak siler ve geri alınamaz.",
@@ -299,6 +305,8 @@ export const messages = {
     socialRemove: "Bağlantıyı kaldır",
     socialRemoveConfirm: "Bu sosyal hesap bağlantısı kaldırılsın mı?",
     socialRemoveError: "Sosyal hesap bağlantısı kaldırılamadı. Tekrar deneyin.",
+    socialRemoveSuccess: "Sosyal hesap bağlantısı kaldırıldı.",
+    close: "Kapat",
     systemLanguage: "Sistem dili",
     appearance: "Görünüm",
     english: "İngilizce",

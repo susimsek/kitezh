@@ -3,6 +3,10 @@ import test from "node:test";
 
 import { messages, resolveLocale } from "../../shared/src/i18n.ts";
 import { colors, resolveTheme } from "../../shared/src/theme.ts";
+import {
+  DEFAULT_NOTICE_DURATION_MS,
+  normalizeNoticeDuration,
+} from "./notifications/notice.ts";
 import type {
   ConsoleName,
   DesktopLanguageMode,
@@ -36,4 +40,10 @@ test("native contracts stay platform-neutral", () => {
   assert.equal(consoleName, "account");
   assert.equal(languageMode, "system");
   assert.equal(provider.configured, true);
+});
+
+test("mobile notices use a bounded auto-dismiss duration", () => {
+  assert.equal(normalizeNoticeDuration(), DEFAULT_NOTICE_DURATION_MS);
+  assert.equal(normalizeNoticeDuration(500), 1_000);
+  assert.equal(normalizeNoticeDuration(60_000), 10_000);
 });

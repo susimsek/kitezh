@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import { authorizationServerIssuer } from "@/config";
 import {
   listSocialLinks,
@@ -28,6 +29,7 @@ export default function SocialLinksScreen() {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
   const { refreshSession, session, status } = useMobileAuth();
+  const { showNotice } = useMobileNotice();
   const [links, setLinks] = useState<SocialLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -82,13 +84,24 @@ export default function SocialLinksScreen() {
             item.provider === link.provider ? { ...item, linked: false } : item,
           ),
         );
+        showNotice({
+          kind: "success",
+          message: dictionary.socialRemoveSuccess,
+        });
       } catch {
-        Alert.alert(dictionary.socialRemoveError);
+        showNotice({ kind: "error", message: dictionary.socialRemoveError });
       } finally {
         setBusyProvider(null);
       }
     },
-    [busyProvider, dictionary.socialRemoveError, refreshSession, session],
+    [
+      busyProvider,
+      dictionary.socialRemoveError,
+      dictionary.socialRemoveSuccess,
+      refreshSession,
+      session,
+      showNotice,
+    ],
   );
 
   const openLinkFlow = useCallback(
@@ -99,11 +112,13 @@ export default function SocialLinksScreen() {
         const url = `${authorizationServerIssuer.replace(/\/$/, "")}/account/social-links/${encodeURIComponent(provider)}/start`;
         await WebBrowser.openBrowserAsync(url);
         await load(true);
+      } catch {
+        showNotice({ kind: "error", message: dictionary.browserError });
       } finally {
         setBusyProvider(null);
       }
     },
-    [busyProvider, load],
+    [busyProvider, dictionary.browserError, load, showNotice],
   );
 
   const confirmRemove = (link: SocialLink) => {

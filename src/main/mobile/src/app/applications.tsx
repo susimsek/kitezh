@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
 import { AccountTabBar } from "@/components/AccountTabBar";
+import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import {
   listAccountApplications,
   listOfflineSessions,
@@ -36,6 +37,7 @@ export default function ApplicationsScreen() {
   const { dictionary, resolvedLocale } = useLocale();
   const { palette } = useTheme();
   const { session, status, refreshSession } = useMobileAuth();
+  const { showNotice } = useMobileNotice();
   const [applications, setApplications] = useState<AccountApplication[]>([]);
   const [offlineSessions, setOfflineSessions] = useState<
     AccountOfflineSession[]
@@ -108,8 +110,15 @@ export default function ApplicationsScreen() {
           },
         );
         await loadData(true);
+        showNotice({
+          kind: "success",
+          message: dictionary.revokeApplicationSuccess,
+        });
       } catch {
-        Alert.alert(dictionary.revokeApplicationError);
+        showNotice({
+          kind: "error",
+          message: dictionary.revokeApplicationError,
+        });
       } finally {
         setBusyKey(null);
       }
@@ -117,8 +126,10 @@ export default function ApplicationsScreen() {
     [
       busyKey,
       dictionary.revokeApplicationError,
+      dictionary.revokeApplicationSuccess,
       loadData,
       refreshSession,
+      showNotice,
       session,
     ],
   );
@@ -140,8 +151,15 @@ export default function ApplicationsScreen() {
           },
         );
         await loadData(true);
+        showNotice({
+          kind: "success",
+          message: dictionary.revokeOfflineSessionSuccess,
+        });
       } catch {
-        Alert.alert(dictionary.revokeOfflineSessionError);
+        showNotice({
+          kind: "error",
+          message: dictionary.revokeOfflineSessionError,
+        });
       } finally {
         setBusyKey(null);
       }
@@ -149,8 +167,10 @@ export default function ApplicationsScreen() {
     [
       busyKey,
       dictionary.revokeOfflineSessionError,
+      dictionary.revokeOfflineSessionSuccess,
       loadData,
       refreshSession,
+      showNotice,
       session,
     ],
   );
@@ -206,119 +226,122 @@ export default function ApplicationsScreen() {
     >
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dictionary.back}
-            onPress={() => router.back()}
-            style={styles.back}
-          >
-            <AppIcon name="arrowLeft" size={18} color={palette.primary} />
-            <Text style={{ color: palette.primary }}>{dictionary.back}</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: palette.text }]}>
-            {dictionary.applications}
-          </Text>
-        </View>
-
-        <SectionHeader palette={palette} title={dictionary.applicationsTitle} />
-        {applicationsLoading ? (
-          <ActivityIndicator
-            color={palette.primary}
-            accessibilityLabel={dictionary.loading}
-          />
-        ) : applicationsError ? (
-          <RetryRow
-            label={dictionary.applicationsError}
-            retry={dictionary.sessionsRetry}
-            onPress={() => void loadData(true)}
-            palette={palette}
-          />
-        ) : applications.length === 0 ? (
-          <Text style={[styles.empty, { color: palette.textMuted }]}>
-            {dictionary.applicationsEmpty}
-          </Text>
-        ) : (
-          applications.map((application) => (
-            <View
-              key={application.clientId}
-              style={[styles.card, { borderColor: palette.border }]}
+          <View style={styles.header}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={dictionary.back}
+              onPress={() => router.back()}
+              style={styles.back}
             >
-              <Text style={[styles.cardTitle, { color: palette.text }]}>
-                {application.clientName}
-              </Text>
-              <Text style={[styles.meta, { color: palette.textMuted }]}>
-                {application.clientId}
-              </Text>
-              <Text style={[styles.meta, { color: palette.textMuted }]}>
-                {application.scopes.join(", ")}
-              </Text>
-              <ActionButton
-                label={dictionary.revokeApplication}
-                loading={busyKey === `application:${application.clientId}`}
-                disabled={Boolean(busyKey)}
-                onPress={() => confirmApplication(application)}
-                palette={palette}
-              />
-            </View>
-          ))
-        )}
+              <AppIcon name="arrowLeft" size={18} color={palette.primary} />
+              <Text style={{ color: palette.primary }}>{dictionary.back}</Text>
+            </Pressable>
+            <Text style={[styles.title, { color: palette.text }]}>
+              {dictionary.applications}
+            </Text>
+          </View>
 
-        <SectionHeader
-          palette={palette}
-          title={dictionary.offlineSessionsTitle}
-          help={dictionary.offlineSessionsHelp}
-        />
-        {offlineLoading ? (
-          <ActivityIndicator
-            color={palette.primary}
-            accessibilityLabel={dictionary.loading}
-          />
-        ) : offlineError ? (
-          <RetryRow
-            label={dictionary.offlineSessionsError}
-            retry={dictionary.sessionsRetry}
-            onPress={() => void loadData(true)}
+          <SectionHeader
             palette={palette}
+            title={dictionary.applicationsTitle}
           />
-        ) : offlineSessions.length === 0 ? (
-          <Text style={[styles.empty, { color: palette.textMuted }]}>
-            {dictionary.offlineSessionsEmpty}
-          </Text>
-        ) : (
-          offlineSessions.map((offlineSession) => (
-            <View
-              key={offlineSession.id}
-              style={[styles.card, { borderColor: palette.border }]}
-            >
-              <Text style={[styles.cardTitle, { color: palette.text }]}>
-                {offlineSession.clientName}
-              </Text>
-              <Text style={[styles.meta, { color: palette.textMuted }]}>
-                {offlineSession.clientId}
-              </Text>
-              <Text style={[styles.meta, { color: palette.textMuted }]}>
-                {dictionary.offlineIssued}:{" "}
-                {formatDate(offlineSession.issuedAt, resolvedLocale, "—")}
-              </Text>
-              <Text style={[styles.meta, { color: palette.textMuted }]}>
-                {dictionary.offlineExpires}:{" "}
-                {formatDate(
-                  offlineSession.expiresAt,
-                  resolvedLocale,
-                  dictionary.offlineNoExpiry,
-                )}
-              </Text>
-              <ActionButton
-                label={dictionary.revokeOfflineSession}
-                loading={busyKey === `offline:${offlineSession.id}`}
-                disabled={Boolean(busyKey)}
-                onPress={() => confirmOffline(offlineSession)}
-                palette={palette}
-              />
-            </View>
-          ))
-        )}
+          {applicationsLoading ? (
+            <ActivityIndicator
+              color={palette.primary}
+              accessibilityLabel={dictionary.loading}
+            />
+          ) : applicationsError ? (
+            <RetryRow
+              label={dictionary.applicationsError}
+              retry={dictionary.sessionsRetry}
+              onPress={() => void loadData(true)}
+              palette={palette}
+            />
+          ) : applications.length === 0 ? (
+            <Text style={[styles.empty, { color: palette.textMuted }]}>
+              {dictionary.applicationsEmpty}
+            </Text>
+          ) : (
+            applications.map((application) => (
+              <View
+                key={application.clientId}
+                style={[styles.card, { borderColor: palette.border }]}
+              >
+                <Text style={[styles.cardTitle, { color: palette.text }]}>
+                  {application.clientName}
+                </Text>
+                <Text style={[styles.meta, { color: palette.textMuted }]}>
+                  {application.clientId}
+                </Text>
+                <Text style={[styles.meta, { color: palette.textMuted }]}>
+                  {application.scopes.join(", ")}
+                </Text>
+                <ActionButton
+                  label={dictionary.revokeApplication}
+                  loading={busyKey === `application:${application.clientId}`}
+                  disabled={Boolean(busyKey)}
+                  onPress={() => confirmApplication(application)}
+                  palette={palette}
+                />
+              </View>
+            ))
+          )}
+
+          <SectionHeader
+            palette={palette}
+            title={dictionary.offlineSessionsTitle}
+            help={dictionary.offlineSessionsHelp}
+          />
+          {offlineLoading ? (
+            <ActivityIndicator
+              color={palette.primary}
+              accessibilityLabel={dictionary.loading}
+            />
+          ) : offlineError ? (
+            <RetryRow
+              label={dictionary.offlineSessionsError}
+              retry={dictionary.sessionsRetry}
+              onPress={() => void loadData(true)}
+              palette={palette}
+            />
+          ) : offlineSessions.length === 0 ? (
+            <Text style={[styles.empty, { color: palette.textMuted }]}>
+              {dictionary.offlineSessionsEmpty}
+            </Text>
+          ) : (
+            offlineSessions.map((offlineSession) => (
+              <View
+                key={offlineSession.id}
+                style={[styles.card, { borderColor: palette.border }]}
+              >
+                <Text style={[styles.cardTitle, { color: palette.text }]}>
+                  {offlineSession.clientName}
+                </Text>
+                <Text style={[styles.meta, { color: palette.textMuted }]}>
+                  {offlineSession.clientId}
+                </Text>
+                <Text style={[styles.meta, { color: palette.textMuted }]}>
+                  {dictionary.offlineIssued}:{" "}
+                  {formatDate(offlineSession.issuedAt, resolvedLocale, "—")}
+                </Text>
+                <Text style={[styles.meta, { color: palette.textMuted }]}>
+                  {dictionary.offlineExpires}:{" "}
+                  {formatDate(
+                    offlineSession.expiresAt,
+                    resolvedLocale,
+                    dictionary.offlineNoExpiry,
+                  )}
+                </Text>
+                <ActionButton
+                  label={dictionary.revokeOfflineSession}
+                  loading={busyKey === `offline:${offlineSession.id}`}
+                  disabled={Boolean(busyKey)}
+                  onPress={() => confirmOffline(offlineSession)}
+                  palette={palette}
+                />
+              </View>
+            ))
+          )}
         </ScrollView>
         <AccountTabBar active="applications" />
       </View>

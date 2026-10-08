@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LocaleProvider, useLocale } from "@/i18n/LocaleProvider";
 import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
 import { MobileAuthProvider } from "@/auth/MobileAuthProvider";
+import { MobileNoticeProvider } from "@/components/MobileNoticeProvider";
 
 function AppNavigator() {
   const { ready: themeReady, resolvedTheme, palette } = useTheme();
@@ -35,9 +36,11 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <LocaleProvider>
-        <MobileAuthProvider>
-          <AppNavigator />
-        </MobileAuthProvider>
+        <MobileNoticeProvider>
+          <MobileAuthProvider>
+            <AppNavigator />
+          </MobileAuthProvider>
+        </MobileNoticeProvider>
       </LocaleProvider>
     </ThemeProvider>
   );

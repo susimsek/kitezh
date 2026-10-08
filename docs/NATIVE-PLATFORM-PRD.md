@@ -281,7 +281,7 @@ acceptance evidence is linked in the feature matrix.
 - [ ] Mobile Admin pagination, filters, authority-aware actions, and confirmations
 - [ ] Android/iOS development-build and device E2E coverage
 - [ ] Mobile store/OTA release and rollback strategy
-- [ ] Mobile notification, permission, and action-routing adapter
+- [~] Mobile in-app notification adapter with localized auto-dismiss feedback (`MobileNoticeProvider`); OS permission and authenticated action-routing remain blocked until a backend event contract and native E2E harness are available
 - [ ] Mobile signing, runtime-version, staged rollout, and release metadata
 - [ ] Mobile native E2E harness, fixtures, and CI matrix
 - [ ] Desktop packaged smoke tests on macOS, Windows, and Linux
