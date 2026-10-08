@@ -242,7 +242,7 @@ The following matrix compares the behavior currently implemented in this reposit
 | Authorization Services / UMA | Spring Security authorities protect endpoints | Resources, scopes, policies, permissions, permission tickets, and RPTs[^7] | Missing | Separate resource-server authorization product from admin RBAC. |
 | Admin REST | Documented custom `/api/admin` contract with OpenAPI | Keycloak Admin REST under `/admin/realms/{realm}` | Partial | Keep the application contract; map semantics explicitly rather than copying paths. |
 | Account Console | Custom account pages for profile, security, sessions, consents, and configurable profile attributes | Keycloak Account Console and account REST capabilities | Partial | Preserve the current user experience and add credential inventory and device views. |
-| Themes and localization | Next.js theme switcher, English/Turkish dictionaries, application-wide locale settings, persisted per-user locale preference, separate `login`/`account`/`admin`/`email`/`backend`/`common` bundles, database message overrides, and an effective-message browser | Themes, message bundles, supported locales, default locale, user locale preference, realm overrides, and effective bundle search | Implemented (application scope) | Built-in messages remain bundled resources; administrators can enable supported locales, choose one of the six message bundles, override individual messages, and inspect the merged frontend or backend bundle without a realm. The authenticated user's language preference is available as a separate field in the account profile and is persisted on the user record. Locale resolution follows the Keycloak order: an explicitly selected locale cookie, the authenticated user's profile preference, OIDC `ui_locales`, the browser cookie, the `Accept-Language` header, and the configured default. |
+| Themes and localization | Next.js theme switcher, English/Turkish dictionaries, application-wide locale settings, persisted per-user locale preference, separate `login`/`account`/`admin`/`email`/`backend`/`common` bundles, database message overrides, and an effective-message browser | Themes, message bundles, supported locales, default locale, user locale preference, realm overrides, and effective bundle search | Implemented (application scope) | Built-in messages remain bundled resources; administrators can enable supported locales, choose one of the six message bundles, override individual messages, and inspect the merged web or backend bundle without a realm. The authenticated user's language preference is available as a separate field in the account profile and is persisted on the user record. Locale resolution follows the Keycloak order: an explicitly selected locale cookie, the authenticated user's profile preference, OIDC `ui_locales`, the browser cookie, the `Accept-Language` header, and the configured default. |
 
 ### Existing roles and Keycloak equivalents
 
@@ -691,7 +691,7 @@ Liquibase changelogs, CSV seed data, and i18n bundles must remain available to n
 - [ ] Controller, service, authorization, persistence, and UI tests cover viewer and manager decisions.
 - [ ] OpenAPI documentation reflects the actual request and response contracts.
 - [ ] Liquibase migrations, cache regions, native hints, localized strings, and audit behavior are verified.
-- [ ] `./mvnw verify`, frontend formatting, type checking, linting, and unit tests pass.
+- [ ] `./mvnw verify`, web formatting, type checking, linting, and unit tests pass.
 
 ## Current implementation mapping and gaps
 

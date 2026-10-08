@@ -106,12 +106,12 @@ jobs:
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
           cache-dependency-path: |
-            src/main/frontend/pnpm-lock.yaml
+            src/main/web/pnpm-lock.yaml
             src/main/desktop/pnpm-lock.yaml
           install: false
 
-      - name: Install frontend dependencies
-        working-directory: src/main/frontend
+      - name: Install web dependencies
+        working-directory: src/main/web
         run: pnpm install --frozen-lockfile
 
       - name: Install desktop dependencies

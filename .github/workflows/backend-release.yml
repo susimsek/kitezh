@@ -46,7 +46,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
       - name: Make Maven wrapper executable
@@ -55,11 +55,11 @@ jobs:
       - name: Install Maven dependencies
         run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
-      - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
 
-      - name: Build frontend assets
-        run: pnpm --dir src/main/frontend build
+      - name: Build web assets
+        run: pnpm --dir src/main/web build
 
       - name: Verify backend
         run: ./mvnw -B -ntp verify -Dskip.frontend=true
@@ -109,7 +109,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
       - name: Make Maven wrapper executable
@@ -118,11 +118,11 @@ jobs:
       - name: Install Maven dependencies
         run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
-      - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
 
-      - name: Build frontend assets
-        run: pnpm --dir src/main/frontend build
+      - name: Build web assets
+        run: pnpm --dir src/main/web build
 
       - name: Install UPX
         run: |

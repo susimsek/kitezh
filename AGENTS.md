@@ -62,7 +62,7 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
 
 ## Project Structure
 
-- `src/main/frontend`: Next.js App Router + TypeScript login, Administration Console, and Account Console UI built with pnpm, React-Bootstrap, Bootstrap, and Font Awesome. Maven exports it into Spring Boot static resources.
+- `src/main/web`: Next.js App Router + TypeScript login, Administration Console, and Account Console UI built with pnpm, React-Bootstrap, Bootstrap, and Font Awesome. Maven exports it into Spring Boot static resources.
   - `routing/AppRoutes.tsx` and `components/admin`: Administration Console routes and UI.
   - `routing/AppRoutes.tsx` and `components/account`: end-user Account Console routes and UI.
   - `lib/console-auth.ts`: shared browser OIDC Authorization Code + PKCE, refresh-token, and logout adapter.

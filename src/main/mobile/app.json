@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Kitezh",
+    "slug": "kitezh",
+    "version": "0.1.0",
+    "scheme": "kitezh",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.github.susimsek.kitezh.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#0b3b82"
+      },
+      "package": "io.github.susimsek.kitezh.mobile"
+    },
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}

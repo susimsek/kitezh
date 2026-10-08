@@ -1,7 +1,7 @@
 # Mobile AI Agent Guidelines
 
 These instructions apply to `src/main/mobile/**`. The repository-root `AGENTS.md` remains
-applicable. The web rules in `src/main/frontend/AGENTS.md` and Electron rules in
+applicable. The web rules in `src/main/web/AGENTS.md` and Electron rules in
 `src/main/desktop/AGENTS.md` are references for shared behavior, but their DOM-, CSS-, or
 Electron-specific implementation details do not apply directly to React Native.
 

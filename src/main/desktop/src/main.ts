@@ -22,6 +22,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { ThemeMode } from "@kitezh/shared";
+
 import {
   DESKTOP_PROTOCOL,
   findDesktopDeepLink,
@@ -62,7 +64,7 @@ const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 app.setName(DESKTOP_APP_NAME);
 
-type DesktopTheme = "system" | "light" | "dark";
+type DesktopTheme = ThemeMode;
 type DesktopLanguage = "en" | "tr";
 
 let desktopLanguage: DesktopLanguage = app

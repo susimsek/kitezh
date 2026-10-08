@@ -107,6 +107,7 @@
     "releaseType": "release"
   },
   "dependencies": {
+    "@kitezh/shared": "file:../shared",
     "electron-updater": "6.8.9"
   }
 }
