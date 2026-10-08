@@ -53,7 +53,11 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Keep `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` enabled for every BrowserWindow.
 - Expose only the smallest required API through `contextBridge`; use explicit method names and validate every argument in the main process.
 - Serve the static renderer through the trusted `app://renderer` protocol. Do not load application screens from arbitrary remote URLs.
-- Reuse the shared web components, routes, translation dictionaries, API clients, and design tokens. Do not create a second desktop-only UI system or duplicate browser authentication logic.
+- Use the Web client as the behavior and API reference. Native authenticated Desktop screens must
+  not import Web DOM components, Web routes, React-Bootstrap, browser storage, or remote Web pages.
+  Reuse only framework-neutral contracts, semantic design tokens, icon metadata, and localized
+  message keys from shared code. Keep browser and Electron authentication protocol rules aligned
+  through typed adapters, without moving token exchange or secure storage into the renderer.
 - Keep platform-specific behavior behind small adapters. Use Node's path and URL APIs instead of shell-specific path or command assumptions.
 
 ## Security
