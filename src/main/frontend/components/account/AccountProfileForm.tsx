@@ -262,6 +262,7 @@ export function AccountProfileForm({ dictionary }: { dictionary: Dictionary }) {
       });
       persistLocale(values.preferredLocale);
       await i18n.changeLanguage(values.preferredLocale);
+      if (window.desktopApi) void window.desktopApi.language.set(values.preferredLocale);
       setProfile({ ...updated, preferredLocale: values.preferredLocale });
       const safeAttributesResponse = attributesResponse ?? { definitions: [], attributes: {} };
       setProfileAttributes(safeAttributesResponse);

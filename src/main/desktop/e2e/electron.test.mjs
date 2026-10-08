@@ -424,6 +424,18 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await settingsWindow.locator("#desktop-language").selectOption("tr");
     await mainWindow.getByRole("heading", { name: "Bir konsol seçin" }).waitFor();
     await settingsWindow.getByRole("heading", { name: "Ayarlar" }).waitFor();
+    await settingsWindow.close();
+    const reopenedSettingsWindowPromise = application.waitForEvent("window");
+    await clickApplicationMenuItem(application, "Ayarlar…");
+    const reopenedSettingsWindow = await reopenedSettingsWindowPromise;
+    await reopenedSettingsWindow
+      .getByRole("heading", { name: "Ayarlar" })
+      .waitFor();
+    assert.equal(
+      await reopenedSettingsWindow.locator("#desktop-language").inputValue(),
+      "tr",
+    );
+    await reopenedSettingsWindow.close();
     const checkingWindowPromise = application.waitForEvent("window");
     await clickApplicationMenuItem(application, "Güncellemeleri denetle…");
     const checkingWindow = await checkingWindowPromise;

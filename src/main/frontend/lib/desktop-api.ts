@@ -87,6 +87,7 @@ export type DesktopApi = {
     set: (value: "system" | "light" | "dark") => Promise<void>;
   };
   language: {
+    get: () => Promise<"en" | "tr">;
     set: (value: "en" | "tr") => Promise<void>;
     onChanged: (listener: (locale: "en" | "tr") => void) => () => void;
   };
