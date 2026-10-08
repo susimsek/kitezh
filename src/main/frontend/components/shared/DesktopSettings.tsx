@@ -62,8 +62,7 @@ export function DesktopSettings() {
   const [resettingDefaults, setResettingDefaults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const languageMode: LanguageMode =
-    typeof window !== "undefined" &&
-    localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system"
+    typeof window !== "undefined" && localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system"
       ? "system"
       : locale;
 
