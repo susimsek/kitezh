@@ -6,6 +6,13 @@ This product requirements document defines the Electron desktop console and its 
 
 The term “desktop” means a packaged Electron application with a local renderer. The existing responsive Next.js UI remains the shared renderer source, while Electron packages its static output locally and connects to the Render-hosted Spring Boot API. Spring Boot remains the authority for authentication, authorization, validation, persistence, audit events, localization, and deployment health.
 
+**Native migration decision (current):** the shared-renderer description above records the
+transitional implementation and remains valid for the screens that have not migrated yet. The
+target architecture is now documented in [`NATIVE-PLATFORM-PRD.md`](NATIVE-PLATFORM-PRD.md): Web is
+the behavior/API reference, while Mobile and Desktop own independent native screens and platform
+adapters. Do not use the transitional shared-renderer wording to mark an authenticated Desktop or
+Mobile screen complete.
+
 ## Desktop console, shared components, and Render delivery
 
 This section records the codebase audit and the implementation decisions needed to ship a maintainable Keycloak-like Electron desktop console. The application remains a Spring Boot resource server and authorization server with a statically exported Next.js renderer that is served by Spring Boot on the web and packaged locally by Electron.[^7]

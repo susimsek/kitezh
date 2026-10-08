@@ -422,6 +422,11 @@ installers are managed by the operating system.
 
 The static web client also contains browser-based OIDC clients for administration and end-user account management. Both use the Authorization Code flow with PKCE (S256), obtain access, ID, and refresh tokens, refresh access tokens before they expire, and sign out through the OIDC end-session endpoint. Access, ID, and refresh tokens remain in browser memory; only the short-lived authorization transaction is retained across the redirect callback.
 
+The Web console is the behavior reference for the native clients. The remaining Mobile and Desktop
+native migration scope, platform boundaries, acceptance states, and delivery order are tracked in
+[`docs/NATIVE-PLATFORM-PRD.md`](docs/NATIVE-PLATFORM-PRD.md) and the detailed
+[`WEB-MOBILE-FEATURE-MATRIX.md`](src/main/mobile/WEB-MOBILE-FEATURE-MATRIX.md).
+
 | Console | Entry URL | OIDC client | API scope | Access |
 | --- | --- | --- | --- | --- |
 | Administration | `/admin` | `admin-console` | `admin-api` | Administrative API permissions; the seeded `admin/admin` user has `ROLE_ADMIN` |
