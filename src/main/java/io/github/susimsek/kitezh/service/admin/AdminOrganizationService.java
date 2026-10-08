@@ -372,7 +372,6 @@ public class AdminOrganizationService {
     @Transactional
     public void addGroupMember(Long id, Long groupId, Long userId) {
         OrganizationGroupEntity group = group(id, groupId);
-        UserEntity user = user(userId);
         if (!memberRepository.existsByOrganizationIdAndUserId(id, userId)) {
             throw ApiException.badRequest(
                     ApiErrorCode.ORGANIZATION_MEMBER_REQUIRED,
@@ -383,6 +382,7 @@ public class AdminOrganizationService {
                     ApiErrorCode.ORGANIZATION_GROUP_MEMBER_EXISTS,
                     "The user is already in the organization group");
         }
+        UserEntity user = user(userId);
         OrganizationGroupMemberEntity membership = new OrganizationGroupMemberEntity();
         membership.setGroup(group);
         membership.setUser(user);

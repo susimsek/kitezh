@@ -65,12 +65,10 @@ class AdminOrganizationServiceTest {
     @Test
     void rejectsDuplicateOrganizationAlias() {
         when(organizationRepository.existsByAliasIgnoreCase("acme")).thenReturn(true);
+        AdminOrganizationRequestDTO request =
+                new AdminOrganizationRequestDTO("acme", "Acme", null, null, true);
 
-        assertThatThrownBy(
-                        () ->
-                                service.create(
-                                        new AdminOrganizationRequestDTO(
-                                                "acme", "Acme", null, null, true)))
+        assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
@@ -109,13 +107,10 @@ class AdminOrganizationServiceTest {
         OrganizationEntity organization = new OrganizationEntity();
         organization.setId(10L);
         when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
+        AdminOrganizationDomainRequestDTO request =
+                new AdminOrganizationDomainRequestDTO("https://example.com");
 
-        assertThatThrownBy(
-                        () ->
-                                service.addDomain(
-                                        10L,
-                                        new AdminOrganizationDomainRequestDTO(
-                                                "https://example.com")))
+        assertThatThrownBy(() -> service.addDomain(10L, request))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
@@ -429,33 +424,27 @@ class AdminOrganizationServiceTest {
         OrganizationEntity organization = organization(10L, "acme");
         when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
         when(organizationRepository.existsByAliasIgnoreCase("other")).thenReturn(true);
-        assertThatThrownBy(
-                        () ->
-                                service.update(
-                                        10L,
-                                        new AdminOrganizationRequestDTO(
-                                                "other", "Acme", null, null, true)))
+        AdminOrganizationRequestDTO updateRequest =
+                new AdminOrganizationRequestDTO("other", "Acme", null, null, true);
+        assertThatThrownBy(() -> service.update(10L, updateRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
                 .isEqualTo(ApiErrorCode.ORGANIZATION_DUPLICATE_ALIAS);
 
         when(memberRepository.existsByOrganizationIdAndUserId(10L, 20L)).thenReturn(true);
-        assertThatThrownBy(
-                        () ->
-                                service.addMember(
-                                        10L, new AdminOrganizationMemberRequestDTO(20L, "member")))
+        AdminOrganizationMemberRequestDTO memberRequest =
+                new AdminOrganizationMemberRequestDTO(20L, "member");
+        assertThatThrownBy(() -> service.addMember(10L, memberRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
                 .isEqualTo(ApiErrorCode.ORGANIZATION_MEMBER_EXISTS);
 
         when(domainRepository.existsByDomainIgnoreCase("acme.example.com")).thenReturn(true);
-        assertThatThrownBy(
-                        () ->
-                                service.addDomain(
-                                        10L,
-                                        new AdminOrganizationDomainRequestDTO("acme.example.com")))
+        AdminOrganizationDomainRequestDTO domainRequest =
+                new AdminOrganizationDomainRequestDTO("acme.example.com");
+        assertThatThrownBy(() -> service.addDomain(10L, domainRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
@@ -463,12 +452,9 @@ class AdminOrganizationServiceTest {
 
         when(claimRepository.existsByOrganizationIdAndClaimNameIgnoreCase(10L, "organization"))
                 .thenReturn(true);
-        assertThatThrownBy(
-                        () ->
-                                service.createClaim(
-                                        10L,
-                                        new AdminOrganizationClaimRequestDTO(
-                                                "organization", "acme", null, null, null)))
+        AdminOrganizationClaimRequestDTO claimRequest =
+                new AdminOrganizationClaimRequestDTO("organization", "acme", null, null, null);
+        assertThatThrownBy(() -> service.createClaim(10L, claimRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
@@ -534,11 +520,9 @@ class AdminOrganizationServiceTest {
         when(groupRepository.findByIdAndOrganizationId(60L, 10L)).thenReturn(Optional.of(group));
         when(groupRepository.existsByOrganizationIdAndNameIgnoreCase(10L, "engineering"))
                 .thenReturn(true);
-        assertThatThrownBy(
-                        () ->
-                                service.createGroup(
-                                        10L,
-                                        new AdminOrganizationGroupRequestDTO("engineering", null)))
+        AdminOrganizationGroupRequestDTO createRequest =
+                new AdminOrganizationGroupRequestDTO("engineering", null);
+        assertThatThrownBy(() -> service.createGroup(10L, createRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
@@ -546,23 +530,17 @@ class AdminOrganizationServiceTest {
 
         when(groupRepository.existsByOrganizationIdAndNameIgnoreCase(10L, "platform"))
                 .thenReturn(true);
-        assertThatThrownBy(
-                        () ->
-                                service.updateGroup(
-                                        10L,
-                                        60L,
-                                        new AdminOrganizationGroupRequestDTO("platform", null)))
+        AdminOrganizationGroupRequestDTO updateRequest =
+                new AdminOrganizationGroupRequestDTO("platform", null);
+        assertThatThrownBy(() -> service.updateGroup(10L, 60L, updateRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
                 .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_DUPLICATE);
 
-        assertThatThrownBy(
-                        () ->
-                                service.updateGroup(
-                                        10L,
-                                        60L,
-                                        new AdminOrganizationGroupRequestDTO("engineering", 60L)))
+        AdminOrganizationGroupRequestDTO invalidParentRequest =
+                new AdminOrganizationGroupRequestDTO("engineering", 60L);
+        assertThatThrownBy(() -> service.updateGroup(10L, 60L, invalidParentRequest))
                 .isInstanceOf(ApiException.class)
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)

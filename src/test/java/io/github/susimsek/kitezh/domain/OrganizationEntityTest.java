@@ -76,23 +76,51 @@ class OrganizationEntityTest {
         provider.setOrganization(organization);
         provider.setProviderAlias("google");
 
+        assertOrganizationState(organization);
+        assertMemberState(member, organization, user, joinedAt);
+        assertDomainState(domain, organization, verifiedAt);
+        assertInvitationState(invitation, organization, joinedAt, verifiedAt);
+        assertGroupState(group, groupMember, organization, parent, user, joinedAt);
+        assertClaimState(claim, organization);
+        assertIdentityProviderState(provider, organization);
+    }
+
+    private static void assertOrganizationState(OrganizationEntity organization) {
         assertThat(organization.getId()).isEqualTo(1L);
         assertThat(organization.getAlias()).isEqualTo("acme");
         assertThat(organization.getName()).isEqualTo("Acme");
         assertThat(organization.getDisplayName()).isEqualTo("Acme Corporation");
         assertThat(organization.getDescription()).isEqualTo("Description");
         assertThat(organization.isEnabled()).isFalse();
+    }
+
+    private static void assertMemberState(
+            OrganizationMemberEntity member,
+            OrganizationEntity organization,
+            UserEntity user,
+            Instant joinedAt) {
         assertThat(member.getId()).isEqualTo(2L);
         assertThat(member.getOrganization()).isSameAs(organization);
         assertThat(member.getUser()).isSameAs(user);
         assertThat(member.getRole()).isEqualTo("ADMIN");
         assertThat(member.getJoinedAt()).isEqualTo(joinedAt);
+    }
+
+    private static void assertDomainState(
+            OrganizationDomainEntity domain, OrganizationEntity organization, Instant verifiedAt) {
         assertThat(domain.getId()).isEqualTo(3L);
         assertThat(domain.getOrganization()).isSameAs(organization);
         assertThat(domain.getDomain()).isEqualTo("acme.example.com");
         assertThat(domain.isVerified()).isTrue();
         assertThat(domain.getVerificationToken()).isEqualTo("token");
         assertThat(domain.getVerifiedAt()).isEqualTo(verifiedAt);
+    }
+
+    private static void assertInvitationState(
+            OrganizationInvitationEntity invitation,
+            OrganizationEntity organization,
+            Instant joinedAt,
+            Instant verifiedAt) {
         assertThat(invitation.getId()).isEqualTo(4L);
         assertThat(invitation.getOrganization()).isSameAs(organization);
         assertThat(invitation.getEmail()).isEqualTo("alice@example.com");
@@ -102,6 +130,15 @@ class OrganizationEntityTest {
         assertThat(invitation.getAcceptedAt()).isEqualTo(joinedAt);
         assertThat(invitation.getRevokedAt()).isEqualTo(verifiedAt);
         assertThat(invitation.getCreatedAt()).isEqualTo(joinedAt);
+    }
+
+    private static void assertGroupState(
+            OrganizationGroupEntity group,
+            OrganizationGroupMemberEntity groupMember,
+            OrganizationEntity organization,
+            OrganizationGroupEntity parent,
+            UserEntity user,
+            Instant joinedAt) {
         assertThat(group.getId()).isEqualTo(6L);
         assertThat(group.getOrganization()).isSameAs(organization);
         assertThat(group.getParent()).isSameAs(parent);
@@ -110,6 +147,10 @@ class OrganizationEntityTest {
         assertThat(groupMember.getGroup()).isSameAs(group);
         assertThat(groupMember.getUser()).isSameAs(user);
         assertThat(groupMember.getJoinedAt()).isEqualTo(joinedAt);
+    }
+
+    private static void assertClaimState(
+            OrganizationClaimEntity claim, OrganizationEntity organization) {
         assertThat(claim.getId()).isEqualTo(8L);
         assertThat(claim.getOrganization()).isSameAs(organization);
         assertThat(claim.getClaimName()).isEqualTo("organization");
@@ -117,6 +158,10 @@ class OrganizationEntityTest {
         assertThat(claim.isAddToAccessToken()).isFalse();
         assertThat(claim.isAddToIdToken()).isTrue();
         assertThat(claim.isAddToUserInfo()).isTrue();
+    }
+
+    private static void assertIdentityProviderState(
+            OrganizationIdentityProviderEntity provider, OrganizationEntity organization) {
         assertThat(provider.getId()).isEqualTo(9L);
         assertThat(provider.getOrganization()).isSameAs(organization);
         assertThat(provider.getProviderAlias()).isEqualTo("google");

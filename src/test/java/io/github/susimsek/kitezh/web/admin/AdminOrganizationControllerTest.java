@@ -92,7 +92,7 @@ class AdminOrganizationControllerTest {
                 .thenReturn(member);
         when(service.addDomain(eq(7L), any(AdminOrganizationDomainRequestDTO.class)))
                 .thenReturn(domain);
-        when(service.verifyDomain(eq(7L), eq(8L))).thenReturn(domain);
+        when(service.verifyDomain(7L, 8L)).thenReturn(domain);
         when(service.invitations(7L, pageable)).thenReturn(Page.empty(pageable));
         when(service.createInvitation(eq(7L), any(AdminOrganizationInvitationRequestDTO.class)))
                 .thenReturn(invitation);
@@ -109,6 +109,25 @@ class AdminOrganizationControllerTest {
                 .thenReturn(claim);
         when(service.addIdentityProvider(7L, "google")).thenReturn(provider);
 
+        assertMemberAndDomainOperations(controller, pageable, member, domain, invitation);
+        assertInvitationAndGroupOperations(controller, pageable, group);
+        assertClaimAndProviderOperations(controller, claim, provider);
+
+        verify(service).removeDomain(7L, 8L);
+        verify(service).revokeInvitation(7L, 8L);
+        verify(service).deleteGroup(7L, 9L);
+        verify(service).addGroupMember(7L, 9L, 20L);
+        verify(service).removeGroupMember(7L, 9L, 20L);
+        verify(service).deleteClaim(7L, 10L);
+        verify(service).removeIdentityProvider(7L, "google");
+    }
+
+    private static void assertMemberAndDomainOperations(
+            AdminOrganizationController controller,
+            PageRequest pageable,
+            AdminOrganizationMemberDTO member,
+            AdminOrganizationDomainDTO domain,
+            AdminOrganizationInvitationDTO invitation) {
         assertThat(controller.updateMember(7L, 20L, mock(AdminOrganizationMemberRequestDTO.class)))
                 .isSameAs(member);
         assertThat(controller.addDomain(7L, mock(AdminOrganizationDomainRequestDTO.class)))
@@ -121,6 +140,12 @@ class AdminOrganizationControllerTest {
                         controller.createInvitation(
                                 7L, mock(AdminOrganizationInvitationRequestDTO.class)))
                 .isSameAs(invitation);
+    }
+
+    private static void assertInvitationAndGroupOperations(
+            AdminOrganizationController controller,
+            PageRequest pageable,
+            AdminOrganizationGroupDTO group) {
         assertThat(controller.revokeInvitation(7L, 8L).getStatusCode())
                 .isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(controller.groups(7L, "eng", pageable)).isEmpty();
@@ -135,6 +160,12 @@ class AdminOrganizationControllerTest {
                 .isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(controller.removeGroupMember(7L, 9L, 20L).getStatusCode())
                 .isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    private static void assertClaimAndProviderOperations(
+            AdminOrganizationController controller,
+            AdminOrganizationClaimDTO claim,
+            AdminOrganizationIdentityProviderDTO provider) {
         assertThat(controller.createClaim(7L, mock(AdminOrganizationClaimRequestDTO.class)))
                 .isSameAs(claim);
         assertThat(controller.updateClaim(7L, 10L, mock(AdminOrganizationClaimRequestDTO.class)))
@@ -147,13 +178,5 @@ class AdminOrganizationControllerTest {
                 .isSameAs(provider);
         assertThat(controller.removeIdentityProvider(7L, "google").getStatusCode())
                 .isEqualTo(HttpStatus.NO_CONTENT);
-
-        verify(service).removeDomain(7L, 8L);
-        verify(service).revokeInvitation(7L, 8L);
-        verify(service).deleteGroup(7L, 9L);
-        verify(service).addGroupMember(7L, 9L, 20L);
-        verify(service).removeGroupMember(7L, 9L, 20L);
-        verify(service).deleteClaim(7L, 10L);
-        verify(service).removeIdentityProvider(7L, "google");
     }
 }
