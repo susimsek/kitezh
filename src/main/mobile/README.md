@@ -12,11 +12,12 @@ token refresh and expose localized loading/error states.
 Social account status and unlinking are available natively; provider linking hands off to the
 authorization server in the system browser.
 
-Registration, forgot-password, and reset-password are native screens with typed API adapters,
-localized validation, and inline progress states. Registration uses the system browser only when
-CAPTCHA is enabled, because the CAPTCHA challenge is owned by the authorization server. Email
-verification callbacks and social-provider linking still use the system browser until their
-native deep-link screens are added.
+Registration, forgot-password, reset-password, and email verification are native screens with
+typed API adapters, localized validation, and inline progress states. Registration uses the
+system browser only when CAPTCHA is enabled, because the CAPTCHA challenge is owned by the
+authorization server. Email links can open the native `/verify-email?token=...` screen after the
+app link or custom `kitezh://verify-email` redirect is registered. Social-provider linking still
+uses the system browser until its native deep-link completion screen is added.
 
 ## Local development
 

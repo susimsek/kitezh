@@ -107,3 +107,7 @@ export function resetPassword(request: {
 }) {
   return post<void>("/api/auth/reset-password", request);
 }
+
+export function verifyEmail(token: string) {
+  return post<void>("/api/auth/verify-email", { token });
+}

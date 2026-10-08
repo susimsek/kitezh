@@ -28,6 +28,12 @@ export const messages = {
     resetSuccess: "Your password was reset. You can sign in now.",
     resetError:
       "We could not reset your password. Check the token and try again.",
+    verifyEmailTitle: "Verify your email",
+    verifyEmailHelp:
+      "Use the one-time link from your email to verify your address.",
+    verifyEmailSuccess: "Your email address has been verified.",
+    verifyEmailError:
+      "We could not verify your email. The link may be expired or invalid.",
     continueInBrowser: "Continue in browser",
     registration: "Registration",
     signOut: "Sign out",
@@ -175,6 +181,12 @@ export const messages = {
     resetSuccess: "Parolanız sıfırlandı. Şimdi giriş yapabilirsiniz.",
     resetError:
       "Parolanız sıfırlanamadı. Belirteci kontrol edip tekrar deneyin.",
+    verifyEmailTitle: "E-postanızı doğrulayın",
+    verifyEmailHelp:
+      "E-posta adresinizi doğrulamak için e-postanızdaki tek kullanımlık bağlantıyı kullanın.",
+    verifyEmailSuccess: "E-posta adresiniz doğrulandı.",
+    verifyEmailError:
+      "E-postanız doğrulanamadı. Bağlantının süresi dolmuş veya geçersiz olabilir.",
     continueInBrowser: "Tarayıcıda devam et",
     registration: "Kayıt",
     signOut: "Çıkış yap",

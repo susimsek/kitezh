@@ -948,6 +948,7 @@ async function showAboutDialog() {
       ? `${DESKTOP_APP_NAME} hakkında`
       : `About ${DESKTOP_APP_NAME}`,
     backgroundColor: desktopBackgroundColor(),
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1573,6 +1574,7 @@ async function showUpdateCheckWindow() {
     resizable: false,
     title: windowTitle,
     backgroundColor: desktopBackgroundColor(),
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1659,6 +1661,7 @@ async function showUpdateNotAvailableWindow() {
     resizable: false,
     title: windowTitle,
     backgroundColor: desktopBackgroundColor(),
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1743,6 +1746,7 @@ async function showUpdateConfirmation() {
     resizable: false,
     title,
     backgroundColor: desktopBackgroundColor(),
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1840,6 +1844,7 @@ async function showUpdateDialog(version: string, force = false) {
     resizable: false,
     title,
     backgroundColor: desktopBackgroundColor(),
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
