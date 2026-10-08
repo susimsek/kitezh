@@ -61,15 +61,11 @@ export function DesktopSettings() {
   const [copyingDiagnostics, setCopyingDiagnostics] = useState(false);
   const [resettingDefaults, setResettingDefaults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [languageMode, setLanguageMode] = useState<LanguageMode>(() => {
-    if (
-      typeof window !== "undefined" &&
-      localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system"
-    ) {
-      return "system";
-    }
-    return locale;
-  });
+  const languageMode: LanguageMode =
+    typeof window !== "undefined" &&
+    localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system"
+      ? "system"
+      : locale;
 
   useEffect(() => {
     if (!isDesktopRuntime() || !window.desktopApi) return undefined;
@@ -141,7 +137,6 @@ export function DesktopSettings() {
   };
 
   const changeLocale = (nextMode: LanguageMode) => {
-    setLanguageMode(nextMode);
     if (nextMode === "system") {
       localStorage.setItem(DESKTOP_LANGUAGE_MODE_KEY, "system");
       const systemLocale = detectLocale("", navigator.languages);
