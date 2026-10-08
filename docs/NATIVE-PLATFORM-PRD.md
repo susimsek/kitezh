@@ -277,7 +277,7 @@ another owner's work, but a review does not transfer implementation ownership.
 acceptance evidence is linked in the feature matrix.
 
 - [~] Mobile Admin client registration and isolated session namespace: `mobile-admin-console` is registered with the `admin-api` scope, `kitezh://admin/oauth/callback` redirect, and a separate `kitezh.mobile.admin.session` SecureStore key; native Admin screens remain to be built
-- [ ] Mobile native Admin shell and navigation (client and authority scope are now registered; native screens remain to be built)
+- [~] Mobile native Admin shell and navigation: `/admin` now has a native sign-in boundary, Admin session provider, dashboard shell, tab navigation, loading, 401/403, and retry states; resource screens remain to be built
 - [ ] Mobile Admin pagination, filters, authority-aware actions, and confirmations (client and API session contract are now available; native screens remain to be built)
 - [ ] Android/iOS development-build and device E2E coverage
 - [~] Mobile store-first release and rollback strategy documented in `src/main/mobile/README.md` and `eas.json`; EAS project, staged rollout, and OTA configuration remain

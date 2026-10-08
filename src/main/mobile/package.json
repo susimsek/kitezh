@@ -12,7 +12,7 @@
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "test": "node --experimental-strip-types --test 'src/**/*.test.ts'",
     "build:web": "expo export --platform web"
   },
   "dependencies": {
