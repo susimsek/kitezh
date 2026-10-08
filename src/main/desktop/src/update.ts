@@ -99,9 +99,17 @@ async function verifyPublishedManifest() {
   const publicKey = await readFile(
     path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
   );
-  if (!verify(null, manifest, publicKey, signature)) {
+  if (!verifyUpdateManifestSignature(manifest, signature, publicKey)) {
     throw new Error("The update manifest signature is invalid.");
   }
+}
+
+export function verifyUpdateManifestSignature(
+  manifest: Buffer,
+  signature: Buffer,
+  publicKey: string | Buffer,
+) {
+  return verify(null, manifest, publicKey, signature);
 }
 
 async function markUpdatePending(version: string) {
