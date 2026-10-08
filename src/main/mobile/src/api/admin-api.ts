@@ -7,6 +7,25 @@ export type AdminDashboard = {
   consents: number;
 };
 
+export type AdminUser = {
+  id: number;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  enabled: boolean;
+  locked: boolean;
+  effectiveRoles: string[];
+};
+
+export type AdminPage<T> = {
+  content: T[];
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -68,6 +87,27 @@ export function getAdminDashboard(
   return requestAdmin<AdminDashboard>(
     accessToken,
     "/api/admin/dashboard",
+    options,
+    false,
+  );
+}
+
+export function listAdminUsers(
+  accessToken: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "username,asc",
+  });
+  return requestAdmin<AdminPage<AdminUser>>(
+    accessToken,
+    `/api/admin/users?${params.toString()}`,
     options,
     false,
   );

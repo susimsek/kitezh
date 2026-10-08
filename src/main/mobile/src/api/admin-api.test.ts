@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { AdminApiError, getAdminDashboard } from "./admin-api.ts";
+import {
+  AdminApiError,
+  getAdminDashboard,
+  listAdminUsers,
+} from "./admin-api.ts";
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -57,6 +61,27 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
     await assert.rejects(
       getAdminDashboard("access-token"),
       (error: unknown) => error instanceof AdminApiError && error.status === 403,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin users request encodes search and pagination parameters", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  globalThis.fetch = async (input) => {
+    request = input.toString();
+    return new Response(
+      JSON.stringify({ content: [], number: 1, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminUsers("access-token", "ada@example.test", 1, 10);
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/users?q=ada%40example.test&page=1&size=10&sort=username%2Casc",
     );
   } finally {
     globalThis.fetch = originalFetch;

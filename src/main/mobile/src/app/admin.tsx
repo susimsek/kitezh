@@ -5,12 +5,20 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useMobileAuth, MobileAuthProvider } from "@/auth/MobileAuthProvider";
-import { AdminApiError, getAdminDashboard, type AdminDashboard } from "@/api/admin-api";
+import {
+  AdminApiError,
+  getAdminDashboard,
+  listAdminUsers,
+  type AdminDashboard,
+  type AdminPage,
+  type AdminUser,
+} from "@/api/admin-api";
 import { AppIcon } from "@/components/AppIcon";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -34,6 +42,13 @@ function AdminConsole() {
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
+  const [users, setUsers] = useState<AdminPage<AdminUser> | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersErrorStatus, setUsersErrorStatus] = useState<number | null>(
+    null,
+  );
+  const [userQuery, setUserQuery] = useState("");
+  const [userPage, setUserPage] = useState(0);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -60,9 +75,44 @@ function AdminConsole() {
     [refreshSession, session],
   );
 
+  const loadUsers = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setUsersLoading(true);
+      setUsersErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setUsers(
+          await listAdminUsers(
+            currentSession.accessToken,
+            userQuery,
+            userPage,
+            10,
+            {
+              refreshAccessToken: async () =>
+                (await refreshSession(true))?.accessToken ?? null,
+            },
+          ),
+        );
+      } catch (cause) {
+        setUsersErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setUsersLoading(false);
+      }
+    },
+    [refreshSession, session, userPage, userQuery],
+  );
+
   useEffect(() => {
     if (session) queueMicrotask(() => void loadDashboard());
   }, [loadDashboard, session]);
+
+  useEffect(() => {
+    if (session && section === "users") queueMicrotask(() => void loadUsers());
+  }, [loadUsers, section, session]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -148,6 +198,20 @@ function AdminConsole() {
                 loading={loading}
                 onRetry={() => void loadDashboard(true)}
               />
+            ) : section === "users" ? (
+              <UsersContent
+                errorStatus={usersErrorStatus}
+                loading={usersLoading}
+                onNext={() => setUserPage((page) => page + 1)}
+                onPrevious={() => setUserPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadUsers(true)}
+                page={users}
+                query={userQuery}
+                setQuery={(query) => {
+                  setUserPage(0);
+                  setUserQuery(query);
+                }}
+              />
             ) : null}
           </ScrollView>
         </View>
@@ -224,15 +288,120 @@ function DashboardContent({
   );
 }
 
+function UsersContent({
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminUser> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchUsers}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchUsers}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminUsersLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((user) => (
+            <View
+              key={user.id}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <View style={styles.userCardHeader}>
+                <Text style={[styles.userName, { color: palette.text }]}>{user.username}</Text>
+                <Text style={{ color: user.enabled ? palette.success : palette.danger }}>
+                  {user.enabled ? dictionary.adminUserEnabled : dictionary.adminUserDisabled}
+                </Text>
+              </View>
+              <Text style={{ color: palette.textMuted }}>
+                {user.email ??
+                  ([user.firstName, user.lastName].filter(Boolean).join(" ") || "—")}
+              </Text>
+              {user.locked ? (
+                <Text style={{ color: palette.danger }}>{dictionary.adminUserLocked}</Text>
+              ) : null}
+              {user.effectiveRoles.length > 0 ? (
+                <Text style={[styles.roles, { color: palette.textMuted }]}>
+                  {user.effectiveRoles.join(", ")}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+          <View style={styles.pagination}>
+            <ActionButton
+              label={dictionary.adminPrevious}
+              busy={loading}
+              disabled={page.number === 0}
+              onPress={onPrevious}
+              palette={palette}
+              secondary
+            />
+            <Text style={{ color: palette.textMuted }}>
+              {dictionary.adminPage} {page.number + 1} / {Math.max(page.totalPages, 1)}
+            </Text>
+            <ActionButton
+              label={dictionary.adminNext}
+              busy={loading}
+              disabled={page.number + 1 >= page.totalPages}
+              onPress={onNext}
+              palette={palette}
+              secondary
+            />
+          </View>
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoUsers}</Text>
+      )}
+    </View>
+  );
+}
+
 function ActionButton({
   label,
   busy,
+  disabled = false,
   onPress,
   palette,
   secondary = false,
 }: {
   label: string;
   busy: boolean;
+  disabled?: boolean;
   onPress: () => void;
   palette: ReturnType<typeof useTheme>["palette"];
   secondary?: boolean;
@@ -240,15 +409,15 @@ function ActionButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled: busy }}
-      disabled={busy}
+      accessibilityState={{ disabled: busy || disabled }}
+      disabled={busy || disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.action,
         {
           backgroundColor: secondary ? palette.surfaceMuted : palette.primary,
           borderColor: secondary ? palette.border : palette.primary,
-          opacity: pressed || busy ? 0.7 : 1,
+          opacity: pressed || busy || disabled ? 0.7 : 1,
         },
       ]}
     >
@@ -321,6 +490,14 @@ const styles = StyleSheet.create({
   iconButton: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" },
   body: { flex: 1 },
   content: { gap: spacing.sm, padding: spacing.lg },
+  usersContent: { gap: spacing.md, marginTop: spacing.lg },
+  search: { borderRadius: radii.md, borderWidth: 1, fontSize: 16, minHeight: 48, paddingHorizontal: spacing.md },
+  userList: { gap: spacing.md },
+  userCard: { borderRadius: radii.md, borderWidth: 1, gap: spacing.xs, padding: spacing.md },
+  userCardHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  userName: { fontSize: 16, fontWeight: "700" },
+  roles: { fontSize: 12, marginTop: spacing.xs },
+  pagination: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   authContent: { alignItems: "center", flex: 1, justifyContent: "center", padding: spacing.xl },
   logo: { alignItems: "center", borderRadius: radii.lg, height: 92, justifyContent: "center", width: 92 },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
