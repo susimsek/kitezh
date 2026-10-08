@@ -18,12 +18,16 @@ import {
   getAdminDashboard,
   listAdminClientScopes,
   listAdminClients,
+  listAdminGroups,
+  listAdminRoles,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
   type AdminClient,
   type AdminClientScope,
+  type AdminGroup,
   type AdminPage,
+  type AdminRole,
   type AdminUser,
 } from "@/api/admin-api";
 import { AppIcon } from "@/components/AppIcon";
@@ -37,6 +41,8 @@ type AdminSection =
   | "users"
   | "clients"
   | "scopes"
+  | "roles"
+  | "groups"
   | "settings";
 
 export default function AdminScreen() {
@@ -78,6 +84,16 @@ function AdminConsole() {
   );
   const [scopeQuery, setScopeQuery] = useState("");
   const [scopePage, setScopePage] = useState(0);
+  const [roles, setRoles] = useState<AdminPage<AdminRole> | null>(null);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesErrorStatus, setRolesErrorStatus] = useState<number | null>(null);
+  const [roleQuery, setRoleQuery] = useState("");
+  const [rolePage, setRolePage] = useState(0);
+  const [groups, setGroups] = useState<AdminPage<AdminGroup> | null>(null);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsErrorStatus, setGroupsErrorStatus] = useState<number | null>(null);
+  const [groupQuery, setGroupQuery] = useState("");
+  const [groupPage, setGroupPage] = useState(0);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -230,6 +246,56 @@ function AdminConsole() {
     [refreshSession, scopePage, scopeQuery, session],
   );
 
+  const loadRoles = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setRolesLoading(true);
+      setRolesErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setRoles(
+          await listAdminRoles(currentSession.accessToken, roleQuery, rolePage, 10, {
+            refreshAccessToken: async () =>
+              (await refreshSession(true))?.accessToken ?? null,
+          }),
+        );
+      } catch (cause) {
+        setRolesErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setRolesLoading(false);
+      }
+    },
+    [refreshSession, rolePage, roleQuery, session],
+  );
+
+  const loadGroups = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setGroupsLoading(true);
+      setGroupsErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setGroups(
+          await listAdminGroups(currentSession.accessToken, groupQuery, groupPage, 10, {
+            refreshAccessToken: async () =>
+              (await refreshSession(true))?.accessToken ?? null,
+          }),
+        );
+      } catch (cause) {
+        setGroupsErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setGroupsLoading(false);
+      }
+    },
+    [groupPage, groupQuery, refreshSession, session],
+  );
+
   const deleteUser = useCallback(
     (user: AdminUser) => {
       if (!session || userActionKey) return;
@@ -289,6 +355,18 @@ function AdminConsole() {
       queueMicrotask(() => void loadScopes());
     }
   }, [loadScopes, section, session]);
+
+  useEffect(() => {
+    if (session && section === "roles") {
+      queueMicrotask(() => void loadRoles());
+    }
+  }, [loadRoles, section, session]);
+
+  useEffect(() => {
+    if (session && section === "groups") {
+      queueMicrotask(() => void loadGroups());
+    }
+  }, [loadGroups, section, session]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -362,13 +440,19 @@ function AdminConsole() {
                   ? dictionary.adminClients
                   : section === "scopes"
                     ? dictionary.adminClientScopes
-                    : dictionary.adminSettings}
+                    : section === "roles"
+                      ? dictionary.adminRoles
+                      : section === "groups"
+                        ? dictionary.adminGroups
+                        : dictionary.adminSettings}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
               {section === "dashboard"
                 ? dictionary.adminOverview
                 : section === "scopes"
                   ? dictionary.adminOverview
+                  : section === "roles" || section === "groups"
+                    ? dictionary.adminOverview
                   : dictionary.adminComingSoon}
             </Text>
             {section === "dashboard" ? (
@@ -421,6 +505,34 @@ function AdminConsole() {
                 setQuery={(query) => {
                   setScopePage(0);
                   setScopeQuery(query);
+                }}
+              />
+            ) : section === "roles" ? (
+              <RolesContent
+                errorStatus={rolesErrorStatus}
+                loading={rolesLoading}
+                onNext={() => setRolePage((page) => page + 1)}
+                onPrevious={() => setRolePage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadRoles(true)}
+                page={roles}
+                query={roleQuery}
+                setQuery={(query) => {
+                  setRolePage(0);
+                  setRoleQuery(query);
+                }}
+              />
+            ) : section === "groups" ? (
+              <GroupsContent
+                errorStatus={groupsErrorStatus}
+                loading={groupsLoading}
+                onNext={() => setGroupPage((page) => page + 1)}
+                onPrevious={() => setGroupPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadGroups(true)}
+                page={groups}
+                query={groupQuery}
+                setQuery={(query) => {
+                  setGroupPage(0);
+                  setGroupQuery(query);
                 }}
               />
             ) : null}
@@ -824,6 +936,201 @@ function ClientScopesContent({
   );
 }
 
+function RolesContent({
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminRole> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchRoles}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchRoles}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminRolesLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((role) => (
+            <View
+              key={role.name}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <Text style={[styles.userName, { color: palette.text }]}>{role.name}</Text>
+              {role.description ? (
+                <Text style={{ color: palette.textMuted }}>{role.description}</Text>
+              ) : null}
+            </View>
+          ))}
+          <Pagination
+            loading={loading}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            page={page}
+            palette={palette}
+          />
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoRoles}</Text>
+      )}
+    </View>
+  );
+}
+
+function GroupsContent({
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminGroup> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchGroups}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchGroups}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminGroupsLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((group) => (
+            <View
+              key={group.id}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <View style={styles.userCardHeader}>
+                <Text style={[styles.userName, { color: palette.text }]}>{group.name}</Text>
+                <Text style={{ color: palette.textMuted }}>{group.userCount}</Text>
+              </View>
+              <Text style={{ color: palette.textMuted }}>{group.path}</Text>
+              {group.effectiveRoles.length > 0 ? (
+                <Text style={[styles.roles, { color: palette.textMuted }]}>
+                  {group.effectiveRoles.join(", ")}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+          <Pagination
+            loading={loading}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            page={page}
+            palette={palette}
+          />
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoGroups}</Text>
+      )}
+    </View>
+  );
+}
+
+function Pagination<T>({
+  loading,
+  onNext,
+  onPrevious,
+  page,
+  palette,
+}: {
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  page: AdminPage<T>;
+  palette: ReturnType<typeof useTheme>["palette"];
+}) {
+  const { dictionary } = useLocale();
+  return (
+    <View style={styles.pagination}>
+      <ActionButton
+        label={dictionary.adminPrevious}
+        busy={loading}
+        disabled={page.number === 0}
+        onPress={onPrevious}
+        palette={palette}
+        secondary
+      />
+      <Text style={{ color: palette.textMuted }}>
+        {dictionary.adminPage} {page.number + 1} / {Math.max(page.totalPages, 1)}
+      </Text>
+      <ActionButton
+        label={dictionary.adminNext}
+        busy={loading}
+        disabled={page.number + 1 >= page.totalPages}
+        onPress={onNext}
+        palette={palette}
+        secondary
+      />
+    </View>
+  );
+}
+
 function ActionButton({
   label,
   busy,
@@ -880,11 +1187,15 @@ function AdminTabBar({
     ["users", dictionary.adminUsers, "shield"],
     ["clients", dictionary.adminClients, "shield"],
     ["scopes", dictionary.adminClientScopes, "layers"],
+    ["roles", dictionary.adminRoles, "shield"],
+    ["groups", dictionary.adminGroups, "layers"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
   return (
-    <View
+    <ScrollView
       accessibilityRole="tablist"
+      horizontal
+      showsHorizontalScrollIndicator={false}
       style={[styles.tabBar, { backgroundColor: palette.surface, borderColor: palette.border }]}
     >
       {tabs.map(([section, label, icon]) => {
@@ -905,7 +1216,7 @@ function AdminTabBar({
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -948,6 +1259,6 @@ const styles = StyleSheet.create({
   card: { borderRadius: radii.md, borderWidth: 1, flexBasis: "47%", flexGrow: 1, minHeight: 112, padding: spacing.md },
   cardLabel: { fontSize: 13, lineHeight: 18 },
   cardValue: { fontSize: 30, fontWeight: "800", marginTop: spacing.sm },
-  tabBar: { borderTopWidth: 1, flexDirection: "row", padding: spacing.xs },
-  tab: { alignItems: "center", borderRadius: radii.sm, flex: 1, gap: spacing.xs, justifyContent: "center", minHeight: 58 },
+  tabBar: { borderTopWidth: 1, padding: spacing.xs },
+  tab: { alignItems: "center", borderRadius: radii.sm, gap: spacing.xs, justifyContent: "center", minHeight: 58, minWidth: 84, paddingHorizontal: spacing.sm },
 });

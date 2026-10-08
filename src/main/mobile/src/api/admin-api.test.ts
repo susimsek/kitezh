@@ -7,6 +7,8 @@ import {
   listAdminUsers,
   listAdminClients,
   listAdminClientScopes,
+  listAdminGroups,
+  listAdminRoles,
   deleteAdminUser,
   setAdminUserEnabled,
 } from "./admin-api.ts";
@@ -160,6 +162,28 @@ test("admin client scopes request uses a bounded sorted page", async () => {
       request,
       "https://kitezh.onrender.com/api/admin/client-scopes?q=profile&page=0&size=10&sort=name%2Casc",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin roles and groups requests use bounded sorted pages", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: string[] = [];
+  globalThis.fetch = async (input) => {
+    requests.push(input.toString());
+    return new Response(
+      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminRoles("access-token", "admin", 0, 10);
+    await listAdminGroups("access-token", "finance", 1, 10);
+    assert.deepEqual(requests, [
+      "https://kitezh.onrender.com/api/admin/roles?q=admin&page=0&size=10&sort=name%2Casc",
+      "https://kitezh.onrender.com/api/admin/groups?q=finance&page=1&size=10&sort=name%2Casc",
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

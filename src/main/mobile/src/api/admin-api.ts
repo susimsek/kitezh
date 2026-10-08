@@ -45,6 +45,22 @@ export type AdminClientScope = {
   includeInTokenScope: boolean;
 };
 
+export type AdminRole = {
+  name: string;
+  description: string | null;
+};
+
+export type AdminGroup = {
+  id: number;
+  name: string;
+  path: string;
+  parentId: number | null;
+  roles: string[];
+  effectiveRoles: string[];
+  defaultGroup: boolean;
+  userCount: number;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -174,6 +190,48 @@ export function listAdminClientScopes(
   return requestAdmin<AdminPage<AdminClientScope>>(
     accessToken,
     `/api/admin/client-scopes?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function listAdminRoles(
+  accessToken: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "name,asc",
+  });
+  return requestAdmin<AdminPage<AdminRole>>(
+    accessToken,
+    `/api/admin/roles?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function listAdminGroups(
+  accessToken: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "name,asc",
+  });
+  return requestAdmin<AdminPage<AdminGroup>>(
+    accessToken,
+    `/api/admin/groups?${params.toString()}`,
     options,
     false,
   );
