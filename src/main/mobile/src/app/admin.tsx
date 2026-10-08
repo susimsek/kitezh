@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,13 +14,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMobileAuth, MobileAuthProvider } from "@/auth/MobileAuthProvider";
 import {
   AdminApiError,
+  deleteAdminUser,
   getAdminDashboard,
   listAdminUsers,
+  setAdminUserEnabled,
   type AdminDashboard,
   type AdminPage,
   type AdminUser,
 } from "@/api/admin-api";
 import { AppIcon } from "@/components/AppIcon";
+import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -38,6 +42,7 @@ function AdminConsole() {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
   const { session, signIn, signOut, status, refreshSession } = useMobileAuth();
+  const { showNotice } = useMobileNotice();
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +54,7 @@ function AdminConsole() {
   );
   const [userQuery, setUserQuery] = useState("");
   const [userPage, setUserPage] = useState(0);
+  const [userActionKey, setUserActionKey] = useState<string | null>(null);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -104,6 +110,75 @@ function AdminConsole() {
       }
     },
     [refreshSession, session, userPage, userQuery],
+  );
+
+  const updateUserEnabled = useCallback(
+    async (user: AdminUser) => {
+      if (!session || userActionKey) return;
+      const key = `enabled:${user.id}`;
+      setUserActionKey(key);
+      try {
+        const currentSession = await refreshSession();
+        if (!currentSession) throw new Error();
+        await setAdminUserEnabled(currentSession.accessToken, user.id, !user.enabled, {
+          refreshAccessToken: async () =>
+            (await refreshSession(true))?.accessToken ?? null,
+        });
+        showNotice({ kind: "success", message: dictionary.adminUserUpdated });
+        await loadUsers(true);
+      } catch (cause) {
+        showNotice({
+          kind: "error",
+          message:
+            cause instanceof AdminApiError && cause.status === 403
+              ? dictionary.adminForbidden
+              : dictionary.adminUserActionError,
+        });
+      } finally {
+        setUserActionKey(null);
+      }
+    },
+    [dictionary.adminForbidden, dictionary.adminUserActionError, dictionary.adminUserUpdated, loadUsers, refreshSession, session, showNotice, userActionKey],
+  );
+
+  const deleteUser = useCallback(
+    (user: AdminUser) => {
+      if (!session || userActionKey) return;
+      Alert.alert(dictionary.adminUserDelete, dictionary.adminUserDeleteConfirm, [
+        { text: dictionary.cancel, style: "cancel" },
+        {
+          text: dictionary.adminUserDelete,
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              const key = `delete:${user.id}`;
+              setUserActionKey(key);
+              try {
+                const currentSession = await refreshSession();
+                if (!currentSession) throw new Error();
+                await deleteAdminUser(currentSession.accessToken, user.id, {
+                  refreshAccessToken: async () =>
+                    (await refreshSession(true))?.accessToken ?? null,
+                });
+                showNotice({ kind: "success", message: dictionary.adminUserDeleted });
+                await loadUsers(true);
+              } catch (cause) {
+                showNotice({
+                  kind: "error",
+                  message:
+                    cause instanceof AdminApiError && cause.status === 403
+                      ? dictionary.adminForbidden
+                      : dictionary.adminUserActionError,
+                });
+              } finally {
+                setUserActionKey(null);
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [dictionary, loadUsers, refreshSession, session, showNotice, userActionKey],
   );
 
   useEffect(() => {
@@ -205,12 +280,15 @@ function AdminConsole() {
                 onNext={() => setUserPage((page) => page + 1)}
                 onPrevious={() => setUserPage((page) => Math.max(0, page - 1))}
                 onRetry={() => void loadUsers(true)}
+                onToggle={updateUserEnabled}
+                onDelete={deleteUser}
                 page={users}
                 query={userQuery}
                 setQuery={(query) => {
                   setUserPage(0);
                   setUserQuery(query);
                 }}
+                busyKey={userActionKey}
               />
             ) : null}
           </ScrollView>
@@ -294,18 +372,24 @@ function UsersContent({
   onNext,
   onPrevious,
   onRetry,
+  onToggle,
+  onDelete,
   page,
   query,
   setQuery,
+  busyKey,
 }: {
   errorStatus: number | null;
   loading: boolean;
   onNext: () => void;
   onPrevious: () => void;
   onRetry: () => void;
+  onToggle: (user: AdminUser) => void;
+  onDelete: (user: AdminUser) => void;
   page: AdminPage<AdminUser> | null;
   query: string;
   setQuery: (query: string) => void;
+  busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -360,6 +444,24 @@ function UsersContent({
                   {user.effectiveRoles.join(", ")}
                 </Text>
               ) : null}
+              <View style={styles.userActions}>
+                <ActionButton
+                  label={user.enabled ? dictionary.adminUserDisable : dictionary.adminUserEnable}
+                  busy={busyKey === `enabled:${user.id}`}
+                  disabled={busyKey !== null && busyKey !== `enabled:${user.id}`}
+                  onPress={() => onToggle(user)}
+                  palette={palette}
+                  secondary
+                />
+                <ActionButton
+                  label={dictionary.adminUserDelete}
+                  busy={busyKey === `delete:${user.id}`}
+                  disabled={busyKey !== null && busyKey !== `delete:${user.id}`}
+                  onPress={() => onDelete(user)}
+                  palette={palette}
+                  secondary
+                />
+              </View>
             </View>
           ))}
           <View style={styles.pagination}>
@@ -498,6 +600,7 @@ const styles = StyleSheet.create({
   userName: { fontSize: 16, fontWeight: "700" },
   roles: { fontSize: 12, marginTop: spacing.xs },
   pagination: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  userActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   authContent: { alignItems: "center", flex: 1, justifyContent: "center", padding: spacing.xl },
   logo: { alignItems: "center", borderRadius: radii.lg, height: 92, justifyContent: "center", width: 92 },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },

@@ -50,11 +50,14 @@ async function requestAdmin<T>(
   path: string,
   options: RequestOptions,
   retried: boolean,
+  init: RequestInit = {},
 ): Promise<T> {
   let response: Response;
   try {
     response = await fetch(adminApiUrl(path), {
+      ...init,
       headers: {
+        ...init.headers,
         Accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
@@ -73,10 +76,12 @@ async function requestAdmin<T>(
         path,
         options,
         true,
+        init,
       );
     }
   }
   if (!response.ok) throw new AdminApiError(response.status, "Administration request failed");
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -110,5 +115,38 @@ export function listAdminUsers(
     `/api/admin/users?${params.toString()}`,
     options,
     false,
+  );
+}
+
+export function setAdminUserEnabled(
+  accessToken: string,
+  userId: number,
+  enabled: boolean,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<void>(
+    accessToken,
+    `/api/admin/users/${encodeURIComponent(userId)}/enabled`,
+    options,
+    false,
+    {
+      body: JSON.stringify({ enabled }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    },
+  );
+}
+
+export function deleteAdminUser(
+  accessToken: string,
+  userId: number,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<void>(
+    accessToken,
+    `/api/admin/users/${encodeURIComponent(userId)}`,
+    options,
+    false,
+    { method: "DELETE" },
   );
 }

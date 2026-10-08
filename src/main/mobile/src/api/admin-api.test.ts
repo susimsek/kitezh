@@ -5,6 +5,8 @@ import {
   AdminApiError,
   getAdminDashboard,
   listAdminUsers,
+  deleteAdminUser,
+  setAdminUserEnabled,
 } from "./admin-api.ts";
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
@@ -83,6 +85,37 @@ test("admin users request encodes search and pagination parameters", async () =>
       request,
       "https://kitezh.onrender.com/api/admin/users?q=ada%40example.test&page=1&size=10&sort=username%2Casc",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin user mutations use protected HTTP methods and JSON state", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      body: init?.body?.toString() ?? null,
+      method: init?.method ?? "GET",
+      url: input.toString(),
+    });
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await setAdminUserEnabled("access-token", 7, false);
+    await deleteAdminUser("access-token", 7);
+    assert.deepEqual(calls, [
+      {
+        body: JSON.stringify({ enabled: false }),
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/users/7/enabled",
+      },
+      {
+        body: null,
+        method: "DELETE",
+        url: "https://kitezh.onrender.com/api/admin/users/7",
+      },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
