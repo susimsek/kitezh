@@ -33,6 +33,11 @@ The first device flows are checked in under `e2e/maestro/`:
 - `cold-start.yaml` verifies a clean native launch, the public shell, and the sign-in boundary.
 - `settings-locale-theme.yaml` verifies native settings navigation and Turkish/light-dark controls.
 
+The manually triggered `.github/workflows/mobile-native-e2e.yml` workflow provisions an Android
+emulator and an iOS simulator, creates the Expo native projects, starts Metro, installs the
+development build, and runs both flows. It is intentionally separate from push/PR CI because the
+native runners are slower and the authenticated fixture is not part of the smoke slice yet.
+
 Run them only against an Expo development build with the `io.github.susimsek.kitezh.mobile`
 package ID:
 
