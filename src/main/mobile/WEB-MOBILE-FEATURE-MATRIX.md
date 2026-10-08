@@ -39,6 +39,7 @@ Status values:
 | Updates                        | Electron-native checking, available, up-to-date, error, download, install, and rollback dialogs       | In progress    | Manual check, notification click, theme/language variants, and update recovery E2E scenarios                                   |
 | Secure storage                 | Access, ID, and refresh tokens never exposed to web storage; main process is authoritative            | Complete       | `safeStorage` boundary, renderer bridge allow-list, logout cleanup, and token refresh tests                                    |
 | Desktop diagnostics            | Redacted version, runtime, platform, storage, update capability, and event information                | Complete       | Diagnostics screen and redaction tests                                                                                         |
+| Packaged release smoke         | CI desktop release workflow and electron-builder metadata                         | In progress    | `src/main/desktop/test/package-metadata.test.mjs` verifies app identity, protocol, maintainer, desktop entry, and artifact targets; macOS/Windows/Linux packaged startup and signed artifact evidence remain |
 
 Desktop components must not import React-Bootstrap, browser `localStorage`, or remote web pages.
 The renderer may reuse typed API/session contracts from `src/main/shared`; visual components and

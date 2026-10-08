@@ -284,7 +284,7 @@ acceptance evidence is linked in the feature matrix.
 - [~] Mobile in-app notification adapter with localized auto-dismiss feedback (`MobileNoticeProvider`); OS permission and authenticated action-routing remain blocked until a backend event contract and native E2E harness are available
 - [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; CI signing, staged rollout evidence, and store metadata remain
 - [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; device build, fixture server, and CI matrix remain
-- [ ] Desktop packaged smoke tests on macOS, Windows, and Linux
+- [~] Desktop package metadata smoke check added in `src/main/desktop/test/package-metadata.test.mjs`; macOS/Windows/Linux packaged startup, protocol, storage, asset, and signed-artifact runs remain
 - [ ] Linux system-package handoff and AppImage rollback verification
 - [ ] Desktop signing, Sigstore, checksum, and update-manifest verification
 - [~] Desktop accessibility screenshots and native control checks
