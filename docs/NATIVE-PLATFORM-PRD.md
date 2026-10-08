@@ -107,6 +107,31 @@ so a native implementation can be audited against behavior without copying its m
 5. Define the mobile release/update strategy (store updates or Expo Updates) before exposing an
    update action in the mobile UI.
 
+### Additional mobile gaps found in the source audit
+
+The following items are not optional polish. They are required to make the existing native
+screens reliable on real devices and across app restarts.
+
+| Area | Finding in the current source | Required native behavior and acceptance criterion |
+| --- | --- | --- |
+| OAuth browser lifecycle | `MobileAuthProvider` starts AuthSession and refreshes tokens, but the PRD did not define background/resume, cancellation, timeout, or replay behavior | Persist only the transaction state needed to resume a browser handoff; reject a second callback, stale state, wrong redirect, and expired code verifier; return a localized cancelled/timeout state; never leave a spinner active after the app resumes |
+| Discovery/configuration | `useAutoDiscovery` may be unavailable and the current failure is a generic English message | Validate issuer, client ID, redirect URI, and required endpoints at startup; map discovery, TLS, timeout, and malformed metadata failures to localized states; include a diagnostics-safe error code rather than an endpoint or token |
+| Refresh races | Screens can call the API wrapper while the provider is hydrating or another request is refreshing | Use one process-wide single-flight refresh, cancel requests on logout, prevent an old refresh from overwriting a newer session, and make every authenticated adapter use the same retry policy |
+| Error contract | Native screens currently reduce several failures to booleans or generic alerts; field violations are not uniformly mapped | Add one Problem Detail parser for `type`, `title`, `detail`, field violations, 401/403, 429, timeout, and 5xx; localize the fallback; honor `Retry-After`; keep field feedback inside the owning field group |
+| Public API resilience | CAPTCHA and public-auth calls do not have one documented abort/status policy | Add request cancellation, timeout, status-specific mapping, and safe retry rules; distinguish unavailable CAPTCHA from a server error and never log a token, password, or CAPTCHA response |
+| SecureStore lifecycle | SecureStore is used, but reinstall, backup restore, OS-lock changes, unavailable keychain, and storage-version migration are unspecified | Version and namespace records, handle unavailable/invalid storage by signing out safely, exclude sensitive Android backup data, use the platform keychain access group, and test reinstall/restore/biometric-lock scenarios |
+| Navigation/deep links | Native routes exist, but protected-route guards and warm/cold link behavior are not one contract | Centralize signed-in guards, replace rather than stack callback routes, handle cold start and an already-open app, preserve back behavior, and require explicit confirmation before abandoning an unsaved form |
+| Device UX | Safe areas, keyboard avoidance, dynamic type, reduced motion, orientation, and screen-reader semantics are not acceptance criteria | Test notch/insets, keyboard overlap, large text, VoiceOver/TalkBack labels and roles, minimum touch targets, reduced-motion transitions, and portrait/landscape policy on supported screens |
+| Locale/theme changes | Persistence and live system changes are not covered for every native screen | Apply a locale or system-theme change without restart, update system-browser return screens and native alerts, persist the choice across restart, and provide translated validation/error strings for every native route |
+| Notifications | A notification adapter is not defined for permission denial or action routing | Request permission only when a feature needs it, deep-link notification actions through the same auth guard, handle denied permission with an OS-settings route, and announce important changes accessibly without inventing unread state |
+| Mobile release | The repository has a web export script but no documented device build, signing, runtime-version, or rollback policy | Define Android/iOS build profiles, bundle/package identifiers, signing ownership, OTA/store boundaries, runtime compatibility, staged rollout, rollback, privacy disclosure, icon/splash assets, and minimum supported OS before release automation |
+| Native test harness | Current mobile tests are contract tests rather than device-flow tests | Select and document a device E2E tool (for example Detox, Maestro, or an Expo development build), provide deterministic auth/API fixtures, and run a matrix for cold start, callback, refresh, logout, deep links, offline, locale, theme, and accessibility |
+
+Mobile social login is explicitly blocked until the server exposes a registered mobile client and
+callback contract. The native client must not exchange a provider token directly or infer an account
+from an email address. The same rule applies to a future mobile Admin client: it needs its own client
+registration, authority scope, storage namespace, and logout/session invalidation tests.
+
 ## Remaining desktop scope
 
 ### P0 — replace the authenticated Web renderer
@@ -154,6 +179,80 @@ so a native implementation can be audited against behavior without copying its m
    release policy requires signatures.
 4. Add screenshots/accessibility checks for narrow windows, keyboard traversal, screen readers,
    high-contrast mode, long Turkish strings, and offline storage/API failures.
+
+### Additional desktop gaps found in the source audit
+
+The current Electron package has strong native infrastructure, but the authenticated console still
+loads the Web renderer. The following findings keep that boundary visible and prevent a partial
+migration from being mistaken for a native client.
+
+| Area | Finding in the current source | Required native behavior and acceptance criterion |
+| --- | --- | --- |
+| Authenticated renderer | `main.ts` still loads the bundled Admin/Account Web routes after login | Replace the authenticated route with a desktop-owned native shell and screen registry; keep the Web renderer only as an explicitly named temporary fallback with telemetry-free local diagnostics and a removal milestone |
+| Renderer privileges | The preload bridge exposes session operations while native screens are not yet fully separated | Prefer main-process request adapters for protected API calls; if a renderer receives a typed session facade, it must never receive refresh-token material, generic network passthrough, or arbitrary IPC channels |
+| Auth transaction lifecycle | Pending PKCE authorizations are in memory and callback/second-instance paths are not fully specified | Add expiry, cancellation, one-time consumption, browser-close handling, callback mismatch handling, and recovery after app restart; cover macOS `open-url`, Windows/Linux second-instance, and an already-open chooser |
+| External navigation | Native windows need a single policy for links and popup attempts | Allow only declared HTTPS hosts and exact paths; deny unexpected `will-navigate`, popup, custom-protocol, port, and redirect combinations; open approved external links in the system browser |
+| Window lifecycle | Settings, companion, dialogs, and the main window have different close/focus behavior | Define parent/child ownership, modal focus, macOS activation, tray-only mode, dock/menu-bar visibility, multi-monitor bounds, DPI/display removal, always-on-top companion behavior, and no-grey-flash startup for every native window |
+| Offline/API state | Native UI has no unified request proxy, cancellation, or mutation policy | Provide typed request cancellation and offline detection; disable unsafe mutations while disconnected, preserve idempotent retry rules, and show a recoverable localized error without losing form input |
+| Theme/language | Live theme propagation exists for part of the renderer, but all native windows, menus, tray labels, and dialogs are not covered | Use one desktop preference source; update every open surface immediately; test OS light/dark and locale changes while a settings, update, companion, or auth dialog is open, including long Turkish strings and system high-contrast mode |
+| Update/release integrity | Update UI and rollback paths exist, but packaging/signing/architecture behavior is not one tested contract | Verify signed manifests, `latest*.yml`, checksums, rollback markers, architecture matching, interrupted downloads, proxy/air-gapped errors, permission failures, AppImage rollback, and system-package handoff; test macOS universal/x64/arm64, Windows, and Linux separately |
+| Package metadata | Linux packaging depends on desktop entry metadata and maintainer information | Assert `desktopName`, maintainer email, desktop entry association, icon/resource inclusion, ASAR integrity, per-architecture filenames, and install/uninstall behavior in CI smoke jobs |
+| Diagnostics/privacy | A diagnostics surface exists, but redaction/retention/export rules are not complete | Redact authorization codes, tokens, cookies, headers, query/body secrets, file paths, usernames, provider subjects, and PII; define retention, copy/export behavior, crash handler policy, and an explicit no-remote-telemetry default |
+| Accessibility | Native HTML dialogs and Electron windows need a consistent accessibility contract | Test tab order, focus restoration, ARIA names/roles, keyboard-only action, screen readers, reduced motion, high contrast, zoom, and dialogs that cannot trap focus after closing |
+| Companion/global shortcut | Companion visibility and global shortcut settings exist, but conflict and privacy behavior is unspecified | Detect accelerator conflicts, expose a recoverable setting, restore the previous window focus, and prevent the companion from displaying account/admin data without a valid session |
+| Native E2E | Existing E2E mostly covers unauthenticated native surfaces and update dialogs | Add an authenticated stub server/fixture and test Admin/Account startup, API 401/403/offline, logout, deep-link callbacks, external-link policy, settings persistence, companion, update states, and packaged smoke runs on macOS/Windows/Linux |
+
+Desktop token handling must be treated as a security boundary: the main process owns the vault and
+refresh operation, native screens use typed capability-scoped calls, and no diagnostic, crash, or
+renderer log may contain token material. A temporary Web fallback may exist during migration, but it
+must be explicit, removable, and excluded from the definition of native parity.
+
+## Cross-client contract gaps
+
+The source audit also found contracts that are currently implicit. They must be written once in the
+shared package and consumed by Web, Mobile, and Desktop without sharing UI components.
+
+1. **Capability and version negotiation**: expose the client capabilities needed for passkeys, MFA,
+   social providers, CIBA, and native update flows. A client must hide unsupported actions and show a
+   localized unavailable state rather than sending an unknown request.
+2. **Error taxonomy**: standardize error codes for validation, authentication, authorization,
+   conflict, rate limit, unavailable, timeout, offline, and update failures. Each platform maps the
+   same code to its own visual treatment.
+3. **Session model**: define access/ID/refresh token ownership, expiry skew, refresh single-flight,
+   logout invalidation, storage version, and per-client namespaces. Account, Admin, and future mobile
+   sessions must never share a refresh record.
+4. **Deep-link model**: define route names, required parameters, one-time token handling, state and
+   code-verifier correlation, cold/warm start semantics, and allowed origins for every client.
+5. **Localization catalog**: keep message keys, placeholders, plural rules, accessibility labels,
+   error titles, and menu/dialog text in one catalog with English and Turkish coverage checks. Native
+   clients may choose a platform font and control, but may not fall back to English silently.
+6. **Design tokens and icon semantics**: share semantic colors, spacing, typography roles, and icon
+   names only. Each platform maps them to native controls and tests contrast in light/dark/high-
+   contrast modes.
+7. **Audit and privacy contract**: define which security events are observable locally, how they are
+   redacted, and whether any optional telemetry requires consent. Native diagnostics must not become a
+   hidden token or personal-data export channel.
+8. **Environment and endpoint policy**: development, staging, and production issuers, API origins,
+   redirect URIs, and update feeds must be selected by build profile; a packaged build must never
+   silently use `127.0.0.1` or a development issuer.
+
+## Native migration gates
+
+The migration cannot advance a client from In progress to Complete on visual similarity alone. Each
+vertical slice must satisfy all of the following gates:
+
+- its screen and navigation are owned by the target platform;
+- its API calls use a typed adapter and the shared error/session contract;
+- its auth callback, refresh, logout, deep-link, offline, and restart behavior are tested;
+- its English/Turkish, light/dark/system, accessibility, and loading/error states are complete;
+- its secrets, logs, diagnostics, and external navigation follow the platform security policy;
+- its CI job runs the focused native tests and a packaged smoke test where packaging is involved;
+- the feature matrix records the exact test evidence and any explicit backend/client-registration
+  blocker.
+
+If a backend capability is not available yet, record it as Blocked with the missing endpoint or
+client registration. Do not mark it Complete by embedding the Web route or by accepting a weaker
+security flow.
 
 ## Shared/native architecture contract
 
