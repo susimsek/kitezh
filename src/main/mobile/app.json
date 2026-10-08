@@ -6,6 +6,9 @@
     "scheme": "kitezh",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,

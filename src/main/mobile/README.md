@@ -37,3 +37,22 @@ or browser storage code.
 Set `EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER` to use another issuer during development. The
 default is `https://kitezh.onrender.com`. The authorization server must contain the
 `mobile-account-console` public client with the `kitezh://oauth/callback` redirect URI.
+
+## Native release profiles
+
+`eas.json` defines the supported build boundaries:
+
+- `development` is a development client for local device and callback testing.
+- `preview` is an internally distributed build for QA and acceptance evidence.
+- `production` is the store build and increments the remote app version for each release.
+
+The iOS bundle identifier and Android package are both
+`io.github.susimsek.kitezh.mobile`. EAS owns platform signing credentials; credentials must stay
+in the EAS project or CI secret store and must never be committed here. The runtime contract is
+the app version, so a native store build cannot load an incompatible JavaScript bundle.
+
+The current release path is store-first. No mobile update button or OTA channel is exposed until
+an EAS project, update URL, privacy disclosure, staged rollout, and rollback owner are configured.
+To roll back a store release, stop the rollout and promote the last compatible build; do not use an
+OTA rollback to cross a native runtime boundary. Device builds must be validated on both Android
+and iOS before a production submission.

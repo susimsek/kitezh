@@ -280,9 +280,9 @@ acceptance evidence is linked in the feature matrix.
 - [ ] Mobile native Admin shell and navigation
 - [ ] Mobile Admin pagination, filters, authority-aware actions, and confirmations
 - [ ] Android/iOS development-build and device E2E coverage
-- [ ] Mobile store/OTA release and rollback strategy
+- [~] Mobile store-first release and rollback strategy documented in `src/main/mobile/README.md` and `eas.json`; EAS project, staged rollout, and OTA configuration remain
 - [~] Mobile in-app notification adapter with localized auto-dismiss feedback (`MobileNoticeProvider`); OS permission and authenticated action-routing remain blocked until a backend event contract and native E2E harness are available
-- [ ] Mobile signing, runtime-version, staged rollout, and release metadata
+- [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; CI signing, staged rollout evidence, and store metadata remain
 - [ ] Mobile native E2E harness, fixtures, and CI matrix
 - [ ] Desktop packaged smoke tests on macOS, Windows, and Linux
 - [ ] Linux system-package handoff and AppImage rollback verification
