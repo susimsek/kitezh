@@ -16,11 +16,13 @@ import {
   AdminApiError,
   deleteAdminUser,
   getAdminDashboard,
+  listAdminClientScopes,
   listAdminClients,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
   type AdminClient,
+  type AdminClientScope,
   type AdminPage,
   type AdminUser,
 } from "@/api/admin-api";
@@ -30,7 +32,12 @@ import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
 
-type AdminSection = "dashboard" | "users" | "clients" | "settings";
+type AdminSection =
+  | "dashboard"
+  | "users"
+  | "clients"
+  | "scopes"
+  | "settings";
 
 export default function AdminScreen() {
   return (
@@ -64,6 +71,13 @@ function AdminConsole() {
   );
   const [clientQuery, setClientQuery] = useState("");
   const [clientPage, setClientPage] = useState(0);
+  const [scopes, setScopes] = useState<AdminPage<AdminClientScope> | null>(null);
+  const [scopesLoading, setScopesLoading] = useState(false);
+  const [scopesErrorStatus, setScopesErrorStatus] = useState<number | null>(
+    null,
+  );
+  const [scopeQuery, setScopeQuery] = useState("");
+  const [scopePage, setScopePage] = useState(0);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -183,6 +197,39 @@ function AdminConsole() {
     [clientPage, clientQuery, refreshSession, session],
   );
 
+  const loadScopes = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setScopesLoading(true);
+      setScopesErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setScopes(
+          await listAdminClientScopes(
+            currentSession.accessToken,
+            scopeQuery,
+            scopePage,
+            10,
+            {
+              refreshAccessToken: async () =>
+                (await refreshSession(true))?.accessToken ?? null,
+            },
+          ),
+        );
+      } catch (cause) {
+        setScopesErrorStatus(
+          cause instanceof AdminApiError ? cause.status : 0,
+        );
+      } finally {
+        setScopesLoading(false);
+      }
+    },
+    [refreshSession, scopePage, scopeQuery, session],
+  );
+
   const deleteUser = useCallback(
     (user: AdminUser) => {
       if (!session || userActionKey) return;
@@ -237,6 +284,12 @@ function AdminConsole() {
     }
   }, [loadClients, section, session]);
 
+  useEffect(() => {
+    if (session && section === "scopes") {
+      queueMicrotask(() => void loadScopes());
+    }
+  }, [loadScopes, section, session]);
+
   if (status === "loading") {
     return <LoadingScreen />;
   }
@@ -284,7 +337,7 @@ function AdminConsole() {
             </View>
             <View>
               <Text style={[styles.headerTitle, { color: palette.text }]}>Kitezh</Text>
-              <Text style={[styles.headerSubtitle, { color: palette.textMuted }]}> 
+              <Text style={[styles.headerSubtitle, { color: palette.textMuted }]}>
                 {dictionary.adminTitle}
               </Text>
             </View>
@@ -305,14 +358,18 @@ function AdminConsole() {
                 ? dictionary.adminDashboard
                 : section === "users"
                   ? dictionary.adminUsers
-                  : section === "clients"
-                    ? dictionary.adminClients
+                : section === "clients"
+                  ? dictionary.adminClients
+                  : section === "scopes"
+                    ? dictionary.adminClientScopes
                     : dictionary.adminSettings}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
               {section === "dashboard"
                 ? dictionary.adminOverview
-                : dictionary.adminComingSoon}
+                : section === "scopes"
+                  ? dictionary.adminOverview
+                  : dictionary.adminComingSoon}
             </Text>
             {section === "dashboard" ? (
               <DashboardContent
@@ -350,6 +407,20 @@ function AdminConsole() {
                 setQuery={(query) => {
                   setClientPage(0);
                   setClientQuery(query);
+                }}
+              />
+            ) : section === "scopes" ? (
+              <ClientScopesContent
+                errorStatus={scopesErrorStatus}
+                loading={scopesLoading}
+                onNext={() => setScopePage((page) => page + 1)}
+                onPrevious={() => setScopePage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadScopes(true)}
+                page={scopes}
+                query={scopeQuery}
+                setQuery={(query) => {
+                  setScopePage(0);
+                  setScopeQuery(query);
                 }}
               />
             ) : null}
@@ -650,6 +721,109 @@ function ClientsContent({
   );
 }
 
+function ClientScopesContent({
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminClientScope> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchClientScopes}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchClientScopes}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403
+              ? dictionary.adminForbidden
+              : dictionary.adminClientScopesLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((scope) => (
+            <View
+              key={scope.id}
+              style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+            >
+              <View style={styles.userCardHeader}>
+                <Text style={[styles.userName, { color: palette.text }]}>{scope.name}</Text>
+                <Text style={{ color: scope.builtIn ? palette.textMuted : palette.primary }}>
+                  {scope.builtIn ? dictionary.adminBuiltIn : dictionary.adminCustom}
+                </Text>
+              </View>
+              {scope.displayName ? (
+                <Text style={{ color: palette.textMuted }}>{scope.displayName}</Text>
+              ) : null}
+              {scope.description ? (
+                <Text style={{ color: palette.textMuted }}>{scope.description}</Text>
+              ) : null}
+              <Text style={[styles.roles, { color: palette.textMuted }]}>
+                {scope.includeInTokenScope ? "token_scope" : "—"}
+                {scope.displayOnConsentScreen ? " · consent" : ""}
+              </Text>
+            </View>
+          ))}
+          <View style={styles.pagination}>
+            <ActionButton
+              label={dictionary.adminPrevious}
+              busy={loading}
+              disabled={page.number === 0}
+              onPress={onPrevious}
+              palette={palette}
+              secondary
+            />
+            <Text style={{ color: palette.textMuted }}>
+              {dictionary.adminPage} {page.number + 1} / {Math.max(page.totalPages, 1)}
+            </Text>
+            <ActionButton
+              label={dictionary.adminNext}
+              busy={loading}
+              disabled={page.number + 1 >= page.totalPages}
+              onPress={onNext}
+              palette={palette}
+              secondary
+            />
+          </View>
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoClientScopes}</Text>
+      )}
+    </View>
+  );
+}
+
 function ActionButton({
   label,
   busy,
@@ -697,10 +871,15 @@ function AdminTabBar({
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
-  const tabs: readonly [AdminSection, string, "home" | "shield" | "gear"][] = [
+  const tabs: readonly [
+    AdminSection,
+    string,
+    "home" | "shield" | "layers" | "gear",
+  ][] = [
     ["dashboard", dictionary.adminDashboard, "home"],
     ["users", dictionary.adminUsers, "shield"],
     ["clients", dictionary.adminClients, "shield"],
+    ["scopes", dictionary.adminClientScopes, "layers"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
   return (

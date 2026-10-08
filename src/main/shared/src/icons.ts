@@ -7,6 +7,7 @@ export const iconNames = [
   "gear",
   "globe",
   "home",
+  "layers",
   "moon",
   "shield",
   "sun",

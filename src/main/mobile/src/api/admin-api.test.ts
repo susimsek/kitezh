@@ -6,6 +6,7 @@ import {
   getAdminDashboard,
   listAdminUsers,
   listAdminClients,
+  listAdminClientScopes,
   deleteAdminUser,
   setAdminUserEnabled,
 } from "./admin-api.ts";
@@ -137,6 +138,27 @@ test("admin clients request uses a bounded sorted page", async () => {
     assert.equal(
       request,
       "https://kitezh.onrender.com/api/admin/clients?q=mobile&page=0&size=10&sort=clientId%2Casc",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin client scopes request uses a bounded sorted page", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  globalThis.fetch = async (input) => {
+    request = input.toString();
+    return new Response(
+      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminClientScopes("access-token", "profile", 0, 10);
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/client-scopes?q=profile&page=0&size=10&sort=name%2Casc",
     );
   } finally {
     globalThis.fetch = originalFetch;

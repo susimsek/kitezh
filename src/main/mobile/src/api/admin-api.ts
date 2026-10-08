@@ -35,6 +35,16 @@ export type AdminClient = {
   serviceAccountEnabled: boolean;
 };
 
+export type AdminClientScope = {
+  id: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  builtIn: boolean;
+  displayOnConsentScreen: boolean;
+  includeInTokenScope: boolean;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -143,6 +153,27 @@ export function listAdminClients(
   return requestAdmin<AdminPage<AdminClient>>(
     accessToken,
     `/api/admin/clients?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function listAdminClientScopes(
+  accessToken: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "name,asc",
+  });
+  return requestAdmin<AdminPage<AdminClientScope>>(
+    accessToken,
+    `/api/admin/client-scopes?${params.toString()}`,
     options,
     false,
   );
