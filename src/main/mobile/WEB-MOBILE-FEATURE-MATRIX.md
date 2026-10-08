@@ -32,7 +32,7 @@ Status values:
 | Native sign-in surface         | Separate Electron login and console chooser with Kitezh branding; must not render the web login route | Complete       | Native `app://renderer/desktop-login` window, Admin/Account choices, localized error/loading state, duplicate-click prevention |
 | Browser authentication handoff | System browser Authorization Code + PKCE; callback returns through `kitezh://`                        | Complete       | Main-process state validation, code exchange, callback error handling, and secure-vault storage                                |
 | Admin and Account consoles     | Native desktop screen components with the same API contracts as web and mobile                        | In progress    | Replace web-only layout/components incrementally; preserve authorization, refresh, logout, and deep-link behavior              |
-| Desktop shell                  | Main window, menu bar, dock visibility, companion window, single-instance focus, and native menus     | In progress    | Native menu/tray/companion tests, second-launch focus, logout, and visibility preferences                                      |
+| Desktop shell                  | Main window, menu bar, dock visibility, companion window, single-instance focus, and native menus     | In progress    | Native menu/tray/companion tests, second-launch focus, keyboard focus, accessible landmarks, minimum action targets, logout, and visibility preferences; authenticated native console migration remains |
 | Settings                       | Native settings window with General, Notifications, Appearance, Updates, and Diagnostics sections     | Complete       | Separate window, theme/language persistence, reset defaults, keyboard shortcut, diagnostics, and no-login access               |
 | Theme                          | System, light, and dark modes applied to Electron windows and dialogs                                 | In progress    | Native dialogs follow `nativeTheme` and receive live system-theme changes; renderer controls and restart persistence remain    |
 | Language                       | English and Turkish for menus, native windows, and desktop settings                                   | In progress    | Language change updates open windows and menu/tray labels; full console coverage remains                                       |
@@ -246,6 +246,9 @@ remaining migration work instead of marking it complete because the Web screen a
 - Add native window tests for first launch without a session, existing-session startup, logout,
   second-instance focus, settings without login, companion window behavior, and native menu/tray
   actions.
+- Companion E2E must verify an accessible main landmark, named console actions, keyboard focus,
+  duplicate-action prevention, and minimum action target size. It must also verify that the
+  companion displays only the console chooser until the main process completes a valid session.
 - Cover Admin and Account native screens with success, loading, validation, empty, offline,
   401/403, refresh, logout, and permission-denied scenarios.
 - Verify system, light, and dark themes and English/Turkish labels in every native window and

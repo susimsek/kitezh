@@ -473,6 +473,7 @@ async function desktopSettingsHtml() {
         notificationsEnabled: "Masaüstü bildirimlerini göster",
         globalShortcut: "Hızlı erişim kısayolu",
         shortcutHelp: "Alanı seçip yeni bir tuş kombinasyonuna basın.",
+        shortcutUnavailable: "Bu kısayol kullanılamıyor. Başka bir kısayol seçin.",
         automaticDownload: "Güncellemeleri otomatik indir ve kur",
         checkForUpdates: "Güncellemeleri denetle",
         reset: "Varsayılanlara sıfırla",
@@ -507,6 +508,8 @@ async function desktopSettingsHtml() {
         globalShortcut: "Quick access shortcut",
         shortcutHelp:
           "Click the field and press a key combination to change it.",
+        shortcutUnavailable:
+          "This shortcut is unavailable. Choose another shortcut.",
         automaticDownload: "Automatically download and install updates",
         checkForUpdates: "Check for updates",
         reset: "Reset to defaults",
@@ -577,7 +580,7 @@ async function desktopSettingsHtml() {
         <button type="button" data-section="diagnostics" aria-selected="false">${labels.diagnostics}</button>
         <div id="desktop-settings-no-results" class="no-results" hidden>${labels.noResults}</div>
       </nav>
-      <main>
+      <main aria-label="${labels.title}">
         <section data-panel="general">
           <h2>${labels.general}</h2>
           <p class="intro">${labels.launchAtLogin}</p>
@@ -588,6 +591,7 @@ async function desktopSettingsHtml() {
             ${dockControl}
             <label class="setting-row"><span>${labels.globalShortcut}</span><input id="desktop-global-shortcut" type="text" readonly aria-describedby="shortcut-help"></label>
             <p id="shortcut-help" class="status">${labels.shortcutHelp}</p>
+            <p id="desktop-shortcut-status" class="status" role="status" aria-live="polite"></p>
           </div>
         </section>
         <section data-panel="notifications" hidden>
@@ -626,12 +630,13 @@ async function desktopSettingsHtml() {
       const search = document.getElementById("desktop-settings-search");
       const noResults = document.getElementById("desktop-settings-no-results");
       const status = document.getElementById("desktop-status");
+      const shortcutStatus = document.getElementById("desktop-shortcut-status");
       const setStatus = (value) => { status.textContent = value; };
       const setBusy = (busy) => { document.querySelectorAll("button, select, input").forEach((control) => { if (control.id !== "desktop-global-shortcut") control.disabled = busy; }); };
       const showSection = (name) => { sections.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.section === name))); panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; }); if (name === "diagnostics") void loadDiagnostics(); };
       sections.forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section)));
       search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); let visible = 0; sections.forEach((button) => { const matches = !query || button.textContent.toLocaleLowerCase().includes(query); button.hidden = !matches; if (matches) visible += 1; }); noResults.hidden = visible > 0; if (visible === 0) panels.forEach((panel) => { panel.hidden = true; }); });
-      const setPreferences = async (value) => { setBusy(true); setStatus(labels.saving); try { const next = await api.preferences.set(value); applyPreferences(next); setStatus(labels.saved); } catch { setStatus(labels.unavailable); } finally { setBusy(false); } };
+      const setPreferences = async (value) => { setBusy(true); setStatus(labels.saving); try { const next = await api.preferences.set(value); applyPreferences(next); setStatus(labels.saved); shortcutStatus.textContent = ""; } catch (error) { const unavailable = error instanceof Error && error.message === "Global shortcut is unavailable"; setStatus(unavailable ? labels.shortcutUnavailable : labels.unavailable); if (unavailable) shortcutStatus.textContent = labels.shortcutUnavailable; } finally { setBusy(false); } };
       const applyPreferences = (value) => { document.getElementById("desktop-launch-at-login").checked = Boolean(value.launchAtLogin); document.getElementById("desktop-show-in-menu-bar").checked = Boolean(value.showInMenuBar); const dock = document.getElementById("desktop-show-in-dock"); if (dock) dock.checked = Boolean(value.showInDock); document.getElementById("desktop-notifications").checked = Boolean(value.notifications); document.getElementById("desktop-automatic-download").checked = Boolean(value.automaticDownload); document.getElementById("desktop-global-shortcut").value = value.globalShortcut || "Alt+Space"; };
       const loadPreferences = async () => { try { applyPreferences(await api.preferences.get()); const languageMode = await api.language.getMode(); document.getElementById("desktop-language").value = languageMode; document.querySelector("input[name='desktop-theme'][value='${currentTheme}']").checked = true; } catch { setStatus(labels.unavailable); } };
       const loadDiagnostics = async () => { try { const value = await api.diagnostics.get(); document.getElementById("desktop-diagnostics").textContent = JSON.stringify(value, null, 2); } catch { document.getElementById("desktop-diagnostics").textContent = labels.unavailable; } };
@@ -1238,7 +1243,7 @@ async function desktopCompanionHtml() {
     </style>
   </head>
   <body>
-    <main>
+    <main aria-label="${labels.eyebrow}">
       <section aria-labelledby="companion-title">
         <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
         <div class="eyebrow">${labels.eyebrow}</div>
@@ -1257,17 +1262,18 @@ async function desktopCompanionHtml() {
         button.addEventListener("click", async () => {
           if (pending) return;
           pending = true;
-          for (const candidate of document.querySelectorAll("button[data-console]")) candidate.disabled = true;
+          for (const candidate of document.querySelectorAll("button[data-console]")) { candidate.disabled = true; candidate.setAttribute("aria-busy", "true"); }
           button.innerHTML = '<span class="spinner" aria-hidden="true"></span>' + labels.loading;
           try {
             await window.desktopApi.companion.openConsole(button.dataset.console);
           } finally {
             pending = false;
             button.textContent = button.dataset.console === "admin" ? labels.admin : labels.account;
-            for (const candidate of document.querySelectorAll("button[data-console]")) candidate.disabled = false;
+            for (const candidate of document.querySelectorAll("button[data-console]")) { candidate.disabled = false; candidate.removeAttribute("aria-busy"); }
           }
         });
       }
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape") window.close(); });
       window.desktopApi.language.onChanged(() => window.location.reload());
     </script>
   </body>

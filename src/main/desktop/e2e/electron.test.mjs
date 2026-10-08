@@ -293,6 +293,12 @@ test("opens the native quick access companion from View", async () => {
     );
     assert.equal(
       await companionWindow
+        .getByRole("main", { name: "CONTINUE SECURELY" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await companionWindow
         .getByRole("button", { name: "Admin Console" })
         .count(),
       1,
@@ -302,6 +308,39 @@ test("opens the native quick access companion from View", async () => {
         .getByRole("button", { name: "Account Console" })
         .count(),
       1,
+    );
+    for (const button of await companionWindow
+      .getByRole("button")
+      .all()) {
+      assert.equal(await button.getAttribute("aria-busy"), null);
+      assert.equal(
+        await button.evaluate(
+          (element) => Number.parseFloat(getComputedStyle(element).minHeight) >= 44,
+        ),
+        true,
+      );
+    }
+    const accountButton = companionWindow.getByRole("button", {
+      name: "Account Console",
+    });
+    await accountButton.focus();
+    assert.equal(
+      await companionWindow.evaluate(
+        () => document.activeElement?.getAttribute("data-console"),
+      ),
+      "account",
+    );
+    const companionClosed = companionWindow.waitForEvent("close");
+    await Promise.allSettled([
+      companionWindow.keyboard.press("Escape"),
+      companionClosed,
+    ]);
+    await mainWindow.waitForTimeout(100);
+    assert.equal(
+      application
+        .windows()
+        .some((candidate) => candidate.url().includes("/desktop-companion")),
+      false,
     );
   } finally {
     await application.close();

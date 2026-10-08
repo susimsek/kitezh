@@ -271,6 +271,34 @@ Each owner must update the feature matrix with evidence, mark unavailable backen
 registrations as **Blocked**, and link focused tests or packaged smoke results. A person may review
 another owner's work, but a review does not transfer implementation ownership.
 
+### Şuayb progress checklist
+
+`[ ]` not started, `[~]` in progress, and `[x]` complete. An item becomes `[x]` only after its
+acceptance evidence is linked in the feature matrix.
+
+- [ ] Mobile Admin client registration and isolated session namespace
+- [ ] Mobile native Admin shell and navigation
+- [ ] Mobile Admin pagination, filters, authority-aware actions, and confirmations
+- [ ] Android/iOS development-build and device E2E coverage
+- [ ] Mobile store/OTA release and rollback strategy
+- [ ] Mobile notification, permission, and action-routing adapter
+- [ ] Mobile signing, runtime-version, staged rollout, and release metadata
+- [ ] Mobile native E2E harness, fixtures, and CI matrix
+- [ ] Desktop packaged smoke tests on macOS, Windows, and Linux
+- [ ] Linux system-package handoff and AppImage rollback verification
+- [ ] Desktop signing, Sigstore, checksum, and update-manifest verification
+- [~] Desktop accessibility screenshots and native control checks
+- [~] Desktop accessibility behavior: focus, keyboard, ARIA, high contrast, and reduced motion
+- [~] Companion/global shortcut conflict handling and privacy behavior
+- [~] Authenticated desktop native E2E fixture and cross-platform protocol coverage
+- [ ] Native screen/navigation ownership gate
+- [ ] Typed adapter and shared error/session contract gate
+- [ ] Auth callback, refresh, logout, deep-link, offline, and restart test gate
+- [ ] Localization, theme, accessibility, loading, and error-state gate
+- [ ] Secret, log, diagnostics, and external-navigation security gate
+- [ ] Focused CI and packaged smoke-test gate
+- [ ] Feature-matrix evidence and explicit blocker gate
+
 ## Shared/native architecture contract
 
 ### Allowed in `src/main/shared`
