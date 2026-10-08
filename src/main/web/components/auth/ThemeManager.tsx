@@ -37,10 +37,18 @@ export function ThemeManager() {
     };
 
     applyTheme();
-    if (theme !== "system") return undefined;
+    const removeDesktopThemeListener = window.desktopApi?.theme.onChanged((resolvedTheme) => {
+      if (theme === "system") {
+        document.documentElement.setAttribute("data-bs-theme", resolvedTheme);
+      }
+    });
+    if (theme !== "system") return removeDesktopThemeListener;
 
     mediaQuery.addEventListener("change", applyTheme);
-    return () => mediaQuery.removeEventListener("change", applyTheme);
+    return () => {
+      mediaQuery.removeEventListener("change", applyTheme);
+      removeDesktopThemeListener?.();
+    };
   }, [theme]);
 
   return null;

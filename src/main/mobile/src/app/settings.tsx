@@ -11,6 +11,8 @@ import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { AccountTabBar } from "@/components/AccountTabBar";
+import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -18,6 +20,7 @@ import { radii, spacing } from "@/theme/tokens";
 export default function SettingsScreen() {
   const { dictionary, locale, reset: resetLocale, setLocale } = useLocale();
   const { mode, palette, reset: resetTheme, setMode } = useTheme();
+  const { session } = useMobileAuth();
   const [resetting, setResetting] = useState(false);
 
   const resetDefaults = async () => {
@@ -36,7 +39,8 @@ export default function SettingsScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Pressable
             accessibilityLabel={dictionary.back}
@@ -129,7 +133,9 @@ export default function SettingsScreen() {
             {dictionary.resetDefaults}
           </Text>
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+        {session ? <AccountTabBar active="settings" /> : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -174,6 +180,7 @@ function Option({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  screen: { flex: 1 },
   content: { padding: spacing.xl },
   header: { alignItems: "center", flexDirection: "row", minHeight: 48 },
   back: { padding: spacing.sm },

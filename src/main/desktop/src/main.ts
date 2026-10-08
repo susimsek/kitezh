@@ -93,8 +93,26 @@ function applyDesktopTheme(value: unknown) {
   const backgroundColor = desktopBackgroundColor();
   for (const window of BrowserWindow.getAllWindows()) {
     window.setBackgroundColor(backgroundColor);
+    if (!window.isDestroyed()) {
+      window.webContents.send(
+        "desktop:theme-changed",
+        nativeTheme.shouldUseDarkColors ? "dark" : "light",
+      );
+    }
   }
 }
+
+nativeTheme.on("updated", () => {
+  const backgroundColor = desktopBackgroundColor();
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    window.setBackgroundColor(backgroundColor);
+    window.webContents.send(
+      "desktop:theme-changed",
+      nativeTheme.shouldUseDarkColors ? "dark" : "light",
+    );
+  }
+});
 
 async function applyDesktopLanguage(value: unknown) {
   desktopLanguageMode = value === "tr" || value === "en" ? value : "system";

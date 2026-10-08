@@ -37,6 +37,14 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   theme: {
     set: (value: unknown) => ipcRenderer.invoke("desktop:theme-set", value),
+    onChanged: (listener: (theme: "light" | "dark") => void) => {
+      const callback = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        if (value === "light" || value === "dark") listener(value);
+      };
+      ipcRenderer.on("desktop:theme-changed", callback);
+      return () =>
+        ipcRenderer.removeListener("desktop:theme-changed", callback);
+    },
   },
   language: {
     get: () => ipcRenderer.invoke("desktop:language-get"),

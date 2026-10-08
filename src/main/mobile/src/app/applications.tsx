@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { AccountTabBar } from "@/components/AccountTabBar";
 import {
   listAccountApplications,
   listOfflineSessions,
@@ -203,7 +204,8 @@ export default function ApplicationsScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -317,7 +319,9 @@ export default function ApplicationsScreen() {
             </View>
           ))
         )}
-      </ScrollView>
+        </ScrollView>
+        <AccountTabBar active="applications" />
+      </View>
     </SafeAreaView>
   );
 }
@@ -400,6 +404,7 @@ function ActionButton({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  screen: { flex: 1 },
   content: { gap: spacing.md, padding: spacing.xl },
   header: { alignSelf: "stretch", gap: spacing.md },
   back: { alignItems: "center", flexDirection: "row", gap: spacing.xs },

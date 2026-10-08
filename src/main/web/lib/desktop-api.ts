@@ -84,6 +84,7 @@ export type DesktopApi = {
   };
   theme: {
     set: (value: "system" | "light" | "dark") => Promise<void>;
+    onChanged: (listener: (theme: "light" | "dark") => void) => () => void;
   };
   language: {
     get: () => Promise<"en" | "tr">;

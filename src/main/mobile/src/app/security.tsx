@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { AccountTabBar } from "@/components/AccountTabBar";
 import {
   AccountApiError,
   changeAccountPassword,
@@ -294,10 +295,11 @@ export default function SecurityScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView
+      <View style={styles.screen}>
+        <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-      >
+        >
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -589,13 +591,16 @@ export default function SecurityScreen() {
             </Text>
           </Pressable>
         </View>
-      </ScrollView>
+        </ScrollView>
+        <AccountTabBar active="security" />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  screen: { flex: 1 },
   content: { gap: spacing.lg, padding: spacing.xl },
   header: { alignSelf: "stretch", gap: spacing.md },
   back: { alignItems: "center", flexDirection: "row", gap: spacing.xs },

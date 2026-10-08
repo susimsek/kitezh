@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { AccountTabBar } from "@/components/AccountTabBar";
 import { useLocale } from "@/i18n/LocaleProvider";
 import {
   getAccountProfile,
@@ -153,10 +154,11 @@ export default function AccountScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView
+      <View style={styles.screen}>
+        <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-      >
+        >
         <View style={[styles.logo, { backgroundColor: palette.primary }]}>
           <AppIcon name="shield" size={38} color={palette.onPrimary} />
         </View>
@@ -376,13 +378,16 @@ export default function AccountScreen() {
             {dictionary.continue}
           </Text>
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+        <AccountTabBar active="account" />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  screen: { flex: 1 },
   content: {
     alignItems: "center",
     flex: 1,
