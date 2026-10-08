@@ -13,6 +13,7 @@ export const colors = {
     primaryPressed: "#0f5fd2",
     onPrimary: "#ffffff",
     danger: "#c93636",
+    success: "#1a8f5b",
   },
   dark: {
     background: "#111418",
@@ -25,6 +26,7 @@ export const colors = {
     primaryPressed: "#7badff",
     onPrimary: "#08152a",
     danger: "#ff8585",
+    success: "#65d49b",
   },
 } as const;
 

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -22,8 +23,11 @@ async function launchDesktop({
   updatePreviewState,
   updatePreviewVersion = "0.1.1",
 } = {}) {
+  const userDataDirectory = await mkdtemp(
+    path.join(os.tmpdir(), "kitezh-desktop-e2e-"),
+  );
   return electron.launch({
-    args: [desktopDirectory],
+    args: [`--user-data-dir=${userDataDirectory}`, desktopDirectory],
     cwd: desktopDirectory,
     env: {
       ...process.env,
@@ -52,6 +56,19 @@ async function clickApplicationMenuItem(application, label) {
     return Boolean(item);
   }, label);
   assert.equal(clicked, true, `Could not find application menu item: ${label}`);
+}
+
+async function clickViewMenuItem(application, label) {
+  const clicked = await application.evaluate(({ Menu }, itemLabel) => {
+    const menu = Menu.getApplicationMenu();
+    const view = menu?.items.find((candidate) => candidate.label === "View");
+    const item = view?.submenu?.items.find(
+      (candidate) => candidate.label === itemLabel,
+    );
+    item?.click();
+    return Boolean(item);
+  }, label);
+  assert.equal(clicked, true, `Could not find View menu item: ${label}`);
 }
 
 async function openManualUpdateCheck(
@@ -83,15 +100,31 @@ test("opens the trusted renderer and exposes the narrow desktop bridge", async (
     assert.equal(await window.url(), "app://renderer/");
     assert.equal(await window.locator(".desktop-console-option").count(), 2);
     assert.ok(
-      (await window.locator('img[aria-hidden="true"]').evaluateAll((images) =>
-        images.every(
-          (image) =>
-            image.complete &&
-            image.naturalWidth > 0 &&
-            image.src.startsWith("app://renderer/brand/"),
+      await window
+        .locator('img[aria-hidden="true"]')
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              image.complete &&
+              image.naturalWidth > 0 &&
+              image.src.startsWith("app://renderer/brand/"),
+          ),
         ),
-      )),
       "Desktop brand logos should load from the packaged renderer",
+    );
+    const nativeLogin = application
+      .windows()
+      .find((candidate) => candidate.url().includes("/desktop-login"));
+    assert.ok(nativeLogin, "Desktop should show the native login window");
+    await nativeLogin
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    assert.equal(await nativeLogin.url(), "app://renderer/desktop-login");
+    assert.equal(
+      await nativeLogin
+        .getByRole("button", { name: "Sign in to Admin Console" })
+        .count(),
+      1,
     );
     assert.deepEqual(
       await window.evaluate(async () => ({
@@ -142,6 +175,17 @@ test("opens settings in a separate window without requiring login", async () => 
         1,
       );
     }
+    const settingsSearch = settingsWindow.locator("#desktop-settings-search");
+    await settingsSearch.fill("zz");
+    assert.equal(
+      await settingsWindow.locator("#desktop-settings-no-results").isVisible(),
+      true,
+    );
+    await settingsSearch.fill("");
+    assert.equal(
+      await settingsWindow.getByRole("button", { name: "General" }).isVisible(),
+      true,
+    );
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("heading", { name: "Appearance" }).waitFor();
     assert.equal(
@@ -232,6 +276,38 @@ test("opens settings in a separate window without requiring login", async () => 
   }
 });
 
+test("opens the native quick access companion from View", async () => {
+  const application = await launchDesktop();
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const companionWindowPromise = application.waitForEvent("window");
+    await clickViewMenuItem(application, "Quick Access…");
+    const companionWindow = await companionWindowPromise;
+    await companionWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+    assert.equal(
+      await companionWindow.url(),
+      "app://renderer/desktop-companion",
+    );
+    assert.equal(
+      await companionWindow
+        .getByRole("button", { name: "Admin Console" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await companionWindow
+        .getByRole("button", { name: "Account Console" })
+        .count(),
+      1,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("brings the existing window forward on a second launch", async () => {
   const application = await launchDesktop();
   try {
@@ -242,11 +318,15 @@ test("brings the existing window forward on a second launch", async () => {
       .waitFor();
 
     await application.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0]?.hide();
+      BrowserWindow.getAllWindows()
+        .find((window) => window.webContents.getURL() === "app://renderer/")
+        ?.hide();
     });
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()[0]?.isVisible(),
+        BrowserWindow.getAllWindows()
+          .find((window) => window.webContents.getURL() === "app://renderer/")
+          ?.isVisible(),
       ),
       false,
     );
@@ -257,7 +337,9 @@ test("brings the existing window forward on a second launch", async () => {
     await mainWindow.waitForTimeout(100);
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()[0]?.isVisible(),
+        BrowserWindow.getAllWindows()
+          .find((window) => window.webContents.getURL() === "app://renderer/")
+          ?.isVisible(),
       ),
       true,
     );
@@ -422,7 +504,9 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await settingsWindow.getByRole("radio", { name: "Dark" }).click();
     await settingsWindow.getByRole("button", { name: "General" }).click();
     await settingsWindow.locator("#desktop-language").selectOption("tr");
-    await mainWindow.getByRole("heading", { name: "Bir konsol seçin" }).waitFor();
+    await mainWindow
+      .getByRole("heading", { name: "Bir konsol seçin" })
+      .waitFor();
     await settingsWindow.getByRole("heading", { name: "Ayarlar" }).waitFor();
     await settingsWindow.close();
     const reopenedSettingsWindowPromise = application.waitForEvent("window");

@@ -15,22 +15,38 @@ type ThemeContextValue = {
   mode: ThemeMode;
   resolvedTheme: ResolvedTheme;
   palette: (typeof colors)[ResolvedTheme];
+  ready: boolean;
   setMode: (mode: ThemeMode) => void;
+  reset: () => Promise<void>;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemTheme: ResolvedTheme = useColorScheme() === "dark" ? "dark" : "light";
+  const systemTheme: ResolvedTheme =
+    useColorScheme() === "dark" ? "dark" : "light";
   const [mode, setModeState] = useState<ThemeMode>("system");
+  const [ready, setReady] = useState(false);
   const resolvedTheme = resolveTheme(mode, systemTheme);
 
   useEffect(() => {
-    void SecureStore.getItemAsync(THEME_KEY).then((stored) => {
-      if (stored === "system" || stored === "light" || stored === "dark") {
-        setModeState(stored);
-      }
-    });
+    let active = true;
+    void SecureStore.getItemAsync(THEME_KEY)
+      .then((stored) => {
+        if (
+          active &&
+          (stored === "system" || stored === "light" || stored === "dark")
+        ) {
+          setModeState(stored);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const value = useMemo<ThemeContextValue>(
@@ -38,15 +54,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       mode,
       resolvedTheme,
       palette: colors[resolvedTheme],
+      ready,
       setMode: (nextMode) => {
         setModeState(nextMode);
         void SecureStore.setItemAsync(THEME_KEY, nextMode);
       },
+      reset: async () => {
+        setModeState("system");
+        await SecureStore.deleteItemAsync(THEME_KEY);
+      },
     }),
-    [mode, resolvedTheme],
+    [mode, ready, resolvedTheme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
     clearAllSessions: () =>
       ipcRenderer.invoke("desktop:auth-clear-all-sessions"),
     getStorageStatus: () => ipcRenderer.invoke("desktop:auth-storage-status"),
+    openConsole: (consoleName: unknown) =>
+      ipcRenderer.invoke("desktop:auth-open-console", consoleName),
   },
   getConfig: () => ipcRenderer.invoke("desktop:config"),
   getAppVersion: () => ipcRenderer.invoke("desktop:app-version"),
@@ -38,16 +40,15 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   language: {
     get: () => ipcRenderer.invoke("desktop:language-get"),
+    getMode: () => ipcRenderer.invoke("desktop:language-mode-get"),
     set: (value: unknown) => ipcRenderer.invoke("desktop:language-set", value),
     onChanged: (listener: (locale: "en" | "tr") => void) => {
-      const callback = (
-        _event: Electron.IpcRendererEvent,
-        value: unknown,
-      ) => {
+      const callback = (_event: Electron.IpcRendererEvent, value: unknown) => {
         if (value === "en" || value === "tr") listener(value);
       };
       ipcRenderer.on("desktop:language-changed", callback);
-      return () => ipcRenderer.removeListener("desktop:language-changed", callback);
+      return () =>
+        ipcRenderer.removeListener("desktop:language-changed", callback);
     },
   },
   settings: {

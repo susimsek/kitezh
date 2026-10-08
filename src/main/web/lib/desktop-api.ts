@@ -1,9 +1,15 @@
+import type {
+  ConsoleName,
+  DesktopLanguageMode,
+  DesktopUpdateStatus,
+} from "@kitezh/shared/contracts";
+
 export type DesktopConfig = {
   apiBaseUrl: string;
   protocol: string;
 };
 
-export type DesktopConsole = "admin" | "account";
+export type DesktopConsole = ConsoleName;
 export type DesktopTokens = {
   accessToken: string;
   expiresAt: number;
@@ -12,15 +18,7 @@ export type DesktopTokens = {
   version: 1;
 };
 export type DesktopAuthCallback = { console: DesktopConsole; url: string; error?: string };
-export type DesktopUpdateStatus =
-  | { state: "unsupported" }
-  | { state: "checking" }
-  | { state: "available"; version: string }
-  | { state: "not-available" }
-  | { state: "downloading"; percent: number }
-  | { state: "downloaded"; version: string }
-  | { state: "recovered"; version: string }
-  | { state: "error"; message: string };
+export type { DesktopLanguageMode, DesktopUpdateStatus };
 
 export type DesktopPreferences = {
   launchAtLogin: boolean;
@@ -72,6 +70,7 @@ export type DesktopApi = {
     clearSession: (console: DesktopConsole) => Promise<void>;
     clearAllSessions: () => Promise<void>;
     getStorageStatus: () => Promise<"available" | "unavailable">;
+    openConsole: (consoleName: DesktopConsole) => Promise<void>;
   };
   getConfig: () => Promise<DesktopConfig>;
   getAppVersion: () => Promise<string>;
@@ -88,7 +87,8 @@ export type DesktopApi = {
   };
   language: {
     get: () => Promise<"en" | "tr">;
-    set: (value: "en" | "tr") => Promise<void>;
+    getMode: () => Promise<DesktopLanguageMode>;
+    set: (value: "system" | "en" | "tr") => Promise<void>;
     onChanged: (listener: (locale: "en" | "tr") => void) => () => void;
   };
   settings: {

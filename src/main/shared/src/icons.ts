@@ -1,5 +1,9 @@
 export const iconNames = [
+  "arrowLeft",
   "arrowRight",
+  "check",
+  "logout",
+  "reset",
   "gear",
   "globe",
   "home",

@@ -66,6 +66,7 @@ app.setName(DESKTOP_APP_NAME);
 
 type DesktopTheme = ThemeMode;
 type DesktopLanguage = "en" | "tr";
+type DesktopLanguageMode = DesktopLanguage | "system";
 
 let desktopLanguage: DesktopLanguage = app
   .getLocale()
@@ -73,6 +74,7 @@ let desktopLanguage: DesktopLanguage = app
   .startsWith("tr")
   ? "tr"
   : "en";
+let desktopLanguageMode: DesktopLanguageMode = "system";
 
 function isTurkishDesktop() {
   return desktopLanguage === "tr";
@@ -95,8 +97,15 @@ function applyDesktopTheme(value: unknown) {
 }
 
 async function applyDesktopLanguage(value: unknown) {
-  desktopLanguage = value === "tr" ? "tr" : "en";
+  desktopLanguageMode = value === "tr" || value === "en" ? value : "system";
+  desktopLanguage =
+    desktopLanguageMode === "system"
+      ? app.getLocale().toLowerCase().startsWith("tr")
+        ? "tr"
+        : "en"
+      : desktopLanguageMode;
   await writeDesktopLanguage(desktopLanguage);
+  await writeDesktopLanguageMode(desktopLanguageMode);
   if (aboutWindow && !aboutWindow.isDestroyed()) {
     aboutWindow.setTitle(
       isTurkishDesktop()
@@ -151,6 +160,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
+let desktopLoginWindow: BrowserWindow | null = null;
 let companionWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -309,8 +319,347 @@ function rendererFile(requestUrl: string) {
   return path.extname(pathname) ? file : path.join(root, "index.html");
 }
 
+async function desktopLoginHtml() {
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  const isTurkish = isTurkishDesktop();
+  const labels = isTurkish
+    ? {
+        eyebrow: "Güvenli şekilde devam edin",
+        title: "Bir konsol seçin",
+        description: "Devam etmek istediğiniz konsolu seçin.",
+        admin: "Admin Console’a giriş yap",
+        adminDescription: "Yönetim ve erişim kontrolü.",
+        account: "Account Console’a giriş yap",
+        accountDescription: "Profil ve hesap ayarları.",
+        browserHint:
+          "Parolanız tarayıcıda kalır ve masaüstü uygulamasında saklanmaz.",
+        unavailable:
+          "Güvenli oturum açma başlatılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+        starting: "Tarayıcı açılıyor…",
+      }
+    : {
+        eyebrow: "Continue securely",
+        title: "Choose a console",
+        description: "Select where you want to continue.",
+        admin: "Sign in to Admin Console",
+        adminDescription: "Administration and access control.",
+        account: "Sign in to Account Console",
+        accountDescription: "Profile and account settings.",
+        browserHint:
+          "Your password stays in the browser and is never stored by the desktop app.",
+        unavailable:
+          "Secure sign-in could not be started. Check your connection and try again.",
+        starting: "Opening browser…",
+      };
+  return `<!doctype html>
+<html lang="${isTurkish ? "tr" : "en"}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${DESKTOP_APP_NAME}</title>
+    <style>
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { width: 100%; max-width: 560px; padding: 42px 36px 34px; text-align: center; }
+      img { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 22px; }
+      .eyebrow { color: #1683ff; font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 12px 0 8px; font-size: 30px; line-height: 1.15; font-weight: 750; }
+      .description { margin: 0 0 26px; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
+      .option { margin-top: 14px; }
+      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: #1683ff; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+      button:hover { background: #0b72e4; }
+      button:disabled { cursor: wait; opacity: .7; }
+      .option p { margin: 8px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.35; }
+      .hint { margin: 28px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.45; }
+      .error { display: none; margin: 18px 0 0; padding: 11px 14px; border: 1px solid #d93025; border-radius: 8px; color: #d93025; font-size: 13px; line-height: 1.4; }
+      .error.visible { display: block; }
+      .status { display: none; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 14px; }
+      .status.visible { display: block; }
+      .spinner { display: inline-block; width: 15px; height: 15px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
+      <div class="eyebrow">${labels.eyebrow}</div>
+      <h1>${labels.title}</h1>
+      <p class="description">${labels.description}</p>
+      <div class="option">
+        <button type="button" data-console="admin">${labels.admin}</button>
+        <p>${labels.adminDescription}</p>
+      </div>
+      <div class="option">
+        <button type="button" data-console="account">${labels.account}</button>
+        <p>${labels.accountDescription}</p>
+      </div>
+      <p class="hint">${labels.browserHint}</p>
+      <p id="status" class="status"><span class="spinner"></span>${labels.starting}</p>
+      <p id="error" class="error">${labels.unavailable}</p>
+    </main>
+    <script>
+      const buttons = [...document.querySelectorAll("button[data-console]")];
+      const status = document.getElementById("status");
+      const error = document.getElementById("error");
+      function setPending(pending) {
+        buttons.forEach((button) => { button.disabled = pending; });
+        status.classList.toggle("visible", pending);
+      }
+      buttons.forEach((button) => button.addEventListener("click", async () => {
+        setPending(true);
+        error.classList.remove("visible");
+        try {
+          await window.desktopApi.auth.openConsole(button.dataset.console);
+        } catch {
+          setPending(false);
+          error.classList.add("visible");
+        }
+      }));
+      window.desktopApi.onAuthCallback(({ error: callbackError }) => {
+        if (callbackError) {
+          setPending(false);
+          error.classList.add("visible");
+        }
+      });
+      window.desktopApi.language.onChanged(() => window.location.reload());
+    </script>
+  </body>
+</html>`;
+}
+
+async function desktopSettingsHtml() {
+  const isTurkish = isTurkishDesktop();
+  const labels = isTurkish
+    ? {
+        title: "Ayarlar",
+        general: "Genel",
+        notifications: "Bildirimler",
+        appearance: "Görünüm",
+        updates: "Güncellemeler",
+        diagnostics: "Tanı bilgileri",
+        search: "Ara",
+        noResults: "Sonuç bulunamadı",
+        language: "Dil",
+        system: "Sistem",
+        english: "English",
+        turkish: "Türkçe",
+        theme: "Tema",
+        light: "Açık",
+        dark: "Koyu",
+        launchAtLogin: "Oturum açıldığında Kitezh’i başlat",
+        showInMenuBar: "Menü çubuğunda göster",
+        showInDock: "Dock’ta göster",
+        notificationsEnabled: "Masaüstü bildirimlerini göster",
+        globalShortcut: "Hızlı erişim kısayolu",
+        shortcutHelp: "Alanı seçip yeni bir tuş kombinasyonuna basın.",
+        automaticDownload: "Güncellemeleri otomatik indir ve kur",
+        checkForUpdates: "Güncellemeleri denetle",
+        reset: "Varsayılanlara sıfırla",
+        close: "Kapat",
+        diagnosticsHelp: "Sorun giderme için redakte edilmiş tanı bilgileri.",
+        copyDiagnostics: "Tanı bilgilerini kopyala",
+        copied: "Kopyalandı",
+        saving: "Kaydediliyor…",
+        saved: "Kaydedildi",
+        unavailable: "Kullanılamıyor",
+      }
+    : {
+        title: "Settings",
+        general: "General",
+        notifications: "Notifications",
+        appearance: "Appearance",
+        updates: "Updates",
+        diagnostics: "Diagnostics",
+        search: "Search",
+        noResults: "No results found",
+        language: "Language",
+        system: "System",
+        english: "English",
+        turkish: "Türkçe",
+        theme: "Theme",
+        light: "Light",
+        dark: "Dark",
+        launchAtLogin: "Launch Kitezh at login",
+        showInMenuBar: "Show in the menu bar",
+        showInDock: "Show in the Dock",
+        notificationsEnabled: "Show desktop notifications",
+        globalShortcut: "Quick access shortcut",
+        shortcutHelp:
+          "Click the field and press a key combination to change it.",
+        automaticDownload: "Automatically download and install updates",
+        checkForUpdates: "Check for updates",
+        reset: "Reset to defaults",
+        close: "Close",
+        diagnosticsHelp: "Redacted runtime information for troubleshooting.",
+        copyDiagnostics: "Copy diagnostics",
+        copied: "Copied",
+        saving: "Saving…",
+        saved: "Saved",
+        unavailable: "Unavailable",
+      };
+  const dockControl =
+    process.platform === "darwin"
+      ? `<label class="setting-row"><span>${labels.showInDock}</span><input id="desktop-show-in-dock" type="checkbox"></label>`
+      : "";
+  const currentTheme = nativeTheme.themeSource;
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  return `<!doctype html>
+<html lang="${isTurkish ? "tr" : "en"}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${labels.title}</title>
+    <style>
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+      header { display: flex; align-items: center; gap: 14px; padding: 22px 28px 16px; border-bottom: 1px solid var(--dialog-border); }
+      header img { width: 38px; height: 38px; border-radius: 10px; }
+      header h1 { margin: 0; font-size: 24px; line-height: 1.2; }
+      .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 540px; }
+      nav { padding: 18px 14px; border-right: 1px solid var(--dialog-border); }
+      nav input { width: 100%; margin-bottom: 12px; }
+      nav button { display: block; width: 100%; margin: 3px 0; padding: 11px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--dialog-foreground); text-align: left; font: inherit; cursor: pointer; }
+      nav button:hover, nav button[aria-selected="true"] { background: var(--dialog-button); }
+      .no-results { margin: 8px 4px; color: var(--dialog-secondary); font-size: 13px; }
+      main { padding: 30px 36px 28px; max-width: 760px; }
+      section[hidden] { display: none; }
+      h2 { margin: 0 0 8px; font-size: 25px; }
+      .intro { margin: 0 0 24px; color: var(--dialog-secondary); line-height: 1.45; }
+      .card { border: 1px solid var(--dialog-border); border-radius: 12px; padding: 18px; }
+      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 50px; padding: 7px 0; border-bottom: 1px solid var(--dialog-border); }
+      .setting-row:last-child { border-bottom: 0; }
+      .setting-row span { font-size: 15px; }
+      select, input[type="text"] { min-height: 38px; padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: 7px; background: var(--dialog-background); color: var(--dialog-foreground); font: inherit; }
+      input[type="checkbox"] { width: 19px; height: 19px; accent-color: #1683ff; }
+      .theme-options { display: flex; gap: 8px; }
+      .theme-options label { display: flex; align-items: center; gap: 6px; }
+      .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
+      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 8px; background: #1683ff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+      button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
+      button:disabled { cursor: wait; opacity: .65; }
+      .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
+      pre { overflow: auto; max-height: 300px; padding: 14px; border-radius: 8px; background: var(--dialog-button); color: var(--dialog-secondary); white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </head>
+  <body>
+    <header><img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo"><h1>${labels.title}</h1></header>
+    <div class="layout">
+      <nav aria-label="${labels.title}">
+        <input id="desktop-settings-search" type="text" placeholder="${labels.search}" aria-label="${labels.search}">
+        <button type="button" data-section="general" aria-selected="true">${labels.general}</button>
+        <button type="button" data-section="notifications" aria-selected="false">${labels.notifications}</button>
+        <button type="button" data-section="appearance" aria-selected="false">${labels.appearance}</button>
+        <button type="button" data-section="updates" aria-selected="false">${labels.updates}</button>
+        <button type="button" data-section="diagnostics" aria-selected="false">${labels.diagnostics}</button>
+        <div id="desktop-settings-no-results" class="no-results" hidden>${labels.noResults}</div>
+      </nav>
+      <main>
+        <section data-panel="general">
+          <h2>${labels.general}</h2>
+          <p class="intro">${labels.launchAtLogin}</p>
+          <div class="card">
+            <label class="setting-row"><span>${labels.language}</span><select id="desktop-language"><option value="system">${labels.system}</option><option value="en">${labels.english}</option><option value="tr">${labels.turkish}</option></select></label>
+            <label class="setting-row"><span>${labels.launchAtLogin}</span><input id="desktop-launch-at-login" type="checkbox"></label>
+            <label class="setting-row"><span>${labels.showInMenuBar}</span><input id="desktop-show-in-menu-bar" type="checkbox"></label>
+            ${dockControl}
+            <label class="setting-row"><span>${labels.globalShortcut}</span><input id="desktop-global-shortcut" type="text" readonly aria-describedby="shortcut-help"></label>
+            <p id="shortcut-help" class="status">${labels.shortcutHelp}</p>
+          </div>
+        </section>
+        <section data-panel="notifications" hidden>
+          <h2>${labels.notifications}</h2>
+          <p class="intro">${labels.notificationsEnabled}</p>
+          <div class="card"><label class="setting-row"><span>${labels.notificationsEnabled}</span><input id="desktop-notifications" type="checkbox"></label></div>
+        </section>
+        <section data-panel="appearance" hidden>
+          <h2>${labels.appearance}</h2>
+          <p class="intro">${labels.theme}</p>
+          <div class="card theme-options">
+            <label><input type="radio" name="desktop-theme" value="system">${labels.system}</label>
+            <label><input type="radio" name="desktop-theme" value="light">${labels.light}</label>
+            <label><input type="radio" name="desktop-theme" value="dark">${labels.dark}</label>
+          </div>
+        </section>
+        <section data-panel="updates" hidden>
+          <h2>${labels.updates}</h2>
+          <p class="intro">${labels.automaticDownload}</p>
+          <div class="card"><label class="setting-row"><span>${labels.automaticDownload}</span><input id="desktop-automatic-download" type="checkbox"></label></div>
+          <div class="actions"><span></span><button id="desktop-check-for-updates" class="action" type="button">${labels.checkForUpdates}</button></div>
+        </section>
+        <section data-panel="diagnostics" hidden>
+          <h2>${labels.diagnostics}</h2>
+          <p class="intro">${labels.diagnosticsHelp}</p>
+          <div class="card"><pre id="desktop-diagnostics">${labels.unavailable}</pre><div class="actions"><span></span><button id="desktop-copy-diagnostics" class="action secondary" type="button">${labels.copyDiagnostics}</button></div></div>
+        </section>
+        <div class="actions"><span id="desktop-status" class="status"></span><button id="desktop-reset" class="action secondary" type="button">${labels.reset}</button></div>
+      </main>
+    </div>
+    <script>
+      const labels = ${JSON.stringify(labels)};
+      const api = window.desktopApi;
+      const sections = Array.from(document.querySelectorAll("nav button[data-section]"));
+      const panels = Array.from(document.querySelectorAll("section[data-panel]"));
+      const search = document.getElementById("desktop-settings-search");
+      const noResults = document.getElementById("desktop-settings-no-results");
+      const status = document.getElementById("desktop-status");
+      const setStatus = (value) => { status.textContent = value; };
+      const setBusy = (busy) => { document.querySelectorAll("button, select, input").forEach((control) => { if (control.id !== "desktop-global-shortcut") control.disabled = busy; }); };
+      const showSection = (name) => { sections.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.section === name))); panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; }); if (name === "diagnostics") void loadDiagnostics(); };
+      sections.forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section)));
+      search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); let visible = 0; sections.forEach((button) => { const matches = !query || button.textContent.toLocaleLowerCase().includes(query); button.hidden = !matches; if (matches) visible += 1; }); noResults.hidden = visible > 0; if (visible === 0) panels.forEach((panel) => { panel.hidden = true; }); });
+      const setPreferences = async (value) => { setBusy(true); setStatus(labels.saving); try { const next = await api.preferences.set(value); applyPreferences(next); setStatus(labels.saved); } catch { setStatus(labels.unavailable); } finally { setBusy(false); } };
+      const applyPreferences = (value) => { document.getElementById("desktop-launch-at-login").checked = Boolean(value.launchAtLogin); document.getElementById("desktop-show-in-menu-bar").checked = Boolean(value.showInMenuBar); const dock = document.getElementById("desktop-show-in-dock"); if (dock) dock.checked = Boolean(value.showInDock); document.getElementById("desktop-notifications").checked = Boolean(value.notifications); document.getElementById("desktop-automatic-download").checked = Boolean(value.automaticDownload); document.getElementById("desktop-global-shortcut").value = value.globalShortcut || "Alt+Space"; };
+      const loadPreferences = async () => { try { applyPreferences(await api.preferences.get()); const languageMode = await api.language.getMode(); document.getElementById("desktop-language").value = languageMode; document.querySelector("input[name='desktop-theme'][value='${currentTheme}']").checked = true; } catch { setStatus(labels.unavailable); } };
+      const loadDiagnostics = async () => { try { const value = await api.diagnostics.get(); document.getElementById("desktop-diagnostics").textContent = JSON.stringify(value, null, 2); } catch { document.getElementById("desktop-diagnostics").textContent = labels.unavailable; } };
+      document.getElementById("desktop-language").addEventListener("change", async (event) => { const value = event.target.value; setBusy(true); try { await api.language.set(value); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } });
+      document.getElementById("desktop-launch-at-login").addEventListener("change", (event) => void setPreferences({ launchAtLogin: event.target.checked }));
+      document.getElementById("desktop-show-in-menu-bar").addEventListener("change", (event) => void setPreferences({ showInMenuBar: event.target.checked }));
+      const dock = document.getElementById("desktop-show-in-dock"); if (dock) dock.addEventListener("change", (event) => void setPreferences({ showInDock: event.target.checked }));
+      document.getElementById("desktop-notifications").addEventListener("change", (event) => void setPreferences({ notifications: event.target.checked }));
+      document.getElementById("desktop-automatic-download").addEventListener("change", (event) => void setPreferences({ automaticDownload: event.target.checked }));
+      const shortcut = document.getElementById("desktop-global-shortcut"); shortcut.addEventListener("keydown", (event) => { event.preventDefault(); const parts = []; if (event.metaKey) parts.push("Command"); else if (event.ctrlKey) parts.push("CommandOrControl"); if (event.altKey) parts.push("Alt"); if (event.shiftKey) parts.push("Shift"); const key = event.key.length === 1 ? event.key.toUpperCase() : ({ " ": "Space", Escape: "Escape", Enter: "Enter", Tab: "Tab" }[event.key] || event.key); if (parts.length && key) void setPreferences({ globalShortcut: parts.concat(key).join("+") }); });
+      document.querySelectorAll("input[name='desktop-theme']").forEach((control) => control.addEventListener("change", async (event) => { setBusy(true); try { await api.theme.set(event.target.value); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } }));
+      document.getElementById("desktop-check-for-updates").addEventListener("click", async () => { setBusy(true); try { await api.updates.check(); } finally { setBusy(false); } });
+      document.getElementById("desktop-copy-diagnostics").addEventListener("click", async () => { try { await navigator.clipboard.writeText(document.getElementById("desktop-diagnostics").textContent); setStatus(labels.copied); } catch { setStatus(labels.unavailable); } });
+      document.getElementById("desktop-reset").addEventListener("click", async () => { setBusy(true); setStatus(labels.saving); try { applyPreferences(await api.preferences.reset()); await api.language.set("system"); await api.theme.set("system"); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } });
+      api.language.onChanged(() => window.location.reload());
+      void api.settings.ready();
+      void loadPreferences();
+    </script>
+  </body>
+</html>`;
+}
+
 async function registerRendererProtocol() {
   protocol.handle(RENDERER_PROTOCOL, async (request) => {
+    const requestPath = new URL(request.url).pathname;
+    if (requestPath === "/desktop-login" || requestPath === "/desktop-login/") {
+      return new Response(await desktopLoginHtml(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+    if (
+      requestPath === "/desktop-settings" ||
+      requestPath === "/desktop-settings/"
+    ) {
+      return new Response(await desktopSettingsHtml(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+    if (
+      requestPath === "/desktop-companion" ||
+      requestPath === "/desktop-companion/"
+    ) {
+      return new Response(await desktopCompanionHtml(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
     const file = rendererFile(request.url);
     if (!file || !existsSync(file))
       return new Response("Not found", { status: 404 });
@@ -337,8 +686,19 @@ async function sendDeepLink(value: string) {
     return;
   }
   pendingAuthorizations.delete(pending[0]);
+  const sendAuthCallback = (payload: {
+    console: ConsoleName;
+    url: string;
+    error?: string;
+  }) => {
+    for (const window of [mainWindow, desktopLoginWindow]) {
+      if (window && !window.isDestroyed()) {
+        window.webContents.send("desktop:auth-callback", payload);
+      }
+    }
+  };
   if (callback.error || !callback.code) {
-    mainWindow.webContents.send("desktop:auth-callback", {
+    sendAuthCallback({
       console: pending[0],
       url: value,
       error: callback.error ?? "authorization_failed",
@@ -348,18 +708,20 @@ async function sendDeepLink(value: string) {
   try {
     await storeAuthorizationCode(pending[1], callback.code, pending[0]);
   } catch {
-    mainWindow.webContents.send("desktop:auth-callback", {
+    sendAuthCallback({
       console: pending[0],
       url: value,
       error: "token_exchange_failed",
     });
     return;
   }
-  mainWindow.webContents.send("desktop:auth-callback", {
+  sendAuthCallback({
     console: pending[0],
     url: sanitizedAuthCallback(callback.state, DESKTOP_PROTOCOL),
   });
+  closeDesktopLoginWindow();
   if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
   mainWindow.focus();
 }
 
@@ -681,6 +1043,10 @@ function desktopLanguagePath() {
   return path.join(app.getPath("userData"), DESKTOP_LANGUAGE_FILE);
 }
 
+function desktopLanguageModePath() {
+  return path.join(app.getPath("userData"), "desktop-language-mode.json");
+}
+
 async function readDesktopLanguage(): Promise<DesktopLanguage> {
   try {
     const value = await readFile(desktopLanguagePath(), "utf8");
@@ -693,6 +1059,24 @@ async function readDesktopLanguage(): Promise<DesktopLanguage> {
 async function writeDesktopLanguage(language: DesktopLanguage) {
   await mkdir(path.dirname(desktopLanguagePath()), { recursive: true });
   await writeFile(desktopLanguagePath(), language, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+}
+
+async function readDesktopLanguageMode(): Promise<DesktopLanguageMode> {
+  try {
+    const value = await readFile(desktopLanguageModePath(), "utf8");
+    const normalized = value.trim();
+    return normalized === "tr" || normalized === "en" ? normalized : "system";
+  } catch {
+    return "system";
+  }
+}
+
+async function writeDesktopLanguageMode(mode: DesktopLanguageMode) {
+  await mkdir(path.dirname(desktopLanguageModePath()), { recursive: true });
+  await writeFile(desktopLanguageModePath(), mode, {
     encoding: "utf8",
     mode: 0o600,
   });
@@ -788,6 +1172,144 @@ function focusMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+async function desktopCompanionHtml() {
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
+  const isTurkish = isTurkishDesktop();
+  const labels = isTurkish
+    ? {
+        account: "Hesap Konsolu",
+        admin: "Yönetim Konsolu",
+        description: "Devam etmek istediğiniz konsolu seçin.",
+        eyebrow: "GÜVENLİ ERİŞİM",
+        loading: "Açılıyor…",
+      }
+    : {
+        account: "Account Console",
+        admin: "Admin Console",
+        description: "Choose where you want to continue.",
+        eyebrow: "CONTINUE SECURELY",
+        loading: "Opening…",
+      };
+  return `<!doctype html>
+<html lang="${isTurkish ? "tr" : "en"}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${DESKTOP_APP_NAME}</title>
+    <style>
+      ${nativeDialogThemeCss()}
+      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+      main { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
+      section { width: min(100%, 390px); text-align: center; }
+      img { width: 76px; height: 76px; border-radius: 18px; margin-bottom: 1.25rem; }
+      .eyebrow { color: #1677ff; font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
+      h1 { font-size: 1.65rem; margin: .6rem 0 .45rem; }
+      p { color: var(--dialog-secondary); font-size: .98rem; margin: 0 0 1.5rem; }
+      .actions { display: grid; gap: .75rem; }
+      button { align-items: center; background: #1677ff; border: 0; border-radius: 10px; color: white; cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
+      button:hover { background: #0f5fd2; }
+      button:disabled { cursor: default; opacity: .65; }
+      .spinner { animation: spin 800ms linear infinite; border: 2px solid rgba(255,255,255,.45); border-radius: 50%; border-top-color: white; height: 16px; width: 16px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section aria-labelledby="companion-title">
+        <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
+        <div class="eyebrow">${labels.eyebrow}</div>
+        <h1 id="companion-title">${DESKTOP_APP_NAME}</h1>
+        <p>${labels.description}</p>
+        <div class="actions">
+          <button type="button" data-console="admin">${labels.admin}</button>
+          <button type="button" data-console="account">${labels.account}</button>
+        </div>
+      </section>
+    </main>
+    <script>
+      const labels = ${JSON.stringify(labels)};
+      let pending = false;
+      for (const button of document.querySelectorAll("button[data-console]")) {
+        button.addEventListener("click", async () => {
+          if (pending) return;
+          pending = true;
+          for (const candidate of document.querySelectorAll("button[data-console]")) candidate.disabled = true;
+          button.innerHTML = '<span class="spinner" aria-hidden="true"></span>' + labels.loading;
+          try {
+            await window.desktopApi.companion.openConsole(button.dataset.console);
+          } finally {
+            pending = false;
+            button.textContent = button.dataset.console === "admin" ? labels.admin : labels.account;
+            for (const candidate of document.querySelectorAll("button[data-console]")) candidate.disabled = false;
+          }
+        });
+      }
+      window.desktopApi.language.onChanged(() => window.location.reload());
+    </script>
+  </body>
+</html>`;
+}
+
+async function showDesktopLoginWindow() {
+  if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
+    desktopLoginWindow.show();
+    desktopLoginWindow.focus();
+    return;
+  }
+  desktopLoginWindow = new BrowserWindow({
+    parent: mainWindow?.isVisible() ? mainWindow : undefined,
+    modal: Boolean(mainWindow?.isVisible()),
+    width: 580,
+    height: 650,
+    minWidth: 500,
+    minHeight: 580,
+    resizable: false,
+    closable: true,
+    show: false,
+    title: DESKTOP_APP_NAME,
+    backgroundColor: desktopBackgroundColor(),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
+    },
+  });
+  const loginWindow = desktopLoginWindow;
+  loginWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  loginWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isTrustedRendererUrl(url)) event.preventDefault();
+  });
+  loginWindow.on("closed", () => {
+    if (desktopLoginWindow === loginWindow) desktopLoginWindow = null;
+    void readVault()
+      .then((vault) => {
+        if (!vault.admin && !vault.account) app.quit();
+      })
+      .catch(() => app.quit());
+  });
+  await loginWindow.loadURL(
+    `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-login`,
+  );
+  if (loginWindow.isDestroyed() || desktopLoginWindow !== loginWindow) return;
+  loginWindow.center();
+  loginWindow.show();
+  loginWindow.focus();
+}
+
+function closeDesktopLoginWindow() {
+  if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
+    desktopLoginWindow.close();
+  }
+  desktopLoginWindow = null;
 }
 
 async function showCompanionWindow() {
@@ -1062,7 +1584,8 @@ async function showUpdateCheckWindow() {
     if (updateCheckWindow === checkingWindow) updateCheckWindow = null;
   });
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
-  if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow) return;
+  if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow)
+    return;
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   const html = `<!doctype html>
 <html lang="${isTurkish ? "tr" : "en"}">
@@ -1099,7 +1622,8 @@ async function showUpdateCheckWindow() {
   await checkingWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
-  if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow) return;
+  if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow)
+    return;
   checkingWindow.center();
   checkingWindow.show();
 }
@@ -1452,7 +1976,9 @@ function installApplicationMenu() {
         id: "desktop-logout",
         label: isTurkish ? "Oturumu kapat" : "Log Out",
         click: () => {
-          void writeVault({}).catch(() => undefined);
+          void writeVault({})
+            .then(() => showDesktopLoginWindow())
+            .catch(() => undefined);
           mainWindow?.webContents.send("desktop:menu-logout");
         },
       },
@@ -1480,6 +2006,11 @@ function installApplicationMenu() {
     ],
   };
   const viewSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: isTurkish ? "Hızlı erişim…" : "Quick Access…",
+      click: toggleQuickAccess,
+    },
+    { type: "separator" },
     { role: "reload" },
     { role: "forceReload" },
     { type: "separator" },
@@ -1516,6 +2047,13 @@ function installApplicationMenu() {
 async function createWindow() {
   const preload = path.join(__dirname, "preload.js");
   const state = await readWindowState();
+  let hasStoredSession = false;
+  try {
+    const vault = await readVault();
+    hasStoredSession = Boolean(vault.admin || vault.account);
+  } catch {
+    hasStoredSession = false;
+  }
   mainWindow = new BrowserWindow({
     x: state?.x,
     y: state?.y,
@@ -1523,6 +2061,7 @@ async function createWindow() {
     height: state?.height ?? 960,
     minWidth: 960,
     minHeight: 640,
+    show: hasStoredSession,
     backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
@@ -1574,6 +2113,10 @@ async function createWindow() {
     mainWindow = null;
   });
   if (state?.maximized) mainWindow.maximize();
+  if (hasStoredSession) {
+    mainWindow.webContents.once("did-finish-load", () => mainWindow?.show());
+  }
+  if (!hasStoredSession) void showDesktopLoginWindow().catch(() => undefined);
   if (pendingDeepLink) {
     const value = pendingDeepLink;
     pendingDeepLink = null;
@@ -1647,6 +2190,10 @@ function registerIpc() {
   ipcMain.handle("desktop:language-get", async (event) => {
     assertTrustedSender(event);
     return desktopLanguage;
+  });
+  ipcMain.handle("desktop:language-mode-get", async (event) => {
+    assertTrustedSender(event);
+    return desktopLanguageMode;
   });
   ipcMain.handle("desktop:preferences-get", async (event) => {
     assertTrustedSender(event);
@@ -1771,6 +2318,20 @@ function registerIpc() {
       focusMainWindow();
     },
   );
+  ipcMain.handle("desktop:auth-open-console", async (event, value: unknown) => {
+    assertTrustedSender(event);
+    assertConsole(value);
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      throw new Error("Desktop window is unavailable");
+    }
+    await mainWindow.loadURL(
+      `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value === "admin" ? "admin" : "account/personal-info"}?desktopSignIn=1`,
+    );
+    if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
+      desktopLoginWindow.show();
+      desktopLoginWindow.focus();
+    }
+  });
   ipcMain.handle(
     "desktop:auth-start-login",
     async (event, request: unknown) => {
@@ -1929,7 +2490,13 @@ if (!hasLock) {
   });
   app.whenReady().then(async () => {
     app.setName(DESKTOP_APP_NAME);
+    desktopLanguageMode = await readDesktopLanguageMode();
     desktopLanguage = await readDesktopLanguage();
+    if (desktopLanguageMode === "system") {
+      desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
+        ? "tr"
+        : "en";
+    }
     installApplicationMenu();
     pendingDeepLink = findDesktopDeepLink();
     registerDesktopProtocol();

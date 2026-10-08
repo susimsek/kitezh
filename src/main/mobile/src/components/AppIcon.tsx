@@ -1,10 +1,14 @@
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import {
+  faArrowLeft,
   faArrowRight,
+  faCheck,
   faGear,
   faGlobe,
   faHouse,
   faMoon,
+  faRightFromBracket,
+  faRotate,
   faShieldHalved,
   faSun,
 } from "@fortawesome/free-solid-svg-icons";
@@ -14,7 +18,11 @@ import type { ComponentProps } from "react";
 import type { AppIconName } from "@kitezh/shared/icons";
 
 const icons = {
+  arrowLeft: faArrowLeft,
   arrowRight: faArrowRight,
+  check: faCheck,
+  logout: faRightFromBracket,
+  reset: faRotate,
   gear: faGear,
   globe: faGlobe,
   home: faHouse,

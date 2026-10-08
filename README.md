@@ -361,6 +361,13 @@ pnpm dev
 
 `pnpm dev` uses `http://localhost:9090`; `pnpm start` uses the deployed Render API unless
 `DESKTOP_API_BASE_URL` is explicitly supplied. Build platform installers with `pnpm package`.
+When no desktop session exists, Electron shows its own native console chooser and keeps the
+sign-in surface separate from the web login page. Selecting Account Console or Admin Console
+opens the system browser for Authorization Code + PKCE; the bundled renderer is used only after
+the callback completes. Settings, update dialogs, and the Quick Access companion are native
+Electron windows; the authenticated console screens are being migrated incrementally from the
+bundled renderer to native desktop screens. Desktop tokens remain in the Electron main-process
+secure vault.
 Local development opens Electron DevTools automatically, so the Network panel can be used to
 inspect renderer API, token refresh, and logout requests. The OAuth authorization page and the
 main-process token exchange run outside that renderer panel; inspect the system browser for the

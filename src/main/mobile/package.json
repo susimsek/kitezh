@@ -12,17 +12,18 @@
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test": "jest --passWithNoTests",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
     "build:web": "expo export --platform web"
   },
   "dependencies": {
-    "@kitezh/shared": "file:../shared",
     "@fortawesome/fontawesome-svg-core": "7.3.1",
     "@fortawesome/free-solid-svg-icons": "7.3.1",
     "@fortawesome/react-native-fontawesome": "1.0.0",
+    "@kitezh/shared": "file:../shared",
     "expo": "~57.0.27",
     "expo-auth-session": "~57.0.14",
     "expo-linking": "~57.0.12",
+    "expo-localization": "~57.0.2",
     "expo-router": "~57.0.12",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@types/jest": "30.0.0",
+    "@types/node": "24.10.1",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
