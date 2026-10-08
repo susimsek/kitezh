@@ -38,6 +38,12 @@ test("fixture exposes discovery, authorization, protected account, and failure s
     }).then((response) => response.json());
     assert.equal(profile.username, "fixture-user");
     assert.equal((await fetch(`${bound.issuer}/fixture/forbidden`)).status, 403);
+    const timeoutController = new AbortController();
+    const timeoutRequest = fetch(`${bound.issuer}/fixture/timeout?delay=50`, {
+      signal: timeoutController.signal,
+    });
+    setTimeout(() => timeoutController.abort(), 5);
+    await assert.rejects(timeoutRequest, (error) => error?.name === "AbortError");
   } finally {
     await fixture.close();
   }

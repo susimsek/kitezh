@@ -136,7 +136,8 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       return;
     }
     if (url.pathname === "/fixture/timeout") {
-      await new Promise((resolve) => setTimeout(resolve, 30_000));
+      const delayMs = Number(url.searchParams.get("delay") ?? 30_000);
+      await new Promise((resolve) => setTimeout(resolve, Number.isFinite(delayMs) ? delayMs : 30_000));
       writeJson(response, 504, { title: "Gateway Timeout", status: 504 });
       return;
     }
