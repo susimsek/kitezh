@@ -16,6 +16,7 @@ import {
   AdminApiError,
   deleteAdminUser,
   deleteAdminSession,
+  revokeAdminConsent,
   getAdminDashboard,
   listAdminClientScopes,
   listAdminClients,
@@ -23,6 +24,7 @@ import {
   listAdminIdentityProviders,
   listAdminRoles,
   listAdminSessions,
+  listAdminConsents,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
@@ -30,6 +32,7 @@ import {
   type AdminClientScope,
   type AdminGroup,
   type AdminIdentityProvider,
+  type AdminConsent,
   type AdminPage,
   type AdminRole,
   type AdminSession,
@@ -50,6 +53,7 @@ type AdminSection =
   | "groups"
   | "identity-providers"
   | "sessions"
+  | "consents"
   | "settings";
 
 export default function AdminScreen() {
@@ -117,6 +121,12 @@ function AdminConsole() {
   const [sessionStatus, setSessionStatus] = useState<"active" | "expired">("active");
   const [sessionPage, setSessionPage] = useState(0);
   const [sessionActionKey, setSessionActionKey] = useState<string | null>(null);
+  const [consents, setConsents] = useState<AdminPage<AdminConsent> | null>(null);
+  const [consentsLoading, setConsentsLoading] = useState(false);
+  const [consentsErrorStatus, setConsentsErrorStatus] = useState<number | null>(null);
+  const [consentQuery, setConsentQuery] = useState("");
+  const [consentPage, setConsentPage] = useState(0);
+  const [consentActionKey, setConsentActionKey] = useState<string | null>(null);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -385,6 +395,40 @@ function AdminConsole() {
     [refreshSession, session, sessionPage, sessionQuery, sessionStatus],
   );
 
+  const loadConsents = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setConsentsLoading(true);
+      setConsentsErrorStatus(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setConsents(
+          await listAdminConsents(
+            currentSession.accessToken,
+            consentQuery,
+            "",
+            "",
+            "",
+            consentPage,
+            10,
+            {
+              refreshAccessToken: async () =>
+                (await refreshSession(true))?.accessToken ?? null,
+            },
+          ),
+        );
+      } catch (cause) {
+        setConsentsErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setConsentsLoading(false);
+      }
+    },
+    [consentPage, consentQuery, refreshSession, session],
+  );
+
   const deleteSession = useCallback(
     (adminSession: AdminSession) => {
       if (!session || sessionActionKey) return;
@@ -426,6 +470,55 @@ function AdminConsole() {
       );
     },
     [dictionary, loadSessions, refreshSession, session, sessionActionKey, showNotice],
+  );
+
+  const revokeConsent = useCallback(
+    (consent: AdminConsent) => {
+      if (!session || consentActionKey) return;
+      Alert.alert(
+        dictionary.adminConsentRevoke,
+        dictionary.adminConsentRevokeConfirm,
+        [
+          { text: dictionary.cancel, style: "cancel" },
+          {
+            text: dictionary.adminConsentRevoke,
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const key = `${consent.clientId}:${consent.principalName}`;
+                setConsentActionKey(key);
+                try {
+                  const currentSession = await refreshSession();
+                  if (!currentSession) throw new Error();
+                  await revokeAdminConsent(
+                    currentSession.accessToken,
+                    consent.clientId,
+                    consent.principalName,
+                    {
+                      refreshAccessToken: async () =>
+                        (await refreshSession(true))?.accessToken ?? null,
+                    },
+                  );
+                  showNotice({ kind: "success", message: dictionary.adminConsentRevoked });
+                  await loadConsents(true);
+                } catch (cause) {
+                  showNotice({
+                    kind: "error",
+                    message:
+                      cause instanceof AdminApiError && cause.status === 403
+                        ? dictionary.adminForbidden
+                        : dictionary.adminConsentActionError,
+                  });
+                } finally {
+                  setConsentActionKey(null);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [consentActionKey, dictionary, loadConsents, refreshSession, session, showNotice],
   );
 
   const deleteUser = useCallback(
@@ -512,6 +605,12 @@ function AdminConsole() {
     }
   }, [loadSessions, section, session]);
 
+  useEffect(() => {
+    if (session && section === "consents") {
+      queueMicrotask(() => void loadConsents());
+    }
+  }, [loadConsents, section, session]);
+
   if (status === "loading") {
     return <LoadingScreen />;
   }
@@ -592,6 +691,8 @@ function AdminConsole() {
                           ? dictionary.adminIdentityProviders
                           : section === "sessions"
                             ? dictionary.adminSessions
+                            : section === "consents"
+                              ? dictionary.adminConsents
                           : dictionary.adminSettings}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
@@ -719,6 +820,22 @@ function AdminConsole() {
                 }}
                 status={sessionStatus}
                 busyKey={sessionActionKey}
+              />
+            ) : section === "consents" ? (
+              <ConsentsContent
+                busyKey={consentActionKey}
+                errorStatus={consentsErrorStatus}
+                loading={consentsLoading}
+                onNext={() => setConsentPage((page) => page + 1)}
+                onPrevious={() => setConsentPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadConsents(true)}
+                onRevoke={revokeConsent}
+                page={consents}
+                query={consentQuery}
+                setQuery={(query) => {
+                  setConsentPage(0);
+                  setConsentQuery(query);
+                }}
               />
             ) : null}
           </ScrollView>
@@ -1366,6 +1483,101 @@ function IdentityProvidersContent({
   );
 }
 
+function ConsentsContent({
+  busyKey,
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  onRevoke,
+  page,
+  query,
+  setQuery,
+}: {
+  busyKey: string | null;
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  onRevoke: (consent: AdminConsent) => void;
+  page: AdminPage<AdminConsent> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput
+        accessibilityLabel={dictionary.adminSearchConsents}
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder={dictionary.adminSearchConsents}
+        placeholderTextColor={palette.textMuted}
+        style={[styles.search, { borderColor: palette.border, color: palette.text }]}
+        value={query}
+      />
+      {loading && !page ? (
+        <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
+      ) : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>
+            {errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminConsentsLoadError}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={loading}
+            onPress={onRetry}
+            palette={palette}
+            secondary
+          />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((consent) => {
+            const key = `${consent.clientId}:${consent.principalName}`;
+            return (
+              <View
+                key={key}
+                style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}
+              >
+                <View style={styles.userCardHeader}>
+                  <Text style={[styles.userName, { color: palette.text }]}>
+                    {consent.clientName}
+                  </Text>
+                  <Text style={{ color: palette.textMuted }}>{consent.principalName}</Text>
+                </View>
+                <Text style={[styles.roles, { color: palette.textMuted }]}>
+                  {consent.authorities.join(", ") || "—"}
+                </Text>
+                <ActionButton
+                  label={dictionary.adminConsentRevoke}
+                  busy={busyKey === key}
+                  disabled={busyKey !== null && busyKey !== key}
+                  onPress={() => onRevoke(consent)}
+                  palette={palette}
+                  secondary
+                />
+              </View>
+            );
+          })}
+          <Pagination
+            loading={loading}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            page={page}
+            palette={palette}
+          />
+        </View>
+      ) : (
+        <Text style={{ color: palette.textMuted }}>{dictionary.adminNoConsents}</Text>
+      )}
+    </View>
+  );
+}
+
 function SessionsContent({
   busyKey,
   errorStatus,
@@ -1586,6 +1798,7 @@ function AdminTabBar({
     ["groups", dictionary.adminGroups, "layers"],
     ["identity-providers", dictionary.adminIdentityProviders, "globe"],
     ["sessions", dictionary.adminSessions, "shield"],
+    ["consents", dictionary.adminConsents, "shield"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
   return (

@@ -11,6 +11,8 @@ import {
   listAdminIdentityProviders,
   listAdminSessions,
   deleteAdminSession,
+  listAdminConsents,
+  revokeAdminConsent,
   listAdminRoles,
   deleteAdminUser,
   setAdminUserEnabled,
@@ -247,6 +249,48 @@ test("admin session deletion uses the protected delete endpoint", async () => {
     await deleteAdminSession("access-token", "session/one");
     assert.equal(method, "DELETE");
     assert.equal(request, "https://kitezh.onrender.com/api/admin/sessions/session%2Fone");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin consents request encodes all filters and stable sort", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  globalThis.fetch = async (input) => {
+    request = input.toString();
+    return new Response(
+      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      { status: 200 },
+    );
+  };
+  try {
+    await listAdminConsents("access-token", "account", "account-console", "ada", "openid");
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/consents?q=account&clientId=account-console&username=ada&scope=openid&page=0&size=10&sort=id.principalName%2Casc",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin consent revoke encodes client and username", async () => {
+  const originalFetch = globalThis.fetch;
+  let request = "";
+  let method = "";
+  globalThis.fetch = async (input, init) => {
+    request = input.toString();
+    method = init?.method ?? "GET";
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await revokeAdminConsent("access-token", "client/one", "ada@example.com");
+    assert.equal(method, "DELETE");
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/consents/client%2Fone/ada%40example.com",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

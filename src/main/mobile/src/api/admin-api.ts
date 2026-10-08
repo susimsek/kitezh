@@ -83,6 +83,16 @@ export type AdminSession = {
   active: boolean;
 };
 
+export type AdminConsent = {
+  clientId: string;
+  clientName: string;
+  principalName: string;
+  userId: number;
+  authorities: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
 
@@ -313,6 +323,48 @@ export function deleteAdminSession(
   return requestAdmin<void>(
     accessToken,
     `/api/admin/sessions/${encodeURIComponent(sessionId)}`,
+    options,
+    false,
+    { method: "DELETE" },
+  );
+}
+
+export function listAdminConsents(
+  accessToken: string,
+  query = "",
+  clientId = "",
+  username = "",
+  scope = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    clientId,
+    username,
+    scope,
+    page: String(page),
+    size: String(size),
+    sort: "id.principalName,asc",
+  });
+  return requestAdmin<AdminPage<AdminConsent>>(
+    accessToken,
+    `/api/admin/consents?${params.toString()}`,
+    options,
+    false,
+  );
+}
+
+export function revokeAdminConsent(
+  accessToken: string,
+  clientId: string,
+  username: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<void>(
+    accessToken,
+    `/api/admin/consents/${encodeURIComponent(clientId)}/${encodeURIComponent(username)}`,
     options,
     false,
     { method: "DELETE" },
