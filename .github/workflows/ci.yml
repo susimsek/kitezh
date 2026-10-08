@@ -137,6 +137,44 @@ jobs:
             -Dsonar.organization=susimsek \
             -Dsonar.token="${SONAR_TOKEN}"
 
+  mobile-quality:
+    name: Mobile quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          install: false
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check mobile client
+        working-directory: src/main/mobile
+        run: pnpm run typecheck
+
+      - name: Lint mobile client
+        working-directory: src/main/mobile
+        run: pnpm run lint
+
+      - name: Test mobile client
+        working-directory: src/main/mobile
+        run: pnpm run test
+
+      - name: Build mobile web export
+        working-directory: src/main/mobile
+        run: pnpm run build:web
+
   desktop:
     name: Desktop package (${{ matrix.platform }})
     needs: build

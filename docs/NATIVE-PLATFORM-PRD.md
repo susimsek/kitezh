@@ -282,7 +282,7 @@ acceptance evidence is linked in the feature matrix.
 - [ ] Android/iOS development-build and device E2E coverage
 - [~] Mobile store-first release and rollback strategy documented in `src/main/mobile/README.md` and `eas.json`; EAS project, staged rollout, and OTA configuration remain
 - [~] Mobile in-app notification adapter with localized auto-dismiss feedback (`MobileNoticeProvider`); OS permission and authenticated action-routing remain blocked until a backend event contract and native E2E harness are available
-- [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; CI signing, staged rollout evidence, and store metadata remain
+- [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; GitHub CI now runs the mobile quality gate, while EAS signing, native device builds, staged rollout evidence, and store metadata remain
 - [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; device build, fixture server, and CI matrix remain
 - [~] Desktop package metadata smoke check added in `src/main/desktop/test/package-metadata.test.mjs`; macOS/Windows/Linux packaged startup, protocol, storage, asset, and signed-artifact runs remain
 - [~] Linux system-package handoff is enforced by `supportsAutoUpdate` and covered by desktop tests; packaged AppImage rollback and `.deb`/`.rpm`/`.snap` smoke evidence remain

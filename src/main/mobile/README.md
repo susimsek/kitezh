@@ -60,3 +60,11 @@ an EAS project, update URL, privacy disclosure, staged rollout, and rollback own
 To roll back a store release, stop the rollout and promote the last compatible build; do not use an
 OTA rollback to cross a native runtime boundary. Device builds must be validated on both Android
 and iOS before a production submission.
+
+GitHub Actions runs the mobile quality gate on every push and pull request through the
+`mobile-quality` job in `.github/workflows/ci.yml`. It installs the locked dependencies and runs
+type checking, linting, unit/contract tests, and the Expo web export. Native EAS builds, store
+submissions, and OTA updates are intentionally not triggered by CI yet because the repository does
+not contain an EAS project identifier, `updates.url`, signing credentials, rollout metadata, or an
+`EXPO_TOKEN`. Adding those values to the protected release environment is required before a native
+release workflow can be enabled; no token or signing material belongs in this repository.
