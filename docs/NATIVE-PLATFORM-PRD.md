@@ -254,6 +254,23 @@ If a backend capability is not available yet, record it as Blocked with the miss
 client registration. Do not mark it Complete by embedding the Web route or by accepting a weaker
 security flow.
 
+## Ownership split
+
+The PRD contains 66 checklist items: 26 mobile, 25 desktop, 8 cross-client contracts, and 7
+migration gates. The scope and audit tables intentionally overlap where an implementation item also
+needs a separate acceptance check. Ownership below keeps the work balanced at 22 items per person;
+the owner is responsible for reconciling those overlapping checks instead of implementing them twice.
+
+| Owner | 22 assigned items | Primary outcome |
+| --- | --- | --- |
+| **Nail** | Mobile P0 (3), Mobile P1 (6), Mobile audit rows OAuth browser lifecycle, discovery/configuration, refresh races, error contract, public API resilience, SecureStore lifecycle, navigation/deep links, device UX, locale/theme changes (9), and cross-client contracts capability negotiation, error taxonomy, session model, deep-link model (4) | Reliable Mobile authentication/account foundation with a single session, error, and deep-link contract |
+| **Muharem** | Desktop P0 (3), Desktop P1 (5), Desktop audit rows authenticated renderer, renderer privileges, auth transaction lifecycle, external navigation, window lifecycle, offline/API state, theme/language, update/release integrity, package metadata, diagnostics/privacy (10), and cross-client contracts localization catalog, design tokens/icon semantics, audit/privacy, environment/endpoint policy (4) | Native Desktop shell and secure platform boundary, with Web renderer migration explicitly tracked |
+| **Şuayb** | Mobile P2 (5), Mobile audit rows notifications, mobile release, native test harness (3), Desktop P2 (4), Desktop audit rows accessibility, companion/global shortcut, native E2E (3), and all 7 native migration gates | Cross-platform release confidence, accessibility, E2E coverage, and final parity evidence |
+
+Each owner must update the feature matrix with evidence, mark unavailable backend/client
+registrations as **Blocked**, and link focused tests or packaged smoke results. A person may review
+another owner's work, but a review does not transfer implementation ownership.
+
 ## Shared/native architecture contract
 
 ### Allowed in `src/main/shared`
