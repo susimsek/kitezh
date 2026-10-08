@@ -515,7 +515,6 @@ class AdminOrganizationServiceTest {
         group.setId(60L);
         group.setOrganization(organization);
         group.setName("engineering");
-        UserEntity user = user(20L, "alice", "alice@example.com");
         when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
         when(groupRepository.findByIdAndOrganizationId(60L, 10L)).thenReturn(Optional.of(group));
         when(groupRepository.existsByOrganizationIdAndNameIgnoreCase(10L, "engineering"))
@@ -553,7 +552,6 @@ class AdminOrganizationServiceTest {
                 .extracting(ApiException::getErrorCode)
                 .isEqualTo(ApiErrorCode.ORGANIZATION_GROUP_HAS_CHILDREN);
 
-        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
         when(memberRepository.existsByOrganizationIdAndUserId(10L, 20L)).thenReturn(false);
         assertThatThrownBy(() -> service.addGroupMember(10L, 60L, 20L))
                 .isInstanceOf(ApiException.class)
