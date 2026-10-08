@@ -20,9 +20,8 @@ import { AppState } from "react-native";
 import { useLocale } from "@/i18n/LocaleProvider";
 import {
   authorizationServerIssuer,
-  mobileClientId,
-  mobilePostLogoutRedirectUri,
-  mobileRedirectUri,
+  getMobileConsoleConfig,
+  type MobileConsole,
 } from "@/config";
 import {
   clearSession,
@@ -58,18 +57,24 @@ function expiresAtFromToken(expiresIn = 300, issuedAt = Date.now()) {
 
 export function MobileAuthProvider({
   children,
+  consoleName = "account",
 }: {
   children: React.ReactNode;
+  consoleName?: MobileConsole;
 }) {
   const { resolvedLocale } = useLocale();
+  const consoleConfig = useMemo(
+    () => getMobileConsoleConfig(consoleName),
+    [consoleName],
+  );
   const discovery = useAutoDiscovery(authorizationServerIssuer);
-  const redirectUri = makeRedirectUri({ native: mobileRedirectUri });
+  const redirectUri = makeRedirectUri({ native: consoleConfig.redirectUri });
   const [request, , promptAsync] = useAuthRequest(
     {
-      clientId: mobileClientId,
+      clientId: consoleConfig.clientId,
       redirectUri,
       responseType: "code",
-      scopes: ["openid", "profile", "email", "account-api"],
+      scopes: consoleConfig.scopes,
       usePKCE: true,
       extraParams: { ui_locales: resolvedLocale },
     },
@@ -82,7 +87,7 @@ export function MobileAuthProvider({
 
   useEffect(() => {
     let cancelled = false;
-    void readSession()
+    void readSession(consoleConfig.namespace)
       .then((stored) => {
         if (cancelled) return;
         setSession(stored);
@@ -94,7 +99,7 @@ export function MobileAuthProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [consoleConfig.namespace]);
 
   const signIn = useCallback(async () => {
     if (status === "signing-in" || status === "signing-out") return;
@@ -120,7 +125,7 @@ export function MobileAuthProvider({
       }
       const token = await exchangeCodeAsync(
         {
-          clientId: mobileClientId,
+          clientId: consoleConfig.clientId,
           code: result.params.code,
           redirectUri,
           extraParams: { code_verifier: request.codeVerifier },
@@ -133,14 +138,14 @@ export function MobileAuthProvider({
         idToken: token.idToken ?? null,
         expiresAt: expiresAtFromToken(token.expiresIn, token.issuedAt * 1000),
       };
-      await writeSession(nextSession);
+      await writeSession(nextSession, consoleConfig.namespace);
       setSession(nextSession);
       setStatus("signed-in");
     } catch (cause) {
       setStatus("error");
       setError(cause instanceof Error ? cause.message : "Authorization failed");
     }
-  }, [discovery, promptAsync, redirectUri, request, status]);
+  }, [consoleConfig, discovery, promptAsync, redirectUri, request, status]);
 
   const refreshSession = useCallback(
     async (force = false) => {
@@ -149,7 +154,10 @@ export function MobileAuthProvider({
       if (refreshInProgress.current) return refreshInProgress.current;
 
       const requestPromise = refreshAsync(
-        { clientId: mobileClientId, refreshToken: session.refreshToken },
+        {
+          clientId: consoleConfig.clientId,
+          refreshToken: session.refreshToken,
+        },
         discovery,
       )
         .then(async (token) => {
@@ -162,13 +170,13 @@ export function MobileAuthProvider({
               token.issuedAt * 1000,
             ),
           };
-          await writeSession(nextSession);
+          await writeSession(nextSession, consoleConfig.namespace);
           setSession(nextSession);
           setStatus("signed-in");
           return nextSession;
         })
         .catch(() => {
-          void clearSession();
+          void clearSession(consoleConfig.namespace);
           setSession(null);
           setStatus("signed-out");
           return null;
@@ -179,7 +187,7 @@ export function MobileAuthProvider({
       refreshInProgress.current = requestPromise;
       return requestPromise;
     },
-    [discovery, session],
+    [consoleConfig, discovery, session],
   );
 
   useEffect(() => {
@@ -199,21 +207,21 @@ export function MobileAuthProvider({
         url.searchParams.set("id_token_hint", currentSession.idToken);
         url.searchParams.set(
           "post_logout_redirect_uri",
-          mobilePostLogoutRedirectUri,
+          consoleConfig.postLogoutRedirectUri,
         );
-        url.searchParams.set("client_id", mobileClientId);
+        url.searchParams.set("client_id", consoleConfig.clientId);
         await WebBrowser.openAuthSessionAsync(
           url.toString(),
-          mobilePostLogoutRedirectUri,
+          consoleConfig.postLogoutRedirectUri,
         );
       }
     } finally {
-      await clearSession();
+      await clearSession(consoleConfig.namespace);
       setSession(null);
       setStatus("signed-out");
       setError(null);
     }
-  }, [discovery, session, status]);
+  }, [consoleConfig, discovery, session, status]);
 
   const value = useMemo(
     () => ({ session, status, error, signIn, signOut, refreshSession }),

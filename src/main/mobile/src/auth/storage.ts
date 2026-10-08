@@ -1,5 +1,13 @@
 import * as SecureStore from "expo-secure-store";
 
+import {
+  sessionStorageKey,
+  type MobileSessionNamespace,
+} from "./session-keys";
+
+export { sessionStorageKey } from "./session-keys";
+export type { MobileSessionNamespace } from "./session-keys";
+
 export type MobileSession = {
   accessToken: string;
   refreshToken: string | null;
@@ -7,10 +15,10 @@ export type MobileSession = {
   expiresAt: number;
 };
 
-const SESSION_KEY = "kitezh.mobile.account.session";
-
-export async function readSession(): Promise<MobileSession | null> {
-  const stored = await SecureStore.getItemAsync(SESSION_KEY);
+export async function readSession(
+  namespace: MobileSessionNamespace = "account",
+): Promise<MobileSession | null> {
+  const stored = await SecureStore.getItemAsync(sessionStorageKey(namespace));
   if (!stored) return null;
   try {
     const session = JSON.parse(stored) as Partial<MobileSession>;
@@ -38,10 +46,18 @@ export async function readSession(): Promise<MobileSession | null> {
   }
 }
 
-export async function writeSession(session: MobileSession) {
-  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
+export async function writeSession(
+  session: MobileSession,
+  namespace: MobileSessionNamespace = "account",
+) {
+  await SecureStore.setItemAsync(
+    sessionStorageKey(namespace),
+    JSON.stringify(session),
+  );
 }
 
-export async function clearSession() {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+export async function clearSession(
+  namespace: MobileSessionNamespace = "account",
+) {
+  await SecureStore.deleteItemAsync(sessionStorageKey(namespace));
 }

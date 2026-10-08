@@ -35,8 +35,12 @@ The native app consumes platform-neutral theme, locale, and icon contracts from
 or browser storage code.
 
 Set `EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER` to use another issuer during development. The
-default is `https://kitezh.onrender.com`. The authorization server must contain the
-`mobile-account-console` public client with the `kitezh://oauth/callback` redirect URI.
+default is `https://kitezh.onrender.com`. The authorization server must contain the public
+`mobile-account-console` client with the `kitezh://oauth/callback` redirect URI for Account. The
+native Admin client is deliberately separate: `mobile-admin-console` uses the `admin-api` scope,
+the `kitezh://admin/oauth/callback` redirect, and the `kitezh.mobile.admin.session` SecureStore
+namespace. Set `EXPO_PUBLIC_MOBILE_ADMIN_CLIENT_ID` only when a deployment uses a different
+registered client ID; never reuse the browser or Account client for Admin.
 
 ## Native release profiles
 
