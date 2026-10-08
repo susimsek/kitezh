@@ -27,3 +27,21 @@ The first CI slice must cover:
 The repository currently has the contract/unit checks and Expo config, but no installed Maestro
 runner, device build, or deterministic fixture server. Until those are supplied by CI, the native
 E2E item remains **In progress** and must not be reported as a passing device test.
+
+The first device flows are checked in under `e2e/maestro/`:
+
+- `cold-start.yaml` verifies a clean native launch, the public shell, and the sign-in boundary.
+- `settings-locale-theme.yaml` verifies native settings navigation and Turkish/light-dark controls.
+
+Run them only against an Expo development build with the `io.github.susimsek.kitezh.mobile`
+package ID:
+
+```bash
+pnpm exec expo prebuild --non-interactive
+pnpm exec expo run:android
+maestro test e2e/maestro
+```
+
+These flows deliberately avoid real credentials and token-bearing callbacks. Authenticated,
+offline, timeout, refresh, and deep-link flows still require the deterministic fixture server and
+an Android/iOS device runner before they can be marked complete.

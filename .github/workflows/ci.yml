@@ -163,6 +163,10 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm run typecheck
 
+      - name: Check native dependency boundaries
+        working-directory: src/main/mobile
+        run: pnpm run check:boundaries
+
       - name: Lint mobile client
         working-directory: src/main/mobile
         run: pnpm run lint

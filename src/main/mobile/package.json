@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test": "node --experimental-strip-types --test 'src/**/*.test.ts'",
+    "check:boundaries": "node scripts/check-native-boundaries.mjs",
     "build:web": "expo export --platform web"
   },
   "dependencies": {
