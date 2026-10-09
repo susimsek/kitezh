@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import test from "node:test";
@@ -26,6 +26,11 @@ async function launchDesktop({
   const userDataDirectory = await mkdtemp(
     path.join(os.tmpdir(), "kitezh-desktop-e2e-"),
   );
+  await writeFile(
+    path.join(userDataDirectory, "desktop-language-mode.json"),
+    "en",
+  );
+  await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
   return electron.launch({
     args: [`--user-data-dir=${userDataDirectory}`, desktopDirectory],
     cwd: desktopDirectory,
