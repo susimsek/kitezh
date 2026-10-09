@@ -15,6 +15,24 @@ import { useMobileAuth, MobileAuthProvider } from "@/auth/MobileAuthProvider";
 import {
   AdminApiError,
   deleteAdminUser,
+  unlockAdminUser,
+  createAdminUser,
+  updateAdminUser,
+  createAdminClient,
+  updateAdminClient,
+  deleteAdminClient,
+  createAdminClientScope,
+  updateAdminClientScope,
+  deleteAdminClientScope,
+  createAdminRole,
+  updateAdminRole,
+  deleteAdminRole,
+  createAdminGroup,
+  updateAdminGroup,
+  deleteAdminGroup,
+  createAdminIdentityProvider,
+  updateAdminIdentityProvider,
+  deleteAdminIdentityProvider,
   deleteAdminSession,
   revokeAdminConsent,
   getAdminDashboard,
@@ -25,6 +43,10 @@ import {
   listAdminRoles,
   listAdminSessions,
   listAdminConsents,
+  listAdminKeys,
+  rotateAdminKey,
+  listAdminEvents,
+  deleteAdminEvents,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
@@ -37,8 +59,21 @@ import {
   type AdminRole,
   type AdminSession,
   type AdminUser,
+  type AdminKey,
+  type AdminEvent,
+  type AdminUserRequest,
+  type AdminClientRequest,
+  type AdminClientScopeRequest,
+  type AdminRoleRequest,
+  type AdminGroupRequest,
+  type AdminIdentityProviderRequest,
 } from "@/api/admin-api";
 import { AppIcon } from "@/components/AppIcon";
+import {
+  AdminResourceEditor,
+  type AdminEditorResource,
+  type AdminEditorState,
+} from "@/components/AdminResourceEditor";
 import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -54,7 +89,205 @@ type AdminSection =
   | "identity-providers"
   | "sessions"
   | "consents"
+  | "keys"
+  | "events"
   | "settings";
+
+function splitValues(value: string, separator = /[,\n]/) {
+  return value
+    .split(separator)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function editorDefaults(resource: AdminEditorResource): Record<string, string> {
+  if (resource === "users") return { roles: "ROLE_USER" };
+  if (resource === "clients") {
+    return {
+      clientName: "",
+      scopes: "openid,profile",
+      redirectUris: "",
+      postLogoutRedirectUris: "",
+    };
+  }
+  if (resource === "scopes") return {};
+  if (resource === "roles") return { name: "ROLE_" };
+  if (resource === "groups") return {};
+  return {
+    providerType: "oidc",
+    iconKey: "generic",
+    enabled: "true",
+    showInAccountConsole: "always",
+    syncMode: "import",
+    clientAuthenticationMethod: "client_secret_basic",
+    scopes: "openid,profile,email",
+    userNameAttribute: "sub",
+  };
+}
+
+function toAdminRequest(
+  resource: AdminEditorResource,
+  values: Record<string, string>,
+): AdminUserRequest | AdminClientRequest | AdminClientScopeRequest | AdminRoleRequest | AdminGroupRequest | AdminIdentityProviderRequest {
+  if (resource === "users") {
+    return {
+      username: values.username.trim(),
+      firstName: values.firstName?.trim() || null,
+      lastName: values.lastName?.trim() || null,
+      email: values.email?.trim() || null,
+      emailVerified: false,
+      password: values.password?.trim() || null,
+      temporary: false,
+      enabled: true,
+      roles: splitValues(values.roles || "ROLE_USER"),
+    };
+  }
+  if (resource === "clients") {
+    return {
+      clientId: values.clientId.trim(),
+      clientName: values.clientName.trim(),
+      clientAuthenticationMethods: ["client_secret_basic"],
+      authorizationGrantTypes: ["authorization_code", "refresh_token"],
+      redirectUris: splitValues(values.redirectUris || "", /\n/),
+      postLogoutRedirectUris: splitValues(values.postLogoutRedirectUris || "", /\n/),
+      scopes: splitValues(values.scopes || ""),
+      requireAuthorizationConsent: true,
+      requireProofKey: true,
+      requireDpop: false,
+      requireDpopJkt: false,
+      dpopRefreshTokenOnly: false,
+      dpopSigningAlgorithms: ["RS256", "ES256"],
+      cibaDeliveryMode: "poll",
+      cibaNotificationEndpoint: null,
+      cibaClientNotificationToken: null,
+      authorizationCodeTimeToLive: "PT5M",
+      accessTokenTimeToLive: "PT5M",
+      refreshTokenTimeToLive: "PT1H",
+      serviceAccountEnabled: false,
+      clientSecretTimeToLive: null,
+      enabled: true,
+      rootUrl: null,
+      homeUrl: null,
+      webOrigins: [],
+      adminUrl: null,
+      frontChannelLogout: false,
+      backchannelLogout: false,
+      jwkSetUrl: null,
+      tokenEndpointAuthenticationSigningAlgorithm: null,
+      x509CertificateSubjectDN: null,
+      clientSecretGracePeriod: "PT24H",
+      offlineSessionIdle: null,
+      offlineSessionMax: null,
+      tokenExchangeDownscopeOnly: false,
+      tokenExchangeAllowDelegation: false,
+      tokenExchangeAllowedAudiences: [],
+    };
+  }
+  if (resource === "scopes") {
+    return {
+      name: values.name.trim(),
+      displayName: values.displayName?.trim() || null,
+      description: values.description?.trim() || null,
+      displayOnConsentScreen: true,
+      consentScreenText: null,
+      includeInTokenScope: true,
+      groupMapperEnabled: false,
+      groupClaimName: "groups",
+      groupMapperFullPath: false,
+    };
+  }
+  if (resource === "roles") {
+    return { name: values.name.trim(), description: values.description?.trim() || null };
+  }
+  if (resource === "groups") {
+    const parentId = values.parentId?.trim();
+    return {
+      name: values.name.trim(),
+      parentId: parentId ? Number(parentId) : null,
+      attributes: {},
+      defaultGroup: false,
+    };
+  }
+  return {
+    registrationId: values.registrationId.trim(),
+    providerType: values.providerType.trim().toLowerCase(),
+    displayName: values.displayName.trim(),
+    alias: values.alias.trim(),
+    iconKey: values.iconKey.trim() || "generic",
+    shortStateParameter: false,
+    caseSensitiveUsername: false,
+    enabled: true,
+    clientId: values.clientId?.trim() || null,
+    clientSecret: values.clientSecret?.trim() || null,
+    hideOnLogin: false,
+    accountLinkingOnly: false,
+    trustEmail: false,
+    mfaRequired: false,
+    requiredClaims: null,
+    storeTokens: false,
+    storedTokensReadable: false,
+    guiOrder: 0,
+    showInAccountConsole: "always",
+    syncMode: "import",
+    authorizationUri: values.authorizationUri?.trim() || null,
+    tokenUri: values.tokenUri?.trim() || null,
+    userInfoUri: values.userInfoUri?.trim() || null,
+    jwkSetUri: values.jwkSetUri?.trim() || null,
+    issuerUri: values.issuerUri?.trim() || null,
+    clientAuthenticationMethod: "client_secret_basic",
+    scopes: values.scopes?.trim() || "openid,profile,email",
+    userNameAttribute: values.userNameAttribute?.trim() || "sub",
+    samlMetadataUri: null,
+    samlAssertingPartyEntityId: null,
+    samlSingleSignOnServiceUrl: null,
+    samlSingleLogoutServiceUrl: null,
+    samlIdpCertificate: null,
+    samlSigningPrivateKey: null,
+    samlSigningCertificate: null,
+    samlServiceProviderEntityId: null,
+    samlSignAuthnRequests: false,
+    samlWantAssertionsSigned: false,
+    samlNameIdFormat: null,
+    samlPrincipalAttribute: null,
+    samlEmailAttribute: null,
+    samlFirstNameAttribute: null,
+    samlLastNameAttribute: null,
+    samlGroupsAttribute: null,
+    samlDecryptionPrivateKey: null,
+    samlDecryptionCertificate: null,
+    samlSignatureAlgorithm: null,
+    samlAuthnRequestBinding: null,
+    samlResponseBinding: null,
+    samlLogoutBinding: null,
+    samlForceAuthentication: false,
+    samlPassSubject: false,
+  };
+}
+
+function editorValues(resource: AdminEditorResource, item?: unknown): Record<string, string> {
+  const source = (item ?? {}) as Record<string, unknown>;
+  const values: Record<string, string> = { ...editorDefaults(resource) };
+  for (const key of Object.keys(values)) {
+    const value = source[key];
+    if (value !== null && value !== undefined) values[key] = String(value);
+  }
+  if (resource === "users" && source.effectiveRoles) {
+    values.roles = (source.effectiveRoles as string[]).join(",");
+  }
+  if (resource === "clients") {
+    values.clientId = String(source.clientId ?? "");
+    values.clientName = String(source.clientName ?? "");
+    values.scopes = Array.isArray(source.scopes) ? source.scopes.join(",") : "openid,profile";
+  }
+  if (resource === "identity-providers") {
+    values.registrationId = String(source.registrationId ?? "");
+    values.providerType = String(source.providerType ?? "oidc");
+    values.displayName = String(source.displayName ?? "");
+    values.alias = String(source.alias ?? "");
+    values.iconKey = "generic";
+  }
+  return values;
+}
 
 export default function AdminScreen() {
   return (
@@ -127,6 +360,21 @@ function AdminConsole() {
   const [consentQuery, setConsentQuery] = useState("");
   const [consentPage, setConsentPage] = useState(0);
   const [consentActionKey, setConsentActionKey] = useState<string | null>(null);
+  const [keys, setKeys] = useState<AdminPage<AdminKey> | null>(null);
+  const [keysLoading, setKeysLoading] = useState(false);
+  const [keysErrorStatus, setKeysErrorStatus] = useState<number | null>(null);
+  const [keyQuery, setKeyQuery] = useState("");
+  const [keyPage, setKeyPage] = useState(0);
+  const [keyActionKey, setKeyActionKey] = useState<string | null>(null);
+  const [events, setEvents] = useState<AdminPage<AdminEvent> | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsErrorStatus, setEventsErrorStatus] = useState<number | null>(null);
+  const [eventQuery, setEventQuery] = useState("");
+  const [eventPage, setEventPage] = useState(0);
+  const [eventActionKey, setEventActionKey] = useState<string | null>(null);
+  const [editor, setEditor] = useState<AdminEditorState | null>(null);
+  const [editorSaving, setEditorSaving] = useState(false);
+  const [resourceActionKey, setResourceActionKey] = useState<string | null>(null);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -206,6 +454,27 @@ function AdminConsole() {
               ? dictionary.adminForbidden
               : dictionary.adminUserActionError,
         });
+      } finally {
+        setUserActionKey(null);
+      }
+    },
+    [dictionary.adminForbidden, dictionary.adminUserActionError, dictionary.adminUserUpdated, loadUsers, refreshSession, session, showNotice, userActionKey],
+  );
+
+  const unlockUser = useCallback(
+    async (user: AdminUser) => {
+      if (!session || userActionKey) return;
+      setUserActionKey(`unlock:${user.id}`);
+      try {
+        const currentSession = await refreshSession();
+        if (!currentSession) throw new Error("No session");
+        await unlockAdminUser(currentSession.accessToken, user.id, {
+          refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+        });
+        showNotice({ kind: "success", message: dictionary.adminUserUpdated });
+        await loadUsers(true);
+      } catch (cause) {
+        showNotice({ kind: "error", message: cause instanceof AdminApiError && cause.status === 403 ? dictionary.adminForbidden : dictionary.adminUserActionError });
       } finally {
         setUserActionKey(null);
       }
@@ -429,6 +698,93 @@ function AdminConsole() {
     [consentPage, consentQuery, refreshSession, session],
   );
 
+  const loadKeys = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setKeysLoading(true);
+      setKeysErrorStatus(null);
+      try {
+        const currentSession = retry ? await refreshSession(true) : await refreshSession();
+        if (!currentSession) return;
+        setKeys(await listAdminKeys(currentSession.accessToken, keyQuery, undefined, keyPage, 10, {
+          refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+        }));
+      } catch (cause) {
+        setKeysErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setKeysLoading(false);
+      }
+    },
+    [keyPage, keyQuery, refreshSession, session],
+  );
+
+  const loadEvents = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setEventsLoading(true);
+      setEventsErrorStatus(null);
+      try {
+        const currentSession = retry ? await refreshSession(true) : await refreshSession();
+        if (!currentSession) return;
+        setEvents(await listAdminEvents(currentSession.accessToken, eventQuery, eventPage, 10, {
+          refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+        }));
+      } catch (cause) {
+        setEventsErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+      } finally {
+        setEventsLoading(false);
+      }
+    },
+    [eventPage, eventQuery, refreshSession, session],
+  );
+
+  const rotateKey = useCallback(async () => {
+    if (!session || keyActionKey) return;
+    setKeyActionKey("rotate");
+    try {
+      const currentSession = await refreshSession();
+      if (!currentSession) throw new Error("No session");
+      await rotateAdminKey(currentSession.accessToken, {
+        refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+      });
+      showNotice({ kind: "success", message: dictionary.adminKeyRotated });
+      await loadKeys(true);
+    } catch (cause) {
+      showNotice({ kind: "error", message: cause instanceof AdminApiError && cause.status === 403 ? dictionary.adminForbidden : dictionary.adminActionError });
+    } finally {
+      setKeyActionKey(null);
+    }
+  }, [dictionary, keyActionKey, loadKeys, refreshSession, session, showNotice]);
+
+  const deleteEvents = useCallback(() => {
+    if (!session || eventActionKey) return;
+    Alert.alert(dictionary.adminDeleteEvents, dictionary.adminDeleteEventsConfirm, [
+      { text: dictionary.cancel, style: "cancel" },
+      {
+        text: dictionary.adminDelete,
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            setEventActionKey("delete");
+            try {
+              const currentSession = await refreshSession();
+              if (!currentSession) throw new Error("No session");
+              await deleteAdminEvents(currentSession.accessToken, {
+                refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+              });
+              showNotice({ kind: "success", message: dictionary.adminEventsDeleted });
+              await loadEvents(true);
+            } catch (cause) {
+              showNotice({ kind: "error", message: cause instanceof AdminApiError && cause.status === 403 ? dictionary.adminForbidden : dictionary.adminActionError });
+            } finally {
+              setEventActionKey(null);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [dictionary, eventActionKey, loadEvents, refreshSession, session, showNotice]);
+
   const deleteSession = useCallback(
     (adminSession: AdminSession) => {
       if (!session || sessionActionKey) return;
@@ -561,6 +917,107 @@ function AdminConsole() {
     [dictionary, loadUsers, refreshSession, session, showNotice, userActionKey],
   );
 
+  const openEditor = useCallback((resource: AdminEditorResource, item?: unknown) => {
+    const source = item as Record<string, unknown> | undefined;
+    const id = source?.id ?? (resource === "roles" ? source?.name : undefined);
+    setEditor({ resource, id: id === undefined ? undefined : String(id), values: editorValues(resource, item) });
+  }, []);
+
+  const saveEditor = useCallback(
+    async (values: Record<string, string>) => {
+      if (!session || !editor || editorSaving) return;
+      setEditorSaving(true);
+      try {
+        const currentSession = await refreshSession();
+        if (!currentSession) throw new Error("No session");
+        const options = {
+          refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+        };
+        const request = toAdminRequest(editor.resource, values);
+        if (editor.resource === "users") {
+          if (editor.id) await updateAdminUser(currentSession.accessToken, Number(editor.id), request as AdminUserRequest, options);
+          else await createAdminUser(currentSession.accessToken, request as AdminUserRequest, options);
+          await loadUsers(true);
+        } else if (editor.resource === "clients") {
+          if (editor.id) await updateAdminClient(currentSession.accessToken, editor.id, request as AdminClientRequest, options);
+          else await createAdminClient(currentSession.accessToken, request as AdminClientRequest, options);
+          await loadClients(true);
+        } else if (editor.resource === "scopes") {
+          if (editor.id) await updateAdminClientScope(currentSession.accessToken, editor.id, request as AdminClientScopeRequest, options);
+          else await createAdminClientScope(currentSession.accessToken, request as AdminClientScopeRequest, options);
+          await loadScopes(true);
+        } else if (editor.resource === "roles") {
+          if (editor.id) await updateAdminRole(currentSession.accessToken, editor.id, request as AdminRoleRequest, options);
+          else await createAdminRole(currentSession.accessToken, request as AdminRoleRequest, options);
+          await loadRoles(true);
+        } else if (editor.resource === "groups") {
+          if (editor.id) await updateAdminGroup(currentSession.accessToken, Number(editor.id), request as AdminGroupRequest, options);
+          else await createAdminGroup(currentSession.accessToken, request as AdminGroupRequest, options);
+          await loadGroups(true);
+        } else if (editor.resource === "identity-providers") {
+          if (editor.id) await updateAdminIdentityProvider(currentSession.accessToken, editor.id, request as AdminIdentityProviderRequest, options);
+          else await createAdminIdentityProvider(currentSession.accessToken, request as AdminIdentityProviderRequest, options);
+          await loadIdentityProviders(true);
+        }
+        setEditor(null);
+        showNotice({ kind: "success", message: editor.id ? dictionary.adminUpdated : dictionary.adminCreated });
+      } catch (cause) {
+        showNotice({
+          kind: "error",
+          message: cause instanceof AdminApiError && cause.status === 403 ? dictionary.adminForbidden : dictionary.adminActionError,
+        });
+      } finally {
+        setEditorSaving(false);
+      }
+    },
+    [dictionary, editor, editorSaving, loadClients, loadGroups, loadIdentityProviders, loadRoles, loadScopes, loadUsers, refreshSession, session, showNotice],
+  );
+
+  const deleteResource = useCallback(
+    (resource: AdminEditorResource, item: unknown) => {
+      if (!session || resourceActionKey) return;
+      const source = item as Record<string, unknown>;
+      const rawId = source.id ?? source.name;
+      if (rawId === undefined) return;
+      const id = String(rawId);
+      Alert.alert(dictionary.adminDelete, dictionary.adminDeleteConfirm, [
+        { text: dictionary.cancel, style: "cancel" },
+        {
+          text: dictionary.adminDelete,
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setResourceActionKey(`${resource}:${id}`);
+              try {
+                const currentSession = await refreshSession();
+                if (!currentSession) throw new Error("No session");
+                const options = { refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null };
+                if (resource === "users") await deleteAdminUser(currentSession.accessToken, Number(id), options);
+                else if (resource === "clients") await deleteAdminClient(currentSession.accessToken, id, options);
+                else if (resource === "scopes") await deleteAdminClientScope(currentSession.accessToken, id, options);
+                else if (resource === "roles") await deleteAdminRole(currentSession.accessToken, id, options);
+                else if (resource === "groups") await deleteAdminGroup(currentSession.accessToken, Number(id), options);
+                else await deleteAdminIdentityProvider(currentSession.accessToken, id, options);
+                if (resource === "users") await loadUsers(true);
+                else if (resource === "clients") await loadClients(true);
+                else if (resource === "scopes") await loadScopes(true);
+                else if (resource === "roles") await loadRoles(true);
+                else if (resource === "groups") await loadGroups(true);
+                else await loadIdentityProviders(true);
+                showNotice({ kind: "success", message: dictionary.adminDeleted });
+              } catch (cause) {
+                showNotice({ kind: "error", message: cause instanceof AdminApiError && cause.status === 403 ? dictionary.adminForbidden : dictionary.adminActionError });
+              } finally {
+                setResourceActionKey(null);
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [dictionary, loadClients, loadGroups, loadIdentityProviders, loadRoles, loadScopes, loadUsers, refreshSession, resourceActionKey, session, showNotice],
+  );
+
   useEffect(() => {
     if (session) queueMicrotask(() => void loadDashboard());
   }, [loadDashboard, session]);
@@ -610,6 +1067,18 @@ function AdminConsole() {
       queueMicrotask(() => void loadConsents());
     }
   }, [loadConsents, section, session]);
+
+  useEffect(() => {
+    if (session && section === "keys") {
+      queueMicrotask(() => void loadKeys());
+    }
+  }, [loadKeys, section, session]);
+
+  useEffect(() => {
+    if (session && section === "events") {
+      queueMicrotask(() => void loadEvents());
+    }
+  }, [loadEvents, section, session]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -691,19 +1160,60 @@ function AdminConsole() {
                           ? dictionary.adminIdentityProviders
                           : section === "sessions"
                             ? dictionary.adminSessions
-                            : section === "consents"
-                              ? dictionary.adminConsents
+                          : section === "consents"
+                            ? dictionary.adminConsents
+                            : section === "keys"
+                              ? dictionary.adminKeys
+                              : section === "events"
+                                ? dictionary.adminEvents
                           : dictionary.adminSettings}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
               {section === "dashboard"
                 ? dictionary.adminOverview
-                : section === "scopes"
-                  ? dictionary.adminOverview
-                  : section === "roles" || section === "groups"
-                    ? dictionary.adminOverview
-                  : dictionary.adminComingSoon}
+                : dictionary.adminOverview}
             </Text>
+            {editor ? (
+              <AdminResourceEditor
+                key={`${editor.resource}:${editor.id ?? "new"}`}
+                initial={editor}
+                onCancel={() => setEditor(null)}
+                onSave={(values) => void saveEditor(values)}
+                saving={editorSaving}
+              />
+            ) : section === "keys" ? (
+              <KeysContent
+                errorStatus={keysErrorStatus}
+                loading={keysLoading}
+                onNext={() => setKeyPage((page) => page + 1)}
+                onPrevious={() => setKeyPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadKeys(true)}
+                onRotate={() => void rotateKey()}
+                page={keys}
+                query={keyQuery}
+                setQuery={(query) => {
+                  setKeyPage(0);
+                  setKeyQuery(query);
+                }}
+                busyKey={keyActionKey}
+              />
+            ) : section === "events" ? (
+              <EventsContent
+                busyKey={eventActionKey}
+                errorStatus={eventsErrorStatus}
+                loading={eventsLoading}
+                onDelete={deleteEvents}
+                onNext={() => setEventPage((page) => page + 1)}
+                onPrevious={() => setEventPage((page) => Math.max(0, page - 1))}
+                onRetry={() => void loadEvents(true)}
+                page={events}
+                query={eventQuery}
+                setQuery={(query) => {
+                  setEventPage(0);
+                  setEventQuery(query);
+                }}
+              />
+            ) : null}
             {section === "dashboard" ? (
               <DashboardContent
                 dashboard={dashboard}
@@ -719,7 +1229,10 @@ function AdminConsole() {
                 onPrevious={() => setUserPage((page) => Math.max(0, page - 1))}
                 onRetry={() => void loadUsers(true)}
                 onToggle={updateUserEnabled}
+                onUnlock={unlockUser}
                 onDelete={deleteUser}
+                onCreate={() => openEditor("users")}
+                onEdit={(user) => openEditor("users", user)}
                 page={users}
                 query={userQuery}
                 setQuery={(query) => {
@@ -741,6 +1254,10 @@ function AdminConsole() {
                   setClientPage(0);
                   setClientQuery(query);
                 }}
+                onCreate={() => openEditor("clients")}
+                onEdit={(client) => openEditor("clients", client)}
+                onDelete={(client) => deleteResource("clients", client)}
+                busyKey={resourceActionKey}
               />
             ) : section === "scopes" ? (
               <ClientScopesContent
@@ -755,6 +1272,10 @@ function AdminConsole() {
                   setScopePage(0);
                   setScopeQuery(query);
                 }}
+                onCreate={() => openEditor("scopes")}
+                onEdit={(scope) => openEditor("scopes", scope)}
+                onDelete={(scope) => deleteResource("scopes", scope)}
+                busyKey={resourceActionKey}
               />
             ) : section === "roles" ? (
               <RolesContent
@@ -769,6 +1290,10 @@ function AdminConsole() {
                   setRolePage(0);
                   setRoleQuery(query);
                 }}
+                onCreate={() => openEditor("roles")}
+                onEdit={(role) => openEditor("roles", role)}
+                onDelete={(role) => deleteResource("roles", role)}
+                busyKey={resourceActionKey}
               />
             ) : section === "groups" ? (
               <GroupsContent
@@ -783,6 +1308,10 @@ function AdminConsole() {
                   setGroupPage(0);
                   setGroupQuery(query);
                 }}
+                onCreate={() => openEditor("groups")}
+                onEdit={(group) => openEditor("groups", group)}
+                onDelete={(group) => deleteResource("groups", group)}
+                busyKey={resourceActionKey}
               />
             ) : section === "identity-providers" ? (
               <IdentityProvidersContent
@@ -799,6 +1328,10 @@ function AdminConsole() {
                   setIdentityProviderPage(0);
                   setIdentityProviderQuery(query);
                 }}
+                onCreate={() => openEditor("identity-providers")}
+                onEdit={(provider) => openEditor("identity-providers", provider)}
+                onDelete={(provider) => deleteResource("identity-providers", provider)}
+                busyKey={resourceActionKey}
               />
             ) : section === "sessions" ? (
               <SessionsContent
@@ -843,6 +1376,107 @@ function AdminConsole() {
         <AdminTabBar active={section} onChange={setSection} />
       </View>
     </SafeAreaView>
+  );
+}
+
+function KeysContent({
+  busyKey,
+  errorStatus,
+  loading,
+  onNext,
+  onPrevious,
+  onRetry,
+  onRotate,
+  page,
+  query,
+  setQuery,
+}: {
+  busyKey: string | null;
+  errorStatus: number | null;
+  loading: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  onRotate: () => void;
+  page: AdminPage<AdminKey> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput accessibilityLabel={dictionary.adminSearchKeys} autoCapitalize="none" onChangeText={setQuery} placeholder={dictionary.adminSearchKeys} placeholderTextColor={palette.textMuted} style={[styles.search, { borderColor: palette.border, color: palette.text }]} value={query} />
+      <ActionButton label={dictionary.adminRotateKey} busy={busyKey === "rotate"} disabled={busyKey !== null} onPress={onRotate} palette={palette} />
+      {loading && !page ? <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} /> : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>{errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminLoadError}</Text>
+          <ActionButton label={dictionary.adminRetry} busy={loading} onPress={onRetry} palette={palette} secondary />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((key) => (
+            <View key={key.id} style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.userCardHeader}><Text style={[styles.userName, { color: palette.text }]}>{key.kid}</Text><Text style={{ color: key.active ? palette.success : palette.textMuted }}>{key.active ? dictionary.adminActive : dictionary.adminExpired}</Text></View>
+              <Text style={{ color: palette.textMuted }}>{key.type} · {key.algorithm} · {key.use}</Text>
+              <Text style={[styles.roles, { color: palette.textMuted }]}>{key.createdAt}</Text>
+            </View>
+          ))}
+          <Pagination loading={loading} onNext={onNext} onPrevious={onPrevious} page={page} palette={palette} />
+        </View>
+      ) : <Text style={{ color: palette.textMuted }}>{dictionary.adminNoKeys}</Text>}
+    </View>
+  );
+}
+
+function EventsContent({
+  busyKey,
+  errorStatus,
+  loading,
+  onDelete,
+  onNext,
+  onPrevious,
+  onRetry,
+  page,
+  query,
+  setQuery,
+}: {
+  busyKey: string | null;
+  errorStatus: number | null;
+  loading: boolean;
+  onDelete: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onRetry: () => void;
+  page: AdminPage<AdminEvent> | null;
+  query: string;
+  setQuery: (query: string) => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  return (
+    <View style={styles.usersContent}>
+      <TextInput accessibilityLabel={dictionary.adminSearchEvents} autoCapitalize="none" onChangeText={setQuery} placeholder={dictionary.adminSearchEvents} placeholderTextColor={palette.textMuted} style={[styles.search, { borderColor: palette.border, color: palette.text }]} value={query} />
+      <ActionButton label={dictionary.adminDeleteEvents} busy={busyKey === "delete"} disabled={busyKey !== null} onPress={onDelete} palette={palette} secondary />
+      {loading && !page ? <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} /> : errorStatus !== null && !page ? (
+        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+          <Text style={{ color: palette.danger }}>{errorStatus === 403 ? dictionary.adminForbidden : dictionary.adminLoadError}</Text>
+          <ActionButton label={dictionary.adminRetry} busy={loading} onPress={onRetry} palette={palette} secondary />
+        </View>
+      ) : page && page.content.length > 0 ? (
+        <View style={styles.userList}>
+          {page.content.map((event) => (
+            <View key={event.id} style={[styles.userCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <View style={styles.userCardHeader}><Text style={[styles.userName, { color: palette.text }]}>{event.action}</Text><Text style={{ color: palette.textMuted }}>{event.actor}</Text></View>
+              <Text style={{ color: palette.textMuted }}>{event.targetType} · {event.targetId}</Text>
+              <Text style={[styles.roles, { color: palette.textMuted }]}>{event.occurredAt}</Text>
+              {event.details ? <Text style={[styles.roles, { color: palette.textMuted }]}>{event.details}</Text> : null}
+            </View>
+          ))}
+          <Pagination loading={loading} onNext={onNext} onPrevious={onPrevious} page={page} palette={palette} />
+        </View>
+      ) : <Text style={{ color: palette.textMuted }}>{dictionary.adminNoEvents}</Text>}
+    </View>
   );
 }
 
@@ -925,6 +1559,9 @@ function UsersContent({
   query,
   setQuery,
   busyKey,
+  onCreate,
+  onEdit,
+  onUnlock,
 }: {
   errorStatus: number | null;
   loading: boolean;
@@ -937,6 +1574,9 @@ function UsersContent({
   query: string;
   setQuery: (query: string) => void;
   busyKey: string | null;
+  onCreate: () => void;
+  onEdit: (user: AdminUser) => void;
+  onUnlock: (user: AdminUser) => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -951,6 +1591,7 @@ function UsersContent({
         style={[styles.search, { borderColor: palette.border, color: palette.text }]}
         value={query}
       />
+      <ActionButton label={dictionary.adminCreate} busy={false} onPress={onCreate} palette={palette} />
       {loading && !page ? (
         <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
       ) : errorStatus !== null && !page ? (
@@ -992,6 +1633,24 @@ function UsersContent({
                 </Text>
               ) : null}
               <View style={styles.userActions}>
+                <ActionButton
+                  label={dictionary.adminEdit}
+                  busy={false}
+                  disabled={busyKey !== null}
+                  onPress={() => onEdit(user)}
+                  palette={palette}
+                  secondary
+                />
+                {user.locked ? (
+                  <ActionButton
+                    label={dictionary.adminUserUnlock}
+                    busy={busyKey === `unlock:${user.id}`}
+                    disabled={busyKey !== null && busyKey !== `unlock:${user.id}`}
+                    onPress={() => onUnlock(user)}
+                    palette={palette}
+                    secondary
+                  />
+                ) : null}
                 <ActionButton
                   label={user.enabled ? dictionary.adminUserDisable : dictionary.adminUserEnable}
                   busy={busyKey === `enabled:${user.id}`}
@@ -1049,6 +1708,10 @@ function ClientsContent({
   page,
   query,
   setQuery,
+  onCreate,
+  onEdit,
+  onDelete,
+  busyKey,
 }: {
   errorStatus: number | null;
   loading: boolean;
@@ -1058,6 +1721,10 @@ function ClientsContent({
   page: AdminPage<AdminClient> | null;
   query: string;
   setQuery: (query: string) => void;
+  onCreate: () => void;
+  onEdit: (client: AdminClient) => void;
+  onDelete: (client: AdminClient) => void;
+  busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1072,6 +1739,7 @@ function ClientsContent({
         style={[styles.search, { borderColor: palette.border, color: palette.text }]}
         value={query}
       />
+      <ActionButton label={dictionary.adminCreate} busy={false} onPress={onCreate} palette={palette} />
       {loading && !page ? (
         <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
       ) : errorStatus !== null && !page ? (
@@ -1104,6 +1772,10 @@ function ClientsContent({
               <Text style={[styles.roles, { color: palette.textMuted }]}>
                 {client.scopes.join(", ") || "—"}
               </Text>
+              <View style={styles.userActions}>
+                <ActionButton label={dictionary.adminEdit} busy={false} disabled={busyKey !== null} onPress={() => onEdit(client)} palette={palette} secondary />
+                <ActionButton label={dictionary.adminDelete} busy={busyKey === `clients:${client.id}`} disabled={busyKey !== null && busyKey !== `clients:${client.id}`} onPress={() => onDelete(client)} palette={palette} secondary />
+              </View>
             </View>
           ))}
           <View style={styles.pagination}>
@@ -1144,6 +1816,10 @@ function ClientScopesContent({
   page,
   query,
   setQuery,
+  onCreate,
+  onEdit,
+  onDelete,
+  busyKey,
 }: {
   errorStatus: number | null;
   loading: boolean;
@@ -1153,6 +1829,10 @@ function ClientScopesContent({
   page: AdminPage<AdminClientScope> | null;
   query: string;
   setQuery: (query: string) => void;
+  onCreate: () => void;
+  onEdit: (scope: AdminClientScope) => void;
+  onDelete: (scope: AdminClientScope) => void;
+  busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1167,6 +1847,7 @@ function ClientScopesContent({
         style={[styles.search, { borderColor: palette.border, color: palette.text }]}
         value={query}
       />
+      <ActionButton label={dictionary.adminCreate} busy={false} onPress={onCreate} palette={palette} />
       {loading && !page ? (
         <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
       ) : errorStatus !== null && !page ? (
@@ -1207,6 +1888,12 @@ function ClientScopesContent({
                 {scope.includeInTokenScope ? "token_scope" : "—"}
                 {scope.displayOnConsentScreen ? " · consent" : ""}
               </Text>
+              {!scope.builtIn ? (
+                <View style={styles.userActions}>
+                  <ActionButton label={dictionary.adminEdit} busy={false} disabled={busyKey !== null} onPress={() => onEdit(scope)} palette={palette} secondary />
+                  <ActionButton label={dictionary.adminDelete} busy={busyKey === `scopes:${scope.id}`} disabled={busyKey !== null && busyKey !== `scopes:${scope.id}`} onPress={() => onDelete(scope)} palette={palette} secondary />
+                </View>
+              ) : null}
             </View>
           ))}
           <View style={styles.pagination}>
@@ -1247,6 +1934,10 @@ function RolesContent({
   page,
   query,
   setQuery,
+  onCreate,
+  onEdit,
+  onDelete,
+  busyKey,
 }: {
   errorStatus: number | null;
   loading: boolean;
@@ -1256,6 +1947,10 @@ function RolesContent({
   page: AdminPage<AdminRole> | null;
   query: string;
   setQuery: (query: string) => void;
+  onCreate: () => void;
+  onEdit: (role: AdminRole) => void;
+  onDelete: (role: AdminRole) => void;
+  busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1270,6 +1965,7 @@ function RolesContent({
         style={[styles.search, { borderColor: palette.border, color: palette.text }]}
         value={query}
       />
+      <ActionButton label={dictionary.adminCreate} busy={false} onPress={onCreate} palette={palette} />
       {loading && !page ? (
         <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
       ) : errorStatus !== null && !page ? (
@@ -1296,6 +1992,10 @@ function RolesContent({
               {role.description ? (
                 <Text style={{ color: palette.textMuted }}>{role.description}</Text>
               ) : null}
+              <View style={styles.userActions}>
+                <ActionButton label={dictionary.adminEdit} busy={false} disabled={busyKey !== null} onPress={() => onEdit(role)} palette={palette} secondary />
+                <ActionButton label={dictionary.adminDelete} busy={busyKey === `roles:${role.name}`} disabled={busyKey !== null && busyKey !== `roles:${role.name}`} onPress={() => onDelete(role)} palette={palette} secondary />
+              </View>
             </View>
           ))}
           <Pagination
@@ -1322,6 +2022,10 @@ function GroupsContent({
   page,
   query,
   setQuery,
+  onCreate,
+  onEdit,
+  onDelete,
+  busyKey,
 }: {
   errorStatus: number | null;
   loading: boolean;
@@ -1331,6 +2035,10 @@ function GroupsContent({
   page: AdminPage<AdminGroup> | null;
   query: string;
   setQuery: (query: string) => void;
+  onCreate: () => void;
+  onEdit: (group: AdminGroup) => void;
+  onDelete: (group: AdminGroup) => void;
+  busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1345,6 +2053,7 @@ function GroupsContent({
         style={[styles.search, { borderColor: palette.border, color: palette.text }]}
         value={query}
       />
+      <ActionButton label={dictionary.adminCreate} busy={false} onPress={onCreate} palette={palette} />
       {loading && !page ? (
         <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
       ) : errorStatus !== null && !page ? (
@@ -1377,6 +2086,10 @@ function GroupsContent({
                   {group.effectiveRoles.join(", ")}
                 </Text>
               ) : null}
+              <View style={styles.userActions}>
+                <ActionButton label={dictionary.adminEdit} busy={false} disabled={busyKey !== null} onPress={() => onEdit(group)} palette={palette} secondary />
+                <ActionButton label={dictionary.adminDelete} busy={busyKey === `groups:${group.id}`} disabled={busyKey !== null && busyKey !== `groups:${group.id}`} onPress={() => onDelete(group)} palette={palette} secondary />
+              </View>
             </View>
           ))}
           <Pagination
@@ -1403,6 +2116,10 @@ function IdentityProvidersContent({
   page,
   query,
   setQuery,
+  onCreate,
+  onEdit,
+  onDelete,
+  busyKey,
 }: {
   errorStatus: number | null;
   loading: boolean;
@@ -1412,6 +2129,10 @@ function IdentityProvidersContent({
   page: AdminPage<AdminIdentityProvider> | null;
   query: string;
   setQuery: (query: string) => void;
+  onCreate: () => void;
+  onEdit: (provider: AdminIdentityProvider) => void;
+  onDelete: (provider: AdminIdentityProvider) => void;
+  busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1426,6 +2147,7 @@ function IdentityProvidersContent({
         style={[styles.search, { borderColor: palette.border, color: palette.text }]}
         value={query}
       />
+      <ActionButton label={dictionary.adminCreate} busy={false} onPress={onCreate} palette={palette} />
       {loading && !page ? (
         <ActivityIndicator accessibilityLabel={dictionary.loading} color={palette.primary} />
       ) : errorStatus !== null && !page ? (
@@ -1466,6 +2188,10 @@ function IdentityProvidersContent({
                 {provider.hideOnLogin ? ` · ${dictionary.adminHidden}` : ""}
                 {` · ${provider.mapperCount} mappers`}
               </Text>
+              <View style={styles.userActions}>
+                <ActionButton label={dictionary.adminEdit} busy={false} disabled={busyKey !== null} onPress={() => onEdit(provider)} palette={palette} secondary />
+                <ActionButton label={dictionary.adminDelete} busy={busyKey === `identity-providers:${provider.id}`} disabled={busyKey !== null && busyKey !== `identity-providers:${provider.id}`} onPress={() => onDelete(provider)} palette={palette} secondary />
+              </View>
             </View>
           ))}
           <Pagination
@@ -1799,6 +2525,8 @@ function AdminTabBar({
     ["identity-providers", dictionary.adminIdentityProviders, "globe"],
     ["sessions", dictionary.adminSessions, "shield"],
     ["consents", dictionary.adminConsents, "shield"],
+    ["keys", dictionary.adminKeys, "shield"],
+    ["events", dictionary.adminEvents, "layers"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
   return (

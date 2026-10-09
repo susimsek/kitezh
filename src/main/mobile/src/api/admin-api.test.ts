@@ -16,6 +16,14 @@ import {
   listAdminRoles,
   deleteAdminUser,
   setAdminUserEnabled,
+  createAdminUser,
+  updateAdminClient,
+  deleteAdminGroup,
+  createAdminIdentityProvider,
+  listAdminKeys,
+  rotateAdminKey,
+  listAdminEvents,
+  deleteAdminEvents,
 } from "./admin-api.ts";
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
@@ -125,6 +133,89 @@ test("admin user mutations use protected HTTP methods and JSON state", async () 
         url: "https://kitezh.onrender.com/api/admin/users/7",
       },
     ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("native admin resource mutations use JSON contracts and protected paths", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      body: init?.body?.toString() ?? null,
+      method: init?.method ?? "GET",
+      url: input.toString(),
+    });
+    return new Response(JSON.stringify({ client: { id: "client-1" }, clientSecret: null }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    await createAdminUser("access-token", {
+      username: "native-user",
+      roles: ["ROLE_USER"],
+    });
+    await updateAdminClient("access-token", "client-1", {
+      clientId: "client-1",
+      clientName: "Native client",
+      clientAuthenticationMethods: ["none"],
+      authorizationGrantTypes: ["authorization_code"],
+      redirectUris: [],
+      postLogoutRedirectUris: [],
+      scopes: ["openid"],
+      requireAuthorizationConsent: true,
+      requireProofKey: true,
+      requireDpop: false,
+      requireDpopJkt: false,
+      dpopRefreshTokenOnly: false,
+      dpopSigningAlgorithms: ["RS256"],
+      cibaDeliveryMode: "poll",
+      authorizationCodeTimeToLive: "PT5M",
+      accessTokenTimeToLive: "PT5M",
+      refreshTokenTimeToLive: "PT1H",
+      serviceAccountEnabled: false,
+      webOrigins: [],
+      tokenExchangeAllowedAudiences: [],
+    });
+    await deleteAdminGroup("access-token", 12);
+    await createAdminIdentityProvider("access-token", {
+      registrationId: "native",
+      providerType: "oidc",
+      displayName: "Native OIDC",
+      alias: "native",
+      iconKey: "generic",
+      shortStateParameter: false,
+      caseSensitiveUsername: false,
+      enabled: true,
+      hideOnLogin: false,
+      accountLinkingOnly: false,
+      trustEmail: false,
+      mfaRequired: false,
+      storeTokens: false,
+      storedTokensReadable: false,
+      guiOrder: 0,
+      showInAccountConsole: "always",
+      syncMode: "import",
+      clientAuthenticationMethod: "client_secret_basic",
+      scopes: "openid profile",
+      userNameAttribute: "sub",
+      samlSignAuthnRequests: false,
+      samlWantAssertionsSigned: false,
+      samlForceAuthentication: false,
+      samlPassSubject: false,
+    });
+    assert.deepEqual(
+      calls.map(({ method, url }) => ({ method, url })),
+      [
+        { method: "POST", url: "https://kitezh.onrender.com/api/admin/users" },
+        { method: "PUT", url: "https://kitezh.onrender.com/api/admin/clients/client-1" },
+        { method: "DELETE", url: "https://kitezh.onrender.com/api/admin/groups/12" },
+        { method: "POST", url: "https://kitezh.onrender.com/api/admin/identity-providers" },
+      ],
+    );
+    assert.match(calls[0].body ?? "", /native-user/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -291,6 +382,31 @@ test("admin consent revoke encodes client and username", async () => {
       request,
       "https://kitezh.onrender.com/api/admin/consents/client%2Fone/ada%40example.com",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin keys and events expose bounded native management endpoints", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: { url: string; method: string }[] = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: input.toString(), method: init?.method ?? "GET" });
+    return init?.method === "POST" || init?.method === "DELETE"
+      ? new Response(null, { status: 204 })
+      : new Response(JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }), { status: 200 });
+  };
+  try {
+    await listAdminKeys("access-token", "rsa", true);
+    await rotateAdminKey("access-token");
+    await listAdminEvents("access-token", "user.updated");
+    await deleteAdminEvents("access-token");
+    assert.deepEqual(requests, [
+      { url: "https://kitezh.onrender.com/api/admin/keys?q=rsa&page=0&size=10&sort=createdAt%2Cdesc&active=true", method: "GET" },
+      { url: "https://kitezh.onrender.com/api/admin/keys/rotate", method: "POST" },
+      { url: "https://kitezh.onrender.com/api/admin/events?q=user.updated&action=&targetType=&targetId=&page=0&size=10&sort=occurredAt%2Cdesc", method: "GET" },
+      { url: "https://kitezh.onrender.com/api/admin/events", method: "DELETE" },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
