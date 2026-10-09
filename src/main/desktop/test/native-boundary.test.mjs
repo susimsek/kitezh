@@ -21,3 +21,13 @@ test("native desktop renderer does not depend on the Web component tree", async 
   assert.match(source, /social-start/);
   assert.match(source, /onCallback/);
 });
+
+test("native Admin selection does not call Account APIs", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "src", "native", "renderer.mjs"),
+    "utf8",
+  );
+  assert.match(source, /if \(state\.console === "admin"\) return adminContent\(\)/);
+  assert.match(source, /adminComingSoon/);
+  assert.match(source, /state\.session && state\.console === "account"/);
+});

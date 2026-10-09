@@ -69,7 +69,8 @@ function violations(body) {
 }
 
 function shell() {
-  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("adminSignIn"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(state.error.message)} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(text("sessionsRetry"), { action: "retry" })}</div>` : ""}${content()}</div></main></div>`;
+  const navigation = state.console === "admin" ? "" : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
+  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(state.error.message)} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(text("sessionsRetry"), { action: "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
 
 function navButton(route, label) {
@@ -77,20 +78,27 @@ function navButton(route, label) {
 }
 
 function routeTitle() {
+  if (state.console === "admin") return text("adminTitle");
   return ({ profile: text("accountTitle"), security: text("securityTitle"), sessions: text("sessionsTitle"), applications: text("applicationsTitle"), settings: text("settingsTitle") })[state.route];
 }
 
 function routeDescription() {
+  if (state.console === "admin") return text("adminOverview");
   return ({ profile: state.locale === "tr" ? "Profil bilgilerinizi yönetin." : "Manage your profile information.", security: text("mfaHelp"), sessions: text("sessionsError"), applications: text("applicationsError"), settings: state.locale === "tr" ? "Masaüstü tercihlerini yönetin." : "Manage desktop preferences." })[state.route];
 }
 
 function content() {
   if (state.loading) return '<div class="loading" role="status"><span class="spinner"></span>' + escapeHtml(text("loading")) + '</div>';
+  if (state.console === "admin") return adminContent();
   if (state.route === "profile") return profileContent();
   if (state.route === "security") return securityContent();
   if (state.route === "sessions") return sessionsContent();
   if (state.route === "applications") return applicationsContent();
   return settingsContent();
+}
+
+function adminContent() {
+  return `<section class="card"><h2>${escapeHtml(text("adminTitle"))}</h2><p>${escapeHtml(text("adminComingSoon"))}</p></section>`;
 }
 
 function profileContent() {
@@ -251,7 +259,7 @@ async function hydrate() {
   } catch { state.session = null; }
   state.loading = false;
   render();
-  if (state.session) void loadRoute();
+  if (state.session && state.console === "account") void loadRoute();
   else if (new URLSearchParams(location.search).has("console")) void signIn();
 }
 
