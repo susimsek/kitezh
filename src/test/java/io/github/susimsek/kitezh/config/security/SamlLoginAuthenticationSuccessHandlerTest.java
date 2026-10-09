@@ -139,6 +139,39 @@ class SamlLoginAuthenticationSuccessHandlerTest {
     }
 
     @Test
+    void rejectsProviderLoginWhenMfaServiceIsUnavailable() throws Exception {
+        SamlLoginService service = mock(SamlLoginService.class);
+        UserDetailsService users = mock(UserDetailsService.class);
+        Saml2Authentication authentication = authentication();
+        when(service.findOrCreate("saml-e2e", authentication)).thenReturn("saml-user");
+        when(users.loadUserByUsername("saml-user"))
+                .thenReturn(
+                        User.withUsername("saml-user").password("encoded").roles("USER").build());
+        when(service.providerRequiresMfa("saml-e2e")).thenReturn(true);
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        new SamlLoginAuthenticationSuccessHandler(
+                        service, users, mock(SecurityContextRepository.class), null)
+                .onAuthenticationSuccess(request(), response, authentication);
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("/login?error");
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void rejectsNonSamlAuthentication() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        new SamlLoginAuthenticationSuccessHandler(
+                        mock(SamlLoginService.class),
+                        mock(UserDetailsService.class),
+                        mock(SecurityContextRepository.class),
+                        null)
+                .onAuthenticationSuccess(request(), response, mock(Authentication.class));
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("/login?error");
+    }
+
+    @Test
     void acceptsEnrolledProviderMfaWithoutTreatingEnrollmentAsVerification() throws Exception {
         SamlLoginService service = mock(SamlLoginService.class);
         UserDetailsService users = mock(UserDetailsService.class);

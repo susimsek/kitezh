@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="032-01-authentication-flow-sequences" author="susimsek">
+		<createSequence sequenceName="authentication_flow_seq" startValue="100" incrementBy="1"/>
+		<createSequence sequenceName="authentication_execution_seq" startValue="100" incrementBy="1"/>
+	</changeSet>
+
+	<changeSet id="032-02-authentication-flow-tables" author="susimsek">
+		<createTable tableName="authentication_flow">
+			<column name="id" type="bigint"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authentication_flow"/></column>
+			<column name="alias" type="varchar(100)"><constraints nullable="false" unique="true" uniqueConstraintName="uk_authentication_flow_alias"/></column>
+			<column name="name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="description" type="varchar(1000)"/>
+			<column name="flow_type" type="varchar(20)"><constraints nullable="false"/></column>
+			<column name="built_in" type="boolean"><constraints nullable="false"/></column>
+			<column name="parent_flow_id" type="bigint"/>
+			<column name="requirement" type="varchar(20)"/>
+			<column name="priority" type="int"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp"><constraints nullable="false"/></column>
+		</createTable>
+		<addForeignKeyConstraint baseTableName="authentication_flow" baseColumnNames="parent_flow_id" constraintName="fk_authentication_flow_parent" referencedTableName="authentication_flow" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex indexName="idx_authentication_flow_parent_priority" tableName="authentication_flow">
+			<column name="parent_flow_id"/>
+			<column name="priority"/>
+		</createIndex>
+
+		<createTable tableName="authentication_execution">
+			<column name="id" type="bigint"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authentication_execution"/></column>
+			<column name="flow_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="provider_id" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="display_name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="requirement" type="varchar(20)"><constraints nullable="false"/></column>
+			<column name="priority" type="int"><constraints nullable="false"/></column>
+			<column name="authenticator_reference" type="varchar(100)"/>
+			<column name="configuration" type="varchar(4000)"/>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp"><constraints nullable="false"/></column>
+		</createTable>
+		<addForeignKeyConstraint baseTableName="authentication_execution" baseColumnNames="flow_id" constraintName="fk_authentication_execution_flow" referencedTableName="authentication_flow" referencedColumnNames="id" onDelete="CASCADE"/>
+		<createIndex indexName="idx_authentication_execution_flow_priority" tableName="authentication_execution">
+			<column name="flow_id"/>
+			<column name="priority"/>
+		</createIndex>
+
+		<createTable tableName="authentication_flow_binding">
+			<column name="binding_type" type="varchar(30)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authentication_flow_binding"/></column>
+			<column name="flow_id" type="bigint"/>
+		</createTable>
+		<addForeignKeyConstraint baseTableName="authentication_flow_binding" baseColumnNames="flow_id" constraintName="fk_authentication_flow_binding_flow" referencedTableName="authentication_flow" referencedColumnNames="id" onDelete="SET NULL"/>
+	</changeSet>
+
+	<changeSet id="032-03-seed-authentication-flows" author="susimsek">
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="1"/><column name="alias" value="browser"/><column name="name" value="Browser"/><column name="description" value="Default browser authentication flow."/><column name="flow_type" value="BASIC"/><column name="built_in" valueBoolean="true"/><column name="priority" valueNumeric="0"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="2"/><column name="alias" value="registration"/><column name="name" value="Registration"/><column name="description" value="Default single-issuer registration flow."/><column name="flow_type" value="FORM"/><column name="built_in" valueBoolean="true"/><column name="priority" valueNumeric="0"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="3"/><column name="alias" value="reset-credentials"/><column name="name" value="Reset credentials"/><column name="description" value="Default password recovery flow."/><column name="flow_type" value="FORM"/><column name="built_in" valueBoolean="true"/><column name="priority" valueNumeric="0"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="4"/><column name="alias" value="first-broker-login"/><column name="name" value="First broker login"/><column name="description" value="Default first social-login flow."/><column name="flow_type" value="FORM"/><column name="built_in" valueBoolean="true"/><column name="priority" valueNumeric="0"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="5"/><column name="alias" value="post-broker-login"/><column name="name" value="Post broker login"/><column name="description" value="Default post social-login flow."/><column name="flow_type" value="BASIC"/><column name="built_in" valueBoolean="true"/><column name="priority" valueNumeric="0"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="6"/><column name="alias" value="direct-grant"/><column name="name" value="Direct grant"/><column name="description" value="Default direct authentication flow."/><column name="flow_type" value="BASIC"/><column name="built_in" valueBoolean="true"/><column name="priority" valueNumeric="0"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="7"/><column name="alias" value="browser-forms"/><column name="name" value="Browser forms"/><column name="flow_type" value="FORM"/><column name="built_in" valueBoolean="true"/><column name="parent_flow_id" valueNumeric="1"/><column name="requirement" value="ALTERNATIVE"/><column name="priority" valueNumeric="20"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_flow"><column name="id" valueNumeric="8"/><column name="alias" value="browser-conditional-otp"/><column name="name" value="Browser conditional OTP"/><column name="flow_type" value="BASIC"/><column name="built_in" valueBoolean="true"/><column name="parent_flow_id" valueNumeric="7"/><column name="requirement" value="CONDITIONAL"/><column name="priority" valueNumeric="20"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="1"/><column name="flow_id" valueNumeric="1"/><column name="provider_id" value="cookie"/><column name="display_name" value="Cookie"/><column name="requirement" value="ALTERNATIVE"/><column name="priority" valueNumeric="10"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="2"/><column name="flow_id" valueNumeric="1"/><column name="provider_id" value="identity-provider-redirector"/><column name="display_name" value="Identity provider redirector"/><column name="requirement" value="ALTERNATIVE"/><column name="priority" valueNumeric="15"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="3"/><column name="flow_id" valueNumeric="7"/><column name="provider_id" value="username-password-form"/><column name="display_name" value="Username Password Form"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="10"/><column name="authenticator_reference" value="pwd"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="4"/><column name="flow_id" valueNumeric="8"/><column name="provider_id" value="condition-user-configured"/><column name="display_name" value="Condition - user configured"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="10"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="5"/><column name="flow_id" valueNumeric="8"/><column name="provider_id" value="otp-form"/><column name="display_name" value="OTP Form"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="20"/><column name="authenticator_reference" value="otp"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="6"/><column name="flow_id" valueNumeric="2"/><column name="provider_id" value="registration-user-creation"/><column name="display_name" value="User creation"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="10"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="7"/><column name="flow_id" valueNumeric="3"/><column name="provider_id" value="reset-credentials-email"/><column name="display_name" value="Reset credentials email"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="10"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="8"/><column name="flow_id" valueNumeric="3"/><column name="provider_id" value="reset-password"/><column name="display_name" value="Reset password"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="20"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="9"/><column name="flow_id" valueNumeric="4"/><column name="provider_id" value="verify-existing-account"/><column name="display_name" value="Verify existing account"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="10"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="10"/><column name="flow_id" valueNumeric="4"/><column name="provider_id" value="create-user-if-unique"/><column name="display_name" value="Create user if unique"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="20"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+		<insert tableName="authentication_execution"><column name="id" valueNumeric="11"/><column name="flow_id" valueNumeric="6"/><column name="provider_id" value="username-password-form"/><column name="display_name" value="Username Password Form"/><column name="requirement" value="REQUIRED"/><column name="priority" valueNumeric="10"/><column name="authenticator_reference" value="pwd"/><column name="created_by" value="system"/><column name="created_at" valueDate="${now}"/><column name="updated_at" valueDate="${now}"/></insert>
+
+		<insert tableName="authentication_flow_binding"><column name="binding_type" value="BROWSER"/><column name="flow_id" valueNumeric="1"/></insert>
+		<insert tableName="authentication_flow_binding"><column name="binding_type" value="REGISTRATION"/><column name="flow_id" valueNumeric="2"/></insert>
+		<insert tableName="authentication_flow_binding"><column name="binding_type" value="RESET_CREDENTIALS"/><column name="flow_id" valueNumeric="3"/></insert>
+		<insert tableName="authentication_flow_binding"><column name="binding_type" value="FIRST_BROKER_LOGIN"/><column name="flow_id" valueNumeric="4"/></insert>
+		<insert tableName="authentication_flow_binding"><column name="binding_type" value="POST_BROKER_LOGIN"/><column name="flow_id" valueNumeric="5"/></insert>
+		<insert tableName="authentication_flow_binding"><column name="binding_type" value="DIRECT_GRANT"/><column name="flow_id" valueNumeric="6"/></insert>
+	</changeSet>
+</databaseChangeLog>

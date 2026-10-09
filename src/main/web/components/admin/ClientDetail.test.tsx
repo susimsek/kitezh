@@ -9,9 +9,14 @@ import { ClientDetail } from "./ClientDetail";
 
 const mockPush = jest.fn();
 const mockRefresh = jest.fn();
+const mockAddAlert = jest.fn();
+const mockAddError = jest.fn();
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
 
 jest.mock("@/lib/admin-api", () => ({ adminRequest: jest.fn() }));
+jest.mock("@/components/auth/ConsoleAlerts", () => ({
+  useConsoleAlerts: () => ({ addAlert: mockAddAlert, addError: mockAddError }),
+}));
 jest.mock("./AdminAuthProvider", () => ({
   useAdminAuth: () => ({ accessToken: "token", access: { manageClients: true } }),
 }));
@@ -127,5 +132,62 @@ describe("ClientDetail", () => {
         method: "DELETE",
       }),
     );
+  });
+
+  it("revokes all client sessions and reports the result", async () => {
+    let revoked = false;
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/clients/client-1") {
+        return { status: 200, data: client } as never;
+      }
+      if (config.url?.startsWith("/api/admin/clients/client-1/sessions")) {
+        if (config.method === "DELETE") {
+          revoked = true;
+          return { status: 204, data: null } as never;
+        }
+        return {
+          status: 200,
+          data: {
+            content: revoked
+              ? []
+              : [
+                  {
+                    id: "session-1",
+                    username: "ada",
+                    createdAt: "2026-01-01T12:00:00Z",
+                    lastAccessedAt: "2026-01-01T12:30:00Z",
+                    expiresAt: "2026-01-01T13:00:00Z",
+                    authorizationCount: 1,
+                  },
+                ],
+            number: 0,
+            totalPages: 1,
+            totalElements: revoked ? 0 : 1,
+          },
+        } as never;
+      }
+      return { status: 500, data: null } as never;
+    });
+
+    render(<ClientDetail dictionary={dictionary} id="client-1" locale="en" tab="sessions" />);
+
+    expect(await screen.findByText("ada")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.resources.signOutAllClientSessions }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.signOutAllClientSessions,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockAdminRequest).toHaveBeenCalledWith("token", {
+        url: "/api/admin/clients/client-1/sessions",
+        method: "DELETE",
+      });
+      expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.resources.sessionTerminated);
+    });
+    expect(mockAddError).not.toHaveBeenCalled();
   });
 });

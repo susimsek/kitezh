@@ -48,4 +48,21 @@ class AdminSessionControllerTest {
         verify(service).deleteSession("session-1", "admin");
         verify(service).deleteUserSessions("alice", "admin");
     }
+
+    @Test
+    void delegatesGlobalSessionDeletion() {
+        assertThat(controller.deleteAllSessions().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        verify(service).deleteAllSessions();
+    }
+
+    @Test
+    void delegatesTokenRevocation() {
+        assertThat(controller.revokeAllTokens().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(controller.revokeUserTokens("alice", authentication).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        verify(service).revokeAllTokens();
+        verify(service).revokeUserTokens("alice", "admin");
+    }
 }

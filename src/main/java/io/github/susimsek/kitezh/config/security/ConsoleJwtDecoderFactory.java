@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.config.security;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
+import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import java.util.Collection;
 import java.util.Set;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -23,7 +24,21 @@ final class ConsoleJwtDecoderFactory {
             String issuer,
             String audience,
             AuthorizationRepository authorizationRepository) {
-        return create(jwkSource, issuer, Set.of(audience), authorizationRepository);
+        return create(jwkSource, issuer, Set.of(audience), authorizationRepository, null);
+    }
+
+    static JwtDecoder create(
+            JWKSource<SecurityContext> jwkSource,
+            String issuer,
+            String audience,
+            AuthorizationRepository authorizationRepository,
+            AuthorizationRevocationPolicyService revocationPolicyService) {
+        return create(
+                jwkSource,
+                issuer,
+                Set.of(audience),
+                authorizationRepository,
+                revocationPolicyService);
     }
 
     static JwtDecoder create(
@@ -31,6 +46,15 @@ final class ConsoleJwtDecoderFactory {
             String issuer,
             Collection<String> audiences,
             AuthorizationRepository authorizationRepository) {
+        return create(jwkSource, issuer, audiences, authorizationRepository, null);
+    }
+
+    static JwtDecoder create(
+            JWKSource<SecurityContext> jwkSource,
+            String issuer,
+            Collection<String> audiences,
+            AuthorizationRepository authorizationRepository,
+            AuthorizationRevocationPolicyService revocationPolicyService) {
         NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withJwkSource(jwkSource).build();
         OAuth2TokenValidator<Jwt> audienceValidator =
                 jwt ->
@@ -43,7 +67,8 @@ final class ConsoleJwtDecoderFactory {
                 new DelegatingOAuth2TokenValidator<>(
                         JwtValidators.createDefaultWithIssuer(issuer),
                         audienceValidator,
-                        new ActiveAuthorizationTokenValidator(authorizationRepository)));
+                        new ActiveAuthorizationTokenValidator(
+                                authorizationRepository, revocationPolicyService)));
         return jwtDecoder;
     }
 }

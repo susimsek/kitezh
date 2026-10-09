@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -54,6 +55,24 @@ public interface AuthorizationRepository extends JpaRepository<AuthorizationEnti
     long deleteBySessionId(String sessionId);
 
     long deleteBySessionIdIn(Collection<String> sessionIds);
+
+    long deleteByRegisteredClientIdAndSessionId(String registeredClientId, String sessionId);
+
+    long deleteByRegisteredClientIdAndSessionIdIsNotNull(String registeredClientId);
+
+    boolean existsByRegisteredClientIdAndSessionId(String registeredClientId, String sessionId);
+
+    boolean existsBySessionId(String sessionId);
+
+    @Query(
+            "select distinct a.sessionId from AuthorizationEntity a where a.sessionId in"
+                    + " :sessionIds")
+    List<String> findDistinctSessionIdsBySessionIdIn(
+            @Param("sessionIds") Collection<String> sessionIds);
+
+    @Modifying
+    @Query("delete from AuthorizationEntity a where a.sessionId is not null")
+    int deleteBySessionIdIsNotNull();
 
     List<AuthorizationEntity> findAllBySessionIdOrderByAccessTokenIssuedAtDesc(String sessionId);
 

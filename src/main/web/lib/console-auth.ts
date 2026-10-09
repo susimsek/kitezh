@@ -25,6 +25,10 @@ import { apiUrl, isDesktopRuntime } from "./desktop-api";
 export { CONSOLE_TRANSACTION_KEYS } from "./console-auth-storage";
 export type { ConsoleTokenResponse, JwtPayload } from "./console-auth-types";
 
+export type ConsoleLogoutOptions = {
+  sessionAlreadyRevoked?: boolean;
+};
+
 const CALLBACK_TTL_MS = 5 * 60 * 1000;
 
 function isPermanentRefreshFailure(error: unknown) {
@@ -379,7 +383,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
   }, [completeAuthorization, consoleKind]);
 
   const logout = useCallback(
-    async (locale: Locale) => {
+    async (locale: Locale, options: ConsoleLogoutOptions = {}) => {
       const idTokenHint = idTokenRef.current;
       clearStoredTransactions();
       clearAuthentication(true, false);
@@ -390,6 +394,10 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       const postLogoutRedirectUri = isDesktopRuntime()
         ? "kitezh://logout/callback"
         : `${window.location.origin}${config.postLogoutRedirectPath(locale)}`;
+      if (options.sessionAlreadyRevoked) {
+        window.location.replace("/login?logout");
+        return;
+      }
       if (!idTokenHint) {
         await axios.post(apiUrl("/logout")).catch(() => undefined);
         window.location.replace("/login?logout");

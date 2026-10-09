@@ -459,6 +459,7 @@ class AuthorizationServerConfigTest {
         assertThat(claims.build().getClaims())
                 .containsEntry(
                         "picture", "https://issuer.example/avatars/avatar-id?v=1767225600000")
+                .containsEntry("client_id", "admin-console")
                 .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"))
                 .containsEntry("locale", "tr")
                 .containsEntry("groups", List.of("/platform-administrators"))

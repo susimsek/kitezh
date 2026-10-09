@@ -15,7 +15,7 @@ test.describe("public landing page", () => {
     await expect(page.locator('input[name="username"]')).toHaveCount(0);
     await expect(page.locator('a[href="/download"]').first()).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /Download the application|Uygulamayı indir/i }),
+      page.getByRole("link", { name: /Download the application|Uygulamayı indir/i }),
     ).toBeVisible();
 
     await page.goto("/login");

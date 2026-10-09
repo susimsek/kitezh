@@ -10,6 +10,7 @@ import io.github.susimsek.kitezh.mapper.AdminSessionMapper;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.ClientRepository;
 import io.github.susimsek.kitezh.repository.UserSessionRepository;
+import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import io.github.susimsek.kitezh.service.SessionInvalidationService;
 import io.github.susimsek.kitezh.service.error.ApiException;
 import java.time.Instant;
@@ -33,6 +34,7 @@ public class AdminSessionService {
     private final ClientRepository clientRepository;
     private final AdminAuditEventService adminAuditEventService;
     private final SessionInvalidationService sessionInvalidationService;
+    private final AuthorizationRevocationPolicyService revocationPolicyService;
     private final AdminSessionMapper adminSessionMapper;
 
     @Transactional(readOnly = true)
@@ -149,6 +151,56 @@ public class AdminSessionService {
         adminUserService.assertCanManageUsername(username, currentUsername);
         sessionInvalidationService.invalidatePrincipal(username);
         adminAuditEventService.record("user.sessions.deleted", "user", username);
+    }
+
+    @Transactional
+    public void deleteAllSessions() {
+        sessionInvalidationService.invalidateAll();
+        adminAuditEventService.record("sessions.deleted", "application", "default");
+    }
+
+    @Transactional
+    public void deleteClientSession(String clientId, String sessionId) {
+        if (!clientRepository.existsById(clientId)) {
+            throw ApiException.notFound("Client not found");
+        }
+        if (!authorizationRepository.existsByRegisteredClientIdAndSessionId(clientId, sessionId)) {
+            throw ApiException.notFound("Client session not found");
+        }
+        sessionInvalidationService.invalidateClientSession(clientId, sessionId);
+        adminAuditEventService.record("client.session.deleted", "client", clientId);
+    }
+
+    @Transactional
+    public void deleteClientSessions(String clientId) {
+        if (!clientRepository.existsById(clientId)) {
+            throw ApiException.notFound("Client not found");
+        }
+        sessionInvalidationService.invalidateClientSessions(clientId);
+        adminAuditEventService.record("client.sessions.deleted", "client", clientId);
+    }
+
+    @Transactional
+    public void revokeAllTokens() {
+        revocationPolicyService.revokeApplication();
+        adminAuditEventService.record("tokens.revoked", "application", "default");
+    }
+
+    @Transactional
+    public void revokeUserTokens(String username, String currentUsername) {
+        adminUserService.assertCanManageUsername(username, currentUsername);
+        revocationPolicyService.revokeUser(username);
+        adminAuditEventService.record("user.tokens.revoked", "user", username);
+    }
+
+    @Transactional
+    public void revokeClientTokens(String clientId) {
+        RegisteredClientEntity client =
+                clientRepository
+                        .findById(clientId)
+                        .orElseThrow(() -> ApiException.notFound("Client not found"));
+        revocationPolicyService.revokeClient(client.getClientId());
+        adminAuditEventService.record("client.tokens.revoked", "client", clientId);
     }
 
     private static String normalizeStatus(String status) {

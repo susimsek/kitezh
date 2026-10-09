@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Badge, Button, Card } from "react-bootstrap";
+import { Alert, Badge, Button, Card, Spinner } from "react-bootstrap";
 import { useRouter } from "@/routing/navigation";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/get-dictionary";
 import { adminRequest } from "@/lib/admin-api";
+import { useConsoleAlerts } from "@/components/auth/ConsoleAlerts";
 import { useAdminAuth } from "./AdminAuthProvider";
 import { AdminActionIcon } from "./AdminActionIcon";
 import { ConfirmModal } from "./ConfirmModal";
@@ -56,12 +57,16 @@ export function ClientDetail({
 }) {
   const router = useRouter();
   const { access, accessToken } = useAdminAuth();
+  const alerts = useConsoleAlerts();
   const [client, setClient] = useState<Detail | null>(null);
   const [error, setError] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [secretError, setSecretError] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSecretConfirm, setShowSecretConfirm] = useState(false);
+  const [showClientSessionConfirm, setShowClientSessionConfirm] = useState(false);
+  const [clientSessionRevokeBusy, setClientSessionRevokeBusy] = useState(false);
+  const [sessionsVersion, setSessionsVersion] = useState(0);
   const activeTab = CLIENT_DETAIL_TABS.includes((tab ?? "") as (typeof CLIENT_DETAIL_TABS)[number])
     ? (tab as string)
     : "settings";
@@ -96,6 +101,27 @@ export function ClientDetail({
       return;
     }
     setSecret(r.data.clientSecret);
+  };
+  const revokeClientSessions = async () => {
+    if (!access?.manageClients || !id || !accessToken) return;
+    setClientSessionRevokeBusy(true);
+    try {
+      const response = await adminRequest(accessToken, {
+        url: `/api/admin/clients/${encodeURIComponent(id)}/sessions`,
+        method: "DELETE",
+      });
+      if (response.status >= 300) {
+        alerts.addError(dictionary.admin.resources.operationError);
+        return;
+      }
+      setShowClientSessionConfirm(false);
+      setSessionsVersion((value) => value + 1);
+      alerts.addAlert(dictionary.admin.resources.sessionTerminated);
+    } catch {
+      alerts.addError(dictionary.admin.resources.operationError);
+    } finally {
+      setClientSessionRevokeBusy(false);
+    }
   };
   if (!id || error) return <ErrorState message={dictionary.admin.clients.notFound} />;
   if (!client) return <LoadingState />;
@@ -273,13 +299,41 @@ export function ClientDetail({
         <ClientScopeEvaluation clientId={client.id} dictionary={dictionary} />
       )}
       {activeTab === "sessions" && (
-        <EntityRelatedData
-          resource="sessions"
-          url={`/api/admin/clients/${encodeURIComponent(client.id)}/sessions`}
-          locale={locale}
-          dictionary={dictionary}
-          canManage={access?.manageUsers ?? false}
-        />
+        <div className="d-grid gap-3">
+          {access?.manageClients && (
+            <div className="admin-detail-heading">
+              <div>
+                <h2 className="h5 mb-1">{copy.sessions}</h2>
+                <p className="text-body-secondary small mb-0">
+                  {dictionary.admin.resources.signOutAllClientSessionsHelp}
+                </p>
+              </div>
+              <Button
+                disabled={clientSessionRevokeBusy}
+                onClick={() => setShowClientSessionConfirm(true)}
+                variant="danger"
+              >
+                {clientSessionRevokeBusy ? (
+                  <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                ) : (
+                  <AdminActionIcon action="logout" />
+                )}
+                {dictionary.admin.resources.signOutAllClientSessions}
+              </Button>
+            </div>
+          )}
+          <EntityRelatedData
+            resource="sessions"
+            url={`/api/admin/clients/${encodeURIComponent(client.id)}/sessions`}
+            locale={locale}
+            dictionary={dictionary}
+            canManage={access?.manageClients ?? false}
+            deleteUrl={(sessionId) =>
+              `/api/admin/clients/${encodeURIComponent(client.id)}/sessions/${encodeURIComponent(sessionId)}`
+            }
+            refreshKey={sessionsVersion}
+          />
+        </div>
       )}
       {activeTab === "consents" && (
         <EntityRelatedData
@@ -327,6 +381,15 @@ export function ClientDetail({
           void remove();
         }}
         show={showDeleteConfirm}
+      />
+      <ConfirmModal
+        busy={clientSessionRevokeBusy}
+        cancelLabel={dictionary.admin.common.cancel}
+        confirmLabel={dictionary.admin.resources.signOutAllClientSessions}
+        message={dictionary.admin.resources.signOutAllClientSessionsConfirm}
+        onCancel={() => setShowClientSessionConfirm(false)}
+        onConfirm={() => void revokeClientSessions()}
+        show={showClientSessionConfirm}
       />
     </>
   );

@@ -19,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -125,6 +126,47 @@ class AdminSessionController {
                     String username,
             Authentication authentication) {
         adminSessionService.deleteUserSessions(username, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/revoke-all")
+    @Operation(
+            summary = "Sign out all active sessions",
+            description =
+                    "Terminates every browser session and its persisted OAuth2 authorization in the"
+                            + " application.")
+    @ApiResponse(responseCode = "204", description = "All browser sessions deleted.")
+    ResponseEntity<Void> deleteAllSessions() {
+        adminSessionService.deleteAllSessions();
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/revoke-tokens")
+    @Operation(
+            summary = "Revoke all issued tokens",
+            description =
+                    "Marks all tokens issued before now as invalid across this application."
+                            + " Browser sessions and offline authorizations are not deleted.")
+    @ApiResponse(responseCode = "204", description = "Issued tokens revoked.")
+    ResponseEntity<Void> revokeAllTokens() {
+        adminSessionService.revokeAllTokens();
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/users/{username}/revoke-tokens")
+    @Operation(
+            summary = "Revoke all user tokens",
+            description = "Marks all tokens issued to the user before now as invalid.")
+    @ApiResponse(responseCode = "204", description = "User tokens revoked.")
+    ResponseEntity<Void> revokeUserTokens(
+            @Parameter(
+                            description = "Username whose tokens should be revoked.",
+                            example = "user",
+                            required = true)
+                    @PathVariable
+                    String username,
+            Authentication authentication) {
+        adminSessionService.revokeUserTokens(username, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

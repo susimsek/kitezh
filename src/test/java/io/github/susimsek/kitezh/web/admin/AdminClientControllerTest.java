@@ -111,6 +111,20 @@ class AdminClientControllerTest {
         assertThat(response.clientSecret()).isEqualTo("new-secret");
     }
 
+    @Test
+    void delegatesClientSessionAndTokenActions() {
+        assertThat(controller.deleteSessions("client-1").getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(controller.deleteSession("client-1", "session-1").getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(controller.revokeTokens("client-1").getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+
+        verify(adminSessionService).deleteClientSessions("client-1");
+        verify(adminSessionService).deleteClientSession("client-1", "session-1");
+        verify(adminSessionService).revokeClientTokens("client-1");
+    }
+
     private static AdminClientRequestDTO clientRequest() {
         return new AdminClientRequestDTO(
                 "demo-client",
