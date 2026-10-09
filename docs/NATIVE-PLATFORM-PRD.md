@@ -295,7 +295,7 @@ acceptance evidence is linked in the feature matrix.
 - [~] Typed adapter and shared error/session contract gate: `src/main/shared/src/api.ts` defines Problem Detail, status classification, and native session contracts consumed by mobile adapters; full authenticated refresh/logout evidence remains
 - [~] Auth callback, refresh, logout, deep-link, offline, and restart test gate: shared OAuth state/scheme validation is covered in `src/main/mobile/src/shared.contract.test.ts`, and the fixture covers callback, 401/403, and timeout; device resume, refresh, logout, and cold/warm deep-link runs remain
 - [ ] Localization, theme, accessibility, loading, and error-state gate
-- [ ] Secret, log, diagnostics, and external-navigation security gate
+- [~] Secret, log, diagnostics, and external-navigation security gate: `check-native-security.mjs` rejects diagnostic logging and token-bearing URLs; allowlisted external-navigation and packaged privacy evidence remain
 - [~] Focused CI and packaged smoke-test gate: mobile typecheck, lint, unit tests, boundary checks, web build, and fixture contract run in `mobile-quality`; Android/iOS packaged device evidence remains manual
 - [~] Feature-matrix evidence and explicit blocker gate: PRD and mobile matrix link boundary, fixture, Maestro, and workflow evidence; authenticated callback/offline/device results remain explicit blockers
 

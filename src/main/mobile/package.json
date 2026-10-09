@@ -15,6 +15,7 @@
     "test": "node --experimental-strip-types --test 'src/**/*.test.ts'",
     "test:fixture": "node --test e2e/fixture-server.test.mjs",
     "check:boundaries": "node scripts/check-native-boundaries.mjs",
+    "check:security": "node scripts/check-native-security.mjs",
     "build:web": "expo export --platform web"
   },
   "dependencies": {

@@ -57,6 +57,10 @@ OAuth callbacks are validated by the shared native contract before code exchange
 contain the original state and use the registered `kitezh://` redirect host/path. A browser result
 with a missing, stale, or mismatched state is rejected without exchanging the code.
 
+The mobile CI also runs `pnpm run check:security`, which rejects diagnostic logging and token-bearing
+URLs in native source. Runtime diagnostics must expose only a stable error category; credentials,
+authorization codes, and personally identifying values stay out of logs.
+
 Validate the fixture contract locally with:
 
 ```bash
