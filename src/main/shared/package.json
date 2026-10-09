@@ -4,17 +4,23 @@
   "private": true,
   "license": "Apache-2.0",
   "description": "Platform-neutral Kitezh contracts and design tokens",
-  "types": "./src/index.ts",
-  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./theme": "./src/theme.ts",
-    "./i18n": "./src/i18n.ts",
-    "./icons": "./src/icons.ts",
-    "./contracts": "./src/contracts.ts",
-    "./api": "./src/api.ts",
-    "./auth": "./src/auth.ts",
-    "./session": "./src/session.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./theme": { "types": "./dist/theme.d.ts", "default": "./dist/theme.js" },
+    "./i18n": { "types": "./dist/i18n.d.ts", "default": "./dist/i18n.js" },
+    "./icons": { "types": "./dist/icons.d.ts", "default": "./dist/icons.js" },
+    "./contracts": { "types": "./dist/contracts.d.ts", "default": "./dist/contracts.js" },
+    "./api": { "types": "./dist/api.d.ts", "default": "./dist/api.js" },
+    "./auth": { "types": "./dist/auth.d.ts", "default": "./dist/auth.js" },
+    "./session": { "types": "./dist/session.d.ts", "default": "./dist/session.js" }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
   }
 }

@@ -22,7 +22,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { ThemeMode } from "@kitezh/shared";
+import { colors, messages, type ThemeMode } from "@kitezh/shared";
 
 import {
   DESKTOP_PROTOCOL,
@@ -54,10 +54,14 @@ import {
   type DesktopUpdateStatus,
 } from "./update";
 import { showDesktopNotification } from "./notifications";
+import { createDesktopApiAdapter } from "./api/desktop-api";
+
+import { createHash, randomBytes } from "node:crypto";
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
 const DESKTOP_LANGUAGE_FILE = "desktop-language.json";
+const DESKTOP_THEME_FILE = "desktop-theme.json";
 const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
 const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
@@ -82,6 +86,29 @@ function isTurkishDesktop() {
 
 function desktopBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? "#202124" : "#f8f9fa";
+}
+
+function desktopThemePath() {
+  return path.join(app.getPath("userData"), DESKTOP_THEME_FILE);
+}
+
+async function readDesktopTheme(): Promise<DesktopTheme> {
+  try {
+    const value = JSON.parse(await readFile(desktopThemePath(), "utf8"));
+    return value === "light" || value === "dark" || value === "system"
+      ? value
+      : "system";
+  } catch {
+    return "system";
+  }
+}
+
+async function writeDesktopTheme(theme: DesktopTheme) {
+  await mkdir(path.dirname(desktopThemePath()), { recursive: true });
+  await writeFile(desktopThemePath(), JSON.stringify(theme), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 function applyDesktopTheme(value: unknown) {
@@ -314,6 +341,24 @@ async function readDiagnosticEvents() {
 
 function rendererRoot() {
   return path.resolve(__dirname, "../renderer");
+}
+
+function nativeRendererRoot() {
+  return path.resolve(__dirname, "native");
+}
+
+async function nativeRendererHtml() {
+  const source = await readFile(path.join(nativeRendererRoot(), "native.html"), "utf8");
+  const bootstrap = JSON.stringify({
+    locale: desktopLanguage,
+    theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+    messages,
+    colors,
+  }).replace(/</g, "\\u003c");
+  return source.replace(
+    "<script type=\"module\" src=\"app://renderer/native/renderer.mjs\"></script>",
+    `<script>globalThis.__KITEZH_NATIVE_BOOTSTRAP__=${bootstrap};</script><script type="module" src="app://renderer/native/renderer.mjs"></script>`,
+  );
 }
 
 function rendererFile(requestUrl: string) {
@@ -662,6 +707,17 @@ async function desktopSettingsHtml() {
 async function registerRendererProtocol() {
   protocol.handle(RENDERER_PROTOCOL, async (request) => {
     const requestPath = new URL(request.url).pathname;
+    if (requestPath === "/native" || requestPath === "/native/") {
+      return new Response(await nativeRendererHtml(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+    if (requestPath === "/native/renderer.mjs") {
+      return new Response(
+        await readFile(path.join(nativeRendererRoot(), "renderer.mjs"), "utf8"),
+        { headers: { "content-type": "text/javascript; charset=utf-8" } },
+      );
+    }
     if (requestPath === "/desktop-login" || requestPath === "/desktop-login/") {
       return new Response(await desktopLoginHtml(), {
         headers: { "content-type": "text/html; charset=utf-8" },
@@ -949,6 +1005,84 @@ async function writeVault(vault: Partial<Record<ConsoleName, StoredTokens>>) {
     .encryptString(JSON.stringify(vault))
     .toString("base64");
   await writeFile(file, encrypted, { encoding: "utf8", mode: 0o600 });
+}
+
+const desktopApiAdapter = createDesktopApiAdapter({
+  apiBaseUrl: getApiBaseUrl(),
+  readSession: async (consoleName) => (await readVault())[consoleName] ?? null,
+  writeSession: async (consoleName, tokens) => {
+    const vault = await readVault();
+    vault[consoleName] = tokens;
+    await writeVault(vault);
+    setLogoutMenuVisible(true);
+  },
+  clearSession: async (consoleName) => {
+    const vault = await readVault();
+    delete vault[consoleName];
+    await writeVault(vault);
+    setLogoutMenuVisible(Boolean(vault.admin || vault.account));
+  },
+});
+
+function base64Url(value: Buffer) {
+  return value.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function nativeAuthorizationRequest(consoleName: ConsoleName) {
+  const state = base64Url(randomBytes(32));
+  const codeVerifier = base64Url(randomBytes(32));
+  const challenge = base64Url(
+    createHash("sha256").update(codeVerifier).digest(),
+  );
+  const clientId =
+    consoleName === "admin"
+      ? "desktop-admin-console"
+      : "desktop-account-console";
+  const authorizationUrl = new URL("/oauth2/authorize", getApiBaseUrl());
+  authorizationUrl.search = new URLSearchParams({
+    client_id: clientId,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    nonce: base64Url(randomBytes(32)),
+    redirect_uri: "kitezh://oauth/callback",
+    response_mode: "fragment",
+    response_type: "code",
+    scope:
+      consoleName === "admin"
+        ? "openid profile email admin-api"
+        : "openid profile email account-api",
+    state,
+    ui_locales: desktopLanguage,
+  }).toString();
+  return {
+    authorizationUrl,
+    pending: {
+      state,
+      codeVerifier,
+      clientId,
+      redirectUri: "kitezh://oauth/callback",
+      createdAt: Date.now(),
+    } satisfies PendingAuthorizationData,
+  };
+}
+
+async function logoutDesktopSession(consoleName: ConsoleName) {
+  const vault = await readVault();
+  const tokens = vault[consoleName];
+  delete vault[consoleName];
+  await writeVault(vault);
+  setLogoutMenuVisible(Boolean(vault.admin || vault.account));
+  if (!tokens) return;
+  const logoutUrl = new URL("/connect/logout", getApiBaseUrl());
+  logoutUrl.search = new URLSearchParams({
+    client_id:
+      consoleName === "admin"
+        ? "desktop-admin-console"
+        : "desktop-account-console",
+    ...(tokens.idToken ? { id_token_hint: tokens.idToken } : {}),
+    post_logout_redirect_uri: "kitezh://logout/callback",
+  }).toString();
+  await shell.openExternal(logoutUrl.toString());
 }
 
 async function showAboutDialog() {
@@ -2134,7 +2268,7 @@ async function createWindow() {
       exitCode: details.exitCode,
     });
   });
-  void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/`);
+  void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/native`);
   mainWindow.on("closed", () => {
     if (companionWindow && !companionWindow.isDestroyed()) {
       companionWindow.destroy();
@@ -2210,7 +2344,16 @@ function registerIpc() {
   });
   ipcMain.handle("desktop:theme-set", (event, value: unknown) => {
     assertTrustedSender(event);
-    applyDesktopTheme(value);
+    const theme: DesktopTheme =
+      value === "light" || value === "dark" || value === "system"
+        ? value
+        : "system";
+    applyDesktopTheme(theme);
+    void writeDesktopTheme(theme);
+  });
+  ipcMain.handle("desktop:theme-get", (event) => {
+    assertTrustedSender(event);
+    return nativeTheme.themeSource;
   });
   ipcMain.handle("desktop:language-set", async (event, value: unknown) => {
     assertTrustedSender(event);
@@ -2342,7 +2485,7 @@ function registerIpc() {
       closeCompanionWindow();
       if (!mainWindow || mainWindow.isDestroyed()) return;
       await mainWindow.loadURL(
-        `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value}?desktopSignIn=1`,
+        `${RENDERER_PROTOCOL}://${RENDERER_HOST}/native?console=${value}`,
       );
       focusMainWindow();
     },
@@ -2354,17 +2497,24 @@ function registerIpc() {
       throw new Error("Desktop window is unavailable");
     }
     await mainWindow.loadURL(
-      `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value === "admin" ? "admin" : "account/personal-info"}?desktopSignIn=1`,
+      `${RENDERER_PROTOCOL}://${RENDERER_HOST}/native?console=${value}`,
     );
-    if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
-      desktopLoginWindow.show();
-      desktopLoginWindow.focus();
-    }
+    mainWindow.show();
+    mainWindow.focus();
+    if (desktopLoginWindow && !desktopLoginWindow.isDestroyed())
+      desktopLoginWindow.close();
   });
   ipcMain.handle(
     "desktop:auth-start-login",
     async (event, request: unknown) => {
       assertTrustedSender(event);
+      if (typeof request === "string") {
+        assertConsole(request);
+        const nativeRequest = nativeAuthorizationRequest(request);
+        pendingAuthorizations.set(request, nativeRequest.pending);
+        await shell.openExternal(nativeRequest.authorizationUrl.toString());
+        return;
+      }
       if (!request || typeof request !== "object")
         throw new Error("Invalid login request");
       const value = request as Partial<{
@@ -2426,6 +2576,15 @@ function registerIpc() {
     },
   );
   ipcMain.handle(
+    "desktop:auth-has-session",
+    async (event, consoleName: unknown) => {
+      assertTrustedSender(event);
+      assertConsole(consoleName);
+      const vault = await readVault();
+      return Boolean(vault[consoleName]);
+    },
+  );
+  ipcMain.handle(
     "desktop:auth-set-session",
     async (event, consoleName: unknown, tokens: unknown) => {
       assertTrustedSender(event);
@@ -2456,6 +2615,37 @@ function registerIpc() {
   ipcMain.handle("desktop:auth-storage-status", (event) => {
     assertTrustedSender(event);
     return safeStorage.isEncryptionAvailable() ? "available" : "unavailable";
+  });
+  ipcMain.handle("desktop:auth-logout", async (event, consoleName: unknown) => {
+    assertTrustedSender(event);
+    assertConsole(consoleName);
+    await logoutDesktopSession(consoleName);
+  });
+  ipcMain.handle("desktop:api-request", async (event, request: unknown) => {
+    assertTrustedSender(event);
+    if (!request || typeof request !== "object")
+      throw new Error("Invalid native API request");
+    const value = request as Partial<{
+      console: ConsoleName;
+      method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+      path: string;
+      body: unknown;
+    }>;
+    assertConsole(value.console);
+    if (
+      typeof value.path !== "string" ||
+      !value.path.startsWith("/") ||
+      value.path.includes("//") ||
+      value.path.includes("..")
+    ) {
+      throw new Error("Invalid native API path");
+    }
+    return desktopApiAdapter.request({
+      console: value.console,
+      method: value.method,
+      path: value.path,
+      body: value.body,
+    });
   });
   ipcMain.handle("desktop:update-check", (event) => {
     assertTrustedSender(event);
@@ -2519,6 +2709,7 @@ if (!hasLock) {
   });
   app.whenReady().then(async () => {
     app.setName(DESKTOP_APP_NAME);
+    applyDesktopTheme(await readDesktopTheme());
     desktopLanguageMode = await readDesktopLanguageMode();
     desktopLanguage = await readDesktopLanguage();
     if (desktopLanguageMode === "system") {

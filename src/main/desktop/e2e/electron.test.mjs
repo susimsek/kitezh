@@ -90,28 +90,17 @@ async function openManualUpdateCheck(
   return { checkingWindow, nextWindowPromise };
 }
 
-test("opens the trusted renderer and exposes the narrow desktop bridge", async () => {
+test("opens the native console chooser and exposes the narrow desktop bridge", async () => {
   const application = await launchDesktop();
   try {
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("heading", { name: "Choose a console" }).waitFor();
 
-    assert.equal(await window.url(), "app://renderer/");
-    assert.equal(await window.locator(".desktop-console-option").count(), 2);
-    assert.ok(
-      await window
-        .locator('img[aria-hidden="true"]')
-        .evaluateAll((images) =>
-          images.every(
-            (image) =>
-              image.complete &&
-              image.naturalWidth > 0 &&
-              image.src.startsWith("app://renderer/brand/"),
-          ),
-        ),
-      "Desktop brand logos should load from the packaged renderer",
-    );
+    assert.equal(await window.url(), "app://renderer/native");
+    assert.equal(await window.getByRole("button", { name: "Administration Console" }).count(), 1);
+    assert.equal(await window.getByRole("button", { name: "Account Console" }).count(), 1);
+    assert.equal(await window.locator(".desktop-console-option").count(), 0);
     const nativeLogin = application
       .windows()
       .find((candidate) => candidate.url().includes("/desktop-login"));

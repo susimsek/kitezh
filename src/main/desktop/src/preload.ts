@@ -12,20 +12,24 @@ contextBridge.exposeInMainWorld("desktopApi", {
   auth: {
     startLogin: (request: unknown) =>
       ipcRenderer.invoke("desktop:auth-start-login", request),
-    getSession: (consoleName: unknown) =>
-      ipcRenderer.invoke("desktop:auth-get-session", consoleName),
-    setSession: (consoleName: unknown, tokens: unknown) =>
-      ipcRenderer.invoke("desktop:auth-set-session", consoleName, tokens),
+    hasSession: (consoleName: unknown) =>
+      ipcRenderer.invoke("desktop:auth-has-session", consoleName),
     clearSession: (consoleName: unknown) =>
       ipcRenderer.invoke("desktop:auth-clear-session", consoleName),
     clearAllSessions: () =>
       ipcRenderer.invoke("desktop:auth-clear-all-sessions"),
+    logout: (consoleName: unknown) =>
+      ipcRenderer.invoke("desktop:auth-logout", consoleName),
     getStorageStatus: () => ipcRenderer.invoke("desktop:auth-storage-status"),
     openConsole: (consoleName: unknown) =>
       ipcRenderer.invoke("desktop:auth-open-console", consoleName),
   },
   getConfig: () => ipcRenderer.invoke("desktop:config"),
   getAppVersion: () => ipcRenderer.invoke("desktop:app-version"),
+  api: {
+    request: (request: unknown) =>
+      ipcRenderer.invoke("desktop:api-request", request),
+  },
   preferences: {
     get: () => ipcRenderer.invoke("desktop:preferences-get"),
     set: (value: unknown) =>
@@ -37,6 +41,7 @@ contextBridge.exposeInMainWorld("desktopApi", {
   },
   theme: {
     set: (value: unknown) => ipcRenderer.invoke("desktop:theme-set", value),
+    get: () => ipcRenderer.invoke("desktop:theme-get"),
     onChanged: (listener: (theme: "light" | "dark") => void) => {
       const callback = (_event: Electron.IpcRendererEvent, value: unknown) => {
         if (value === "light" || value === "dark") listener(value);

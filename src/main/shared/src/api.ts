@@ -72,3 +72,16 @@ export type NativeSession = {
 };
 
 export type NativeSessionNamespace = "account" | "admin";
+
+export type NativeApiRequest = {
+  console: NativeSessionNamespace;
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+  path: string;
+  body?: unknown;
+};
+
+export type NativeApiResponse = {
+  status: number;
+  kind: ApiErrorKind | null;
+  body: unknown;
+};

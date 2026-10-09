@@ -271,6 +271,16 @@ Each owner must update the feature matrix with evidence, mark unavailable backen
 registrations as **Blocked**, and link focused tests or packaged smoke results. A person may review
 another owner's work, but a review does not transfer implementation ownership.
 
+### Muharem progress checklist
+
+The first Desktop P0 vertical slice is intentionally `[~]` until authenticated native E2E, packaged
+smoke, and cross-platform release evidence are available.
+
+- [~] Desktop P0 native console shell: `app://renderer/native` owns the console chooser and authenticated Account shell; the default packaged route no longer loads the Web console. Evidence: `src/main/desktop/src/native/native.html`, `src/main/desktop/src/native/renderer.mjs`, and `test/native-boundary.test.mjs`.
+- [~] Desktop P0 API/session adapter: protected Account requests run through the main-process typed adapter with separate Admin/Account vault records, one refresh retry, timeout/offline/401/403/validation mapping, and atomic refresh replacement. Evidence: `src/main/desktop/src/api/desktop-api.ts` and `test/api-adapter.test.mjs`.
+- [~] Desktop P0 Account vertical slice: profile, password, sessions, offline sessions, applications, MFA, account deletion, settings, and social-link read/unlink are native. New social-provider link start is **Blocked** pending a desktop callback/session contract; no token-bearing browser URL is accepted.
+- [~] Shared/native contract boundary: shared changes are limited to API/session contracts, icon metadata, semantic tokens, and English/Turkish message values. Desktop source has no Web component, React-Bootstrap, or browser-storage dependency; full packaged/authenticated evidence remains.
+
 ### Şuayb progress checklist
 
 `[ ]` not started, `[~]` in progress, and `[x]` complete. An item becomes `[x]` only after its

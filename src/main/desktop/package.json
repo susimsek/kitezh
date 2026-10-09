@@ -19,12 +19,14 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "build:renderer": "node scripts/build-renderer.mjs",
+    "build:native": "node scripts/build-native-renderer.mjs",
     "typecheck": "tsc --noEmit",
-    "build:main": "tsc -p tsconfig.json",
+    "build:shared": "pnpm --dir ../shared run build",
+    "build:main": "pnpm run build:shared && tsc -p tsconfig.json",
     "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",
     "test": "pnpm run test:unit",
     "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
-    "build": "pnpm run build:renderer && tsc -p tsconfig.json",
+    "build": "pnpm run build:main && pnpm run build:native",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",
     "package": "pnpm run build && electron-builder --publish never"

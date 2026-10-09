@@ -71,6 +71,7 @@ node/
 tsconfig.tsbuildinfo
 src/main/desktop/node_modules/
 src/main/desktop/dist/
+src/main/shared/dist/
 src/main/desktop/renderer/
 src/main/desktop/release/
 .offline-bundle/

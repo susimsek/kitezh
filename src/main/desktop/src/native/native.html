@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Kitezh</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #f7f9fc;
+        --surface: #ffffff;
+        --surface-muted: #eef2f7;
+        --text: #172033;
+        --text-muted: #5f6b7a;
+        --border: #d9e0ea;
+        --primary: #1677ff;
+        --primary-pressed: #0f5fd2;
+        --on-primary: #ffffff;
+        --danger: #c93636;
+        --success: #1a8f5b;
+        --focus: #1677ff;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --background: #111418;
+        --surface: #1b2027;
+        --surface-muted: #252c35;
+        --text: #f4f7fb;
+        --text-muted: #aab4c2;
+        --border: #38424f;
+        --primary: #4d94ff;
+        --primary-pressed: #7badff;
+        --on-primary: #08152a;
+        --danger: #ff8585;
+        --success: #65d49b;
+        --focus: #7badff;
+      }
+      * { box-sizing: border-box; }
+      html, body { min-height: 100%; }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      button, input, select { font: inherit; }
+      button { cursor: pointer; }
+      button:disabled { cursor: wait; opacity: .68; }
+      button:focus-visible, input:focus-visible, select:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent);
+        outline-offset: 2px;
+      }
+      .spinner { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .app { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100vh; }
+      .sidebar { display: flex; flex-direction: column; gap: 20px; padding: 24px 16px; background: var(--surface); border-right: 1px solid var(--border); }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; border-bottom: 1px solid var(--border); font-weight: 750; font-size: 19px; }
+      .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--primary); color: var(--on-primary); font-weight: 800; }
+      .console-label { margin: 0 10px; color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+      .nav { display: grid; gap: 4px; }
+      .nav button, .secondary-button { min-height: 44px; padding: 9px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text); text-align: left; }
+      .nav button:hover, .nav button[aria-current="page"] { background: var(--surface-muted); border-color: var(--border); }
+      .sidebar-footer { display: grid; gap: 8px; margin-top: auto; }
+      .main { min-width: 0; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 28px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 86%, transparent); }
+      .topbar h1 { margin: 0; font-size: 23px; }
+      .topbar p { margin: 3px 0 0; color: var(--text-muted); }
+      .content { max-width: 1040px; margin: 0 auto; padding: 28px; }
+      .grid { display: grid; gap: 18px; }
+      .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card { padding: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 5%, transparent); }
+      .card h2, .card h3 { margin: 0 0 7px; }
+      .card > p { margin: 0 0 18px; color: var(--text-muted); }
+      .form-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .field { display: grid; gap: 6px; }
+      .field.full { grid-column: 1 / -1; }
+      label { font-weight: 650; }
+      input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+      input[aria-invalid="true"] { border-color: var(--danger); }
+      .field-error { min-height: 18px; color: var(--danger); font-size: 13px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; }
+      .primary-button, .danger-button { min-height: 44px; padding: 9px 15px; border: 0; border-radius: 8px; color: var(--on-primary); font-weight: 700; }
+      .primary-button { background: var(--primary); }
+      .primary-button:hover { background: var(--primary-pressed); }
+      .danger-button { background: var(--danger); color: #fff; }
+      .notice { margin-bottom: 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); }
+      .notice.error { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); color: var(--danger); }
+      .notice.success { border-color: color-mix(in srgb, var(--success) 55%, var(--border)); color: var(--success); }
+      .notice.warning { border-color: #c68b22; }
+      .list { display: grid; gap: 10px; }
+      .list-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 9px; }
+      .list-item strong, .list-item span { display: block; }
+      .muted { color: var(--text-muted); }
+      .empty { padding: 22px; border: 1px dashed var(--border); border-radius: 9px; color: var(--text-muted); }
+      .loading { display: grid; place-items: center; min-height: 240px; color: var(--text-muted); }
+      .login { display: grid; place-items: center; min-height: 100vh; padding: 28px; }
+      .login-card { width: min(520px, 100%); text-align: center; }
+      .login-card .actions { justify-content: center; }
+      .login-card button { min-width: 230px; }
+      .settings-row { display: flex; justify-content: space-between; gap: 18px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+      .settings-row:last-child { border-bottom: 0; }
+      dialog { max-width: 440px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); }
+      dialog::backdrop { background: rgb(0 0 0 / 45%); }
+      @media (max-width: 800px) { .app { grid-template-columns: 1fr; } .sidebar { border-right: 0; border-bottom: 1px solid var(--border); } .nav { grid-template-columns: repeat(3, 1fr); } .sidebar-footer { grid-template-columns: 1fr 1fr; } .two-col, .form-grid { grid-template-columns: 1fr; } .content { padding: 18px; } .topbar { padding: 16px 18px; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="app://renderer/native/renderer.mjs"></script>
+  </body>
+</html>
