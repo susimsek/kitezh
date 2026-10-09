@@ -54,7 +54,13 @@ export function isAllowedNativeRedirect(
 }
 
 export type NativeDeepLink = {
-  kind: "oauth-callback" | "logout-callback" | "verify-email" | "reset-password";
+  kind:
+    | "oauth-callback"
+    | "admin-oauth-callback"
+    | "logout-callback"
+    | "admin-logout-callback"
+    | "verify-email"
+    | "reset-password";
   token?: string;
 };
 
@@ -65,8 +71,14 @@ export function parseNativeDeepLink(value: string): NativeDeepLink | null {
     if (url.hostname === "oauth" && url.pathname === "/callback") {
       return { kind: "oauth-callback" };
     }
+    if (url.hostname === "admin" && url.pathname === "/oauth/callback") {
+      return { kind: "admin-oauth-callback" };
+    }
     if (url.hostname === "logout" && url.pathname === "/callback") {
       return { kind: "logout-callback" };
+    }
+    if (url.hostname === "admin" && url.pathname === "/logout/callback") {
+      return { kind: "admin-logout-callback" };
     }
     if (
       (url.hostname === "verify-email" || url.hostname === "reset-password") &&

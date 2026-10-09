@@ -9,16 +9,25 @@ const config = JSON.parse(
 
 const android = config.android;
 const filters = android?.intentFilters ?? [];
-const requiredHosts = new Set(["oauth", "logout", "verify-email", "reset-password"]);
-const configuredHosts = new Set(
-  filters.flatMap((filter) => filter.data ?? []).map((data) => data.host),
+const requiredRoutes = new Set([
+  "oauth/callback",
+  "logout/callback",
+  "admin/oauth/callback",
+  "admin/logout/callback",
+  "verify-email/",
+  "reset-password/",
+]);
+const configuredRoutes = new Set(
+  filters
+    .flatMap((filter) => filter.data ?? [])
+    .map((data) => `${data.host}/${String(data.path ?? "").replace(/^\//, "")}`),
 );
 
 if (
   config.scheme !== "kitezh" ||
   android?.package !== "io.github.susimsek.kitezh.mobile" ||
-  requiredHosts.size !== configuredHosts.size ||
-  [...requiredHosts].some((host) => !configuredHosts.has(host))
+  requiredRoutes.size !== configuredRoutes.size ||
+  [...requiredRoutes].some((route) => !configuredRoutes.has(route))
 ) {
   throw new Error("Expo native scheme, package, or deep-link filters are incomplete");
 }

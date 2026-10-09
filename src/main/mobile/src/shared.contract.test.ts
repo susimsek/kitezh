@@ -128,6 +128,12 @@ test("native deep links accept only registered routes", () => {
   assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
     kind: "oauth-callback",
   });
+  assert.deepEqual(parseNativeDeepLink("kitezh://admin/oauth/callback"), {
+    kind: "admin-oauth-callback",
+  });
+  assert.deepEqual(parseNativeDeepLink("kitezh://admin/logout/callback"), {
+    kind: "admin-logout-callback",
+  });
   assert.equal(
     parseNativeDeepLink("https://kitezh.onrender.com/verify-email?token=secret"),
     null,

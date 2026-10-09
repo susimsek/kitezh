@@ -34,6 +34,16 @@
         {
           "action": "VIEW",
           "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "admin", "path": "/oauth/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "admin", "path": "/logout/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
           "data": [{ "scheme": "kitezh", "host": "verify-email", "path": "/" }]
         },
         {
