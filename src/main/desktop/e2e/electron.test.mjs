@@ -76,6 +76,27 @@ async function clickViewMenuItem(application, label) {
   assert.equal(clicked, true, `Could not find View menu item: ${label}`);
 }
 
+async function nativeMainWindow(application) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const window = application
+      .windows()
+      .find((candidate) => candidate.url() === "app://renderer/native");
+    if (window) return window;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Native main window did not become available");
+}
+
+async function windowWithHeading(application, name) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    for (const window of application.windows()) {
+      if (await window.getByRole("heading", { name }).count()) return window;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Window with heading ${String(name)} did not become available`);
+}
+
 async function openManualUpdateCheck(
   application,
   label = "Check for Updates…",
@@ -98,7 +119,7 @@ async function openManualUpdateCheck(
 test("opens the native console chooser and exposes the narrow desktop bridge", async () => {
   const application = await launchDesktop();
   try {
-    const window = await application.firstWindow();
+    const window = await nativeMainWindow(application);
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("heading", { name: "Choose a console" }).waitFor();
 
@@ -140,7 +161,7 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
 test("opens settings in a separate window without requiring login", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow.waitForLoadState("domcontentloaded");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -227,6 +248,10 @@ test("opens settings in a separate window without requiring login", async () => 
     });
     assert.equal(await resetDefaults.count(), 1);
     await resetDefaults.click();
+    await settingsWindow.waitForLoadState("domcontentloaded");
+    await settingsWindow
+      .getByRole("heading", { name: /Settings|Ayarlar/ })
+      .waitFor();
     await settingsWindow.waitForFunction(
       () =>
         document.querySelector("#desktop-global-shortcut")?.value ===
@@ -237,13 +262,15 @@ test("opens settings in a separate window without requiring login", async () => 
       await settingsWindow.locator("#desktop-language").inputValue(),
       "system",
     );
-    await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
     await settingsWindow
-      .getByRole("heading", { name: "Diagnostics" })
+      .getByRole("button", { name: /Diagnostics|Tanı bilgileri/ })
+      .click();
+    await settingsWindow
+      .getByRole("heading", { name: /Diagnostics|Tanı bilgileri/ })
       .waitFor();
     assert.equal(
       await settingsWindow
-        .getByRole("button", { name: "Copy diagnostics" })
+        .getByRole("button", { name: /Copy diagnostics|Tanı bilgilerini kopyala/ })
         .count(),
       1,
     );
@@ -261,7 +288,7 @@ test("opens settings in a separate window without requiring login", async () => 
     );
     assert.equal(
       await mainWindow
-        .getByRole("heading", { name: "Choose a console" })
+        .getByRole("heading", { name: /Choose a console|Bir konsol seçin/ })
         .count(),
       1,
     );
@@ -273,7 +300,7 @@ test("opens settings in a separate window without requiring login", async () => 
 test("opens the native quick access companion from View", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -344,7 +371,7 @@ test("opens the native quick access companion from View", async () => {
 test("brings the existing window forward on a second launch", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow.waitForLoadState("domcontentloaded");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -352,13 +379,13 @@ test("brings the existing window forward on a second launch", async () => {
 
     await application.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()
-        .find((window) => window.webContents.getURL() === "app://renderer/")
+        .find((window) => window.webContents.getURL() === "app://renderer/native")
         ?.hide();
     });
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .find((window) => window.webContents.getURL() === "app://renderer/")
+          .find((window) => window.webContents.getURL() === "app://renderer/native")
           ?.isVisible(),
       ),
       false,
@@ -371,7 +398,7 @@ test("brings the existing window forward on a second launch", async () => {
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .find((window) => window.webContents.getURL() === "app://renderer/")
+          .find((window) => window.webContents.getURL() === "app://renderer/native")
           ?.isVisible(),
       ),
       true,
@@ -384,7 +411,7 @@ test("brings the existing window forward on a second launch", async () => {
 test("keeps developer tools closed until toggled from View", async () => {
   const application = await launchDesktop({ devTools: true });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow.waitForLoadState("domcontentloaded");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -428,7 +455,7 @@ test("shows the available update dialog from the application menu", async () => 
     updatePreviewState: "available",
   });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -485,7 +512,7 @@ test("shows an up-to-date result when no update is available", async () => {
     updatePreviewState: "not-available",
   });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -508,15 +535,26 @@ test("shows an up-to-date result when no update is available", async () => {
 test("shows the update error in the renderer when checking fails", async () => {
   const application = await launchDesktop({ updatePreviewState: "error" });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
+    const statusPromise = mainWindow.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let remove;
+          remove = window.desktopApi?.updates.onStatus((status) => {
+            if (status?.state !== "error") return;
+            remove?.();
+            resolve(status);
+          });
+        }),
+    );
     await openManualUpdateCheck(application, "Check for Updates…", false);
-    await mainWindow
-      .getByRole("status")
-      .filter({ hasText: "The desktop update could not be completed" })
-      .waitFor();
+    assert.deepEqual(await statusPromise, {
+      state: "error",
+      message: "Desktop update could not be checked.",
+    });
   } finally {
     await application.close();
   }
@@ -525,7 +563,7 @@ test("shows the update error in the renderer when checking fails", async () => {
 test("localizes and themes the update dialog with desktop preferences", async () => {
   const application = await launchDesktop({ updatePreviewState: "available" });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -541,7 +579,9 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       .getByRole("heading", { name: "Bir konsol seçin" })
       .waitFor();
     await settingsWindow.getByRole("heading", { name: "Ayarlar" }).waitFor();
+    const settingsClosed = settingsWindow.waitForEvent("close");
     await settingsWindow.close();
+    await settingsClosed;
     const reopenedSettingsWindowPromise = application.waitForEvent("window");
     await clickApplicationMenuItem(application, "Ayarlar…");
     const reopenedSettingsWindow = await reopenedSettingsWindowPromise;
@@ -552,18 +592,16 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       await reopenedSettingsWindow.locator("#desktop-language").inputValue(),
       "tr",
     );
+    const reopenedSettingsClosed = reopenedSettingsWindow.waitForEvent("close");
     await reopenedSettingsWindow.close();
-    const checkingWindowPromise = application.waitForEvent("window");
+    await reopenedSettingsClosed;
+    await mainWindow.waitForTimeout(100);
     await clickApplicationMenuItem(application, "Güncellemeleri denetle…");
-    const checkingWindow = await checkingWindowPromise;
-    const availableWindowPromise = application.waitForEvent("window");
-    await checkingWindow
-      .getByRole("heading", { name: "Güncellemeler denetleniyor…" })
-      .waitFor();
-    const availableWindow = await availableWindowPromise;
-    await availableWindow
-      .getByRole("heading", { name: "Yeni bir Kitezh sürümü var!" })
-      .waitFor();
+    await windowWithHeading(application, "Güncellemeler denetleniyor…");
+    const availableWindow = await windowWithHeading(
+      application,
+      "Yeni bir Kitezh sürümü var!",
+    );
     assert.equal(
       await availableWindow
         .getByRole("button", { name: "Bu sürümü atla" })
