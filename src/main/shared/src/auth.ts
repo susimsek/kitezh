@@ -52,3 +52,33 @@ export function isAllowedNativeRedirect(
     return false;
   }
 }
+
+export type NativeDeepLink = {
+  kind: "oauth-callback" | "logout-callback" | "verify-email" | "reset-password";
+  token?: string;
+};
+
+export function parseNativeDeepLink(value: string): NativeDeepLink | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "kitezh:") return null;
+    if (url.hostname === "oauth" && url.pathname === "/callback") {
+      return { kind: "oauth-callback" };
+    }
+    if (url.hostname === "logout" && url.pathname === "/callback") {
+      return { kind: "logout-callback" };
+    }
+    if (
+      (url.hostname === "verify-email" || url.hostname === "reset-password") &&
+      url.pathname === "/"
+    ) {
+      const token = url.searchParams.get("token")?.trim();
+      const kind =
+        url.hostname === "verify-email" ? "verify-email" : "reset-password";
+      return token ? { kind, token } : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

@@ -20,6 +20,7 @@ import {
 } from "../../shared/src/api.ts";
 import {
   isAllowedNativeRedirect,
+  parseNativeDeepLink,
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
 
@@ -116,4 +117,19 @@ test("native OAuth callbacks require the original state and approved scheme", ()
     ),
     false,
   );
+});
+
+test("native deep links accept only registered routes", () => {
+  assert.deepEqual(
+    parseNativeDeepLink("kitezh://verify-email/?token=one-time-token"),
+    { kind: "verify-email", token: "one-time-token" },
+  );
+  assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
+    kind: "oauth-callback",
+  });
+  assert.equal(
+    parseNativeDeepLink("https://kitezh.onrender.com/verify-email?token=secret"),
+    null,
+  );
+  assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
 });

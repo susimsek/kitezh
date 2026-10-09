@@ -19,7 +19,29 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#0b3b82"
       },
-      "package": "io.github.susimsek.kitezh.mobile"
+      "package": "io.github.susimsek.kitezh.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "oauth", "path": "/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "logout", "path": "/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "verify-email", "path": "/" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "reset-password", "path": "/" }]
+        }
+      ]
     },
     "plugins": ["expo-router", "expo-secure-store"]
   }
