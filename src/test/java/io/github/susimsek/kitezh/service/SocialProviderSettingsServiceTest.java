@@ -128,6 +128,18 @@ class SocialProviderSettingsServiceTest {
     }
 
     @Test
+    void acceptsUnconfiguredProviderWithoutClientId() {
+        AdminSocialProviderRequestDTO github =
+                new AdminSocialProviderRequestDTO(
+                        "github", "github", null, null, false, false, false, false, "sub", false,
+                        false, 20, "always");
+
+        service.update(new AdminSocialProvidersRequestDTO(List.of(github)));
+
+        assertThat(settings.getGithubClientId()).isBlank();
+    }
+
+    @Test
     void rejectsDuplicateAndUnreadableStoredTokenSettings() {
         assertThatThrownBy(
                         () ->

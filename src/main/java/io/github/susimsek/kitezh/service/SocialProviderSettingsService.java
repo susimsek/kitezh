@@ -135,7 +135,7 @@ public class SocialProviderSettingsService {
                     registrationId,
                     settings,
                     alias,
-                    provider.clientId().trim(),
+                    normalizeClientId(provider.clientId()),
                     provider.clientSecret(),
                     provider.hideOnLogin(),
                     provider.accountLinkingOnly(),
@@ -616,6 +616,10 @@ public class SocialProviderSettingsService {
 
     private static String normalizeProvider(String provider) {
         return provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeClientId(String clientId) {
+        return clientId == null ? "" : clientId.trim();
     }
 
     private static String normalizeAccountConsoleVisibility(String value) {

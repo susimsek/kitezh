@@ -24,8 +24,8 @@ public record AdminSocialProviderRequestDTO(
         @Schema(
                         description = "OAuth client id.",
                         example = "client-id",
-                        requiredMode = Schema.RequiredMode.REQUIRED)
-                @NotBlank
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+                        nullable = true)
                 @Size(max = 500)
                 String clientId,
         @Schema(
