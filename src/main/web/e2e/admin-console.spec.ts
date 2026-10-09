@@ -37,6 +37,20 @@ test.describe("administration console", () => {
     await expect(page.locator('input[name="username"]')).toHaveValue(/.+/);
   });
 
+  test("renders the organization administration surface", async ({ page, request }) => {
+    await visitConsole(page, "admin", "/organizations");
+    await expect(page).toHaveURL(/\/admin\/organizations$/);
+    await expect(
+      page.getByRole("heading", { name: /Organizations|Organizasyonlar/i }),
+    ).toBeVisible();
+    await expect(page.locator("table")).toBeVisible();
+
+    const response = await apiRequest(request, page, "/api/admin/organizations?size=10");
+    expect(response.ok()).toBeTruthy();
+    const body = (await response.json()) as { content: unknown[] };
+    expect(body.content).toBeDefined();
+  });
+
   test("keeps mobile navigation usable", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await visitConsole(page, "admin");

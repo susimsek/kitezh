@@ -12,4 +12,7 @@ ROLE_EVENT_MANAGER;Manage administrative event access and configuration.
 ROLE_USER_IMPERSONATOR;Impersonate non-administrator users through controlled browser handoffs.
 ROLE_USER_QUERY;Discover and search user accounts.
 ROLE_GROUP_QUERY;Discover and search groups.
+ROLE_ORGANIZATION_VIEWER;View organizations, members, domains, invitations, groups, and claims.
+ROLE_ORGANIZATION_MANAGER;Manage organizations, memberships, domains, invitations, groups, and claims.
+ROLE_ORGANIZATION_QUERY;Discover and search organizations.
 ROLE_CLIENT_QUERY;Discover and search registered OAuth2 clients.
