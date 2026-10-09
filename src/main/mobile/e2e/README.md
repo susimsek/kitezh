@@ -53,6 +53,10 @@ starts the fixture server without exposing its runtime token values. Authenticat
 timeout, refresh, and deep-link flows still require a completed Android/iOS device run before they
 can be marked complete.
 
+OAuth callbacks are validated by the shared native contract before code exchange: the callback must
+contain the original state and use the registered `kitezh://` redirect host/path. A browser result
+with a missing, stale, or mismatched state is rejected without exchanging the code.
+
 Validate the fixture contract locally with:
 
 ```bash

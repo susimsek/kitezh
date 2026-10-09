@@ -18,6 +18,7 @@ import {
 import { AppState } from "react-native";
 
 import { useLocale } from "@/i18n/LocaleProvider";
+import { validateAuthorizationCallback } from "../../../shared/src/auth.ts";
 import {
   authorizationServerIssuer,
   getMobileConsoleConfig,
@@ -112,21 +113,21 @@ export function MobileAuthProvider({
     setError(null);
     try {
       const result = await promptAsync();
-      if (
-        result.type !== "success" ||
-        !result.params.code ||
-        !request.codeVerifier
-      ) {
+      if (result.type !== "success" || !request.codeVerifier) {
         if (result.type === "cancel" || result.type === "dismiss") {
           setStatus("signed-out");
           return;
         }
         throw new Error("Authorization was not completed");
       }
+      const callback = validateAuthorizationCallback(
+        result.params,
+        request.state,
+      );
       const token = await exchangeCodeAsync(
         {
           clientId: consoleConfig.clientId,
-          code: result.params.code,
+          code: callback.code,
           redirectUri,
           extraParams: { code_verifier: request.codeVerifier },
         },

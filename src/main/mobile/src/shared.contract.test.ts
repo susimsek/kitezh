@@ -18,6 +18,10 @@ import {
   classifyApiError,
   parseProblemDetail,
 } from "../../shared/src/api.ts";
+import {
+  isAllowedNativeRedirect,
+  validateAuthorizationCallback,
+} from "../../shared/src/auth.ts";
 
 test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
@@ -80,4 +84,36 @@ test("shared API errors preserve native status semantics without transport detai
   assert.equal(classifyApiError(403), "forbidden");
   assert.equal(classifyApiError(0, new DOMException("timeout", "AbortError")), "timeout");
   assert.equal(classifyApiError(0, new Error("network")), "offline");
+});
+
+test("native OAuth callbacks require the original state and approved scheme", () => {
+  assert.deepEqual(
+    validateAuthorizationCallback(
+      { code: "one-time-code", state: "request-state" },
+      "request-state",
+    ),
+    { code: "one-time-code", state: "request-state" },
+  );
+  assert.throws(
+    () =>
+      validateAuthorizationCallback(
+        { code: "one-time-code", state: "other-state" },
+        "request-state",
+      ),
+    /authorization_callback_state_mismatch/,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://oauth/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    true,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "https://example.test/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
 });
