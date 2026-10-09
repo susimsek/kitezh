@@ -38,7 +38,7 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 6. [Configuration and Profiles](#configuration-and-profiles)
 7. [RSA Signing Keys](#rsa-signing-keys)
 8. [Persistent User Sessions](#persistent-user-sessions)
-9. [Frontend](#frontend)
+9. [Web](#web)
 10. [Administration and Account Consoles](#administration-and-account-consoles)
 11. [Run Locally](#run-locally)
 12. [API Quick Overview](#api-quick-overview)
@@ -292,16 +292,16 @@ USER_SESSION_ATTRIBUTES
 
 The schema keeps the JDBC model's session id, creation/last-access timestamps, max inactive interval, expiry time, principal index, and binary session attributes. Expired sessions are cleaned every minute. Spring Security continues to use a regular `HttpSession`; `@EnableSpringHttpSession` transparently replaces the servlet-container session store with the JPA repository.
 
-## Frontend
+## Web
 ### Authorization UI localization
 
-The frontend remains a Next.js static export. React Router resolves runtime paths such as
+The web client remains a Next.js static export. React Router resolves runtime paths such as
 `/admin/users/123`, `/admin/clients/abc`, and `/admin/roles/42`; identifiers are never generated at build time.
-Spring's `SpaFilter` forwards only frontend GET/HEAD HTML navigations to `/index.html`.
+Spring's `SpaFilter` forwards only web GET/HEAD HTML navigations to `/index.html`.
 API, OAuth, well-known, actuator, assets and real backend endpoints are excluded.
 The two callback pages are explicitly exported at `/admin/callback` and `/account/callback`.
 
-All frontend URLs are locale-free, including `/login`, `/consent`, and `/auth-error`.
+All web URLs are locale-free, including `/login`, `/consent`, and `/auth-error`.
 `next-i18next` v16 uses `localeInPath: false`, with client-only detection:
 
 1. `locale` cookie
@@ -310,7 +310,7 @@ All frontend URLs are locale-free, including `/login`, `/consent`, and `/auth-er
 
 The language selector updates the cookie and i18next instance without changing the URL,
 reloading the page, or resetting form input. Translation resources live in
-`src/main/frontend/locales/{en,tr}/common.json`.
+`src/main/web/locales/{en,tr}/common.json`.
 No request-time Next server APIs are used.
 
 The login form still posts to Spring Security's standard `POST /login` endpoint.
@@ -318,16 +318,16 @@ PKCE, refresh-token handling, namespaced console token storage and browser SSO a
 
 The login screen is implemented with Next.js App Router + TypeScript and exported as static HTML/CSS/JS. The UI uses React-Bootstrap, Bootstrap, and Font Awesome while Spring Security remains responsible for authentication and session handling.
 
-Maven manages a project-local Node.js runtime through `frontend-maven-plugin` and Corepack. The normal lifecycle runs pnpm install, TypeScript checking, and `next build`; the generated `src/main/frontend/out` directory is copied to Spring Boot's `static/` classpath.
+Maven manages a project-local Node.js runtime through `frontend-maven-plugin` and Corepack. The normal lifecycle runs pnpm install, TypeScript checking, and `next build`; the generated `src/main/web/out` directory is copied to Spring Boot's `static/` classpath.
 
 ```bash
 ./mvnw verify
 ```
 
-Frontend-only development:
+Web-only development:
 
 ```bash
-cd src/main/frontend
+cd src/main/web
 corepack enable
 pnpm install
 pnpm dev
@@ -335,11 +335,11 @@ pnpm dev
 
 The exported page is served at `/login` and submits credentials directly to Spring Security's `POST /login` endpoint. CSRF protection is intentionally disabled in this application.
 
-Frontend browser E2E tests use Playwright and are configured independently from the Electron
+Web browser E2E tests use Playwright and are configured independently from the Electron
 tests. With the server running on port `9090`, install the Chromium browser once and run:
 
 ```bash
-cd src/main/frontend
+cd src/main/web
 pnpm test:e2e:install
 pnpm test:e2e
 ```
@@ -361,6 +361,13 @@ pnpm dev
 
 `pnpm dev` uses `http://localhost:9090`; `pnpm start` uses the deployed Render API unless
 `DESKTOP_API_BASE_URL` is explicitly supplied. Build platform installers with `pnpm package`.
+When no desktop session exists, Electron shows its own native console chooser and keeps the
+sign-in surface separate from the web login page. Selecting Account Console or Admin Console
+opens the system browser for Authorization Code + PKCE; the bundled renderer is used only after
+the callback completes. Settings, update dialogs, and the Quick Access companion are native
+Electron windows; the authenticated console screens are being migrated incrementally from the
+bundled renderer to native desktop screens. Desktop tokens remain in the Electron main-process
+secure vault.
 Local development opens Electron DevTools automatically, so the Network panel can be used to
 inspect renderer API, token refresh, and logout requests. The OAuth authorization page and the
 main-process token exchange run outside that renderer panel; inspect the system browser for the
@@ -413,7 +420,12 @@ installers are managed by the operating system.
 
 ## Administration and Account Consoles
 
-The static frontend also contains browser-based OIDC clients for administration and end-user account management. Both use the Authorization Code flow with PKCE (S256), obtain access, ID, and refresh tokens, refresh access tokens before they expire, and sign out through the OIDC end-session endpoint. Access, ID, and refresh tokens remain in browser memory; only the short-lived authorization transaction is retained across the redirect callback.
+The static web client also contains browser-based OIDC clients for administration and end-user account management. Both use the Authorization Code flow with PKCE (S256), obtain access, ID, and refresh tokens, refresh access tokens before they expire, and sign out through the OIDC end-session endpoint. Access, ID, and refresh tokens remain in browser memory; only the short-lived authorization transaction is retained across the redirect callback.
+
+The Web console is the behavior reference for the native clients. The remaining Mobile and Desktop
+native migration scope, platform boundaries, acceptance states, and delivery order are tracked in
+[`docs/NATIVE-PLATFORM-PRD.md`](docs/NATIVE-PLATFORM-PRD.md) and the detailed
+[`WEB-MOBILE-FEATURE-MATRIX.md`](src/main/mobile/WEB-MOBILE-FEATURE-MATRIX.md).
 
 | Console | Entry URL | OIDC client | API scope | Access |
 | --- | --- | --- | --- | --- |

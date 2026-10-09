@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.web.admin;
 import io.github.susimsek.kitezh.config.openapi.OpenApiConfig;
 import io.github.susimsek.kitezh.dto.admin.AdminWhoAmIDTO;
 import io.github.susimsek.kitezh.security.AuthoritiesConstants;
+import io.github.susimsek.kitezh.service.admin.AdminUserService;
 import io.github.susimsek.kitezh.web.ApiController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,10 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @ApiController
+@RequiredArgsConstructor
 @RequestMapping("/api/admin")
 @Tag(name = "Admin - Identity", description = "Current administrator identity and access flags.")
 @SecurityRequirement(name = OpenApiConfig.ADMIN_BEARER)
 public class AdminWhoAmIController {
+
+    private final AdminUserService adminUserService;
 
     @GetMapping("/whoami")
     @Operation(
@@ -39,6 +44,7 @@ public class AdminWhoAmIController {
 
         return new AdminWhoAmIDTO(
                 authentication.getName(),
+                adminUserService.currentAvatarUrl(authentication.getName()),
                 authorities.stream().sorted().toList(),
                 Map.ofEntries(
                         Map.entry("isAdmin", hasAny(authorities, AuthoritiesConstants.ADMIN)),

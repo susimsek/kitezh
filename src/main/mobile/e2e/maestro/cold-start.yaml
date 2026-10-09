@@ -1,0 +1,9 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Kitezh"
+- assertVisible: "Continue"
+- tapOn: "Continue"
+- assertVisible: "Sign in"
+- assertVisible: "Continue securely in your default browser."

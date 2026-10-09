@@ -14,6 +14,13 @@ public record AdminWhoAmIDTO(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 String username,
         @Schema(
+                        description = "Public avatar URL, if available.",
+                        example = "/avatars/admin-avatar-123?v=1725438600000",
+                        format = "uri-reference",
+                        nullable = true,
+                        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+                String avatarUrl,
+        @Schema(
                         description = "Granted authorities.",
                         example = "[\"ROLE_ADMIN\"]",
                         requiredMode = Schema.RequiredMode.REQUIRED)

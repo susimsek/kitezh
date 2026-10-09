@@ -1,0 +1,1418 @@
+[
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.AbstractDerivationKeyAgreementProcessor",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.AbstractKeyAgreementProcessor",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.BasicKeyAgreementCredential",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.DHWithExplicitKDFKeyAgreementProcessor",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.DHWithLegacyKDFKeyAgreementProcessor",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.DigestMethod",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.DigestMethod$Parser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.ECDHKeyAgreementProcessor",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.KANonce",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.KANonce$Parser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.KeyAgreementParameterParser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.KeyAgreementParametersParser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.KeySize",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.PrivateCredential",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.StaticStaticMode",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.agreement.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.config.impl.ApacheXMLSecurityInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.config.impl.DefaultSecurityConfigurationBootstrap",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.config.impl.GlobalSecurityConfigurationInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.config.impl.JavaCryptoValidationInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.config.impl.XMLObjectProviderInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.config.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.derivation.impl.ConcatKDF",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.derivation.impl.ConcatKDF$Parser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.derivation.impl.DHLegacyKDF",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.derivation.impl.PBKDF2",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.derivation.impl.PBKDF2$Parser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.derivation.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AbstractXMLEncryptionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AbstractXMLEncryptionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AgreementMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AgreementMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AgreementMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AgreementMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AlgorithmIdentifierTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AlgorithmIdentifierTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.AlgorithmIdentifierTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CarriedKeyNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CarriedKeyNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherDataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherDataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.CipherValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ConcatKDFParamsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ConcatKDFParamsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ConcatKDFParamsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ConcatKDFParamsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DHKeyValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DHKeyValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DHKeyValueMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DHKeyValueUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DataReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DataReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DataReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DataReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DerivedKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DerivedKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DerivedKeyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DerivedKeyNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DerivedKeyNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.DerivedKeyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedDataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedDataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedKeyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedKeyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptedTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertiesBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertiesImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertiesMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertiesUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.EncryptionPropertyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.GeneratorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.GeneratorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.IterationCountBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.IterationCountImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KANonceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KANonceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyDerivationMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyDerivationMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyDerivationMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyDerivationMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyLengthBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyLengthImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeyReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeySizeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.KeySizeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.MGFBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.MGFImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.MGFMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.MGFUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.MasterKeyNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.MasterKeyNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OAEPparamsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OAEPparamsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OriginatorKeyInfoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OriginatorKeyInfoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OriginatorKeyInfoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OriginatorKeyInfoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OtherSourceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OtherSourceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OtherSourceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.OtherSourceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PBKDF2ParamsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PBKDF2ParamsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PBKDF2ParamsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PBKDF2ParamsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PRFBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PRFImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PRFMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PRFUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PgenCounterBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PgenCounterImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PublicBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.PublicImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.QBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.QImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.RecipientKeyInfoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.RecipientKeyInfoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.RecipientKeyInfoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.RecipientKeyInfoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceListBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceListImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceListMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceListUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.ReferenceTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SaltBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SaltImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SaltMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SaltUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SeedBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SeedImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SpecifiedBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.SpecifiedImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.TransformsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.TransformsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.TransformsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.TransformsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.encryption.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.AbstractSecurityParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.AbstractSecurityParametersResolver$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.AlgorithmRuntimeSupportedPredicate",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicAlgorithmPolicyConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicDecryptionConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicDecryptionParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicEncryptionConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicEncryptionParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicSignatureSigningConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicSignatureSigningParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicSignatureValidationConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.BasicSignatureValidationParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.ExcludedAlgorithmsPredicate",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.IncludedAlgorithmsPredicate",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.StaticDecryptionParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.StaticEncryptionParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.StaticSignatureSigningParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.StaticSignatureValidationParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.provider.ApacheSantuarioXMLParser",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.impl.provider.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.BasicKeyInfoGeneratorFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.BasicKeyInfoGeneratorFactory$BasicKeyInfoGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.BasicKeyInfoGeneratorFactory$BasicOptions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.BasicProviderKeyInfoCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.ChainingKeyInfoCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.CollectionKeyInfoCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.KeyAgreementKeyInfoGeneratorFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.KeyAgreementKeyInfoGeneratorFactory$KeyAgreementKeyInfoGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.KeyAgreementKeyInfoGeneratorFactory$KeyAgreementOptions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.KeyInfoCredentialContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.KeyInfoProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.KeyInfoResolutionContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.LocalKeyInfoCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.StaticKeyInfoCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.StaticKeyInfoGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.X509KeyInfoGeneratorFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.X509KeyInfoGeneratorFactory$X509KeyInfoGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.X509KeyInfoGeneratorFactory$X509Options",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.AbstractKeyInfoProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.AgreementMethodKeyInfoProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.DEREncodedKeyValueProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.DSAKeyValueProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.ECKeyValueProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.InlineX509DataProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.KeyInfoReferenceProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.RSAKeyValueProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.keyinfo.impl.provider.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.messaging.impl.PopulateSignatureValidationParametersHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.messaging.impl.PopulateSignatureValidationParametersHandler$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.AbstractXMLSignatureMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.AbstractXMLSignatureUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.CryptoBinaryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.CryptoBinaryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.CryptoBinaryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.CryptoBinaryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DEREncodedKeyValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DEREncodedKeyValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DEREncodedKeyValueMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DEREncodedKeyValueUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DSAKeyValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DSAKeyValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DSAKeyValueMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DSAKeyValueUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DigestMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DigestMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DigestMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.DigestMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ECKeyValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ECKeyValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ECKeyValueMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ECKeyValueUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ECPointTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ExponentBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ExponentImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.GBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.GImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.JBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.JImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyInfoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyValueMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.KeyValueUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.MgmtDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.MgmtDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ModulusBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.ModulusImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.NamedCurveBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.NamedCurveImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.NamedCurveMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.NamedCurveUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPDataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPDataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPKeyIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPKeyIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPKeyPacketBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PGPKeyPacketImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PgenCounterBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PgenCounterImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PublicKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.PublicKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.QBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.QImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RSAKeyValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RSAKeyValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RSAKeyValueMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RSAKeyValueUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RetrievalMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RetrievalMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RetrievalMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.RetrievalMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SPKIDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SPKIDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SPKIDataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SPKIDataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SPKISexpBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SPKISexpImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SeedBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SeedImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SignatureBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SignatureImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SignatureMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.SignatureUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.TransformsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509CRLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509CRLImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509CRLImpl$CleanerState",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509CertificateBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509CertificateImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509CertificateImpl$CleanerState",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DigestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DigestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DigestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509DigestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509IssuerNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509IssuerNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509IssuerSerialBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509IssuerSerialImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509IssuerSerialMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509IssuerSerialUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SKIBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SKIImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SerialNumberBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SerialNumberImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SerialNumberMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SerialNumberUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SubjectNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.X509SubjectNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.XPathBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.XPathImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.YBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.YImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.BaseSignatureTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.ChainingSignaturePrevalidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.ChainingSignatureTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.ExplicitKeySignatureTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.PKIXSignatureTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.SignatureAlgorithmValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.provider.ApacheSantuarioSignatureValidationProviderImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.provider.ApacheSantuarioSignerProviderImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.xmlsec.signature.support.impl.provider.package-info",
+    "allDeclaredConstructors": true
+  }
+]

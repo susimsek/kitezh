@@ -13,10 +13,10 @@ public interface SocialProviderRepository
     String SOCIAL_PROVIDER_BY_REGISTRATION_ID_CACHE = "socialProvidersByRegistrationId";
     String SOCIAL_PROVIDER_BY_ALIAS_CACHE = "socialProvidersByAlias";
 
-    @Cacheable(cacheNames = SOCIAL_PROVIDER_BY_REGISTRATION_ID_CACHE, key = "#root.args[0]")
+    @Cacheable(cacheNames = SOCIAL_PROVIDER_BY_REGISTRATION_ID_CACHE, key = "#registrationId")
     Optional<SocialProviderEntity> findByRegistrationId(String registrationId);
 
-    @Cacheable(cacheNames = SOCIAL_PROVIDER_BY_ALIAS_CACHE, key = "#root.args[0]")
+    @Cacheable(cacheNames = SOCIAL_PROVIDER_BY_ALIAS_CACHE, key = "#alias")
     Optional<SocialProviderEntity> findByAliasIgnoreCase(String alias);
 
     boolean existsByAliasIgnoreCase(String alias);

@@ -1,0 +1,39 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "\\Qdefault-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qschema-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qencryption-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qsignature-config.xml\\E"
+      },
+      {
+        "pattern": "saml.*-config\\.xml"
+      },
+      {
+        "pattern": "\\Qsoap11-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qwsaddressing-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qwsfed11-protocol-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qwspolicy-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qwssecurity-config.xml\\E"
+      },
+      {
+        "pattern": "\\Qwstrust-config.xml\\E"
+      }
+    ]
+  }
+}

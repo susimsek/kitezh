@@ -1,6 +1,6 @@
 # Desktop AI Agent Guidelines
 
-These instructions apply to `src/main/desktop/**` and supplement the repository-root `AGENTS.md` and the shared frontend rules in `src/main/frontend/AGENTS.md`. The root rules remain applicable unless this file provides a more specific Electron rule.
+These instructions apply to `src/main/desktop/**` and supplement the repository-root `AGENTS.md` and the shared web rules in `src/main/web/AGENTS.md`. The root rules remain applicable unless this file provides a more specific Electron rule.
 
 ## Table of Contents
 
@@ -53,7 +53,11 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Keep `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` enabled for every BrowserWindow.
 - Expose only the smallest required API through `contextBridge`; use explicit method names and validate every argument in the main process.
 - Serve the static renderer through the trusted `app://renderer` protocol. Do not load application screens from arbitrary remote URLs.
-- Reuse the shared frontend components, routes, translation dictionaries, API clients, and design tokens. Do not create a second desktop-only UI system or duplicate browser authentication logic.
+- Use the Web client as the behavior and API reference. Native authenticated Desktop screens must
+  not import Web DOM components, Web routes, React-Bootstrap, browser storage, or remote Web pages.
+  Reuse only framework-neutral contracts, semantic design tokens, icon metadata, and localized
+  message keys from shared code. Keep browser and Electron authentication protocol rules aligned
+  through typed adapters, without moving token exchange or secure storage into the renderer.
 - Keep platform-specific behavior behind small adapters. Use Node's path and URL APIs instead of shell-specific path or command assumptions.
 
 ## Security
@@ -94,9 +98,9 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Run `pnpm typecheck`, `pnpm test`, and `pnpm build` after desktop changes.
 - Run `pnpm test:e2e` for changes to the main process, preload bridge, renderer startup,
   protocol handling, or desktop authentication flow. Linux CI should run it through `xvfb-run`.
-- Keep Electron E2E independently configurable from the frontend suite: desktop tests use the
+- Keep Electron E2E independently configurable from the web suite: desktop tests use the
   desktop package's pinned `playwright-core` Electron launcher and Node test runner, while
-  frontend browser tests use `@playwright/test` under `src/main/frontend/e2e`.
+  web browser tests use `@playwright/test` under `src/main/web/e2e`.
 - Run `pnpm package` when changing packaging configuration, protocol registration, assets, preload/main behavior, or renderer integration.
 - Add or update tests for:
   - callback route and protocol validation;
@@ -131,7 +135,7 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 
 ## UI and Renderer Standards
 
-- Follow `src/main/frontend/AGENTS.md` for all shared renderer components, forms, validation, localization, icons, responsive layout, accessibility, loading states, and theme behavior.
+- Follow `src/main/web/AGENTS.md` for all shared renderer components, forms, validation, localization, icons, responsive layout, accessibility, loading states, and theme behavior.
 - Keep the desktop sign-in and console chooser visually consistent with the web login surface. Reuse shared cards, buttons, icons, typography, spacing, light/dark tokens, and localized messages.
 - Keep Admin and Account actions separate and clearly labeled. Preserve the existing solid Bootstrap button variants; do not introduce outline button variants or one-off icons.
 - Every asynchronous action must disable duplicate submission and show the inline progress spinner while it is pending, including sign-in, refresh, logout, and retry actions.

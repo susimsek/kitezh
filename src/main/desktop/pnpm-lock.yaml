@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@kitezh/shared':
+        specifier: file:../shared
+        version: file:../shared
       electron-updater:
         specifier: 6.8.9
         version: 6.8.9(supports-color@7.2.0)
@@ -77,6 +80,9 @@ packages:
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
     engines: {node: '>=18.0.0'}
+
+  '@kitezh/shared@file:../shared':
+    resolution: {directory: ../shared, type: directory}
 
   '@malept/cross-spawn-promise@2.0.0':
     resolution: {integrity: sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg==}
@@ -1171,6 +1177,8 @@ snapshots:
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
       minipass: 7.1.3
+
+  '@kitezh/shared@file:../shared': {}
 
   '@malept/cross-spawn-promise@2.0.0':
     dependencies:

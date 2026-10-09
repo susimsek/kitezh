@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Kitezh",
+    "slug": "kitezh",
+    "version": "0.1.0",
+    "scheme": "kitezh",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.github.susimsek.kitezh.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#0b3b82"
+      },
+      "package": "io.github.susimsek.kitezh.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "oauth", "path": "/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "logout", "path": "/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "admin", "path": "/oauth/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "admin", "path": "/logout/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "verify-email", "path": "/" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "reset-password", "path": "/" }]
+        }
+      ]
+    },
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}

@@ -78,7 +78,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
       - name: Print tool versions
@@ -93,8 +93,8 @@ jobs:
       - name: Install Maven dependencies
         run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
-      - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
 
       - name: Set up Snyk CLI
         if: ${{ env.SNYK_TOKEN != '' }}
@@ -117,17 +117,17 @@ jobs:
       - name: Backend verification
         run: ./mvnw -B -ntp verify -Dskip.frontend=true
 
-      - name: Frontend type check
-        run: pnpm --dir src/main/frontend typecheck
+      - name: Web type check
+        run: pnpm --dir src/main/web typecheck
 
-      - name: Frontend lint
-        run: pnpm --dir src/main/frontend lint
+      - name: Web lint
+        run: pnpm --dir src/main/web lint
 
-      - name: Frontend format check
-        run: pnpm --dir src/main/frontend format:check
+      - name: Web format check
+        run: pnpm --dir src/main/web format:check
 
-      - name: Frontend build
-        run: pnpm --dir src/main/frontend build
+      - name: Web build
+        run: pnpm --dir src/main/web build
 
       - name: Analyze code with SonarCloud
         if: ${{ env.SONAR_TOKEN != '' }}
@@ -136,6 +136,60 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=susimsek \
             -Dsonar.token="${SONAR_TOKEN}"
+
+  mobile-quality:
+    name: Mobile quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          install: false
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check mobile client
+        working-directory: src/main/mobile
+        run: pnpm run typecheck
+
+      - name: Check native dependency boundaries
+        working-directory: src/main/mobile
+        run: pnpm run check:boundaries
+
+      - name: Check native security boundaries
+        working-directory: src/main/mobile
+        run: pnpm run check:security
+
+      - name: Check Expo native configuration
+        working-directory: src/main/mobile
+        run: pnpm run check:expo-config
+
+      - name: Lint mobile client
+        working-directory: src/main/mobile
+        run: pnpm run lint
+
+      - name: Test mobile client
+        working-directory: src/main/mobile
+        run: pnpm run test
+
+      - name: Test native fixture contract
+        working-directory: src/main/mobile
+        run: pnpm run test:fixture
+
+      - name: Build mobile web export
+        working-directory: src/main/mobile
+        run: pnpm run build:web
 
   desktop:
     name: Desktop package (${{ matrix.platform }})
@@ -165,12 +219,12 @@ jobs:
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
           cache-dependency-path: |
-            src/main/frontend/pnpm-lock.yaml
+            src/main/web/pnpm-lock.yaml
             src/main/desktop/pnpm-lock.yaml
           install: false
 
-      - name: Install frontend dependencies
-        working-directory: src/main/frontend
+      - name: Install web dependencies
+        working-directory: src/main/web
         run: pnpm install --frozen-lockfile
 
       - name: Install desktop dependencies
@@ -245,7 +299,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
       - name: Print tool versions
@@ -261,11 +315,11 @@ jobs:
       - name: Install Maven dependencies
         run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
-      - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
 
-      - name: Build frontend assets
-        run: pnpm --dir src/main/frontend build
+      - name: Build web assets
+        run: pnpm --dir src/main/web build
 
       - name: Install UPX
         run: |

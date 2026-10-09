@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
     clearAllSessions: () =>
       ipcRenderer.invoke("desktop:auth-clear-all-sessions"),
     getStorageStatus: () => ipcRenderer.invoke("desktop:auth-storage-status"),
+    openConsole: (consoleName: unknown) =>
+      ipcRenderer.invoke("desktop:auth-open-console", consoleName),
   },
   getConfig: () => ipcRenderer.invoke("desktop:config"),
   getAppVersion: () => ipcRenderer.invoke("desktop:app-version"),
@@ -28,15 +30,34 @@ contextBridge.exposeInMainWorld("desktopApi", {
     get: () => ipcRenderer.invoke("desktop:preferences-get"),
     set: (value: unknown) =>
       ipcRenderer.invoke("desktop:preferences-set", value),
+    reset: () => ipcRenderer.invoke("desktop:preferences-reset"),
   },
   diagnostics: {
     get: () => ipcRenderer.invoke("desktop:diagnostics-get"),
   },
   theme: {
     set: (value: unknown) => ipcRenderer.invoke("desktop:theme-set", value),
+    onChanged: (listener: (theme: "light" | "dark") => void) => {
+      const callback = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        if (value === "light" || value === "dark") listener(value);
+      };
+      ipcRenderer.on("desktop:theme-changed", callback);
+      return () =>
+        ipcRenderer.removeListener("desktop:theme-changed", callback);
+    },
   },
   language: {
+    get: () => ipcRenderer.invoke("desktop:language-get"),
+    getMode: () => ipcRenderer.invoke("desktop:language-mode-get"),
     set: (value: unknown) => ipcRenderer.invoke("desktop:language-set", value),
+    onChanged: (listener: (locale: "en" | "tr") => void) => {
+      const callback = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        if (value === "en" || value === "tr") listener(value);
+      };
+      ipcRenderer.on("desktop:language-changed", callback);
+      return () =>
+        ipcRenderer.removeListener("desktop:language-changed", callback);
+    },
   },
   settings: {
     close: () => ipcRenderer.invoke("desktop:settings-close"),
@@ -51,11 +72,20 @@ contextBridge.exposeInMainWorld("desktopApi", {
     download: () => ipcRenderer.invoke("desktop:update-download"),
     install: () => ipcRenderer.invoke("desktop:update-install"),
     onStatus: (listener: (status: unknown) => void) => {
+      let active = true;
       const callback = (_event: Electron.IpcRendererEvent, status: unknown) =>
-        listener(status);
+        active && listener(status);
       ipcRenderer.on("desktop:update-status", callback);
-      return () =>
+      void ipcRenderer
+        .invoke("desktop:update-status-get")
+        .then((status: unknown) => {
+          if (active && status) listener(status);
+        })
+        .catch(() => undefined);
+      return () => {
+        active = false;
         ipcRenderer.removeListener("desktop:update-status", callback);
+      };
     },
   },
   openExternal: (url: string) =>

@@ -1,5 +1,5 @@
 {
-  "name": "kitezh-frontend",
+  "name": "kitezh-web",
   "version": "0.0.1",
   "private": true,
   "license": "Apache-2.0",
@@ -23,12 +23,12 @@
     "format:check": "prettier --check .",
     "test:unit": "jest",
     "test:unit:coverage": "jest --coverage",
-    "test:e2e": "pnpm --dir src/main/frontend test:e2e",
-    "test:e2e:open": "pnpm --dir src/main/frontend test:e2e:open",
-    "test:e2e:chrome": "pnpm --dir src/main/frontend test:e2e:chrome",
-    "test:e2e:admin": "pnpm --dir src/main/frontend test:e2e:admin",
-    "test:e2e:account": "pnpm --dir src/main/frontend test:e2e:account",
-    "test:e2e:install": "pnpm --dir src/main/frontend test:e2e:install"
+    "test:e2e": "pnpm --dir src/main/web test:e2e",
+    "test:e2e:open": "pnpm --dir src/main/web test:e2e:open",
+    "test:e2e:chrome": "pnpm --dir src/main/web test:e2e:chrome",
+    "test:e2e:admin": "pnpm --dir src/main/web test:e2e:admin",
+    "test:e2e:account": "pnpm --dir src/main/web test:e2e:account",
+    "test:e2e:install": "pnpm --dir src/main/web test:e2e:install"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "7.3.1",

@@ -1,0 +1,3650 @@
+[
+  {
+    "name": "org.opensaml.saml.common.binding.artifact.impl.BasicSAMLArtifactMap",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.artifact.impl.BasicSAMLArtifactMap$Cleanup",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.artifact.impl.ExpiringSAMLArtifactMapEntryFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.artifact.impl.StorageServiceSAMLArtifactMap",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.artifact.impl.StorageServiceSAMLArtifactMapEntryFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.artifact.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.AddChannelBindingsHeaderHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.BaseSAMLHttpServletRequestDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.BaseSAMLHttpServletRequestDecoder$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.BaseSAMLHttpServletResponseEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.CheckMessageStatusHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.CheckMessageVersionHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.DefaultEndpointResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.PopulateSignatureSigningParametersHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.PopulateSignatureSigningParametersHandler$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.SAMLAddAttributeConsumingServiceHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.SAMLAddAttributeConsumingServiceHandler$AuthnRequestLookup",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.SAMLMetadataLookupHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.SAMLOutboundDestinationHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.SAMLProtocolAndRoleHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.SAMLSOAPDecoderBodyHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.BaseSAMLSimpleSignatureSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.BaseSAMLXMLSignatureSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.CheckAndRecordServerTLSEntityAuthenticationtHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.CheckAndRecordServerTLSEntityAuthenticationtHandler$DefaultHttpClientContextLookup",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.EndpointURLSchemeSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.InResponseToSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.MessageLifetimeSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.MessageReplaySecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.OperationContextEntityIDLookup",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.ReceivedEndpointSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.SAMLMDClientCertAuthSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.SAMLOutboundProtocolMessageSigningHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.SAMLProtocolMessageXMLSignatureSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.binding.security.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.AddAudienceRestrictionToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.AddInResponseToToResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.AddInResponseToToResponse$DefaultRequestIdLookupStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.AddNotBeforeConditionToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.AddNotOnOrAfterConditionToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.ChainingNameIdentifierGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.PopulateSignatureSigningParameters",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.PopulateSignatureSigningParameters$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.SignAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.VerifyChannelBindings",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.common.profile.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.config.impl.SAMLConfigurationInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.config.impl.XMLObjectProviderInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.config.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.idpdisco.impl.DiscoveryResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.idpdisco.impl.DiscoveryResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.idpdisco.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.reqattr.impl.RequestedAttributesBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.reqattr.impl.RequestedAttributesImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.reqattr.impl.RequestedAttributesMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.reqattr.impl.RequestedAttributesUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.reqattr.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml1md.impl.SourceIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml1md.impl.SourceIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml1md.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.DigestMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.DigestMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.DigestMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.DigestMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.SigningMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.SigningMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.SigningMethodMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.SigningMethodUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2alg.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2aslo.impl.AsynchronousBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2aslo.impl.AsynchronousImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2aslo.impl.AsynchronousMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2aslo.impl.AsynchronousUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2aslo.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2cb.impl.ChannelBindingsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2cb.impl.ChannelBindingsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2cb.impl.ChannelBindingsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2cb.impl.ChannelBindingsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2cb.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegateBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegateImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegateMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegateUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegationRestrictionTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegationRestrictionTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegationRestrictionTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.DelegationRestrictionTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2delrestrict.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdattr.impl.EntityAttributesBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdattr.impl.EntityAttributesImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdattr.impl.EntityAttributesMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdattr.impl.EntityAttributesUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdattr.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.ActionNamespaceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.ActionNamespaceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AttributeQueryDescriptorTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AttributeQueryDescriptorTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AttributeQueryDescriptorTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AttributeQueryDescriptorTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthnQueryDescriptorTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthnQueryDescriptorTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthnQueryDescriptorTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthnQueryDescriptorTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthzDecisionQueryDescriptorTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthzDecisionQueryDescriptorTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthzDecisionQueryDescriptorTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.AuthzDecisionQueryDescriptorTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.QueryDescriptorTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.QueryDescriptorTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.QueryDescriptorTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdquery.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdreqinit.impl.RequestInitiatorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdreqinit.impl.RequestInitiatorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdreqinit.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationInfoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationInfoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationInfoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationInfoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationPathBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationPathImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationPathMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationPathUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.PublicationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.RegistrationInfoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.RegistrationInfoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.RegistrationInfoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.RegistrationInfoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.RegistrationPolicyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.RegistrationPolicyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.UsagePolicyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.UsagePolicyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdrpi.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DescriptionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DescriptionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DiscoHintsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DiscoHintsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DiscoHintsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DiscoHintsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DisplayNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DisplayNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DomainHintBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.DomainHintImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.GeolocationHintBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.GeolocationHintImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.IPHintBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.IPHintImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.InformationURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.InformationURLImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.KeywordsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.KeywordsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.KeywordsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.KeywordsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.LogoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.LogoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.LogoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.LogoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.PrivacyStatementURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.PrivacyStatementURLImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.UIInfoBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.UIInfoImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.UIInfoMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.UIInfoUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.saml2mdui.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.EncTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.EncTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.GeneratedKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.GeneratedKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.GeneratedKeyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.GeneratedKeyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.SessionKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.SessionKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.SessionKeyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.SessionKeyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlec.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlpthrpty.impl.RespondToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlpthrpty.impl.RespondToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.ext.samlpthrpty.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.entity.impl.EntityDescriptorCriterionPredicateRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.entity.impl.EvaluableEntityRoleEntityDescriptorCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.entity.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.role.impl.EvaluableEntityRoleDescriptorCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.role.impl.EvaluableProtocolRoleDescriptorCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.role.impl.RoleDescriptorCriterionPredicateRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.criteria.role.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.AbstractEndpointConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.ArtifactResolutionServiceConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.AssertionConsumerServiceConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.AttributeServiceConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.MetadataGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.MetadataGeneratorParameters",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.SingleLogoutServiceConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.SingleSignOnServiceConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.TemplateMetadataGeneratorParameters",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.VelocityMetadataGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.generator.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.data.impl.MetadataSource",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.data.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.AlgorithmFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.BasicDynamicTrustedNamesStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.ByReferenceMetadataFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.EntitiesDescriptorNameProcessor",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.EntityAttributesFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.EntityRoleFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.NameIDFormatFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.NodeProcessingMetadataFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.PredicateFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.PredicateFilter$Direction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.RequiredValidUntilFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.SchemaValidationFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.ScriptedTrustedNamesFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.SignatureValidationFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.filter.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractBatchMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractBatchMetadataResolver$BatchEntityBackingStore",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicHTTPMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicHTTPMetadataResolver$BasicMetadataResponseHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$2",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$3",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$4",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$BackingStoreCleanupSweeper",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$DefaultCacheKeyGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$DynamicEntityBackingStore",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$EntityManagementData",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractDynamicMetadataResolver$PersistentCacheInitializationMetrics",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractMetadataResolver$EntityBackingStore",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractReloadingMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.AbstractReloadingMetadataResolver$RefreshMetadataTask",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.CompositeMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.CompositeMetadataResolver$CompositeMetadataResolverIterable",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.CompositeMetadataResolver$CompositeMetadataResolverIterable$CompositeMetadataResolverIterator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.DOMMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.DefaultLocalDynamicSourceKeyGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.EntityIDDigestGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.FileBackedHTTPMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.FilesystemMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.FunctionDrivenDynamicHTTPMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.HTTPEntityIDRequestURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.HTTPMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.IdentityEntityIDGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.LocalDynamicMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.MetadataQueryProtocolRequestURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.MetadataQueryProtocolRequestURLBuilder$MetadataQueryProtocolURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.PredicateRoleDescriptorResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.RegexRequestURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.ResourceBackedMetadataResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.SAMLArtifactURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.TemplateRequestURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.TemplateRequestURLBuilder$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.TemplateRequestURLBuilder$EncodingStyle",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.EndpointMetadataIndex",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.EndpointMetadataIndex$DefaultEndpointSelectionPredicate",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.EndpointMetadataIndex$EndpointMetadataIndexKey",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.FunctionDrivenMetadataIndex",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.LockableMetadataIndexManager",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.MetadataIndexManager",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.MetadataIndexManager$EntityIDExtractionFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.MetadataIndexManager$IdentityExtractionFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.MetadataIndexStore",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.MetadataIndexSupport",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.RoleMetadataIndex",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.RoleMetadataIndex$RoleMetadataIndexKey",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.SAMLArtifactMetadataIndex",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.SAMLArtifactMetadataIndex$ArtifactSourceIDMetadataIndexKey",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.SAMLArtifactMetadataIndex$ArtifactSourceLocationMetadataIndexKey",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.SAMLArtifactMetadataIndex$EntityIDToSHA1SourceIDIndexingFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.SAMLArtifactMetadataIndex$SourceIDExtensionIndexingFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.SAMLArtifactMetadataIndex$SourceLocationIndexingFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.metadata.resolver.index.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.decoding.impl.HTTPArtifactDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.decoding.impl.HTTPPostDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.decoding.impl.HTTPSOAP11Decoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.decoding.impl.HttpClientResponseSOAP11Decoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.decoding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.encoding.impl.BaseSAML1MessageEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.encoding.impl.HTTPArtifactEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.encoding.impl.HTTPPostEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.encoding.impl.HTTPSOAP11Encoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.encoding.impl.HttpClientRequestSOAP11Encoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.encoding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.impl.SAML1ArtifactRequestIssuerHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.binding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ActionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ActionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ActionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ActionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AdviceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AdviceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AdviceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AdviceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionArtifactBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionArtifactImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionIDReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionIDReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AssertionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeDesignatorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeDesignatorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeDesignatorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeDesignatorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeQueryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeStatementBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AttributeValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AudienceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AudienceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AudienceRestrictionConditionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AudienceRestrictionConditionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AudienceRestrictionConditionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AudienceRestrictionConditionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationQueryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationStatementBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthenticationStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorityBindingBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorityBindingImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorityBindingMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorityBindingUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionQueryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionStatementBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.AuthorizationDecisionStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ConditionsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ConditionsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ConditionsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ConditionsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ConfirmationMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ConfirmationMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.DoNotCacheConditionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.DoNotCacheConditionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.DoNotCacheConditionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.DoNotCacheConditionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.EvidenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.EvidenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.EvidenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.EvidenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.NameIdentifierBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.NameIdentifierImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.NameIdentifierMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.NameIdentifierUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestAbstractTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestAbstractTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestAbstractTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RespondWithBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.RespondWithImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseAbstractTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseAbstractTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseAbstractTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.ResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusCodeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusCodeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusCodeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusCodeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusDetailBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusDetailImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusDetailMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusDetailUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusMessageBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusMessageImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.StatusUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectConfirmationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectConfirmationDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectConfirmationDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectConfirmationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectConfirmationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectConfirmationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectLocalityBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectLocalityImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectLocalityMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectLocalityUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.SubjectUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.core.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddDoNotCacheConditionToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddNameIdentifierToSubjects",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddNameIdentifierToSubjects$AssertionStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddResponseShell",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddStatusToResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddStatusToResponse$StatusCodeMappingFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.AddSubjectConfirmationToSubjects",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.ChainingSAML1NameIdentifierGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.CopyNameIdentifierFromRequest",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.ResolveArtifacts",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml1.profile.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.AbstractSubjectConfirmationValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.AssertionValidationSupport",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.AudienceRestrictionConditionValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.AuthnStatementValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.BearerSubjectConfirmationValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.DelegationRestrictionConditionValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.HolderOfKeySubjectConfirmationValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.OneTimeUseConditionValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.ProxyRestrictionConditionValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.SenderVouchersSubjectConfirmationValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.messaging.impl.DefaultAssertionValidationContextBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.messaging.impl.DefaultAssertionValidationContextBuilder$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.messaging.impl.DefaultAssertionValidationContextBuilder$DefaultSelfEntityIDLookupFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.messaging.impl.DefaultAssertionValidationContextBuilder$DefaultValidInResponseToLookupFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.messaging.impl.DefaultAssertionValidationContextBuilder$DefaultValidIssuersLookupFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.assertion.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.HTTPArtifactDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.HTTPPostDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.HTTPPostSimpleSignDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.HTTPRedirectDeflateDecoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.HTTPSOAP11Decoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.HttpClientResponseSOAP11Decoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.SimpleSignatureContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.decoding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.BaseSAML2MessageEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.HTTPArtifactEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.HTTPPostEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.HTTPPostSimpleSignEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.HTTPRedirectDeflateEncoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.HTTPSOAP11Encoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.HttpClientRequestSOAP11Encoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.encoding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.AddConsentToResponseHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.AddECPResponseHeaderHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.AddGeneratedKeyHeaderHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.AddRelayStateHeaderHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.AddRequestAuthenticatedHeaderHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.CheckNoPassiveHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.ExtractConsentFromRequestHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.ExtractProxiedRequestersHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.security.impl.ExtractChannelBindingsExtensionsHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.security.impl.ExtractChannelBindingsHeadersHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.security.impl.SAML2AuthnRequestsSignedSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.security.impl.SAML2HTTPPostSimpleSignSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.security.impl.SAML2HTTPRedirectDeflateSignatureSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.binding.security.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AbstractNameIDType",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ActionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ActionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ActionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ActionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AdviceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AdviceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AdviceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AdviceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResolveBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResolveImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResolveMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResolveUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ArtifactResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionIDRefBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionIDRefImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionIDRequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionIDRequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionIDRequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionIDRequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionURIRefBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionURIRefImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AssertionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeQueryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeStatementBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeValueBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AttributeValueImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AudienceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AudienceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AudienceRestrictionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AudienceRestrictionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AudienceRestrictionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AudienceRestrictionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthenticatingAuthorityBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthenticatingAuthorityImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextClassRefBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextClassRefImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextDeclBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextDeclImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextDeclRefBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextDeclRefImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnContextUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnQueryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnRequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnRequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnRequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnRequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnStatementBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthnStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionQueryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionStatementBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionStatementImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionStatementMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.AuthzDecisionStatementUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.BaseIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.BaseIDMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.BaseIDUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.BaseIDXSAnyAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ConditionXSAnyAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ConditionsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ConditionsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ConditionsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ConditionsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAssertionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAssertionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAssertionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAssertionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAttributeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAttributeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAttributeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedAttributeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedElementTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedElementTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedElementTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedIDMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EncryptedIDUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EvidenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EvidenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EvidenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.EvidenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ExtensionsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ExtensionsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ExtensionsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ExtensionsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.GetCompleteBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.GetCompleteImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPEntryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPEntryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPEntryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPEntryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPListBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPListImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPListMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IDPListUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IssuerBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.IssuerImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.KeyInfoConfirmationDataTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.KeyInfoConfirmationDataTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutRequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutRequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutRequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutRequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.LogoutResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDRequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDRequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDRequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDRequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ManageNameIDResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingRequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingRequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingRequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingRequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDMappingResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDPolicyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDPolicyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDPolicyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDPolicyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NameIDTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NewEncryptedIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NewEncryptedIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NewEncryptedIDMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NewEncryptedIDUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NewIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.NewIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.OneTimeUseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.OneTimeUseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.OneTimeUseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.OneTimeUseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ProxyRestrictionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ProxyRestrictionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ProxyRestrictionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ProxyRestrictionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestAbstractTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestAbstractTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestAbstractTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestedAuthnContextBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestedAuthnContextImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestedAuthnContextMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequestedAuthnContextUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequesterIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.RequesterIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ScopingBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ScopingImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ScopingMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.ScopingUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SessionIndexBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SessionIndexImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatementXSAnyAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusCodeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusCodeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusCodeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusCodeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusDetailBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusDetailImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusDetailMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusDetailUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusMessageBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusMessageImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusResponseTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusResponseTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusResponseTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.StatusUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationDataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationDataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationDataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationDataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectConfirmationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectLocalityBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectLocalityImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectLocalityMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectLocalityUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectQueryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectQueryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectQueryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.SubjectUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.TerminateBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.TerminateImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.TerminateMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.TerminateUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.core.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RelayStateBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RelayStateImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RelayStateMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RelayStateUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestAuthenticatedBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestAuthenticatedImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestAuthenticatedMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestAuthenticatedUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.RequestUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.ResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.ResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.ResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.ResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.SubjectConfirmationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.SubjectConfirmationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.SubjectConfirmationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.SubjectConfirmationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.ecp.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AdditionalMetadataLocationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AdditionalMetadataLocationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AdditionalMetadataLocationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AdditionalMetadataLocationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AffiliateMemberBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AffiliateMemberImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AffiliationDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AffiliationDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AffiliationDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AffiliationDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ArtifactResolutionServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ArtifactResolutionServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AssertionConsumerServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AssertionConsumerServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AssertionIDRequestServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AssertionIDRequestServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeAuthorityDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeAuthorityDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeAuthorityDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeAuthorityDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeConsumingServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeConsumingServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeConsumingServiceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeConsumingServiceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeProfileBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeProfileImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AttributeServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthnAuthorityDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthnAuthorityDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthnAuthorityDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthnAuthorityDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthnQueryServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthnQueryServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthzServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.AuthzServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.CompanyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.CompanyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ContactPersonBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ContactPersonImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ContactPersonMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ContactPersonUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EmailAddressBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EmailAddressImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EncryptionMethodBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EncryptionMethodImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EndpointImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EndpointMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EndpointUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntitiesDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntitiesDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntitiesDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntitiesDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntityDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntityDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntityDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.EntityDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ExtensionsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ExtensionsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ExtensionsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ExtensionsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.GivenNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.GivenNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IDPSSODescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IDPSSODescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IDPSSODescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IDPSSODescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IndexedEndpointImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IndexedEndpointMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.IndexedEndpointUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.KeyDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.KeyDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.KeyDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.KeyDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.LocalizedNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.LocalizedNameMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.LocalizedNameUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.LocalizedURIImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.LocalizedURIMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.LocalizedURIUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ManageNameIDServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ManageNameIDServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.NameIDFormatBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.NameIDFormatImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.NameIDMappingServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.NameIDMappingServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationDisplayNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationDisplayNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationURLBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationURLImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.OrganizationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.PDPDescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.PDPDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.PDPDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.PDPDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RequestedAttributeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RequestedAttributeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RequestedAttributeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RequestedAttributeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorXSAnyAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorXSAnyAdapter$MutableChildrenList",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorXSAnyAdapter$MutableChildrenList$MutableChildrenIterator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.RoleDescriptorXSAnyAdapter$MutableChildrenList$MutableChildrenListIterator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SPSSODescriptorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SPSSODescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SPSSODescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SPSSODescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SSODescriptorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SSODescriptorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SSODescriptorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ServiceDescriptionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ServiceDescriptionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ServiceNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.ServiceNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SingleLogoutServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SingleLogoutServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SingleSignOnServiceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SingleSignOnServiceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SurNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.SurNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.TelephoneNumberBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.TelephoneNumberImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.metadata.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AbstractDecryptAction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AbstractEncryptAction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AbstractResponseShellAction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddChannelBindingsToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddGeneratedKeyToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddNameIDToSubjects",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddNameIDToSubjects$AssertionStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddNameIDToSubjects$NameIDPolicyLookupFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddNameIDToSubjects$RequesterIdFromIssuerFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddOneTimeUseConditionToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddProxyRestrictionToAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddStatusResponseShell",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddStatusToResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddStatusToResponse$StatusCodeMappingFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddSubjectConfirmationToSubjects",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddSubjectConfirmationToSubjects$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddSubjectConfirmationToSubjects$2",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddSubjectConfirmationToSubjects$3",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.AddSubjectConfirmationToSubjects$RemoteAddressStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.ChainingSAML2NameIDGenerator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.CopyNameIDFromRequest",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.DecryptAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.DecryptAttributes",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.DecryptNameIDs",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.DefaultAssertionValidationContextBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.DefaultAssertionValidationContextBuilder$DefaultValidInResponseToLookupFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.DefaultAssertionValidationContextBuilder$DefaultValidIssuersLookupFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.EncryptAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.EncryptAttributes",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.EncryptNameIDs",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.PopulateECPContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.ResolveArtifact",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.ValidateAssertions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.ValidateAssertions$AssertionValidationInput",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.ValidateAssertions$DefaultAssertionResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.profile.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.wssecurity.messaging.impl.DefaultSAML20AssertionValidationContextBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.wssecurity.messaging.impl.SAML20AssertionTokenValidationInput",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.wssecurity.messaging.impl.WSSecuritySAML20AssertionTokenSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.wssecurity.messaging.impl.WSSecuritySAML20AssertionTokenSecurityHandler$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.saml2.wssecurity.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.security.impl.MetadataCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.security.impl.SAMLMDCredentialContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.security.impl.SAMLMetadataEncryptionParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.security.impl.SAMLMetadataSignatureSigningParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.security.impl.SAMLSignatureProfileValidator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.saml.security.impl.package-info",
+    "allDeclaredConstructors": true
+  }
+]

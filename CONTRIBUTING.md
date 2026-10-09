@@ -10,13 +10,13 @@ Thank you for helping improve Kitezh, the identity platform in this repository.
 
 ## Development setup
 
-Use Java 25 and the Maven Wrapper. The frontend uses the project-managed pnpm version.
+Use Java 25 and the Maven Wrapper. The web client uses the project-managed pnpm version.
 
 ```bash
 ./mvnw test
 ./mvnw verify
-pnpm --dir src/main/frontend lint
-pnpm --dir src/main/frontend typecheck
+pnpm --dir src/main/web lint
+pnpm --dir src/main/web typecheck
 ```
 
 Run Kitezh locally with `./mvnw spring-boot:run`. The default development server

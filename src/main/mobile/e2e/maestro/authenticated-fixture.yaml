@@ -1,0 +1,12 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- launchApp:
+    clearState: true
+- tapOn: "Continue"
+- tapOn: "Sign in"
+- assertVisible: "Kitezh fixture account"
+- tapOn: "Continue with fixture account"
+- assertVisible: "Account Console"
+- assertVisible: "fixture-user"
+- tapOn: "Sign out"
+- assertVisible: "Sign in"

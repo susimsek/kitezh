@@ -66,6 +66,14 @@ public class AdminUserService {
         return userView(user, avatarUrl(user.getId()));
     }
 
+    @Transactional(readOnly = true)
+    public String currentAvatarUrl(String username) {
+        return userRepository
+                .findByUsername(username)
+                .map(user -> userView(user, avatarUrl(user.getId())).avatarUrl())
+                .orElse(null);
+    }
+
     @Transactional
     @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, allEntries = true)
     public AdminUserDTO createUser(

@@ -1,0 +1,274 @@
+[
+  {
+    "name": "org.opensaml.security.config.impl.ClientTLSValidationConfiguratonInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.config.impl.HttpClientSecurityConfigurationInitalizer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.config.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableCredentialCriteriaRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableEntityIDCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableKeyAlgorithmCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableKeyLengthCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableKeyNameCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluablePublicKeyCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableUsageCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableX509CertSelectorCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableX509DigestCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableX509IssuerSerialCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableX509SubjectKeyIdentifierCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.EvaluableX509SubjectNameCredentialCriterion",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.criteria.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.AbstractChainingCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.AbstractChainingCredentialResolver$CredentialIterable",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.AbstractChainingCredentialResolver$CredentialIterator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.AbstractCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.AbstractCriteriaFilteringCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.ChainingCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.CollectionCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.FilesystemCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.KeyStoreCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.StaticCredentialResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.credential.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.BasicHttpClientSecurityConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.BasicHttpClientSecurityParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.SecurityEnhancedHttpClientSupport",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.SecurityEnhancedTLSSocketFactory",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.ThreadLocalClientTLSCredentialHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.ThreadLocalServerTLSHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.httpclient.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.messaging.impl.BaseClientCertAuthSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.messaging.impl.BaseTrustEngineSecurityHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.messaging.impl.PopulateHttpClientSecurityParametersHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.messaging.impl.PopulateHttpClientSecurityParametersHandler$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.ChainingTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.ExplicitKeyTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.ExplicitKeyTrustEvaluator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.ExplicitX509CertificateTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.ExplicitX509CertificateTrustEvaluator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.TrustEngineX509TrustManager",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.trust.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.BasicPKIXValidationInformation",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.BasicX509CredentialNameEvaluator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.CertPathPKIXTrustEvaluator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.CertPathPKIXValidationOptions",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.DummyX509CredentialNameEvaluator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.KeyStoreX509CredentialAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.PKIXX509CredentialTrustEngine",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.StaticPKIXValidationInformationResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.X509CredentialNameEvaluator",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.X509KeyManagerX509CredentialAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.BasicClientTLSValidationConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.BasicClientTLSValidationParametersResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.StaticX509CredentialKeyManager",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.ThreadLocalX509CredentialContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.ThreadLocalX509CredentialKeyManager",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.ThreadLocalX509TrustEngineContext",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.ThreadLocalX509TrustEngineContext$Data",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.ThreadLocalX509TrustEngineSupport",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.ThreadLocalX509TrustManager",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.security.x509.tls.impl.package-info",
+    "allDeclaredConstructors": true
+  }
+]

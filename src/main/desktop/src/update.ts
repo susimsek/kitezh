@@ -21,10 +21,13 @@ const UPDATE_REPOSITORY = "susimsek/kitezh";
 const UPDATE_RECOVERY_FILE = "desktop-update-recovery.json";
 const UPDATE_WATCHDOG_FILE = "desktop-update-watchdog.js";
 const UPDATE_HEALTH_WINDOW_MS = 15_000;
+const UPDATE_RETRY_DELAY_MS = 2_000;
 
 let listener: UpdateListener | null = null;
 let configured = false;
 let downloadedVersion: string | null = null;
+let updateRetryScheduled = false;
+let updateRetryAttempted = false;
 
 export function setAutomaticInstallOnAppQuit(enabled: boolean) {
   autoUpdater.autoInstallOnAppQuit = enabled;
@@ -96,9 +99,17 @@ async function verifyPublishedManifest() {
   const publicKey = await readFile(
     path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
   );
-  if (!verify(null, manifest, publicKey, signature)) {
+  if (!verifyUpdateManifestSignature(manifest, signature, publicKey)) {
     throw new Error("The update manifest signature is invalid.");
   }
+}
+
+export function verifyUpdateManifestSignature(
+  manifest: Buffer,
+  signature: Buffer,
+  publicKey: string | Buffer,
+) {
+  return verify(null, manifest, publicKey, signature);
 }
 
 async function markUpdatePending(version: string) {
@@ -191,15 +202,28 @@ async function initializeUpdateRecovery() {
   }
 }
 
+export function supportsAutoUpdate({
+  appImage,
+  autoUpdate,
+  packaged,
+  platform,
+}: {
+  appImage: boolean;
+  autoUpdate?: string;
+  packaged: boolean;
+  platform: NodeJS.Platform;
+}) {
+  if (!packaged || autoUpdate === "false") return false;
+  return platform !== "linux" || appImage;
+}
+
 function isSupported() {
-  if (!app.isPackaged) return false;
-  if (
-    !process.env.DESKTOP_AUTO_UPDATE ||
-    process.env.DESKTOP_AUTO_UPDATE === "true"
-  ) {
-    return process.platform !== "linux" || Boolean(process.env.APPIMAGE);
-  }
-  return false;
+  return supportsAutoUpdate({
+    appImage: Boolean(process.env.APPIMAGE),
+    autoUpdate: process.env.DESKTOP_AUTO_UPDATE,
+    packaged: app.isPackaged,
+    platform: process.platform,
+  });
 }
 
 function isUpdatePreviewEnabled() {
@@ -218,6 +242,16 @@ function publish(status: DesktopUpdateStatus) {
   listener?.(status);
 }
 
+function scheduleUpdateRetry() {
+  if (updateRetryScheduled || updateRetryAttempted || !isSupported()) return;
+  updateRetryAttempted = true;
+  updateRetryScheduled = true;
+  setTimeout(() => {
+    updateRetryScheduled = false;
+    void checkForUpdates();
+  }, UPDATE_RETRY_DELAY_MS);
+}
+
 export function configureAutoUpdater(nextListener: UpdateListener) {
   if (configured) return;
   configured = true;
@@ -234,25 +268,30 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
   autoUpdater.on("update-available", (info) =>
     publish({ state: "available", version: info.version }),
   );
-  autoUpdater.on("update-not-available", () =>
-    publish({ state: "not-available" }),
-  );
+  autoUpdater.on("update-not-available", () => {
+    updateRetryAttempted = false;
+    publish({ state: "not-available" });
+  });
   autoUpdater.on("download-progress", (progress) =>
     publish({ state: "downloading", percent: progress.percent }),
   );
   autoUpdater.on("update-downloaded", (info) => {
+    updateRetryAttempted = false;
     downloadedVersion = info.version;
     publish({ state: "downloaded", version: info.version });
   });
-  autoUpdater.on("error", () =>
+  autoUpdater.on("error", () => {
     publish({
       state: "error",
       message: "Desktop update could not be completed.",
-    }),
-  );
+    });
+    scheduleUpdateRetry();
+  });
 
   void initializeUpdateRecovery();
-  setTimeout(() => void checkForUpdates(), 5_000);
+  if (!isUpdatePreviewEnabled()) {
+    setTimeout(() => void checkForUpdates(), 5_000);
+  }
 }
 
 export async function checkForUpdates() {
@@ -289,6 +328,7 @@ export async function checkForUpdates() {
       state: "error",
       message: "Desktop update could not be checked.",
     });
+    scheduleUpdateRetry();
   }
 }
 
@@ -302,6 +342,7 @@ export async function downloadUpdate() {
       state: "error",
       message: "Desktop update could not be downloaded.",
     });
+    scheduleUpdateRetry();
     return false;
   }
 }
@@ -310,10 +351,11 @@ export function installUpdate() {
   if (!isSupported() || !downloadedVersion) return;
   void markUpdatePending(downloadedVersion)
     .then(() => autoUpdater.quitAndInstall(false, true))
-    .catch(() =>
+    .catch(() => {
       publish({
         state: "error",
         message: "Desktop update could not be prepared.",
-      }),
-    );
+      });
+      scheduleUpdateRetry();
+    });
 }

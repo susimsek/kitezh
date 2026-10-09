@@ -1,0 +1,262 @@
+[
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$1",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$10",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$11",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$12",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$13",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$14",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$15",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$16",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$17",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$2",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$3",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$4",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$5",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$6",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$7",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$8",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.CoreGaugeSet$9",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.DisabledCounter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.DisabledHistogram",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.DisabledMeter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.DisabledMetric",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.DisabledTimer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.FilteredMetricRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.HTTPReporter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.MetricRegistryInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.metrics.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.config.impl.XMLObjectProviderInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.config.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.persist.impl.PassthroughSourceStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.persist.impl.SegmentingIntermediateDirectoryStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.persist.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSAnyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSAnyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSAnyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSAnyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBase64BinaryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBase64BinaryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBase64BinaryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBase64BinaryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBooleanBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBooleanImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBooleanMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSBooleanUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSDateTimeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSDateTimeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSDateTimeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSDateTimeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSIntegerBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSIntegerImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSIntegerMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSIntegerUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSQNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSQNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSQNameMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSQNameUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSStringBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSStringImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSStringMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSStringUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSURIBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSURIImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSURIMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.XSURIUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.core.xml.schema.impl.package-info",
+    "allDeclaredConstructors": true
+  }
+]

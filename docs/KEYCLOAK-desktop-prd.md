@@ -2,9 +2,16 @@
 
 ## Purpose
 
-This product requirements document defines the Electron desktop console and its shared web renderer for the Kitezh application. It is based on an audit of the current Next.js static-export frontend, Spring Boot APIs, shared UI components, observability setup, GitHub Actions pipeline, and Render image deployment. It compares the current implementation with Keycloak’s Admin and Account Console information architecture and JHipster’s operational dashboards, while preserving this project’s single-issuer model and existing security boundaries.
+This product requirements document defines the Electron desktop console and its shared web renderer for the Kitezh application. It is based on an audit of the current Next.js static-export web client, Spring Boot APIs, shared UI components, observability setup, GitHub Actions pipeline, and Render image deployment. It compares the current implementation with Keycloak’s Admin and Account Console information architecture and JHipster’s operational dashboards, while preserving this project’s single-issuer model and existing security boundaries.
 
 The term “desktop” means a packaged Electron application with a local renderer. The existing responsive Next.js UI remains the shared renderer source, while Electron packages its static output locally and connects to the Render-hosted Spring Boot API. Spring Boot remains the authority for authentication, authorization, validation, persistence, audit events, localization, and deployment health.
+
+**Native migration decision (current):** the shared-renderer description above records the
+transitional implementation and remains valid for the screens that have not migrated yet. The
+target architecture is now documented in [`NATIVE-PLATFORM-PRD.md`](NATIVE-PLATFORM-PRD.md): Web is
+the behavior/API reference, while Mobile and Desktop own independent native screens and platform
+adapters. Do not use the transitional shared-renderer wording to mark an authenticated Desktop or
+Mobile screen complete.
 
 ## Desktop console, shared components, and Render delivery
 
@@ -16,7 +23,7 @@ The current repository already has the right foundation for a desktop-oriented c
 
 | Concern | Current implementation | Product implication |
 | --- | --- | --- |
-| Frontend runtime | Next.js App Router with `output: "export"`, trailing-slash routes, Bootstrap, React-Bootstrap, Redux, React Hook Form, Zod, and i18n | Build the static export once per release, serve it from Spring Boot on the web, and package the same output into Electron. |
+| Web runtime | Next.js App Router with `output: "export"`, trailing-slash routes, Bootstrap, React-Bootstrap, Redux, React Hook Form, Zod, and i18n | Build the static export once per release, serve it from Spring Boot on the web, and package the same output into Electron. |
 | Admin shell | `AdminShell`, `AdminPageHeader`, `AdminBreadcrumb`, `DetailTabs`, `AdminGlobalSearch`, `ConsoleAlertsProvider` | The main navigation and interaction model exists; future work should compose shared primitives rather than replace the shell. |
 | Account shell | `AccountShell`, `AccountPageHeader`, shared branding, theme, language, user menu, and alerts | The user console should share shell behavior and accessibility rules with Admin while keeping its own navigation and authorization. |
 | Collections | `DataTable`, `ResourceFilters`, `PaginationControls`, `AsyncState`, `RowActions`, and bounded server-side APIs | Preserve predictable search, sort, page size, empty, loading, forbidden, and error states on every resource screen. |
@@ -24,7 +31,7 @@ The current repository already has the right foundation for a desktop-oriented c
 | Search | `AdminGlobalSearch` with Cmd/Ctrl+K, grouped users/clients/roles/groups, keyboard escape, and `/api/admin/search` | Search is present. The next increment is keyboard result navigation, permission-aware result filtering, and a consistent no-results state, not a second search implementation. |
 | Operational view | Dashboard counts, recent events, server information, signing-key information, and readiness status | This is an overview, not a full monitoring console. Metrics, health details, and log-level operations need an explicit Observability screen or external Grafana links. |
 | Desktop delivery | `src/main/desktop` contains a pinned Electron main/preload package, a controlled `app://renderer` protocol, and a build script that packages the shared static export | Keep the Electron shell thin; CI packages Linux, macOS, and Windows installers, while signing and notarization remain release prerequisites. |
-| Backend deployment | GitHub Actions builds frontend/backend and native images, publishes architecture tags and a multi-architecture tag, then triggers Render | The desktop client connects to the Render HTTPS API; image publication and Render deployment remain independent of Electron packaging. |
+| Backend deployment | GitHub Actions builds web/backend and native images, publishes architecture tags and a multi-architecture tag, then triggers Render | The desktop client connects to the Render HTTPS API; image publication and Render deployment remain independent of Electron packaging. |
 
 The audit also found two maintainability risks. `AdminShell` and `AccountShell` duplicate navbar, sidebar, branding, language, theme, user-menu, alert, and responsive behavior. In addition, asynchronous action behavior is implemented by individual forms and tables. These are suitable for incremental extraction into shared primitives; a wholesale rewrite would increase regression risk without improving the product contract.
 
@@ -39,7 +46,7 @@ The desktop application must be a thin native shell around the same static rende
 | Renderer | Load the packaged local static export through `app://` and run the same Next.js React components as the web console | No Node integration, no privileged Electron imports, no secrets in the bundle, and no arbitrary remote navigation. |
 | Spring Boot/Render | Authenticate users, issue and revoke OAuth tokens, enforce permissions, persist data, audit mutations, and publish health/observability data | Never trust a renderer-only authorization decision or desktop-provided role claim. |
 
-The package lives in a separate workspace at `src/main/desktop/` with `main`, `preload`, packaging configuration, generated renderer assets, and platform assets. The renderer source continues to come from `src/main/frontend`. Electron loads the generated local export through `app://renderer/` and calls the Render API through `DESKTOP_API_BASE_URL`, defaulting to `https://kitezh.onrender.com` in the packaged release and `http://localhost:9090` in local development. The backend must allow the exact desktop origin for the required API methods; wildcard CORS is forbidden.
+The package lives in a separate workspace at `src/main/desktop/` with `main`, `preload`, packaging configuration, generated renderer assets, and platform assets. The renderer source continues to come from `src/main/web`. Electron loads the generated local export through `app://renderer/` and calls the Render API through `DESKTOP_API_BASE_URL`, defaulting to `https://kitezh.onrender.com` in the packaged release and `http://localhost:9090` in local development. The backend must allow the exact desktop origin for the required API methods; wildcard CORS is forbidden.
 
 The project layout is:
 
@@ -56,7 +63,7 @@ src/main/desktop/
     security/origin-policy.ts  # Exact renderer-origin and navigation allow-list
   assets/                      # Shared 1024px application icon
   test/                        # Callback, PKCE, and origin-policy tests
-src/main/frontend/             # The only React UI shared by web and Electron
+src/main/web/             # The only React UI shared by web and Electron
   app/
   components/
   lib/
@@ -65,7 +72,7 @@ src/main/frontend/             # The only React UI shared by web and Electron
 
 `src/main/desktop/` must not contain copies of Admin or Account pages, dictionaries, API DTOs, validation schemas, or business rules. It is a separate Electron package, but it imports no feature UI; it packages the generated output of the common renderer. The web build continues to be copied into Spring Boot static resources, while the Electron package contains the same generated renderer plus the native shell and icons.
 
-For the current local-renderer model, `src/main/frontend` is the shared source location. A separate `packages/ui` or published shared npm package is intentionally out of scope: there is one React renderer, and both the browser and Electron shell use its build output. Extracting a package now would add workspace/build/versioning overhead without creating a second independent UI implementation. Revisit a separate package only if a second native client or an independently versioned design system is introduced.
+For the current local-renderer model, `src/main/web` is the shared source location. A separate `packages/ui` or published shared npm package is intentionally out of scope: there is one React renderer, and both the browser and Electron shell use its build output. Extracting a package now would add workspace/build/versioning overhead without creating a second independent UI implementation. Revisit a separate package only if a second native client or an independently versioned design system is introduced.
 
 Electron security is a release requirement: use a current Electron version, `contextIsolation: true`, `nodeIntegration: false`, renderer sandboxing, restrictive CSP, no `webSecurity` bypass, no arbitrary remote navigation, and sender validation for every IPC message.[^9][^10][^11] The main process must serve the local renderer through a controlled custom protocol rather than broad `file://` access, allow only the app’s own paths, and open unexpected external destinations in the system browser after strict HTTPS allow-list validation.
 
@@ -148,9 +155,9 @@ These components should be extracted only when a second consumer exists or a sha
 
 ### One UI for web and Electron
 
-Web and desktop must use the same React component tree, dictionaries, design tokens, route definitions, validation schemas, API DTOs, and test fixtures. The Electron shell is an adapter around the renderer; it is not a second Admin or Account frontend.
+Web and desktop must use the same React component tree, dictionaries, design tokens, route definitions, validation schemas, API DTOs, and test fixtures. The Electron shell is an adapter around the renderer; it is not a second Admin or Account web client.
 
-The shared frontend package remains under `src/main/frontend`:
+The shared web package remains under `src/main/web`:
 
 - `components/shared`, `components/auth`, `components/admin`, and `components/account` contain platform-neutral UI and domain behavior;
 - `lib/*` exposes a typed `ConsoleSessionAdapter` and API client contract;
@@ -220,7 +227,7 @@ The packaged Electron app uses a local renderer and the Render deployment as its
 
 The supported release path is:
 
-1. GitHub Actions checks the repository, frontend, backend, security, Compose, Helm, Terraform, and native-image metadata.
+1. GitHub Actions checks the repository, web client, backend, security, Compose, Helm, Terraform, and native-image metadata.
 2. The native-image matrix produces versioned `${VERSION}-amd64` and `${VERSION}-arm64` images.
 3. The publish job creates and verifies both the `${VERSION}` and `latest` multi-architecture manifests.
 4. The workflow calls `RENDER_DEPLOY_HOOK_URL` after the manifest is available.
@@ -241,7 +248,7 @@ The deployment contract must also define:
 
 ### Static export constraints
 
-The frontend is intentionally a static export. Next.js documents API routes, rewrites, redirects, headers, middleware, ISR, and default image optimization as unsupported or constrained for static export.[^7] Those server-only features must not be introduced into feature work unless the deployment architecture is changed first. Spring Boot remains the authority for authentication, authorization, API contracts, validation, persistence, audit events, and localization data.
+The web client is intentionally a static export. Next.js documents API routes, rewrites, redirects, headers, middleware, ISR, and default image optimization as unsupported or constrained for static export.[^7] Those server-only features must not be introduced into feature work unless the deployment architecture is changed first. Spring Boot remains the authority for authentication, authorization, API contracts, validation, persistence, audit events, and localization data.
 
 Every new route must therefore satisfy all of the following:
 
@@ -263,7 +270,7 @@ Use the existing cache policy: cache stable reference/configuration data, avoid 
 The PRD is complete only when the following checks are reproducible:
 
 - backend `./mvnw verify`, Spotless, Checkstyle, focused integration tests, and native-image smoke start;
-- frontend type check, lint, format, static build, and focused Admin/Account tests pass;
+- web type check, lint, format, static build, and focused Admin/Account tests pass;
 - Compose, Helm, Terraform, and Render Blueprint validation pass;
 - an image manifest inspection confirms both supported architectures and the expected digest;
 - a Render deployment passes readiness, discovery, static asset, login, and protected-route smoke checks;
@@ -281,7 +288,7 @@ The PRD is complete only when the following checks are reproducible:
 4. **Authorization Services**: add client resources/policies/permissions only after the scope is explicitly approved.
 5. **Hardening**: add the optional static web manifest, image-digest release records, rollback automation, and the remaining browser/Native/Sonar coverage.[^8]
 
-This sequence gives the project a Keycloak-like desktop experience without copying Keycloak’s multi-realm assumptions, avoids a risky frontend rewrite, and keeps Render deployment reproducible.
+This sequence gives the project a Keycloak-like desktop experience without copying Keycloak’s multi-realm assumptions, avoids a risky web-client rewrite, and keeps Render deployment reproducible.
 
 ## Sources
 

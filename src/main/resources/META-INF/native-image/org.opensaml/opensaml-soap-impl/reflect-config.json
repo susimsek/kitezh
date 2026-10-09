@@ -1,0 +1,2030 @@
+[
+  {
+    "name": "org.opensaml.soap.client.soap11.decoder.http.impl.HttpClientResponseSOAP11Decoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.client.soap11.decoder.http.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.client.soap11.encoder.http.impl.HttpClientRequestSOAP11Encoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.client.soap11.encoder.http.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.config.impl.SOAPConfigurationInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.config.impl.XMLObjectProviderInitializer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.config.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.decoder.http.impl.EnvelopeBodyHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.decoder.http.impl.HTTPSOAP11Decoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.decoder.http.impl.SimplePayloadBodyHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.decoder.http.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.encoder.http.impl.HTTPSOAP11Encoder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.encoder.http.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.BodyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.BodyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.BodyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.BodyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.DetailBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.DetailImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.DetailMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.DetailUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.EnvelopeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.EnvelopeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.EnvelopeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.EnvelopeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultActorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultActorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultCodeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultCodeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultStringBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultStringImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.FaultUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.HeaderBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.HeaderImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.HeaderMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.HeaderUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.messaging.impl.SOAP11FaultContextDecoratingErrorHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.profile.impl.AddSOAPFault",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.profile.impl.AddSOAPFault$FaultCodeMappingFunction",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.profile.impl.AddSOAPFault$MessageContextFaultStrategy",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.soap11.profile.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AbstractWSAddressingObject",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AbstractWSAddressingObjectBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AbstractWSAddressingObjectMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AbstractWSAddressingObjectUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ActionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ActionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ActionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ActionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AddressBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AddressImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AddressMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AddressUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedQNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedQNameMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedQNameUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedURIImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedURIMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedURIUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedUnsignedLongImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedUnsignedLongMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.AttributedUnsignedLongUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.EndpointReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FaultToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FaultToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FaultToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FaultToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FromBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FromImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FromMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.FromUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MessageIDBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MessageIDImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MessageIDMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MessageIDUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MetadataBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MetadataImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MetadataMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.MetadataUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemActionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemActionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemActionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemActionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemHeaderQNameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemHeaderQNameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemHeaderQNameMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemHeaderQNameUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemIRIBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemIRIImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemIRIMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ProblemIRIUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReferenceParametersBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReferenceParametersImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReferenceParametersMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReferenceParametersUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RelatesToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RelatesToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RelatesToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RelatesToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReplyToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReplyToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReplyToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ReplyToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RetryAfterBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RetryAfterImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RetryAfterMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.RetryAfterUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.SoapActionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.SoapActionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.SoapActionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.SoapActionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.ToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.messaging.impl.AddActionHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.messaging.impl.AddMessageIDHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.messaging.impl.AddRelatesToHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.messaging.impl.ExtractMessageIDHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.messaging.impl.ValidateActionHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsaddressing.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AddressBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AddressImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AddressMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AddressUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AppliesToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AppliesToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AppliesToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.AppliesToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.EndPointReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.EndPointReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.EndPointReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.EndPointReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestSecurityTokenResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestSecurityTokenResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestSecurityTokenResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestSecurityTokenResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestedSecurityTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestedSecurityTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestedSecurityTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.RequestedSecurityTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wsfed.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AbstractWSPolicyObject",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AbstractWSPolicyObjectBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AbstractWSPolicyObjectMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AbstractWSPolicyObjectUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AllBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AllImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AllMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AllUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AppliesToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AppliesToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AppliesToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.AppliesToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.ExactlyOneBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.ExactlyOneImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.ExactlyOneMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.ExactlyOneUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.OperatorContentTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.OperatorContentTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.OperatorContentTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyAttachmentBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyAttachmentImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyAttachmentMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyAttachmentUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.PolicyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wspolicy.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AbstractWSSecurityObject",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AbstractWSSecurityObjectBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AbstractWSSecurityObjectMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AbstractWSSecurityObjectUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedDateTimeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedDateTimeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedDateTimeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedStringImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedStringMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedStringUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedURIImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedURIMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.AttributedURIUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.BinarySecurityTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.BinarySecurityTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.BinarySecurityTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.BinarySecurityTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.CreatedBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.CreatedImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.CreatedMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.CreatedUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EmbeddedBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EmbeddedImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EmbeddedMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EmbeddedUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncodedStringImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncodedStringMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncodedStringUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncryptedHeaderBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncryptedHeaderImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncryptedHeaderMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.EncryptedHeaderUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ExpiresBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ExpiresImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ExpiresMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ExpiresUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.IterationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.IterationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.IterationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.IterationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.KeyIdentifierBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.KeyIdentifierImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.KeyIdentifierMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.KeyIdentifierUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.NonceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.NonceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.NonceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.NonceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.PasswordBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.PasswordImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.PasswordMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.PasswordUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.ReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SaltBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SaltImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SaltMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SaltUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityTokenReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityTokenReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityTokenReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityTokenReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SecurityUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SignatureConfirmationBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SignatureConfirmationImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SignatureConfirmationMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.SignatureConfirmationUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TimestampBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TimestampImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TimestampMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TimestampUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TransformationParametersBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TransformationParametersImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TransformationParametersMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.TransformationParametersUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.UsernameUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.messaging.impl.AddTimestampHandler",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wssecurity.messaging.impl.package-info",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AbstractWSTrustObject",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AbstractWSTrustObjectBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AbstractWSTrustObjectMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AbstractWSTrustObjectUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AllowPostdatingBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AllowPostdatingImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AllowPostdatingMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AllowPostdatingUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticationTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticationTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticationTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticationTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticatorBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticatorImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticatorMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.AuthenticatorUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinaryExchangeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinaryExchangeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinaryExchangeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinaryExchangeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinarySecretBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinarySecretImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinarySecretMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.BinarySecretUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CancelTargetBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CancelTargetImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CancelTargetMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CancelTargetUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CanonicalizationAlgorithmBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CanonicalizationAlgorithmImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CanonicalizationAlgorithmMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CanonicalizationAlgorithmUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ChallengeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ChallengeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ChallengeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ChallengeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ClaimsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ClaimsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ClaimsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ClaimsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CodeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CodeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CodeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CodeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CombinedHashBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CombinedHashImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CombinedHashMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.CombinedHashUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyAlgorithmBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyAlgorithmImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyAlgorithmMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyAlgorithmUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ComputedKeyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegatableBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegatableImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegatableMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegatableUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegateToBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegateToImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegateToMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.DelegateToUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptWithBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptWithImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptWithMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptWithUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionAlgorithmBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionAlgorithmImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionAlgorithmMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionAlgorithmUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EncryptionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EntropyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EntropyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EntropyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.EntropyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ForwardableBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ForwardableImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ForwardableMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ForwardableUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuedTokensBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuedTokensImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuedTokensMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuedTokensUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuerBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuerImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuerMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.IssuerUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyExchangeTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyExchangeTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyExchangeTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyExchangeTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeySizeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeySizeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeySizeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeySizeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyWrapAlgorithmBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyWrapAlgorithmImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyWrapAlgorithmMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.KeyWrapAlgorithmUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.LifetimeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.LifetimeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.LifetimeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.LifetimeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.OnBehalfOfBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.OnBehalfOfImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.OnBehalfOfMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.OnBehalfOfUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantsBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantsImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantsMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ParticipantsUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.PrimaryBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.PrimaryImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.PrimaryMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.PrimaryUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ProofEncryptionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ProofEncryptionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ProofEncryptionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ProofEncryptionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ReasonBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ReasonImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ReasonMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ReasonUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewTargetBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewTargetImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewTargetMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewTargetUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewingBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewingImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewingMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RenewingUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestKETBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestKETImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestKETMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestKETUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenCollectionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenCollectionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenCollectionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenCollectionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseCollectionBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseCollectionImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseCollectionMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseCollectionUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestSecurityTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedAttachedReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedAttachedReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedAttachedReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedAttachedReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedProofTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedProofTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedProofTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedProofTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedReferenceTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedReferenceTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedReferenceTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedSecurityTokenBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedSecurityTokenImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedSecurityTokenMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedSecurityTokenUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedTokenCancelledBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedTokenCancelledImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedTokenCancelledMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedTokenCancelledUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedUnattachedReferenceBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedUnattachedReferenceImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedUnattachedReferenceMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.RequestedUnattachedReferenceUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeResponseBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeResponseImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeResponseMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeResponseUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignChallengeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignWithBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignWithImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignWithMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignWithUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignatureAlgorithmBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignatureAlgorithmImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignatureAlgorithmMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.SignatureAlgorithmUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.StatusBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.StatusImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.StatusMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.StatusUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.TokenTypeBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.TokenTypeImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.TokenTypeMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.TokenTypeUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.UseKeyBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.UseKeyImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.UseKeyMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.UseKeyUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ValidateTargetBuilder",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ValidateTargetImpl",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ValidateTargetMarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.ValidateTargetUnmarshaller",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.opensaml.soap.wstrust.impl.package-info",
+    "allDeclaredConstructors": true
+  }
+]

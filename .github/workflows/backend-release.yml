@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
@@ -44,7 +46,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
       - name: Make Maven wrapper executable
@@ -53,11 +55,11 @@ jobs:
       - name: Install Maven dependencies
         run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
-      - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
 
-      - name: Build frontend assets
-        run: pnpm --dir src/main/frontend build
+      - name: Build web assets
+        run: pnpm --dir src/main/web build
 
       - name: Verify backend
         run: ./mvnw -B -ntp verify -Dskip.frontend=true
@@ -89,6 +91,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
@@ -105,7 +109,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/frontend/pnpm-lock.yaml
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
       - name: Make Maven wrapper executable
@@ -114,11 +118,11 @@ jobs:
       - name: Install Maven dependencies
         run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
-      - name: Install frontend dependencies
-        run: pnpm --dir src/main/frontend install --frozen-lockfile
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
 
-      - name: Build frontend assets
-        run: pnpm --dir src/main/frontend build
+      - name: Build web assets
+        run: pnpm --dir src/main/web build
 
       - name: Install UPX
         run: |
@@ -173,6 +177,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Check Docker Hub credentials
         run: |

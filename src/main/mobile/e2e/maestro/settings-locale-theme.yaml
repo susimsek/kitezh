@@ -1,0 +1,13 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- launchApp:
+    clearState: true
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- tapOn: "Turkish"
+- assertVisible: "Ayarlar"
+- assertVisible: "Görünüm"
+- tapOn: "Koyu"
+- assertVisible: "Koyu"
+- tapOn: "Açık"
+- assertVisible: "Açık"

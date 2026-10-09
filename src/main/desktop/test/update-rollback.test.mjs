@@ -5,6 +5,51 @@ import path from "node:path";
 import test from "node:test";
 
 import { restoreInstallation } from "../dist/update-watchdog.js";
+import { supportsAutoUpdate } from "../dist/update.js";
+
+test("keeps Linux system packages outside the in-app update path", () => {
+  assert.equal(
+    supportsAutoUpdate({
+      appImage: true,
+      packaged: true,
+      platform: "linux",
+    }),
+    true,
+  );
+  assert.equal(
+    supportsAutoUpdate({
+      appImage: false,
+      packaged: true,
+      platform: "linux",
+    }),
+    false,
+  );
+  assert.equal(
+    supportsAutoUpdate({
+      appImage: false,
+      packaged: true,
+      platform: "darwin",
+    }),
+    true,
+  );
+  assert.equal(
+    supportsAutoUpdate({
+      appImage: false,
+      packaged: false,
+      platform: "win32",
+    }),
+    false,
+  );
+  assert.equal(
+    supportsAutoUpdate({
+      appImage: true,
+      autoUpdate: "false",
+      packaged: true,
+      platform: "linux",
+    }),
+    false,
+  );
+});
 
 test("restores a backed-up installation and removes the recovery marker", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "kitezh-rollback-"));
