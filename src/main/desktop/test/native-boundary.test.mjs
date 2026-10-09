@@ -18,4 +18,6 @@ test("native desktop renderer does not depend on the Web component tree", async 
   assert.match(source, /api\.api\.request/);
   assert.doesNotMatch(source, /getSession|refreshToken|accessToken/);
   assert.match(source, /aria-busy/);
+  assert.match(source, /social-start/);
+  assert.match(source, /onCallback/);
 });

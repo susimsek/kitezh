@@ -33,3 +33,24 @@ export type AccountSocialLink = {
   configured: boolean;
   enabled: boolean;
 };
+
+export type DesktopSocialLinkStartRequest = {
+  state: string;
+  codeChallenge: string;
+};
+
+export type DesktopSocialLinkStartResponse = {
+  authorizationUrl: string;
+  state: string;
+  expiresAt: string;
+};
+
+export type DesktopSocialLinkCompleteRequest = {
+  code: string;
+  codeVerifier: string;
+};
+
+export type DesktopSocialLinkCompleteResponse = {
+  provider: string;
+  linked: boolean;
+};

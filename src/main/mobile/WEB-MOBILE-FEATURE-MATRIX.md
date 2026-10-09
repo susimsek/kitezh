@@ -49,8 +49,10 @@ platform behavior remain owned by Desktop. The web console remains available for
 not loaded as the desktop sign-in surface.
 
 The Account social-link list and unlink operation are native and use the bearer API. Starting a
-new provider link remains blocked until the backend exposes a desktop callback/session contract;
-the native client does not put an access token in a browser URL or silently reuse a browser cookie.
+provider link now uses a short-lived server transaction and native PKCE handoff through the
+validated `kitezh://social-link/callback` contract. Authenticated packaged native E2E coverage
+remains open; the native client does not put an access token in a browser URL or silently reuse a
+browser cookie.
 
 ## Native transformation rules
 

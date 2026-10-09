@@ -4,6 +4,12 @@ export type DesktopAuthCallback = {
   error: string | null;
 };
 
+export type DesktopSocialLinkCallback = {
+  state: string;
+  code: string | null;
+  error: string | null;
+};
+
 export type PendingAuthorization = {
   state: string;
   codeVerifier: string;
@@ -110,6 +116,32 @@ export function parseLogoutCallback(value: string, protocol = "kitezh") {
     );
   } catch {
     return false;
+  }
+}
+
+export function parseSocialLinkCallback(
+  value: string,
+  protocol = "kitezh",
+): DesktopSocialLinkCallback | null {
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== `${protocol}:` ||
+      url.hostname !== "social-link" ||
+      url.pathname !== "/callback" ||
+      url.hash
+    ) {
+      return null;
+    }
+    const state = url.searchParams.get("state");
+    if (!state) return null;
+    return {
+      state,
+      code: url.searchParams.get("code"),
+      error: url.searchParams.get("error"),
+    };
+  } catch {
+    return null;
   }
 }
 

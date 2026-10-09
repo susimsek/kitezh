@@ -5,6 +5,7 @@ import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.kitezh.security.LocalizedAuthenticationEntryPoint;
+import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
 import io.github.susimsek.kitezh.service.SamlLoginService;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialProviderSettingsService;
@@ -211,6 +212,9 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers("/account/avatar")
                                         .authenticated()
+                                        .requestMatchers(
+                                                "/account/social-links/*/desktop/authorize")
+                                        .permitAll()
                                         .requestMatchers("/account/social-links/**")
                                         .authenticated()
                                         .requestMatchers("/api/auth/**")
@@ -344,8 +348,11 @@ public class SecurityConfig {
                                                             socialDependencies
                                                                     .socialTokenResponseClient()))
                                     .failureHandler(
-                                            new SimpleUrlAuthenticationFailureHandler(
-                                                    LOGIN_ERROR_PATH))
+                                            new DesktopSocialLinkAuthenticationFailureHandler(
+                                                    socialDependencies
+                                                            .desktopSocialLinkTransactionService(),
+                                                    new SimpleUrlAuthenticationFailureHandler(
+                                                            LOGIN_ERROR_PATH)))
                                     .permitAll());
         }
 
@@ -377,8 +384,11 @@ public class SecurityConfig {
                                                     .samlAuthenticationRequestResolver())
                                     .successHandler(securityDependencies.samlLoginSuccessHandler())
                                     .failureHandler(
-                                            new SimpleUrlAuthenticationFailureHandler(
-                                                    LOGIN_ERROR_PATH))
+                                            new DesktopSocialLinkAuthenticationFailureHandler(
+                                                    socialDependencies
+                                                            .desktopSocialLinkTransactionService(),
+                                                    new SimpleUrlAuthenticationFailureHandler(
+                                                            LOGIN_ERROR_PATH)))
                                     .permitAll());
         }
 
@@ -474,14 +484,16 @@ public class SecurityConfig {
             SocialLoginService socialLoginService,
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
             OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
-                    socialTokenResponseClient) {
+                    socialTokenResponseClient,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
         return new SocialSecurityDependencies(
                 clientRegistrationRepository,
                 socialLoginSuccessHandler,
                 socialAuthorizationRequestResolver,
                 socialLoginService,
                 socialAuthorizedClientRepository,
-                socialTokenResponseClient);
+                socialTokenResponseClient,
+                desktopSocialLinkTransactionService);
     }
 
     record BrowserSecurityDependencies(
@@ -500,7 +512,28 @@ public class SecurityConfig {
             SocialLoginService socialLoginService,
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
             OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
-                    socialTokenResponseClient) {}
+                    socialTokenResponseClient,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+
+        SocialSecurityDependencies(
+                ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
+                ObjectProvider<SocialLoginAuthenticationSuccessHandler> socialLoginSuccessHandler,
+                ObjectProvider<OAuth2AuthorizationRequestResolver>
+                        socialAuthorizationRequestResolver,
+                SocialLoginService socialLoginService,
+                OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
+                OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+                        socialTokenResponseClient) {
+            this(
+                    clientRegistrationRepository,
+                    socialLoginSuccessHandler,
+                    socialAuthorizationRequestResolver,
+                    socialLoginService,
+                    socialAuthorizedClientRepository,
+                    socialTokenResponseClient,
+                    null);
+        }
+    }
 
     private static WebAuthnSettings resolveWebAuthnSettings(
             ApplicationProperties applicationProperties) {
@@ -652,6 +685,25 @@ public class SecurityConfig {
                     SecurityContextRepository securityContextRepository,
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
             SocialTokenService socialTokenService,
+            MfaService mfaService,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+        return new SocialLoginAuthenticationSuccessHandler(
+                socialLoginService,
+                userDetailsService,
+                securityContextRepository,
+                socialAuthorizedClientRepository,
+                socialTokenService,
+                mfaService,
+                desktopSocialLinkTransactionService);
+    }
+
+    SocialLoginAuthenticationSuccessHandler socialLoginAuthenticationSuccessHandler(
+            SocialLoginService socialLoginService,
+            org.springframework.security.core.userdetails.UserDetailsService userDetailsService,
+            @Qualifier("browserSecurityContextRepository")
+                    SecurityContextRepository securityContextRepository,
+            OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
+            SocialTokenService socialTokenService,
             MfaService mfaService) {
         return new SocialLoginAuthenticationSuccessHandler(
                 socialLoginService,
@@ -659,7 +711,8 @@ public class SecurityConfig {
                 securityContextRepository,
                 socialAuthorizedClientRepository,
                 socialTokenService,
-                mfaService);
+                mfaService,
+                null);
     }
 
     @Bean
@@ -668,9 +721,14 @@ public class SecurityConfig {
             org.springframework.security.core.userdetails.UserDetailsService userDetailsService,
             @Qualifier("browserSecurityContextRepository")
                     SecurityContextRepository securityContextRepository,
-            MfaService mfaService) {
+            MfaService mfaService,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
         return new SamlLoginAuthenticationSuccessHandler(
-                samlLoginService, userDetailsService, securityContextRepository, mfaService);
+                samlLoginService,
+                userDetailsService,
+                securityContextRepository,
+                mfaService,
+                desktopSocialLinkTransactionService);
     }
 
     @Bean(name = "formAuthenticationManager")

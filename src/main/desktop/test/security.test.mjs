@@ -6,6 +6,7 @@ import {
   isPendingAuthorizationValid,
   parseAuthCallback,
   parseLogoutCallback,
+  parseSocialLinkCallback,
   sanitizedAuthCallback,
 } from "../dist/security/auth-flow.js";
 import {
@@ -60,6 +61,35 @@ test("accepts only the exact native logout callback", () => {
   assert.equal(
     parseLogoutCallback("https://example.com/logout/callback"),
     false,
+  );
+});
+
+test("accepts only a social-link callback without fragment data", () => {
+  assert.deepEqual(
+    parseSocialLinkCallback(
+      "kitezh://social-link/callback?state=state-1&code=completion-1",
+    ),
+    { state: "state-1", code: "completion-1", error: null },
+  );
+  assert.deepEqual(
+    parseSocialLinkCallback(
+      "kitezh://social-link/callback?state=state-2&error=authorization_failed",
+    ),
+    { state: "state-2", code: null, error: "authorization_failed" },
+  );
+  assert.equal(
+    parseSocialLinkCallback(
+      "kitezh://social-link/callback?state=state-1&code=completion-1#fragment",
+    ),
+    null,
+  );
+  assert.equal(
+    parseSocialLinkCallback("kitezh://oauth/callback?state=state-1"),
+    null,
+  );
+  assert.equal(
+    parseSocialLinkCallback("https://example.test/social-link/callback?state=state-1"),
+    null,
   );
 });
 

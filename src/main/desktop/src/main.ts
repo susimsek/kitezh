@@ -37,10 +37,16 @@ import {
   isPendingAuthorizationValid,
   parseAuthCallback,
   parseLogoutCallback,
+  parseSocialLinkCallback,
   sanitizedAuthCallback,
   type DesktopTokens,
   type PendingAuthorization as PendingAuthorizationData,
 } from "./security/auth-flow";
+import type {
+  DesktopSocialLinkCompleteRequest,
+  DesktopSocialLinkStartRequest,
+  DesktopSocialLinkStartResponse,
+} from "@kitezh/shared";
 import {
   isTrustedRendererFrame,
   isTrustedRendererUrl,
@@ -223,6 +229,8 @@ let latestUpdateStatus: DesktopUpdateStatus | null = null;
 let logoutMenuItem: MenuItem | null = null;
 type ConsoleName = "admin" | "account";
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
+type PendingSocialLink = PendingAuthorizationData & { provider: string };
+const pendingSocialLinks = new Map<string, PendingSocialLink>();
 type StoredTokens = DesktopTokens;
 type UpdatePreferences = {
   skippedVersion?: string;
@@ -754,6 +762,56 @@ async function sendDeepLink(value: string) {
     }
     return;
   }
+  const socialLinkCallback = parseSocialLinkCallback(value);
+  if (socialLinkCallback) {
+    const pending = pendingSocialLinks.get(socialLinkCallback.state);
+    if (!pending || !isPendingAuthorizationValid(pending, socialLinkCallback.state)) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      return;
+    }
+    if (!mainWindow) {
+      pendingDeepLink = value;
+      return;
+    }
+    const sendSocialLinkCallback = (payload: {
+      provider: string;
+      error?: string;
+    }) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("desktop:social-link-callback", payload);
+      }
+    };
+    if (socialLinkCallback.error || !socialLinkCallback.code) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      sendSocialLinkCallback({
+        provider: pending.provider,
+        error: socialLinkCallback.error ?? "authorization_failed",
+      });
+      return;
+    }
+    const response = await desktopApiAdapter.request({
+      console: "account",
+      method: "POST",
+      path: "/api/account/social-links/desktop/complete",
+      body: {
+        code: socialLinkCallback.code,
+        codeVerifier: pending.codeVerifier,
+      } satisfies DesktopSocialLinkCompleteRequest,
+    });
+    if (response.status >= 200 && response.status < 300) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      sendSocialLinkCallback({ provider: pending.provider });
+    } else if (response.status !== 0 && response.status < 500) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      sendSocialLinkCallback({
+        provider: pending.provider,
+        error: response.kind ?? "link_failed",
+      });
+    } else {
+      sendSocialLinkCallback({ provider: pending.provider, error: response.kind ?? "link_failed" });
+    }
+    return;
+  }
   const callback = parseAuthCallback(value);
   if (!callback) return;
   const pending = [...pendingAuthorizations.entries()].find(([, value]) =>
@@ -1026,6 +1084,77 @@ const desktopApiAdapter = createDesktopApiAdapter({
 
 function base64Url(value: Buffer) {
   return value.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function assertSocialProvider(value: unknown): asserts value is string {
+  if (typeof value !== "string" || !/^[a-z0-9][a-z0-9_-]{0,49}$/.test(value)) {
+    throw new Error("Invalid social provider");
+  }
+}
+
+function nativeSocialLinkRequest(provider: string) {
+  const state = base64Url(randomBytes(32));
+  const codeVerifier = base64Url(randomBytes(32));
+  const codeChallenge = base64Url(
+    createHash("sha256").update(codeVerifier).digest(),
+  );
+  return {
+    request: {
+      state,
+      codeChallenge,
+    } satisfies DesktopSocialLinkStartRequest,
+    pending: {
+      state,
+      codeVerifier,
+      clientId: "desktop-account-console",
+      redirectUri: "kitezh://social-link/callback",
+      createdAt: Date.now(),
+      provider,
+    } satisfies PendingSocialLink,
+  };
+}
+
+async function startNativeSocialLink(providerValue: unknown) {
+  assertSocialProvider(providerValue);
+  if ([...pendingSocialLinks.values()].some((pending) => pending.provider === providerValue)) {
+    return { status: 409, kind: "http", body: null };
+  }
+  const nativeRequest = nativeSocialLinkRequest(providerValue);
+  const response = await desktopApiAdapter.request({
+    console: "account",
+    method: "POST",
+    path: `/api/account/social-links/${encodeURIComponent(providerValue)}/desktop/start`,
+    body: nativeRequest.request,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    return { status: response.status, kind: response.kind, body: null };
+  }
+  const body = response.body as Partial<DesktopSocialLinkStartResponse> | null;
+  if (
+    !body ||
+    typeof body.authorizationUrl !== "string" ||
+    body.state !== nativeRequest.pending.state ||
+    typeof body.expiresAt !== "string"
+  ) {
+    return { status: 502, kind: "server", body: null };
+  }
+  const authorizationUrl = new URL(body.authorizationUrl);
+  if (
+    authorizationUrl.origin !== getApiBaseUrl() ||
+    authorizationUrl.pathname !==
+      `/account/social-links/${providerValue}/desktop/authorize` ||
+    !authorizationUrl.searchParams.get("transaction")
+  ) {
+    return { status: 502, kind: "server", body: null };
+  }
+  pendingSocialLinks.set(nativeRequest.pending.state, nativeRequest.pending);
+  try {
+    await shell.openExternal(authorizationUrl.toString());
+  } catch {
+    pendingSocialLinks.delete(nativeRequest.pending.state);
+    return { status: 0, kind: "offline", body: null };
+  }
+  return { status: 202, kind: null, body: null };
 }
 
 function nativeAuthorizationRequest(consoleName: ConsoleName) {
@@ -2620,6 +2749,10 @@ function registerIpc() {
     assertTrustedSender(event);
     assertConsole(consoleName);
     await logoutDesktopSession(consoleName);
+  });
+  ipcMain.handle("desktop:social-link-start", async (event, provider: unknown) => {
+    assertTrustedSender(event);
+    return startNativeSocialLink(provider);
   });
   ipcMain.handle("desktop:api-request", async (event, request: unknown) => {
     assertTrustedSender(event);

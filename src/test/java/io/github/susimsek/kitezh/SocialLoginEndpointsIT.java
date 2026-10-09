@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -83,6 +84,23 @@ class SocialLoginEndpointsIT {
                     socialIdentityRepository.findAllByUserUsername(username));
             userRepository.deleteById(user.getId());
         }
+    }
+
+    @Test
+    void desktopSocialLinkContractRejectsInvalidPkceValues() throws Exception {
+        mockMvc.perform(
+                        post("/api/account/social-links/google/desktop/start")
+                                .with(accountUser("validation-user"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"state\":\"short\",\"codeChallenge\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        post("/api/account/social-links/desktop/complete")
+                                .with(accountUser("validation-user"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"code\":\"short\",\"codeVerifier\":\"short\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     private static JwtRequestPostProcessor admin() {

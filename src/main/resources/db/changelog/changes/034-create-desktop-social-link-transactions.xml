@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+	<changeSet id="034-create-desktop-social-link-transactions" author="susimsek">
+		<createSequence sequenceName="desktop_social_link_tx_seq" startValue="1" incrementBy="1"/>
+		<createTable tableName="desktop_social_link_transaction">
+			<column name="id" type="bigint">
+				<constraints primaryKey="true" nullable="false" primaryKeyName="pk_desktop_social_link_tx"/>
+			</column>
+			<column name="user_id" type="bigint"><constraints nullable="false"/></column>
+			<column name="provider" type="varchar(50)"><constraints nullable="false"/></column>
+			<column name="authorization_token_hash" type="varchar(64)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="ux_desktop_social_link_tx_auth_hash"/>
+			</column>
+			<column name="code_challenge" type="varchar(128)"><constraints nullable="false"/></column>
+			<column name="state" type="varchar(256)"><constraints nullable="false"/></column>
+			<column name="completion_code_hash" type="varchar(64)">
+				<constraints unique="true" uniqueConstraintName="ux_desktop_social_link_tx_completion_hash"/>
+			</column>
+			<column name="created_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="expires_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="completed_at" type="timestamp"/>
+			<column name="consumed_at" type="timestamp"/>
+		</createTable>
+		<addForeignKeyConstraint
+			baseTableName="desktop_social_link_transaction"
+			baseColumnNames="user_id"
+			constraintName="fk_desktop_social_link_tx_user"
+			referencedTableName="users"
+			referencedColumnNames="id"
+			onDelete="CASCADE"/>
+		<createIndex tableName="desktop_social_link_transaction" indexName="ix_desktop_social_link_tx_user_expiry">
+			<column name="user_id"/>
+			<column name="expires_at"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

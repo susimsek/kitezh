@@ -23,6 +23,20 @@ contextBridge.exposeInMainWorld("desktopApi", {
     getStorageStatus: () => ipcRenderer.invoke("desktop:auth-storage-status"),
     openConsole: (consoleName: unknown) =>
       ipcRenderer.invoke("desktop:auth-open-console", consoleName),
+    socialLink: {
+      start: (provider: unknown) =>
+        ipcRenderer.invoke("desktop:social-link-start", provider),
+      onCallback: (
+        listener: (callback: { provider: string; error?: string }) => void,
+      ) => {
+        const callback = (
+          _event: Electron.IpcRendererEvent,
+          value: { provider: string; error?: string },
+        ) => listener(value);
+        ipcRenderer.on("desktop:social-link-callback", callback);
+        return () => ipcRenderer.removeListener("desktop:social-link-callback", callback);
+      },
+    },
   },
   getConfig: () => ipcRenderer.invoke("desktop:config"),
   getAppVersion: () => ipcRenderer.invoke("desktop:app-version"),

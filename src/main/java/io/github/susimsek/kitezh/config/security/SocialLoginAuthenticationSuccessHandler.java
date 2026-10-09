@@ -1,5 +1,6 @@
 package io.github.susimsek.kitezh.config.security;
 
+import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
 import io.github.susimsek.kitezh.service.SocialAccountLinkRequiredException;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialTokenService;
@@ -42,6 +43,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     private final OAuth2AuthorizedClientRepository authorizedClientRepository;
     private final SocialTokenService socialTokenService;
     private final MfaService mfaService;
+    private final DesktopSocialLinkTransactionService desktopSocialLinkTransactionService;
     private final AuthenticationFailureHandler failureHandler =
             new SimpleUrlAuthenticationFailureHandler("/login?error");
     private final AuthenticationFailureHandler accountLinkFailureHandler =
@@ -54,13 +56,15 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             SecurityContextRepository securityContextRepository,
             OAuth2AuthorizedClientRepository authorizedClientRepository,
             SocialTokenService socialTokenService,
-            MfaService mfaService) {
+            MfaService mfaService,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
         this.socialLoginService = socialLoginService;
         this.userDetailsService = userDetailsService;
         this.securityContextRepository = securityContextRepository;
         this.authorizedClientRepository = authorizedClientRepository;
         this.socialTokenService = socialTokenService;
         this.mfaService = mfaService;
+        this.desktopSocialLinkTransactionService = desktopSocialLinkTransactionService;
     }
 
     public SocialLoginAuthenticationSuccessHandler(
@@ -75,6 +79,24 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
                 securityContextRepository,
                 authorizedClientRepository,
                 socialTokenService,
+                null,
+                null);
+    }
+
+    public SocialLoginAuthenticationSuccessHandler(
+            SocialLoginService socialLoginService,
+            UserDetailsService userDetailsService,
+            SecurityContextRepository securityContextRepository,
+            OAuth2AuthorizedClientRepository authorizedClientRepository,
+            SocialTokenService socialTokenService,
+            MfaService mfaService) {
+        this(
+                socialLoginService,
+                userDetailsService,
+                securityContextRepository,
+                authorizedClientRepository,
+                socialTokenService,
+                mfaService,
                 null);
     }
 
@@ -82,7 +104,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             SocialLoginService socialLoginService,
             UserDetailsService userDetailsService,
             SecurityContextRepository securityContextRepository) {
-        this(socialLoginService, userDetailsService, securityContextRepository, null, null);
+        this(socialLoginService, userDetailsService, securityContextRepository, null, null, null);
     }
 
     @Override
@@ -93,6 +115,26 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             if (!(authentication instanceof OAuth2AuthenticationToken oauth2Authentication)) {
                 throw new IllegalStateException("Social login requires an OAuth2 authentication");
             }
+            jakarta.servlet.http.HttpSession session = request.getSession(false);
+            Object desktopPending =
+                    session == null
+                            ? null
+                            : session.getAttribute(
+                                    DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+            if (desktopPending instanceof String token
+                    && desktopSocialLinkTransactionService != null) {
+                DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion completion =
+                        desktopSocialLinkTransactionService.completeFromBrowser(
+                                token,
+                                oauth2Authentication.getAuthorizedClientRegistrationId(),
+                                oauth2Authentication);
+                session.removeAttribute(
+                        DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+                response.sendRedirect(
+                        desktopSocialLinkTransactionService.callbackUrl(
+                                completion.state(), completion.code(), null));
+                return;
+            }
             OAuth2AuthorizedClient authorizedClient =
                     authorizedClientRepository == null
                             ? null
@@ -100,7 +142,6 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
                                     oauth2Authentication.getAuthorizedClientRegistrationId(),
                                     oauth2Authentication,
                                     request);
-            jakarta.servlet.http.HttpSession session = request.getSession(false);
             Object linkTarget =
                     session == null
                             ? null
