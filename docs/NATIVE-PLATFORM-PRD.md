@@ -279,12 +279,12 @@ acceptance evidence is linked in the feature matrix.
 - [~] Mobile Admin client registration and isolated session namespace: `mobile-admin-console` is registered with the `admin-api` scope, `kitezh://admin/oauth/callback` and `kitezh://admin/logout/callback` redirects, and a separate `kitezh.mobile.admin.session` SecureStore key; native Admin screens remain to be built
 - [~] Mobile native Admin shell and navigation: `/admin` now has a native sign-in boundary, Admin session provider, dashboard shell, tab navigation, loading, 401/403, and retry states; resource screens remain to be built
 - [~] Mobile Admin pagination, filters, authority-aware actions, and confirmations: native Users, Clients, Client Scopes, Roles, Groups, Identity Providers, Sessions, and Consents tabs use bounded server-side query, page, size, and stable sort requests with loading, empty, 401/403, retry, and disabled pagination states; Users, active-session termination, and consent-revocation actions are server-authorized with native confirmation, while broader resource actions remain
-- [~] Android/iOS development-build and device E2E coverage: Maestro cold-start, settings locale/theme, and authenticated fixture flows are checked in under `src/main/mobile/e2e/maestro`, with a manually triggered Android emulator/iOS simulator workflow in `.github/workflows/mobile-native-e2e.yml`; completed device callback/offline evidence remains
+- [~] Android/iOS development-build and device E2E coverage: Maestro cold-start, settings locale/theme, and authenticated fixture flows are checked in under `src/main/mobile/e2e/maestro`, with a manually triggered Android emulator/iOS simulator workflow in `.github/workflows/mobile-native-e2e.yml`; Android and iOS debug packages now build, install, and launch locally, while completed device callback/offline evidence remains
 - [~] Mobile store-first release and rollback strategy documented in `src/main/mobile/README.md` and `eas.json`; EAS project, staged rollout, and OTA configuration remain
 - [~] Mobile in-app notification adapter with localized auto-dismiss feedback (`MobileNoticeProvider`); OS permission and authenticated action-routing remain blocked until a backend event contract and native E2E harness are available
 - [~] Mobile signing ownership, app-version runtime boundary, and release profiles documented; GitHub CI now runs the mobile quality gate, while EAS signing, native device builds, staged rollout evidence, and store metadata remain
-- [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; deterministic fixture contract test, authenticated flow, and CI fixture health are present, while a completed device run remains
-- [~] Desktop package metadata smoke check added in `src/main/desktop/test/package-metadata.test.mjs`; macOS/Windows/Linux packaged startup, protocol, storage, asset, and signed-artifact runs remain
+- [~] Mobile native E2E harness and fixture contract selected for Maestro in `src/main/mobile/e2e/README.md`; deterministic fixture contract test, authenticated flow, and CI fixture health are present, while a completed device run remains (Android and iOS package install/launch were verified locally)
+- [~] Desktop package metadata smoke check added in `src/main/desktop/test/package-metadata.test.mjs`; desktop typecheck, unit (13/13), and E2E (9/9) runs pass locally, while macOS/Windows/Linux packaged startup, protocol, storage, asset, and signed-artifact runs remain
 - [~] Linux system-package handoff is enforced by `supportsAutoUpdate` and covered by desktop tests; packaged AppImage rollback and `.deb`/`.rpm`/`.snap` smoke evidence remain
 - [~] Desktop update-manifest signature verification is covered by `src/main/desktop/test/update-signature.test.mjs` and CI Sigstore/checksum steps; cross-platform signed release evidence remains
 - [~] Desktop accessibility screenshots and native control checks
@@ -298,6 +298,29 @@ acceptance evidence is linked in the feature matrix.
 - [~] Secret, log, diagnostics, and external-navigation security gate: `check-native-security.mjs` rejects diagnostic logging and token-bearing URLs; allowlisted external-navigation and packaged privacy evidence remain
 - [~] Focused CI and packaged smoke-test gate: mobile typecheck, lint, unit tests, boundary checks, web build, and fixture contract run in `mobile-quality`; Android/iOS packaged device evidence remains manual
 - [~] Feature-matrix evidence and explicit blocker gate: PRD and mobile matrix link boundary, fixture, deep-link, Maestro, and workflow evidence; authenticated callback/offline/device results remain explicit blockers
+
+### Local verification record (2026-10-09)
+
+The following results are from the source and local runs on macOS arm64. They are recorded
+separately from the 22-item completion checklist: a local unit or development-build pass does not
+complete an item whose acceptance criteria still require an authenticated flow, a packaged artifact,
+both operating systems, or a real-device run.
+
+| Status | Target | Local result | Evidence | Checklist impact |
+| --- | --- | --- | --- | --- |
+| `[x]` | Desktop native infrastructure | **Passed locally** | `pnpm --dir src/main/desktop run typecheck`; `test:unit` (13/13); `test:e2e` (9/9), including settings, second-launch focus, developer-tools toggle, update available/up-to-date/error, and theme/locale coverage | Native unauthenticated surfaces are verified; authenticated native Admin/Account screens and cross-platform packaged/signed smoke tests remain `[~]` |
+| `[x]` | Mobile contracts and static quality | **Passed locally** | `pnpm --dir src/main/mobile run typecheck`, `lint`, `test` (22/22), `test:fixture` (1/1), `check:expo-config`, `check:boundaries`, and `check:security` | Source-level boundary, contract, fixture, and security checks are verified; device callback/offline/accessibility evidence remains `[~]` |
+| `[x]` | Android development build | **Passed locally** | `expo run:android --no-bundler` built and installed `app-debug.apk` on `Medium_Phone_API_37.0` (`emulator-5554`) after using Homebrew OpenJDK 17 for the Android Gradle process; Expo SDK dependencies were aligned so Metro now bundles `expo-router` successfully, and the emulator reached the native landing screen without a fatal exception or red bundle-error screen | This proves the debug package can be built, installed, and launched, but does not complete Android authenticated/device E2E acceptance; items 4, 8, 19, 21, and 22 remain `[~]` |
+| `[x]` | Android release build | **Passed locally** | `./gradlew :app:assembleRelease` completed successfully with the aligned Expo dependencies and produced the release APK; only upstream deprecation/compiler warnings were emitted | Packaged release signing, installation, authenticated flows, and store delivery remain `[~]` |
+| `[x]` | Android Java toolchain | **Fixed locally** | GraalVM Java 25 and the local GraalVM Java 17 both failed Android SDK 36 `JdkImageTransform`; the same source built successfully with `/opt/homebrew/opt/openjdk@17` | Keep the repository/backend on Java 25; use a standard OpenJDK 17 toolchain for Expo/Gradle Android builds |
+| `[x]` | iOS development build | **Passed locally** | Xcode 26.6 (17F113), iOS 26.5 simulator runtime, `expo run:ios --no-bundler --device "iPhone 17"`, and Metro reload completed; the native app installed and opened on the iPhone 17 simulator without a red bundle-error screen | This proves the debug package can be built, installed, and launched, but does not complete iOS authenticated/device E2E acceptance; items 4, 8, 19, 21, and 22 remain `[~]` |
+| `[~]` | Authenticated device E2E | **Not verified** | The local Android and iOS installs were development packages; no completed Maestro/real-device callback, refresh, logout, offline, or accessibility run was recorded | Items 4, 8, 12–15, 19, 21, and 22 remain `[~]` until the focused device evidence is linked |
+
+The local evidence therefore confirms that the existing native source and test harnesses are
+healthy, but it does not claim native parity. The remaining `[~]` markers above are intentional:
+they require the missing authenticated desktop/mobile screens, backend/client registrations where
+noted, packaged cross-platform artifacts, or device-level acceptance evidence. Generated Android
+build output and emulator state are local-only and must not be committed.
 
 ## Shared/native architecture contract
 
