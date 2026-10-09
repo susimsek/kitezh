@@ -281,6 +281,70 @@ smoke, and cross-platform release evidence are available.
 - [~] Desktop P0 Account vertical slice: profile, password, sessions, offline sessions, applications, MFA, account deletion, settings, and social-link read/unlink are native. Social-provider link start now uses a short-lived server transaction, native PKCE verifier, authenticated bearer completion, and a validated `kitezh://social-link/callback`; authenticated packaged E2E and macOS/Windows/Linux package evidence remain open.
 - [~] Shared/native contract boundary: shared changes are limited to API/session contracts, icon metadata, semantic tokens, and English/Turkish message values. Desktop source has no Web component, React-Bootstrap, or browser-storage dependency; full packaged/authenticated evidence remains.
 
+#### Windows Google authentication evidence (2026-10-09)
+
+Google authentication was established interactively in Chrome. The opt-in
+`src/main/desktop/e2e/google-authenticated.test.mjs` then passed with a real
+system-browser / Windows `kitezh://` callback (no callback injection or token mocks),
+Account profile and social-link HTTP 200 responses, a linked Google identity, no
+Admin vault session, and an encrypted Account session surviving Electron restart.
+Repeat runs reused the Google-backed browser SSO session; they are not evidence
+of a fresh Google password/consent prompt on every run.
+
+Verification: backend unit tests 1456/1456, focused callback integration 1/1,
+Desktop unit tests 19/19, Electron E2E 10/10, typecheck/build, Spotless,
+Checkstyle, and `git diff --check` passed. The local unpacked Windows package
+and seeded-login packaged PKCE E2E also passed (1/1); the latter injects callback
+delivery and is not real Google or signed-installer evidence. JVM packaging passed;
+GraalVM native-executable validation was not run because `native-image` is unavailable.
+
+Regression coverage includes the OAuth/OIDC provider manager, standards-compliant
+token response/error conversion, disposable unreadable login-failure attributes
+(security-context corruption still fails closed), and Windows protocol registration
+using the actual application path rather than Playwright's `--inspect=0` argument.
+The native sign-in spinner remains pending until callback/error/timeout and rejects
+duplicate requests. See `src/main/desktop/e2e/README.md` for the live test procedure.
+The broader P0 checklist stays `[~]`: this evidence does not complete native Admin,
+all Account mutations, real-provider packaged E2E, or macOS/Linux release validation.
+
+Manual testing exposed two additional Admin startup defects: closing the native
+chooser during a console transition could quit an unauthenticated process, and
+hydrating an already authenticated Admin session started authorization again.
+Both are covered by `native login chooser stays alive and authenticated Admin does
+not reopen the browser` in the Electron E2E suite (11/11). The regression first
+failed on process exit, then on a second browser launch, and passed after the fixes.
+The live Google harness now starts from the visible native chooser, not the hidden
+main-window chooser; earlier source evidence did not cover that entry path.
+The updated live Google Account test passed through the visible chooser, actual
+Windows callback, protected APIs, and restart persistence. The Admin loop regression
+uses synthetic tokens; it is not proof of a fresh Google-to-Admin login. The user
+subsequently confirmed that the opening-loop defect is fixed; fresh Google-to-Admin
+authorization remains separate from that lifecycle acceptance.
+
+Google logout regression verified on Windows (2026-10-09): the unsupported global
+`https://accounts.google.com/Logout?continue=...` fallback and its `continue`
+construction are removed. Without a discovered OIDC end-session endpoint, the
+standard Kitezh OIDC logout handler invalidates the local browser session and
+returns directly to the validated, registered client callback. Google browser
+account SSO intentionally remains signed in; no provider credentials or client
+registrations are changed.
+
+Evidence: logout resolver/handler unit tests 15/15 (five regression failures before
+the fix), backend unit suite 1459/1459, and `SocialLoginLogoutIT` 8/8 cover Desktop
+Admin/Account in English/Turkish, session deletion, reauthentication after logout,
+and rejection of an unregistered callback without invalidating the session. The
+existing OAuth callback integration also passed (1/1). Desktop unit tests 19/19,
+Electron regression E2E 11/11, typecheck/build, Spotless, Checkstyle, and
+`git diff --check` passed.
+
+The updated real Google test passed (1/1), including actual Windows logout callback
+delivery, vault clearing, and the signed-out console chooser after renderer reload.
+It does not inject logout callbacks. The first live logout run reached the callback
+and cleared the vault but failed a harness-only expectation for a Sign-in button;
+the corrected assertion checks the actual signed-out console chooser. This remains
+source Electron evidence, not real-provider packaged, macOS/Linux, or GraalVM native
+executable validation. No commit or push was performed.
+
 ### Şuayb progress checklist
 
 `[ ]` not started, `[~]` in progress, and `[x]` complete. An item becomes `[x]` only after its

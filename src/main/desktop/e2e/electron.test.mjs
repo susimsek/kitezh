@@ -90,11 +90,38 @@ async function nativeMainWindow(application) {
 async function windowWithHeading(application, name) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     for (const window of application.windows()) {
-      if (await window.getByRole("heading", { name }).count()) return window;
+      if (window.isClosed()) continue;
+      try {
+        if (await window.getByRole("heading", { name }).count()) return window;
+      } catch (error) {
+        // Transient checking windows can close between enumeration and lookup.
+        if (!window.isClosed()) throw error;
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`Window with heading ${String(name)} did not become available`);
+  throw new Error(
+    `Window with heading ${String(name)} did not become available`,
+  );
+}
+
+async function closeNativeSettings(application) {
+  // A Playwright page close precedes BrowserWindow's closed event. Waiting for
+  // the latter prevents the next menu action from focusing the closing window.
+  await application.evaluate(
+    ({ BrowserWindow }) =>
+      new Promise((resolve) => {
+        const window = BrowserWindow.getAllWindows().find((candidate) =>
+          candidate.webContents.getURL().includes("/desktop-settings"),
+        );
+        if (!window) {
+          resolve();
+          return;
+        }
+        window.once("closed", resolve);
+        window.close();
+      }),
+  );
 }
 
 async function openManualUpdateCheck(
@@ -103,16 +130,16 @@ async function openManualUpdateCheck(
   expectNextWindow = true,
 ) {
   const checkingWindowPromise = application.waitForEvent("window");
+  // Observe both windows before clicking: a fast result can arrive before the
+  // checking window's DOM is ready.
+  const nextWindowPromise = expectNextWindow
+    ? windowWithHeading(
+        application,
+        /A new version of Kitezh is available!|Kitezh is up to date/,
+      )
+    : null;
   await clickApplicationMenuItem(application, label);
   const checkingWindow = await checkingWindowPromise;
-  const nextWindowPromise = expectNextWindow
-    ? application.waitForEvent("window")
-    : null;
-  await checkingWindow
-    .getByRole("heading", {
-      name: /Checking for updates|Güncellemeler denetleniyor/,
-    })
-    .waitFor();
   return { checkingWindow, nextWindowPromise };
 }
 
@@ -124,8 +151,27 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
     await window.getByRole("heading", { name: "Choose a console" }).waitFor();
 
     assert.equal(await window.url(), "app://renderer/native");
-    assert.equal(await window.getByRole("button", { name: "Administration Console" }).count(), 1);
-    assert.equal(await window.getByRole("button", { name: "Account Console" }).count(), 1);
+    if (process.platform === "win32") {
+      assert.equal(
+        await application.evaluate(({ app }) =>
+          app.isDefaultProtocolClient("kitezh", process.execPath, [
+            app.getAppPath(),
+          ]),
+        ),
+        true,
+        "Protocol registration must use the application path, not debugger argv flags",
+      );
+    }
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Administration Console" })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await window.getByRole("button", { name: "Account Console" }).count(),
+      1,
+    );
     assert.equal(await window.locator(".desktop-console-option").count(), 0);
     const nativeLogin = application
       .windows()
@@ -152,6 +198,134 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
         isDesktop: true,
         version: packageVersion,
       },
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("keeps native sign-in busy until callback and rejects duplicate authorization", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window
+      .getByRole("button", { name: "Account Console", exact: true })
+      .click();
+    const signIn = window.getByRole("button", { name: "Sign in", exact: true });
+    await signIn.waitFor();
+    assert.equal(await signIn.isDisabled(), true);
+    assert.equal(await signIn.locator(".spinner").count(), 1);
+    assert.equal(await signIn.getAttribute("aria-busy"), "true");
+    const duplicateRejected = await window.evaluate(async () => {
+      try {
+        await window.desktopApi.auth.startLogin("account");
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    assert.equal(duplicateRejected, true);
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&error=access_denied`,
+      );
+    });
+    await window.getByRole("alert").waitFor();
+    assert.equal(await signIn.isDisabled(), false);
+    assert.equal(await signIn.locator(".spinner").count(), 0);
+  } finally {
+    await application.close();
+  }
+});
+
+test("native login chooser stays alive and authenticated Admin does not reopen the browser", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__authorizationOpens = 0;
+      shell.openExternal = async (url) => {
+        globalThis.__authorizationOpens += 1;
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url) => {
+        if (!String(url).endsWith("/oauth2/token"))
+          throw new Error("Unexpected Account API request");
+        return new Response(
+          JSON.stringify({
+            access_token: "test-admin-access-token",
+            expires_in: 3600,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      };
+    });
+    const window = await nativeMainWindow(application);
+    let chooser;
+    for (let attempt = 0; attempt < 100 && !chooser; attempt += 1) {
+      chooser = application
+        .windows()
+        .find((page) => page.url() === "app://renderer/desktop-login");
+      if (!chooser) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(chooser, "Visible native login chooser must exist");
+    await chooser
+      .getByRole("button", { name: "Sign in to Admin Console", exact: true })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in", exact: true })
+      .waitFor();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Sign in", exact: true })
+        .isDisabled(),
+      true,
+    );
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=test-admin-code`,
+      );
+    });
+    await window
+      .getByRole("button", { name: "Sign out", exact: true })
+      .waitFor();
+    await window.waitForTimeout(500);
+    assert.deepEqual(
+      await window.evaluate(async () => ({
+        admin: await window.desktopApi.auth.hasSession("admin"),
+        account: await window.desktopApi.auth.hasSession("account"),
+      })),
+      { admin: true, account: false },
+    );
+    assert.equal(
+      await application.evaluate(() => globalThis.__authorizationOpens),
+      1,
+    );
+    await window.reload();
+    await window
+      .getByRole("button", { name: "Sign out", exact: true })
+      .waitFor();
+    await window.waitForTimeout(500);
+    assert.equal(
+      await application.evaluate(() => globalThis.__authorizationOpens),
+      1,
     );
   } finally {
     await application.close();
@@ -270,7 +444,9 @@ test("opens settings in a separate window without requiring login", async () => 
       .waitFor();
     assert.equal(
       await settingsWindow
-        .getByRole("button", { name: /Copy diagnostics|Tanı bilgilerini kopyala/ })
+        .getByRole("button", {
+          name: /Copy diagnostics|Tanı bilgilerini kopyala/,
+        })
         .count(),
       1,
     );
@@ -330,13 +506,12 @@ test("opens the native quick access companion from View", async () => {
         .count(),
       1,
     );
-    for (const button of await companionWindow
-      .getByRole("button")
-      .all()) {
+    for (const button of await companionWindow.getByRole("button").all()) {
       assert.equal(await button.getAttribute("aria-busy"), null);
       assert.equal(
         await button.evaluate(
-          (element) => Number.parseFloat(getComputedStyle(element).minHeight) >= 44,
+          (element) =>
+            Number.parseFloat(getComputedStyle(element).minHeight) >= 44,
         ),
         true,
       );
@@ -346,8 +521,8 @@ test("opens the native quick access companion from View", async () => {
     });
     await accountButton.focus();
     assert.equal(
-      await companionWindow.evaluate(
-        () => document.activeElement?.getAttribute("data-console"),
+      await companionWindow.evaluate(() =>
+        document.activeElement?.getAttribute("data-console"),
       ),
       "account",
     );
@@ -379,13 +554,17 @@ test("brings the existing window forward on a second launch", async () => {
 
     await application.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()
-        .find((window) => window.webContents.getURL() === "app://renderer/native")
+        .find(
+          (window) => window.webContents.getURL() === "app://renderer/native",
+        )
         ?.hide();
     });
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .find((window) => window.webContents.getURL() === "app://renderer/native")
+          .find(
+            (window) => window.webContents.getURL() === "app://renderer/native",
+          )
           ?.isVisible(),
       ),
       false,
@@ -398,7 +577,9 @@ test("brings the existing window forward on a second launch", async () => {
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .find((window) => window.webContents.getURL() === "app://renderer/native")
+          .find(
+            (window) => window.webContents.getURL() === "app://renderer/native",
+          )
           ?.isVisible(),
       ),
       true,
@@ -580,11 +761,13 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       .waitFor();
     await settingsWindow.getByRole("heading", { name: "Ayarlar" }).waitFor();
     const settingsClosed = settingsWindow.waitForEvent("close");
-    await settingsWindow.close();
+    await closeNativeSettings(application);
     await settingsClosed;
-    const reopenedSettingsWindowPromise = application.waitForEvent("window");
     await clickApplicationMenuItem(application, "Ayarlar…");
-    const reopenedSettingsWindow = await reopenedSettingsWindowPromise;
+    const reopenedSettingsWindow = await windowWithHeading(
+      application,
+      "Ayarlar",
+    );
     await reopenedSettingsWindow
       .getByRole("heading", { name: "Ayarlar" })
       .waitFor();
@@ -593,11 +776,9 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       "tr",
     );
     const reopenedSettingsClosed = reopenedSettingsWindow.waitForEvent("close");
-    await reopenedSettingsWindow.close();
+    await closeNativeSettings(application);
     await reopenedSettingsClosed;
-    await mainWindow.waitForTimeout(100);
     await clickApplicationMenuItem(application, "Güncellemeleri denetle…");
-    await windowWithHeading(application, "Güncellemeler denetleniyor…");
     const availableWindow = await windowWithHeading(
       application,
       "Yeni bir Kitezh sürümü var!",

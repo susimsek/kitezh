@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -29,11 +30,21 @@ public class RequiredActionAuthorizationFilter extends OncePerRequestFilter {
         if ("/oauth2/authorize".equals(request.getRequestURI())
                 && authentication != null
                 && authentication.isAuthenticated()
-                && !authentication.getClass().getName().contains("Anonymous")
-                && !requiredActionService.pending(authentication.getName()).isEmpty()) {
+                && !authentication.getClass().getName().contains("Anonymous")) {
             String current = request.getRequestURI();
             if (request.getQueryString() != null) {
                 current += "?" + request.getQueryString();
+            }
+            var pendingActions =
+                    requiredActionService.pendingIfUserExists(authentication.getName());
+            if (pendingActions.isEmpty()) {
+                invalidateStaleAuthentication(request);
+                filterChain.doFilter(request, response);
+                return;
+            }
+            if (pendingActions.get().isEmpty()) {
+                filterChain.doFilter(request, response);
+                return;
             }
             request.getSession(true)
                     .setAttribute(MfaAuthorizationFilter.MFA_PENDING_REQUEST, current);
@@ -43,5 +54,13 @@ public class RequiredActionAuthorizationFilter extends OncePerRequestFilter {
             return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    private static void invalidateStaleAuthentication(HttpServletRequest request) {
+        SecurityContextHolder.clearContext();
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
     }
 }

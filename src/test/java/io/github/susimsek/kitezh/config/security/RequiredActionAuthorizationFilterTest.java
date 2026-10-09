@@ -9,10 +9,12 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.kitezh.dto.account.RequiredActionDTO;
 import io.github.susimsek.kitezh.service.requiredaction.RequiredActionService;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,9 +39,12 @@ class RequiredActionAuthorizationFilterTest {
                                 "alice",
                                 "password",
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))));
-        when(requiredActionService.pending("alice"))
+        when(requiredActionService.pendingIfUserExists("alice"))
                 .thenReturn(
-                        List.of(new RequiredActionDTO("UPDATE_PASSWORD", "Update", "Update", 1)));
+                        Optional.of(
+                                List.of(
+                                        new RequiredActionDTO(
+                                                "UPDATE_PASSWORD", "Update", "Update", 1))));
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/oauth2/authorize");
         request.setQueryString("client_id=console&state=state");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -62,7 +67,7 @@ class RequiredActionAuthorizationFilterTest {
                                 "alice",
                                 "password",
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))));
-        when(requiredActionService.pending("alice")).thenReturn(List.of());
+        when(requiredActionService.pendingIfUserExists("alice")).thenReturn(Optional.of(List.of()));
         MockHttpServletRequest authorization =
                 new MockHttpServletRequest("GET", "/oauth2/authorize");
         MockHttpServletResponse authorizationResponse = new MockHttpServletResponse();
@@ -74,5 +79,29 @@ class RequiredActionAuthorizationFilterTest {
 
         verify(filterChain).doFilter(authorization, authorizationResponse);
         verify(filterChain).doFilter(other, otherResponse);
+    }
+
+    @Test
+    void invalidatesSessionAndContinuesAnonymouslyWhenAuthenticatedUserIsMissing()
+            throws Exception {
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                "deleted-user",
+                                "password",
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        when(requiredActionService.pendingIfUserExists("deleted-user"))
+                .thenReturn(Optional.empty());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/oauth2/authorize");
+        request.setQueryString("client_id=console&state=state");
+        MockHttpSession session = (MockHttpSession) request.getSession(true);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(session.isInvalid()).isTrue();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(request.getSession(false)).isNull();
+        verify(filterChain).doFilter(request, response);
     }
 }

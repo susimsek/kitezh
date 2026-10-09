@@ -92,6 +92,25 @@ class SessionConfigTest {
     }
 
     @Test
+    void springSessionConversionServiceRoundTripsNestedImmutableCollections() {
+        ConversionService conversionService =
+                config.springSessionConversionService(
+                        new SecurityJsonMapper(getClass().getClassLoader()));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("twoValues", List.of("openid", "profile"));
+        payload.put("manyValues", List.of("openid", "profile", "email"));
+
+        byte[] serialized = conversionService.convert(payload, byte[].class);
+        Object deserialized = conversionService.convert(serialized, Object.class);
+
+        assertThat(deserialized)
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("twoValues", List.of("openid", "profile"))
+                .containsEntry("manyValues", List.of("openid", "profile", "email"));
+    }
+
+    @Test
     void springSessionConversionServiceRoundTripsSavedRequest() {
         ConversionService conversionService =
                 config.springSessionConversionService(

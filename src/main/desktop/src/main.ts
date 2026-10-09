@@ -356,7 +356,10 @@ function nativeRendererRoot() {
 }
 
 async function nativeRendererHtml() {
-  const source = await readFile(path.join(nativeRendererRoot(), "native.html"), "utf8");
+  const source = await readFile(
+    path.join(nativeRendererRoot(), "native.html"),
+    "utf8",
+  );
   const bootstrap = JSON.stringify({
     locale: desktopLanguage,
     theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
@@ -364,7 +367,7 @@ async function nativeRendererHtml() {
     colors,
   }).replace(/</g, "\\u003c");
   return source.replace(
-    "<script type=\"module\" src=\"app://renderer/native/renderer.mjs\"></script>",
+    '<script type="module" src="app://renderer/native/renderer.mjs"></script>',
     `<script>globalThis.__KITEZH_NATIVE_BOOTSTRAP__=${bootstrap};</script><script type="module" src="app://renderer/native/renderer.mjs"></script>`,
   );
 }
@@ -526,7 +529,8 @@ async function desktopSettingsHtml() {
         notificationsEnabled: "Masaüstü bildirimlerini göster",
         globalShortcut: "Hızlı erişim kısayolu",
         shortcutHelp: "Alanı seçip yeni bir tuş kombinasyonuna basın.",
-        shortcutUnavailable: "Bu kısayol kullanılamıyor. Başka bir kısayol seçin.",
+        shortcutUnavailable:
+          "Bu kısayol kullanılamıyor. Başka bir kısayol seçin.",
         automaticDownload: "Güncellemeleri otomatik indir ve kur",
         checkForUpdates: "Güncellemeleri denetle",
         reset: "Varsayılanlara sıfırla",
@@ -765,7 +769,10 @@ async function sendDeepLink(value: string) {
   const socialLinkCallback = parseSocialLinkCallback(value);
   if (socialLinkCallback) {
     const pending = pendingSocialLinks.get(socialLinkCallback.state);
-    if (!pending || !isPendingAuthorizationValid(pending, socialLinkCallback.state)) {
+    if (
+      !pending ||
+      !isPendingAuthorizationValid(pending, socialLinkCallback.state)
+    ) {
       pendingSocialLinks.delete(socialLinkCallback.state);
       return;
     }
@@ -808,7 +815,10 @@ async function sendDeepLink(value: string) {
         error: response.kind ?? "link_failed",
       });
     } else {
-      sendSocialLinkCallback({ provider: pending.provider, error: response.kind ?? "link_failed" });
+      sendSocialLinkCallback({
+        provider: pending.provider,
+        error: response.kind ?? "link_failed",
+      });
     }
     return;
   }
@@ -837,7 +847,7 @@ async function sendDeepLink(value: string) {
   if (callback.error || !callback.code) {
     sendAuthCallback({
       console: pending[0],
-      url: value,
+      url: sanitizedAuthCallback(callback.state, DESKTOP_PROTOCOL),
       error: callback.error ?? "authorization_failed",
     });
     return;
@@ -847,7 +857,7 @@ async function sendDeepLink(value: string) {
   } catch {
     sendAuthCallback({
       console: pending[0],
-      url: value,
+      url: sanitizedAuthCallback(callback.state, DESKTOP_PROTOCOL),
       error: "token_exchange_failed",
     });
     return;
@@ -1083,7 +1093,11 @@ const desktopApiAdapter = createDesktopApiAdapter({
 });
 
 function base64Url(value: Buffer) {
-  return value.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return value
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function assertSocialProvider(value: unknown): asserts value is string {
@@ -1116,7 +1130,11 @@ function nativeSocialLinkRequest(provider: string) {
 
 async function startNativeSocialLink(providerValue: unknown) {
   assertSocialProvider(providerValue);
-  if ([...pendingSocialLinks.values()].some((pending) => pending.provider === providerValue)) {
+  if (
+    [...pendingSocialLinks.values()].some(
+      (pending) => pending.provider === providerValue,
+    )
+  ) {
     return { status: 409, kind: "http", body: null };
   }
   const nativeRequest = nativeSocialLinkRequest(providerValue);
@@ -1310,10 +1328,11 @@ async function showSettingsWindow() {
   settingsWindow.webContents.on("will-navigate", (event, url) => {
     if (!isTrustedRendererUrl(url)) event.preventDefault();
   });
-  settingsWindow.on("closed", () => {
-    settingsWindow = null;
+  const createdSettingsWindow = settingsWindow;
+  createdSettingsWindow.on("closed", () => {
+    if (settingsWindow === createdSettingsWindow) settingsWindow = null;
   });
-  await settingsWindow.loadURL(
+  await createdSettingsWindow.loadURL(
     `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-settings`,
   );
 }
@@ -1447,10 +1466,7 @@ async function applyLaunchAtLogin(enabled: boolean) {
   }
   app.setLoginItemSettings({
     openAtLogin: enabled,
-    args:
-      process.defaultApp && process.argv[1]
-        ? [path.resolve(process.argv[1])]
-        : [],
+    args: process.defaultApp ? [app.getAppPath()] : [],
   });
 }
 
@@ -1577,7 +1593,8 @@ async function showDesktopLoginWindow() {
     if (!isTrustedRendererUrl(url)) event.preventDefault();
   });
   loginWindow.on("closed", () => {
-    if (desktopLoginWindow === loginWindow) desktopLoginWindow = null;
+    if (desktopLoginWindow !== loginWindow) return;
+    desktopLoginWindow = null;
     void readVault()
       .then((vault) => {
         if (!vault.admin && !vault.account) app.quit();
@@ -1594,10 +1611,10 @@ async function showDesktopLoginWindow() {
 }
 
 function closeDesktopLoginWindow() {
-  if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
-    desktopLoginWindow.close();
-  }
+  const loginWindow = desktopLoginWindow;
+  // Clear ownership first: a programmatic transition is not a user dismissal.
   desktopLoginWindow = null;
+  if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
 }
 
 async function showCompanionWindow() {
@@ -2630,8 +2647,7 @@ function registerIpc() {
     );
     mainWindow.show();
     mainWindow.focus();
-    if (desktopLoginWindow && !desktopLoginWindow.isDestroyed())
-      desktopLoginWindow.close();
+    closeDesktopLoginWindow();
   });
   ipcMain.handle(
     "desktop:auth-start-login",
@@ -2639,9 +2655,18 @@ function registerIpc() {
       assertTrustedSender(event);
       if (typeof request === "string") {
         assertConsole(request);
+        const existing = pendingAuthorizations.get(request);
+        if (existing && isPendingAuthorizationValid(existing, existing.state)) {
+          throw new Error("Desktop authorization is already in progress");
+        }
         const nativeRequest = nativeAuthorizationRequest(request);
         pendingAuthorizations.set(request, nativeRequest.pending);
-        await shell.openExternal(nativeRequest.authorizationUrl.toString());
+        try {
+          await shell.openExternal(nativeRequest.authorizationUrl.toString());
+        } catch {
+          pendingAuthorizations.delete(request);
+          throw new Error("Desktop authorization browser could not be opened");
+        }
         return;
       }
       if (!request || typeof request !== "object")
@@ -2750,10 +2775,13 @@ function registerIpc() {
     assertConsole(consoleName);
     await logoutDesktopSession(consoleName);
   });
-  ipcMain.handle("desktop:social-link-start", async (event, provider: unknown) => {
-    assertTrustedSender(event);
-    return startNativeSocialLink(provider);
-  });
+  ipcMain.handle(
+    "desktop:social-link-start",
+    async (event, provider: unknown) => {
+      assertTrustedSender(event);
+      return startNativeSocialLink(provider);
+    },
+  );
   ipcMain.handle("desktop:api-request", async (event, request: unknown) => {
     assertTrustedSender(event);
     if (!request || typeof request !== "object")
@@ -2816,9 +2844,9 @@ function enforceContentSecurityPolicy() {
 }
 
 function registerDesktopProtocol() {
-  if (process.defaultApp && process.argv[1]) {
+  if (process.defaultApp) {
     app.setAsDefaultProtocolClient(DESKTOP_PROTOCOL, process.execPath, [
-      path.resolve(process.argv[1]),
+      app.getAppPath(),
     ]);
     return;
   }

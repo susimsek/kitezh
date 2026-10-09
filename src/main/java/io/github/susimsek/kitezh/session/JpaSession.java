@@ -55,6 +55,15 @@ public final class JpaSession implements Session {
         return delegate;
     }
 
+    void setLoadedAttribute(String attributeName, Object attributeValue) {
+        delegate.setAttribute(attributeName, attributeValue);
+    }
+
+    void removeLoadedAttribute(String attributeName) {
+        delegate.removeAttribute(attributeName);
+        delta.put(attributeName, null);
+    }
+
     @Override
     public String getId() {
         return delegate.getId();

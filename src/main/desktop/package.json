@@ -27,6 +27,8 @@
     "test": "pnpm run test:unit",
     "test:e2e": "pnpm run build && node --test e2e/electron.test.mjs",
     "test:e2e:packaged": "node --test e2e/packaged-authenticated.test.mjs",
+    "test:e2e:google": "node --test e2e/google-authenticated.test.mjs",
+    "test:e2e:providers": "node --test e2e/social-provider-authenticated.test.mjs",
     "build": "pnpm run build:main && pnpm run build:native",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",

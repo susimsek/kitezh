@@ -101,6 +101,27 @@ class SocialProviderSettingsServiceTest {
     }
 
     @Test
+    void usesLoginSettingsToggleForBuiltInProviderCatalogEntries() {
+        settings.setGoogleLoginEnabled(true);
+        settings.setGoogleClientId("google-id");
+        settings.setGoogleClientSecretEncrypted("encrypted-google-secret");
+        when(secretCipher.decrypt("encrypted-google-secret")).thenReturn("google-secret");
+
+        SocialProviderEntity provider = new SocialProviderEntity();
+        provider.setRegistrationId("google");
+        provider.setAlias("google");
+        provider.setProviderType("google");
+        provider.setEnabled(false);
+        when(providerRepository.findByRegistrationId("google")).thenReturn(Optional.of(provider));
+
+        assertThat(service.provider("google"))
+                .extracting(
+                        SocialProviderSettingsService.ProviderCredentials::enabled,
+                        SocialProviderSettingsService.ProviderCredentials::configured)
+                .containsExactly(true, true);
+    }
+
+    @Test
     void reportsDisabledStateAndFailsWhenSettingsAreMissing() {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 

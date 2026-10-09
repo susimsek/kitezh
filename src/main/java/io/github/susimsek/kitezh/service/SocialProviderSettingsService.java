@@ -227,7 +227,7 @@ public class SocialProviderSettingsService {
                         dynamic.providerType(),
                         legacy.clientId(),
                         legacy.clientSecret(),
-                        dynamic.enabled(),
+                        legacy.enabled(),
                         dynamic.hideOnLogin(),
                         dynamic.accountLinkingOnly(),
                         dynamic.trustEmail(),

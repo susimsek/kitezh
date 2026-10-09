@@ -38,10 +38,16 @@ public class SocialProviderLogoutEndpointResolver {
             }
         }
         return switch (provider.providerType().toLowerCase(java.util.Locale.ROOT)) {
-            case "google" -> "https://accounts.google.com/Logout";
+            // Google does not publish an OIDC end_session_endpoint. Its global account
+            // logout page is not an RP logout endpoint and cannot return to native clients.
+            case "google" -> null;
             case "microsoft" -> "https://login.microsoftonline.com/common/oauth2/v2.0/logout";
-            case "github" -> "https://github.com/logout";
-            case "linkedin" -> "https://www.linkedin.com/m/logout";
+            // GitHub OAuth has no RP logout endpoint; its global logout UI asks the user to
+            // choose among browser accounts and cannot target the account linked to this session.
+            case "github" -> null;
+            // LinkedIn OIDC does not expose an RP logout endpoint. Keep the LinkedIn browser
+            // session intact and finish logout through the registered Kitezh redirect instead.
+            case "linkedin" -> null;
             default -> null;
         };
     }

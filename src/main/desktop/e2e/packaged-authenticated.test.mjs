@@ -40,7 +40,10 @@ async function externalUrlFromDesktop(application) {
 async function callbackUrlFromBrowser(application) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const value = await application.evaluate(() => globalThis.__e2eCallbackUrl);
-    if (typeof value === "string" && value.startsWith("kitezh://oauth/callback"))
+    if (
+      typeof value === "string" &&
+      value.startsWith("kitezh://oauth/callback")
+    )
       return value;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -87,9 +90,7 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
-    await mainWindow
-      .getByRole("button", { name: "Account Console" })
-      .click();
+    await mainWindow.getByRole("button", { name: "Account Console" }).click();
 
     const authorizationUrl = await externalUrlFromDesktop(application);
     const browserWindowPromise = application.waitForEvent("window");
@@ -112,7 +113,11 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
         window.webContents.getURL().includes("/login"),
       );
       if (!loginWindow) throw new Error("Packaged login window was not found");
-      const captureCallback = (_event, url) => {
+      const captureCallback = (event, url) => {
+        if (!url.startsWith("kitezh://oauth/callback")) return;
+        // This harness injects delivery below; do not also launch a second,
+        // default-profile process through the operating-system handler.
+        event.preventDefault();
         globalThis.__e2eCallbackUrl = url;
       };
       loginWindow.webContents.on("will-navigate", captureCallback);
@@ -121,9 +126,7 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
 
     await browserWindow.locator('input[name="username"]').fill("admin");
     await browserWindow.locator('input[name="password"]').fill("admin");
-    await browserWindow
-      .getByRole("button", { name: /Sign in|Giriş/i })
-      .click();
+    await browserWindow.getByRole("button", { name: /Sign in|Giriş/i }).click();
 
     const callbackUrl = await callbackUrlFromBrowser(application);
     await application.evaluate(({ app }, url) => {
@@ -137,17 +140,26 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     assert.equal(profileResponse?.status, 200);
-    assert.equal(await mainWindow.url(), "app://renderer/native?console=account");
     assert.equal(
-      await mainWindow.getByRole("heading", { name: "Account Console" }).count(),
+      await mainWindow.url(),
+      "app://renderer/native?console=account",
+    );
+    assert.equal(
+      await mainWindow
+        .getByRole("heading", { name: "Account Console" })
+        .count(),
       1,
     );
     assert.equal(
-      await mainWindow.getByRole("heading", { name: "First name & Last name" }).count(),
+      await mainWindow
+        .getByRole("heading", { name: "First name & Last name" })
+        .count(),
       1,
     );
     assert.equal(
-      await mainWindow.evaluate(() => window.desktopApi.auth.hasSession("account")),
+      await mainWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("account"),
+      ),
       true,
     );
     assert.match(packageVersion, /^\d+\.\d+\.\d+$/);
