@@ -136,6 +136,76 @@ describe("LoginSettings", () => {
     );
   });
 
+  it("normalizes nullable WebAuthn values before saving login settings", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.method === "PUT") return Promise.resolve({ status: 200, data: {} }) as never;
+      if (request.url?.endsWith("/login")) {
+        return Promise.resolve({
+          status: 200,
+          data: {
+            webauthnPolicy: { acceptableAaguids: null },
+            webauthnPasswordlessPolicy: { acceptableAaguids: null },
+          },
+        }) as never;
+      }
+      if (request.url?.includes("social-providers")) {
+        return Promise.resolve({ status: 200, data: [provider] }) as never;
+      }
+      return Promise.resolve({ status: 200, data: {} }) as never;
+    });
+
+    render(<LoginSettings focusSection="social-login" />);
+    expect(
+      await screen.findByText(dictionary.admin.loginSettings.sectionSocialLogin),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: dictionary.admin.loginSettings.save,
+        hidden: true,
+      })[0],
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({ method: "PUT", url: "/api/admin/settings/login" }),
+      ),
+    );
+  });
+
+  it("normalizes nullable social provider client ids before saving credentials", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("social-providers")) {
+        if (request.method === "PUT") {
+          return Promise.resolve({ status: 200, data: [provider] }) as never;
+        }
+        return Promise.resolve({ status: 200, data: [{ ...provider, clientId: null }] }) as never;
+      }
+      return Promise.resolve({ status: 200, data: {} }) as never;
+    });
+
+    render(<LoginSettings focusSection="social-login" />);
+    expect(
+      await screen.findByText(dictionary.admin.loginSettings.sectionSocialLogin),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: dictionary.admin.loginSettings.socialCredentialsSave,
+        hidden: true,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "PUT",
+          url: "/api/admin/settings/social-providers",
+        }),
+      ),
+    );
+  });
+
   it.each([
     ["login", dictionary.admin.loginSettings.sectionLogin],
     ["social-login", dictionary.admin.loginSettings.sectionSocialLogin],

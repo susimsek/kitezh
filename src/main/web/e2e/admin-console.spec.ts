@@ -79,4 +79,64 @@ test.describe("administration console", () => {
     await page.getByRole("link", { name: /Users|Kullanıcılar/i }).click();
     await expect(page).toHaveURL(/\/admin\/users$/);
   });
+
+  test("saves social provider credentials independently from the Google toggle", async ({
+    page,
+  }) => {
+    await visitConsole(page, "admin", "/settings/social-login", "en");
+
+    const providerIds = new Map<string, string>();
+    for (const provider of ["Google", "Github", "Linkedin", "Microsoft"]) {
+      await page.getByRole("button", { name: provider, exact: true }).click();
+      const clientId = `e2e-${provider.toLowerCase()}-${Date.now()}`;
+      providerIds.set(provider, clientId);
+      await page.getByRole("textbox", { name: "Client ID", exact: true }).fill(clientId);
+
+      const saveResponse = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/api/admin/settings/social-providers") &&
+          response.request().method() === "PUT",
+      );
+      await page.getByRole("button", { name: "Save client credentials", exact: true }).click();
+      await expect((await saveResponse).status()).toBe(200);
+      const saveAlerts = page.getByRole("status").filter({ hasText: "Login settings saved." });
+      await expect(saveAlerts.first()).toBeVisible();
+      await expect(page.getByRole("textbox", { name: "Client ID", exact: true })).toHaveValue(
+        clientId,
+      );
+    }
+
+    const googleToggle = page.locator("#login-google-provider");
+    const initialGoogleEnabled = await googleToggle.isChecked();
+    await googleToggle.setChecked(!initialGoogleEnabled);
+    await expect(googleToggle).toBeChecked({ checked: !initialGoogleEnabled });
+    const loginSettingsResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/admin/settings/login") &&
+        response.request().method() === "PUT",
+    );
+    await page.locator('button[type="submit"]:visible').click();
+    await expect((await loginSettingsResponse).status()).toBe(200);
+    await page.reload();
+    await expect(page.locator("#login-google-provider")).toHaveJSProperty(
+      "checked",
+      !initialGoogleEnabled,
+    );
+
+    for (const [provider, clientId] of providerIds) {
+      await page.getByRole("button", { name: provider, exact: true }).click();
+      await expect(page.getByRole("textbox", { name: "Client ID", exact: true })).toHaveValue(
+        clientId,
+      );
+    }
+
+    await page.locator("#login-google-provider").setChecked(initialGoogleEnabled);
+    const restoreResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/admin/settings/login") &&
+        response.request().method() === "PUT",
+    );
+    await page.locator('button[type="submit"]:visible').click();
+    await expect((await restoreResponse).status()).toBe(200);
+  });
 });

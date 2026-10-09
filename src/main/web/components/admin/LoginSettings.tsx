@@ -72,6 +72,13 @@ type Settings = {
   recoveryCodeWarningThreshold: number;
 };
 
+type LoginSettingsResponse = Partial<
+  Omit<Settings, "webauthnPolicy" | "webauthnPasswordlessPolicy">
+> & {
+  webauthnPolicy?: Partial<WebAuthnPolicy> | null;
+  webauthnPasswordlessPolicy?: Partial<WebAuthnPolicy> | null;
+};
+
 type CaptchaSettings = {
   enabled: boolean;
   provider: "recaptcha" | "enterprise";
@@ -375,10 +382,10 @@ export default function LoginSettingsPage({
 
   useEffect(() => {
     if (!accessToken) return;
-    adminRequest<Settings>(accessToken, { url: "/api/admin/settings/login" })
+    adminRequest<LoginSettingsResponse>(accessToken, { url: "/api/admin/settings/login" })
       .then((response) => {
         if (response.status >= 300) throw new Error();
-        reset({ ...defaultSettings, ...response.data });
+        reset(normalizeSettings(response.data));
         setLoaded(true);
       })
       .catch(() => setError(true));
@@ -407,6 +414,7 @@ export default function LoginSettingsPage({
         resetSocial({
           providers: response.data.map((provider) => ({
             ...provider,
+            clientId: provider.clientId ?? "",
             trustEmail: provider.trustEmail ?? false,
             mfaRequired: provider.mfaRequired ?? false,
             requiredClaims: provider.requiredClaims ?? "sub",
@@ -1582,4 +1590,30 @@ function SaveButton({ copy, isSubmitting }: { copy: string; isSubmitting: boolea
       </Button>
     </div>
   );
+}
+
+function normalizeSettings(settings: LoginSettingsResponse): Settings {
+  return {
+    ...defaultSettings,
+    ...settings,
+    webauthnPolicy: normalizeWebAuthnPolicy(settings.webauthnPolicy, defaultWebAuthnPolicy),
+    webauthnPasswordlessPolicy: normalizeWebAuthnPolicy(
+      settings.webauthnPasswordlessPolicy,
+      defaultPasswordlessWebAuthnPolicy,
+    ),
+  };
+}
+
+function normalizeWebAuthnPolicy(
+  policy: Partial<WebAuthnPolicy> | null | undefined,
+  fallback: WebAuthnPolicy,
+): WebAuthnPolicy {
+  return {
+    ...fallback,
+    ...policy,
+    rpName: policy?.rpName ?? fallback.rpName,
+    rpId: policy?.rpId ?? fallback.rpId,
+    signatureAlgorithms: policy?.signatureAlgorithms ?? fallback.signatureAlgorithms,
+    acceptableAaguids: policy?.acceptableAaguids ?? fallback.acceptableAaguids,
+  };
 }
