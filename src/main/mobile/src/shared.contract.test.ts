@@ -23,6 +23,7 @@ import {
   parseNativeDeepLink,
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
+import { createSingleFlight } from "../../shared/src/session.ts";
 
 test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
@@ -132,4 +133,26 @@ test("native deep links accept only registered routes", () => {
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
+});
+
+test("session refresh operations are single-flight and recover after completion", async () => {
+  const coordinator = createSingleFlight<number>();
+  let executions = 0;
+  let resolveOperation: ((value: number) => void) | undefined;
+  const operation = () => {
+    executions += 1;
+    return new Promise<number>((resolve) => {
+      resolveOperation = resolve;
+    });
+  };
+  const first = coordinator.run(operation);
+  const second = coordinator.run(operation);
+  assert.equal(coordinator.pending(), true);
+  assert.equal(executions, 1);
+  resolveOperation?.(7);
+  assert.equal(await first, 7);
+  assert.equal(await second, 7);
+  assert.equal(coordinator.pending(), false);
+  assert.equal(await coordinator.run(async () => 8), 8);
+  assert.equal(executions, 1);
 });

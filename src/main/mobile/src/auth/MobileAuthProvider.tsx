@@ -12,13 +12,13 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { AppState } from "react-native";
 
 import { useLocale } from "@/i18n/LocaleProvider";
 import { validateAuthorizationCallback } from "../../../shared/src/auth.ts";
+import { createSingleFlight } from "../../../shared/src/session.ts";
 import {
   authorizationServerIssuer,
   getMobileConsoleConfig,
@@ -84,7 +84,10 @@ export function MobileAuthProvider({
   const [session, setSession] = useState<MobileSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [error, setError] = useState<string | null>(null);
-  const refreshInProgress = useRef<Promise<MobileSession | null> | null>(null);
+  const refreshCoordinator = useMemo(
+    () => createSingleFlight<MobileSession | null>(),
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -152,16 +155,15 @@ export function MobileAuthProvider({
     async (force = false) => {
       if (!session?.refreshToken || !discovery) return session;
       if (!force && session.expiresAt > Date.now() + 60_000) return session;
-      if (refreshInProgress.current) return refreshInProgress.current;
-
-      const requestPromise = refreshAsync(
-        {
-          clientId: consoleConfig.clientId,
-          refreshToken: session.refreshToken,
-        },
-        discovery,
-      )
-        .then(async (token) => {
+      return refreshCoordinator.run(async () => {
+        try {
+          const token = await refreshAsync(
+            {
+              clientId: consoleConfig.clientId,
+              refreshToken: session.refreshToken ?? undefined,
+            },
+            discovery,
+          );
           const nextSession: MobileSession = {
             accessToken: token.accessToken,
             refreshToken: token.refreshToken ?? session.refreshToken,
@@ -175,20 +177,15 @@ export function MobileAuthProvider({
           setSession(nextSession);
           setStatus("signed-in");
           return nextSession;
-        })
-        .catch(() => {
-          void clearSession(consoleConfig.namespace);
+        } catch {
+          await clearSession(consoleConfig.namespace);
           setSession(null);
           setStatus("signed-out");
           return null;
-        })
-        .finally(() => {
-          refreshInProgress.current = null;
-        });
-      refreshInProgress.current = requestPromise;
-      return requestPromise;
+        }
+      });
     },
-    [consoleConfig, discovery, session],
+    [consoleConfig, discovery, refreshCoordinator, session],
   );
 
   useEffect(() => {
