@@ -37,7 +37,7 @@ test.describe("login and locale", () => {
     await page.route("**/oauth2/authorization/acme-google", (route) => route.abort());
     await page.goto("/login");
 
-    const google = page.getByRole("button", { name: /Google/i });
+    const google = page.getByRole("link", { name: /Google/i });
     const github = page.getByRole("button", { name: /GitHub/i });
     await expect(google).toHaveAttribute("href", "/oauth2/authorization/acme-google");
     await expect(google).toHaveAttribute("aria-disabled", "false");

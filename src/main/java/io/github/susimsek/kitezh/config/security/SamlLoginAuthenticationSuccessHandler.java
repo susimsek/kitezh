@@ -137,11 +137,9 @@ public final class SamlLoginAuthenticationSuccessHandler implements Authenticati
                         .build());
         Authentication local =
                 localAuthentication(user, authorities, samlAuthentication, registrationId);
-        if (samlLoginService.providerRequiresMfa(registrationId)) {
-            if (mfaService == null || !mfaService.status(username).enabled()) {
-                throw new AuthenticationServiceException(
-                        "This SAML provider requires an enrolled MFA factor");
-            }
+        if (requiresMfaEnrollment(registrationId, username)) {
+            throw new AuthenticationServiceException(
+                    "This SAML provider requires an enrolled MFA factor");
             // Enrollment is not verification. The normal authorization flow must challenge MFA.
         }
         SecurityContext context = SecurityContextHolder.createEmptyContext();
@@ -151,6 +149,11 @@ public final class SamlLoginAuthenticationSuccessHandler implements Authenticati
                 .setAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER, registrationId);
         securityContextRepository.saveContext(context, request, response);
         return local;
+    }
+
+    private boolean requiresMfaEnrollment(String registrationId, String username) {
+        return samlLoginService.providerRequiresMfa(registrationId)
+                && (mfaService == null || !mfaService.status(username).enabled());
     }
 
     private static void ensureAccountCanAuthenticate(UserDetails user) {

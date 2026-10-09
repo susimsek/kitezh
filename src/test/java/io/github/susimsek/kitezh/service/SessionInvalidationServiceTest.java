@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh.service;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.UserSessionRepository;
@@ -61,5 +62,40 @@ class SessionInvalidationServiceTest {
                 .deleteByPrincipalNameAndSessionIdNot("alice", "current-session");
         verify(authorizationRepository)
                 .deleteByPrincipalNameAndSessionIdNot("alice", "current-session");
+    }
+
+    @Test
+    void invalidatesAllBrowserSessionsAndAuthorizations() {
+        service.invalidateAll();
+
+        verify(authorizationRepository).deleteBySessionIdIsNotNull();
+        verify(userSessionRepository).deleteAllInBatch();
+    }
+
+    @Test
+    void invalidatesOnlyOneClientAuthorizationAndKeepsSharedBrowserSession() {
+        when(authorizationRepository.existsBySessionId("session-id")).thenReturn(true);
+
+        service.invalidateClientSession("client-id", "session-id");
+
+        verify(authorizationRepository)
+                .deleteByRegisteredClientIdAndSessionId("client-id", "session-id");
+        verify(authorizationRepository).existsBySessionId("session-id");
+        verify(userSessionRepository, never()).deleteBySessionId("session-id");
+    }
+
+    @Test
+    void invalidatesClientSessionsAndRemovesOnlyOrphanedBrowserSessions() {
+        List<String> sessionIds = List.of("shared", "orphan");
+        when(authorizationRepository.findDistinctSessionIdsByRegisteredClientId("client-id"))
+                .thenReturn(sessionIds);
+        when(authorizationRepository.findDistinctSessionIdsBySessionIdIn(sessionIds))
+                .thenReturn(List.of("shared"));
+
+        service.invalidateClientSessions("client-id");
+
+        verify(authorizationRepository)
+                .deleteByRegisteredClientIdAndSessionIdIsNotNull("client-id");
+        verify(userSessionRepository).deleteBySessionIdIn(List.of("orphan"));
     }
 }

@@ -341,6 +341,62 @@ public class AdminClientController {
         return adminSessionService.clientSessions(id, pageable);
     }
 
+    @DeleteMapping("/{id}/sessions")
+    @Operation(
+            summary = "Delete all client sessions",
+            description = "Terminates every browser session currently associated with the client.")
+    @ApiResponse(responseCode = "204", description = "All client sessions deleted.")
+    ResponseEntity<Void> deleteSessions(
+            @Parameter(
+                            description = "Internal client identifier.",
+                            example = "b0a80123-4567-89ab-cdef-0123456789ab",
+                            required = true)
+                    @PathVariable
+                    String id) {
+        adminSessionService.deleteClientSessions(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/sessions/{sessionId}")
+    @Operation(
+            summary = "Delete client session",
+            description =
+                    "Terminates the client session while preserving other client sessions in the"
+                            + " same browser session.")
+    @ApiResponse(responseCode = "204", description = "Client session deleted.")
+    ResponseEntity<Void> deleteSession(
+            @Parameter(
+                            description = "Internal client identifier.",
+                            example = "b0a80123-4567-89ab-cdef-0123456789ab",
+                            required = true)
+                    @PathVariable
+                    String id,
+            @Parameter(
+                            description = "Opaque browser session identifier.",
+                            example = "6f9b4dd0-2ed2-4af8-9e89-6ef3d4dd8c12",
+                            required = true)
+                    @PathVariable
+                    String sessionId) {
+        adminSessionService.deleteClientSession(id, sessionId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/revoke-tokens")
+    @Operation(
+            summary = "Revoke client tokens",
+            description = "Marks all tokens issued to the client before now as invalid.")
+    @ApiResponse(responseCode = "204", description = "Client tokens revoked.")
+    ResponseEntity<Void> revokeTokens(
+            @Parameter(
+                            description = "Internal client identifier.",
+                            example = "b0a80123-4567-89ab-cdef-0123456789ab",
+                            required = true)
+                    @PathVariable
+                    String id) {
+        adminSessionService.revokeClientTokens(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/consents")
     @Operation(
             summary = "List client consents",

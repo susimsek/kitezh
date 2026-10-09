@@ -145,6 +145,10 @@ class AdminLifecycleEndpointsIT {
                 .andExpect(jsonPath("$.active").value(true));
         mockMvc.perform(delete("/api/admin/users/user/sessions").with(admin()))
                 .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/sessions/revoke-tokens").with(admin()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/users/user/revoke-tokens").with(admin()))
+                .andExpect(status().isNoContent());
     }
 
     @Test

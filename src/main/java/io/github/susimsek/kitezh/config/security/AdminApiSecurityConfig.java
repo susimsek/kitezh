@@ -7,6 +7,7 @@ import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.security.AuthoritiesConstants;
+import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.springframework.context.annotation.Bean;
@@ -247,6 +248,11 @@ public class AdminApiSecurityConfig {
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.USER_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.POST, "/api/admin/users/*/revoke-tokens")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.USER_MANAGER)
                                         .requestMatchers(HttpMethod.DELETE, USERS_API_PATH)
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
@@ -267,6 +273,17 @@ public class AdminApiSecurityConfig {
                                                 AuthoritiesConstants.USER_MANAGER)
                                         .requestMatchers(
                                                 HttpMethod.DELETE, "/api/admin/sessions/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.USER_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.POST, "/api/admin/sessions/revoke-all")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.USER_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/api/admin/sessions/revoke-tokens")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.USER_MANAGER)
@@ -322,12 +339,14 @@ public class AdminApiSecurityConfig {
     JwtDecoder adminApiJwtDecoder(
             JWKSource<SecurityContext> jwkSource,
             ApplicationProperties applicationProperties,
-            AuthorizationRepository authorizationRepository) {
+            AuthorizationRepository authorizationRepository,
+            AuthorizationRevocationPolicyService revocationPolicyService) {
         return ConsoleJwtDecoderFactory.create(
                 jwkSource,
                 applicationProperties.authorizationServer().issuer(),
                 ConsoleClients.ADMIN_CLIENTS,
-                authorizationRepository);
+                authorizationRepository,
+                revocationPolicyService);
     }
 
     private static JwtAuthenticationConverter jwtAuthenticationConverter() {

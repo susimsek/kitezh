@@ -36,6 +36,38 @@ public class SessionInvalidationService {
     }
 
     @Transactional
+    public void invalidateClientSession(String registeredClientId, String sessionId) {
+        authorizationRepository.deleteByRegisteredClientIdAndSessionId(
+                registeredClientId, sessionId);
+        if (!authorizationRepository.existsBySessionId(sessionId)) {
+            userSessionRepository.deleteBySessionId(sessionId);
+        }
+    }
+
+    @Transactional
+    public void invalidateClientSessions(String registeredClientId) {
+        Collection<String> sessionIds =
+                authorizationRepository.findDistinctSessionIdsByRegisteredClientId(
+                        registeredClientId);
+        if (sessionIds.isEmpty()) {
+            return;
+        }
+        authorizationRepository.deleteByRegisteredClientIdAndSessionIdIsNotNull(registeredClientId);
+        Collection<String> remainingSessionIds =
+                authorizationRepository.findDistinctSessionIdsBySessionIdIn(sessionIds);
+        if (remainingSessionIds.size() == sessionIds.size()) {
+            return;
+        }
+        Collection<String> orphanedSessionIds =
+                sessionIds.stream()
+                        .filter(sessionId -> !remainingSessionIds.contains(sessionId))
+                        .toList();
+        if (!orphanedSessionIds.isEmpty()) {
+            userSessionRepository.deleteBySessionIdIn(orphanedSessionIds);
+        }
+    }
+
+    @Transactional
     public void invalidatePrincipal(String username) {
         userSessionRepository.deleteByPrincipalName(username);
         authorizationRepository.deleteByPrincipalName(username);
@@ -45,5 +77,11 @@ public class SessionInvalidationService {
     public void invalidatePrincipalExceptSession(String username, String currentSessionId) {
         userSessionRepository.deleteByPrincipalNameAndSessionIdNot(username, currentSessionId);
         authorizationRepository.deleteByPrincipalNameAndSessionIdNot(username, currentSessionId);
+    }
+
+    @Transactional
+    public void invalidateAll() {
+        authorizationRepository.deleteBySessionIdIsNotNull();
+        userSessionRepository.deleteAllInBatch();
     }
 }

@@ -38,6 +38,7 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
     private final AuthorizationMapper authorizationMapper;
     private final AuthorizationServerMapperSupport mapperSupport;
     private final OfflineAccessPolicyService offlineAccessPolicyService;
+    private final AuthorizationRevocationPolicyService revocationPolicyService;
 
     @Override
     @Transactional
@@ -118,13 +119,26 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
                         ? authorizationRepository.findByToken(token)
                         : findByTokenType(token, tokenType);
 
-        return authorization.filter(this::isUsable).map(this::toObject).orElse(null);
+        return authorization
+                .filter(entity -> isUsable(entity, tokenType))
+                .map(this::toObject)
+                .orElse(null);
     }
 
-    private boolean isUsable(AuthorizationEntity entity) {
-        if (offlineAccessPolicyService == null || !isOfflineAuthorization(entity)) {
-            return true;
+    private boolean isUsable(AuthorizationEntity entity, OAuth2TokenType tokenType) {
+        if (offlineAccessPolicyService != null
+                && isOfflineAuthorization(entity)
+                && offlineAuthorizationRevoked(entity)) {
+            return false;
         }
+        Instant issuedAt = issuedAt(entity, tokenType);
+        RegisteredClient client =
+                registeredClientRepository.findById(entity.getRegisteredClientId());
+        String clientId = client == null ? entity.getRegisteredClientId() : client.getClientId();
+        return !revocationPolicyService.isRevoked(entity.getPrincipalName(), clientId, issuedAt);
+    }
+
+    private boolean offlineAuthorizationRevoked(AuthorizationEntity entity) {
         Map<String, Object> attributes = mapperSupport.readMap(entity.getAttributes());
         Object startedAt =
                 attributes == null
@@ -132,12 +146,27 @@ public class DomainOAuth2AuthorizationService implements OAuth2AuthorizationServ
                         : attributes.get(OfflineAccessSettings.SESSION_STARTED_AT);
         if (startedAt instanceof String value) {
             try {
-                return !offlineAccessPolicyService.revoked(Instant.parse(value));
+                return offlineAccessPolicyService.revoked(Instant.parse(value));
             } catch (RuntimeException _) {
-                return true;
+                return false;
             }
         }
-        return true;
+        return false;
+    }
+
+    private static Instant issuedAt(AuthorizationEntity entity, OAuth2TokenType tokenType) {
+        if (tokenType == null) {
+            return entity.getAccessTokenIssuedAt();
+        }
+        return switch (tokenType.getValue()) {
+            case OAuth2ParameterNames.CODE -> entity.getAuthorizationCodeIssuedAt();
+            case OAuth2ParameterNames.ACCESS_TOKEN -> entity.getAccessTokenIssuedAt();
+            case OAuth2ParameterNames.REFRESH_TOKEN -> entity.getRefreshTokenIssuedAt();
+            case OidcParameterNames.ID_TOKEN -> entity.getOidcIdTokenIssuedAt();
+            case OAuth2ParameterNames.USER_CODE -> entity.getUserCodeIssuedAt();
+            case OAuth2ParameterNames.DEVICE_CODE -> entity.getDeviceCodeIssuedAt();
+            default -> entity.getAccessTokenIssuedAt();
+        };
     }
 
     private Optional<AuthorizationEntity> findByTokenType(String token, OAuth2TokenType tokenType) {

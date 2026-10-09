@@ -72,6 +72,7 @@ import AdminEvents from "@/components/admin/AdminEvents";
 import ServerInfo from "@/components/admin/ServerInfo";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminAuthentication from "@/components/admin/AdminAuthentication";
+import AuthenticationFlows from "@/components/admin/AuthenticationFlows";
 import {
   ForgotPasswordForm,
   ResetPasswordForm,
@@ -481,6 +482,7 @@ export function AppRoutes() {
         <Route path="events" element={<AdminEvents />} />
         <Route path="server-info" element={<ServerInfo />} />
         <Route path="authentication" element={<AdminAuthentication />} />
+        <Route path="authentication/flows" element={<AuthenticationFlows />} />
         <Route path="authentication/policies/:policy" element={<AdminAuthentication />} />
         <Route
           path="settings/user-profile/new"

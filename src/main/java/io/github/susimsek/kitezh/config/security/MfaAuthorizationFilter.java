@@ -1,8 +1,10 @@
 package io.github.susimsek.kitezh.config.security;
 
+import io.github.susimsek.kitezh.domain.AuthenticationFlowBindingType;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
 import io.github.susimsek.kitezh.service.account.MfaService;
 import io.github.susimsek.kitezh.service.requiredaction.RequiredActionService;
+import io.github.susimsek.kitezh.service.security.AuthenticationFlowRuntimeService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,9 +35,26 @@ public class MfaAuthorizationFilter extends OncePerRequestFilter {
     private final MfaService mfaService;
     private final RequiredActionService requiredActionService;
     private final LoginSettingsService loginSettingsService;
+    private final AuthenticationFlowRuntimeService authenticationFlowRuntimeService;
     private final Duration fallbackVerificationTimeout;
 
     @Autowired
+    MfaAuthorizationFilter(
+            MfaService mfaService,
+            RequiredActionService requiredActionService,
+            LoginSettingsService loginSettingsService,
+            AuthenticationFlowRuntimeService authenticationFlowRuntimeService) {
+        this.mfaService = mfaService;
+        this.requiredActionService = requiredActionService;
+        this.loginSettingsService = loginSettingsService;
+        this.authenticationFlowRuntimeService = authenticationFlowRuntimeService;
+        this.fallbackVerificationTimeout = DEFAULT_VERIFICATION_TIMEOUT;
+    }
+
+    MfaAuthorizationFilter(MfaService mfaService, RequiredActionService requiredActionService) {
+        this(mfaService, requiredActionService, null);
+    }
+
     MfaAuthorizationFilter(
             MfaService mfaService,
             RequiredActionService requiredActionService,
@@ -43,13 +62,7 @@ public class MfaAuthorizationFilter extends OncePerRequestFilter {
         this.mfaService = mfaService;
         this.requiredActionService = requiredActionService;
         this.loginSettingsService = loginSettingsService;
-        this.fallbackVerificationTimeout = DEFAULT_VERIFICATION_TIMEOUT;
-    }
-
-    MfaAuthorizationFilter(MfaService mfaService, RequiredActionService requiredActionService) {
-        this.mfaService = mfaService;
-        this.requiredActionService = requiredActionService;
-        this.loginSettingsService = null;
+        this.authenticationFlowRuntimeService = null;
         this.fallbackVerificationTimeout = DEFAULT_VERIFICATION_TIMEOUT;
     }
 
@@ -63,6 +76,12 @@ public class MfaAuthorizationFilter extends OncePerRequestFilter {
                 && authentication.isAuthenticated()
                 && !authentication.getClass().getName().contains("Anonymous")
                 && requiredActionService.pending(authentication.getName()).isEmpty()) {
+            if (authenticationFlowRuntimeService != null
+                    && !authenticationFlowRuntimeService.containsEnabledExecution(
+                            AuthenticationFlowBindingType.BROWSER, "otp-form")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             String current = authorizationRequest(request);
             HttpSession session = request.getSession(false);
             var status = mfaService.status(authentication.getName());
