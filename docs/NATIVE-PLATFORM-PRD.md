@@ -297,7 +297,7 @@ acceptance evidence is linked in the feature matrix.
 - [~] Localization, theme, accessibility, loading, and error-state gate: native settings Maestro flow covers Turkish/light/dark switching, shared locale/theme tests cover system resolution, and native screens use page/inline progress; large-text, screen-reader, and full-route device evidence remain
 - [~] Secret, log, diagnostics, and external-navigation security gate: `check-native-security.mjs` rejects diagnostic logging and token-bearing URLs; allowlisted external-navigation and packaged privacy evidence remain
 - [~] Focused CI and packaged smoke-test gate: mobile typecheck, lint, unit tests, boundary checks, web build, and fixture contract run in `mobile-quality`; Android/iOS packaged device evidence remains manual
-- [~] Feature-matrix evidence and explicit blocker gate: PRD and mobile matrix link boundary, fixture, Maestro, and workflow evidence; authenticated callback/offline/device results remain explicit blockers
+- [~] Feature-matrix evidence and explicit blocker gate: PRD and mobile matrix link boundary, fixture, deep-link, Maestro, and workflow evidence; authenticated callback/offline/device results remain explicit blockers
 
 ## Shared/native architecture contract
 

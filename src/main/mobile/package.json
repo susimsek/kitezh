@@ -16,6 +16,7 @@
     "test:fixture": "node --test e2e/fixture-server.test.mjs",
     "check:boundaries": "node scripts/check-native-boundaries.mjs",
     "check:security": "node scripts/check-native-security.mjs",
+    "check:expo-config": "node scripts/check-expo-config.mjs",
     "build:web": "expo export --platform web"
   },
   "dependencies": {

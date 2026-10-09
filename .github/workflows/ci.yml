@@ -171,6 +171,10 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm run check:security
 
+      - name: Check Expo native configuration
+        working-directory: src/main/mobile
+        run: pnpm run check:expo-config
+
       - name: Lint mobile client
         working-directory: src/main/mobile
         run: pnpm run lint
