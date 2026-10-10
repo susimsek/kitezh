@@ -56,11 +56,14 @@ function isAllowedApiPath(
       const isRoles = url.pathname === "/api/admin/roles";
       const isGroups = url.pathname === "/api/admin/groups";
       const isClientScopes = url.pathname === "/api/admin/client-scopes";
+      const isClients = url.pathname === "/api/admin/clients";
       const sortFields = isUsers
         ? ["username,asc", "username,desc"]
-        : ["name,asc", "name,desc"];
+        : isClients
+          ? ["clientId,asc", "clientId,desc"]
+          : ["name,asc", "name,desc"];
       return (
-        (isUsers || isRoles || isGroups || isClientScopes) &&
+        (isUsers || isRoles || isGroups || isClientScopes || isClients) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -75,7 +78,11 @@ function isAllowedApiPath(
         /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&
         sortFields.includes(
           url.searchParams.get("sort") ??
-            (isUsers ? "username,asc" : "name,asc"),
+            (isUsers
+              ? "username,asc"
+              : isClients
+                ? "clientId,asc"
+                : "name,asc"),
         )
       );
     } catch {

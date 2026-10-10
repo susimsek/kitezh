@@ -399,6 +399,37 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/clients") {
+          globalThis.__adminClientRequests ??= [];
+          globalThis.__adminClientRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const clientId = query ? "admin-console" : "account-console";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "client-1",
+                  clientId,
+                  clientName:
+                    clientId === "admin-console"
+                      ? "Admin Console"
+                      : "Account Console",
+                  scopes: ["openid", "admin-api"],
+                  requireProofKey: true,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -558,6 +589,28 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       new URLSearchParams(clientScopeRequests[1]).get("q"),
       "account",
     );
+    const clientsNavigation = window.getByRole("button", {
+      name: "Clients",
+      exact: true,
+    });
+    await clientsNavigation.click();
+    assert.equal(await clientsNavigation.isDisabled(), true);
+    assert.equal(await clientsNavigation.locator(".spinner").count(), 1);
+    await window.getByText("Account Console").waitFor();
+    const clientQuery = window.getByRole("searchbox", {
+      name: "Search clients",
+    });
+    await clientQuery.fill("admin");
+    await window.getByRole("button", { name: "Search clients" }).click();
+    assert.equal(
+      await window.getByRole("button", { name: "Search clients" }).isDisabled(),
+      true,
+    );
+    await window.getByText("Admin Console").waitFor();
+    const clientRequests = await application.evaluate(
+      () => globalThis.__adminClientRequests,
+    );
+    assert.equal(new URLSearchParams(clientRequests[1]).get("q"), "admin");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
