@@ -496,6 +496,55 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               headers: { "Content-Type": "application/json" },
             },
           );
+        if (
+          requestUrl.pathname === "/api/admin/users" &&
+          requestMethod === "POST"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminUserCreateRequests ??= [];
+          globalThis.__adminUserCreateRequests.push({
+            username: body.username,
+            email: body.email,
+            roles: body.roles,
+            passwordProvided: Boolean(body.password),
+            temporary: body.temporary,
+            enabled: body.enabled,
+            emailVerified: body.emailVerified,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.username === "duplicate-user")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the user fields.",
+                violations: [
+                  {
+                    field: "username",
+                    message: "This username is already used.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          globalThis.__createdUsers ??= [];
+          globalThis.__createdUsers.push({
+            id: 99,
+            username: body.username,
+            email: body.email,
+            enabled: body.enabled,
+            authorities: body.roles,
+            effectiveRoles: body.roles,
+          });
+          return new Response(
+            JSON.stringify(globalThis.__createdUsers.at(-1)),
+            {
+              status: 201,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/users") {
           globalThis.__adminUserRequests ??= [];
           globalThis.__adminUserRequests.push(requestUrl.search);
@@ -507,18 +556,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             : page === 0
               ? "admin"
               : "user";
+          const content = [
+            {
+              id: page + 1,
+              username,
+              email: `${username}@example.test`,
+              enabled: true,
+              authorities: ["ROLE_USER"],
+              effectiveRoles: ["ROLE_USER"],
+            },
+          ];
+          if (!query && page === 0)
+            content.push(...(globalThis.__createdUsers ?? []));
           return new Response(
             JSON.stringify({
-              content: [
-                {
-                  id: page + 1,
-                  username,
-                  email: `${username}@example.test`,
-                  enabled: true,
-                  authorities: ["ROLE_USER"],
-                  effectiveRoles: ["ROLE_USER"],
-                },
-              ],
+              content,
               number: page,
               totalPages: 2,
               totalElements: 2,
@@ -541,9 +593,16 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             : page === 0
               ? "ROLE_ADMIN"
               : "ROLE_USER";
+          const roles =
+            requestUrl.searchParams.get("size") === "100"
+              ? [
+                  { name: "ROLE_USER", description: "Standard user role" },
+                  { name: "ROLE_ADMIN", description: "Administrator role" },
+                ]
+              : [{ name, description: "Scoped authorization role" }];
           return new Response(
             JSON.stringify({
-              content: [{ name, description: "Scoped authorization role" }],
+              content: roles,
               number: page,
               totalPages: 2,
               totalElements: 2,
@@ -1398,6 +1457,110 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ["0", "0"],
     );
     assert.equal(new URLSearchParams(roleRequests[1]).get("q"), "AUDITOR");
+    const usersNav = window.getByRole("button", {
+      name: "Users",
+      exact: true,
+    });
+    await usersNav.click();
+    assert.equal(await usersNav.isDisabled(), true);
+    assert.equal(await usersNav.locator(".spinner").count(), 1);
+    const createUserAction = window.locator(".topbar").getByRole("button", {
+      name: "Create user",
+      exact: true,
+    });
+    await createUserAction.click();
+    assert.equal(await createUserAction.isDisabled(), true);
+    assert.equal(await createUserAction.locator(".spinner").count(), 1);
+    await window
+      .getByRole("heading", { name: "Create user", exact: true })
+      .waitFor();
+    const userCreateForm = window.locator(
+      'form[data-form="admin-user-create"]',
+    );
+    await userCreateForm.locator('[name="username"]').fill("duplicate-user");
+    await userCreateForm.locator('[name="firstName"]').fill("Native");
+    await userCreateForm.locator('[name="lastName"]').fill("Account");
+    await userCreateForm
+      .locator('[name="email"]')
+      .fill("native-account@example.test");
+    await userCreateForm
+      .locator('[name="password"]')
+      .fill("TemporaryChange12!");
+    assert.equal(
+      await userCreateForm
+        .locator('input[name="roles"][value="ROLE_USER"]')
+        .isChecked(),
+      true,
+    );
+    const createUserSubmit = userCreateForm.getByRole("button", {
+      name: "Create user",
+      exact: true,
+    });
+    await createUserSubmit.click();
+    assert.equal(await createUserSubmit.isDisabled(), true);
+    assert.equal(await createUserSubmit.locator(".spinner").count(), 1);
+    await window
+      .getByText("This username is already used.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await userCreateForm.locator('[name="username"]').inputValue(),
+      "duplicate-user",
+    );
+    assert.equal(
+      await userCreateForm.locator('[name="password"]').inputValue(),
+      "",
+    );
+    await userCreateForm.locator('[name="username"]').fill("new-native-user");
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Kullanıcı oluştur", exact: true })
+      .waitFor();
+    await window.waitForFunction(() => {
+      const localeButton = document.querySelector(
+        '.sidebar-footer button[data-action="toggle-locale"]',
+      );
+      return localeButton && !localeButton.disabled;
+    });
+    await userCreateForm
+      .locator('[name="password"]')
+      .fill("TemporaryChange12!");
+    await userCreateForm
+      .getByRole("button", { name: "Kullanıcı oluştur", exact: true })
+      .click();
+    await window.getByText("Kullanıcı oluşturuldu.", { exact: true }).waitFor();
+    await window
+      .getByText("native-account@example.test", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminUserCreateRequests),
+      [
+        {
+          username: "duplicate-user",
+          email: "native-account@example.test",
+          roles: ["ROLE_USER"],
+          passwordProvided: true,
+          temporary: false,
+          enabled: true,
+          emailVerified: false,
+        },
+        {
+          username: "new-native-user",
+          email: "native-account@example.test",
+          roles: ["ROLE_USER"],
+          passwordProvided: true,
+          temporary: false,
+          enabled: true,
+          emailVerified: false,
+        },
+      ],
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const rolesNav = window.getByRole("button", {
+      name: "Roles",
+      exact: true,
+    });
+    await rolesNav.click();
+    await window.getByRole("button", { name: "Search roles" }).waitFor();
     await application.evaluate(({ Tray }) => {
       globalThis.__trayTooltips = [];
       const originalSetToolTip = Tray.prototype.setToolTip;

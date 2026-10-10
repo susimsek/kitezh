@@ -1,4 +1,5 @@
 export const iconNames = [
+  "add",
   "arrowLeft",
   "arrowRight",
   "check",
@@ -19,6 +20,7 @@ export const iconMetadata: Record<
   AppIconName,
   { labelKey: string; unicode: string }
 > = {
+  add: { labelKey: "adminCreateUser", unicode: "+" },
   arrowLeft: { labelKey: "back", unicode: "←" },
   arrowRight: { labelKey: "continue", unicode: "→" },
   check: { labelKey: "save", unicode: "✓" },

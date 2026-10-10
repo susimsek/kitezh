@@ -47,6 +47,7 @@ function isAllowedApiPath(
   path: string,
 ) {
   if (namespace === "admin") {
+    if (method === "POST" && path === "/api/admin/users") return true;
     if (
       method === "PUT" &&
       (path === "/api/admin/settings/ciba-policy" ||

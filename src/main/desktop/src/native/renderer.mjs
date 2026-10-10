@@ -49,7 +49,7 @@ const field = (
 ) =>
   `<div class="field"><label for="${name}">${escapeHtml(label)}</label><input id="${name}" name="${name}" type="${type}" value="${escapeHtml(value)}" aria-invalid="${Boolean(error)}" ${extra}/><div class="field-error" id="${name}-error">${escapeHtml(error)}</div></div>`;
 const pageHeader = (title, description) =>
-  `<div class="topbar"><div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><div>${button(text("signOut"), { action: "logout", busy: state.busy === "logout", icon: "logout" })}</div></div>`;
+  `<div class="topbar"><div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><div class="actions">${state.console === "admin" && (state.route === "users" || (state.route === "user-create" && state.busy === "user-create-route")) ? button(text("adminCreateUser"), { action: "create-user", busy: state.busy === "user-create-route" || state.busy === "route:users", disabled: state.offline || Boolean(state.busy), icon: "add" }) : ""}${button(text("signOut"), { action: "logout", busy: state.busy === "logout", icon: "logout" })}</div></div>`;
 
 function setTheme(theme) {
   state.theme = theme === "dark" ? "dark" : "light";
@@ -145,6 +145,7 @@ function routeTitle() {
   if (state.console === "admin")
     return {
       users: text("adminUsers"),
+      "user-create": text("adminCreateUser"),
       roles: text("adminRoles"),
       groups: text("adminGroups"),
       "client-scopes": text("adminClientScopes"),
@@ -176,6 +177,7 @@ function routeDescription() {
   if (state.console === "admin")
     return {
       users: text("adminSearchUsers"),
+      "user-create": text("adminCreateUserDescription"),
       roles: text("adminSearchRoles"),
       groups: text("adminSearchGroups"),
       "client-scopes": text("adminSearchClientScopes"),
@@ -226,6 +228,7 @@ function content() {
 
 function adminContent() {
   if (state.route === "users") return adminUsersContent();
+  if (state.route === "user-create") return adminUserCreateContent();
   if (state.route === "roles") return adminRolesContent();
   if (state.route === "groups") return adminGroupsContent();
   if (state.route === "client-scopes") return adminClientScopesContent();
@@ -263,6 +266,18 @@ function adminUsersContent() {
     ? page.totalPages
     : 0;
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${users.map((user) => `<article class="list-item"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span></div><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminUserCreateContent() {
+  const draft = state.data.userCreateDraft ?? {};
+  const roles = Array.isArray(state.data.userCreateRoles)
+    ? state.data.userCreateRoles
+    : [];
+  const selectedRoles = Array.isArray(draft.roles)
+    ? draft.roles
+    : ["ROLE_USER"];
+  const errors = violations(state.error?.body);
+  return `<section class="card"><form data-form="admin-user-create" novalidate><div class="form-grid">${field("username", text("username"), draft.username ?? "", errors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), draft.firstName ?? "", errors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), draft.lastName ?? "", errors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), draft.email ?? "", errors.email, "email", 'maxlength="200" autocomplete="email"')}${field("password", text("newPassword"), "", errors.password, "password", 'minlength="12" maxlength="128" autocomplete="new-password" required')}</div><label class="settings-row"><input type="checkbox" name="temporary" ${draft.temporary ? "checked" : ""}/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><label class="settings-row"><input type="checkbox" name="emailVerified" ${draft.emailVerified ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${draft.enabled !== false ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${roles.length ? roles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error" id="roles-error">${escapeHtml(errors.roles ?? "")}</div></fieldset><div class="actions">${button(text("adminCreateUser"), { type: "submit", busy: state.busy === "user-create", disabled: state.offline || roles.length === 0 })}</div></form></section>`;
 }
 
 function adminRolesContent() {
@@ -556,6 +571,7 @@ function loginContent() {
 }
 
 function render() {
+  if (state.session) preserveOfflineDrafts();
   if (!state.session) {
     app.innerHTML = loginContent();
   } else {
@@ -593,6 +609,14 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         sort: "username,asc",
       });
       state.data.users = await request(`/api/admin/users?${query.toString()}`);
+    }
+    if (state.console === "admin" && state.route === "user-create") {
+      const page = await request(
+        "/api/admin/roles?page=0&size=100&sort=name,asc",
+      );
+      state.data.userCreateRoles = Array.isArray(page?.content)
+        ? page.content
+        : [];
     }
     if (state.console === "admin" && state.route === "roles") {
       const query = new URLSearchParams({
@@ -880,6 +904,17 @@ function preserveOfflineDrafts() {
         state.data.adminMessageOverrideDrafts ??= {};
         state.data.adminMessageOverrideDrafts[id] = { id, ...values };
       }
+    } else if (form.dataset.form === "admin-user-create") {
+      const { password: _password, ...draft } = values;
+      state.data.userCreateDraft = {
+        ...draft,
+        temporary: form.elements.namedItem("temporary").checked,
+        emailVerified: form.elements.namedItem("emailVerified").checked,
+        enabled: form.elements.namedItem("enabled").checked,
+        roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+          (input) => input.value,
+        ),
+      };
     }
   }
 }
@@ -887,6 +922,55 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-user-create") {
+    const body = {
+      username: String(values.username ?? "").trim(),
+      firstName: String(values.firstName ?? "").trim() || null,
+      lastName: String(values.lastName ?? "").trim() || null,
+      email: String(values.email ?? "").trim() || null,
+      emailVerified: form.elements.namedItem("emailVerified").checked,
+      password: String(values.password ?? ""),
+      temporary: form.elements.namedItem("temporary").checked,
+      enabled: form.elements.namedItem("enabled").checked,
+      roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+        (input) => input.value,
+      ),
+    };
+    if (!form.reportValidity()) return;
+    state.data.userCreateDraft = { ...body };
+    delete state.data.userCreateDraft.password;
+    if (body.roles.length === 0) {
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: text("adminUserRoleRequired"),
+          violations: [
+            { field: "roles", message: text("adminUserRoleRequired") },
+          ],
+        },
+      };
+      render();
+      return;
+    }
+    state.busy = "user-create";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request("/api/admin/users", { method: "POST", body });
+      state.data.userCreateDraft = null;
+      state.data.userQuery = "";
+      state.data.userPage = 0;
+      state.route = "users";
+      await loadRoute();
+      state.notice = text("adminUserCreated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-localization-settings") {
     const body = {
       internationalizationEnabled: form.elements.namedItem(
@@ -1218,6 +1302,18 @@ async function action(action, element) {
     state.route = state.console === "admin" ? "dashboard" : "profile";
     history.replaceState(null, "", `?console=${state.console}`);
     return signIn();
+  }
+  if (action === "create-user") {
+    if (state.busy || state.offline) return;
+    state.busy = "user-create-route";
+    state.route = "user-create";
+    state.data.userCreateDraft = null;
+    state.error = null;
+    state.notice = null;
+    await loadRoute();
+    state.busy = null;
+    render();
+    return;
   }
   if (action === "mfa-setup") {
     state.busy = "mfa";
