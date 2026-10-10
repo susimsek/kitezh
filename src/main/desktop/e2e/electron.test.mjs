@@ -337,6 +337,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/groups") {
+          globalThis.__adminGroupRequests ??= [];
+          globalThis.__adminGroupRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const page = Number(requestUrl.searchParams.get("page") ?? 0);
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const name = query
+            ? "finance-audit"
+            : page === 0
+              ? "finance"
+              : "support";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: page + 1,
+                  name,
+                  path: `Organization / ${name}`,
+                  roles: ["ROLE_USER_VIEWER"],
+                  effectiveRoles: ["ROLE_USER_VIEWER"],
+                  userCount: 3,
+                },
+              ],
+              number: page,
+              totalPages: 2,
+              totalElements: 2,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -445,6 +479,30 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Rol ara" }).waitFor();
     assert.equal(await window.getByText("ROLE_AUDITOR").count(), 1);
     await window.getByRole("button", { name: "İngilizce" }).click();
+    const groupsNavigation = window.getByRole("button", {
+      name: "Groups",
+      exact: true,
+    });
+    await groupsNavigation.click();
+    assert.equal(await groupsNavigation.isDisabled(), true);
+    assert.equal(await groupsNavigation.locator(".spinner").count(), 1);
+    await window.getByText("Organization / finance").waitFor();
+    const groupQuery = window.getByRole("searchbox", { name: "Search groups" });
+    await groupQuery.fill("audit");
+    await window.getByRole("button", { name: "Search groups" }).click();
+    assert.equal(
+      await window.getByRole("button", { name: "Search groups" }).isDisabled(),
+      true,
+    );
+    await window.getByText("Organization / finance-audit").waitFor();
+    const groupRequests = await application.evaluate(
+      () => globalThis.__adminGroupRequests,
+    );
+    assert.deepEqual(
+      groupRequests.map((query) => new URLSearchParams(query).get("page")),
+      ["0", "0"],
+    );
+    assert.equal(new URLSearchParams(groupRequests[1]).get("q"), "audit");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
