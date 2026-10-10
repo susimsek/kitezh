@@ -1860,6 +1860,11 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     const emailHost = emailForm.locator('[name="host"]');
     await emailHost.fill("invalid.example.test");
     const emailSave = emailForm.getByRole("button", { name: "Save" });
+    assert.equal(await emailSave.locator(".button-icon").textContent(), "✓");
+    assert.equal(
+      await emailSave.locator(".button-icon").getAttribute("aria-hidden"),
+      "true",
+    );
     await emailSave.click();
     assert.equal(await emailSave.isDisabled(), true);
     assert.equal(await emailSave.locator(".spinner").count(), 1);

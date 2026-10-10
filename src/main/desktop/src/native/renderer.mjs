@@ -38,7 +38,7 @@ const escapeHtml = (value) =>
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const button = (label, options = {}) =>
-  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${options.icon && icons[options.icon] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${(options.icon ?? (label === text("save") ? "check" : null)) && icons[options.icon ?? "check"] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon ?? "check"].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
 const field = (
   name,
   label,
