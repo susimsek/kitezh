@@ -1326,6 +1326,17 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          requestMethod === "DELETE" &&
+          /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__adminClientDeleteRequests ??= [];
+          globalThis.__adminClientDeleteRequests.push(requestUrl.pathname);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
         if (requestUrl.pathname === "/api/admin/clients") {
           globalThis.__adminClientRequests ??= [];
           globalThis.__adminClientRequests.push(requestUrl.search);
@@ -3302,6 +3313,13 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(await clientsNavigation.isDisabled(), true);
     assert.equal(await clientsNavigation.locator(".spinner").count(), 1);
     await window.getByText("Account Console").waitFor();
+    const platformClientRow = window.locator('[data-client-id="client-1"]');
+    assert.equal(
+      await platformClientRow
+        .getByRole("button", { name: "Delete client" })
+        .count(),
+      0,
+    );
     const clientQuery = window.getByRole("searchbox", {
       name: "Search clients",
     });
@@ -3348,6 +3366,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         () => globalThis.__clientNativeMetadataRequests,
       ),
       [{ clientName: "Rejected client" }, { clientName: "Reporting Client" }],
+    );
+    const deleteClient = clientRow.getByRole("button", {
+      name: "Delete client",
+      exact: true,
+    });
+    await deleteClient.click();
+    await clientRow
+      .getByText(
+        "Delete this client and its authorizations, consents, and service account? Platform console clients cannot be deleted.",
+        { exact: true },
+      )
+      .waitFor();
+    await clientRow.getByRole("button", { name: "Cancel" }).click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await clientRow
+      .getByRole("button", { name: "Delete client", exact: true })
+      .click();
+    const confirmClientDelete = clientRow.getByRole("button", {
+      name: "Delete client",
+      exact: true,
+    });
+    await confirmClientDelete.click();
+    assert.equal(await confirmClientDelete.isDisabled(), true);
+    assert.equal(await confirmClientDelete.locator(".spinner").count(), 1);
+    await window.getByText("Client deleted.", { exact: true }).waitFor();
+    assert.equal(await clientRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminClientDeleteRequests),
+      ["/api/admin/clients/client-1"],
     );
     const identityProvidersNavigation = window.getByRole("button", {
       name: "Identity providers",

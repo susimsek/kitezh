@@ -128,6 +128,41 @@ class AdminClientServiceTest {
     }
 
     @Test
+    void rejectsDeletingEveryPlatformConsoleClientBeforeRemovingAnyData() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        List<String> consoleClientIds =
+                List.of(
+                        "admin-console",
+                        "account-console",
+                        "desktop-admin-console",
+                        "desktop-account-console",
+                        "mobile-admin-console",
+                        "mobile-account-console");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        List<RegisteredClient> consoleClients =
+                consoleClientIds.stream()
+                        .map(clientId -> registeredClient("client-id", clientId))
+                        .toList();
+        when(registeredClientMapper.toObject(entity, mapperSupport))
+                .thenReturn(
+                        consoleClients.getFirst(),
+                        consoleClients
+                                .subList(1, consoleClients.size())
+                                .toArray(RegisteredClient[]::new));
+
+        for (int index = 0; index < consoleClientIds.size(); index++) {
+            assertThatThrownBy(() -> service().delete("client-id"))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage("Platform console clients cannot be deleted");
+        }
+
+        verify(authorizationRepository, never()).deleteByRegisteredClientId(any());
+        verify(authorizationConsentRepository, never()).deleteByIdRegisteredClientId(any());
+        verify(clientRepository, never()).deleteById(any());
+        verify(adminAuditEventService, never()).record(any(), any(), any());
+    }
+
+    @Test
     void findAllNormalizesQueryAndMapsResults() {
         RegisteredClientEntity entity = new RegisteredClientEntity();
         RegisteredClient client = registeredClient("client-id", "query-client");

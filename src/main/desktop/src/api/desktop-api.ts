@@ -146,6 +146,11 @@ function isAllowedApiPath(
       return true;
     if (
       method === "DELETE" &&
+      /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    )
+      return true;
+    if (
+      method === "DELETE" &&
       /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers\/[A-Za-z0-9_-]{1,100}$/.test(
         path,
       )

@@ -146,6 +146,20 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { enabled: false },
   });
   assert.equal(disabledUser.status, 200);
+  const deletedClient = await adapter.request({
+    console: "admin",
+    path: "/api/admin/clients/client-42",
+    method: "DELETE",
+  });
+  assert.equal(deletedClient.status, 200);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/clients/client-42/secret",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
   const deletedUser = await adapter.request({
     console: "admin",
     path: "/api/admin/users/2",
@@ -348,7 +362,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   for (const request of [
     { path: "/api/admin/clients", method: "POST" },
     { path: "/api/admin/clients/client-1", method: "PUT" },
-    { path: "/api/admin/clients/client-1", method: "DELETE" },
+    { path: "/api/admin/clients/client-1/secret", method: "DELETE" },
     { path: "/api/admin/clients/client-1/secret", method: "POST" },
     {
       path: "/api/admin/clients/client-1/native-metadata/secret",

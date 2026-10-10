@@ -24,6 +24,28 @@ class AdminClientEndpointsIT {
     @Autowired private MockMvc mockMvc;
 
     @Test
+    void adminCannotDeleteDesktopConsoleClient() throws Exception {
+        String clientsResponse =
+                mockMvc.perform(
+                                get("/api/admin/clients")
+                                        .param("q", "desktop-admin-console")
+                                        .with(admin()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].clientId").value("desktop-admin-console"))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String id = JSON.readTree(clientsResponse).get("content").get(0).get("id").asString();
+
+        mockMvc.perform(delete("/api/admin/clients/{id}", id).with(admin()))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/admin/clients/{id}", id).with(admin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value("desktop-admin-console"));
+    }
+
+    @Test
     void adminCanManageClientAndItsScopeAssignments() throws Exception {
         String clientId = "it-client-" + UUID.randomUUID().toString().replace("-", "");
         String request = clientRequest(clientId, "IT Client");

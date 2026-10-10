@@ -55,6 +55,14 @@ public class AdminClientService {
     private static final String AUTHORIZATION_GRANT_TYPES_FIELD = "authorizationGrantTypes";
 
     private static final String ADMIN_CONSOLE_CLIENT_ID = "admin-console";
+    private static final Set<String> PLATFORM_CONSOLE_CLIENT_IDS =
+            Set.of(
+                    "admin-console",
+                    "account-console",
+                    "desktop-admin-console",
+                    "desktop-account-console",
+                    "mobile-admin-console",
+                    "mobile-account-console");
     private static final Duration DEFAULT_AUTHORIZATION_CODE_TTL = Duration.ofMinutes(5);
     private static final Duration DEFAULT_ACCESS_TOKEN_TTL = Duration.ofMinutes(5);
     private static final Duration DEFAULT_REFRESH_TOKEN_TTL = Duration.ofHours(1);
@@ -204,7 +212,11 @@ public class AdminClientService {
             cacheNames = ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
             allEntries = true)
     public void delete(String id) {
-        rejectAdminConsoleMutation(findRequired(id));
+        RegisteredClient client = findRequired(id);
+        if (PLATFORM_CONSOLE_CLIENT_IDS.contains(client.getClientId())) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.CLIENT_PROTECTED, "Platform console clients cannot be deleted");
+        }
         authorizationRepository.deleteByRegisteredClientId(id);
         authorizationConsentRepository.deleteByIdRegisteredClientId(id);
         removeServiceAccount(id);

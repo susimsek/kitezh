@@ -20,6 +20,14 @@ const state = {
   offline: !navigator.onLine,
   authStarting: false,
 };
+const PLATFORM_CONSOLE_CLIENT_IDS = new Set([
+  "admin-console",
+  "account-console",
+  "desktop-admin-console",
+  "desktop-account-console",
+  "mobile-admin-console",
+  "mobile-account-console",
+]);
 
 const app = document.getElementById("app");
 let authTimeout;
@@ -50,6 +58,8 @@ const actionIcons = {
   "admin-user-toggle-enabled": "check",
   "admin-client-scope-delete-request": "delete",
   "admin-client-scope-delete-confirm": "delete",
+  "admin-client-delete-request": "delete",
+  "admin-client-delete-confirm": "delete",
   "admin-consent-revoke-request": "delete",
   "admin-consent-revoke-confirm": "delete",
   "admin-group-delete-request": "delete",
@@ -638,7 +648,15 @@ function adminClientsContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-client-native-metadata" data-client-id="${escapeHtml(id)}" novalidate>${field("clientName", text("adminClientName"), draft.clientName ?? client.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-metadata-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-metadata-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}</div>${editForm}</article>`;
+      const protectedClient = PLATFORM_CONSOLE_CLIENT_IDS.has(client.clientId);
+      const confirming = state.data.clientDeleteConfirmId === id;
+      const deleting = state.busy === `client-delete:${id}`;
+      const deleteControls = protectedClient
+        ? `<span>${escapeHtml(text("adminBuiltIn"))}</span>`
+        : confirming
+          ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+          : `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}</div>${editForm}${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -3037,6 +3055,55 @@ async function action(action, element) {
       /* request rendered localized transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-client-delete-request" ||
+    action === "admin-client-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = element.dataset.id;
+    const clients = state.data.clients?.content ?? [];
+    const client = clients.find((item) => item.id === id);
+    if (
+      typeof id !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !client ||
+      PLATFORM_CONSOLE_CLIENT_IDS.has(client.clientId)
+    )
+      return;
+    if (action === "admin-client-delete-request") {
+      state.data.clientDeleteConfirmId = id;
+      render();
+      return;
+    }
+    if (state.data.clientDeleteConfirmId !== id) return;
+    state.busy = `client-delete:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/clients/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      state.data.clients = {
+        ...state.data.clients,
+        content: clients.filter((item) => item.id !== id),
+      };
+      state.data.clientDeleteConfirmId = null;
+      state.notice = text("adminClientDeleted");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-delete-cancel") {
+    if (state.busy) return;
+    if (state.data.clientDeleteConfirmId !== element.dataset.id) return;
+    state.data.clientDeleteConfirmId = null;
     render();
     return;
   }

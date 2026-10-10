@@ -243,6 +243,10 @@ export const messages = {
     adminEditClientMetadata: "Edit client name",
     adminClientName: "Client name",
     adminClientMetadataUpdated: "Client name updated.",
+    adminDeleteClient: "Delete client",
+    adminDeleteClientPrompt:
+      "Delete this client and its authorizations, consents, and service account? Platform console clients cannot be deleted.",
+    adminClientDeleted: "Client deleted.",
     adminClientsLoadError: "We could not load clients.",
     adminSearchClientScopes: "Search client scopes",
     adminNoClientScopes: "No client scopes found.",
@@ -737,6 +741,10 @@ export const messages = {
     adminEditClientMetadata: "İstemci adını düzenle",
     adminClientName: "İstemci adı",
     adminClientMetadataUpdated: "İstemci adı güncellendi.",
+    adminDeleteClient: "İstemciyi sil",
+    adminDeleteClientPrompt:
+      "Bu istemci ve yetkilendirmeleri, rızaları ve hizmet hesabı silinsin mi? Platform konsolu istemcileri silinemez.",
+    adminClientDeleted: "İstemci silindi.",
     adminClientsLoadError: "İstemciler yüklenemedi.",
     adminSearchClientScopes: "İstemci kapsamı ara",
     adminNoClientScopes: "İstemci kapsamı bulunamadı.",
