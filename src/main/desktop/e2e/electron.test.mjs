@@ -869,6 +869,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/send-verify-email$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          globalThis.__adminVerificationEmailRequests ??= [];
+          globalThis.__adminVerificationEmailRequests.push({ id });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*\/unlock$/.test(requestUrl.pathname) &&
           requestMethod === "POST"
         ) {
@@ -1218,7 +1230,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               firstName: username === "admin" ? "Admin" : "Alice",
               lastName: "Example",
               email: `${username}@example.test`,
-              emailVerified: true,
+              emailVerified: username !== "alice-2",
               enabled: globalThis.__userEnabledStates?.[page + 1] ?? true,
               locked:
                 username === "alice-2" &&
@@ -2998,6 +3010,29 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(userUpdateRequests[1].body.firstName, "Alice Updated");
     assert.deepEqual(userUpdateRequests[1].body.roles, ["ROLE_USER"]);
     assert.equal(Object.hasOwn(userUpdateRequests[1].body, "password"), false);
+    const sendVerificationEmail = aliceRow.getByRole("button", {
+      name: "Send verification email",
+      exact: true,
+    });
+    assert.equal(
+      await window
+        .locator('article[data-user-id="1"]')
+        .getByRole("button", { name: "Send verification email", exact: true })
+        .count(),
+      0,
+    );
+    await sendVerificationEmail.click();
+    assert.equal(await sendVerificationEmail.isDisabled(), true);
+    assert.equal(await sendVerificationEmail.locator(".spinner").count(), 1);
+    await window
+      .getByText("Verification email sent.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminVerificationEmailRequests,
+      ),
+      [{ id: 2 }],
+    );
     const manageProfileAttributes = aliceRow.getByRole("button", {
       name: "Profile attributes",
       exact: true,

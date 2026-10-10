@@ -73,6 +73,15 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userEnabledMatch[1]))
     )
       return true;
+    const userVerifyEmailMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/send-verify-email$/,
+    );
+    if (
+      method === "PUT" &&
+      userVerifyEmailMatch &&
+      Number.isSafeInteger(Number(userVerifyEmailMatch[1]))
+    )
+      return true;
     const userTotpResetMatch = path.match(
       /^\/api\/admin\/users\/([1-9]\d*)\/totp$/,
     );

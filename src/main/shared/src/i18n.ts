@@ -397,6 +397,9 @@ export const messages = {
     adminProfileAttributesUpdated: "Profile attributes updated.",
     adminNoProfileAttributes: "No configurable profile attributes are enabled.",
     adminProfileAttributesHelp: "Enter one value per line for multiple values.",
+    adminUserEmailNotVerified: "Email not verified",
+    adminSendVerificationEmail: "Send verification email",
+    adminVerificationEmailSent: "Verification email sent.",
     adminDeleteUser: "Delete user",
     adminDeleteUserPrompt:
       "Delete this user? Their sessions and authorizations will be revoked.",
@@ -952,6 +955,9 @@ export const messages = {
     adminNoProfileAttributes: "Yapılandırılmış profil özelliği etkin değil.",
     adminProfileAttributesHelp:
       "Birden çok değer için her satıra bir değer girin.",
+    adminUserEmailNotVerified: "E-posta doğrulanmadı",
+    adminSendVerificationEmail: "Doğrulama e-postası gönder",
+    adminVerificationEmailSent: "Doğrulama e-postası gönderildi.",
     adminDeleteUser: "Kullanıcıyı sil",
     adminDeleteUserPrompt:
       "Bu kullanıcı silinsin mi? Oturumları ve yetkilendirmeleri iptal edilir.",

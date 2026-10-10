@@ -146,6 +146,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { enabled: false },
   });
   assert.equal(disabledUser.status, 200);
+  const verificationEmail = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/send-verify-email",
+    method: "PUT",
+  });
+  assert.equal(verificationEmail.status, 200);
   const resetUserAuthenticator = await adapter.request({
     console: "admin",
     path: "/api/admin/users/2/totp",
@@ -725,6 +731,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/users/2/profile-attributes?include=all",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/send-verify-email?lifespan=invalid",
+      method: "PUT",
     }),
     /not allowed/,
   );
