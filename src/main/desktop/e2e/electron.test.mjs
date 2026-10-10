@@ -673,6 +673,8 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           requestMethod === "PUT"
         ) {
           const body = JSON.parse(globalThis.__requestBody);
+          globalThis.__offlineAccessPolicyUpdates ??= [];
+          globalThis.__offlineAccessPolicyUpdates.push(body);
           globalThis.__offlineAccessPolicyUpdate = body;
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
@@ -1419,7 +1421,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await offlineForm.locator('[name="idleTimeout"]').fill("P45D");
     await offlineForm.locator('[name="maxLifespan"]').fill("P365D");
     await offlineForm.locator('[name="maxLimited"]').check();
-    const offlineSave = offlineForm.getByRole("button", { name: "Save" });
+    const offlineSave = offlineForm.locator('button[type="submit"]');
     await offlineSave.click();
     assert.equal(await offlineSave.isDisabled(), true);
     assert.equal(await offlineSave.locator(".spinner").count(), 1);
@@ -1428,6 +1430,65 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       await application.evaluate(() => globalThis.__offlineAccessPolicyUpdate),
       { idleTimeout: "P45D", maxLifespan: "P365D", maxLimited: true },
     );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Politikalar", exact: true })
+      .waitFor();
+    await offlineForm.locator('[name="idleTimeout"]').fill("P50D");
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    await window
+      .getByText(
+        "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.equal(
+      await offlineForm.locator('[name="idleTimeout"]').inputValue(),
+      "P50D",
+    );
+    assert.equal(await offlineSave.isDisabled(), true);
+    await offlineForm.locator('[name="idleTimeout"]').fill("P51D");
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__offlineAccessPolicyUpdates.length,
+      ),
+      1,
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await window
+      .getByText(
+        "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı.",
+        { exact: true },
+      )
+      .waitFor({ state: "detached" });
+    assert.equal(
+      await offlineForm.locator('[name="idleTimeout"]').inputValue(),
+      "P51D",
+    );
+    await offlineSave.click();
+    await window
+      .getByText("Politika ayarları kaydedildi.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__offlineAccessPolicyUpdate),
+      { idleTimeout: "P51D", maxLifespan: "P365D", maxLimited: true },
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window
+      .getByRole("heading", { name: "Policies", exact: true })
+      .waitFor();
     await window.getByRole("button", { name: "Turkish" }).click();
     await window
       .getByRole("heading", { name: "Politikalar", exact: true })

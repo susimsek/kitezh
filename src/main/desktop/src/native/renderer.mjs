@@ -398,7 +398,7 @@ function adminAdminPoliciesContent() {
   const cibaDraft = state.data.cibaPolicyDraft ?? ciba;
   const offlineDraft = state.data.offlineAccessPolicyDraft ?? offline;
   const errors = violations(state.error?.body);
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><form data-form="admin-ciba-policy" novalidate>${field("requestLifespanSeconds", text("adminRequestLifespan"), cibaDraft.requestLifespanSeconds ?? "", errors.requestLifespanSeconds, "number", 'min="30" max="3600" required')}${field("pollingIntervalSeconds", text("adminPollingInterval"), cibaDraft.pollingIntervalSeconds ?? "", errors.pollingIntervalSeconds, "number", 'min="1" max="300" required')}<div class="field"><label for="deliveryMode">${escapeHtml(text("adminDeliveryMode"))}</label><select id="deliveryMode" name="deliveryMode"><option value="all" ${cibaDraft.deliveryMode === "all" ? "selected" : ""}>all</option><option value="poll" ${cibaDraft.deliveryMode === "poll" ? "selected" : ""}>poll</option><option value="ping" ${cibaDraft.deliveryMode === "ping" ? "selected" : ""}>ping</option><option value="push" ${cibaDraft.deliveryMode === "push" ? "selected" : ""}>push</option></select><div class="field-error">${escapeHtml(errors.deliveryMode ?? "")}</div></div><div class="field"><label for="userVerification">${escapeHtml(text("adminUserVerification"))}</label><select id="userVerification" name="userVerification"><option value="required" ${cibaDraft.userVerification === "required" ? "selected" : ""}>required</option><option value="preferred" ${cibaDraft.userVerification === "preferred" ? "selected" : ""}>preferred</option><option value="discouraged" ${cibaDraft.userVerification === "discouraged" ? "selected" : ""}>discouraged</option></select><div class="field-error">${escapeHtml(errors.userVerification ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="mfaRequired" ${cibaDraft.mfaRequired ? "checked" : ""}/>${escapeHtml(text("adminMfaRequired"))}</label><label class="settings-row"><input type="checkbox" name="stepUpRequired" ${cibaDraft.stepUpRequired ? "checked" : ""}/>${escapeHtml(text("adminStepUpRequired"))}</label>${field("stepUpAcr", text("adminStepUpAcr"), cibaDraft.stepUpAcr ?? "", errors.stepUpAcr, "text", 'maxlength="100"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-ciba-policy" })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><form data-form="admin-offline-access-policy" novalidate>${field("idleTimeout", text("adminIdleTimeout"), offlineDraft.idleTimeout ?? "", errors.idleTimeout, "text", 'required placeholder="P30D"')}${field("maxLifespan", text("adminMaxLifespan"), offlineDraft.maxLifespan ?? "", errors.maxLifespan, "text", 'placeholder="P180D"')}<div class="field"><label class="settings-row"><input type="checkbox" name="maxLimited" ${offlineDraft.maxLimited ? "checked" : ""}/>${escapeHtml(text("adminMaxLimited"))}</label><div class="field-error">${escapeHtml(errors.maxLimited ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-offline-access-policy" })}</div></form></section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><form data-form="admin-ciba-policy" novalidate>${field("requestLifespanSeconds", text("adminRequestLifespan"), cibaDraft.requestLifespanSeconds ?? "", errors.requestLifespanSeconds, "number", 'min="30" max="3600" required')}${field("pollingIntervalSeconds", text("adminPollingInterval"), cibaDraft.pollingIntervalSeconds ?? "", errors.pollingIntervalSeconds, "number", 'min="1" max="300" required')}<div class="field"><label for="deliveryMode">${escapeHtml(text("adminDeliveryMode"))}</label><select id="deliveryMode" name="deliveryMode"><option value="all" ${cibaDraft.deliveryMode === "all" ? "selected" : ""}>all</option><option value="poll" ${cibaDraft.deliveryMode === "poll" ? "selected" : ""}>poll</option><option value="ping" ${cibaDraft.deliveryMode === "ping" ? "selected" : ""}>ping</option><option value="push" ${cibaDraft.deliveryMode === "push" ? "selected" : ""}>push</option></select><div class="field-error">${escapeHtml(errors.deliveryMode ?? "")}</div></div><div class="field"><label for="userVerification">${escapeHtml(text("adminUserVerification"))}</label><select id="userVerification" name="userVerification"><option value="required" ${cibaDraft.userVerification === "required" ? "selected" : ""}>required</option><option value="preferred" ${cibaDraft.userVerification === "preferred" ? "selected" : ""}>preferred</option><option value="discouraged" ${cibaDraft.userVerification === "discouraged" ? "selected" : ""}>discouraged</option></select><div class="field-error">${escapeHtml(errors.userVerification ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="mfaRequired" ${cibaDraft.mfaRequired ? "checked" : ""}/>${escapeHtml(text("adminMfaRequired"))}</label><label class="settings-row"><input type="checkbox" name="stepUpRequired" ${cibaDraft.stepUpRequired ? "checked" : ""}/>${escapeHtml(text("adminStepUpRequired"))}</label>${field("stepUpAcr", text("adminStepUpAcr"), cibaDraft.stepUpAcr ?? "", errors.stepUpAcr, "text", 'maxlength="100"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-ciba-policy", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><form data-form="admin-offline-access-policy" novalidate>${field("idleTimeout", text("adminIdleTimeout"), offlineDraft.idleTimeout ?? "", errors.idleTimeout, "text", 'required placeholder="P30D"')}${field("maxLifespan", text("adminMaxLifespan"), offlineDraft.maxLifespan ?? "", errors.maxLifespan, "text", 'placeholder="P180D"')}<div class="field"><label class="settings-row"><input type="checkbox" name="maxLimited" ${offlineDraft.maxLimited ? "checked" : ""}/>${escapeHtml(text("adminMaxLimited"))}</label><div class="field-error">${escapeHtml(errors.maxLimited ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-offline-access-policy", disabled: state.offline })}</div></form></section></div>`;
 }
 
 function adminAdminConfigurationContent() {
@@ -421,7 +421,7 @@ function adminAdminConfigurationContent() {
     ["adminSessionTimeout", server.sessionTimeout],
   ];
   const activeKey = server.activeSigningKey;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}</div><form data-form="admin-branding" novalidate>${field("applicationName", text("adminApplicationName"), brandingDraft.applicationName ?? "", brandingErrors.applicationName, "text", 'maxlength="100" required')}${field("primaryColor", text("adminPrimaryColor"), brandingDraft.primaryColor ?? "", brandingErrors.primaryColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("accentColor", text("adminAccentColor"), brandingDraft.accentColor ?? "", brandingErrors.accentColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("backgroundColor", text("adminBackgroundColor"), brandingDraft.backgroundColor ?? "", brandingErrors.backgroundColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-branding" })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}</div><form data-form="admin-branding" novalidate>${field("applicationName", text("adminApplicationName"), brandingDraft.applicationName ?? "", brandingErrors.applicationName, "text", 'maxlength="100" required')}${field("primaryColor", text("adminPrimaryColor"), brandingDraft.primaryColor ?? "", brandingErrors.primaryColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("accentColor", text("adminAccentColor"), brandingDraft.accentColor ?? "", brandingErrors.accentColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("backgroundColor", text("adminBackgroundColor"), brandingDraft.backgroundColor ?? "", brandingErrors.backgroundColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-branding", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
 }
 
 function adminAdminLoginEmailContent() {
@@ -444,7 +444,7 @@ function adminAdminLocalizationContent() {
   const settings = state.data.adminLocalization ?? {};
   const page = state.data.adminMessageOverrides ?? { content: [] };
   const overrides = Array.isArray(page.content) ? page.content : [];
-  const draft = state.data.adminMessageOverrideDraft;
+  const drafts = state.data.adminMessageOverrideDrafts ?? {};
   const localizationDraft = state.data.adminLocalizationDraft ?? settings;
   const errors = violations(state.error?.body);
   const row = (label, value) =>
@@ -456,7 +456,7 @@ function adminAdminLocalizationContent() {
   const supportedLocales = Array.isArray(localizationDraft.supportedLocales)
     ? localizationDraft.supportedLocales
     : [];
-  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${localizationDraft.defaultLocale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => `<label class="settings-row"><input type="checkbox" name="supportedLocales" value="${escapeHtml(locale)}" ${supportedLocales.includes(locale) ? "checked" : ""}/>${escapeHtml(locale)}</label>`).join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings" })}</div></form>`;
+  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${localizationDraft.defaultLocale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => `<label class="settings-row"><input type="checkbox" name="supportedLocales" value="${escapeHtml(locale)}" ${supportedLocales.includes(locale) ? "checked" : ""}/>${escapeHtml(locale)}</label>`).join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings", disabled: state.offline })}</div></form>`;
   const overrideField = (item, name, label, value, error) => {
     const id = `override-${item.id}-${name}`;
     return `<div class="field"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" name="${name}" value="${escapeHtml(value ?? "")}" aria-invalid="${Boolean(error)}" required maxlength="${name === "messageValue" ? 4000 : name === "locale" ? 10 : name === "bundle" ? 50 : 255}"/><div class="field-error" id="${id}-error">${escapeHtml(error ?? "")}</div></div>`;
@@ -465,8 +465,8 @@ function adminAdminLocalizationContent() {
     overrides.length
       ? `<div class="list">${overrides
           .map((item) => {
-            const values = draft?.id === item.id ? draft : item;
-            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, errors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, errors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, errors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(errors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(errors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}` })}</div></form></article>`;
+            const values = drafts[item.id] ?? item;
+            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, errors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, errors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, errors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(errors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(errors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form></article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`
@@ -821,6 +821,47 @@ function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+function preserveNativeAdminDrafts() {
+  for (const form of app.querySelectorAll("form[data-form]")) {
+    const values = formValues(form);
+    if (form.dataset.form === "admin-ciba-policy") {
+      state.data.cibaPolicyDraft = {
+        requestLifespanSeconds: values.requestLifespanSeconds,
+        pollingIntervalSeconds: values.pollingIntervalSeconds,
+        deliveryMode: values.deliveryMode,
+        userVerification: values.userVerification,
+        mfaRequired: form.elements.namedItem("mfaRequired").checked,
+        stepUpRequired: form.elements.namedItem("stepUpRequired").checked,
+        stepUpAcr: values.stepUpAcr,
+      };
+    } else if (form.dataset.form === "admin-offline-access-policy") {
+      state.data.offlineAccessPolicyDraft = {
+        idleTimeout: values.idleTimeout,
+        maxLifespan: values.maxLifespan,
+        maxLimited: form.elements.namedItem("maxLimited").checked,
+      };
+    } else if (form.dataset.form === "admin-branding") {
+      state.data.adminBrandingDraft = values;
+    } else if (form.dataset.form === "admin-localization-settings") {
+      state.data.adminLocalizationDraft = {
+        internationalizationEnabled: form.elements.namedItem(
+          "internationalizationEnabled",
+        ).checked,
+        defaultLocale: values.defaultLocale,
+        supportedLocales: [
+          ...form.querySelectorAll('input[name="supportedLocales"]:checked'),
+        ].map((input) => input.value),
+      };
+    } else if (form.dataset.form === "admin-localization-message") {
+      const id = Number(form.dataset.id);
+      if (Number.isSafeInteger(id) && id > 0) {
+        state.data.adminMessageOverrideDrafts ??= {};
+        state.data.adminMessageOverrideDrafts[id] = { id, ...values };
+      }
+    }
+  }
+}
+
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
@@ -862,7 +903,8 @@ async function submitForm(form) {
       messageKey: String(values.messageKey ?? "").trim(),
       messageValue: String(values.messageValue ?? "").trim(),
     };
-    state.data.adminMessageOverrideDraft = { id, ...body };
+    state.data.adminMessageOverrideDrafts ??= {};
+    state.data.adminMessageOverrideDrafts[id] = { id, ...body };
     state.busy = `admin-message-${id}`;
     state.error = null;
     state.notice = null;
@@ -877,7 +919,7 @@ async function submitForm(form) {
         ...page,
         content: page.content.map((item) => (item.id === id ? updated : item)),
       };
-      state.data.adminMessageOverrideDraft = null;
+      delete state.data.adminMessageOverrideDrafts[id];
       state.notice = text("adminMessageOverrideSaved");
     } catch {
       /* request rendered localized server validation or transport feedback */
@@ -1619,10 +1661,12 @@ api.onMenuLogout(() => {
   void logout();
 });
 window.addEventListener("online", () => {
+  preserveNativeAdminDrafts();
   state.offline = false;
   render();
 });
 window.addEventListener("offline", () => {
+  preserveNativeAdminDrafts();
   state.offline = true;
   render();
 });
