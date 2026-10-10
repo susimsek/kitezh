@@ -1358,6 +1358,22 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .getByRole("heading", { name: "Kimlik doğrulama akışları", exact: true })
       .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.evaluate(async () => window.desktopApi.theme.set("dark"));
+    await window.waitForFunction(
+      () => document.documentElement.dataset.theme === "dark",
+    );
+    await window.evaluate(async () => window.desktopApi.theme.set("light"));
+    await window.waitForFunction(
+      () => document.documentElement.dataset.theme === "light",
+    );
+    await window.evaluate(async () => window.desktopApi.theme.set("system"));
+    assert.equal(
+      await window.evaluate(() => window.desktopApi.theme.get()),
+      "system",
+    );
+    await window.waitForFunction(() =>
+      ["light", "dark"].includes(document.documentElement.dataset.theme),
+    );
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
