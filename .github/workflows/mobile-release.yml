@@ -102,10 +102,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
-          cache-dependency-path: |
-            src/main/mobile/pnpm-lock.yaml
-            src/main/mobile/package.json
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
       - name: Install mobile dependencies
         working-directory: src/main/mobile
@@ -210,7 +209,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/Library/Caches/CocoaPods
-          key: cocoaPods-${{ runner.os }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml') }}
+          key: cocoaPods-${{ runner.os }}-${{ hashFiles('src/main/mobile/ios/Podfile.lock') }}
           restore-keys: |
             cocoaPods-${{ runner.os }}-
 
