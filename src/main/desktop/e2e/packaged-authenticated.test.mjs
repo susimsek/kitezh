@@ -286,6 +286,51 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
       packagedDiagnosticText,
       /PACKAGED_ACCESS|packaged@example\.test|PACKAGED_REFRESH/,
     );
+    const settingsWindowPromise = application.waitForEvent("window");
+    const settingsMenuItemFound = await application.evaluate(({ Menu }) => {
+      const applicationMenu = Menu.getApplicationMenu();
+      const settings = applicationMenu?.items[0]?.submenu?.items.find(
+        (item) => item.label === "Settings…",
+      );
+      settings?.click();
+      return Boolean(settings);
+    });
+    assert.equal(settingsMenuItemFound, true);
+    const settingsWindow = await settingsWindowPromise;
+    await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+    await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
+    await settingsWindow.waitForFunction(() => {
+      const text = document.querySelector("#desktop-diagnostics")?.textContent;
+      return text?.includes("unhandled-rejection");
+    });
+    const diagnosticsPreview = await settingsWindow
+      .locator("#desktop-diagnostics")
+      .innerText();
+    assert.doesNotMatch(
+      diagnosticsPreview,
+      /PACKAGED_ACCESS|packaged@example\.test|PACKAGED_REFRESH/,
+    );
+    await settingsWindow.evaluate(() => {
+      globalThis.__diagnosticsCopyCount = 0;
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        configurable: true,
+        value: async () => {
+          globalThis.__diagnosticsCopyCount += 1;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        },
+      });
+    });
+    const copyDiagnostics = settingsWindow.locator("#desktop-copy-diagnostics");
+    await copyDiagnostics.click();
+    assert.equal(await copyDiagnostics.isDisabled(), true);
+    assert.equal(await copyDiagnostics.getAttribute("aria-busy"), "true");
+    assert.equal(await copyDiagnostics.locator(".inline-spinner").count(), 1);
+    await copyDiagnostics.dispatchEvent("click");
+    assert.equal(
+      await settingsWindow.evaluate(() => globalThis.__diagnosticsCopyCount),
+      1,
+    );
+    await settingsWindow.getByText("Copied", { exact: true }).waitFor();
 
     await application.close();
     application = await launchPackaged();
