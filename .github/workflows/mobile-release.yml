@@ -276,46 +276,35 @@ jobs:
               ;;
           esac
 
-      - name: Install iOS distribution credentials
+      - name: Import iOS distribution certificate
         if: steps.ios-signing.outputs.mode == 'signed'
-        id: ios-credentials
+        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9 # v7.1.0
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+
+      - name: Install iOS provisioning profile
+        if: steps.ios-signing.outputs.mode == 'signed'
+        id: ios-profile
         shell: bash
         env:
-          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
           set -euo pipefail
-          certificate_path="${RUNNER_TEMP}/kitezh-distribution.p12"
           profile_path="${RUNNER_TEMP}/kitezh.mobileprovision"
-          keychain_path="${RUNNER_TEMP}/kitezh-signing.keychain-db"
-          keychain_password="$(openssl rand -hex 24)"
-          printf '%s' "${CERTIFICATE_BASE64}" | base64 -D > "${certificate_path}"
           printf '%s' "${PROVISIONING_PROFILE_BASE64}" | base64 -D > "${profile_path}"
-          security create-keychain -p "${keychain_password}" "${keychain_path}"
-          security set-keychain-settings -lut 21600 "${keychain_path}"
-          security unlock-keychain -p "${keychain_password}" "${keychain_path}"
-          security import "${certificate_path}" \
-            -P "${CERTIFICATE_PASSWORD}" \
-            -A \
-            -f pkcs12 \
-            -k "${keychain_path}"
-          security set-key-partition-list \
-            -S apple-tool:,apple: \
-            -s \
-            -k "${keychain_password}" \
-            "${keychain_path}"
-          security list-keychains -d user -s "${keychain_path}"
           profile_directory="${HOME}/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "${profile_directory}"
           security cms -D -i "${profile_path}" > "${RUNNER_TEMP}/kitezh-profile.plist"
           profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print UUID' "${RUNNER_TEMP}/kitezh-profile.plist")"
           profile_name="$(/usr/libexec/PlistBuddy -c 'Print Name' "${RUNNER_TEMP}/kitezh-profile.plist")"
-          cp "${profile_path}" "${profile_directory}/${profile_uuid}.mobileprovision"
+          installed_profile="${profile_directory}/${profile_uuid}.mobileprovision"
+          cp "${profile_path}" "${installed_profile}"
+          rm -f "${profile_path}" "${RUNNER_TEMP}/kitezh-profile.plist"
           {
-            echo "keychain_path=${keychain_path}"
             echo "profile_uuid=${profile_uuid}"
             echo "profile_name=${profile_name}"
+            echo "installed_profile=${installed_profile}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Build unsigned iOS app
@@ -349,8 +338,8 @@ jobs:
         working-directory: src/main/mobile
         env:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          IOS_PROFILE_UUID: ${{ steps.ios-credentials.outputs.profile_uuid }}
-          IOS_PROFILE_NAME: ${{ steps.ios-credentials.outputs.profile_name }}
+          IOS_PROFILE_UUID: ${{ steps.ios-profile.outputs.profile_uuid }}
+          IOS_PROFILE_NAME: ${{ steps.ios-profile.outputs.profile_name }}
           IOS_BUNDLE_IDENTIFIER: io.github.susimsek.kitezh.mobile
         run: |
           set -euo pipefail
@@ -388,11 +377,11 @@ jobs:
             "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios.ipa"
           codesign --verify --deep --strict "${export_path}/Payload/Kitezh.app"
 
-      - name: Remove temporary iOS signing credentials
-        if: always() && steps.ios-credentials.outputs.keychain_path != ''
+      - name: Remove installed iOS provisioning profile
+        if: always() && steps.ios-profile.outputs.installed_profile != ''
         env:
-          KEYCHAIN_PATH: ${{ steps.ios-credentials.outputs.keychain_path }}
-        run: security delete-keychain "${KEYCHAIN_PATH}"
+          INSTALLED_PROFILE: ${{ steps.ios-profile.outputs.installed_profile }}
+        run: rm -f "${INSTALLED_PROFILE}"
 
       - name: Upload iOS package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
