@@ -19,7 +19,12 @@ const packagedAppPaths = {
     `mac-${process.arch}/Kitezh.app/Contents/MacOS/Kitezh`,
     "mac-universal/Kitezh.app/Contents/MacOS/Kitezh",
   ],
-  linux: ["linux-unpacked/kitezh", `linux-${process.arch}-unpacked/kitezh`],
+  linux: [
+    "linux-unpacked/kitezh",
+    "linux-unpacked/kitezh-desktop",
+    `linux-${process.arch}-unpacked/kitezh`,
+    `linux-${process.arch}-unpacked/kitezh-desktop`,
+  ],
   win32: ["win-unpacked/Kitezh.exe", `win-${process.arch}-unpacked/Kitezh.exe`],
 };
 
@@ -62,7 +67,11 @@ try {
   await window
     .getByRole("heading", { name: "Choose a console" })
     .waitFor({ timeout: 20_000 });
-  assert.equal(await window.url(), "app://renderer/");
+  assert.match(
+    await window.url(),
+    /^app:\/\/renderer\/(?:desktop-login)?$/,
+    "Packaged app should open its signed-out entry screen",
+  );
   assert.equal(await window.evaluate(() => window.desktopApi?.isDesktop), true);
   assert.deepEqual(
     await window.evaluate(() => window.desktopApi?.getConfig()),
