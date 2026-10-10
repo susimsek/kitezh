@@ -57,7 +57,7 @@ try {
     cwd: desktopDirectory,
     env: {
       ...process.env,
-      DESKTOP_API_BASE_URL: "https://kitezh-smoke.invalid",
+      DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
       DESKTOP_AUTO_UPDATE: "false",
       DESKTOP_DEVTOOLS: "false",
     },
@@ -76,7 +76,7 @@ try {
   assert.deepEqual(
     await window.evaluate(() => window.desktopApi?.getConfig()),
     {
-      apiBaseUrl: "https://kitezh-smoke.invalid",
+      apiBaseUrl: "http://127.0.0.1:9090",
       protocol: "kitezh",
     },
   );
