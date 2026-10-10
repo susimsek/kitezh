@@ -179,6 +179,11 @@ function isAllowedApiPath(
         path === "/api/admin/settings/email")
     )
       return true;
+    if (
+      method === "POST" &&
+      path === "/api/admin/settings/offline-access/revoke-all"
+    )
+      return true;
     const localizationMessageMatch = path.match(
       /^\/api\/admin\/settings\/localization\/messages\/([1-9]\d*)$/,
     );

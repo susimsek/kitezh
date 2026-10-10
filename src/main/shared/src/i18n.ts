@@ -74,6 +74,13 @@ export const messages = {
     adminOfflineSessionRevokePrompt:
       "Revoke this offline session? Its refresh token will stop working.",
     adminOfflineSessionRevoked: "Offline session revoked.",
+    adminRevokeAllOfflineTokens: "Revoke all",
+    adminRevokeAllOfflineTokensTitle: "Revoke all offline tokens",
+    adminRevokeAllOfflineTokensHelp:
+      "Every existing offline session will require a new explicit grant.",
+    adminRevokeAllOfflineTokensConfirm:
+      "Revoke every offline access token now?",
+    adminRevokeAllOfflineTokensDone: "All offline access tokens were revoked.",
     adminEvents: "Events",
     adminSearchEvents: "Search events",
     adminNoEvents: "No events found.",
@@ -539,6 +546,14 @@ export const messages = {
     adminOfflineSessionRevokePrompt:
       "Bu çevrimdışı oturum iptal edilsin mi? Yenileme belirteci artık çalışmaz.",
     adminOfflineSessionRevoked: "Çevrimdışı oturum iptal edildi.",
+    adminRevokeAllOfflineTokens: "Tümünü iptal et",
+    adminRevokeAllOfflineTokensTitle: "Tüm çevrimdışı belirteçleri iptal et",
+    adminRevokeAllOfflineTokensHelp:
+      "Mevcut tüm çevrimdışı oturumlar yeni bir açık izin gerektirir.",
+    adminRevokeAllOfflineTokensConfirm:
+      "Tüm çevrimdışı erişim belirteçleri şimdi iptal edilsin mi?",
+    adminRevokeAllOfflineTokensDone:
+      "Tüm çevrimdışı erişim belirteçleri iptal edildi.",
     adminEvents: "Olaylar",
     adminSearchEvents: "Olay ara",
     adminNoEvents: "Olay bulunamadı.",

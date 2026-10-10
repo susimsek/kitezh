@@ -782,10 +782,16 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     }),
     /not allowed/,
   );
+  const revokeAll = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/offline-access/revoke-all",
+    method: "POST",
+  });
+  assert.equal(revokeAll.status, 200);
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/settings/offline-access/revoke-all",
+      path: "/api/admin/settings/offline-access/revoke-all?all=true",
       method: "POST",
     }),
     /not allowed/,

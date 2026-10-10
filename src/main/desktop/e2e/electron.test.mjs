@@ -1580,6 +1580,27 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          requestUrl.pathname ===
+            "/api/admin/settings/offline-access/revoke-all" &&
+          requestMethod === "POST"
+        ) {
+          globalThis.__offlineAccessRevokeCount =
+            (globalThis.__offlineAccessRevokeCount ?? 0) + 1;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              idleTimeout: "P45D",
+              maxLifespan: "P365D",
+              maxLimited: true,
+              revokedBefore: "2026-10-10T00:00:00Z",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/settings/offline-access") {
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
@@ -3514,7 +3535,53 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       await application.evaluate(() => globalThis.__offlineAccessPolicyUpdate),
       { idleTimeout: "P45D", maxLifespan: "P365D", maxLimited: true },
     );
+    const revokeAll = window.getByRole("button", { name: "Revoke all" });
+    await revokeAll.click();
+    await window
+      .getByText("Revoke every offline access token now?", { exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "Cancel" }).click();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__offlineAccessRevokeCount ?? 0,
+      ),
+      0,
+    );
+    await window.getByRole("button", { name: "Revoke all" }).click();
+    const confirmRevokeAll = window.getByRole("button", {
+      name: "Revoke all",
+    });
+    await confirmRevokeAll.click();
+    assert.equal(await confirmRevokeAll.isDisabled(), true);
+    assert.equal(await confirmRevokeAll.locator(".spinner").count(), 1);
+    await confirmRevokeAll.evaluate((button) => button.click());
+    assert.equal(
+      await application.evaluate(() => globalThis.__offlineAccessRevokeCount),
+      1,
+    );
+    await window
+      .getByText("All offline access tokens were revoked.", { exact: true })
+      .waitFor();
     await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("button", { name: "Tümünü iptal et" }).click();
+    await window
+      .getByText("Tüm çevrimdışı erişim belirteçleri şimdi iptal edilsin mi?", {
+        exact: true,
+      })
+      .waitFor();
+    const confirmTurkishRevoke = window.getByRole("button", {
+      name: "Tümünü iptal et",
+    });
+    await confirmTurkishRevoke.click();
+    await window
+      .getByText("Tüm çevrimdışı erişim belirteçleri iptal edildi.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(() => globalThis.__offlineAccessRevokeCount),
+      2,
+    );
     await window
       .getByRole("heading", { name: "Politikalar", exact: true })
       .waitFor();
