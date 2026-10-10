@@ -248,6 +248,163 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
   }
 });
 
+test("preserves Account profile drafts offline and blocks saves until reconnect", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__accountWrites = [];
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        if (requestUrl.pathname === "/oauth2/token")
+          return new Response(
+            JSON.stringify({
+              access_token: "test-account-access-token",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/profile" && method === "GET")
+          return new Response(
+            JSON.stringify({
+              firstName: "Ada",
+              lastName: "Lovelace",
+              email: "ada@example.test",
+              preferredLocale: "en",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (
+          (requestUrl.pathname === "/api/account/profile" ||
+            requestUrl.pathname === "/api/auth/localization/me") &&
+          method === "PUT"
+        ) {
+          const body = JSON.parse(String(init.body));
+          globalThis.__accountWrites.push({ path: requestUrl.pathname, body });
+          return new Response(
+            JSON.stringify(
+              requestUrl.pathname === "/api/account/profile"
+                ? {
+                    firstName: body.firstName,
+                    lastName: body.lastName,
+                    email: body.email,
+                    preferredLocale: "en",
+                  }
+                : { locale: body.locale },
+            ),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        throw new Error("Unexpected Account API request");
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window
+      .getByRole("button", { name: "Account Console", exact: true })
+      .click();
+    const signIn = window.getByRole("button", {
+      name: "Sign in",
+      exact: true,
+    });
+    await signIn.waitFor();
+    assert.equal(await signIn.isDisabled(), true);
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=test-account-code`,
+      );
+    });
+    const profileForm = window.locator('form[data-form="profile"]');
+    await profileForm.locator('[name="firstName"]').waitFor();
+    await profileForm.locator('[name="firstName"]').fill("Grace");
+    await profileForm.locator('[name="lastName"]').fill("Hopper");
+    await profileForm.locator('[name="email"]').fill("grace@example.test");
+    await profileForm.locator('[name="preferredLocale"]').selectOption("tr");
+    await profileForm
+      .locator('[name="currentPassword"]')
+      .fill("TEMPORARY_SECRET");
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    const save = profileForm.getByRole("button", { name: "Save" });
+    assert.equal(await save.isDisabled(), true);
+    assert.match(
+      await window.getByRole("status").textContent(),
+      /Offline mode/,
+    );
+    assert.equal(
+      await profileForm.locator('[name="firstName"]').inputValue(),
+      "Grace",
+    );
+    assert.equal(
+      await profileForm.locator('[name="lastName"]').inputValue(),
+      "Hopper",
+    );
+    assert.equal(
+      await profileForm.locator('[name="email"]').inputValue(),
+      "grace@example.test",
+    );
+    assert.equal(
+      await profileForm.locator('[name="preferredLocale"]').inputValue(),
+      "tr",
+    );
+    assert.equal(
+      await profileForm.locator('[name="currentPassword"]').inputValue(),
+      "",
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__accountWrites),
+      [],
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    assert.equal(await save.isDisabled(), false);
+    await save.click();
+    let writeCount = 0;
+    for (let attempt = 0; attempt < 20 && writeCount < 2; attempt += 1) {
+      writeCount = await application.evaluate(
+        () => globalThis.__accountWrites?.length ?? 0,
+      );
+      if (writeCount < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    assert.equal(writeCount, 2);
+    const accountWrites = await application.evaluate(
+      () => globalThis.__accountWrites,
+    );
+    assert.deepEqual(accountWrites, [
+      {
+        path: "/api/account/profile",
+        body: {
+          firstName: "Grace",
+          lastName: "Hopper",
+          email: "grace@example.test",
+        },
+      },
+      { path: "/api/auth/localization/me", body: { locale: "tr" } },
+    ]);
+  } finally {
+    await application.close();
+  }
+});
+
 test("native login chooser stays alive and authenticated Admin does not reopen the browser", async () => {
   const application = await launchDesktop();
   try {

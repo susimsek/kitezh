@@ -507,9 +507,12 @@ function adminAdminAuthenticationContent() {
 }
 
 function profileContent() {
-  const profile = state.profile ?? {};
+  const profile = {
+    ...(state.profile ?? {}),
+    ...(state.data.accountProfileDraft ?? {}),
+  };
   const errors = violations(state.error?.body);
-  return `<section class="card"><h2>${escapeHtml(text("firstName"))} &amp; ${escapeHtml(text("lastName"))}</h2><p>${escapeHtml(text("profileLoadError"))}</p><form data-form="profile" novalidate><div class="form-grid">${field("firstName", text("firstName"), profile.firstName ?? "", errors.firstName)}${field("lastName", text("lastName"), profile.lastName ?? "", errors.lastName)}${field("email", text("email"), profile.email ?? "", errors.email, "email")}<div class="field"><label for="preferredLocale">${escapeHtml(text("language"))}</label><select id="preferredLocale" name="preferredLocale"><option value="en" ${profile.preferredLocale === "en" ? "selected" : ""}>${escapeHtml(text("english"))}</option><option value="tr" ${profile.preferredLocale === "tr" ? "selected" : ""}>${escapeHtml(text("turkish"))}</option></select><div class="field-error"></div></div>${field("currentPassword", text("currentPassword"), "", errors.currentPassword, "password", 'autocomplete="current-password"')}</div><div class="actions">${button(text("save"), { action: "save-profile", type: "submit", busy: state.busy === "profile" })}</div></form></section>`;
+  return `<section class="card"><h2>${escapeHtml(text("firstName"))} &amp; ${escapeHtml(text("lastName"))}</h2><p>${escapeHtml(text("profileLoadError"))}</p><form data-form="profile" novalidate><div class="form-grid">${field("firstName", text("firstName"), profile.firstName ?? "", errors.firstName)}${field("lastName", text("lastName"), profile.lastName ?? "", errors.lastName)}${field("email", text("email"), profile.email ?? "", errors.email, "email")}<div class="field"><label for="preferredLocale">${escapeHtml(text("language"))}</label><select id="preferredLocale" name="preferredLocale"><option value="en" ${profile.preferredLocale === "en" ? "selected" : ""}>${escapeHtml(text("english"))}</option><option value="tr" ${profile.preferredLocale === "tr" ? "selected" : ""}>${escapeHtml(text("turkish"))}</option></select><div class="field-error"></div></div>${field("currentPassword", text("currentPassword"), "", errors.currentPassword, "password", 'autocomplete="current-password"')}</div><div class="actions">${button(text("save"), { action: "save-profile", type: "submit", busy: state.busy === "profile", disabled: state.offline })}</div></form></section>`;
 }
 
 function securityContent() {
@@ -821,10 +824,17 @@ function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
-function preserveNativeAdminDrafts() {
+function preserveOfflineDrafts() {
   for (const form of app.querySelectorAll("form[data-form]")) {
     const values = formValues(form);
-    if (form.dataset.form === "admin-ciba-policy") {
+    if (form.dataset.form === "profile") {
+      state.data.accountProfileDraft = {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        preferredLocale: values.preferredLocale,
+      };
+    } else if (form.dataset.form === "admin-ciba-policy") {
       state.data.cibaPolicyDraft = {
         requestLifespanSeconds: values.requestLifespanSeconds,
         pollingIntervalSeconds: values.pollingIntervalSeconds,
@@ -1009,6 +1019,12 @@ async function submitForm(form) {
     return;
   }
   if (form.dataset.form === "profile") {
+    state.data.accountProfileDraft = {
+      firstName: String(values.firstName ?? ""),
+      lastName: String(values.lastName ?? ""),
+      email: String(values.email ?? ""),
+      preferredLocale: String(values.preferredLocale ?? "en"),
+    };
     if (values.email && !/^\S+@\S+\.\S+$/.test(values.email)) {
       state.error = {
         message: text("invalidEmail"),
@@ -1036,6 +1052,7 @@ async function submitForm(form) {
         method: "PUT",
         body: { locale: values.preferredLocale },
       });
+      state.data.accountProfileDraft = null;
       state.notice = text("passwordSaved");
     } catch {
       /* request rendered the sanitized error */
@@ -1661,12 +1678,12 @@ api.onMenuLogout(() => {
   void logout();
 });
 window.addEventListener("online", () => {
-  preserveNativeAdminDrafts();
+  preserveOfflineDrafts();
   state.offline = false;
   render();
 });
 window.addEventListener("offline", () => {
-  preserveNativeAdminDrafts();
+  preserveOfflineDrafts();
   state.offline = true;
   render();
 });
