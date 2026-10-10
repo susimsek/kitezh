@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +35,7 @@ class AuthorizationRevocationPolicyServiceTest {
 
         ArgumentCaptor<AuthorizationRevocationPolicyEntity> captor =
                 ArgumentCaptor.forClass(AuthorizationRevocationPolicyEntity.class);
-        verify(repository, org.mockito.Mockito.times(3)).save(captor.capture());
+        verify(repository, times(3)).save(captor.capture());
         assertThat(captor.getAllValues())
                 .extracting(AuthorizationRevocationPolicyEntity::getId)
                 .containsExactly("application:default", "user:alice", "client:admin-console");

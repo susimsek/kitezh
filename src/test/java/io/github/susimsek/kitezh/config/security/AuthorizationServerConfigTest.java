@@ -565,16 +565,19 @@ class AuthorizationServerConfigTest {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "client-id");
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        null,
-                        null,
-                        null,
-                        serviceAccountRepository,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                null,
+                                null,
+                                null,
+                                serviceAccountRepository,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContextWithoutAuthorization(
                                 claims,
@@ -597,16 +600,19 @@ class AuthorizationServerConfigTest {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        null,
-                        null,
-                        null,
-                        serviceAccountRepository,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                null,
+                                null,
+                                null,
+                                serviceAccountRepository,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContextWithoutAuthorization(
                                 claims,
@@ -811,16 +817,19 @@ class AuthorizationServerConfigTest {
                 JwtClaimsSet.builder().claim("sub", "admin").claim("aud", "existing");
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        avatarRepository,
-                        authorizationRepository,
-                        null,
-                        mapperRepository,
-                        mock(ClientScopeMapperRepository.class),
-                        mock(ServiceAccountRepository.class),
-                        mock(UserProfileAttributeRepository.class),
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                avatarRepository,
+                                authorizationRepository,
+                                null,
+                                mapperRepository,
+                                mock(ClientScopeMapperRepository.class),
+                                mock(ServiceAccountRepository.class),
+                                mock(UserProfileAttributeRepository.class),
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -969,16 +978,19 @@ class AuthorizationServerConfigTest {
 
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        scopeRepository,
-                        mapperRepository,
-                        scopeMapperRepository,
-                        mock(ServiceAccountRepository.class),
-                        attributeRepository,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                scopeRepository,
+                                mapperRepository,
+                                scopeMapperRepository,
+                                mock(ServiceAccountRepository.class),
+                                attributeRepository,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -1056,16 +1068,19 @@ class AuthorizationServerConfigTest {
                 JwtClaimsSet.builder().claim("sub", "admin").claim("aud", List.of("existing", 42));
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        scopeRepository,
-                        mapperRepository,
-                        mock(ClientScopeMapperRepository.class),
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                scopeRepository,
+                                mapperRepository,
+                                mock(ClientScopeMapperRepository.class),
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -1141,16 +1156,19 @@ class AuthorizationServerConfigTest {
 
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        null,
-                        mapperRepository,
-                        null,
-                        null,
-                        attributeRepository,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                null,
+                                mapperRepository,
+                                null,
+                                null,
+                                attributeRepository,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -1198,16 +1216,19 @@ class AuthorizationServerConfigTest {
 
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        scopeRepository,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                scopeRepository,
+                                null,
+                                null,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -1250,16 +1271,19 @@ class AuthorizationServerConfigTest {
                 .thenReturn(List.of(idOnly, accessOnly, neither));
         var customizer =
                 config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        null,
-                        mapperRepository,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                null,
+                                mapperRepository,
+                                null,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null));
 
         JwtClaimsSet.Builder idClaims = JwtClaimsSet.builder().claim("sub", "admin");
         customizer.customize(
@@ -1529,16 +1553,19 @@ class AuthorizationServerConfigTest {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        null,
-                        mapperRepository,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                null,
+                                mapperRepository,
+                                null,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -1570,16 +1597,19 @@ class AuthorizationServerConfigTest {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        scopeRepository,
-                        mapperRepository,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                scopeRepository,
+                                mapperRepository,
+                                null,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,
@@ -2103,16 +2133,19 @@ class AuthorizationServerConfigTest {
         JwtClaimsSet.Builder emptyScopes = JwtClaimsSet.builder().claim("sub", "admin");
 
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        scopeRepository,
-                        mapperRepository,
-                        scopeMapperRepository,
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                scopeRepository,
+                                mapperRepository,
+                                scopeMapperRepository,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 emptyScopes,
@@ -2123,16 +2156,19 @@ class AuthorizationServerConfigTest {
 
         JwtClaimsSet.Builder unmappedScope = JwtClaimsSet.builder().claim("sub", "admin");
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        scopeRepository,
-                        mapperRepository,
-                        scopeMapperRepository,
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                scopeRepository,
+                                mapperRepository,
+                                scopeMapperRepository,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 unmappedScope,
@@ -2254,16 +2290,19 @@ class AuthorizationServerConfigTest {
 
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
         config.jwtTokenCustomizer(
-                        userRepository,
-                        mock(UserAvatarRepository.class),
-                        mock(AuthorizationRepository.class),
-                        null,
-                        mapperRepository,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null)
+                        new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                                userRepository,
+                                mock(UserAvatarRepository.class),
+                                mock(AuthorizationRepository.class),
+                                null,
+                                mapperRepository,
+                                null,
+                                null,
+                                null,
+                                false,
+                                null,
+                                null,
+                                null))
                 .customize(
                         jwtContext(
                                 claims,

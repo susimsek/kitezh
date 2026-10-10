@@ -461,33 +461,6 @@ public class AuthorizationServerConfig {
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
             UserRepository userRepository,
             UserAvatarRepository userAvatarRepository,
-            AuthorizationRepository authorizationRepository,
-            ClientScopeRepository clientScopeRepository,
-            ClientMapperRepository clientMapperRepository,
-            ClientScopeMapperRepository clientScopeMapperRepository,
-            ServiceAccountRepository serviceAccountRepository,
-            UserProfileAttributeRepository userProfileAttributeRepository,
-            SocialIdentityRepository socialIdentityRepository,
-            ObjectMapper objectMapper) {
-        return jwtTokenCustomizer(
-                new JwtTokenCustomizerDependencies(
-                        userRepository,
-                        userAvatarRepository,
-                        authorizationRepository,
-                        clientScopeRepository,
-                        clientMapperRepository,
-                        clientScopeMapperRepository,
-                        serviceAccountRepository,
-                        userProfileAttributeRepository,
-                        false,
-                        socialIdentityRepository,
-                        objectMapper,
-                        null));
-    }
-
-    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
-            UserRepository userRepository,
-            UserAvatarRepository userAvatarRepository,
             AuthorizationRepository authorizationRepository) {
         return jwtTokenCustomizer(
                 new JwtTokenCustomizerDependencies(
@@ -528,7 +501,7 @@ public class AuthorizationServerConfig {
                         null));
     }
 
-    private OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
             JwtTokenCustomizerDependencies dependencies) {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
