@@ -4,6 +4,7 @@ import io.github.susimsek.kitezh.config.openapi.OpenApiConfig;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminGroupRenameRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRolesRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupUserDTO;
@@ -107,6 +108,23 @@ public class AdminGroupController {
                     AdminGroupRequestDTO request,
             Authentication authentication) {
         return adminGroupService.update(id, request, authentication.getName());
+    }
+
+    @PutMapping("/{id}/name")
+    @Operation(summary = "Rename group", description = "Changes only a group's name.")
+    @ApiResponse(responseCode = "200", description = "Renamed group returned.")
+    AdminGroupDTO rename(
+            @Parameter(description = "Internal group identifier.", example = "1", required = true)
+                    @PathVariable
+                    Long id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                            description = "New group name.",
+                            required = true)
+                    @Valid
+                    @RequestBody
+                    AdminGroupRenameRequestDTO request,
+            Authentication authentication) {
+        return adminGroupService.rename(id, request, authentication.getName());
     }
 
     @PutMapping("/{id}/roles")

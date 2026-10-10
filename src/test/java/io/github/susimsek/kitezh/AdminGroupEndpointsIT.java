@@ -109,9 +109,12 @@ class AdminGroupEndpointsIT {
                                                                     "name",
                                                                     name,
                                                                     "attributes",
-                                                                    java.util.Map.of(),
+                                                                    java.util.Map.of(
+                                                                            "department",
+                                                                            java.util.List.of(
+                                                                                    "finance")),
                                                                     "defaultGroup",
-                                                                    false))))
+                                                                    true))))
                             .andExpect(status().isCreated())
                             .andReturn()
                             .getResponse()
@@ -120,20 +123,23 @@ class AdminGroupEndpointsIT {
 
             String renamed = name + "-renamed";
             mockMvc.perform(
-                            put("/api/admin/groups/{id}", groupId)
+                            put("/api/admin/groups/{id}/name", groupId)
                                     .with(admin())
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(
                                             objectMapper.writeValueAsString(
-                                                    java.util.Map.of(
-                                                            "name",
-                                                            renamed,
-                                                            "attributes",
-                                                            java.util.Map.of(),
-                                                            "defaultGroup",
-                                                            false))))
+                                                    java.util.Map.of("name", renamed))))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.name").value(renamed));
+                    .andExpect(jsonPath("$.name").value(renamed))
+                    .andExpect(jsonPath("$.attributes.department[0]").value("finance"))
+                    .andExpect(jsonPath("$.defaultGroup").value(true));
+
+            mockMvc.perform(
+                            put("/api/admin/groups/{id}/name", groupId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"name\":\" \"}"))
+                    .andExpect(status().isBadRequest());
 
             mockMvc.perform(
                             put("/api/admin/groups/{id}/roles", groupId)

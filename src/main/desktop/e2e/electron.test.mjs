@@ -847,6 +847,30 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          /^\/api\/admin\/groups\/[1-9]\d*\/name$/.test(requestUrl.pathname) &&
+          requestMethod === "PUT"
+        ) {
+          const groupId = Number(requestUrl.pathname.split("/")[4]);
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminGroupRenameRequests ??= [];
+          globalThis.__adminGroupRenameRequests.push({ id: groupId, body });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const group = (globalThis.__createdGroups ?? []).find(
+            (item) => item.id === groupId,
+          );
+          if (group) {
+            group.name = body.name;
+            group.path = `Organization / ${body.name}`;
+          }
+          return new Response(
+            JSON.stringify({ id: groupId, name: body.name }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
           /^\/api\/admin\/groups\/[1-9]\d*\/roles$/.test(requestUrl.pathname) &&
           requestMethod === "PUT"
         ) {
@@ -2649,6 +2673,27 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Search groups" }).waitFor();
     const createdGroupRow = window.locator('[data-group-id="99"]');
+    await createdGroupRow
+      .getByRole("button", { name: "Edit group name", exact: true })
+      .click();
+    const groupNameForm = createdGroupRow.locator(
+      'form[data-form="admin-group-rename"]',
+    );
+    await groupNameForm
+      .locator('[name="name"]')
+      .fill("native-operators-renamed");
+    const saveGroupName = groupNameForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveGroupName.click();
+    assert.equal(await saveGroupName.isDisabled(), true);
+    assert.equal(await saveGroupName.locator(".spinner").count(), 1);
+    await window.getByText("Group name updated.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminGroupRenameRequests),
+      [{ id: 99, body: { name: "native-operators-renamed" } }],
+    );
     await createdGroupRow
       .getByRole("button", { name: "Edit group roles", exact: true })
       .click();

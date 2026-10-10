@@ -184,6 +184,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdGroup.status, 200);
+  const renamedGroup = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/name",
+    method: "PUT",
+    body: { name: "native-observers" },
+  });
+  assert.equal(renamedGroup.status, 200);
   const updatedGroupRoles = await adapter.request({
     console: "admin",
     path: "/api/admin/groups/12/roles",

@@ -84,6 +84,12 @@ function isAllowedApiPath(
     if (method === "POST" && path === "/api/admin/groups") return true;
     if (
       method === "PUT" &&
+      /^\/api\/admin\/groups\/[1-9]\d*\/name$/.test(path) &&
+      Number.isSafeInteger(Number(path.split("/").at(-2)))
+    )
+      return true;
+    if (
+      method === "PUT" &&
       /^\/api\/admin\/groups\/[1-9]\d*\/roles$/.test(path) &&
       Number.isSafeInteger(Number(path.split("/").at(-2)))
     )
