@@ -914,6 +914,82 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/webauthn\/credentials$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "GET"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-3));
+          globalThis.__adminPasskeyListRequests ??= [];
+          globalThis.__adminPasskeyListRequests.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  credentialId: "e2e_credential_123",
+                  label: "Office security key",
+                  transports: ["usb"],
+                  backupEligible: false,
+                  backupState: false,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 100,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/users\/[1-9]\d*\/webauthn\/credentials\/[A-Za-z0-9_-]+$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-4));
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminPasskeyMutations ??= [];
+          globalThis.__adminPasskeyMutations.push({
+            method: "PUT",
+            userId: id,
+            credentialRouteValid: true,
+            label: body.label,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.label === "Rejected label")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the passkey label.",
+                violations: [
+                  { field: "label", message: "Choose another label." },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(null, { status: 204 });
+        }
+        if (
+          /^\/api\/admin\/users\/[1-9]\d*\/webauthn\/credentials\/[A-Za-z0-9_-]+$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-4));
+          globalThis.__adminPasskeyMutations ??= [];
+          globalThis.__adminPasskeyMutations.push({
+            method: "DELETE",
+            userId: id,
+            credentialRouteValid: true,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "PUT"
         ) {
@@ -2854,6 +2930,109 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       passwordResetRequests.some((entry) => Object.hasOwn(entry, "password")),
       false,
     );
+    const managePasskeys = aliceRow.getByRole("button", {
+      name: "Manage passkeys",
+      exact: true,
+    });
+    await managePasskeys.click();
+    assert.equal(await managePasskeys.isDisabled(), true);
+    assert.equal(await managePasskeys.locator(".spinner").count(), 1);
+    const passkeysPanel = aliceRow.getByRole("region", {
+      name: "Manage passkeys",
+    });
+    await passkeysPanel
+      .getByText("Office security key", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminPasskeyListRequests),
+      [2],
+    );
+    await passkeysPanel
+      .getByRole("button", { name: "Rename passkey", exact: true })
+      .click();
+    const passkeyRenameForm = passkeysPanel.locator(
+      'form[data-form="admin-user-passkey-rename"]',
+    );
+    const passkeyLabelInput = passkeyRenameForm.locator('[name="label"]');
+    const renamePasskeySubmit = passkeyRenameForm.getByRole("button", {
+      name: "Rename passkey",
+      exact: true,
+    });
+    await passkeyLabelInput.fill("Rejected label");
+    await renamePasskeySubmit.click();
+    assert.equal(await renamePasskeySubmit.isDisabled(), true);
+    assert.equal(await renamePasskeySubmit.locator(".spinner").count(), 1);
+    await passkeyRenameForm
+      .getByText("Choose another label.", { exact: true })
+      .waitFor();
+    assert.equal(await passkeyLabelInput.inputValue(), "Rejected label");
+    await passkeyLabelInput.fill("Workstation key");
+    await renamePasskeySubmit.click();
+    assert.equal(await renamePasskeySubmit.isDisabled(), true);
+    assert.equal(await renamePasskeySubmit.locator(".spinner").count(), 1);
+    await window.getByText("Passkey label updated.", { exact: true }).waitFor();
+    await passkeysPanel.getByText("Workstation key", { exact: true }).waitFor();
+    const deletePasskey = passkeysPanel.getByRole("button", {
+      name: "Delete passkey",
+      exact: true,
+    });
+    await deletePasskey.click();
+    await passkeysPanel
+      .getByText(
+        "Delete this passkey? The user will no longer be able to sign in with it.",
+        { exact: true },
+      )
+      .waitFor();
+    await passkeysPanel
+      .locator('button[data-action="admin-user-passkey-delete-cancel"]')
+      .click();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminPasskeyMutations),
+      [
+        {
+          method: "PUT",
+          userId: 2,
+          credentialRouteValid: true,
+          label: "Rejected label",
+        },
+        {
+          method: "PUT",
+          userId: 2,
+          credentialRouteValid: true,
+          label: "Workstation key",
+        },
+      ],
+    );
+    await passkeysPanel
+      .getByRole("button", { name: "Delete passkey", exact: true })
+      .click();
+    const confirmPasskeyDelete = passkeysPanel.getByRole("button", {
+      name: "Delete passkey",
+      exact: true,
+    });
+    await confirmPasskeyDelete.click();
+    assert.equal(await confirmPasskeyDelete.isDisabled(), true);
+    assert.equal(await confirmPasskeyDelete.locator(".spinner").count(), 1);
+    await window.getByText("Passkey deleted.", { exact: true }).waitFor();
+    await passkeysPanel
+      .getByRole("status")
+      .getByText("No passkeys are registered for this user.")
+      .waitFor();
+    const passkeyMutations = await application.evaluate(
+      () => globalThis.__adminPasskeyMutations,
+    );
+    assert.deepEqual(passkeyMutations.at(-1), {
+      method: "DELETE",
+      userId: 2,
+      credentialRouteValid: true,
+    });
+    assert.equal(
+      passkeyMutations.some((entry) => Object.hasOwn(entry, "credentialId")),
+      false,
+    );
+    await passkeysPanel
+      .locator('button[data-action="admin-user-passkeys-close"]')
+      .click();
     const resetAuthenticator = aliceRow.getByRole("button", {
       name: "Reset authenticator",
       exact: true,
@@ -2872,6 +3051,22 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ),
       [],
     );
+    await languageToggle.click();
+    const resetAuthenticatorTurkish = aliceRow.getByRole("button", {
+      name: "Kimlik doğrulayıcıyı sıfırla",
+      exact: true,
+    });
+    await resetAuthenticatorTurkish.click();
+    await aliceRow
+      .getByText(
+        "Bu kullanıcının kimlik doğrulayıcısı kaldırılsın mı? Yeniden kurması gerekir.",
+        { exact: true },
+      )
+      .waitFor();
+    await aliceRow.getByRole("button", { name: "Vazgeç", exact: true }).click();
+    await window
+      .getByRole("button", { name: "İngilizce", exact: true })
+      .click();
     await aliceRow
       .getByRole("button", { name: "Reset authenticator", exact: true })
       .click();
@@ -2892,22 +3087,6 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       await application.evaluate(() => globalThis.__adminTotpResetRequests),
       [2],
     );
-    await languageToggle.click();
-    const resetAuthenticatorTurkish = aliceRow.getByRole("button", {
-      name: "Kimlik doğrulayıcıyı sıfırla",
-      exact: true,
-    });
-    await resetAuthenticatorTurkish.click();
-    await aliceRow
-      .getByText(
-        "Bu kullanıcının kimlik doğrulayıcısı kaldırılsın mı? Yeniden kurması gerekir.",
-        { exact: true },
-      )
-      .waitFor();
-    await aliceRow.getByRole("button", { name: "Vazgeç", exact: true }).click();
-    await window
-      .getByRole("button", { name: "İngilizce", exact: true })
-      .click();
     await aliceRow
       .getByRole("button", { name: "Disable user", exact: true })
       .click();

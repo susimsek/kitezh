@@ -91,6 +91,28 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userPasswordResetMatch[1]))
     )
       return true;
+    const userPasskeyListMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/webauthn\/credentials(?:\?page=(0|[1-9]\d*)&size=(\d+))?$/,
+    );
+    if (
+      method === "GET" &&
+      userPasskeyListMatch &&
+      Number.isSafeInteger(Number(userPasskeyListMatch[1])) &&
+      (userPasskeyListMatch[2] === undefined ||
+        (Number.isSafeInteger(Number(userPasskeyListMatch[2])) &&
+          Number(userPasskeyListMatch[3]) >= 1 &&
+          Number(userPasskeyListMatch[3]) <= 100))
+    )
+      return true;
+    const userPasskeyMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/webauthn\/credentials\/([A-Za-z0-9_-]{1,300})$/,
+    );
+    if (
+      userPasskeyMatch &&
+      Number.isSafeInteger(Number(userPasskeyMatch[1])) &&
+      ["PUT", "DELETE"].includes(method)
+    )
+      return true;
     if (
       method === "DELETE" &&
       /^\/api\/admin\/users\/[1-9]\d*$/.test(path) &&

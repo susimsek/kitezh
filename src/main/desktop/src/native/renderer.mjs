@@ -61,6 +61,8 @@ const actionIcons = {
   "admin-user-totp-reset-confirm": "reset",
   "admin-user-unlock": "reset",
   "admin-user-password-reset-toggle": "reset",
+  "admin-user-passkey-delete-request": "delete",
+  "admin-user-passkey-delete-confirm": "delete",
   "admin-client-scope-delete-request": "delete",
   "admin-client-scope-delete-confirm": "delete",
   "admin-client-scope-role-mappings-toggle": "edit",
@@ -473,6 +475,15 @@ function adminUsersContent() {
       const passwordResetForm = passwordResetOpen
         ? `<form class="card" data-form="admin-user-password-reset" data-user-id="${escapeHtml(user.id)}" novalidate><div class="field"><label for="user-password-${escapeHtml(user.id)}">${escapeHtml(text("newPassword"))}</label><input id="user-password-${escapeHtml(user.id)}" name="password" type="password" aria-invalid="${Boolean(passwordResetErrors.password)}" minlength="12" maxlength="128" autocomplete="new-password" required/><div class="field-error">${escapeHtml(passwordResetErrors.password ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="temporary"/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><div class="actions">${button(text("adminSetPassword"), { type: "submit", busy: passwordResetBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-password-reset-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
+      const passkeysOpen =
+        Number(state.data.userPasskeysOpenId) === Number(user.id);
+      const passkeysLoading = state.busy === `user-passkeys-load:${user.id}`;
+      const passkeysControl = button(text("adminManagePasskeys"), {
+        action: "admin-user-passkeys-toggle",
+        id: user.id,
+        busy: passkeysLoading,
+        disabled: state.offline || Boolean(state.busy),
+      });
       const editing = Number(state.data.userEditOpenId) === Number(user.id);
       const selectedRoles = Array.isArray(editDraft.roles)
         ? editDraft.roles
@@ -481,10 +492,88 @@ function adminUsersContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${passwordResetControl}${unlockControl}${totpControls}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminUserPasskeysContent(userId) {
+  const passkeyPage = state.data.adminUserPasskeys?.[userId];
+  if (!passkeyPage) return "";
+  const passkeys = Array.isArray(passkeyPage.content)
+    ? passkeyPage.content
+    : [];
+  const pageNumber = Number.isSafeInteger(passkeyPage.number)
+    ? passkeyPage.number
+    : 0;
+  const totalPages = Number.isSafeInteger(passkeyPage.totalPages)
+    ? passkeyPage.totalPages
+    : 0;
+  const rows = passkeys
+    .map((passkey, index) => {
+      const editing =
+        state.data.adminPasskeyEditTarget === `${userId}:${index}`;
+      const confirming =
+        state.data.adminPasskeyDeleteConfirmTarget === `${userId}:${index}`;
+      const target = `${userId}:${index}`;
+      const errors =
+        state.data.adminPasskeyErrorTarget === target
+          ? violations(state.error?.body)
+          : {};
+      const draft = state.data.adminPasskeyDrafts?.[target];
+      const renameBusy = state.busy === `admin-passkey-rename:${target}`;
+      const deleteBusy = state.busy === `admin-passkey-delete:${target}`;
+      const labelId = `admin-passkey-label-${userId}-${index}`;
+      const renameForm = editing
+        ? `<form class="card" data-form="admin-user-passkey-rename" data-user-id="${escapeHtml(userId)}" data-passkey-index="${index}" novalidate><div class="field"><label for="${labelId}">${escapeHtml(text("adminPasskeyLabel"))}</label><input id="${labelId}" name="label" type="text" value="${escapeHtml(draft ?? passkey.label)}" maxlength="100" aria-invalid="${Boolean(errors.label)}" required/><div class="field-error">${escapeHtml(errors.label ?? "")}</div></div><div class="actions">${button(text("adminRenamePasskey"), { type: "submit", busy: renameBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-passkey-rename-cancel" data-id="${escapeHtml(userId)}" data-index="${index}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        : "";
+      const deleteControls = confirming
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeletePasskeyPrompt"))}</span>${button(text("adminDeletePasskey"), { action: "admin-user-passkey-delete-confirm", id: userId, index, danger: true, busy: deleteBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-passkey-delete-cancel" data-id="${escapeHtml(userId)}" data-index="${index}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        : button(text("adminDeletePasskey"), {
+            action: "admin-user-passkey-delete-request",
+            id: userId,
+            index,
+            danger: true,
+            disabled: state.offline || Boolean(state.busy),
+          });
+      return `<article class="list-item" data-passkey-index="${index}"><div><strong>${escapeHtml(passkey.label)}</strong><span class="muted">${escapeHtml((passkey.transports ?? []).join(", "))}</span></div><div class="actions"><button class="secondary-button" type="button" data-action="admin-user-passkey-rename-toggle" data-id="${escapeHtml(userId)}" data-index="${index}" ${state.offline || state.busy ? "disabled" : ""}>${escapeHtml(text("adminRenamePasskey"))}</button>${deleteControls}</div>${renameForm}</article>`;
+    })
+    .join("");
+  const previousPage = button(text("adminPrevious"), {
+    action: "admin-user-passkey-page",
+    id: userId,
+    index: pageNumber - 1,
+    busy: state.busy === `admin-passkey-page:${userId}:${pageNumber - 1}`,
+    disabled: pageNumber <= 0 || state.offline || Boolean(state.busy),
+  });
+  const nextPage = button(text("adminNext"), {
+    action: "admin-user-passkey-page",
+    id: userId,
+    index: pageNumber + 1,
+    busy: state.busy === `admin-passkey-page:${userId}:${pageNumber + 1}`,
+    disabled:
+      pageNumber + 1 >= totalPages || state.offline || Boolean(state.busy),
+  });
+  return `<section class="card" aria-label="${escapeHtml(text("adminManagePasskeys"))}"><div class="actions"><h3>${escapeHtml(text("adminManagePasskeys"))}</h3><button class="secondary-button" type="button" data-action="admin-user-passkeys-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>${rows ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoPasskeys"))}</div>`}${totalPages > 1 ? `<div class="actions" aria-label="${escapeHtml(text("adminManagePasskeys"))} pagination">${previousPage}<span>${escapeHtml(text("adminPage"))} ${pageNumber + 1} / ${totalPages}</span>${nextPage}</div>` : ""}</section>`;
+}
+
+function adminUserPasskeyPath(userId, index) {
+  const id = Number(userId);
+  const passkeyIndex = Number(index);
+  const credential =
+    state.data.adminUserPasskeys?.[id]?.content?.[passkeyIndex];
+  const credentialId = credential?.credentialId;
+  if (
+    !Number.isSafeInteger(id) ||
+    id < 1 ||
+    !Number.isSafeInteger(passkeyIndex) ||
+    passkeyIndex < 0 ||
+    typeof credentialId !== "string" ||
+    !/^[A-Za-z0-9_-]{1,300}$/.test(credentialId)
+  )
+    return null;
+  return `/api/admin/users/${id}/webauthn/credentials/${credentialId}`;
 }
 
 function adminUserCreateContent() {
@@ -1549,6 +1638,14 @@ function preserveOfflineDrafts() {
           ),
         };
       }
+    } else if (form.dataset.form === "admin-user-passkey-rename") {
+      const userId = Number(form.dataset.userId);
+      const passkeyIndex = Number(form.dataset.passkeyIndex);
+      const target = `${userId}:${passkeyIndex}`;
+      if (adminUserPasskeyPath(userId, passkeyIndex)) {
+        state.data.adminPasskeyDrafts ??= {};
+        state.data.adminPasskeyDrafts[target] = values.label;
+      }
     } else if (form.dataset.form === "admin-role-create") {
       state.data.adminRoleCreateDraft = values;
     } else if (form.dataset.form === "admin-role-edit") {
@@ -1647,6 +1744,47 @@ async function submitForm(form) {
       state.notice = text("adminPasswordReset");
     } catch {
       /* Keep the form open without retaining the submitted password. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-user-passkey-rename") {
+    const userId = Number(form.dataset.userId);
+    const passkeyIndex = Number(form.dataset.passkeyIndex);
+    const target = `${userId}:${passkeyIndex}`;
+    const path = adminUserPasskeyPath(userId, passkeyIndex);
+    const label = String(values.label ?? "").trim();
+    if (
+      state.offline ||
+      !path ||
+      !form.reportValidity() ||
+      !label ||
+      label.length > 100
+    )
+      return;
+    state.data.adminPasskeyDrafts ??= {};
+    state.data.adminPasskeyDrafts[target] = label;
+    state.data.adminPasskeyErrorTarget = target;
+    state.error = null;
+    state.notice = null;
+    state.busy = `admin-passkey-rename:${target}`;
+    render();
+    try {
+      await request(path, { method: "PUT", body: { label } });
+      const page = state.data.adminUserPasskeys[userId];
+      state.data.adminUserPasskeys[userId] = {
+        ...page,
+        content: page.content.map((credential, index) =>
+          index === passkeyIndex ? { ...credential, label } : credential,
+        ),
+      };
+      delete state.data.adminPasskeyDrafts[target];
+      state.data.adminPasskeyErrorTarget = null;
+      state.data.adminPasskeyEditTarget = null;
+      state.notice = text("adminPasskeyRenamed");
+    } catch {
+      /* Keep the safe label draft for validation recovery. */
     }
     state.busy = null;
     render();
@@ -2878,6 +3016,12 @@ async function action(action, element) {
     render();
     try {
       await request(`/api/admin/users/${id}/totp`, { method: "DELETE" });
+      state.data.users = {
+        ...state.data.users,
+        content: (state.data.users?.content ?? []).map((item) =>
+          Number(item.id) === id ? { ...item, totpEnabled: false } : item,
+        ),
+      };
       state.data.userTotpResetConfirmId = null;
       state.notice = text("adminAuthenticatorReset");
     } catch {
@@ -2932,6 +3076,144 @@ async function action(action, element) {
         : id;
     state.data.userPasswordResetErrorId = null;
     state.error = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-passkeys-toggle" ||
+    action === "admin-user-passkeys-close"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    if (
+      action === "admin-user-passkeys-close" ||
+      Number(state.data.userPasskeysOpenId) === id
+    ) {
+      state.data.userPasskeysOpenId = null;
+      state.data.adminPasskeyEditTarget = null;
+      state.data.adminPasskeyDeleteConfirmTarget = null;
+      render();
+      return;
+    }
+    state.busy = `user-passkeys-load:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const page = await request(
+        `/api/admin/users/${id}/webauthn/credentials?page=0&size=100`,
+      );
+      state.data.adminUserPasskeys ??= {};
+      state.data.adminUserPasskeys[id] = page;
+      state.data.userPasskeysOpenId = id;
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-passkey-page") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const pageNumber = Number(element.dataset.index);
+    if (
+      !Number.isSafeInteger(id) ||
+      id < 1 ||
+      !Number.isSafeInteger(pageNumber) ||
+      pageNumber < 0 ||
+      Number(state.data.userPasskeysOpenId) !== id
+    )
+      return;
+    state.busy = `admin-passkey-page:${id}:${pageNumber}`;
+    state.error = null;
+    render();
+    try {
+      const page = await request(
+        `/api/admin/users/${id}/webauthn/credentials?page=${pageNumber}&size=100`,
+      );
+      state.data.adminUserPasskeys[id] = page;
+      state.data.adminPasskeyEditTarget = null;
+      state.data.adminPasskeyDeleteConfirmTarget = null;
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-passkey-rename-toggle") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const index = Number(element.dataset.index);
+    const target = `${id}:${index}`;
+    if (!adminUserPasskeyPath(id, index)) return;
+    state.data.adminPasskeyEditTarget =
+      state.data.adminPasskeyEditTarget === target ? null : target;
+    state.data.adminPasskeyErrorTarget = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-passkey-rename-cancel") {
+    if (state.busy) return;
+    const target = `${Number(element.dataset.id)}:${Number(element.dataset.index)}`;
+    delete state.data.adminPasskeyDrafts?.[target];
+    state.data.adminPasskeyEditTarget = null;
+    state.data.adminPasskeyErrorTarget = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-passkey-delete-request" ||
+    action === "admin-user-passkey-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const index = Number(element.dataset.index);
+    const target = `${id}:${index}`;
+    const path = adminUserPasskeyPath(id, index);
+    if (!path || Number(state.data.userPasskeysOpenId) !== id) return;
+    if (action === "admin-user-passkey-delete-request") {
+      state.data.adminPasskeyDeleteConfirmTarget = target;
+      render();
+      return;
+    }
+    if (state.data.adminPasskeyDeleteConfirmTarget !== target) return;
+    state.busy = `admin-passkey-delete:${target}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(path, { method: "DELETE" });
+      const page = state.data.adminUserPasskeys[id];
+      const content = page.content.filter(
+        (_, passkeyIndex) => passkeyIndex !== index,
+      );
+      const totalElements = Math.max(0, Number(page.totalElements ?? 0) - 1);
+      state.data.adminUserPasskeys[id] = {
+        ...page,
+        content,
+        totalElements,
+        totalPages: Math.ceil(totalElements / 100),
+      };
+      state.data.adminPasskeyDeleteConfirmTarget = null;
+      state.notice = text("adminPasskeyDeleted");
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-passkey-delete-cancel") {
+    if (state.busy) return;
+    state.data.adminPasskeyDeleteConfirmTarget = null;
     render();
     return;
   }

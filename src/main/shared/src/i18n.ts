@@ -384,6 +384,15 @@ export const messages = {
     adminResetPassword: "Reset password",
     adminSetPassword: "Set password",
     adminPasswordReset: "User password reset.",
+    adminManagePasskeys: "Manage passkeys",
+    adminNoPasskeys: "No passkeys are registered for this user.",
+    adminPasskeyLabel: "Passkey label",
+    adminRenamePasskey: "Rename passkey",
+    adminPasskeyRenamed: "Passkey label updated.",
+    adminDeletePasskey: "Delete passkey",
+    adminDeletePasskeyPrompt:
+      "Delete this passkey? The user will no longer be able to sign in with it.",
+    adminPasskeyDeleted: "Passkey deleted.",
     adminDeleteUser: "Delete user",
     adminDeleteUserPrompt:
       "Delete this user? Their sessions and authorizations will be revoked.",
@@ -925,6 +934,15 @@ export const messages = {
     adminResetPassword: "Parolayı sıfırla",
     adminSetPassword: "Parolayı belirle",
     adminPasswordReset: "Kullanıcı parolası sıfırlandı.",
+    adminManagePasskeys: "Geçiş anahtarlarını yönet",
+    adminNoPasskeys: "Bu kullanıcı için kayıtlı geçiş anahtarı yok.",
+    adminPasskeyLabel: "Geçiş anahtarı etiketi",
+    adminRenamePasskey: "Geçiş anahtarını yeniden adlandır",
+    adminPasskeyRenamed: "Geçiş anahtarı etiketi güncellendi.",
+    adminDeletePasskey: "Geçiş anahtarını sil",
+    adminDeletePasskeyPrompt:
+      "Bu geçiş anahtarı silinsin mi? Kullanıcı artık bu anahtarla giriş yapamaz.",
+    adminPasskeyDeleted: "Geçiş anahtarı silindi.",
     adminDeleteUser: "Kullanıcıyı sil",
     adminDeleteUserPrompt:
       "Bu kullanıcı silinsin mi? Oturumları ve yetkilendirmeleri iptal edilir.",

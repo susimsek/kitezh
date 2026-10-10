@@ -165,6 +165,24 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { password: "test-password-not-a-secret", temporary: true },
   });
   assert.equal(resetUserPassword.status, 200);
+  const userPasskeys = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/webauthn/credentials?page=0&size=100",
+  });
+  assert.equal(userPasskeys.status, 200);
+  const renamedUserPasskey = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/webauthn/credentials/credential_123",
+    method: "PUT",
+    body: { label: "Office laptop" },
+  });
+  assert.equal(renamedUserPasskey.status, 200);
+  const deletedUserPasskey = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/webauthn/credentials/credential_123",
+    method: "DELETE",
+  });
+  assert.equal(deletedUserPasskey.status, 200);
   const deletedClient = await adapter.request({
     console: "admin",
     path: "/api/admin/clients/client-42",
@@ -681,6 +699,21 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/users/2/password/nested",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/webauthn/credentials?page=0&size=101",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/webauthn/credentials/credential_123/nested",
+      method: "DELETE",
     }),
     /not allowed/,
   );
