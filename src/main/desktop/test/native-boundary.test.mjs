@@ -122,6 +122,26 @@ test("desktop runtime sources do not write directly to console logs", async () =
   }
 });
 
+test("desktop does not initialize Electron crash reporting", async () => {
+  const sourceFiles = await runtimeSourceFiles(
+    path.join(desktopDirectory, "src"),
+  );
+  const sources = await Promise.all(
+    sourceFiles.map((sourcePath) => readFile(sourcePath, "utf8")),
+  );
+  const crashReporterStarts = sources.flatMap((source, index) =>
+    [...source.matchAll(/\bcrashReporter\.start\s*\(/g)].map(() =>
+      path.relative(desktopDirectory, sourceFiles[index]),
+    ),
+  );
+
+  assert.deepEqual(
+    crashReporterStarts,
+    [],
+    "Electron crash reporting must remain disabled so memory dumps are not collected or uploaded",
+  );
+});
+
 test("Web and Mobile runtime logging cannot expose rejected exception values", async () => {
   const repositoryDirectory = path.resolve(desktopDirectory, "..", "..", "..");
   const webDirectory = path.join(repositoryDirectory, "src", "main", "web");
