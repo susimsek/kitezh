@@ -90,15 +90,22 @@ try {
     ),
     "Packaged secure storage should report an explicit platform status",
   );
+  const brandingImages = await window
+    .locator('img[alt$=" logo"], img.desktop-sign-in-logo')
+    .evaluateAll((images) =>
+      images.map((image) => ({
+        alt: image.alt,
+        complete: image.complete,
+        naturalWidth: image.naturalWidth,
+        source: image.currentSrc,
+      })),
+    );
   assert.ok(
-    await window
-      .locator('img[alt$=" logo"]')
-      .evaluateAll(
-        (images) =>
-          images.length > 0 &&
-          images.every((image) => image.complete && image.naturalWidth > 0),
-      ),
-    "Packaged Kitezh branding assets should load",
+    brandingImages.length > 0 &&
+      brandingImages.every((image) => image.complete && image.naturalWidth > 0),
+    `Packaged Kitezh branding assets should load: ${JSON.stringify(
+      brandingImages,
+    )}`,
   );
 
   const settingsWindowPromise = application.waitForEvent("window");
