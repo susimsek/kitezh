@@ -84,8 +84,63 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
 
   try {
     await application.evaluate(({ shell }) => {
+      globalThis.__socialLinkStartRequests = [];
+      globalThis.__socialLinkCompletions = [];
+      globalThis.__socialLinkCompleted = false;
       shell.openExternal = async (url) => {
         globalThis.__e2eExternalUrl = url;
+      };
+      const originalFetch = globalThis.fetch.bind(globalThis);
+      globalThis.fetch = async (input, init) => {
+        const requestUrl = new URL(String(input));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        if (requestUrl.pathname === "/api/account/social-links") {
+          return new Response(
+            JSON.stringify([
+              {
+                provider: "github",
+                displayName: "GitHub",
+                linked: globalThis.__socialLinkCompleted,
+                configured: true,
+                enabled: true,
+              },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          requestUrl.pathname ===
+            "/api/account/social-links/github/desktop/start" &&
+          method === "POST"
+        ) {
+          const body = JSON.parse(String(init.body));
+          globalThis.__socialLinkStartRequests.push({
+            path: requestUrl.pathname,
+            body,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          return new Response(
+            JSON.stringify({
+              state: body.state,
+              authorizationUrl:
+                "http://localhost:9090/account/social-links/github/desktop/authorize?transaction=packaged-transaction",
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            }),
+            { status: 202, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          requestUrl.pathname ===
+            "/api/account/social-links/desktop/complete" &&
+          method === "POST"
+        ) {
+          globalThis.__socialLinkCompletions.push(
+            JSON.parse(String(init.body)),
+          );
+          globalThis.__socialLinkCompleted = true;
+          return new Response(null, { status: 204 });
+        }
+        return originalFetch(input, init);
       };
     });
     const mainWindow = await nativeMainWindow(application);
@@ -165,6 +220,56 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
       true,
     );
     assert.match(packageVersion, /^\d+\.\d+\.\d+$/);
+
+    await mainWindow
+      .getByRole("button", { name: "Security", exact: true })
+      .click();
+    await mainWindow.getByText("GitHub", { exact: true }).waitFor();
+    await application.evaluate(() => {
+      globalThis.__e2eExternalUrl = null;
+    });
+    const connectProvider = mainWindow.getByRole("button", {
+      name: "Connect in browser",
+    });
+    await connectProvider.click();
+    await connectProvider.locator(".spinner").waitFor();
+    assert.equal(await connectProvider.isDisabled(), true);
+    assert.equal(await connectProvider.locator(".spinner").count(), 1);
+    const socialAuthorizationUrl = await externalUrlFromDesktop(application);
+    assert.equal(
+      new URL(socialAuthorizationUrl).pathname,
+      "/account/social-links/github/desktop/authorize",
+    );
+    assert.equal(
+      new URL(socialAuthorizationUrl).searchParams.get("transaction"),
+      "packaged-transaction",
+    );
+    const socialStartRequests = await application.evaluate(
+      () => globalThis.__socialLinkStartRequests,
+    );
+    assert.equal(socialStartRequests.length, 1);
+    assert.deepEqual(Object.keys(socialStartRequests[0].body).sort(), [
+      "codeChallenge",
+      "state",
+    ]);
+    assert.match(
+      socialStartRequests[0].body.codeChallenge,
+      /^[A-Za-z0-9_-]{43}$/,
+    );
+    await application.evaluate(({ app }, state) => {
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://social-link/callback?state=${state}&code=packaged-social-link-code`,
+      );
+    }, socialStartRequests[0].body.state);
+    await mainWindow.getByText("Connected", { exact: true }).waitFor();
+    const socialLinkCompletions = await application.evaluate(
+      () => globalThis.__socialLinkCompletions,
+    );
+    assert.equal(socialLinkCompletions.length, 1);
+    assert.equal(socialLinkCompletions[0].code, "packaged-social-link-code");
+    assert.match(socialLinkCompletions[0].codeVerifier, /^[A-Za-z0-9_-]{43}$/);
 
     await application.close();
     application = await launchPackaged();
