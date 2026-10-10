@@ -23,7 +23,7 @@ const config: Config = {
   ],
   coverageThreshold:
     process.env.SONAR_COVERAGE_REPORT === "true"
-      ? {}
+      ? undefined
       : { global: { lines: 95, functions: 95, statements: 95, branches: 90 } },
 };
 
