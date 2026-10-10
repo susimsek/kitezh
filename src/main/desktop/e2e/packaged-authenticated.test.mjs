@@ -13,8 +13,8 @@ const packageVersion = JSON.parse(
 const packagedExecutable = path.join(
   desktopDirectory,
   "release",
-  "win-unpacked",
-  "Kitezh.exe",
+  process.platform === "win32" ? "win-unpacked" : "linux-unpacked",
+  process.platform === "win32" ? "Kitezh.exe" : "kitezh-desktop",
 );
 
 async function nativeMainWindow(application) {
@@ -59,7 +59,7 @@ async function accountProfile(mainWindow) {
   );
 }
 
-test("recovers from canceled PKCE and completes login in the packaged Windows app", async () => {
+test("recovers from canceled PKCE and completes login in the packaged app", async () => {
   const userDataDirectory = await mkdtemp(
     path.join(os.tmpdir(), "kitezh-packaged-auth-e2e-"),
   );
