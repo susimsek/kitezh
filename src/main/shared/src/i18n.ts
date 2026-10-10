@@ -266,6 +266,11 @@ export const messages = {
     adminNext: "Next",
     adminPage: "Page",
     adminUserEnabled: "Enabled",
+    adminDisableUser: "Disable user",
+    adminEnableUser: "Enable user",
+    adminDisableUserPrompt:
+      "Disable this user account? Active sessions will end.",
+    adminUserEnabledUpdated: "User account status updated.",
     adminUserLocked: "Locked",
     adminUserDisabled: "Disabled",
     adminUserEnable: "Enable user",
@@ -671,6 +676,11 @@ export const messages = {
     adminNext: "Sonraki",
     adminPage: "Sayfa",
     adminUserEnabled: "Etkin",
+    adminDisableUser: "Kullanıcıyı devre dışı bırak",
+    adminEnableUser: "Kullanıcıyı etkinleştir",
+    adminDisableUserPrompt:
+      "Bu kullanıcı devre dışı bırakılsın mı? Açık oturumlar kapatılır.",
+    adminUserEnabledUpdated: "Kullanıcı hesap durumu güncellendi.",
     adminUserLocked: "Kilitli",
     adminUserDisabled: "Devre dışı",
     adminUserEnable: "Kullanıcıyı etkinleştir",

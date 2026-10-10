@@ -48,6 +48,15 @@ function isAllowedApiPath(
 ) {
   if (namespace === "admin") {
     if (method === "POST" && path === "/api/admin/users") return true;
+    const userEnabledMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/enabled$/,
+    );
+    if (
+      method === "PUT" &&
+      userEnabledMatch &&
+      Number.isSafeInteger(Number(userEnabledMatch[1]))
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/roles") return true;
     if (
       method === "PUT" &&

@@ -497,6 +497,24 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/enabled$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminUserEnabledRequests ??= [];
+          globalThis.__adminUserEnabledRequests.push({
+            id,
+            enabled: body.enabled,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__userEnabledStates ??= {};
+          globalThis.__userEnabledStates[id] = body.enabled;
+          return new Response(null, { status: 204 });
+        }
+        if (
           requestUrl.pathname === "/api/admin/users" &&
           requestMethod === "POST"
         ) {
@@ -561,7 +579,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               id: page + 1,
               username,
               email: `${username}@example.test`,
-              enabled: true,
+              enabled: globalThis.__userEnabledStates?.[page + 1] ?? true,
               authorities: ["ROLE_USER"],
               effectiveRoles: ["ROLE_USER"],
             },
@@ -1694,6 +1712,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ["0", "0", "1"],
     );
     assert.equal(new URLSearchParams(requestedQueries[1]).get("q"), "alice");
+    const aliceRow = window.locator('article[data-user-id="2"]');
+    await aliceRow
+      .getByRole("button", { name: "Disable user", exact: true })
+      .click();
+    await aliceRow
+      .getByText("Disable this user account? Active sessions will end.", {
+        exact: true,
+      })
+      .waitFor();
+    await aliceRow.getByRole("button", { name: "Cancel", exact: true }).click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminUserEnabledRequests ?? [],
+      ),
+      [],
+    );
+    await aliceRow
+      .getByRole("button", { name: "Disable user", exact: true })
+      .click();
+    const disableAlice = aliceRow.getByRole("button", {
+      name: "Disable user",
+      exact: true,
+    });
+    await disableAlice.click();
+    assert.equal(await disableAlice.isDisabled(), true);
+    assert.equal(await disableAlice.locator(".spinner").count(), 1);
+    await window
+      .getByText("User account status updated.", { exact: true })
+      .waitFor();
+    await aliceRow.getByText("Disabled", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminUserEnabledRequests),
+      [{ id: 2, enabled: false }],
+    );
     const rolesNavigation = window.getByRole("button", {
       name: "Roles",
       exact: true,
