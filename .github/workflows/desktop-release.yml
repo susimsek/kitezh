@@ -387,6 +387,7 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
         run: |
           mapfile -d '' assets < <(find release-assets -type f -print0)
@@ -395,15 +396,17 @@ jobs:
             exit 1
           fi
 
-          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
             if ! gh release create "${RELEASE_TAG}" \
+                --repo "${GH_REPO}" \
                 --verify-tag \
                 --draft \
                 --title "${RELEASE_TAG}" \
                 --generate-notes; then
-              gh release view "${RELEASE_TAG}" >/dev/null
+              gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null
             fi
           fi
+          gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --draft
 
           declare -A allowed_assets=()
           while IFS= read -r -d '' asset; do
@@ -416,14 +419,14 @@ jobs:
             fi
             if [[ -z "${allowed_assets["${asset_name}"]+present}" ]]; then
               echo "Removing stale release asset: ${asset_name}"
-              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+              gh api --repo "${GH_REPO}" --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
             fi
-          done < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
+          done < <(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
 
           for asset in "${assets[@]}"; do
             uploaded=false
             for attempt in 1 2 3; do
-              if gh release upload "${RELEASE_TAG}" "${asset}" --clobber; then
+              if gh release upload "${RELEASE_TAG}" "${asset}" --clobber --repo "${GH_REPO}"; then
                 uploaded=true
                 break
               fi
@@ -435,5 +438,3 @@ jobs:
               exit 1
             fi
           done
-
-          gh release edit "${RELEASE_TAG}" --draft=false

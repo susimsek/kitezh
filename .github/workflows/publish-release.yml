@@ -1,0 +1,87 @@
+name: Publish GitHub Release
+
+on:
+  workflow_run:
+    workflows:
+      - Desktop Release
+      - Mobile Release
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-github-release-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish after all release assets are ready
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.event == 'workflow_run' || github.event.workflow_run.event == 'workflow_dispatch')
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | sort -V | tail -n 1)"
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "No version release tag points at ${RELEASE_SHA}." >&2
+            exit 1
+          fi
+          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Confirm backend, desktop, and mobile workflows succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          runs="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100")"
+          for workflow_name in "Backend Release" "Desktop Release" "Mobile Release"; do
+            if ! jq -e --arg sha "${RELEASE_SHA}" --arg name "${workflow_name}" \
+              '.workflow_runs | any(.[]; .head_sha == $sha and .name == $name and .status == "completed" and .conclusion == "success")' \
+              <<< "${runs}" >/dev/null; then
+              echo "${workflow_name} has not succeeded for ${RELEASE_SHA}; leaving the release as a draft." >&2
+              exit 1
+            fi
+          done
+
+      - name: Confirm expected release assets are present
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" --json assets --jq '.assets | map(.name)')"
+          for pattern in '\.AppImage$' '\.deb$' '\.dmg$' '\.exe$' '\.apk$' '\.ipa$'; do
+            if ! jq -e --arg pattern "${pattern}" 'any(.[]; test($pattern; "i"))' <<< "${assets}" >/dev/null; then
+              echo "Expected release asset matching ${pattern} is missing; keeping ${RELEASE_TAG} as a draft." >&2
+              exit 1
+            fi
+          done
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: gh release edit "${RELEASE_TAG}" --draft=false --repo "${GH_REPO}"

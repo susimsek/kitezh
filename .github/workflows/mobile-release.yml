@@ -416,6 +416,7 @@ jobs:
               gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null
             fi
           fi
+          gh release edit "${RELEASE_TAG}" --draft --repo "${GH_REPO}"
 
           declare -A allowed_assets=()
           for asset in "${assets[@]}"; do
@@ -430,4 +431,3 @@ jobs:
           done < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
 
           gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber --repo "${GH_REPO}"
-          gh release edit "${RELEASE_TAG}" --draft=false --repo "${GH_REPO}"

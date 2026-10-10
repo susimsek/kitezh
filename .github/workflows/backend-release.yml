@@ -260,6 +260,8 @@ jobs:
               --draft \
               --title "${RELEASE_TAG}" \
               --generate-notes
+          else
+            gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --draft
           fi
 
   deploy-render-release:
