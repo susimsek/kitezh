@@ -425,6 +425,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
   let mainWindow;
   let packagedRoleName;
   let packagedScopeId;
+  let packagedLocalizationMessageId;
 
   application = await electron.launch({
     executablePath: packagedExecutable,
@@ -681,6 +682,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       globalThis.__packagedRoleMappingStatuses = [];
       globalThis.__packagedPolicyStatuses = [];
       globalThis.__packagedBrandingStatuses = [];
+      globalThis.__packagedLocalizationStatuses = [];
       const originalFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (input, init) => {
         const response = await originalFetch(input, init);
@@ -713,6 +715,17 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
           requestUrl.pathname === "/api/admin/settings/branding"
         ) {
           globalThis.__packagedBrandingStatuses.push(response.status);
+        }
+        if (
+          ["POST", "PUT", "DELETE"].includes(method) &&
+          /^\/api\/admin\/settings\/localization\/messages(?:\/[1-9]\d*)?$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__packagedLocalizationStatuses.push({
+            method,
+            status: response.status,
+          });
         }
         return response;
       };
@@ -830,6 +843,86 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     }
 
     await mainWindow
+      .getByRole("button", { name: "Localization", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Localization settings", exact: true })
+      .waitFor();
+    const messageKey = `native.packaged.e2e.${Date.now()}`;
+    const createMessageForm = mainWindow.locator(
+      'form[data-form="admin-localization-message-create"]',
+    );
+    await createMessageForm.locator('[name="locale"]').selectOption("en");
+    await createMessageForm.locator('[name="bundle"]').selectOption("admin");
+    await createMessageForm.locator('[name="messageKey"]').fill(messageKey);
+    await createMessageForm
+      .locator('[name="messageValue"]')
+      .fill("Packaged message before edit");
+    await createMessageForm
+      .getByRole("button", { name: "Create message override", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Message override created.", { exact: true })
+      .waitFor();
+    const messageLookup = await mainWindow.evaluate(async (key) =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: `/api/admin/settings/localization/messages?q=${encodeURIComponent(key)}&page=0&size=20&sort=locale,asc`,
+      }),
+    messageKey);
+    assert.equal(messageLookup.status, 200);
+    const createdMessage = messageLookup.body.content.find(
+      (message) => message.messageKey === messageKey,
+    );
+    assert.ok(createdMessage);
+    packagedLocalizationMessageId = createdMessage.id;
+    const messageForm = mainWindow.locator(
+      `form[data-form="admin-localization-message"][data-id="${packagedLocalizationMessageId}"]`,
+    );
+    await messageForm
+      .locator('[name="messageValue"]')
+      .fill("Packaged message after edit");
+    await messageForm
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Message override saved.", { exact: true })
+      .waitFor();
+    const updatedMessage = await mainWindow.evaluate(async (key) =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: `/api/admin/settings/localization/messages?q=${encodeURIComponent(key)}&page=0&size=20&sort=locale,asc`,
+      }),
+    messageKey);
+    assert.equal(updatedMessage.status, 200);
+    assert.equal(
+      updatedMessage.body.content[0].messageValue,
+      "Packaged message after edit",
+    );
+    const messageRow = messageForm.locator("..");
+    await messageRow.getByRole("button", { name: "Delete", exact: true }).click();
+    await messageRow
+      .getByText("Delete this message override?", { exact: true })
+      .waitFor();
+    await messageRow
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Message override deleted.", { exact: true })
+      .waitFor();
+    packagedLocalizationMessageId = null;
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__packagedLocalizationStatuses,
+      ),
+      [
+        { method: "POST", status: 201 },
+        { method: "PUT", status: 200 },
+        { method: "DELETE", status: 204 },
+      ],
+    );
+
+    await mainWindow
       .getByRole("button", { name: "Roles", exact: true })
       .click();
     await mainWindow
@@ -854,6 +947,21 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
   } finally {
     if (application) {
       try {
+        if (packagedLocalizationMessageId && mainWindow) {
+          const cleanup = await mainWindow.evaluate(
+            async (messageId) =>
+              window.desktopApi.api.request({
+                console: "admin",
+                method: "DELETE",
+                path: `/api/admin/settings/localization/messages/${messageId}`,
+              }),
+            packagedLocalizationMessageId,
+          );
+          if (cleanup.status !== 204 && cleanup.status !== 404)
+            throw new Error(
+              `Packaged message cleanup failed with status ${cleanup.status}`,
+            );
+        }
         if (packagedScopeId && mainWindow) {
           const cleanup = await mainWindow.evaluate(
             async (scopeId) =>
