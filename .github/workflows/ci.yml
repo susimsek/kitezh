@@ -235,6 +235,27 @@ jobs:
         working-directory: src/main/desktop
         run: pnpm test
 
+      - name: Run Electron E2E tests
+        shell: bash
+        working-directory: src/main/desktop
+        env:
+          KITEZH_E2E_ARTIFACTS_DIR: ${{ runner.temp }}/desktop-e2e
+        run: |
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            xvfb-run -a pnpm test:e2e
+          else
+            pnpm test:e2e
+          fi
+
+      - name: Upload Desktop E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-e2e-${{ matrix.platform }}-${{ github.sha }}
+          path: ${{ runner.temp }}/desktop-e2e/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Prepare electron-builder cache
         shell: bash
         run: |
@@ -246,6 +267,16 @@ jobs:
       - name: Build desktop package
         working-directory: src/main/desktop
         run: pnpm package
+
+      - name: Smoke-test packaged desktop app
+        shell: bash
+        working-directory: src/main/desktop
+        run: |
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            xvfb-run -a pnpm run smoke:package
+          else
+            pnpm run smoke:package
+          fi
 
       - name: Collect distributable desktop assets
         run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${{ runner.temp }}/desktop-release-assets"

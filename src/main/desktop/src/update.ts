@@ -22,6 +22,7 @@ const UPDATE_RECOVERY_FILE = "desktop-update-recovery.json";
 const UPDATE_WATCHDOG_FILE = "desktop-update-watchdog.js";
 const UPDATE_HEALTH_WINDOW_MS = 15_000;
 const UPDATE_RETRY_DELAY_MS = 2_000;
+const UPDATE_PREVIEW_DELAY_MS = 1_500;
 
 let listener: UpdateListener | null = null;
 let configured = false;
@@ -256,6 +257,7 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
   if (configured) return;
   configured = true;
   listener = nextListener;
+  void initializeUpdateRecovery();
   if (!isSupported()) {
     publish({ state: "unsupported" });
     return;
@@ -288,7 +290,6 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
     scheduleUpdateRetry();
   });
 
-  void initializeUpdateRecovery();
   if (!isUpdatePreviewEnabled()) {
     setTimeout(() => void checkForUpdates(), 5_000);
   }
@@ -313,7 +314,7 @@ export async function checkForUpdates() {
         } else {
           publish({ state: "available", version });
         }
-      }, 600);
+      }, UPDATE_PREVIEW_DELAY_MS);
       return;
     }
     publish({ state: "unsupported" });

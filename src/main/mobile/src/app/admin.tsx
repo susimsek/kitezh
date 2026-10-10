@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useMobileAuth, MobileAuthProvider } from "@/auth/MobileAuthProvider";
+import { BrandMark } from "@/components/BrandMark";
 import {
   AdminApiError,
   deleteAdminUser,
@@ -1090,9 +1091,7 @@ function AdminConsole() {
         style={[styles.safeArea, { backgroundColor: palette.background }]}
       >
         <View style={styles.authContent}>
-          <View style={[styles.logo, { backgroundColor: palette.primary }]}>
-            <AppIcon name="shield" size={42} color={palette.onPrimary} />
-          </View>
+          <BrandMark size={92} />
           <Text style={[styles.title, { color: palette.text }]}>
             {dictionary.adminSignIn}
           </Text>
@@ -1122,9 +1121,7 @@ function AdminConsole() {
       <View style={styles.screen}>
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <View style={[styles.smallLogo, { backgroundColor: palette.primary }]}>
-              <AppIcon name="shield" size={18} color={palette.onPrimary} />
-            </View>
+            <BrandMark size={34} />
             <View>
               <Text style={[styles.headerTitle, { color: palette.text }]}>Kitezh</Text>
               <Text style={[styles.headerSubtitle, { color: palette.textMuted }]}>
@@ -2571,7 +2568,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   brandRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm },
-  smallLogo: { alignItems: "center", borderRadius: radii.sm, height: 34, justifyContent: "center", width: 34 },
   headerTitle: { fontSize: 16, fontWeight: "800" },
   headerSubtitle: { fontSize: 12, marginTop: 2 },
   iconButton: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" },
@@ -2587,7 +2583,6 @@ const styles = StyleSheet.create({
   pagination: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   userActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   authContent: { alignItems: "center", flex: 1, justifyContent: "center", padding: spacing.xl },
-  logo: { alignItems: "center", borderRadius: radii.lg, height: 92, justifyContent: "center", width: 92 },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   subtitle: { fontSize: 16, lineHeight: 23, marginTop: spacing.sm, textAlign: "center" },
   error: { marginTop: spacing.md, textAlign: "center" },

@@ -1,4 +1,6 @@
 import {
+  type AuthRequest,
+  type AuthSessionResult,
   exchangeCodeAsync,
   makeRedirectUri,
   refreshAsync,
@@ -6,6 +8,7 @@ import {
   useAutoDiscovery,
 } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
+import { AppState, Linking, Platform } from "react-native";
 import {
   createContext,
   useCallback,
@@ -14,10 +17,12 @@ import {
   useMemo,
   useState,
 } from "react";
-import { AppState } from "react-native";
 
 import { useLocale } from "@/i18n/LocaleProvider";
-import { validateAuthorizationCallback } from "../../../shared/src/auth.ts";
+import {
+  isAllowedNativeRedirect,
+  validateAuthorizationCallback,
+} from "../../../shared/src/auth.ts";
 import { createSingleFlight } from "../../../shared/src/session.ts";
 import {
   authorizationServerIssuer,
@@ -54,6 +59,59 @@ const MobileAuthContext = createContext<MobileAuthContextValue | null>(null);
 
 function expiresAtFromToken(expiresIn = 300, issuedAt = Date.now()) {
   return issuedAt + Math.max(expiresIn, 0) * 1000;
+}
+
+function promptAndroidAuthSession(
+  request: AuthRequest,
+  discovery: NonNullable<ReturnType<typeof useAutoDiscovery>>,
+): Promise<AuthSessionResult> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let returnedToApp = false;
+    let returnTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (result: AuthSessionResult) => {
+      if (settled) return;
+      settled = true;
+      if (returnTimer) clearTimeout(returnTimer);
+      urlSubscription.remove();
+      appStateSubscription.remove();
+      resolve(result);
+    };
+
+    const urlSubscription = Linking.addEventListener("url", ({ url }) => {
+      if (!isAllowedNativeRedirect(url, request.redirectUri)) return;
+      finish(request.parseReturnUrl(url));
+    });
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState !== "active") {
+          returnedToApp = true;
+          return;
+        }
+        if (!returnedToApp || settled) return;
+        returnTimer = setTimeout(() => {
+          finish({ type: "cancel" });
+        }, 750);
+      },
+    );
+
+    void request
+      .makeAuthUrlAsync(discovery)
+      .then((url) => WebBrowser.openBrowserAsync(url))
+      .then((result) => {
+        if (result.type !== "opened") finish({ type: "cancel" });
+      })
+      .catch((error: unknown) => {
+        if (settled) return;
+        settled = true;
+        if (returnTimer) clearTimeout(returnTimer);
+        urlSubscription.remove();
+        appStateSubscription.remove();
+        reject(error);
+      });
+  });
 }
 
 export function MobileAuthProvider({
@@ -115,12 +173,18 @@ export function MobileAuthProvider({
     setStatus("signing-in");
     setError(null);
     try {
-      const result = await promptAsync();
-      if (result.type !== "success" || !request.codeVerifier) {
+      const result =
+        Platform.OS === "android"
+          ? await promptAndroidAuthSession(request, discovery)
+          : await promptAsync();
+      if (result.type !== "success") {
         if (result.type === "cancel" || result.type === "dismiss") {
           setStatus("signed-out");
           return;
         }
+        throw new Error("Authorization was not completed");
+      }
+      if (!request.codeVerifier) {
         throw new Error("Authorization was not completed");
       }
       const callback = validateAuthorizationCallback(
@@ -145,9 +209,9 @@ export function MobileAuthProvider({
       await writeSession(nextSession, consoleConfig.namespace);
       setSession(nextSession);
       setStatus("signed-in");
-    } catch (cause) {
+    } catch {
       setStatus("error");
-      setError(cause instanceof Error ? cause.message : "Authorization failed");
+      setError("authorization-failed");
     }
   }, [consoleConfig, discovery, promptAsync, redirectUri, request, status]);
 

@@ -17,18 +17,18 @@ These instructions apply to `src/main/desktop/**` and supplement the repository-
 
 ## Quick Reference
 
-| Action | Command |
-| --- | --- |
-| Install dependencies | `pnpm install --frozen-lockfile` |
-| Type check | `pnpm typecheck` |
-| Build main/preload | `pnpm run build:main` |
-| Build renderer and Electron code | `pnpm run build` |
-| Run desktop unit tests | `pnpm test:unit` |
-| Run Electron E2E tests | `pnpm test:e2e` |
-| Run desktop security tests | `pnpm test` |
-| Run local desktop app | `pnpm dev` |
-| Run against deployed API | `pnpm start` |
-| Build installers | `pnpm package` |
+| Action                           | Command                          |
+| -------------------------------- | -------------------------------- |
+| Install dependencies             | `pnpm install --frozen-lockfile` |
+| Type check                       | `pnpm typecheck`                 |
+| Build main/preload               | `pnpm run build:main`            |
+| Build renderer and Electron code | `pnpm run build`                 |
+| Run desktop unit tests           | `pnpm test:unit`                 |
+| Run Electron E2E tests           | `pnpm test:e2e`                  |
+| Run desktop security tests       | `pnpm test`                      |
+| Run local desktop app            | `pnpm dev`                       |
+| Run against deployed API         | `pnpm start`                     |
+| Build installers                 | `pnpm package`                   |
 
 Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 
@@ -101,6 +101,9 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Keep Electron E2E independently configurable from the web suite: desktop tests use the
   desktop package's pinned `playwright-core` Electron launcher and Node test runner, while
   web browser tests use `@playwright/test` under `src/main/web/e2e`.
+- Electron E2E must set `DESKTOP_E2E_BACKGROUND=true`, keep every test window hidden, and avoid
+  app/window focus or bring-to-front calls. Use the main-process visibility helpers so automated
+  tests never take over the user's desktop.
 - Run `pnpm package` when changing packaging configuration, protocol registration, assets, preload/main behavior, or renderer integration.
 - Add or update tests for:
   - callback route and protocol validation;

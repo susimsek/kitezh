@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -42,19 +43,15 @@ export default function HomeScreen() {
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
       <View style={styles.content}>
-        <View style={[styles.logo, { backgroundColor: palette.primary }]}>
-          <AppIcon name="shield" size={44} color={palette.onPrimary} />
-        </View>
+        <BrandMark size={96} />
         <Text style={[styles.brand, { color: palette.text }]}>Kitezh</Text>
         <Text style={[styles.tagline, { color: palette.textMuted }]}>
           {dictionary.appTagline}
         </Text>
-        <Text style={[styles.preview, { color: palette.primary }]}>
-          {dictionary.mobilePreview}
-        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={dictionary.continue}
+          testID="continue-to-sign-in"
           onPress={() => router.push("/sign-in")}
           style={[styles.action, { backgroundColor: palette.primary }]}
         >
@@ -115,13 +112,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.xl,
   },
-  logo: {
-    alignItems: "center",
-    borderRadius: radii.lg,
-    height: 96,
-    justifyContent: "center",
-    width: 96,
-  },
   brand: { fontSize: 36, fontWeight: "800", marginTop: spacing.lg },
   tagline: {
     fontSize: 17,
@@ -129,12 +119,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     maxWidth: 320,
     textAlign: "center",
-  },
-  preview: {
-    fontSize: 14,
-    fontWeight: "700",
-    marginTop: spacing.xl,
-    textTransform: "uppercase",
   },
   action: {
     alignItems: "center",

@@ -1,10 +1,16 @@
 appId: io.github.susimsek.kitezh.mobile
 ---
+- stopApp
 - launchApp:
-    clearState: true
-- tapOn: "Settings"
+    clearState: false
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- tapOn: "Settings|Ayarlar"
+- assertVisible: "Settings|Ayarlar"
+- tapOn: "English|İngilizce"
 - assertVisible: "Settings"
-- tapOn: "Turkish"
+- tapOn: "Turkish|Türkçe"
 - assertVisible: "Ayarlar"
 - assertVisible: "Görünüm"
 - tapOn: "Koyu"

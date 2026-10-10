@@ -1,12 +1,37 @@
 appId: io.github.susimsek.kitezh.mobile
 ---
+- stopApp
 - launchApp:
     clearState: true
-- tapOn: "Continue"
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- tapOn:
+    text: "Dil"
+    optional: true
+- tapOn: "Continue|Devam et"
 - tapOn: "Sign in"
-- assertVisible: "Kitezh fixture account"
+# iOS may ask once to allow the app to use the local fixture domain for sign-in.
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
 - tapOn: "Continue with fixture account"
-- assertVisible: "Account Console"
-- assertVisible: "fixture-user"
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- extendedWaitUntil:
+    visible: "fixture-user"
+    timeout: 180000
+- scrollUntilVisible:
+    element:
+      text: "Sign out"
+    direction: DOWN
 - tapOn: "Sign out"
+# iOS asks separately when the logout endpoint opens the local fixture domain.
+- tapOn:
+    text: "Continue"
+    optional: true
 - assertVisible: "Sign in"

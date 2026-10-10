@@ -21,6 +21,7 @@ import {
 import {
   isAllowedNativeRedirect,
   parseNativeDeepLink,
+  resolveNativeIntentPath,
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
 import { createSingleFlight } from "../../shared/src/session.ts";
@@ -139,6 +140,25 @@ test("native deep links accept only registered routes", () => {
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
+});
+
+test("native intent routes registered callback links without callback parameters", () => {
+  assert.equal(
+    resolveNativeIntentPath("kitezh://oauth/callback?code=secret&state=state"),
+    "/oauth/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath("kitezh://admin/oauth/callback?code=secret&state=state"),
+    "/admin/oauth/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath("kitezh://logout/callback"),
+    "/logout/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath("https://example.com/oauth/callback"),
+    null,
+  );
 });
 
 test("session refresh operations are single-flight and recover after completion", async () => {

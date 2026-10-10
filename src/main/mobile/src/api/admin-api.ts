@@ -1,6 +1,8 @@
 import { authorizationServerIssuer } from "../config.ts";
 import {
   classifyApiError,
+  createNativeRequestSignal,
+  DEFAULT_NATIVE_API_TIMEOUT_MS,
   parseProblemDetail,
   type ApiErrorKind,
   type ProblemDetail,
@@ -266,6 +268,7 @@ export class AdminApiError extends Error {
 type RequestOptions = {
   refreshAccessToken?: () => Promise<string | null>;
   signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 function adminApiUrl(path: string) {
@@ -280,6 +283,10 @@ async function requestAdmin<T>(
   init: RequestInit = {},
 ): Promise<T> {
   let response: Response;
+  const requestSignal = createNativeRequestSignal(
+    options.timeoutMs ?? DEFAULT_NATIVE_API_TIMEOUT_MS,
+    options.signal,
+  );
   try {
     response = await fetch(adminApiUrl(path), {
       ...init,
@@ -288,11 +295,17 @@ async function requestAdmin<T>(
         Accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      signal: options.signal,
+      signal: requestSignal.signal,
     });
   } catch (cause) {
-    if (cause instanceof Error && cause.name === "AbortError") throw cause;
-    throw new AdminApiError(0, "Administration request failed", cause);
+    const failure = requestSignal.timedOut()
+      ? Object.assign(new Error("Native API request timed out"), {
+          name: "TimeoutError",
+        })
+      : cause;
+    throw new AdminApiError(0, "Administration request failed", failure);
+  } finally {
+    requestSignal.dispose();
   }
 
   if (response.status === 401 && !retried && options.refreshAccessToken) {

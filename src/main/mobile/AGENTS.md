@@ -65,6 +65,9 @@ Electron-specific implementation details do not apply directly to React Native.
   localized errors, first-invalid-field focus, server validation mapping, and clearing stale field
   errors when the field changes.
 - Do not use hard-coded black/white theme colors or one-off spacing when a semantic token exists.
+- Use the bundled native `BrandMark` for Kitezh product identity on mobile screens; do not substitute
+  a generic shield icon or load the web logo over the network. Keep the iOS/Android launcher icons,
+  Android adaptive icon layers, and light/dark splash screen aligned with the desktop product mark.
 
 ## Authentication and security
 
@@ -111,6 +114,9 @@ Electron-specific implementation details do not apply directly to React Native.
   web-equivalent behavior where the backend contract is shared.
 - Do not consider a web Playwright pass to be mobile E2E coverage. Native E2E must launch the
   mobile build and exercise the real navigation/authentication boundaries.
+- On macOS, run local iOS E2E with `bash e2e/run-ios-background.sh`; it boots, installs, and launches
+  through `simctl`/`xcodebuild` without opening Simulator.app. Do not use `expo run:ios` in the
+  automated E2E path because it opens the Simulator desktop window.
 - Run `git diff --check` after changes. Keep changes focused and do not commit, push, merge, or
   rewrite history without explicit user permission.
 

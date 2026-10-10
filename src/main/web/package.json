@@ -24,7 +24,6 @@
     "test:unit": "jest",
     "test:unit:coverage": "jest --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:open": "playwright test --ui",
     "test:e2e:chrome": "playwright test --project=chromium",
     "test:e2e:admin": "playwright test e2e/admin-console.spec.ts",
     "test:e2e:account": "playwright test e2e/account-console.spec.ts",

@@ -24,6 +24,7 @@
     "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",
     "test": "pnpm run test:unit",
     "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
+    "smoke:package": "node scripts/smoke-packaged-app.mjs",
     "build": "pnpm run build:renderer && tsc -p tsconfig.json",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",

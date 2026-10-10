@@ -40,103 +40,147 @@ export default function SettingsScreen() {
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
       <View style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityLabel={dictionary.back}
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.back}
-          >
-            <AppIcon
-              name="arrowRight"
-              size={18}
-              color={palette.text}
-              style={{ transform: [{ rotate: "180deg" }] }}
-            />
-          </Pressable>
-          <Text style={[styles.title, { color: palette.text }]}>
-            {dictionary.settingsTitle}
-          </Text>
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>
-          {dictionary.language}
-        </Text>
-        <View style={[styles.card, { backgroundColor: palette.surface }]}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>
-            {dictionary.systemLanguage}
-          </Text>
-          <Option
-            label={dictionary.system}
-            selected={locale === "system"}
-            onPress={() => setLocale("system")}
-            palette={palette}
-          />
-          <Option
-            label={dictionary.english}
-            selected={locale === "en"}
-            onPress={() => setLocale("en")}
-            palette={palette}
-          />
-          <Option
-            label={dictionary.turkish}
-            selected={locale === "tr"}
-            onPress={() => setLocale("tr")}
-            palette={palette}
-          />
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>
-          {dictionary.appearance}
-        </Text>
-        <View style={[styles.card, { backgroundColor: palette.surface }]}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>
-            {dictionary.theme}
-          </Text>
-          <Option
-            label={dictionary.system}
-            selected={mode === "system"}
-            onPress={() => setMode("system")}
-            palette={palette}
-          />
-          <Option
-            label={dictionary.light}
-            selected={mode === "light"}
-            onPress={() => setMode("light")}
-            palette={palette}
-          />
-          <Option
-            label={dictionary.dark}
-            selected={mode === "dark"}
-            onPress={() => setMode("dark")}
-            palette={palette}
-          />
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: resetting }}
-          disabled={resetting}
-          onPress={() => void resetDefaults()}
-          style={[
-            styles.reset,
-            { borderColor: palette.border, opacity: resetting ? 0.6 : 1 },
-          ]}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
         >
-          {resetting ? (
-            <ActivityIndicator color={palette.primary} />
-          ) : (
-            <AppIcon name="reset" size={16} color={palette.primary} />
-          )}
-          <Text style={{ color: palette.primary, fontWeight: "700" }}>
-            {dictionary.resetDefaults}
-          </Text>
-        </Pressable>
+          <View style={styles.header}>
+            <Pressable
+              accessibilityLabel={dictionary.back}
+              accessibilityRole="button"
+              onPress={() => router.back()}
+              style={[styles.back, { backgroundColor: palette.surfaceMuted }]}
+            >
+              <AppIcon
+                name="arrowRight"
+                size={18}
+                color={palette.text}
+                style={{ transform: [{ rotate: "180deg" }] }}
+              />
+            </Pressable>
+            <Text style={[styles.title, { color: palette.text }]}>
+              {dictionary.settingsTitle}
+            </Text>
+          </View>
+
+          <SectionHeading
+            icon="globe"
+            label={dictionary.language}
+            palette={palette}
+          />
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: palette.textMuted }]}>
+              {dictionary.systemLanguage}
+            </Text>
+            <Option
+              label={dictionary.system}
+              selected={locale === "system"}
+              onPress={() => setLocale("system")}
+              palette={palette}
+            />
+            <Option
+              label={dictionary.english}
+              selected={locale === "en"}
+              onPress={() => setLocale("en")}
+              palette={palette}
+            />
+            <Option
+              label={dictionary.turkish}
+              selected={locale === "tr"}
+              onPress={() => setLocale("tr")}
+              palette={palette}
+            />
+          </View>
+
+          <SectionHeading
+            icon="sun"
+            label={dictionary.appearance}
+            palette={palette}
+          />
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: palette.textMuted }]}>
+              {dictionary.theme}
+            </Text>
+            <Option
+              label={dictionary.system}
+              selected={mode === "system"}
+              onPress={() => setMode("system")}
+              palette={palette}
+            />
+            <Option
+              label={dictionary.light}
+              selected={mode === "light"}
+              onPress={() => setMode("light")}
+              palette={palette}
+            />
+            <Option
+              label={dictionary.dark}
+              selected={mode === "dark"}
+              onPress={() => setMode("dark")}
+              palette={palette}
+            />
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: resetting }}
+            disabled={resetting}
+            onPress={() => void resetDefaults()}
+            style={[
+              styles.reset,
+              {
+                backgroundColor: palette.surfaceMuted,
+                borderColor: palette.border,
+                opacity: resetting ? 0.6 : 1,
+              },
+            ]}
+          >
+            {resetting ? (
+              <ActivityIndicator color={palette.primary} />
+            ) : (
+              <AppIcon name="reset" size={16} color={palette.primary} />
+            )}
+            <Text style={{ color: palette.primary, fontWeight: "700" }}>
+              {dictionary.resetDefaults}
+            </Text>
+          </Pressable>
         </ScrollView>
         {session ? <AccountTabBar active="settings" /> : null}
       </View>
     </SafeAreaView>
+  );
+}
+
+function SectionHeading({
+  icon,
+  label,
+  palette,
+}: {
+  icon: "globe" | "sun";
+  label: string;
+  palette: ReturnType<typeof useTheme>["palette"];
+}) {
+  return (
+    <View style={styles.sectionHeading}>
+      <View
+        style={[styles.sectionIcon, { backgroundColor: palette.surfaceMuted }]}
+      >
+        <AppIcon name={icon} size={15} color={palette.primary} />
+      </View>
+      <Text style={[styles.sectionTitle, { color: palette.text }]}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -181,47 +225,78 @@ function Option({
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   screen: { flex: 1 },
-  content: { padding: spacing.xl },
-  header: { alignItems: "center", flexDirection: "row", minHeight: 48 },
-  back: { padding: spacing.sm },
-  title: { fontSize: 28, fontWeight: "800", marginLeft: spacing.sm },
-  sectionTitle: { fontSize: 18, fontWeight: "800", marginTop: spacing.xl },
+  content: { gap: spacing.xs, padding: spacing.lg, paddingBottom: spacing.xxl },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    minHeight: 48,
+  },
+  back: {
+    alignItems: "center",
+    borderRadius: radii.pill,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  title: { fontSize: 26, fontWeight: "700" },
+  sectionHeading: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  sectionIcon: {
+    alignItems: "center",
+    borderRadius: radii.sm,
+    height: 30,
+    justifyContent: "center",
+    width: 30,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: "700" },
   card: {
+    borderWidth: 1,
     borderRadius: radii.md,
-    marginTop: spacing.sm,
+    overflow: "hidden",
     paddingHorizontal: spacing.md,
   },
-  cardTitle: { fontSize: 15, fontWeight: "700", paddingVertical: spacing.md },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
   option: {
     alignItems: "center",
     borderTopWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 52,
+    minHeight: 54,
   },
   optionLabel: { fontSize: 16 },
   radio: {
     alignItems: "center",
     borderRadius: radii.pill,
     borderWidth: 2,
-    height: 22,
+    height: 20,
     justifyContent: "center",
-    width: 22,
+    width: 20,
   },
   radioDot: {
-    backgroundColor: "#ffffff",
     borderRadius: radii.pill,
     height: 8,
     width: 8,
   },
   reset: {
     alignItems: "center",
-    borderRadius: radii.pill,
+    borderRadius: radii.md,
     borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
     justifyContent: "center",
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     minHeight: 48,
     paddingHorizontal: spacing.lg,
   },

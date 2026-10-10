@@ -12,6 +12,11 @@ export type PendingAuthorization = {
   createdAt: number;
 };
 
+export type DesktopConsoleName = "admin" | "account";
+export type PendingAuthorizationStore = Partial<
+  Record<DesktopConsoleName, PendingAuthorization>
+>;
+
 export type DesktopTokens = {
   accessToken: string;
   expiresAt: number;
@@ -31,6 +36,45 @@ export function isPendingAuthorizationValid(
     now - pending.createdAt >= 0 &&
     now - pending.createdAt < ttlMs
   );
+}
+
+export function parsePendingAuthorizationStore(
+  value: unknown,
+  now = Date.now(),
+): PendingAuthorizationStore {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const input = value as Record<string, unknown>;
+  const store: PendingAuthorizationStore = {};
+  for (const consoleName of ["admin", "account"] as const) {
+    const candidate = input[consoleName];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate))
+      continue;
+
+    const pending = candidate as Partial<PendingAuthorization>;
+    const expectedClientId = `desktop-${consoleName}-console`;
+    if (
+      typeof pending.state !== "string" ||
+      pending.state.length < 16 ||
+      pending.state.length > 256 ||
+      typeof pending.codeVerifier !== "string" ||
+      pending.codeVerifier.length < 43 ||
+      pending.codeVerifier.length > 128 ||
+      pending.clientId !== expectedClientId ||
+      pending.redirectUri !== "kitezh://oauth/callback" ||
+      typeof pending.createdAt !== "number" ||
+      !Number.isFinite(pending.createdAt) ||
+      !isPendingAuthorizationValid(
+        pending as PendingAuthorization,
+        pending.state,
+        now,
+      )
+    ) {
+      continue;
+    }
+    store[consoleName] = pending as PendingAuthorization;
+  }
+  return store;
 }
 
 export async function exchangeAuthorizationCode(

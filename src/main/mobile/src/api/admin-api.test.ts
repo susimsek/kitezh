@@ -86,6 +86,40 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
   }
 });
 
+test("admin requests classify timeout and offline failures", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_input, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener(
+        "abort",
+        () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+        { once: true },
+      );
+    });
+  try {
+    await assert.rejects(
+      getAdminDashboard("access-token", { timeoutMs: 5 }),
+      (error: unknown) =>
+        error instanceof AdminApiError &&
+        error.status === 0 &&
+        error.kind === "timeout",
+    );
+  } finally {
+    globalThis.fetch = async () => {
+      throw new TypeError("private transport detail");
+    };
+    try {
+      await assert.rejects(
+        getAdminDashboard("access-token"),
+        (error: unknown) =>
+          error instanceof AdminApiError && error.kind === "offline",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+});
+
 test("admin users request encodes search and pagination parameters", async () => {
   const originalFetch = globalThis.fetch;
   let request = "";

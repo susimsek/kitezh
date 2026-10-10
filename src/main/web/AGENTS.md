@@ -52,6 +52,7 @@ These instructions apply to `src/main/web/**` and supplement the repository-root
 - Social-login UI coverage must verify provider discovery rendering, backend redirect targets, duplicate-click prevention, and the inline loading spinner; provider-owner authentication itself requires configured test credentials and must not be simulated by entering secrets into committed tests.
 - New or materially changed console flows require component coverage and Playwright E2E coverage for the affected login, refresh/reload, direct deep-link, mutation, error, and logout paths.
 - Keep Playwright route assertions aligned with the unprefixed route contract. Web and Electron suites use Playwright but keep separate package dependencies, configs, and launch targets so either application can be built and tested independently.
+- Keep browser E2E headless (`headless: true`) so running tests does not open or activate a browser window.
 - Run `pnpm build` after changes to routes, static-export configuration, or production rendering behavior.
 
 ## Authentication

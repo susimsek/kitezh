@@ -90,24 +90,24 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 - Maven Wrapper (`./mvnw`)
 - Kubernetes `1.24+`
 - Helm `3.8.0+`
-- Docker or Podman *(optional, for Jib, Docker Compose, and Helm deployments)*
-- GraalVM Native Image `25+` *(optional, for native builds)*
-- OpenSSL *(for RSA signing key generation)*
-- `curl` *(optional, for OAuth2 endpoint testing)*
-- `jq` *(optional, for parsing token responses)*
+- Docker or Podman _(optional, for Jib, Docker Compose, and Helm deployments)_
+- GraalVM Native Image `25+` _(optional, for native builds)_
+- OpenSSL _(for RSA signing key generation)_
+- `curl` _(optional, for OAuth2 endpoint testing)_
+- `jq` _(optional, for parsing token responses)_
 
 ## Kitezh Layout
 
 - Application code: `src/main/java/io/github/susimsek/kitezh`
-    - `config`: Spring configuration
-        - `aot`: GraalVM Native Image runtime hints
-        - `cache`: Spring Cache and Hibernate second-level cache configuration
-        - `security`: Spring Security and Authorization Server configuration
-    - `domain`: JPA entities and auditing base class
-    - `repository`: Spring Data JPA repositories
-    - `service`: Authorization Server persistence adapters, user details, and JWK loading
-    - `security`: localized security handlers, auditor/security utilities, and the database-backed `JWKSource`
-    - `web`: lightweight MVC endpoints for landing output
+  - `config`: Spring configuration
+    - `aot`: GraalVM Native Image runtime hints
+    - `cache`: Spring Cache and Hibernate second-level cache configuration
+    - `security`: Spring Security and Authorization Server configuration
+  - `domain`: JPA entities and auditing base class
+  - `repository`: Spring Data JPA repositories
+  - `service`: Authorization Server persistence adapters, user details, and JWK loading
+  - `security`: localized security handlers, auditor/security utilities, and the database-backed `JWKSource`
+  - `web`: lightweight MVC endpoints for landing output
 - Configuration: `src/main/resources/config`
 - Liquibase changelogs: `src/main/resources/db/changelog`
 - Liquibase seed data: `src/main/resources/db/data`
@@ -116,8 +116,8 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 - Docker compose files: `src/main/docker`
 - Helm chart: `helm/kitezh`
 - Tests: `src/test/java`
-    - Application unit/integration tests: `src/test/java/io/github/susimsek/kitezh`
-    - Gatling performance tests: `src/test/java/gatling/simulations`
+  - Application unit/integration tests: `src/test/java/io/github/susimsek/kitezh`
+  - Gatling performance tests: `src/test/java/gatling/simulations`
 
 ## Configuration
 
@@ -293,6 +293,7 @@ USER_SESSION_ATTRIBUTES
 The schema keeps the JDBC model's session id, creation/last-access timestamps, max inactive interval, expiry time, principal index, and binary session attributes. Expired sessions are cleaned every minute. Spring Security continues to use a regular `HttpSession`; `@EnableSpringHttpSession` transparently replaces the servlet-container session store with the JPA repository.
 
 ## Web
+
 ### Authorization UI localization
 
 The web client remains a Next.js static export. React Router resolves runtime paths such as
@@ -344,9 +345,9 @@ pnpm test:e2e:install
 pnpm test:e2e
 ```
 
-Use `pnpm test:e2e:open` for Playwright UI mode, or set `E2E_BASE_URL` and the
-`E2E_ADMIN_*`/`E2E_USER_*` credentials for another environment. The Electron package keeps its
-own Playwright-based launch and test configuration under `src/main/desktop`.
+Playwright runs these browser tests headless so they do not open or activate a browser window. Set
+`E2E_BASE_URL` and the `E2E_ADMIN_*`/`E2E_USER_*` credentials for another environment. The Electron
+package keeps its own hidden-window launch and test configuration under `src/main/desktop`.
 
 ### Electron desktop console
 
@@ -427,10 +428,10 @@ native migration scope, platform boundaries, acceptance states, and delivery ord
 [`docs/NATIVE-PLATFORM-PRD.md`](docs/NATIVE-PLATFORM-PRD.md) and the detailed
 [`WEB-MOBILE-FEATURE-MATRIX.md`](src/main/mobile/WEB-MOBILE-FEATURE-MATRIX.md).
 
-| Console | Entry URL | OIDC client | API scope | Access |
-| --- | --- | --- | --- | --- |
-| Administration | `/admin` | `admin-console` | `admin-api` | Administrative API permissions; the seeded `admin/admin` user has `ROLE_ADMIN` |
-| Account | `/account` | `account-console` | `account-api` | Authenticated users, including `admin/admin`, `user/user`, `user2/user2`, `user3/user3`, `user4/user4`, `user5/user5`, and `user6/user6` |
+| Console        | Entry URL  | OIDC client       | API scope     | Access                                                                                                                                   |
+| -------------- | ---------- | ----------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Administration | `/admin`   | `admin-console`   | `admin-api`   | Administrative API permissions; the seeded `admin/admin` user has `ROLE_ADMIN`                                                           |
+| Account        | `/account` | `account-console` | `account-api` | Authenticated users, including `admin/admin`, `user/user`, `user2/user2`, `user3/user3`, `user4/user4`, `user5/user5`, and `user6/user6` |
 
 The authorization server browser session provides SSO between the login screen and the console clients. The Admin Console includes client, client-scope, user, role, session, consent, signing-key, event, and server-information screens. The Account Console provides personal information, password, TOTP MFA, and one-time recovery-code security, authorized applications, and session-management screens.
 
@@ -737,9 +738,9 @@ Flow summary:
 3. The user signs in and approves consent.
 4. The authorization server redirects back with an authorization `code`.
 5. The client calls `/oauth2/token` with:
-    - client authentication
-    - the authorization code
-    - the original `code_verifier`
+   - client authentication
+   - the authorization code
+   - the original `code_verifier`
 6. The server validates both the client credentials and the PKCE proof before issuing tokens.
 
 Generate a PKCE verifier and challenge:
@@ -859,23 +860,23 @@ curl http://127.0.0.1:9090/oauth2/jwks
 
 Seeded users:
 
-| Username | Password | Authorities |
-| --- | --- | --- |
-| `admin` | `admin` | `ROLE_ADMIN`, `ROLE_USER` |
-| `user` | `user` | `ROLE_USER` |
-| `user2` | `user2` | `ROLE_USER` |
-| `user3` | `user3` | `ROLE_USER` |
-| `user4` | `user4` | `ROLE_USER` |
-| `user5` | `user5` | `ROLE_USER` |
-| `user6` | `user6` | `ROLE_USER` |
+| Username | Password | Authorities               |
+| -------- | -------- | ------------------------- |
+| `admin`  | `admin`  | `ROLE_ADMIN`, `ROLE_USER` |
+| `user`   | `user`   | `ROLE_USER`               |
+| `user2`  | `user2`  | `ROLE_USER`               |
+| `user3`  | `user3`  | `ROLE_USER`               |
+| `user4`  | `user4`  | `ROLE_USER`               |
+| `user5`  | `user5`  | `ROLE_USER`               |
+| `user6`  | `user6`  | `ROLE_USER`               |
 
 Seeded OAuth2 clients:
 
-| Client ID | Client Secret | Grants |
-| --- | --- | --- |
+| Client ID     | Client Secret | Grants                                                                            |
+| ------------- | ------------- | --------------------------------------------------------------------------------- |
 | `demo-client` | `demo-secret` | `authorization_code`, `refresh_token`, `client_credentials`, token exchange, CIBA |
-| `ciba-client` | `demo-secret` | CIBA, refresh_token |
-| `pkce-client` | `demo-secret` | `authorization_code`, `refresh_token` |
+| `ciba-client` | `demo-secret` | CIBA, refresh_token                                                               |
+| `pkce-client` | `demo-secret` | `authorization_code`, `refresh_token`                                             |
 
 Seeded client scopes:
 

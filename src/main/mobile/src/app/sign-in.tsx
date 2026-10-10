@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { spacing } from "@/theme/tokens";
@@ -26,7 +27,7 @@ export default function SignInScreen() {
     >
       <View style={styles.content}>
         <Pressable
-          accessibilityLabel={dictionary.continue}
+          accessibilityLabel={dictionary.back}
           onPress={() => router.back()}
           style={styles.back}
         >
@@ -37,7 +38,7 @@ export default function SignInScreen() {
             style={{ transform: [{ rotate: "180deg" }] }}
           />
         </Pressable>
-        <AppIcon name="shield" size={48} color={palette.primary} />
+        <BrandMark size={72} />
         <Text style={[styles.title, { color: palette.text }]}>Kitezh</Text>
         <Text style={[styles.message, { color: palette.textMuted }]}>
           {dictionary.appTagline}
@@ -54,6 +55,7 @@ export default function SignInScreen() {
           accessibilityRole="button"
           accessibilityState={{ disabled: pending }}
           disabled={pending}
+          testID="sign-in-submit"
           onPress={() => void signIn()}
           style={[
             styles.action,

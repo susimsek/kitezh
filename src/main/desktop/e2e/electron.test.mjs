@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import test from "node:test";
@@ -20,19 +20,29 @@ const packageVersion = JSON.parse(
 
 async function launchDesktop({
   devTools = false,
+  recoveryState,
+  apiBaseUrl = "http://127.0.0.1:9090",
   updatePreviewState,
   updatePreviewVersion = "0.1.1",
 } = {}) {
   const userDataDirectory = await mkdtemp(
     path.join(os.tmpdir(), "kitezh-desktop-e2e-"),
   );
+  if (recoveryState) {
+    await writeFile(
+      path.join(userDataDirectory, "desktop-update-recovery.json"),
+      JSON.stringify(recoveryState),
+      { mode: 0o600 },
+    );
+  }
   return electron.launch({
     args: [`--user-data-dir=${userDataDirectory}`, desktopDirectory],
     cwd: desktopDirectory,
     env: {
       ...process.env,
-      DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
+      DESKTOP_API_BASE_URL: apiBaseUrl,
       DESKTOP_AUTO_UPDATE: "false",
+      DESKTOP_E2E_BACKGROUND: "true",
       DESKTOP_DEVTOOLS: devTools ? "true" : "false",
       ...(updatePreviewState
         ? {
@@ -151,6 +161,12 @@ test("opens settings in a separate window without requiring login", async () => 
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      ),
+      true,
+    );
 
     const settingsWindowPromise = application.waitForEvent("window");
     await application.evaluate(({ Menu }) => {
@@ -162,6 +178,41 @@ test("opens settings in a separate window without requiring login", async () => 
     });
     const settingsWindow = await settingsWindowPromise;
     await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+    assert.equal(
+      await settingsWindow
+        .getByRole("navigation", { name: "Settings" })
+        .locator('button[data-section] svg[aria-hidden="true"]')
+        .count(),
+      5,
+    );
+    assert.equal(
+      await settingsWindow
+        .locator("#desktop-settings-search")
+        .evaluate((input) => {
+          const style = getComputedStyle(input);
+          return (
+            style.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            style.borderStyle === "solid"
+          );
+        }),
+      true,
+      "Settings search should use the native theme surface and defined border",
+    );
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      ),
+      true,
+    );
+    const screenshotDirectory =
+      process.env.KITEZH_E2E_ARTIFACTS_DIR ?? os.tmpdir();
+    await settingsWindow
+      .locator("#desktop-settings-search")
+      .evaluate((input) => input.blur());
+    await mkdir(screenshotDirectory, { recursive: true });
+    await settingsWindow.screenshot({
+      path: path.join(screenshotDirectory, "settings-default.png"),
+    });
 
     for (const section of [
       "General",
@@ -176,6 +227,17 @@ test("opens settings in a separate window without requiring login", async () => 
       );
     }
     const settingsSearch = settingsWindow.locator("#desktop-settings-search");
+    await settingsSearch.fill("automatic");
+    assert.equal(
+      await settingsWindow
+        .getByRole("button", { name: "Updates", exact: true })
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    assert.equal(
+      await settingsWindow.locator("#desktop-automatic-download").isVisible(),
+      true,
+    );
     await settingsSearch.fill("zz");
     assert.equal(
       await settingsWindow.locator("#desktop-settings-no-results").isVisible(),
@@ -185,6 +247,12 @@ test("opens settings in a separate window without requiring login", async () => 
     assert.equal(
       await settingsWindow.getByRole("button", { name: "General" }).isVisible(),
       true,
+    );
+    assert.equal(
+      await settingsWindow
+        .locator("[data-panel='general'] .intro")
+        .textContent(),
+      "Manage startup, language, and quick access.",
     );
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("heading", { name: "Appearance" }).waitFor();
@@ -247,12 +315,81 @@ test("opens settings in a separate window without requiring login", async () => 
     await settingsWindow
       .getByRole("heading", { name: "Diagnostics" })
       .waitFor();
+    const copyDiagnostics = settingsWindow.getByRole("button", {
+      name: "Copy diagnostics",
+    });
+    assert.equal(await copyDiagnostics.count(), 1);
+    await settingsWindow.emulateMedia({
+      forcedColors: "active",
+      reducedMotion: "reduce",
+    });
+    assert.equal(
+      await settingsWindow.evaluate(
+        () => matchMedia("(forced-colors: active)").matches,
+      ),
+      true,
+    );
+    assert.equal(
+      await settingsWindow.evaluate(
+        () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+      ),
+      true,
+    );
+    await settingsWindow.keyboard.press("Tab");
+    assert.equal(
+      await settingsWindow.evaluate(
+        () => getComputedStyle(document.activeElement).outlineStyle,
+      ),
+      "solid",
+    );
+    assert.ok(
+      await settingsWindow.evaluate(
+        () =>
+          Number.parseFloat(
+            getComputedStyle(document.activeElement).transitionDuration,
+          ) <= 0.00001,
+      ),
+      "Reduced-motion mode should minimize control transitions",
+    );
+    await settingsWindow.setViewportSize({ width: 680, height: 700 });
+    assert.ok(
+      await settingsWindow.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      "Settings should fit a narrow viewport without horizontal scrolling",
+    );
+    const zoomApplied = await application.evaluate(({ BrowserWindow }) => {
+      const settings = BrowserWindow.getAllWindows().find((candidate) =>
+        candidate.webContents.getURL().includes("/desktop-settings"),
+      );
+      if (!settings) return false;
+      settings.webContents.setZoomFactor(2);
+      return true;
+    });
+    assert.equal(zoomApplied, true);
+    await settingsWindow.waitForFunction(() => window.devicePixelRatio >= 2);
+    assert.ok(
+      await settingsWindow.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      "Settings should fit at 200% zoom without horizontal scrolling",
+    );
+    await application.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()
+        .find((candidate) =>
+          candidate.webContents.getURL().includes("/desktop-settings"),
+        )
+        ?.webContents.setZoomFactor(1);
+    });
     assert.equal(
       await settingsWindow
-        .getByRole("button", { name: "Copy diagnostics" })
-        .count(),
-      1,
+        .getByRole("button", { name: "Appearance" })
+        .isVisible(),
+      true,
     );
+    await settingsWindow.screenshot({
+      path: path.join(screenshotDirectory, "settings-accessibility.png"),
+    });
 
     assert.equal(await settingsWindow.url(), "app://renderer/desktop-settings");
     assert.equal(
@@ -309,13 +446,12 @@ test("opens the native quick access companion from View", async () => {
         .count(),
       1,
     );
-    for (const button of await companionWindow
-      .getByRole("button")
-      .all()) {
+    for (const button of await companionWindow.getByRole("button").all()) {
       assert.equal(await button.getAttribute("aria-busy"), null);
       assert.equal(
         await button.evaluate(
-          (element) => Number.parseFloat(getComputedStyle(element).minHeight) >= 44,
+          (element) =>
+            Number.parseFloat(getComputedStyle(element).minHeight) >= 44,
         ),
         true,
       );
@@ -325,8 +461,8 @@ test("opens the native quick access companion from View", async () => {
     });
     await accountButton.focus();
     assert.equal(
-      await companionWindow.evaluate(
-        () => document.activeElement?.getAttribute("data-console"),
+      await companionWindow.evaluate(() =>
+        document.activeElement?.getAttribute("data-console"),
       ),
       "account",
     );
@@ -347,7 +483,7 @@ test("opens the native quick access companion from View", async () => {
   }
 });
 
-test("brings the existing window forward on a second launch", async () => {
+test("handles a second launch while the E2E app stays hidden", async () => {
   const application = await launchDesktop();
   try {
     const mainWindow = await application.firstWindow();
@@ -356,38 +492,25 @@ test("brings the existing window forward on a second launch", async () => {
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
 
-    await application.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()
-        .find((window) => window.webContents.getURL() === "app://renderer/")
-        ?.hide();
-    });
-    assert.equal(
-      await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((window) => window.webContents.getURL() === "app://renderer/")
-          ?.isVisible(),
-      ),
-      false,
-    );
-
     await application.evaluate(({ app }) => {
       app.emit("second-instance", {}, []);
     });
     await mainWindow.waitForTimeout(100);
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((window) => window.webContents.getURL() === "app://renderer/")
-          ?.isVisible(),
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
       ),
       true,
     );
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
   } finally {
     await application.close();
   }
 });
 
-test("keeps developer tools closed until toggled from View", async () => {
+test("keeps developer tools closed and the app hidden", async () => {
   const application = await launchDesktop({ devTools: true });
   try {
     const mainWindow = await application.firstWindow();
@@ -411,18 +534,112 @@ test("keeps developer tools closed until toggled from View", async () => {
       const toggle = view?.submenu?.items.find(
         (item) => item.label === "Toggle Developer Tools",
       );
-      toggle?.click();
       return Boolean(toggle);
     });
     assert.equal(hasToggle, true);
-    await mainWindow.waitForTimeout(1000);
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows().some((window) =>
           window.webContents.isDevToolsOpened(),
         ),
       ),
+      false,
+    );
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      ),
       true,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("completes a desktop OAuth callback and keeps credentials out of diagnostics", async () => {
+  const application = await launchDesktop();
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    await application.evaluate(({ shell }) => {
+      shell.openExternal = async () => {};
+      globalThis.fetch = async (_url, options) => {
+        globalThis.__kitezhAuthRequest = String(options?.body ?? "");
+        return new Response(
+          JSON.stringify({
+            access_token: "fixture-access-secret",
+            expires_in: 300,
+            id_token: "fixture-id-secret",
+            refresh_token: "fixture-refresh-secret",
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      };
+    });
+
+    const state = "desktop-e2e-state-0123456789";
+    const codeVerifier = "v".repeat(43);
+    await mainWindow.evaluate(
+      (request) => window.desktopApi.auth.startLogin(request),
+      {
+        console: "account",
+        authorizationUrl:
+          "http://127.0.0.1:9090/oauth2/authorize?client_id=desktop-account-console",
+        state,
+        codeVerifier,
+        clientId: "desktop-account-console",
+        redirectUri: "kitezh://oauth/callback",
+      },
+    );
+    await application.evaluate(({ app }, callbackUrl) => {
+      app.emit("open-url", { preventDefault() {} }, callbackUrl);
+    }, `kitezh://oauth/callback?code=fixture-code&state=${state}`);
+    await mainWindow.waitForFunction(async () => {
+      const session = await window.desktopApi.auth.getSession("account");
+      return session?.accessToken === "fixture-access-secret";
+    });
+
+    const session = await mainWindow.evaluate(() =>
+      window.desktopApi.auth.getSession("account"),
+    );
+    assert.equal(session.accessToken, "fixture-access-secret");
+    assert.equal(session.idToken, "fixture-id-secret");
+    assert.equal(session.refreshToken, "fixture-refresh-secret");
+    assert.equal(session.version, 1);
+    assert.ok(session.expiresAt > Date.now());
+    const requestBody = await application.evaluate(
+      () => globalThis.__kitezhAuthRequest,
+    );
+    assert.equal(
+      new URLSearchParams(requestBody).get("grant_type"),
+      "authorization_code",
+    );
+    assert.equal(
+      new URLSearchParams(requestBody).get("code_verifier"),
+      codeVerifier,
+    );
+    assert.equal(new URLSearchParams(requestBody).get("code"), "fixture-code");
+    const diagnostics = await mainWindow.evaluate(() =>
+      window.desktopApi.diagnostics.get(),
+    );
+    assert.equal(
+      JSON.stringify(diagnostics).includes("fixture-access-secret"),
+      false,
+    );
+    assert.equal(
+      JSON.stringify(diagnostics).includes("fixture-refresh-secret"),
+      false,
+    );
+    await mainWindow.evaluate(() =>
+      window.desktopApi.auth.clearSession("account"),
+    );
+    assert.equal(
+      await mainWindow.evaluate(() =>
+        window.desktopApi.auth.getSession("account"),
+      ),
+      null,
     );
   } finally {
     await application.close();
@@ -511,6 +728,43 @@ test("shows an up-to-date result when no update is available", async () => {
   }
 });
 
+test("reports a recovered update after the previous version starts", async () => {
+  const application = await launchDesktop({
+    recoveryState: {
+      version: "pending-update",
+      previousVersion: packageVersion,
+      startedAt: Date.now() - 30_000,
+      backupPath: path.join(os.tmpdir(), "kitezh-e2e-backup"),
+      targetPath: path.join(os.tmpdir(), "kitezh-e2e-target"),
+      targetType: "file",
+      executablePath: process.execPath,
+    },
+  });
+  try {
+    const mainWindow = await application.firstWindow();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const recoveredStatus = await mainWindow.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let remove;
+          remove = window.desktopApi?.updates.onStatus((status) => {
+            if (status?.state !== "recovered") return;
+            remove?.();
+            resolve(status);
+          });
+        }),
+    );
+    assert.deepEqual(recoveredStatus, {
+      state: "recovered",
+      version: packageVersion,
+    });
+  } finally {
+    await application.close();
+  }
+});
+
 test("shows the update error in the renderer when checking fails", async () => {
   const application = await launchDesktop({ updatePreviewState: "error" });
   try {
@@ -540,7 +794,23 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     const settingsWindow = await settingsWindowPromise;
     await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("radio", { name: "Light" }).click();
+    assert.equal(
+      await application.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+      "light",
+    );
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("radio", { name: "System" }).click();
+    assert.equal(
+      await application.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+      "system",
+    );
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("radio", { name: "Dark" }).click();
+    assert.equal(
+      await application.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+      "dark",
+    );
     await settingsWindow.getByRole("button", { name: "General" }).click();
     await settingsWindow.locator("#desktop-language").selectOption("tr");
     await mainWindow

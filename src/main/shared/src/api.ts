@@ -28,9 +28,46 @@ export type ApiErrorKind =
   | "server"
   | "http";
 
+export const DEFAULT_NATIVE_API_TIMEOUT_MS = 15_000;
+
+export type NativeRequestSignal = {
+  signal: AbortSignal;
+  timedOut: () => boolean;
+  dispose: () => void;
+};
+
+export function createNativeRequestSignal(
+  timeoutMs = DEFAULT_NATIVE_API_TIMEOUT_MS,
+  parentSignal?: AbortSignal,
+): NativeRequestSignal {
+  const controller = new AbortController();
+  let didTimeout = false;
+  const timeout = setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+  const abortFromParent = () => controller.abort();
+
+  if (parentSignal?.aborted) {
+    abortFromParent();
+  } else {
+    parentSignal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    timedOut: () => didTimeout,
+    dispose: () => {
+      clearTimeout(timeout);
+      parentSignal?.removeEventListener("abort", abortFromParent);
+    },
+  };
+}
+
 export function classifyApiError(status: number, cause?: unknown): ApiErrorKind {
   if (status === 0) {
-    return cause instanceof Error && cause.name === "AbortError"
+    return cause instanceof Error &&
+      (cause.name === "AbortError" || cause.name === "TimeoutError")
       ? "timeout"
       : "offline";
   }

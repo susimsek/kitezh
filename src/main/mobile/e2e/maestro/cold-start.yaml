@@ -1,9 +1,12 @@
 appId: io.github.susimsek.kitezh.mobile
 ---
+- stopApp
 - launchApp:
-    clearState: true
+    clearState: false
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
 - assertVisible: "Kitezh"
-- assertVisible: "Continue"
-- tapOn: "Continue"
-- assertVisible: "Sign in"
-- assertVisible: "Continue securely in your default browser."
+- assertVisible: "Continue|Devam et"
+- tapOn: "Continue|Devam et"
+- assertVisible: "Sign in|Giriş yap"

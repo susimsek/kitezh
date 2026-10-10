@@ -94,3 +94,22 @@ export function parseNativeDeepLink(value: string): NativeDeepLink | null {
     return null;
   }
 }
+
+export function resolveNativeIntentPath(value: string): string | null {
+  const deepLink = parseNativeDeepLink(value);
+  if (!deepLink) return null;
+  switch (deepLink.kind) {
+    case "oauth-callback":
+      return "/oauth/callback";
+    case "admin-oauth-callback":
+      return "/admin/oauth/callback";
+    case "logout-callback":
+      return "/logout/callback";
+    case "admin-logout-callback":
+      return "/admin/logout/callback";
+    case "verify-email":
+      return "/verify-email";
+    case "reset-password":
+      return "/reset-password";
+  }
+}

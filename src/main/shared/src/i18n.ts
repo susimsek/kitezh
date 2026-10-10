@@ -5,7 +5,6 @@ export const messages = {
   en: {
     appTagline: "Secure identity and access for your organization.",
     continue: "Continue",
-    mobilePreview: "Mobile app foundation",
     signIn: "Sign in",
     username: "Username",
     createAccount: "Create an account",
@@ -288,7 +287,6 @@ export const messages = {
   tr: {
     appTagline: "Kurumunuz için güvenli kimlik ve erişim.",
     continue: "Devam et",
-    mobilePreview: "Mobil uygulama temeli",
     signIn: "Giriş yap",
     username: "Kullanıcı adı",
     createAccount: "Hesap oluştur",

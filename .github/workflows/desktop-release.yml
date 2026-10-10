@@ -209,6 +209,16 @@ jobs:
             pnpm exec electron-builder --publish never --mac --universal
           fi
 
+      - name: Smoke-test packaged desktop app
+        shell: bash
+        working-directory: src/main/desktop
+        run: |
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            xvfb-run -a pnpm run smoke:package
+          else
+            pnpm run smoke:package
+          fi
+
       - name: Verify macOS signature and notarization
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
