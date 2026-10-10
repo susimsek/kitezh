@@ -69,6 +69,42 @@ Electron-specific implementation details do not apply directly to React Native.
   a generic shield icon or load the web logo over the network. Keep the iOS/Android launcher icons,
   Android adaptive icon layers, and light/dark splash screen aligned with the desktop product mark.
 
+### Native visual standards
+
+- Use the Web UI standards in `src/main/web/AGENTS.md` as the behavioral and semantic reference,
+  not as a component or layout source. Follow native iOS/Android conventions and do not copy the
+  Web markup, Bootstrap patterns, or desktop layouts literally. ChatGPT mobile is a reference for
+  clear hierarchy, calm surfaces, compact navigation, and predictable touch behavior; do not copy
+  its branding or force a pixel-identical layout.
+- Give each screen one clear page title, a short supporting description only when it helps, and a
+  consistent content inset. Respect safe areas and keyboard insets. Screens with long content must
+  scroll; forms must keep the focused field and its validation message visible above the keyboard.
+- Use the shared type scale consistently: page title 26–30, section title 18–20, body 15–16,
+  supporting text 13–14 points. Keep line-height readable and avoid using small text for primary
+  labels, navigation, or important status.
+- Use a consistent 48–52 point height for primary controls and at least a 44 by 44 point target for
+  icon-only controls. Keep labels, fields, buttons, and cards aligned to the same horizontal inset.
+  Use the semantic spacing and radius tokens instead of per-screen values when they express the same
+  role.
+- Keep surfaces visually quiet: group related settings and data into one clearly bounded surface,
+  avoid nested cards and extra outer frames, and use separators for rows within a group. Use filled
+  semantic status treatments with readable foreground contrast in both themes.
+- Use one visual treatment per action role across screens: primary for the main continuation/save
+  action, secondary for navigation/cancel, and danger for destructive actions. Keep destructive
+  confirmation explicit. Add a pressed state without reducing disabled/loading legibility.
+- Reuse native screen headers, section headings, field treatments, empty/error/loading states, and
+  account navigation rather than restyling each route independently. Preserve visible field labels;
+  placeholders are hints, not labels. Keep field errors directly below their field and visibly
+  distinguish invalid, focused, disabled, and read-only states.
+- Keep layouts comfortable on compact phones and tablets. Allow localized Turkish text and larger
+  accessibility text to wrap; do not truncate primary actions or force horizontal scrolling for
+  ordinary forms and settings. Dense administrative tables may use an intentional native list or
+  horizontal scrolling only when all actions remain reachable.
+- Before accepting a visual change, inspect the affected native screen at a compact phone size and
+  a larger phone/tablet size, in light and dark mode, with English and Turkish text. Check keyboard
+  overlap, large text, focus/pressed/disabled states, and VoiceOver/TalkBack labels. Record or update
+  a native E2E assertion when the screen behavior or layout constraint changes.
+
 ## Authentication and security
 
 - Use Authorization Code + PKCE (S256) for mobile. The mobile OAuth client is public and must not

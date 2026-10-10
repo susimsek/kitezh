@@ -63,7 +63,7 @@ export function AccountTabBar({ active }: { active: AccountTab }) {
               numberOfLines={1}
               style={{
                 color: selected ? palette.primary : palette.textMuted,
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: selected ? "700" : "500",
               }}
             >
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
     justifyContent: "center",
-    minHeight: 54,
+    minHeight: 56,
     paddingHorizontal: spacing.xs,
   },
 });

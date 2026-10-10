@@ -36,7 +36,11 @@ async function launchDesktop({
     );
   }
   return electron.launch({
-    args: [`--user-data-dir=${userDataDirectory}`, desktopDirectory],
+    args: [
+      ...(process.platform === "linux" ? ["--password-store=basic"] : []),
+      `--user-data-dir=${userDataDirectory}`,
+      desktopDirectory,
+    ],
     cwd: desktopDirectory,
     env: {
       ...process.env,
@@ -54,6 +58,21 @@ async function launchDesktop({
     },
     executablePath: electronExecutable,
   });
+}
+
+async function captureBackgroundWindow(application, window, screenshotPath) {
+  const screenshot = await application.evaluate(
+    async ({ BrowserWindow }, targetUrl) => {
+      const target = BrowserWindow.getAllWindows().find(
+        (candidate) => candidate.webContents.getURL() === targetUrl,
+      );
+      if (!target) throw new Error("Could not find the background window");
+      const image = await target.webContents.capturePage();
+      return image.toPNG().toString("base64");
+    },
+    window.url(),
+  );
+  await writeFile(screenshotPath, Buffer.from(screenshot, "base64"));
 }
 
 async function clickApplicationMenuItem(application, label) {
@@ -210,9 +229,11 @@ test("opens settings in a separate window without requiring login", async () => 
       .locator("#desktop-settings-search")
       .evaluate((input) => input.blur());
     await mkdir(screenshotDirectory, { recursive: true });
-    await settingsWindow.screenshot({
-      path: path.join(screenshotDirectory, "settings-default.png"),
-    });
+    await captureBackgroundWindow(
+      application,
+      settingsWindow,
+      path.join(screenshotDirectory, "settings-default.png"),
+    );
 
     for (const section of [
       "General",
@@ -387,9 +408,11 @@ test("opens settings in a separate window without requiring login", async () => 
         .isVisible(),
       true,
     );
-    await settingsWindow.screenshot({
-      path: path.join(screenshotDirectory, "settings-accessibility.png"),
-    });
+    await captureBackgroundWindow(
+      application,
+      settingsWindow,
+      path.join(screenshotDirectory, "settings-accessibility.png"),
+    );
 
     assert.equal(await settingsWindow.url(), "app://renderer/desktop-settings");
     assert.equal(

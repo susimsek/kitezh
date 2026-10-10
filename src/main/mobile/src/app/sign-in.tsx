@@ -28,8 +28,15 @@ export default function SignInScreen() {
       <View style={styles.content}>
         <Pressable
           accessibilityLabel={dictionary.back}
+          accessibilityRole="button"
           onPress={() => router.back()}
-          style={styles.back}
+          style={({ pressed }) => [
+            styles.back,
+            {
+              backgroundColor: palette.surfaceMuted,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
         >
           <AppIcon
             name="arrowRight"
@@ -108,10 +115,14 @@ const styles = StyleSheet.create({
   },
   back: {
     alignSelf: "flex-start",
-    padding: spacing.sm,
+    alignItems: "center",
+    borderRadius: 22,
+    height: 44,
+    justifyContent: "center",
     position: "absolute",
     top: spacing.sm,
     left: spacing.md,
+    width: 44,
   },
   title: { fontSize: 30, fontWeight: "800", marginTop: spacing.md },
   message: {
@@ -135,19 +146,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   action: {
+    alignSelf: "stretch",
     alignItems: "center",
-    borderRadius: 999,
+    borderRadius: 14,
     flexDirection: "row",
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.lg,
     minHeight: 52,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   browserActions: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.lg,
+    justifyContent: "center",
     marginTop: spacing.md,
   },
   browserAction: {

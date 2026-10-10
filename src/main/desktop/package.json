@@ -21,7 +21,7 @@
     "build:renderer": "node scripts/build-renderer.mjs",
     "typecheck": "tsc --noEmit",
     "build:main": "tsc -p tsconfig.json",
-    "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",
+    "test:unit": "pnpm run build:main && node --test --test-concurrency=1 test/**/*.test.mjs",
     "test": "pnpm run test:unit",
     "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
     "smoke:package": "node scripts/smoke-packaged-app.mjs",

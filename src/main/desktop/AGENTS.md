@@ -139,6 +139,31 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 ## UI and Renderer Standards
 
 - Follow `src/main/web/AGENTS.md` for all shared renderer components, forms, validation, localization, icons, responsive layout, accessibility, loading states, and theme behavior.
+- Treat the Web UI standards as the semantic behavior reference. Native Electron windows and dialogs
+  must use desktop interaction patterns; do not reproduce a mobile layout or copy Web DOM components
+  into a native window. ChatGPT desktop/mobile may inform hierarchy and spacing, but Kitezh keeps its
+  own product identity and keyboard-first desktop behavior.
+- The authenticated Desktop console renderer is currently generated from the Web application by
+  `scripts/build-renderer.mjs`. Until that renderer is migrated to independently owned Desktop
+  screens, any visual change under `src/main/web` affects both Web and Desktop. Keep the migration
+  marked in `src/main/mobile/WEB-MOBILE-FEATURE-MATRIX.md`; do not claim native Desktop styling or
+  screen ownership based only on the bundled Web renderer. Desktop-only sign-in, settings, update,
+  and confirmation windows are authored in the Desktop source and must remain independently themed.
+- Keep native window typography, spacing, control heights, radii, borders, and action colors aligned
+  through shared semantic tokens or a small common Desktop style helper. Avoid slightly different
+  hand-written CSS for the same action or control across the login, settings, update, and confirmation
+  windows. Keep text readable at narrow window sizes and with long Turkish labels.
+- Use a clear window title and content hierarchy, one main content surface, consistent window
+  insets, and compact sections. Avoid unnecessary nested frames or empty outer panels. Size dialogs
+  to their content with sensible minimum dimensions; allow content to scroll rather than clipping
+  at smaller displays or 200% zoom.
+- Use the same semantic action treatment everywhere: primary for the main action, secondary for
+  cancel/back, and danger for destructive actions. Every action must have visible keyboard focus,
+  keyboard access, screen-reader name, and a disabled/loading state that remains distinguishable.
+- Verify system/light/dark appearance, English/Turkish, keyboard focus order, narrow windows, 200%
+  zoom, reduced motion, forced colors/high contrast, loading/empty/error states, and long text for
+  every materially changed native window. Capture screenshots from background E2E runs where
+  practical; never bring test windows to the foreground.
 - Keep the desktop sign-in and console chooser visually consistent with the web login surface. Reuse shared cards, buttons, icons, typography, spacing, light/dark tokens, and localized messages.
 - Keep Admin and Account actions separate and clearly labeled. Preserve the existing solid Bootstrap button variants; do not introduce outline button variants or one-off icons.
 - Every asynchronous action must disable duplicate submission and show the inline progress spinner while it is pending, including sign-in, refresh, logout, and retry actions.

@@ -2545,7 +2545,13 @@ function AdminTabBar({
             style={[styles.tab, { backgroundColor: selected ? palette.surfaceMuted : "transparent" }]}
           >
             <AppIcon color={selected ? palette.primary : palette.textMuted} name={icon} size={17} />
-            <Text style={{ color: selected ? palette.primary : palette.textMuted, fontSize: 11 }}>
+            <Text
+              style={{
+                color: selected ? palette.primary : palette.textMuted,
+                fontSize: 12,
+                fontWeight: selected ? "700" : "500",
+              }}
+            >
               {label}
             </Text>
           </Pressable>
@@ -2594,5 +2600,13 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 30, fontWeight: "800", marginTop: spacing.sm },
   tabBar: { borderTopWidth: 1, padding: spacing.xs },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  tab: { alignItems: "center", borderRadius: radii.sm, gap: spacing.xs, justifyContent: "center", minHeight: 58, minWidth: 84, paddingHorizontal: spacing.sm },
+  tab: {
+    alignItems: "center",
+    borderRadius: radii.sm,
+    gap: spacing.xs,
+    justifyContent: "center",
+    minHeight: 60,
+    minWidth: 92,
+    paddingHorizontal: spacing.sm,
+  },
 });
