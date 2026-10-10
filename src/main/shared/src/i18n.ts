@@ -271,6 +271,9 @@ export const messages = {
     adminDisableUserPrompt:
       "Disable this user account? Active sessions will end.",
     adminUserEnabledUpdated: "User account status updated.",
+    adminDeleteUser: "Delete user",
+    adminDeleteUserPrompt:
+      "Delete this user? Their sessions and authorizations will be revoked.",
     adminUserLocked: "Locked",
     adminUserDisabled: "Disabled",
     adminUserEnable: "Enable user",
@@ -681,6 +684,9 @@ export const messages = {
     adminDisableUserPrompt:
       "Bu kullanıcı devre dışı bırakılsın mı? Açık oturumlar kapatılır.",
     adminUserEnabledUpdated: "Kullanıcı hesap durumu güncellendi.",
+    adminDeleteUser: "Kullanıcıyı sil",
+    adminDeleteUserPrompt:
+      "Bu kullanıcı silinsin mi? Oturumları ve yetkilendirmeleri iptal edilir.",
     adminUserLocked: "Kilitli",
     adminUserDisabled: "Devre dışı",
     adminUserEnable: "Kullanıcıyı etkinleştir",

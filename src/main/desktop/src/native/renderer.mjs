@@ -331,10 +331,16 @@ function adminUsersContent() {
       const busy = state.busy === `user-enabled:${user.id}`;
       const confirming =
         Number(state.data.userDisableConfirmId) === Number(user.id);
-      const controls = confirming
+      const enabledControls = confirming
         ? `<div class="actions"><span role="status">${escapeHtml(text("adminDisableUserPrompt"))}</span>${button(text("adminDisableUser"), { action: "admin-user-toggle-confirm", id: user.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-toggle-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text(user.enabled ? "adminDisableUser" : "adminEnableUser"), { action: "admin-user-toggle-enabled", id: user.id, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div>${controls}</article>`;
+      const deleteConfirming =
+        Number(state.data.userDeleteConfirmId) === Number(user.id);
+      const deleting = state.busy === `user-delete:${user.id}`;
+      const deleteControls = deleteConfirming
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteUserPrompt"))}</span>${button(text("adminDeleteUser"), { action: "admin-user-delete-confirm", id: user.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        : `<div class="actions">${button(text("adminDeleteUser"), { action: "admin-user-delete-request", id: user.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div><div>${enabledControls}${deleteControls}</div></article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1707,6 +1713,46 @@ async function action(action, element) {
   if (action === "admin-user-toggle-cancel") {
     if (state.busy) return;
     state.data.userDisableConfirmId = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-delete-request" ||
+    action === "admin-user-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const users = state.data.users?.content ?? [];
+    const user = users.find((candidate) => Number(candidate.id) === id);
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    if (action === "admin-user-delete-request") {
+      state.data.userDeleteConfirmId = id;
+      render();
+      return;
+    }
+    if (Number(state.data.userDeleteConfirmId) !== id) return;
+    state.busy = `user-delete:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/users/${id}`, { method: "DELETE" });
+      state.data.users = {
+        ...state.data.users,
+        content: users.filter((item) => Number(item.id) !== id),
+      };
+      state.data.userDeleteConfirmId = null;
+      state.notice = text("adminUserDeleted");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-delete-cancel") {
+    if (state.busy) return;
+    state.data.userDeleteConfirmId = null;
     render();
     return;
   }

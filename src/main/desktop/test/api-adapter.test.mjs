@@ -128,6 +128,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { enabled: false },
   });
   assert.equal(disabledUser.status, 200);
+  const deletedUser = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2",
+    method: "DELETE",
+  });
+  assert.equal(deletedUser.status, 200);
   const createdRole = await adapter.request({
     console: "admin",
     path: "/api/admin/roles",
@@ -410,6 +416,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/users/1/enabled/nested",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/groups/1",
+      method: "DELETE",
     }),
     /not allowed/,
   );

@@ -515,6 +515,16 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
+          requestMethod === "DELETE"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-1));
+          globalThis.__adminUserDeleteRequests ??= [];
+          globalThis.__adminUserDeleteRequests.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (
           requestUrl.pathname === "/api/admin/users" &&
           requestMethod === "POST"
         ) {
@@ -1745,6 +1755,38 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.deepEqual(
       await application.evaluate(() => globalThis.__adminUserEnabledRequests),
       [{ id: 2, enabled: false }],
+    );
+    await aliceRow
+      .getByRole("button", { name: "Delete user", exact: true })
+      .click();
+    await aliceRow
+      .getByText(
+        "Delete this user? Their sessions and authorizations will be revoked.",
+        { exact: true },
+      )
+      .waitFor();
+    await aliceRow.getByRole("button", { name: "Cancel", exact: true }).click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminUserDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await aliceRow
+      .getByRole("button", { name: "Delete user", exact: true })
+      .click();
+    const confirmUserDelete = aliceRow.getByRole("button", {
+      name: "Delete user",
+      exact: true,
+    });
+    await confirmUserDelete.click();
+    assert.equal(await confirmUserDelete.isDisabled(), true);
+    assert.equal(await confirmUserDelete.locator(".spinner").count(), 1);
+    await window.getByText("User deleted.", { exact: true }).waitFor();
+    assert.equal(await aliceRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminUserDeleteRequests),
+      [2],
     );
     const rolesNavigation = window.getByRole("button", {
       name: "Roles",

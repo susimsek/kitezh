@@ -57,6 +57,12 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userEnabledMatch[1]))
     )
       return true;
+    if (
+      method === "DELETE" &&
+      /^\/api\/admin\/users\/[1-9]\d*$/.test(path) &&
+      Number.isSafeInteger(Number(path.split("/").at(-1)))
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/roles") return true;
     if (
       method === "PUT" &&
