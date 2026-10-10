@@ -129,20 +129,66 @@ jobs:
       - name: Web build
         run: pnpm --dir src/main/web build
 
-      - name: Analyze code with SonarCloud
-        if: ${{ env.SONAR_TOKEN != '' }}
-        run: |
-          ./mvnw -B -ntp -Psonar initialize sonar:sonar \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.organization=susimsek \
-            -Dsonar.token="${SONAR_TOKEN}"
+      - name: Test web client and collect Sonar coverage
+        env:
+          SONAR_COVERAGE_REPORT: "true"
+        run: pnpm --dir src/main/web test:unit:sonar-coverage
 
-  mobile-native-e2e:
-    name: Mobile native E2E
-    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
-    uses: ./.github/workflows/mobile-native-e2e.yml
-    with:
-      source-ref: ${{ github.sha }}
+      - name: Upload backend Sonar inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-sonar-inputs
+          path: |
+            target/classes/**
+            target/test-classes/**
+            target/surefire-reports/**
+            target/failsafe-reports/**
+            target/site/**
+            target/checkstyle-result.xml
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload web Sonar coverage
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-sonar-coverage
+          path: src/main/web/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  desktop-quality:
+    name: Desktop quality and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/desktop/pnpm-lock.yaml
+          install: false
+
+      - name: Install desktop dependencies
+        working-directory: src/main/desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Test desktop shell and collect Sonar coverage
+        working-directory: src/main/desktop
+        run: pnpm run test:unit:coverage
+
+      - name: Upload desktop Sonar coverage
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-sonar-coverage
+          path: src/main/desktop/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
 
   mobile-quality:
     name: Mobile quality checks
@@ -188,7 +234,7 @@ jobs:
 
       - name: Test mobile client
         working-directory: src/main/mobile
-        run: pnpm run test
+        run: pnpm run test:coverage
 
       - name: Test native fixture contract
         working-directory: src/main/mobile
@@ -198,9 +244,72 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm run build:web
 
-  desktop:
+      - name: Upload mobile Sonar coverage
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-sonar-coverage
+          path: src/main/mobile/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  sonar:
+    name: SonarCloud analysis
+    needs:
+      - build
+      - desktop-quality
+      - mobile-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+
+      - name: Download backend Sonar inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: backend-sonar-inputs
+          path: target
+
+      - name: Download client coverage reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: '*-sonar-coverage'
+          path: sonar-coverage
+          merge-multiple: false
+
+      - name: Place client coverage reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/main/web/coverage src/main/desktop/coverage src/main/mobile/coverage
+          cp sonar-coverage/web-sonar-coverage/lcov.info src/main/web/coverage/lcov.info
+          cp sonar-coverage/desktop-sonar-coverage/lcov.info src/main/desktop/coverage/lcov.info
+          cp sonar-coverage/mobile-sonar-coverage/lcov.info src/main/mobile/coverage/lcov.info
+
+      - name: Analyze backend and client code with SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ./mvnw -B -ntp -Psonar initialize sonar:sonar \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=susimsek \
+            -Dsonar.token="${SONAR_TOKEN}"
+
+  desktop-e2e:
     name: Desktop E2E (${{ matrix.platform }})
-    needs: build
+    needs: desktop-quality
     strategy:
       fail-fast: false
       matrix:
@@ -238,10 +347,6 @@ jobs:
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
 
-      - name: Test desktop shell
-        working-directory: src/main/desktop
-        run: pnpm test
-
       - name: Run Electron E2E tests
         shell: bash
         working-directory: src/main/desktop
@@ -262,6 +367,14 @@ jobs:
           path: ${{ runner.temp }}/desktop-e2e/*.png
           if-no-files-found: ignore
           retention-days: 7
+
+  mobile-native-e2e:
+    name: Mobile native E2E
+    needs: mobile-quality
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
+    uses: ./.github/workflows/mobile-native-e2e.yml
+    with:
+      source-ref: ${{ github.sha }}
 
   native-image:
     name: Native image verification (${{ matrix.architecture }})

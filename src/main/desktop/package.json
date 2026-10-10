@@ -22,6 +22,7 @@
     "typecheck": "tsc --noEmit",
     "build:main": "tsc -p tsconfig.json",
     "test:unit": "pnpm run build:main && node --test --test-concurrency=1 test/**/*.test.mjs",
+    "test:unit:coverage": "pnpm run build:main && c8 --include='src/**/*.ts' --all --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
     "test": "pnpm run test:unit",
     "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
     "smoke:package": "node scripts/smoke-packaged-app.mjs",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@types/node": "24.10.1",
+    "c8": "10.1.3",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
     "playwright-core": "1.63.0",

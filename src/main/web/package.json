@@ -23,6 +23,7 @@
     "format:check": "prettier --check .",
     "test:unit": "jest",
     "test:unit:coverage": "jest --coverage",
+    "test:unit:sonar-coverage": "jest --coverage --runInBand && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/web",
     "test:e2e": "playwright test",
     "test:e2e:chrome": "playwright test --project=chromium",
     "test:e2e:admin": "playwright test e2e/admin-console.spec.ts",
