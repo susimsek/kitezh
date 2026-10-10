@@ -265,6 +265,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           [
             "/api/admin/settings/ciba-policy",
             "/api/admin/settings/offline-access",
+            "/api/admin/settings/branding",
           ].includes(requestUrl.pathname)
         )
           globalThis.__requestBody = init?.body;
@@ -690,6 +691,43 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               maxLifespan: "P180D",
               maxLimited: true,
               revokedBefore: "2026-01-01T00:00:00Z",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          requestUrl.pathname === "/api/admin/settings/branding" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__brandingUpdates ??= [];
+          globalThis.__brandingUpdates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (!/^#[0-9a-fA-F]{6}$/.test(body.primaryColor))
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the branding fields.",
+                violations: [
+                  {
+                    field: "primaryColor",
+                    message: "Enter a six-digit hex color.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(
+            JSON.stringify({
+              ...body,
+              logoPath: "/assets/logo.svg",
+              faviconPath: "/assets/favicon.ico",
+              appleTouchIconPath: "/assets/apple-touch.png",
             }),
             {
               status: 200,
@@ -1351,7 +1389,41 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window
       .getByRole("heading", { name: "Branding", exact: true })
       .waitFor();
-    await window.getByText("Kitezh <Admin>", { exact: true }).waitFor();
+    const brandingForm = window.locator('form[data-form="admin-branding"]');
+    assert.equal(
+      await brandingForm.locator('[name="applicationName"]').inputValue(),
+      "Kitezh <Admin>",
+    );
+    const brandingPrimary = brandingForm.locator('[name="primaryColor"]');
+    await brandingPrimary.fill("blue");
+    const brandingSave = brandingForm.getByRole("button", { name: "Save" });
+    await brandingSave.click();
+    assert.equal(await brandingSave.isDisabled(), true);
+    assert.equal(await brandingSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Enter a six-digit hex color.", { exact: true })
+      .waitFor();
+    assert.equal(await brandingPrimary.inputValue(), "blue");
+    await brandingPrimary.fill("#123abc");
+    await brandingSave.click();
+    assert.equal(await brandingSave.isDisabled(), true);
+    assert.equal(await brandingSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Branding settings saved.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__brandingUpdates.at(-1)),
+      {
+        applicationName: "Kitezh <Admin>",
+        primaryColor: "#123abc",
+        accentColor: "#0b2b69",
+        backgroundColor: "#f8f9fa",
+      },
+    );
+    assert.equal(
+      await brandingForm.locator('[name="applicationName"]').inputValue(),
+      "Kitezh <Admin>",
+    );
     assert.equal(await window.locator("admin").count(), 0);
     await window
       .getByText("https://identity.example.test/oauth2/token", { exact: true })
@@ -1362,6 +1434,13 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Turkish" }).click();
     await window
       .getByRole("heading", { name: "Markalama", exact: true })
+      .waitFor();
+    await brandingForm
+      .locator('[name="applicationName"]')
+      .fill("Kitezh Yönetim");
+    await brandingForm.getByRole("button", { name: "Kaydet" }).click();
+    await window
+      .getByText("Markalama ayarları kaydedildi.", { exact: true })
       .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     const loginEmailNavigation = window.getByRole("button", {

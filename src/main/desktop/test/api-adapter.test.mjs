@@ -188,6 +188,13 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/branding",
   });
   assert.equal(branding.status, 200);
+  const updatedBranding = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/branding",
+    method: "PUT",
+    body: { applicationName: "Kitezh", primaryColor: "#123abc" },
+  });
+  assert.equal(updatedBranding.status, 200);
   const serverInfo = await adapter.request({
     console: "admin",
     path: "/api/admin/server-info",
@@ -243,7 +250,7 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/settings/branding",
+      path: "/api/admin/settings/branding?unexpected=true",
       method: "PUT",
     }),
     /not allowed/,

@@ -403,6 +403,8 @@ function adminAdminPoliciesContent() {
 
 function adminAdminConfigurationContent() {
   const branding = state.data.adminBranding ?? {};
+  const brandingDraft = state.data.adminBrandingDraft ?? branding;
+  const brandingErrors = violations(state.error?.body);
   const server = state.data.adminServerInfo ?? {};
   const row = (label, value) =>
     `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
@@ -419,7 +421,7 @@ function adminAdminConfigurationContent() {
     ["adminSessionTimeout", server.sessionTimeout],
   ];
   const activeKey = server.activeSigningKey;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminApplicationName"), branding.applicationName)}${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}${row(text("adminPrimaryColor"), branding.primaryColor)}${row(text("adminAccentColor"), branding.accentColor)}${row(text("adminBackgroundColor"), branding.backgroundColor)}</div></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}</div><form data-form="admin-branding" novalidate>${field("applicationName", text("adminApplicationName"), brandingDraft.applicationName ?? "", brandingErrors.applicationName, "text", 'maxlength="100" required')}${field("primaryColor", text("adminPrimaryColor"), brandingDraft.primaryColor ?? "", brandingErrors.primaryColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("accentColor", text("adminAccentColor"), brandingDraft.accentColor ?? "", brandingErrors.accentColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("backgroundColor", text("adminBackgroundColor"), brandingDraft.backgroundColor ?? "", brandingErrors.backgroundColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-branding" })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
 }
 
 function adminAdminLoginEmailContent() {
@@ -799,6 +801,32 @@ function formValues(form) {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-branding") {
+    const body = {
+      applicationName: String(values.applicationName ?? "").trim(),
+      primaryColor: String(values.primaryColor ?? "").trim(),
+      accentColor: String(values.accentColor ?? "").trim(),
+      backgroundColor: String(values.backgroundColor ?? "").trim(),
+    };
+    state.data.adminBrandingDraft = body;
+    state.busy = "admin-branding";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminBranding = await request("/api/admin/settings/branding", {
+        method: "PUT",
+        body,
+      });
+      state.data.adminBrandingDraft = null;
+      state.notice = text("adminBrandingSaved");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-ciba-policy") {
     const body = {
       requestLifespanSeconds: Number(values.requestLifespanSeconds),

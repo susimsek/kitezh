@@ -50,7 +50,8 @@ function isAllowedApiPath(
     if (
       method === "PUT" &&
       (path === "/api/admin/settings/ciba-policy" ||
-        path === "/api/admin/settings/offline-access")
+        path === "/api/admin/settings/offline-access" ||
+        path === "/api/admin/settings/branding")
     )
       return true;
     if (method !== "GET") return false;
