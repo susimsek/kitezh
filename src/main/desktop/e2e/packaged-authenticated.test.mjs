@@ -683,6 +683,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       globalThis.__packagedPolicyStatuses = [];
       globalThis.__packagedBrandingStatuses = [];
       globalThis.__packagedLocalizationStatuses = [];
+      globalThis.__packagedLocalizationPolicyStatuses = [];
       const originalFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (input, init) => {
         const response = await originalFetch(input, init);
@@ -726,6 +727,12 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
             method,
             status: response.status,
           });
+        }
+        if (
+          method === "PUT" &&
+          requestUrl.pathname === "/api/admin/settings/localization"
+        ) {
+          globalThis.__packagedLocalizationPolicyStatuses.push(response.status);
         }
         return response;
       };
@@ -848,6 +855,47 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await mainWindow
       .getByRole("heading", { name: "Localization settings", exact: true })
       .waitFor();
+    const localizationPolicyForm = mainWindow.locator(
+      'form[data-form="admin-localization-settings"]',
+    );
+    const localizationEnabled = await localizationPolicyForm
+      .locator('[name="internationalizationEnabled"]')
+      .isChecked();
+    const defaultLocale = await localizationPolicyForm
+      .locator('[name="defaultLocale"]')
+      .inputValue();
+    const supportedLocales = await localizationPolicyForm
+      .locator('[name="supportedLocales"]:checked')
+      .evaluateAll((inputs) => inputs.map((input) => input.value).sort());
+    await localizationPolicyForm
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Localization settings saved.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__packagedLocalizationPolicyStatuses,
+      ),
+      [200],
+    );
+    const persistedLocalizationPolicy = await mainWindow.evaluate(() =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/settings/localization",
+      }),
+    );
+    assert.equal(persistedLocalizationPolicy.status, 200);
+    assert.equal(
+      persistedLocalizationPolicy.body.internationalizationEnabled,
+      localizationEnabled,
+    );
+    assert.equal(persistedLocalizationPolicy.body.defaultLocale, defaultLocale);
+    assert.deepEqual(
+      [...persistedLocalizationPolicy.body.supportedLocales].sort(),
+      supportedLocales,
+    );
+
     const messageKey = `native.packaged.e2e.${Date.now()}`;
     const createMessageForm = mainWindow.locator(
       'form[data-form="admin-localization-message-create"]',
