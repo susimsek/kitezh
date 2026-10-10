@@ -245,11 +245,18 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
   const application = await launchDesktop();
   try {
     await application.evaluate(({ shell }) => {
+      globalThis.__authorizationUrls = [];
       shell.openExternal = async (url) => {
+        globalThis.__authorizationUrls.push(url);
         globalThis.__pendingAuthorizationUrl = url;
       };
     });
     const window = await nativeMainWindow(application);
+    await window.evaluate(() => {
+      const originalSetTimeout = window.setTimeout.bind(window);
+      window.setTimeout = (callback, delay, ...args) =>
+        originalSetTimeout(callback, delay === 300_000 ? 25 : delay, ...args);
+    });
     await window
       .getByRole("button", { name: "Account Console", exact: true })
       .click();
@@ -291,6 +298,18 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
     assert.equal(
       await application.evaluate(() => globalThis.__pendingAuthorizationUrl),
       originalAuthorizationUrl,
+    );
+    await window.getByText("Sign-in timed out. Try again.").waitFor();
+    assert.equal(await signIn.isEnabled(), true);
+    await signIn.click();
+    await window.waitForTimeout(100);
+    const authorizationUrls = await application.evaluate(
+      () => globalThis.__authorizationUrls,
+    );
+    assert.equal(authorizationUrls.length, 2);
+    assert.notEqual(
+      new URL(authorizationUrls[0]).searchParams.get("state"),
+      new URL(authorizationUrls[1]).searchParams.get("state"),
     );
     await application.evaluate(({ app }) => {
       const state = new URL(

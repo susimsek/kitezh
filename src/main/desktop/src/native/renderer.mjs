@@ -1278,9 +1278,15 @@ async function signIn() {
   clearTimeout(authTimeout);
   authTimeout = setTimeout(
     () => {
-      state.authStarting = false;
-      state.error = { message: text("authTimeout") };
-      render();
+      void api.auth
+        .cancelLogin(state.console)
+        .catch(() => undefined)
+        .finally(() => {
+          if (!state.authStarting) return;
+          state.authStarting = false;
+          state.error = { message: text("authTimeout") };
+          render();
+        });
     },
     5 * 60 * 1000,
   );

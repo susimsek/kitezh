@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
   auth: {
     startLogin: (consoleName: ConsoleName) =>
       ipcRenderer.invoke("desktop:auth-start-login", consoleName),
+    cancelLogin: (consoleName: ConsoleName) =>
+      ipcRenderer.invoke("desktop:auth-cancel-login", consoleName),
     hasSession: (consoleName: unknown) =>
       ipcRenderer.invoke("desktop:auth-has-session", consoleName),
     clearSession: (consoleName: unknown) =>

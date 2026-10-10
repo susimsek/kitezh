@@ -2737,6 +2737,11 @@ function registerIpc() {
       }
     },
   );
+  ipcMain.handle("desktop:auth-cancel-login", (event, consoleName: unknown) => {
+    assertTrustedSender(event);
+    assertConsole(consoleName);
+    pendingAuthorizations.delete(consoleName);
+  });
   ipcMain.handle(
     "desktop:auth-has-session",
     async (event, consoleName: unknown) => {
