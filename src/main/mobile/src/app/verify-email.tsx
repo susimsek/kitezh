@@ -34,7 +34,6 @@ export default function VerifyEmailScreen() {
       return;
     }
     setPending(true);
-    setFailed(false);
     try {
       await verifyEmail(token.trim());
       setCompleted(true);
@@ -103,8 +102,9 @@ export default function VerifyEmailScreen() {
               accessibilityState={{ disabled: pending }}
               disabled={pending}
               onPress={() => void submit()}
-              style={styles.action}
+              style={[styles.action, { flexDirection: "row", gap: spacing.xs }]}
             >
+              {pending ? <ActivityIndicator color={palette.primary} /> : null}
               <Text style={{ color: palette.primary, fontWeight: "700" }}>
                 {dictionary.sessionsRetry}
               </Text>

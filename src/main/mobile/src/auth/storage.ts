@@ -3,11 +3,12 @@ import * as SecureStore from "expo-secure-store";
 import {
   sessionStorageKey,
   type MobileSessionNamespace,
-} from "./session-keys";
+} from "./session-keys.ts";
 import type { NativeSession } from "../../../shared/src/api.ts";
+import { parseSessionRecord, serializeSessionRecord } from "./session-record.ts";
 
-export { sessionStorageKey } from "./session-keys";
-export type { MobileSessionNamespace } from "./session-keys";
+export { sessionStorageKey } from "./session-keys.ts";
+export type { MobileSessionNamespace } from "./session-keys.ts";
 
 export type MobileSession = NativeSession;
 
@@ -17,29 +18,13 @@ export async function readSession(
   const stored = await SecureStore.getItemAsync(sessionStorageKey(namespace));
   if (!stored) return null;
   try {
-    const session = JSON.parse(stored) as Partial<MobileSession>;
-    if (
-      typeof session.accessToken !== "string" ||
-      typeof session.expiresAt !== "number" ||
-      !Number.isFinite(session.expiresAt) ||
-      (session.refreshToken !== undefined &&
-        session.refreshToken !== null &&
-        typeof session.refreshToken !== "string") ||
-      (session.idToken !== undefined &&
-        session.idToken !== null &&
-        typeof session.idToken !== "string")
-    ) {
-      return null;
-    }
-    return {
-      accessToken: session.accessToken,
-      refreshToken: session.refreshToken ?? null,
-      idToken: session.idToken ?? null,
-      expiresAt: session.expiresAt,
-    };
+    const session = parseSessionRecord(stored, namespace);
+    if (session) return session;
   } catch {
-    return null;
+    // Invalid SecureStore data is removed below; no credential material is logged.
   }
+  await SecureStore.deleteItemAsync(sessionStorageKey(namespace));
+  return null;
 }
 
 export async function writeSession(
@@ -48,7 +33,7 @@ export async function writeSession(
 ) {
   await SecureStore.setItemAsync(
     sessionStorageKey(namespace),
-    JSON.stringify(session),
+    serializeSessionRecord(session, namespace),
   );
 }
 

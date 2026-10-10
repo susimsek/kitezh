@@ -15,6 +15,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -23,7 +24,6 @@ import {
   isAllowedNativeRedirect,
   validateAuthorizationCallback,
 } from "../../../shared/src/auth.ts";
-import { createSingleFlight } from "../../../shared/src/session.ts";
 import {
   authorizationServerIssuer,
   getMobileConsoleConfig,
@@ -35,6 +35,12 @@ import {
   type MobileSession,
   writeSession,
 } from "./storage";
+import {
+  invalidateSessionOperations,
+  isSessionOperationCurrent,
+  sessionOperationGeneration,
+  sessionRefreshCoordinator,
+} from "./session-operations";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -142,9 +148,10 @@ export function MobileAuthProvider({
   const [session, setSession] = useState<MobileSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const refreshCoordinator = useMemo(
-    () => createSingleFlight<MobileSession | null>(),
-    [],
+    () => sessionRefreshCoordinator(consoleConfig.namespace),
+    [consoleConfig.namespace],
   );
 
   useEffect(() => {
@@ -164,12 +171,19 @@ export function MobileAuthProvider({
   }, [consoleConfig.namespace]);
 
   const signIn = useCallback(async () => {
-    if (status === "signing-in" || status === "signing-out") return;
+    if (
+      actionLock.current ||
+      status === "signing-in" ||
+      status === "signing-out"
+    )
+      return;
     if (!request || !discovery) {
       setStatus("error");
       setError("Authorization service is unavailable");
       return;
     }
+    actionLock.current = true;
+    invalidateSessionOperations(consoleConfig.namespace);
     setStatus("signing-in");
     setError(null);
     try {
@@ -212,6 +226,8 @@ export function MobileAuthProvider({
     } catch {
       setStatus("error");
       setError("authorization-failed");
+    } finally {
+      actionLock.current = false;
     }
   }, [consoleConfig, discovery, promptAsync, redirectUri, request, status]);
 
@@ -219,6 +235,7 @@ export function MobileAuthProvider({
     async (force = false) => {
       if (!session?.refreshToken || !discovery) return session;
       if (!force && session.expiresAt > Date.now() + 60_000) return session;
+      const generation = sessionOperationGeneration(consoleConfig.namespace);
       return refreshCoordinator.run(async () => {
         try {
           const token = await refreshAsync(
@@ -237,14 +254,23 @@ export function MobileAuthProvider({
               token.issuedAt * 1000,
             ),
           };
+          if (!isSessionOperationCurrent(consoleConfig.namespace, generation)) {
+            return null;
+          }
           await writeSession(nextSession, consoleConfig.namespace);
           setSession(nextSession);
           setStatus("signed-in");
           return nextSession;
         } catch {
-          await clearSession(consoleConfig.namespace);
-          setSession(null);
-          setStatus("signed-out");
+          if (!isSessionOperationCurrent(consoleConfig.namespace, generation)) {
+            return null;
+          }
+          try {
+            await clearSession(consoleConfig.namespace);
+          } finally {
+            setSession(null);
+            setStatus("signed-out");
+          }
           return null;
         }
       });
@@ -260,8 +286,10 @@ export function MobileAuthProvider({
   }, [refreshSession]);
 
   const signOut = useCallback(async () => {
-    if (status === "signing-out") return;
+    if (actionLock.current || status === "signing-out") return;
+    actionLock.current = true;
     const currentSession = session;
+    invalidateSessionOperations(consoleConfig.namespace);
     setStatus("signing-out");
     try {
       if (currentSession?.idToken && discovery?.endSessionEndpoint) {
@@ -278,10 +306,14 @@ export function MobileAuthProvider({
         );
       }
     } finally {
-      await clearSession(consoleConfig.namespace);
-      setSession(null);
-      setStatus("signed-out");
-      setError(null);
+      try {
+        await clearSession(consoleConfig.namespace);
+      } finally {
+        setSession(null);
+        setStatus("signed-out");
+        setError(null);
+        actionLock.current = false;
+      }
     }
   }, [consoleConfig, discovery, session, status]);
 

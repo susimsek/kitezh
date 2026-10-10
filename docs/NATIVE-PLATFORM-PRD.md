@@ -271,6 +271,85 @@ Each owner must update the feature matrix with evidence, mark unavailable backen
 registrations as **Blocked**, and link focused tests or packaged smoke results. A person may review
 another owner's work, but a review does not transfer implementation ownership.
 
+### Nail progress checklist
+
+Status reflects source and unit-test evidence on `nailunluu-dev`. `[~]` means implementation is
+partial and acceptance remains; `[B]` names a required contract/configuration that is absent. No
+item is marked complete until its full native acceptance evidence exists.
+
+**Mobile P0 (3)**
+
+- [B] Social provider login completion: typed discovery now validates the public endpoint's alias
+  shape and icon allowlist (`src/main/mobile/src/api/public-api.test.ts`). Native provider start and
+  callback completion still need a server-defined mobile provider-selection/callback contract. The
+  `mobile-account-console` registration exists; provider tokens remain server-side.
+- [~] Session lifecycle: per-console process-wide refresh single-flight, logout/sign-in generation
+  invalidation, versioned SecureStore records, legacy-record migration, malformed-record cleanup,
+  and scoped session keys are implemented and unit-tested. Process restart and authenticated device
+  refresh/logout race evidence remains.
+- [~] App links: custom OAuth/logout/reset/verify routes and client redirects are registered. Deep
+  link action tokens now require a bounded base64url shape and survive intent routing; unit tests
+  cover callback query stripping and reset/verify token forwarding. HTTPS associated domains are
+  not configured, and device callback replay/resume evidence remains.
+
+**Mobile P1 (6)**
+
+- [~] Passkeys: account credential management endpoints exist; native authentication ceremonies,
+  capability negotiation, and unsupported-device fallback remain.
+- [B] MFA and required actions: account TOTP settings exist, but no mobile login-challenge contract
+  covers TOTP/recovery/passkey-required actions and first-invalid focus.
+- [B] Consent: both mobile client registrations currently disable authorization consent; a pending
+  consent and native callback contract is required before enabling this flow.
+- [B] Social account linking: server-authoritative status and unlink APIs exist; native callback
+  completion needs a server mobile-link callback contract.
+- [~] CIBA approvals: account-authenticated list/approve/deny endpoints are confirmed in
+  `src/main/java/io/github/susimsek/kitezh/web/CibaController.java`; native adapter, screen,
+  step-up states, and focused tests remain.
+- [B] Notifications: authenticated notification event/action and device-registration contract is
+  absent; do not synthesize actions or unread counts.
+
+**Mobile audit rows (9)**
+
+- [~] OAuth browser lifecycle: PKCE and cancellation handling exist; durable transaction restore,
+  stale/replayed callback coverage, and device resume/timeout evidence remain.
+- [~] Discovery/configuration: provider discovery is typed and validated; OIDC discovery/TLS and
+  malformed-metadata failures still need explicit localized diagnostics and device tests.
+- [~] Refresh races: namespace-scoped single-flight and stale-write prevention are covered by unit
+  tests; authenticated device concurrency and restart evidence remain.
+- [~] Error contract: shared taxonomy covers validation, 401/403, conflict, 429, unavailable,
+  timeout, offline, and server errors; EN/TR keys, field violations, and Retry-After parsing exist.
+  Screen-level field mapping and complete device coverage remain.
+- [~] Public API resilience: public GET/POST adapters support deadlines/cancellation, retain HTTP
+  status and Retry-After, and distinguish timeout/offline; endpoint-specific safe retry policy and
+  cancellation integration tests remain.
+- [~] SecureStore lifecycle: namespaced versioned records, legacy migration, invalid-record
+  cleanup, and Android backup exclusions exist; keychain access-group, reinstall/restore/OS-lock,
+  and device evidence remain.
+- [~] Navigation/deep links: exact scheme routes and action-token shape/forwarding are covered;
+  protected-route consistency and OAuth cold/warm replay behavior remain.
+- [~] Device UX: native controls and touch labels exist; VoiceOver/TalkBack, dynamic type, reduced
+  motion, orientation, and keyboard-avoidance acceptance remains.
+- [~] Locale/theme changes: system/light/dark and English/Turkish settings persist and update live;
+  complete route/error-state and accessibility coverage remains.
+
+**Cross-client contracts (4)**
+
+- [~] Capability negotiation: shared capability/version types exist; no server negotiation
+  endpoint or consuming clients exist yet.
+- [~] Error taxonomy: shared status classification, Problem Detail violations, Retry-After, and
+  EN/TR message keys are implemented and unit-tested; platform screens still need consistent use.
+- [~] Session model: shared session shape plus mobile per-console storage version/namespace and
+  refresh invalidation rules are implemented; desktop/web adoption and full native lifecycle tests
+  remain.
+- [~] Deep-link model: shared callback/reset/verify route contract validates allowed schemes,
+  state, and bounded action tokens; persisted verifier/replay and HTTPS-origin policies remain.
+
+Evidence: `src/main/mobile/src/shared.contract.test.ts`,
+`src/main/mobile/src/api/public-api.test.ts`, and
+`src/main/mobile/src/auth/session-operations.test.ts`. Current Nail checklist: **0 complete, 17 in
+progress, 5 blocked**. The blocked items require server-owned mobile callback/consent/notification
+contracts; do not loosen client registration or authentication to simulate them.
+
 ### Şuayb progress checklist
 
 `[ ]` not started, `[~]` in progress, `[B]` blocked by a missing external contract/configuration,

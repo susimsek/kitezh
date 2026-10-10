@@ -12,11 +12,14 @@ import {
 import type {
   ConsoleName,
   DesktopLanguageMode,
+  NativeClientCapabilities,
   SocialProviderAvailability,
 } from "../../shared/src/contracts.ts";
 import {
+  apiErrorMessageKey,
   classifyApiError,
   parseProblemDetail,
+  parseRetryAfterSeconds,
 } from "../../shared/src/api.ts";
 import {
   isAllowedNativeRedirect,
@@ -49,10 +52,16 @@ test("native contracts stay platform-neutral", () => {
     provider: "google",
     providerType: "google",
   };
+  const capabilities: NativeClientCapabilities = {
+    clientVersion: "0.1.0",
+    platform: "ios",
+    capabilities: ["mfa-totp", "social-login"],
+  };
 
   assert.equal(consoleName, "account");
   assert.equal(languageMode, "system");
   assert.equal(provider.configured, true);
+  assert.ok(capabilities.capabilities.includes("mfa-totp"));
 });
 
 test("mobile notices use a bounded auto-dismiss duration", () => {
@@ -85,6 +94,15 @@ test("shared API errors preserve native status semantics without transport detai
   ]);
   assert.equal(classifyApiError(401), "unauthorized");
   assert.equal(classifyApiError(403), "forbidden");
+  assert.equal(classifyApiError(409), "conflict");
+  assert.equal(classifyApiError(503), "unavailable");
+  assert.equal(apiErrorMessageKey("offline"), "apiOffline");
+  assert.equal(apiErrorMessageKey("conflict"), "apiConflict");
+  assert.equal(apiErrorMessageKey("unavailable"), "apiUnavailable");
+  assert.equal(parseRetryAfterSeconds("12", 0), 12);
+  assert.equal(parseRetryAfterSeconds("Thu, 01 Jan 1970 00:00:05 GMT", 0), 5);
+  assert.ok(messages.en.apiTimeout);
+  assert.ok(messages.tr.apiTimeout);
   assert.equal(classifyApiError(0, new DOMException("timeout", "AbortError")), "timeout");
   assert.equal(classifyApiError(0, new Error("network")), "offline");
 });
@@ -123,8 +141,8 @@ test("native OAuth callbacks require the original state and approved scheme", ()
 
 test("native deep links accept only registered routes", () => {
   assert.deepEqual(
-    parseNativeDeepLink("kitezh://verify-email/?token=one-time-token"),
-    { kind: "verify-email", token: "one-time-token" },
+    parseNativeDeepLink("kitezh://verify-email/?token=one-time-token-123456789012345678901234"),
+    { kind: "verify-email", token: "one-time-token-123456789012345678901234" },
   );
   assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
     kind: "oauth-callback",
@@ -140,6 +158,7 @@ test("native deep links accept only registered routes", () => {
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
+  assert.equal(parseNativeDeepLink("kitezh://verify-email/?token=../secret"), null);
 });
 
 test("native intent routes registered callback links without callback parameters", () => {
@@ -158,6 +177,14 @@ test("native intent routes registered callback links without callback parameters
   assert.equal(
     resolveNativeIntentPath("https://example.com/oauth/callback"),
     null,
+  );
+  assert.equal(
+    resolveNativeIntentPath("kitezh://verify-email/?token=one-time-token-123456789012345678901234"),
+    "/verify-email?token=one-time-token-123456789012345678901234",
+  );
+  assert.equal(
+    resolveNativeIntentPath("kitezh://reset-password/?token=secretvalue123456789012345678901234"),
+    "/reset-password?token=secretvalue123456789012345678901234",
   );
 });
 

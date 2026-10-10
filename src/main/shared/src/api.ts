@@ -16,6 +16,7 @@ export type ProblemDetail = {
   status?: number;
   detail?: string;
   violations?: ProblemViolation[];
+  retryAfterSeconds?: number;
 };
 
 export type ApiErrorKind =
@@ -25,8 +26,35 @@ export type ApiErrorKind =
   | "forbidden"
   | "validation"
   | "rate-limited"
+  | "conflict"
+  | "unavailable"
   | "server"
   | "http";
+
+export function apiErrorMessageKey(kind: ApiErrorKind): string {
+  switch (kind) {
+    case "offline":
+      return "apiOffline";
+    case "timeout":
+      return "apiTimeout";
+    case "unauthorized":
+      return "apiUnauthorized";
+    case "forbidden":
+      return "apiForbidden";
+    case "validation":
+      return "apiValidation";
+    case "conflict":
+      return "apiConflict";
+    case "rate-limited":
+      return "apiRateLimited";
+    case "unavailable":
+      return "apiUnavailable";
+    case "server":
+      return "apiServer";
+    case "http":
+      return "apiGeneric";
+  }
+}
 
 export const DEFAULT_NATIVE_API_TIMEOUT_MS = 15_000;
 
@@ -74,9 +102,22 @@ export function classifyApiError(status: number, cause?: unknown): ApiErrorKind 
   if (status === 401) return "unauthorized";
   if (status === 403) return "forbidden";
   if (status === 400 || status === 422) return "validation";
+  if (status === 409) return "conflict";
   if (status === 429) return "rate-limited";
+  if (status === 503) return "unavailable";
   if (status >= 500) return "server";
   return "http";
+}
+
+export function parseRetryAfterSeconds(
+  value: string | null,
+  now = Date.now(),
+): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - now) / 1000));
 }
 
 export function parseProblemDetail(value: unknown): ProblemDetail | undefined {
@@ -97,6 +138,11 @@ export function parseProblemDetail(value: unknown): ProblemDetail | undefined {
     title: typeof record.title === "string" ? record.title : undefined,
     status: typeof record.status === "number" ? record.status : undefined,
     detail: typeof record.detail === "string" ? record.detail : undefined,
+    retryAfterSeconds:
+      typeof record.retryAfterSeconds === "number" &&
+      Number.isFinite(record.retryAfterSeconds)
+        ? Math.max(0, record.retryAfterSeconds)
+        : undefined,
     violations,
   };
 }

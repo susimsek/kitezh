@@ -87,7 +87,9 @@ export function parseNativeDeepLink(value: string): NativeDeepLink | null {
       const token = url.searchParams.get("token")?.trim();
       const kind =
         url.hostname === "verify-email" ? "verify-email" : "reset-password";
-      return token ? { kind, token } : null;
+      return token && /^[A-Za-z0-9_-]{20,128}$/.test(token)
+        ? { kind, token }
+        : null;
     }
     return null;
   } catch {
@@ -108,8 +110,8 @@ export function resolveNativeIntentPath(value: string): string | null {
     case "admin-logout-callback":
       return "/admin/logout/callback";
     case "verify-email":
-      return "/verify-email";
+      return `/verify-email?token=${encodeURIComponent(deepLink.token ?? "")}`;
     case "reset-password":
-      return "/reset-password";
+      return `/reset-password?token=${encodeURIComponent(deepLink.token ?? "")}`;
   }
 }

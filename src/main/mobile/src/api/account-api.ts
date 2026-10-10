@@ -5,6 +5,7 @@ import {
   createNativeRequestSignal,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
   parseProblemDetail,
+  parseRetryAfterSeconds,
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
@@ -94,14 +95,21 @@ export class AccountApiError extends Error {
   readonly data: unknown;
   readonly kind: ApiErrorKind;
   readonly problem: ProblemDetail | undefined;
+  readonly retryAfterSeconds: number | undefined;
 
-  constructor(status: number, message: string, data?: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    data?: unknown,
+    retryAfterSeconds?: number,
+  ) {
     super(message);
     this.name = "AccountApiError";
     this.status = status;
     this.data = data;
     this.kind = classifyApiError(status, data);
     this.problem = parseProblemDetail(data);
+    this.retryAfterSeconds = retryAfterSeconds ?? this.problem?.retryAfterSeconds;
   }
 }
 
@@ -176,6 +184,7 @@ async function requestAccount<T>(
       response.status,
       message,
       await readErrorData(response),
+      parseRetryAfterSeconds(response.headers.get("Retry-After")),
     );
   }
 

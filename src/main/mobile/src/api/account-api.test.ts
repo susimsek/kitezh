@@ -84,3 +84,20 @@ test("account requests refresh once after an unauthorized response", async () =>
     globalThis.fetch = originalFetch;
   }
 });
+
+test("account API exposes bounded Retry-After metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(null, { status: 429, headers: { "Retry-After": "8" } });
+  try {
+    await assert.rejects(
+      getAccountProfile("access-token"),
+      (error: unknown) =>
+        error instanceof AccountApiError &&
+        error.kind === "rate-limited" &&
+        error.retryAfterSeconds === 8,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

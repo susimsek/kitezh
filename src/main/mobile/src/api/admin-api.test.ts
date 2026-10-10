@@ -86,6 +86,23 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
   }
 });
 
+test("admin API exposes Retry-After metadata for throttled calls", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(null, { status: 429, headers: { "Retry-After": "9" } });
+  try {
+    await assert.rejects(
+      getAdminDashboard("access-token"),
+      (error: unknown) =>
+        error instanceof AdminApiError &&
+        error.kind === "rate-limited" &&
+        error.retryAfterSeconds === 9,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("admin requests classify timeout and offline failures", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (_input, init) =>
