@@ -21,7 +21,7 @@ async function nativeMainWindow(application) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const window = application
       .windows()
-      .find((candidate) => candidate.url() === "app://renderer/native");
+      .find((candidate) => candidate.url().startsWith("app://renderer/native"));
     if (window) return window;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -69,16 +69,18 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
   );
   await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
 
-  const application = await electron.launch({
-    executablePath: packagedExecutable,
-    args: [`--user-data-dir=${userDataDirectory}`],
-    env: {
-      ...process.env,
-      DESKTOP_API_BASE_URL:
-        process.env.DESKTOP_API_BASE_URL ?? "http://localhost:9090",
-      DESKTOP_AUTO_UPDATE: "false",
-    },
-  });
+  const launchPackaged = () =>
+    electron.launch({
+      executablePath: packagedExecutable,
+      args: [`--user-data-dir=${userDataDirectory}`],
+      env: {
+        ...process.env,
+        DESKTOP_API_BASE_URL:
+          process.env.DESKTOP_API_BASE_URL ?? "http://localhost:9090",
+        DESKTOP_AUTO_UPDATE: "false",
+      },
+    });
+  let application = await launchPackaged();
 
   try {
     await application.evaluate(({ shell }) => {
@@ -163,6 +165,39 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
       true,
     );
     assert.match(packageVersion, /^\d+\.\d+\.\d+$/);
+
+    await application.close();
+    application = await launchPackaged();
+    const restartedWindow = await nativeMainWindow(application);
+    await restartedWindow
+      .getByRole("heading", { name: "Account Console" })
+      .waitFor();
+    assert.equal(
+      await restartedWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("account"),
+      ),
+      true,
+    );
+    assert.equal((await accountProfile(restartedWindow)).status, 200);
+    await application.evaluate(({ shell }) => {
+      shell.openExternal = async (url) => {
+        globalThis.__e2eLogoutPath = new URL(url).pathname;
+      };
+    });
+    await restartedWindow
+      .getByRole("button", { name: "Sign out", exact: true })
+      .click();
+    await restartedWindow.locator(".login-card").waitFor();
+    assert.equal(
+      await application.evaluate(() => globalThis.__e2eLogoutPath),
+      "/connect/logout",
+    );
+    assert.equal(
+      await restartedWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("account"),
+      ),
+      false,
+    );
   } finally {
     await application.close();
   }
