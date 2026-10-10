@@ -683,6 +683,56 @@ function adminUserPasskeyPath(userId, index) {
 }
 
 function adminUserCreateContent() {
+  const createdUserId = Number(state.data.userCreateCreatedUserId);
+  if (Number.isSafeInteger(createdUserId) && createdUserId > 0) {
+    const definitions = Array.isArray(state.data.userCreateProfileDefinitions)
+      ? state.data.userCreateProfileDefinitions
+      : [];
+    const draft = state.data.userCreateDraft?.profile ?? {};
+    const errors = violations(state.error?.body);
+    const fields = definitions
+      .filter((definition) => definition.enabled && !definition.builtIn)
+      .map((definition) => {
+        const name = String(definition.name ?? "");
+        if (!/^[A-Za-z][A-Za-z0-9_.-]{0,99}$/.test(name)) return "";
+        const values = Array.isArray(draft[name]) ? draft[name] : [];
+        const error = errors[`attributes.${name}`] ?? errors[name] ?? "";
+        const label = escapeHtml(definition.displayName || name);
+        const id = `admin-create-profile-attribute-${escapeHtml(name)}`;
+        const common = `id="${id}" name="attribute-${escapeHtml(name)}" data-profile-attribute="${escapeHtml(name)}" data-multivalued="${Boolean(definition.multivalued)}" aria-invalid="${Boolean(error)}" ${definition.required ? "required" : ""}`;
+        let input;
+        if (definition.multivalued) {
+          input = `<textarea ${common} rows="3">${escapeHtml(values.join("\n"))}</textarea>`;
+        } else if (definition.type === "BOOLEAN") {
+          input = `<select ${common}><option value=""></option><option value="true" ${values[0] === "true" ? "selected" : ""}>true</option><option value="false" ${values[0] === "false" ? "selected" : ""}>false</option></select>`;
+        } else {
+          const type =
+            definition.type === "EMAIL"
+              ? "email"
+              : definition.type === "INTEGER"
+                ? "number"
+                : "text";
+          const constraints = [
+            definition.minLength != null
+              ? `minlength="${Number(definition.minLength)}"`
+              : "",
+            definition.maxLength != null
+              ? `maxlength="${Number(definition.maxLength)}"`
+              : "",
+            definition.type === "INTEGER" ? 'step="1"' : "",
+            definition.pattern
+              ? `pattern="${escapeHtml(definition.pattern)}"`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          input = `<input ${common} type="${type}" value="${escapeHtml(values[0] ?? "")}" ${constraints}/>`;
+        }
+        return `<div class="field"><label for="${id}">${label}</label>${input}<div class="field-error">${escapeHtml(error)}</div></div>`;
+      })
+      .join("");
+    return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><p role="status">${escapeHtml(text("adminUserCreatedProfileSaveFailed"))}</p><form data-form="admin-user-create" data-created-user-id="${createdUserId}" novalidate><div class="form-grid">${fields || `<div class="empty" role="status">${escapeHtml(text("adminNoProfileAttributes"))}</div>`}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "user-create-profile-save", disabled: state.offline || definitions.length === 0 })}</div></form></section>`;
+  }
   const draft = state.data.userCreateDraft ?? {};
   const roles = Array.isArray(state.data.userCreateRoles)
     ? state.data.userCreateRoles
@@ -691,7 +741,46 @@ function adminUserCreateContent() {
     ? draft.roles
     : ["ROLE_USER"];
   const errors = violations(state.error?.body);
-  return `<section class="card"><form data-form="admin-user-create" novalidate><div class="form-grid">${field("username", text("username"), draft.username ?? "", errors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), draft.firstName ?? "", errors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), draft.lastName ?? "", errors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), draft.email ?? "", errors.email, "email", 'maxlength="200" autocomplete="email"')}${field("password", text("newPassword"), "", errors.password, "password", 'minlength="12" maxlength="128" autocomplete="new-password" required')}</div><label class="settings-row"><input type="checkbox" name="temporary" ${draft.temporary ? "checked" : ""}/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><label class="settings-row"><input type="checkbox" name="emailVerified" ${draft.emailVerified ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${draft.enabled !== false ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${roles.length ? roles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error" id="roles-error">${escapeHtml(errors.roles ?? "")}</div></fieldset><div class="actions">${button(text("adminCreateUser"), { type: "submit", busy: state.busy === "user-create", disabled: state.offline || roles.length === 0 })}</div></form></section>`;
+  const profileDefinitions = (
+    state.data.userCreateProfileDefinitions ?? []
+  ).filter((definition) => definition.enabled && !definition.builtIn);
+  const profileFields = profileDefinitions
+    .map((definition) => {
+      const name = String(definition.name ?? "");
+      if (!/^[A-Za-z][A-Za-z0-9_.-]{0,99}$/.test(name)) return "";
+      const values = Array.isArray(draft.profile?.[name])
+        ? draft.profile[name]
+        : [];
+      const error = errors[`attributes.${name}`] ?? errors[name] ?? "";
+      const label = escapeHtml(definition.displayName || name);
+      const id = `admin-create-profile-attribute-${escapeHtml(name)}`;
+      const common = `id="${id}" name="attribute-${escapeHtml(name)}" data-profile-attribute="${escapeHtml(name)}" data-multivalued="${Boolean(definition.multivalued)}" aria-invalid="${Boolean(error)}" ${definition.required ? "required" : ""}`;
+      if (definition.multivalued)
+        return `<div class="field"><label for="${id}">${label}</label><textarea ${common} rows="3">${escapeHtml(values.join("\n"))}</textarea><div class="field-error">${escapeHtml(error)}</div></div>`;
+      if (definition.type === "BOOLEAN")
+        return `<div class="field"><label for="${id}">${label}</label><select ${common}><option value=""></option><option value="true" ${values[0] === "true" ? "selected" : ""}>true</option><option value="false" ${values[0] === "false" ? "selected" : ""}>false</option></select><div class="field-error">${escapeHtml(error)}</div></div>`;
+      const type =
+        definition.type === "EMAIL"
+          ? "email"
+          : definition.type === "INTEGER"
+            ? "number"
+            : "text";
+      const constraints = [
+        definition.minLength != null
+          ? `minlength="${Number(definition.minLength)}"`
+          : "",
+        definition.maxLength != null
+          ? `maxlength="${Number(definition.maxLength)}"`
+          : "",
+        definition.type === "INTEGER" ? 'step="1"' : "",
+        definition.pattern ? `pattern="${escapeHtml(definition.pattern)}"` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return `<div class="field"><label for="${id}">${label}</label><input ${common} type="${type}" value="${escapeHtml(values[0] ?? "")}" ${constraints}/><div class="field-error">${escapeHtml(error)}</div></div>`;
+    })
+    .join("");
+  return `<section class="card"><form data-form="admin-user-create" novalidate><div class="form-grid">${field("username", text("username"), draft.username ?? "", errors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), draft.firstName ?? "", errors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), draft.lastName ?? "", errors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), draft.email ?? "", errors.email, "email", 'maxlength="200" autocomplete="email"')}${field("password", text("newPassword"), "", errors.password, "password", 'minlength="12" maxlength="128" autocomplete="new-password" required')}${profileFields}</div><label class="settings-row"><input type="checkbox" name="temporary" ${draft.temporary ? "checked" : ""}/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><label class="settings-row"><input type="checkbox" name="emailVerified" ${draft.emailVerified ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${draft.enabled !== false ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${roles.length ? roles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error" id="roles-error">${escapeHtml(errors.roles ?? "")}</div></fieldset><div class="actions">${button(text("adminCreateUser"), { type: "submit", busy: state.busy === "user-create", disabled: state.offline || roles.length === 0 || !state.data.userCreateProfileDefinitionsLoaded })}</div></form></section>`;
 }
 
 function adminRolesContent() {
@@ -1397,12 +1486,17 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
       state.data.users = await request(`/api/admin/users?${query.toString()}`);
     }
     if (state.console === "admin" && state.route === "user-create") {
-      const page = await request(
-        "/api/admin/roles?page=0&size=100&sort=name,asc",
-      );
+      const [page, definitions] = await Promise.all([
+        request("/api/admin/roles?page=0&size=100&sort=name,asc"),
+        request("/api/admin/profile-attributes"),
+      ]);
       state.data.userCreateRoles = Array.isArray(page?.content)
         ? page.content
         : [];
+      state.data.userCreateProfileDefinitions = Array.isArray(definitions)
+        ? definitions
+        : [];
+      state.data.userCreateProfileDefinitionsLoaded = true;
     }
     if (state.console === "admin" && state.route === "roles") {
       const query = new URLSearchParams({
@@ -1739,16 +1833,23 @@ function preserveOfflineDrafts() {
         state.data.adminMessageOverrideDrafts[id] = { id, ...values };
       }
     } else if (form.dataset.form === "admin-user-create") {
-      const { password: _password, ...draft } = values;
-      state.data.userCreateDraft = {
-        ...draft,
-        temporary: form.elements.namedItem("temporary").checked,
-        emailVerified: form.elements.namedItem("emailVerified").checked,
-        enabled: form.elements.namedItem("enabled").checked,
-        roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
-          (input) => input.value,
-        ),
-      };
+      const createdUserId = Number(form.dataset.createdUserId);
+      if (Number.isSafeInteger(createdUserId) && createdUserId > 0) {
+        state.data.userCreateDraft ??= {};
+        state.data.userCreateDraft.profile = profileAttributeValues(form);
+      } else {
+        const { password: _password, ...draft } = values;
+        state.data.userCreateDraft = {
+          ...draft,
+          profile: profileAttributeValues(form),
+          temporary: form.elements.namedItem("temporary").checked,
+          emailVerified: form.elements.namedItem("emailVerified").checked,
+          enabled: form.elements.namedItem("enabled").checked,
+          roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+            (input) => input.value,
+          ),
+        };
+      }
     } else if (form.dataset.form === "admin-user-edit") {
       const id = Number(form.dataset.userId);
       if (Number.isSafeInteger(id) && id > 0) {
@@ -2581,6 +2682,34 @@ async function submitForm(form) {
     return;
   }
   if (form.dataset.form === "admin-user-create") {
+    const createdUserId = Number(form.dataset.createdUserId);
+    if (Number.isSafeInteger(createdUserId) && createdUserId > 0) {
+      const attributes = profileAttributeValues(form);
+      state.data.userCreateDraft ??= {};
+      state.data.userCreateDraft.profile = attributes;
+      state.busy = "user-create-profile-save";
+      state.error = null;
+      state.notice = null;
+      render();
+      try {
+        await request(`/api/admin/users/${createdUserId}/profile-attributes`, {
+          method: "PUT",
+          body: { attributes },
+        });
+        state.data.userCreateDraft = null;
+        state.data.userCreateCreatedUserId = null;
+        state.data.userQuery = "";
+        state.data.userPage = 0;
+        state.route = "users";
+        await loadRoute();
+        state.notice = text("adminUserCreated");
+      } catch {
+        /* Preserve the created account and profile draft; retry only the profile save. */
+      }
+      state.busy = null;
+      render();
+      return;
+    }
     const body = {
       username: String(values.username ?? "").trim(),
       firstName: String(values.firstName ?? "").trim() || null,
@@ -2615,7 +2744,34 @@ async function submitForm(form) {
     state.notice = null;
     render();
     try {
-      await request("/api/admin/users", { method: "POST", body });
+      const createdUser = await request("/api/admin/users", {
+        method: "POST",
+        body,
+      });
+      if (
+        Array.isArray(state.data.userCreateProfileDefinitions) &&
+        state.data.userCreateProfileDefinitions.some(
+          (definition) => definition.enabled && !definition.builtIn,
+        )
+      ) {
+        if (
+          !Number.isSafeInteger(Number(createdUser?.id)) ||
+          Number(createdUser.id) < 1
+        )
+          throw new Error("Created user response missing ID");
+        try {
+          await request(
+            `/api/admin/users/${Number(createdUser.id)}/profile-attributes`,
+            {
+              method: "PUT",
+              body: { attributes: state.data.userCreateDraft?.profile ?? {} },
+            },
+          );
+        } catch {
+          state.data.userCreateCreatedUserId = Number(createdUser.id);
+          throw new Error("Profile attributes require retry");
+        }
+      }
       state.data.userCreateDraft = null;
       state.data.userQuery = "";
       state.data.userPage = 0;
@@ -4510,6 +4666,8 @@ async function action(action, element) {
     state.busy = "user-create-route";
     state.route = "user-create";
     state.data.userCreateDraft = null;
+    state.data.userCreateCreatedUserId = null;
+    state.data.userCreateProfileDefinitionsLoaded = false;
     state.error = null;
     state.notice = null;
     await loadRoute();

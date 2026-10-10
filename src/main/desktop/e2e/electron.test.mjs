@@ -1129,6 +1129,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          requestUrl.pathname === "/api/admin/profile-attributes" &&
+          requestMethod === "GET"
+        ) {
+          return new Response(
+            JSON.stringify([
+              {
+                name: "department",
+                displayName: "Department",
+                type: "STRING",
+                required: false,
+                multivalued: false,
+                maxLength: 40,
+                enabled: true,
+                builtIn: false,
+              },
+              {
+                name: "firstName",
+                displayName: "Built-in first name",
+                type: "STRING",
+                required: false,
+                multivalued: false,
+                enabled: true,
+                builtIn: true,
+              },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*\/webauthn\/credentials\/[A-Za-z0-9_-]+$/.test(
             requestUrl.pathname,
           ) &&
@@ -3535,6 +3564,9 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       'form[data-form="admin-user-create"]',
     );
     await userCreateForm.locator('[name="username"]').fill("duplicate-user");
+    await userCreateForm
+      .locator('[data-profile-attribute="department"]')
+      .fill("Operations");
     await userCreateForm.locator('[name="firstName"]').fill("Native");
     await userCreateForm.locator('[name="lastName"]').fill("Account");
     await userCreateForm
@@ -3568,6 +3600,9 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       "",
     );
     await userCreateForm.locator('[name="username"]').fill("new-native-user");
+    await userCreateForm
+      .locator('[data-profile-attribute="department"]')
+      .fill("Rejected Department");
     await window.getByRole("button", { name: "Turkish" }).click();
     await window
       .getByRole("heading", { name: "Kullanıcı oluştur", exact: true })
@@ -3584,6 +3619,26 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await userCreateForm
       .getByRole("button", { name: "Kullanıcı oluştur", exact: true })
       .click();
+    await window
+      .getByText(
+        "Kullanıcı oluşturuldu ancak profil özellikleri kaydedilemedi. Aşağıdan profil kaydını yeniden deneyin.",
+        { exact: true },
+      )
+      .waitFor();
+    const createProfileRecovery = window.locator(
+      'form[data-form="admin-user-create"][data-created-user-id="99"]',
+    );
+    const retryProfileSave = createProfileRecovery.getByRole("button", {
+      name: "Kaydet",
+      exact: true,
+    });
+    assert.equal(await retryProfileSave.isEnabled(), true);
+    await createProfileRecovery
+      .locator('[data-profile-attribute="department"]')
+      .fill("Operations");
+    await retryProfileSave.click();
+    assert.equal(await retryProfileSave.isDisabled(), true);
+    assert.equal(await retryProfileSave.locator(".spinner").count(), 1);
     await window.getByText("Kullanıcı oluşturuldu.", { exact: true }).waitFor();
     await window
       .getByText("native-account@example.test", { exact: true })
@@ -3608,6 +3663,31 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           temporary: false,
           enabled: true,
           emailVerified: false,
+        },
+      ],
+    );
+    assert.deepEqual(
+      await application.evaluate(() =>
+        (globalThis.__adminProfileAttributeWrites ?? []).filter(
+          (entry) => entry.id === 99,
+        ),
+      ),
+      [
+        {
+          id: 99,
+          names: ["department"],
+          departmentCount: 1,
+          departmentLength: "Rejected Department".length,
+          skillsCount: 0,
+          skillsLength: 0,
+        },
+        {
+          id: 99,
+          names: ["department"],
+          departmentCount: 1,
+          departmentLength: 10,
+          skillsCount: 0,
+          skillsLength: 0,
         },
       ],
     );

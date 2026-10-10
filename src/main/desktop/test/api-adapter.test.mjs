@@ -179,6 +179,11 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { password: "test-password-not-a-secret", temporary: true },
   });
   assert.equal(resetUserPassword.status, 200);
+  const profileAttributeDefinitions = await adapter.request({
+    console: "admin",
+    path: "/api/admin/profile-attributes",
+  });
+  assert.equal(profileAttributeDefinitions.status, 200);
   const userProfileAttributes = await adapter.request({
     console: "admin",
     path: "/api/admin/users/2/profile-attributes",
@@ -747,6 +752,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/users/2/profile-attributes?include=all",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/profile-attributes?include=all",
     }),
     /not allowed/,
   );

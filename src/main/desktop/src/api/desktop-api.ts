@@ -47,6 +47,8 @@ function isAllowedApiPath(
   path: string,
 ) {
   if (namespace === "admin") {
+    if (method === "GET" && path === "/api/admin/profile-attributes")
+      return true;
     if (method === "POST" && path === "/api/admin/users") return true;
     if (method === "POST" && path === "/api/admin/users/bulk") return true;
     const userUpdateMatch = path.match(/^\/api\/admin\/users\/([1-9]\d*)$/);

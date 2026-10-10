@@ -397,6 +397,8 @@ export const messages = {
     adminProfileAttributesUpdated: "Profile attributes updated.",
     adminNoProfileAttributes: "No configurable profile attributes are enabled.",
     adminProfileAttributesHelp: "Enter one value per line for multiple values.",
+    adminUserCreatedProfileSaveFailed:
+      "The user was created, but profile attributes could not be saved. Retry the profile save below.",
     adminUserEmailNotVerified: "Email not verified",
     adminSendActionEmail: "Send action email",
     adminActionEmailAction: "Required action",
@@ -970,6 +972,8 @@ export const messages = {
     adminNoProfileAttributes: "Yapılandırılmış profil özelliği etkin değil.",
     adminProfileAttributesHelp:
       "Birden çok değer için her satıra bir değer girin.",
+    adminUserCreatedProfileSaveFailed:
+      "Kullanıcı oluşturuldu ancak profil özellikleri kaydedilemedi. Aşağıdan profil kaydını yeniden deneyin.",
     adminUserEmailNotVerified: "E-posta doğrulanmadı",
     adminSendActionEmail: "İşlem e-postası gönder",
     adminActionEmailAction: "Gerekli işlem",
