@@ -553,6 +553,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/events") {
+          globalThis.__adminEventRequests ??= [];
+          globalThis.__adminEventRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const query = requestUrl.searchParams.get("q") ?? "";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "event-id",
+                  actor: "admin",
+                  action: query ? "user.updated" : "user.created",
+                  targetType: "user",
+                  targetId: "4",
+                  details: "SECRET_PII_DETAIL_NEVER_RENDER",
+                  occurredAt: "2026-10-10T07:00:00Z",
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -851,6 +880,31 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ),
       ["0", "1"],
     );
+    const eventsNavigation = window.getByRole("button", {
+      name: "Events",
+      exact: true,
+    });
+    await eventsNavigation.click();
+    assert.equal(await eventsNavigation.isDisabled(), true);
+    assert.equal(await eventsNavigation.locator(".spinner").count(), 1);
+    await window.getByText("user.created", { exact: true }).waitFor();
+    assert.equal(
+      await window.getByText("SECRET_PII_DETAIL_NEVER_RENDER").count(),
+      0,
+    );
+    await window
+      .getByRole("searchbox", { name: "Search events" })
+      .fill("admin");
+    await window.getByRole("button", { name: "Search events" }).click();
+    assert.equal(
+      await window.getByRole("button", { name: "Search events" }).isDisabled(),
+      true,
+    );
+    await window.getByText("user.updated", { exact: true }).waitFor();
+    const eventRequests = await application.evaluate(
+      () => globalThis.__adminEventRequests,
+    );
+    assert.equal(new URLSearchParams(eventRequests[1]).get("q"), "admin");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
