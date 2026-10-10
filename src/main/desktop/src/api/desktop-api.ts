@@ -51,7 +51,9 @@ function isAllowedApiPath(
     if (path === "/api/admin/dashboard") return true;
     if (
       path === "/api/admin/settings/ciba-policy" ||
-      path === "/api/admin/settings/offline-access"
+      path === "/api/admin/settings/offline-access" ||
+      path === "/api/admin/settings/branding" ||
+      path === "/api/admin/server-info"
     )
       return true;
     try {

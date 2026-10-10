@@ -644,6 +644,55 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/settings/branding") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              applicationName: "Kitezh <Admin>",
+              logoPath: "/assets/logo.svg",
+              faviconPath: "/assets/favicon.ico",
+              appleTouchIconPath: "/assets/apple-touch.png",
+              primaryColor: "#0d6efd",
+              accentColor: "#0b2b69",
+              backgroundColor: "#f8f9fa",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (requestUrl.pathname === "/api/admin/server-info") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              issuer: "https://identity.example.test",
+              discoveryEndpoint:
+                "https://identity.example.test/.well-known/openid-configuration",
+              authorizationEndpoint:
+                "https://identity.example.test/oauth2/authorize",
+              tokenEndpoint: "https://identity.example.test/oauth2/token",
+              introspectionEndpoint:
+                "https://identity.example.test/oauth2/introspect",
+              revocationEndpoint: "https://identity.example.test/oauth2/revoke",
+              jwksEndpoint: "https://identity.example.test/oauth2/jwks",
+              userInfoEndpoint: "https://identity.example.test/userinfo",
+              endSessionEndpoint:
+                "https://identity.example.test/connect/logout",
+              sessionTimeout: "30m",
+              activeSigningKey: {
+                kid: "rsa-current",
+                type: "RSA",
+                algorithm: "RS256",
+                use: "sig",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -1010,6 +1059,29 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("heading", { name: "CIBA politikası" }).waitFor();
     await window.getByText("MFA gerekli", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const configurationNavigation = window.getByRole("button", {
+      name: "Server & branding",
+      exact: true,
+    });
+    await configurationNavigation.click();
+    assert.equal(await configurationNavigation.isDisabled(), true);
+    assert.equal(await configurationNavigation.locator(".spinner").count(), 1);
+    await window
+      .getByRole("heading", { name: "Branding", exact: true })
+      .waitFor();
+    await window.getByText("Kitezh <Admin>", { exact: true }).waitFor();
+    assert.equal(await window.locator("admin").count(), 0);
+    await window
+      .getByText("https://identity.example.test/oauth2/token", { exact: true })
+      .waitFor();
+    await window
+      .getByText("rsa-current · RSA · RS256 · sig", { exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Markalama", exact: true })
+      .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {

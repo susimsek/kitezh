@@ -169,10 +169,28 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/offline-access",
   });
   assert.equal(offlineAccessPolicy.status, 200);
+  const branding = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/branding",
+  });
+  assert.equal(branding.status, 200);
+  const serverInfo = await adapter.request({
+    console: "admin",
+    path: "/api/admin/server-info",
+  });
+  assert.equal(serverInfo.status, 200);
   await assert.rejects(
     adapter.request({
       console: "account",
       path: "/api/admin/settings/ciba-policy",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/branding",
+      method: "PUT",
     }),
     /not allowed/,
   );

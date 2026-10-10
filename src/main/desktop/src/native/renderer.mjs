@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -155,6 +155,7 @@ function routeTitle() {
       events: text("adminEvents"),
       keys: text("adminKeys"),
       policies: text("adminPolicies"),
+      configuration: text("adminConfiguration"),
       dashboard: text("adminDashboard"),
     }[state.route];
   return {
@@ -181,6 +182,7 @@ function routeDescription() {
       events: text("adminSearchEvents"),
       keys: text("adminSearchKeys"),
       policies: text("adminPoliciesDescription"),
+      configuration: text("adminConfigurationDescription"),
       dashboard: text("adminOverview"),
     }[state.route];
   return {
@@ -228,6 +230,7 @@ function adminContent() {
   if (state.route === "events") return adminAdminEventsContent();
   if (state.route === "keys") return adminAdminKeysContent();
   if (state.route === "policies") return adminAdminPoliciesContent();
+  if (state.route === "configuration") return adminAdminConfigurationContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -384,6 +387,27 @@ function adminAdminPoliciesContent() {
   const row = (label, value) =>
     `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${policyValue(value)}</span></div>`;
   return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><div class="list">${row(text("adminRequestLifespan"), ciba.requestLifespanSeconds)}${row(text("adminPollingInterval"), ciba.pollingIntervalSeconds)}${row(text("adminDeliveryMode"), ciba.deliveryMode)}${row(text("adminUserVerification"), ciba.userVerification)}${row(text("adminMfaRequired"), ciba.mfaRequired === true ? text("adminRequired") : ciba.mfaRequired === false ? text("adminNotRequired") : undefined)}${row(text("adminStepUpRequired"), ciba.stepUpRequired === true ? text("adminRequired") : ciba.stepUpRequired === false ? text("adminNotRequired") : undefined)}${ciba.stepUpAcr ? row(text("adminStepUpAcr"), ciba.stepUpAcr) : ""}</div></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><div class="list">${row(text("adminIdleTimeout"), offline.idleTimeout)}${row(text("adminMaxLifespan"), offline.maxLifespan)}${row(text("adminMaxLimited"), offline.maxLimited === true ? text("adminRequired") : offline.maxLimited === false ? text("adminNotRequired") : undefined)}${offline.revokedBefore ? row(text("adminRevokedBefore"), offline.revokedBefore) : ""}</div></section></div>`;
+}
+
+function adminAdminConfigurationContent() {
+  const branding = state.data.adminBranding ?? {};
+  const server = state.data.adminServerInfo ?? {};
+  const row = (label, value) =>
+    `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
+  const endpoints = [
+    ["adminIssuer", server.issuer],
+    ["adminDiscoveryEndpoint", server.discoveryEndpoint],
+    ["adminAuthorizationEndpoint", server.authorizationEndpoint],
+    ["adminTokenEndpoint", server.tokenEndpoint],
+    ["adminIntrospectionEndpoint", server.introspectionEndpoint],
+    ["adminRevocationEndpoint", server.revocationEndpoint],
+    ["adminJwksEndpoint", server.jwksEndpoint],
+    ["adminUserInfoEndpoint", server.userInfoEndpoint],
+    ["adminEndSessionEndpoint", server.endSessionEndpoint],
+    ["adminSessionTimeout", server.sessionTimeout],
+  ];
+  const activeKey = server.activeSigningKey;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminApplicationName"), branding.applicationName)}${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}${row(text("adminPrimaryColor"), branding.primaryColor)}${row(text("adminAccentColor"), branding.accentColor)}${row(text("adminBackgroundColor"), branding.backgroundColor)}</div></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
 }
 
 function profileContent() {
@@ -582,6 +606,13 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         await Promise.all([
           request("/api/admin/settings/ciba-policy"),
           request("/api/admin/settings/offline-access"),
+        ]);
+    }
+    if (state.console === "admin" && state.route === "configuration") {
+      [state.data.adminBranding, state.data.adminServerInfo] =
+        await Promise.all([
+          request("/api/admin/settings/branding"),
+          request("/api/admin/server-info"),
         ]);
     }
     if (state.route === "profile")
