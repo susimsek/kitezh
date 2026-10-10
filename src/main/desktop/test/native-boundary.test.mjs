@@ -26,9 +26,14 @@ test("native renderer static message references exist in both shared catalogs", 
     path.join(desktopDirectory, "src", "native", "renderer.mjs"),
     "utf8",
   );
-  const keys = [...source.matchAll(/\btext\(\s*["']([^"']+)["']\s*\)/g)].map(
-    (match) => match[1],
-  );
+  const keys = [
+    ...[...source.matchAll(/\btext\(\s*["']([^"']+)["']\s*\)/g)].map(
+      (match) => match[1],
+    ),
+    ...[...source.matchAll(/\[\s*["']([^"']+)["']\s*,\s*server\./g)].map(
+      (match) => match[1],
+    ),
+  ];
 
   assert.ok(keys.length > 0, "native renderer should use shared message keys");
   const missingKeys = [...new Set(keys)].filter(
