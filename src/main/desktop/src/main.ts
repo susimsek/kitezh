@@ -42,6 +42,7 @@ import {
   type DesktopTokens,
   type PendingAuthorization as PendingAuthorizationData,
 } from "./security/auth-flow";
+import { redactDiagnosticText } from "./security/diagnostics";
 import type {
   DesktopSocialLinkCompleteRequest,
   DesktopSocialLinkStartRequest,
@@ -289,28 +290,6 @@ type CompanionWindowState = Pick<WindowState, "x" | "y" | "width" | "height">;
 
 function diagnosticsLogPath() {
   return path.join(app.getPath("userData"), DIAGNOSTICS_LOG_FILE);
-}
-
-function redactDiagnosticText(value: string) {
-  return value
-    .replace(
-      /((?:access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|cookie|code)=)[^\s&]+/gi,
-      "$1[redacted]",
-    )
-    .replace(
-      /((?:"|'?)(?:access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|cookie|code)(?:"|'?)\s*:\s*["'])([^"']*)(["'])/gi,
-      "$1[redacted]$3",
-    )
-    .replace(/https?:\/\/[^\s]+/gi, (value) => {
-      try {
-        const url = new URL(value);
-        return `${url.origin}${url.pathname}`;
-      } catch {
-        return "[redacted-url]";
-      }
-    })
-    .replace(/(?:\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\s]+/g, "[user-path]")
-    .slice(0, 500);
 }
 
 async function appendDiagnosticEvent(
@@ -2900,7 +2879,6 @@ if (!hasLock) {
     configureAutoUpdater((status: DesktopUpdateStatus) => {
       void appendDiagnosticEvent(`update-${status.state}`, {
         version: "version" in status ? status.version : undefined,
-        message: "message" in status ? status.message : undefined,
       });
       if (status.state === "checking") {
         void showUpdateCheckWindow().catch(() => undefined);
@@ -2960,11 +2938,13 @@ if (!hasLock) {
   });
   process.on("uncaughtExceptionMonitor", (error) => {
     void appendDiagnosticEvent("uncaught-exception", {
-      message: error.message,
+      errorType: error.name,
     });
   });
   process.on("unhandledRejection", (reason) => {
-    void appendDiagnosticEvent("unhandled-rejection", { reason });
+    void appendDiagnosticEvent("unhandled-rejection", {
+      errorType: reason instanceof Error ? reason.name : typeof reason,
+    });
   });
   app.on("before-quit", () => {
     globalShortcut.unregisterAll();

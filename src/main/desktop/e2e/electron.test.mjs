@@ -1927,6 +1927,15 @@ test("opens settings in a separate window without requiring login", async () => 
       await settingsWindow.locator("#desktop-language").inputValue(),
       "system",
     );
+    await application.evaluate(() => {
+      process.emit(
+        "unhandledRejection",
+        new Error(
+          "person@example.test access_token=ACCESS_E2E refresh_token=REFRESH_E2E code=AUTH_E2E",
+        ),
+      );
+    });
+    await settingsWindow.waitForTimeout(200);
     await settingsWindow
       .getByRole("button", { name: /Diagnostics|Tanı bilgileri/ })
       .click();
@@ -1941,6 +1950,18 @@ test("opens settings in a separate window without requiring login", async () => 
         .count(),
       1,
     );
+    const diagnosticText = await settingsWindow
+      .locator("#desktop-diagnostics")
+      .innerText();
+    assert.match(diagnosticText, /unhandled-rejection/);
+    for (const sensitiveValue of [
+      "person@example.test",
+      "ACCESS_E2E",
+      "REFRESH_E2E",
+      "AUTH_E2E",
+    ]) {
+      assert.equal(diagnosticText.includes(sensitiveValue), false);
+    }
 
     assert.equal(await settingsWindow.url(), "app://renderer/desktop-settings");
     assert.equal(
