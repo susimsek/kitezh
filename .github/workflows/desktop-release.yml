@@ -396,10 +396,13 @@ jobs:
           fi
 
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release create "${RELEASE_TAG}" \
-              --verify-tag \
-              --title "${RELEASE_TAG}" \
-              --generate-notes
+            if ! gh release create "${RELEASE_TAG}" \
+                --verify-tag \
+                --draft \
+                --title "${RELEASE_TAG}" \
+                --generate-notes; then
+              gh release view "${RELEASE_TAG}" >/dev/null
+            fi
           fi
 
           declare -A allowed_assets=()
@@ -408,6 +411,9 @@ jobs:
           done < <(find release-assets -type f -print0)
 
           while IFS=$'\t' read -r asset_id asset_name; do
+            if [[ "${asset_name}" == *.apk || "${asset_name}" == *.ipa ]]; then
+              continue
+            fi
             if [[ -z "${allowed_assets["${asset_name}"]+present}" ]]; then
               echo "Removing stale release asset: ${asset_name}"
               gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
@@ -429,3 +435,5 @@ jobs:
               exit 1
             fi
           done
+
+          gh release edit "${RELEASE_TAG}" --draft=false

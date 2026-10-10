@@ -239,6 +239,27 @@ jobs:
               --data-binary @- \
               "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/kitezh"
 
+  prepare-github-release:
+    name: Prepare shared GitHub Release
+    needs: publish-manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create draft release record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --verify-tag \
+              --draft \
+              --title "${RELEASE_TAG}" \
+              --generate-notes
+          fi
+
   deploy-render-release:
     name: Deploy release image to Render
     needs: publish-manifest
