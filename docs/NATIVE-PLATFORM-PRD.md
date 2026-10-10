@@ -332,7 +332,7 @@ uses synthetic tokens; it is not proof of a fresh Google-to-Admin login. The use
 subsequently confirmed that the opening-loop defect is fixed; fresh Google-to-Admin
 authorization remains separate from that lifecycle acceptance.
 
-Latest Windows verification (2026-10-10): desktop unit tests 28/28, full Electron
+Latest Windows verification (2026-10-10): desktop unit tests 29/29, full Electron
 E2E 14/14, rebuilt packaged authenticated Account/Admin PKCE and social-link smoke
 2/2 passed. The packaged tests cover Admin dashboard and isolated session namespace,
 Account API access, session persistence after restart, logout, main-process social-link

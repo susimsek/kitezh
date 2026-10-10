@@ -66,6 +66,26 @@ test("native desktop renderer does not depend on the Web component tree", async 
   assert.match(source, /onCallback/);
 });
 
+test("desktop runtime sources do not write directly to console logs", async () => {
+  const sourcePaths = [
+    path.join(desktopDirectory, "src", "main.ts"),
+    path.join(desktopDirectory, "src", "preload.ts"),
+    path.join(desktopDirectory, "src", "native", "renderer.mjs"),
+    path.join(desktopDirectory, "src", "api", "desktop-api.ts"),
+  ];
+  const sources = await Promise.all(
+    sourcePaths.map((sourcePath) => readFile(sourcePath, "utf8")),
+  );
+
+  for (const [index, source] of sources.entries()) {
+    assert.doesNotMatch(
+      source,
+      /\bconsole\.(?:log|info|warn|error|debug|trace)\s*\(/,
+      `${path.relative(desktopDirectory, sourcePaths[index])} must not log runtime data directly`,
+    );
+  }
+});
+
 test("native renderer cannot read or replace sessions through IPC", async () => {
   const [mainSource, preloadSource] = await Promise.all([
     readFile(path.join(desktopDirectory, "src", "main.ts"), "utf8"),
@@ -74,7 +94,10 @@ test("native renderer cannot read or replace sessions through IPC", async () => 
 
   assert.doesNotMatch(mainSource, /desktop:auth-(get-session|set-session)/);
   assert.match(preloadSource, /startLogin: \(consoleName: ConsoleName\)/);
-  assert.doesNotMatch(preloadSource, /getSession|setSession|refreshToken|accessToken/);
+  assert.doesNotMatch(
+    preloadSource,
+    /getSession|setSession|refreshToken|accessToken/,
+  );
 });
 
 test("native Admin selection does not call Account APIs", async () => {
