@@ -39,6 +39,7 @@ uses typed, capability-scoped API calls.
 
 ## Latest focused evidence
 
+- Windows authenticated Admin E2E covers native client-name editing with validation recovery, draft retention, inline spinner, duplicate prevention, and a `clientName`-only payload; HTTP integration verifies credential and OAuth policy fields stay outside the native metadata contract.
 - Web desktop-release failures now log a fixed message without raw exception content; `components/download/DownloadPage.test.tsx` verifies sensitive rejected details are not emitted.
 - Backend mail and API failure logging omits recipient addresses, raw exception messages, and stack traces; focused `MailServiceTest` and `ApiExceptionHandlerTest` assertions verify the emitted log events.
 - `pnpm --dir src/main/desktop run test:unit`: 25/25 passed, including diagnostics redaction and EN/TR catalog parity.

@@ -333,11 +333,27 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/clients?q=console&page=0&size=20&sort=clientId,asc",
   });
   assert.equal(clients.status, 200);
+  const clientMetadata = await adapter.request({
+    console: "admin",
+    path: "/api/admin/clients/client-1/native-metadata",
+  });
+  assert.equal(clientMetadata.status, 200);
+  const updatedClientMetadata = await adapter.request({
+    console: "admin",
+    path: "/api/admin/clients/client-1/native-metadata",
+    method: "PUT",
+    body: { clientName: "Reporting Client" },
+  });
+  assert.equal(updatedClientMetadata.status, 200);
   for (const request of [
     { path: "/api/admin/clients", method: "POST" },
     { path: "/api/admin/clients/client-1", method: "PUT" },
     { path: "/api/admin/clients/client-1", method: "DELETE" },
     { path: "/api/admin/clients/client-1/secret", method: "POST" },
+    {
+      path: "/api/admin/clients/client-1/native-metadata/secret",
+      method: "PUT",
+    },
   ]) {
     await assert.rejects(
       adapter.request({ console: "admin", ...request }),

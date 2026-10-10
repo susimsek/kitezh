@@ -5,6 +5,8 @@ import io.github.susimsek.kitezh.domain.ServiceAccountEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.mapper.AdminClientMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
@@ -101,6 +103,28 @@ public class AdminClientService {
                                     client, account != null, serviceAccountUsername(account));
                         })
                 .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminClientNativeMetadataDTO findNativeMetadata(String id) {
+        return nativeMetadata(findRequired(id));
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
+            allEntries = true)
+    public AdminClientNativeMetadataDTO updateNativeMetadata(
+            String id, AdminClientNativeMetadataRequestDTO request) {
+        RegisteredClient existing = findRequired(id);
+        rejectAdminConsoleMutation(existing);
+        RegisteredClient updated =
+                save(
+                        RegisteredClient.from(existing)
+                                .clientName(request.clientName().trim())
+                                .build());
+        adminAuditEventService.record("client.updated", CLIENT_TARGET, id);
+        return nativeMetadata(updated);
     }
 
     @Transactional
@@ -238,6 +262,11 @@ public class AdminClientService {
     private AdminClientDTO clientDTO(RegisteredClient client) {
         ServiceAccountEntity account = serviceAccount(client.getId());
         return adminClientMapper.toDTO(client, account != null, serviceAccountUsername(account));
+    }
+
+    private static AdminClientNativeMetadataDTO nativeMetadata(RegisteredClient client) {
+        return new AdminClientNativeMetadataDTO(
+                client.getId(), client.getClientId(), client.getClientName());
     }
 
     private void updateServiceAccount(RegisteredClient client, boolean enabled) {

@@ -15,6 +15,7 @@ import io.github.susimsek.kitezh.domain.ServiceAccountEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.mapper.AdminClientMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
@@ -297,6 +298,47 @@ class AdminClientServiceTest {
         when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(adminConsole);
 
         assertThatThrownBy(() -> service().update("client-id", confidentialRequest()))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The administration console client cannot be changed");
+    }
+
+    @Test
+    void nativeMetadataUpdateChangesOnlyTheClientNameAndAudits() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient client = registeredClient("client-id", "service-client");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
+
+        var metadata =
+                service()
+                        .updateNativeMetadata(
+                                "client-id", new AdminClientNativeMetadataRequestDTO(" New Name "));
+
+        assertThat(metadata.clientName()).isEqualTo("New Name");
+        assertThat(metadata.clientId()).isEqualTo("service-client");
+        assertThat(savedClient.get().getClientAuthenticationMethods())
+                .contains(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        assertThat(savedClient.get().getAuthorizationGrantTypes())
+                .contains(AuthorizationGrantType.CLIENT_CREDENTIALS);
+        assertThat(savedClient.get().getScopes()).containsExactly("openid");
+        verify(adminAuditEventService).record("client.updated", "client", "client-id");
+    }
+
+    @Test
+    void nativeMetadataUpdateRejectsProtectedAdminConsoleClient() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient adminConsole = registeredClient("client-id", "admin-console");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(adminConsole);
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .updateNativeMetadata(
+                                                "client-id",
+                                                new AdminClientNativeMetadataRequestDTO(
+                                                        "New Name")))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("The administration console client cannot be changed");
     }

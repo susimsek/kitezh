@@ -626,7 +626,22 @@ function adminClientsContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clients.map((client) => `<article class="list-item"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const clientRows = clients
+    .map((client) => {
+      const id = String(client.id ?? "");
+      const editing = state.data.clientMetadataEditId === id;
+      const draft = state.data.clientMetadataDrafts?.[id] ?? {};
+      const errors =
+        state.data.clientMetadataErrorId === id
+          ? violations(state.error?.body)
+          : {};
+      const editForm = editing
+        ? `<form class="card" data-form="admin-client-native-metadata" data-client-id="${escapeHtml(id)}" novalidate>${field("clientName", text("adminClientName"), draft.clientName ?? client.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-metadata-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-metadata-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        : "";
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}</div>${editForm}</article>`;
+    })
+    .join("");
+  return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function renderIdentityProviderMappers(providerId) {
@@ -1395,6 +1410,12 @@ function preserveOfflineDrafts() {
         state.data.adminClientScopeDrafts ??= {};
         state.data.adminClientScopeDrafts[scopeId] = values;
       }
+    } else if (form.dataset.form === "admin-client-native-metadata") {
+      const id = form.dataset.clientId;
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
+        state.data.clientMetadataDrafts ??= {};
+        state.data.clientMetadataDrafts[id] = values;
+      }
     } else if (form.dataset.form === "admin-provider-mapper") {
       const providerId = form.dataset.providerId;
       const mapperId = form.dataset.mapperId || "new";
@@ -1439,6 +1460,48 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-client-native-metadata") {
+    const id = form.dataset.clientId ?? "";
+    const clients = state.data.clients?.content ?? [];
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !clients.some((client) => client.id === id) ||
+      !form.reportValidity()
+    )
+      return;
+    const body = { clientName: String(values.clientName ?? "").trim() };
+    state.data.clientMetadataDrafts ??= {};
+    state.data.clientMetadataDrafts[id] = body;
+    state.data.clientMetadataErrorId = id;
+    state.error = null;
+    state.notice = null;
+    state.busy = `client-metadata-save:${id}`;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/clients/${encodeURIComponent(id)}/native-metadata`,
+        { method: "PUT", body },
+      );
+      state.data.clients = {
+        ...state.data.clients,
+        content: clients.map((client) =>
+          client.id === id
+            ? { ...client, clientName: saved.clientName }
+            : client,
+        ),
+      };
+      delete state.data.clientMetadataDrafts[id];
+      state.data.clientMetadataEditId = null;
+      state.data.clientMetadataErrorId = null;
+      state.notice = text("adminClientMetadataUpdated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-identity-provider-policy") {
     const id = form.dataset.providerId ?? "";
     const providers = state.data.identityProviders?.content ?? [];
@@ -2974,6 +3037,51 @@ async function action(action, element) {
       /* request rendered localized transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-metadata-edit") {
+    if (state.busy || state.offline) return;
+    const id = element.dataset.id;
+    const client = (state.data.clients?.content ?? []).find(
+      (item) => item.id === id,
+    );
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
+    if (state.data.clientMetadataEditId === id) {
+      state.data.clientMetadataEditId = null;
+      delete state.data.clientMetadataDrafts?.[id];
+      state.data.clientMetadataErrorId = null;
+      render();
+      return;
+    }
+    state.busy = `client-metadata-load:${id}`;
+    state.error = null;
+    render();
+    try {
+      const metadata = await request(
+        `/api/admin/clients/${encodeURIComponent(id)}/native-metadata`,
+      );
+      state.data.clientMetadataEditId = id;
+      state.data.clientMetadataDrafts ??= {};
+      state.data.clientMetadataDrafts[id] = {
+        clientName: metadata.clientName,
+      };
+      state.data.clientMetadataErrorId = null;
+    } catch {
+      /* request rendered localized transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-metadata-cancel") {
+    if (state.busy) return;
+    const id = element.dataset.id;
+    if (state.data.clientMetadataEditId !== id) return;
+    state.data.clientMetadataEditId = null;
+    delete state.data.clientMetadataDrafts?.[id];
+    state.data.clientMetadataErrorId = null;
+    state.error = null;
     render();
     return;
   }

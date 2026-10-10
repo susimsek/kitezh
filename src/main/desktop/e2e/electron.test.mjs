@@ -1223,17 +1223,17 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           globalThis.__adminClientRequests.push(requestUrl.search);
           await new Promise((resolve) => setTimeout(resolve, 350));
           const query = requestUrl.searchParams.get("q") ?? "";
-          const clientId = query ? "admin-console" : "account-console";
+          const clientId = query ? "demo-client" : "account-console";
+          const clientName =
+            globalThis.__clientNativeMetadata?.clientName ??
+            (query ? "Admin Console" : "Account Console");
           return new Response(
             JSON.stringify({
               content: [
                 {
                   id: "client-1",
                   clientId,
-                  clientName:
-                    clientId === "admin-console"
-                      ? "Admin Console"
-                      : "Account Console",
+                  clientName,
                   scopes: ["openid", "admin-api"],
                   requireProofKey: true,
                 },
@@ -1248,6 +1248,62 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               headers: { "Content-Type": "application/json" },
             },
           );
+        }
+        if (
+          /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/native-metadata$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          if (requestMethod === "GET")
+            return new Response(
+              JSON.stringify({
+                id: "client-1",
+                clientId: "demo-client",
+                clientName:
+                  globalThis.__clientNativeMetadata?.clientName ??
+                  "Admin Console",
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__clientNativeMetadataRequests ??= [];
+            globalThis.__clientNativeMetadataRequests.push(body);
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            if (body.clientName === "Rejected client")
+              return new Response(
+                JSON.stringify({
+                  detail: "Correct the client name.",
+                  violations: [
+                    {
+                      field: "clientName",
+                      message: "Choose another client name.",
+                    },
+                  ],
+                }),
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            globalThis.__clientNativeMetadata = {
+              clientName: body.clientName,
+            };
+            return new Response(
+              JSON.stringify({
+                id: "client-1",
+                clientId: "demo-client",
+                clientName: body.clientName,
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
         }
         if (
           /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/native-policy$/.test(
@@ -3151,6 +3207,39 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       () => globalThis.__adminClientRequests,
     );
     assert.equal(new URLSearchParams(clientRequests[1]).get("q"), "admin");
+    const clientRow = window.locator('[data-client-id="client-1"]');
+    await clientRow
+      .getByRole("button", { name: "Edit client name", exact: true })
+      .click();
+    const clientMetadataForm = clientRow.locator(
+      'form[data-form="admin-client-native-metadata"]',
+    );
+    await clientMetadataForm.waitFor();
+    const clientName = clientMetadataForm.locator('[name="clientName"]');
+    const saveClientName = clientMetadataForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await clientName.fill("Rejected client");
+    await saveClientName.click();
+    assert.equal(await saveClientName.isDisabled(), true);
+    assert.equal(await saveClientName.locator(".spinner").count(), 1);
+    await window
+      .getByText("Choose another client name.", { exact: true })
+      .waitFor();
+    assert.equal(await clientName.inputValue(), "Rejected client");
+    await clientName.fill("Reporting Client");
+    await saveClientName.click();
+    assert.equal(await saveClientName.isDisabled(), true);
+    assert.equal(await saveClientName.locator(".spinner").count(), 1);
+    await window.getByText("Client name updated.", { exact: true }).waitFor();
+    assert.equal(await window.getByText("Reporting Client").count(), 1);
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__clientNativeMetadataRequests,
+      ),
+      [{ clientName: "Rejected client" }, { clientName: "Reporting Client" }],
+    );
     const identityProvidersNavigation = window.getByRole("button", {
       name: "Identity providers",
       exact: true,

@@ -55,6 +55,47 @@ class AdminClientEndpointsIT {
                     .andExpect(jsonPath("$.clientName").value("IT Client"))
                     .andExpect(jsonPath("$.serviceAccountEnabled").value(true));
 
+            String nativeMetadata =
+                    mockMvc.perform(
+                                    get("/api/admin/clients/{id}/native-metadata", id)
+                                            .with(admin()))
+                            .andExpect(status().isOk())
+                            .andExpect(jsonPath("$.id").value(id))
+                            .andExpect(jsonPath("$.clientId").value(clientId))
+                            .andExpect(jsonPath("$.clientName").value("IT Client"))
+                            .andExpect(jsonPath("$.clientSecret").doesNotExist())
+                            .andExpect(jsonPath("$.redirectUris").doesNotExist())
+                            .andExpect(jsonPath("$.authorizationGrantTypes").doesNotExist())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            String originalClientId = JSON.readTree(nativeMetadata).get("clientId").asString();
+            mockMvc.perform(
+                            put("/api/admin/clients/{id}/native-metadata", id)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"clientName\":\"Native IT Client\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clientName").value("Native IT Client"))
+                    .andExpect(jsonPath("$.clientSecret").doesNotExist())
+                    .andExpect(jsonPath("$.clientId").value(originalClientId));
+            mockMvc.perform(get("/api/admin/clients/{id}", id).with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clientName").value("Native IT Client"))
+                    .andExpect(jsonPath("$.clientId").value(clientId))
+                    .andExpect(
+                            jsonPath("$.clientAuthenticationMethods[0]")
+                                    .value("client_secret_basic"))
+                    .andExpect(jsonPath("$.authorizationGrantTypes[0]").value("client_credentials"))
+                    .andExpect(jsonPath("$.scopes").isArray())
+                    .andExpect(jsonPath("$.clientSecret").doesNotExist());
+            mockMvc.perform(
+                            put("/api/admin/clients/{id}/native-metadata", id)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"clientName\":\" \"}"))
+                    .andExpect(status().isBadRequest());
+
             mockMvc.perform(get("/api/admin/clients/{id}/service-account", id).with(admin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.username").value("service-account-" + clientId))
