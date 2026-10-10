@@ -373,3 +373,114 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
     await application.close();
   }
 });
+
+test("keeps packaged Admin authentication in its isolated session namespace", async () => {
+  const userDataDirectory = await mkdtemp(
+    path.join(os.tmpdir(), "kitezh-packaged-admin-e2e-"),
+  );
+  await writeFile(
+    path.join(userDataDirectory, "desktop-language-mode.json"),
+    "en",
+  );
+  await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
+
+  const application = await electron.launch({
+    executablePath: packagedExecutable,
+    args: [`--user-data-dir=${userDataDirectory}`],
+    env: {
+      ...process.env,
+      DESKTOP_API_BASE_URL:
+        process.env.DESKTOP_API_BASE_URL ?? "http://localhost:9090",
+      DESKTOP_AUTO_UPDATE: "false",
+    },
+  });
+
+  try {
+    await application.evaluate(({ shell }) => {
+      shell.openExternal = async (url) => {
+        globalThis.__e2eExternalUrl = url;
+      };
+    });
+    const mainWindow = await nativeMainWindow(application);
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    await mainWindow
+      .getByRole("button", { name: "Administration Console" })
+      .click();
+
+    const authorizationUrl = await externalUrlFromDesktop(application);
+    const browserWindowPromise = application.waitForEvent("window");
+    await application.evaluate(({ BrowserWindow }, url) => {
+      const browserWindow = new BrowserWindow({
+        show: true,
+        width: 1000,
+        height: 800,
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      });
+      browserWindow.loadURL(url);
+    }, authorizationUrl);
+    const browserWindow = await browserWindowPromise;
+    await application.evaluate(({ BrowserWindow }) => {
+      const loginWindow = BrowserWindow.getAllWindows().find((window) =>
+        window.webContents.getURL().includes("/login"),
+      );
+      if (!loginWindow) throw new Error("Packaged login window was not found");
+      const captureCallback = (event, url) => {
+        if (!url.startsWith("kitezh://oauth/callback")) return;
+        event.preventDefault();
+        globalThis.__e2eCallbackUrl = url;
+      };
+      loginWindow.webContents.on("will-navigate", captureCallback);
+      loginWindow.webContents.on("will-redirect", captureCallback);
+    });
+
+    await browserWindow.locator('input[name="username"]').fill("admin");
+    await browserWindow.locator('input[name="password"]').fill("admin");
+    await browserWindow.getByRole("button", { name: /Sign in|Giriş/i }).click();
+    const callbackUrl = await callbackUrlFromBrowser(application);
+    await application.evaluate(({ app }, url) => {
+      app.emit("open-url", { preventDefault() {} }, url);
+    }, callbackUrl);
+
+    let dashboardResponse;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      dashboardResponse = await mainWindow.evaluate(() =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: "/api/admin/dashboard",
+        }),
+      );
+      if (dashboardResponse.status === 200) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    assert.equal(dashboardResponse?.status, 200);
+    assert.equal(await mainWindow.url(), "app://renderer/native?console=admin");
+    assert.equal(
+      await mainWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("admin"),
+      ),
+      true,
+    );
+    assert.equal(
+      await mainWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("account"),
+      ),
+      false,
+    );
+    const accountResponse = await mainWindow.evaluate(() =>
+      window.desktopApi.api.request({
+        console: "account",
+        path: "/api/account/profile",
+      }),
+    );
+    assert.equal(accountResponse.status, 401);
+    assert.equal(accountResponse.kind, "unauthorized");
+  } finally {
+    await application.close();
+  }
+});

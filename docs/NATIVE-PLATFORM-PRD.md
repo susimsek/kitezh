@@ -276,7 +276,7 @@ another owner's work, but a review does not transfer implementation ownership.
 The first Desktop P0 vertical slice is intentionally `[~]` until authenticated native E2E, packaged
 smoke, and cross-platform release evidence are available.
 
-- [~] Desktop P0 native console shell: `app://renderer/native` owns the console chooser and authenticated Account shell; the default packaged route no longer loads the Web console. Windows packaged E2E completes PKCE login, a protected Account API request, session restart, and logout (1/1). Evidence: `src/main/desktop/src/native/native.html`, `src/main/desktop/src/native/renderer.mjs`, `test/native-boundary.test.mjs`, and `e2e/packaged-authenticated.test.mjs`. macOS/Linux evidence and signed Windows release verification remain open.
+- [~] Desktop P0 native console shell: `app://renderer/native` owns the console chooser and authenticated Account shell; the default packaged route no longer loads the Web console. Windows packaged E2E completes Account PKCE login, a protected Account API request, session restart, and logout, plus Admin PKCE login and dashboard access while proving the Account namespace remains unauthenticated (2 packaged tests). Evidence: `src/main/desktop/src/native/native.html`, `src/main/desktop/src/native/renderer.mjs`, `test/native-boundary.test.mjs`, and `e2e/packaged-authenticated.test.mjs`. macOS/Linux evidence and signed Windows release verification remain open.
 - [~] Desktop P0 API/session adapter: protected Account requests run through the main-process typed adapter with separate Admin/Account vault records, one refresh retry, timeout/offline/401/403/validation mapping, and atomic refresh replacement. Evidence: `src/main/desktop/src/api/desktop-api.ts` and `test/api-adapter.test.mjs`.
 - [~] Desktop P0 Account vertical slice: profile, password, sessions, offline sessions, applications, MFA, account deletion, settings, and social-link read/unlink are native. Social-provider link start uses a short-lived server transaction, native PKCE verifier, authenticated bearer completion, and a validated `kitezh://social-link/callback`; Windows Electron E2E verifies state/challenge-only start, exact authorization URL, callback verifier completion, and linked-state refresh. Packaged Windows PKCE Account login/API, session restart, logout, and the social-link callback/verifier path pass; the packaged social-link test stubs only start/complete transaction responses, while Windows NSIS, portable, and AppX targets remain unsigned. Live-provider packaged proof, signed Windows release verification, and macOS/Linux package evidence remain open.
 - [~] Shared/native contract boundary: shared changes are limited to API/session contracts, icon metadata, semantic tokens, and English/Turkish message values. Native renderer CSS is generated from shared semantic color tokens; native dialogs use the same shared palette. Native chooser navigation and Admin/Account create, edit, confirm, delete, revoke, retry, sign-in, logout, language, and save actions consume shared icon metadata; Windows E2E confirms decorative add/delete icons do not alter accessible labels and forced-colors mode selects system color tokens. Unit gates require identical non-empty English/Turkish keys and verify every static native-renderer message reference resolves in both catalogs; Windows E2E asserts the Turkish role-description and English provider-sync labels. Desktop source has no Web component, React-Bootstrap, or browser-storage dependency; real Windows high-contrast OS evidence and full packaged/authenticated platform evidence remain open.
@@ -333,10 +333,11 @@ subsequently confirmed that the opening-loop defect is fixed; fresh Google-to-Ad
 authorization remains separate from that lifecycle acceptance.
 
 Latest Windows verification (2026-10-10): desktop unit tests 28/28, full Electron
-E2E 14/14, rebuilt packaged authenticated PKCE and social-link smoke 1/1 passed.
-The packaged test covers Account API access, session persistence after restart,
-logout, main-process social-link completion, rejected-promise and uncaught-exception
-monitor diagnostics redaction, and manual copy busy/duplicate handling;
+E2E 14/14, rebuilt packaged authenticated Account/Admin PKCE and social-link smoke
+2/2 passed. The packaged tests cover Admin dashboard and isolated session namespace,
+Account API access, session persistence after restart, logout, main-process social-link
+completion, rejected-promise and uncaught-exception monitor diagnostics redaction, and
+manual copy busy/duplicate handling;
 the social-link transaction endpoints are stubbed, the package remains unsigned,
 and this does not establish live-provider or macOS/Linux release evidence.
 
