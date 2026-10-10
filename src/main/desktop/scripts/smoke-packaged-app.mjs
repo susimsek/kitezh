@@ -92,7 +92,7 @@ try {
   );
   assert.ok(
     await window
-      .locator('img[aria-hidden="true"]')
+      .locator('img[alt$=" logo"]')
       .evaluateAll(
         (images) =>
           images.length > 0 &&
