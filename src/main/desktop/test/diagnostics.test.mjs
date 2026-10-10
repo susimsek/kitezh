@@ -22,7 +22,7 @@ test("redacts diagnostic credentials, personal data, URL details, and user paths
     assert.equal(result.includes(sensitiveValue), false);
   }
   assert.match(result, /email=\[redacted\]/);
-  assert.match(result, /https:\/\/identity\.example\.test/);
+  assert.match(result, /\[redacted-url\]/);
   assert.match(result, /\[user-path\]/);
 });
 

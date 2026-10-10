@@ -15,13 +15,7 @@ export function redactDiagnosticText(value: string) {
       "$1[redacted]$3",
     )
     .replace(/\bBearer\s+[^\s,;]+/gi, "Bearer [redacted]")
-    .replace(/https?:\/\/[^\s"']+/gi, (candidate) => {
-      try {
-        return new URL(candidate).origin;
-      } catch {
-        return "[redacted-url]";
-      }
-    })
+    .replace(/https?:\/\/[^\s"']+/gi, "[redacted-url]")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
     .replace(/(?:\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^\s]+/g, "[user-path]")
     .slice(0, 500);
