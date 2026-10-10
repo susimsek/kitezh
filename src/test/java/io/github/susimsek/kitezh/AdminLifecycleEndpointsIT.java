@@ -133,6 +133,40 @@ class AdminLifecycleEndpointsIT {
     }
 
     @Test
+    void administratorCanSaveEmailSettingsWithoutExposingOrReplacingPassword() throws Exception {
+        String settingsResponse =
+                mockMvc.perform(get("/api/admin/settings/email").with(admin()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.password").doesNotExist())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        var original = JSON.readTree(settingsResponse);
+        var request = JSON.createObjectNode();
+        request.put("enabled", original.path("enabled").asBoolean());
+        request.put("fromAddress", original.path("fromAddress").asString());
+        request.put("baseUrl", original.path("baseUrl").asString());
+        request.put("host", original.path("host").asString());
+        request.put("port", original.path("port").asInt());
+        request.put("username", original.path("username").asString(""));
+        request.put("password", "");
+        request.put("smtpAuth", original.path("smtpAuth").asBoolean());
+        request.put("starttls", original.path("starttls").asBoolean());
+        request.put("ssl", original.path("ssl").asBoolean());
+
+        mockMvc.perform(
+                        put("/api/admin/settings/email")
+                                .with(admin())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(JSON.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(
+                        jsonPath("$.passwordConfigured")
+                                .value(original.path("passwordConfigured").asBoolean()));
+    }
+
+    @Test
     void administratorCanAssignAndRemoveRequiredAction() throws Exception {
         mockMvc.perform(get("/api/admin/required-actions").with(admin()))
                 .andExpect(status().isOk())

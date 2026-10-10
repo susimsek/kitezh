@@ -684,6 +684,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       globalThis.__packagedBrandingStatuses = [];
       globalThis.__packagedLocalizationStatuses = [];
       globalThis.__packagedLocalizationPolicyStatuses = [];
+      globalThis.__packagedLoginEmailStatuses = [];
       const originalFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (input, init) => {
         const response = await originalFetch(input, init);
@@ -733,6 +734,23 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
           requestUrl.pathname === "/api/admin/settings/localization"
         ) {
           globalThis.__packagedLocalizationPolicyStatuses.push(response.status);
+        }
+        if (
+          method === "PUT" &&
+          [
+            "/api/admin/settings/login/native",
+            "/api/admin/settings/email",
+          ].includes(requestUrl.pathname)
+        ) {
+          const requestBody =
+            typeof init?.body === "string" ? JSON.parse(init.body) : {};
+          globalThis.__packagedLoginEmailStatuses.push({
+            path: requestUrl.pathname,
+            status: response.status,
+            ...(requestUrl.pathname === "/api/admin/settings/email"
+              ? { passwordBlank: requestBody.password === "" }
+              : {}),
+          });
         }
         return response;
       };
@@ -967,6 +985,107 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
         { method: "POST", status: 201 },
         { method: "PUT", status: 200 },
         { method: "DELETE", status: 204 },
+      ],
+    );
+
+    await mainWindow
+      .getByRole("button", { name: "Login & email", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Login policy", exact: true })
+      .waitFor();
+    const loginSettingsForm = mainWindow.locator(
+      'form[data-form="admin-login-settings"]',
+    );
+    const loginSettings = {};
+    for (const name of [
+      "userRegistration",
+      "forgotPassword",
+      "rememberMe",
+      "loginWithEmail",
+      "verifyEmail",
+      "bruteForceEnabled",
+      "otpEnabled",
+      "otpRequired",
+      "passkeys",
+    ]) {
+      loginSettings[name] = await loginSettingsForm
+        .locator(`[name="${name}"]`)
+        .isChecked();
+    }
+    for (const name of [
+      "sessionTimeoutMinutes",
+      "passwordMinimumLength",
+      "bruteForceMaxFailures",
+    ]) {
+      loginSettings[name] = Number(
+        await loginSettingsForm.locator(`[name="${name}"]`).inputValue(),
+      );
+    }
+    await loginSettingsForm
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Login policy settings saved.", { exact: true })
+      .waitFor();
+    const persistedLoginSettings = await mainWindow.evaluate(() =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/settings/login/native",
+      }),
+    );
+    assert.equal(persistedLoginSettings.status, 200);
+    assert.equal(
+      Object.hasOwn(persistedLoginSettings.body, "passwordCommonPasswords"),
+      false,
+    );
+    for (const [name, value] of Object.entries(loginSettings)) {
+      assert.equal(persistedLoginSettings.body[name], value);
+    }
+
+    const emailSettingsForm = mainWindow.locator(
+      'form[data-form="admin-email-settings"]',
+    );
+    const emailPassword = emailSettingsForm.locator('[name="password"]');
+    const emailUsername = emailSettingsForm.locator('[name="username"]');
+    assert.equal(await emailPassword.inputValue(), "");
+    assert.equal(await emailUsername.inputValue(), "");
+    const emailBefore = await mainWindow.evaluate(() =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/settings/email",
+      }),
+    );
+    assert.equal(emailBefore.status, 200);
+    await emailSettingsForm
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    await mainWindow.getByText("Email settings saved.", { exact: true }).waitFor();
+    const emailAfter = await mainWindow.evaluate(() =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/settings/email",
+      }),
+    );
+    assert.equal(emailAfter.status, 200);
+    assert.equal(
+      emailAfter.body.passwordConfigured,
+      emailBefore.body.passwordConfigured,
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__packagedLoginEmailStatuses,
+      ),
+      [
+        {
+          path: "/api/admin/settings/login/native",
+          status: 200,
+        },
+        {
+          path: "/api/admin/settings/email",
+          status: 200,
+          passwordBlank: true,
+        },
       ],
     );
 
