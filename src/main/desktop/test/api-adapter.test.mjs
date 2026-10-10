@@ -285,6 +285,35 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(updatedClientScope.status, 200);
+  const clientScopeRoleMappings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes/scope-native-observer/role-mappings",
+  });
+  assert.equal(clientScopeRoleMappings.status, 200);
+  const applicationRoleCandidates = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes/scope-native-observer/role-mappings/application-roles?q=VIEWER&page=0&size=20&sort=name,asc",
+  });
+  assert.equal(applicationRoleCandidates.status, 200);
+  const clientRoleCandidates = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes/scope-native-observer/role-mappings/client-roles?q=admin&page=0&size=20&sort=name,asc",
+  });
+  assert.equal(clientRoleCandidates.status, 200);
+  const updatedClientScopeRoleMappings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes/scope-native-observer/role-mappings",
+    method: "PUT",
+    body: { applicationRoles: ["ROLE_USER"], clientRoleIds: [12] },
+  });
+  assert.equal(updatedClientScopeRoleMappings.status, 200);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/client-scopes/scope-native-observer/role-mappings?includeSecrets=true",
+    }),
+    /not allowed/,
+  );
   const deletedClientScope = await adapter.request({
     console: "admin",
     path: "/api/admin/client-scopes/scope-native-observer",

@@ -1245,6 +1245,107 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings\/(?:application-roles|client-roles)$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "GET"
+        ) {
+          const clientRoles = requestUrl.pathname.endsWith("/client-roles");
+          globalThis.__clientScopeRoleCandidateRequests ??= [];
+          globalThis.__clientScopeRoleCandidateRequests.push({
+            path: requestUrl.pathname,
+            query: Object.fromEntries(requestUrl.searchParams),
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const content = clientRoles
+            ? [
+                {
+                  id: 21,
+                  clientId: "admin-console",
+                  name: "manage_users",
+                  description: "Manage users",
+                },
+              ]
+            : [
+                { name: "ROLE_USER", description: "Basic access" },
+                { name: "ROLE_SCOPE_READER", description: "Read scoped data" },
+              ];
+          return new Response(
+            JSON.stringify({
+              content,
+              number: Number(requestUrl.searchParams.get("page") ?? 0),
+              totalPages: 1,
+              totalElements: content.length,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          const scopeId = requestUrl.pathname.split("/").at(-2);
+          globalThis.__clientScopeRoleMappings ??= {
+            [scopeId]: {
+              applicationRoles: ["ROLE_USER"],
+              clientRoleIds: [11],
+            },
+          };
+          if (requestMethod === "GET") {
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            return new Response(
+              JSON.stringify({
+                applicationRoles:
+                  globalThis.__clientScopeRoleMappings[scopeId]
+                    ?.applicationRoles ?? [],
+                clientRoles: (
+                  globalThis.__clientScopeRoleMappings[scopeId]
+                    ?.clientRoleIds ?? []
+                ).map((id) => ({
+                  id,
+                  clientId: "existing-client",
+                  name: `CLIENT_ROLE_${id}`,
+                  description: "Existing client role",
+                })),
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__clientScopeRoleMappingRequests ??= [];
+            globalThis.__clientScopeRoleMappingRequests.push({
+              id: scopeId,
+              body,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            globalThis.__clientScopeRoleMappings[scopeId] = body;
+            return new Response(
+              JSON.stringify({
+                applicationRoles: body.applicationRoles,
+                clientRoles: body.clientRoleIds.map((id) => ({
+                  id,
+                  clientId: id === 11 ? "existing-client" : "admin-console",
+                  name: id === 11 ? "CLIENT_ROLE_11" : "manage_users",
+                  description: "Client role",
+                })),
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+        }
+        if (
           /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(
             requestUrl.pathname,
           ) &&
@@ -3255,6 +3356,107 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         },
       ],
     );
+    const createdScopeRow = window.locator(
+      '[data-client-scope-id="scope-native-observer"]',
+    );
+    const manageScopeRoles = createdScopeRow.getByRole("button", {
+      name: "Rol eşlemelerini yönet",
+      exact: true,
+    });
+    await manageScopeRoles.click();
+    assert.equal(await manageScopeRoles.isDisabled(), true);
+    assert.equal(await manageScopeRoles.locator(".spinner").count(), 1);
+    const roleMappingsPanel = createdScopeRow.locator(
+      "[data-client-scope-role-mappings-panel]",
+    );
+    await roleMappingsPanel
+      .getByRole("heading", { name: "Bu kapsamın rol eşlemeleri" })
+      .waitFor();
+    const applicationRoleSearch = roleMappingsPanel.getByRole("searchbox", {
+      name: "Uygulama rolleri ara",
+    });
+    await applicationRoleSearch.fill("SCOPE");
+    const searchRoleCandidates = roleMappingsPanel
+      .getByRole("button", {
+        name: "Ara",
+        exact: true,
+      })
+      .first();
+    await searchRoleCandidates.click();
+    assert.equal(await searchRoleCandidates.isDisabled(), true);
+    assert.equal(await searchRoleCandidates.locator(".spinner").count(), 1);
+    await window.waitForFunction(() => {
+      const button = document.querySelector(
+        'form[data-form="admin-client-scope-role-candidate-search"][data-role-kind="applicationRoles"] button[type="submit"]',
+      );
+      return button && !button.disabled;
+    });
+    const scopeReaderRole = roleMappingsPanel.getByRole("checkbox", {
+      name: /ROLE_SCOPE_READER/,
+    });
+    await scopeReaderRole.check();
+    assert.equal(await scopeReaderRole.isChecked(), true);
+    const adminClientRole = roleMappingsPanel.getByRole("checkbox", {
+      name: /admin-console · manage_users/,
+    });
+    await adminClientRole.check();
+    assert.equal(await adminClientRole.isChecked(), true);
+    assert.deepEqual(
+      await roleMappingsPanel.evaluate((panel) => ({
+        applicationRoles: [
+          ...panel.querySelectorAll('input[name="applicationRoles"]:checked'),
+        ].map((input) => input.value),
+        clientRoleIds: [
+          ...panel.querySelectorAll('input[name="clientRoleIds"]:checked'),
+        ].map((input) => input.value),
+      })),
+      {
+        applicationRoles: ["ROLE_SCOPE_READER", "ROLE_USER"],
+        clientRoleIds: ["21", "11"],
+      },
+    );
+    const saveRoleMappings = roleMappingsPanel.getByRole("button", {
+      name: "Kaydet",
+      exact: true,
+    });
+    await saveRoleMappings.click();
+    assert.equal(await saveRoleMappings.isDisabled(), true);
+    assert.equal(await saveRoleMappings.locator(".spinner").count(), 1);
+    await saveRoleMappings.evaluate((button) =>
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    await window
+      .getByText("İstemci kapsamı rol eşlemeleri güncellendi.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__clientScopeRoleMappingRequests,
+      ),
+      [
+        {
+          id: "scope-native-observer",
+          body: {
+            applicationRoles: ["ROLE_SCOPE_READER", "ROLE_USER"],
+            clientRoleIds: [11, 21],
+          },
+        },
+      ],
+    );
+    const roleCandidateRequests = await application.evaluate(
+      () => globalThis.__clientScopeRoleCandidateRequests,
+    );
+    assert.equal(
+      roleCandidateRequests.some(
+        ({ path, query }) =>
+          path.endsWith("/application-roles") &&
+          query.q === "SCOPE" &&
+          query.size === "20" &&
+          query.sort === "name,asc",
+      ),
+      true,
+    );
     const scopeEditForm = window.locator(
       'form[data-form="admin-client-scope-edit"][data-scope-id="scope-native-observer"]',
     );
@@ -3308,9 +3510,6 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         },
       ],
     );
-    const createdScopeRow = window.locator(
-      '[data-client-scope-id="scope-native-observer"]',
-    );
     await createdScopeRow
       .getByRole("button", { name: "İstemci kapsamını sil", exact: true })
       .click();
@@ -3321,7 +3520,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       )
       .waitFor();
     await createdScopeRow
-      .getByRole("button", { name: "Vazgeç", exact: true })
+      .locator('[data-action="admin-client-scope-delete-cancel"]')
       .click();
     assert.deepEqual(
       await application.evaluate(

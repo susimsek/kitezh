@@ -121,6 +121,13 @@ function isAllowedApiPath(
     )
       return true;
     if (
+      method === "PUT" &&
+      /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings$/.test(
+        path,
+      )
+    )
+      return true;
+    if (
       method === "DELETE" &&
       /^\/api\/admin\/offline-sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
@@ -283,6 +290,14 @@ function isAllowedApiPath(
         Number.isSafeInteger(Number(groupMemberSearchMatch[1])),
       );
       const isClientScopes = url.pathname === "/api/admin/client-scopes";
+      const isClientScopeRoleMappings =
+        /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings$/.test(
+          url.pathname,
+        );
+      const isClientScopeRoleCandidates =
+        /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings\/(?:application-roles|client-roles)$/.test(
+          url.pathname,
+        );
       const isClients = url.pathname === "/api/admin/clients";
       const isIdentityProviders =
         url.pathname === "/api/admin/identity-providers";
@@ -342,6 +357,8 @@ function isAllowedApiPath(
           isGroups ||
           isGroupMemberSearch ||
           isClientScopes ||
+          isClientScopeRoleMappings ||
+          isClientScopeRoleCandidates ||
           isClients ||
           isIdentityProviders ||
           isProviderMappers ||

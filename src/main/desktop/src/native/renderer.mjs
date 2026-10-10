@@ -58,6 +58,8 @@ const actionIcons = {
   "admin-user-toggle-enabled": "check",
   "admin-client-scope-delete-request": "delete",
   "admin-client-scope-delete-confirm": "delete",
+  "admin-client-scope-role-mappings-toggle": "edit",
+  "admin-client-scope-role-mappings-save": "check",
   "admin-client-delete-request": "delete",
   "admin-client-delete-confirm": "delete",
   "admin-consent-revoke-request": "delete",
@@ -261,6 +263,23 @@ async function loadGroupMembership(groupId) {
     available,
     removeConfirmId: current.removeConfirmId ?? null,
   };
+}
+
+async function loadClientScopeRoleCandidates(scopeId, kind, page) {
+  const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+  if (!mapping || !["applicationRoles", "clientRoleIds"].includes(kind))
+    throw new Error("Invalid client-scope role candidate request");
+  const query = new URLSearchParams({
+    q: mapping[`${kind}Query`] ?? "",
+    page: String(page),
+    size: "20",
+    sort: "name,asc",
+  });
+  const endpoint =
+    kind === "applicationRoles" ? "application-roles" : "client-roles";
+  mapping[`${kind}Candidates`] = await request(
+    `/api/admin/client-scopes/${encodeURIComponent(scopeId)}/role-mappings/${endpoint}?${query.toString()}`,
+  );
 }
 
 function violations(body) {
@@ -587,6 +606,85 @@ function adminGroupCreateContent() {
   return `<section class="card"><form data-form="admin-group-create" novalidate>${field("name", text("adminGroupName"), draft.name ?? "", errors.name, "text", 'maxlength="100" autocomplete="off" required')}<div class="muted">${escapeHtml(text("adminGroupRootOnly"))}</div>${button(text("adminCreateGroup"), { type: "submit", busy: state.busy === "group-create", disabled: state.offline })}</form></section>`;
 }
 
+function clientScopeRoleOptions(scopeId, kind) {
+  const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+  const candidates = mapping?.[`${kind}Candidates`]?.content ?? [];
+  const selected = mapping?.draft?.[kind] ?? [];
+  if (kind === "applicationRoles") {
+    const options = new Map(
+      (mapping?.current?.applicationRoles ?? []).map((name) => [
+        name,
+        { name, description: "" },
+      ]),
+    );
+    for (const role of candidates) options.set(role.name, role);
+    for (const name of selected) {
+      if (!options.has(name)) options.set(name, { name, description: "" });
+    }
+    return [...options.values()].sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+  }
+  const options = new Map(
+    (mapping?.current?.clientRoles ?? []).map((role) => [
+      String(role.id),
+      role,
+    ]),
+  );
+  for (const role of candidates) options.set(String(role.id), role);
+  for (const id of selected) {
+    if (!options.has(String(id)))
+      options.set(String(id), {
+        id: Number(id),
+        clientId: "",
+        name: `#${id}`,
+      });
+  }
+  return [...options.values()].sort(
+    (left, right) =>
+      left.clientId.localeCompare(right.clientId) ||
+      left.name.localeCompare(right.name),
+  );
+}
+
+function clientScopeRoleMappingPanel(scopeId) {
+  const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+  if (!mapping) return "";
+  const applicationRoleDraft = mapping.draft?.applicationRoles ?? [];
+  const clientRoleDraft = (mapping.draft?.clientRoleIds ?? []).map(String);
+  const applicationRoles = clientScopeRoleOptions(scopeId, "applicationRoles");
+  const clientRoles = clientScopeRoleOptions(scopeId, "clientRoleIds");
+  const applicationPage = mapping.applicationRoleCandidates ?? {
+    content: [],
+    number: 0,
+    totalPages: 0,
+  };
+  const clientPage = mapping.clientRoleCandidates ?? {
+    content: [],
+    number: 0,
+    totalPages: 0,
+  };
+  const applicationQuery = mapping.applicationRoleQuery ?? "";
+  const clientQuery = mapping.clientRoleQuery ?? "";
+  const candidateList = (roles, kind, selected) =>
+    roles.length
+      ? roles
+          .map((role) => {
+            const value = kind === "applicationRoles" ? role.name : role.id;
+            const label =
+              kind === "applicationRoles"
+                ? role.name
+                : `${role.clientId ? `${role.clientId} · ` : ""}${role.name}`;
+            const description = role.description
+              ? `<span class="muted">${escapeHtml(role.description)}</span>`
+              : "";
+            return `<label class="settings-row"><span><strong>${escapeHtml(label)}</strong>${description}</span><input type="checkbox" name="${kind}" value="${escapeHtml(value)}" ${selected.some((entry) => String(entry) === String(value)) ? "checked" : ""}/></label>`;
+          })
+          .join("")
+      : `<div class="empty" role="status">${escapeHtml(text(kind === "applicationRoles" ? "adminNoApplicationRoles" : "adminNoClientRoles"))}</div>`;
+  return `<section class="card" data-client-scope-role-mappings-panel="true" data-scope-id="${escapeHtml(scopeId)}"><h3>${escapeHtml(text("adminClientScopeRoleMappings"))}</h3><fieldset><legend>${escapeHtml(text("adminApplicationRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="applicationRoles"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchApplicationRoles"))}" value="${escapeHtml(applicationQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === `client-scope-role-candidates:${scopeId}:applicationRoles` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-scope-role-candidates:${scopeId}:applicationRoles`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(applicationRoles, "applicationRoles", applicationRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) - 1}" ${Number(applicationPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:applicationRoles`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${applicationPage.totalPages ? Number(applicationPage.number) + 1 : 0} / ${Number(applicationPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) + 1}" ${Number(applicationPage.number ?? 0) + 1 >= Number(applicationPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:applicationRoles`)}${escapeHtml(text("adminNext"))}</button></div></fieldset><fieldset><legend>${escapeHtml(text("adminClientRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="clientRoleIds"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchClientRoles"))}" value="${escapeHtml(clientQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === `client-scope-role-candidates:${scopeId}:clientRoleIds` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-scope-role-candidates:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(clientRoles, "clientRoleIds", clientRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) - 1}" ${Number(clientPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${clientPage.totalPages ? Number(clientPage.number) + 1 : 0} / ${Number(clientPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) + 1}" ${Number(clientPage.number ?? 0) + 1 >= Number(clientPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminNext"))}</button></div></fieldset><div class="actions">${button(text("save"), { action: "admin-client-scope-role-mappings-save", id: scopeId, busy: state.busy === `client-scope-role-mappings-save:${scopeId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-role-mappings-cancel" data-id="${escapeHtml(scopeId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
+}
+
 function adminClientScopesContent() {
   const page = state.data.clientScopes ?? {
     content: [],
@@ -617,7 +715,15 @@ function adminClientScopesContent() {
         : confirming
           ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopePrompt"))}</span>${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-confirm", id: scope.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
           : `<div class="actions">${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-request", id: scope.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-scope-id="${escapeHtml(scope.id)}">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span>${deleteControls}</article>`;
+      const roleMappingsOpen =
+        state.data.adminClientScopeRoleMappingsOpenId === scope.id;
+      const roleMappingControls = scope.builtIn
+        ? ""
+        : `<div class="actions">${button(text("adminManageClientScopeRoles"), { action: "admin-client-scope-role-mappings-toggle", id: scope.id, busy: state.busy === `client-scope-role-mappings-load:${scope.id}`, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      const roleMappingPanel = roleMappingsOpen
+        ? clientScopeRoleMappingPanel(scope.id)
+        : "";
+      return `<article class="list-item" data-client-scope-id="${escapeHtml(scope.id)}">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span>${deleteControls}${roleMappingControls}${roleMappingPanel}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopeRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1484,6 +1590,30 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-client-scope-role-candidate-search") {
+    const scopeId = form.dataset.scopeId ?? "";
+    const kind = form.dataset.roleKind ?? "";
+    const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
+      !mapping ||
+      !["applicationRoles", "clientRoleIds"].includes(kind)
+    )
+      return;
+    mapping[`${kind}Query`] = String(values.q ?? "").trim();
+    state.error = null;
+    state.busy = `client-scope-role-candidates:${scopeId}:${kind}`;
+    render();
+    try {
+      await loadClientScopeRoleCandidates(scopeId, kind, 0);
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-client-native-metadata") {
     const id = form.dataset.clientId ?? "";
     const clients = state.data.clients?.content ?? [];
@@ -2419,6 +2549,125 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "admin-client-scope-role-mappings-toggle") {
+    if (state.busy || state.offline) return;
+    const scopeId = element.dataset.id;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (candidate) => candidate.id === scopeId,
+    );
+    if (
+      typeof scopeId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
+      !scope ||
+      scope.builtIn
+    )
+      return;
+    if (state.data.adminClientScopeRoleMappingsOpenId === scopeId) {
+      state.data.adminClientScopeRoleMappingsOpenId = null;
+      render();
+      return;
+    }
+    state.data.adminClientScopeRoleMappingsOpenId = scopeId;
+    state.busy = `client-scope-role-mappings-load:${scopeId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const current = await request(
+        `/api/admin/client-scopes/${encodeURIComponent(scopeId)}/role-mappings`,
+      );
+      state.data.adminClientScopeRoleMappings ??= {};
+      state.data.adminClientScopeRoleMappings[scopeId] = {
+        current,
+        draft: {
+          applicationRoles: [...(current.applicationRoles ?? [])],
+          clientRoleIds: (current.clientRoles ?? []).map((role) => role.id),
+        },
+        applicationRoleQuery: "",
+        clientRoleIdsQuery: "",
+      };
+      await Promise.all([
+        loadClientScopeRoleCandidates(scopeId, "applicationRoles", 0),
+        loadClientScopeRoleCandidates(scopeId, "clientRoleIds", 0),
+      ]);
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-role-mappings-save") {
+    if (state.busy || state.offline) return;
+    const scopeId = element.dataset.id;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (candidate) => candidate.id === scopeId,
+    );
+    const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+    const panel = document.querySelector(
+      `[data-client-scope-role-mappings-panel][data-scope-id="${CSS.escape(scopeId ?? "")}"]`,
+    );
+    if (
+      typeof scopeId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
+      !scope ||
+      scope.builtIn ||
+      !mapping ||
+      !panel
+    )
+      return;
+    const applicationRoles = [
+      ...new Set(
+        [...panel.querySelectorAll('input[name="applicationRoles"]:checked')]
+          .map((input) => input.value.trim())
+          .filter(Boolean),
+      ),
+    ].sort();
+    const clientRoleIds = [
+      ...new Set(
+        [...panel.querySelectorAll('input[name="clientRoleIds"]:checked')]
+          .map((input) => Number(input.value))
+          .filter((id) => Number.isSafeInteger(id) && id > 0),
+      ),
+    ].sort((left, right) => left - right);
+    const body = { applicationRoles, clientRoleIds };
+    mapping.draft = body;
+    state.busy = `client-scope-role-mappings-save:${scopeId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/client-scopes/${encodeURIComponent(scopeId)}/role-mappings`,
+        { method: "PUT", body },
+      );
+      mapping.current = saved;
+      mapping.draft = {
+        applicationRoles: [...(saved.applicationRoles ?? [])],
+        clientRoleIds: (saved.clientRoles ?? []).map((role) => role.id),
+      };
+      state.notice = text("adminClientScopeRoleMappingsSaved");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-role-mappings-cancel") {
+    if (state.busy) return;
+    const scopeId = element.dataset.id;
+    const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+    if (!mapping) return;
+    mapping.draft = {
+      applicationRoles: [...(mapping.current.applicationRoles ?? [])],
+      clientRoleIds: (mapping.current.clientRoles ?? []).map((role) => role.id),
+    };
+    state.data.adminClientScopeRoleMappingsOpenId = null;
+    state.error = null;
+    render();
+    return;
+  }
   if (
     action === "admin-offline-access-revoke-request" ||
     action === "admin-offline-access-revoke-confirm"
@@ -3818,6 +4067,39 @@ function bind() {
     }),
   );
   document
+    .querySelectorAll("[data-client-scope-role-page]")
+    .forEach((element) =>
+      element.addEventListener("click", () => {
+        if (state.busy || element.disabled || state.offline) return;
+        const scopeId = element.dataset.scopeId;
+        const kind = element.dataset.clientScopeRolePage;
+        const page = Number(element.dataset.page);
+        const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+        const currentPage = mapping?.[`${kind}Candidates`];
+        if (
+          typeof scopeId !== "string" ||
+          !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
+          !["applicationRoles", "clientRoleIds"].includes(kind) ||
+          !Number.isSafeInteger(page) ||
+          page < 0 ||
+          !currentPage ||
+          page >= Number(currentPage.totalPages ?? 0)
+        )
+          return;
+        state.busy = `client-scope-role-page:${scopeId}:${kind}`;
+        state.error = null;
+        render();
+        void loadClientScopeRoleCandidates(scopeId, kind, page)
+          .catch(() => {
+            /* request rendered localized authorization or transport feedback */
+          })
+          .finally(() => {
+            state.busy = null;
+            render();
+          });
+      }),
+    );
+  document
     .getElementById("admin-client-search")
     ?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -4014,6 +4296,35 @@ function bind() {
       void submitForm(form);
     }),
   );
+  document
+    .querySelectorAll("[data-client-scope-role-mappings-panel]")
+    .forEach((panel) =>
+      panel.addEventListener("change", () => {
+        const scopeId = panel.dataset.scopeId;
+        const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
+        if (!mapping || state.busy) return;
+        mapping.draft = {
+          applicationRoles: [
+            ...new Set(
+              [
+                ...panel.querySelectorAll(
+                  'input[name="applicationRoles"]:checked',
+                ),
+              ]
+                .map((input) => input.value.trim())
+                .filter(Boolean),
+            ),
+          ],
+          clientRoleIds: [
+            ...new Set(
+              [...panel.querySelectorAll('input[name="clientRoleIds"]:checked')]
+                .map((input) => Number(input.value))
+                .filter((id) => Number.isSafeInteger(id) && id > 0),
+            ),
+          ],
+        };
+      }),
+    );
   document.getElementById("theme")?.addEventListener("change", (event) => {
     void api.theme.set(event.target.value);
   });
