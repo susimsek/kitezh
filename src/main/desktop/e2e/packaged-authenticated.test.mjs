@@ -275,6 +275,7 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
       "Authorization: Bearer PACKAGED_ACCESS email=packaged@example.test refresh_token=PACKAGED_REFRESH";
     await application.evaluate((message) => {
       process.emit("unhandledRejection", new Error(message));
+      process.emit("uncaughtExceptionMonitor", new Error(message));
     }, sensitiveDiagnostic);
     const packagedDiagnostics = await mainWindow.evaluate(() =>
       window.desktopApi.diagnostics.get(),
@@ -282,6 +283,7 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
     const packagedDiagnosticText = packagedDiagnostics.events.join("\n");
     assert.equal(packagedDiagnostics.packaged, true);
     assert.match(packagedDiagnosticText, /unhandled-rejection/);
+    assert.match(packagedDiagnosticText, /uncaught-exception/);
     assert.doesNotMatch(
       packagedDiagnosticText,
       /PACKAGED_ACCESS|packaged@example\.test|PACKAGED_REFRESH/,
@@ -301,7 +303,10 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
     await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
     await settingsWindow.waitForFunction(() => {
       const text = document.querySelector("#desktop-diagnostics")?.textContent;
-      return text?.includes("unhandled-rejection");
+      return (
+        text?.includes("unhandled-rejection") &&
+        text?.includes("uncaught-exception")
+      );
     });
     const diagnosticsPreview = await settingsWindow
       .locator("#desktop-diagnostics")
