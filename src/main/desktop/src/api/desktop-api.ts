@@ -81,6 +81,20 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(path.split("/").at(-1)))
     )
       return true;
+    const groupMembershipMatch = path.match(
+      /^\/api\/admin\/groups\/([1-9]\d*)\/users(?:\/([1-9]\d*))?$/,
+    );
+    if (
+      groupMembershipMatch &&
+      groupMembershipMatch
+        .slice(1)
+        .every((id) =>
+          id === undefined ? true : Number.isSafeInteger(Number(id)),
+        ) &&
+      ((method === "POST" && groupMembershipMatch[2] === undefined) ||
+        (method === "DELETE" && groupMembershipMatch[2] !== undefined))
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/client-scopes") return true;
     if (
       method === "DELETE" &&
@@ -174,6 +188,13 @@ function isAllowedApiPath(
       const isUsers = url.pathname === "/api/admin/users";
       const isRoles = url.pathname === "/api/admin/roles";
       const isGroups = url.pathname === "/api/admin/groups";
+      const groupMemberSearchMatch = url.pathname.match(
+        /^\/api\/admin\/groups\/([1-9]\d*)\/(?:users|available-users)$/,
+      );
+      const isGroupMemberSearch = Boolean(
+        groupMemberSearchMatch &&
+        Number.isSafeInteger(Number(groupMemberSearchMatch[1])),
+      );
       const isClientScopes = url.pathname === "/api/admin/client-scopes";
       const isClients = url.pathname === "/api/admin/clients";
       const isIdentityProviders =
@@ -221,11 +242,14 @@ function isAllowedApiPath(
                           ]
                         : isAuthenticationFlows
                           ? ["name,asc", "name,desc"]
-                          : ["name,asc", "name,desc"];
+                          : isGroupMemberSearch
+                            ? ["username,asc", "username,desc"]
+                            : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
           isGroups ||
+          isGroupMemberSearch ||
           isClientScopes ||
           isClients ||
           isIdentityProviders ||

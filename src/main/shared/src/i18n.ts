@@ -244,6 +244,17 @@ export const messages = {
     adminDeleteGroupPrompt:
       "Delete this group? Its members will be removed and their access revoked. Groups with child groups cannot be deleted.",
     adminGroupDeleted: "Group deleted.",
+    adminManageGroupMembers: "Manage members",
+    adminGroupMembers: "Group members",
+    adminAvailableUsers: "Available users",
+    adminAddGroupUser: "Add to group",
+    adminRemoveGroupUser: "Remove from group",
+    adminRemoveGroupUserPrompt:
+      "Remove this user from the group? Their access will be updated.",
+    adminGroupUserAdded: "User added to group.",
+    adminGroupUserRemoved: "User removed from group.",
+    adminNoGroupMembers: "No group members found.",
+    adminNoAvailableUsers: "No available users found.",
     adminGroupName: "Group name",
     adminGroupNameRequired: "Group name is required.",
     adminGroupRootOnly:
@@ -672,6 +683,17 @@ export const messages = {
     adminDeleteGroupPrompt:
       "Bu grup silinsin mi? Üyeleri gruptan çıkarılır ve erişimleri iptal edilir. Alt grubu olan gruplar silinemez.",
     adminGroupDeleted: "Grup silindi.",
+    adminManageGroupMembers: "Üyeleri yönet",
+    adminGroupMembers: "Grup üyeleri",
+    adminAvailableUsers: "Eklenebilir kullanıcılar",
+    adminAddGroupUser: "Gruba ekle",
+    adminRemoveGroupUser: "Gruptan çıkar",
+    adminRemoveGroupUserPrompt:
+      "Bu kullanıcı gruptan çıkarılsın mı? Erişimi güncellenecek.",
+    adminGroupUserAdded: "Kullanıcı gruba eklendi.",
+    adminGroupUserRemoved: "Kullanıcı gruptan çıkarıldı.",
+    adminNoGroupMembers: "Grupta kullanıcı bulunamadı.",
+    adminNoAvailableUsers: "Eklenebilir kullanıcı bulunamadı.",
     adminGroupName: "Grup adı",
     adminGroupNameRequired: "Grup adı gereklidir.",
     adminGroupRootOnly:

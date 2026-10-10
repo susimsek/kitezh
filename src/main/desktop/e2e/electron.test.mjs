@@ -744,6 +744,73 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          /^\/api\/admin\/groups\/[1-9]\d*\/(?:users|available-users)$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          const groupId = Number(requestUrl.pathname.split("/")[4]);
+          globalThis.__adminGroupMemberRequests ??= [];
+          globalThis.__adminGroupMemberRequests.push({
+            method: requestMethod,
+            path: requestUrl.pathname,
+            search: requestUrl.search,
+          });
+          globalThis.__adminGroupMembers ??= [];
+          if (requestMethod === "POST") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__adminGroupMembers.push({
+              id: body.userId,
+              username: "native-member",
+              enabled: true,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            return new Response(JSON.stringify({ id: groupId }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (requestMethod === "GET") {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            const available = requestUrl.pathname.endsWith("available-users");
+            const content = available
+              ? globalThis.__adminGroupMembers.length
+                ? []
+                : [{ id: 7, username: "native-member", enabled: true }]
+              : globalThis.__adminGroupMembers;
+            return new Response(
+              JSON.stringify({ content, number: 0, totalPages: 1 }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+        }
+        if (
+          /^\/api\/admin\/groups\/[1-9]\d*\/users\/[1-9]\d*$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const parts = requestUrl.pathname.split("/");
+          const groupId = Number(parts[4]);
+          const userId = Number(parts[6]);
+          globalThis.__adminGroupMemberRequests ??= [];
+          globalThis.__adminGroupMemberRequests.push({
+            method: requestMethod,
+            path: requestUrl.pathname,
+            search: requestUrl.search,
+          });
+          globalThis.__adminGroupMembers = (
+            globalThis.__adminGroupMembers ?? []
+          ).filter((user) => user.id !== userId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(JSON.stringify({ id: groupId }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (
           /^\/api\/admin\/groups\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "DELETE"
         ) {
@@ -2261,6 +2328,64 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Search groups" }).waitFor();
     const createdGroupRow = window.locator('[data-group-id="99"]');
+    await createdGroupRow
+      .getByRole("button", { name: "Manage members", exact: true })
+      .click();
+    await createdGroupRow.getByText("native-member", { exact: true }).waitFor();
+    const addGroupMember = createdGroupRow.getByRole("button", {
+      name: "Add to group",
+      exact: true,
+    });
+    await addGroupMember.click();
+    assert.equal(await addGroupMember.isDisabled(), true);
+    assert.equal(await addGroupMember.locator(".spinner").count(), 1);
+    await window.getByText("User added to group.", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "Turkish", exact: true }).click();
+    await window
+      .getByRole("button", { name: "Gruptan çıkar", exact: true })
+      .waitFor();
+    await createdGroupRow
+      .getByRole("button", { name: "Gruptan çıkar", exact: true })
+      .click();
+    await createdGroupRow
+      .getByText("Bu kullanıcı gruptan çıkarılsın mı? Erişimi güncellenecek.", {
+        exact: true,
+      })
+      .waitFor();
+    await createdGroupRow
+      .getByRole("button", { name: "Vazgeç", exact: true })
+      .click();
+    assert.equal(
+      (
+        await application.evaluate(() => globalThis.__adminGroupMemberRequests)
+      ).filter((item) => item.method === "DELETE").length,
+      0,
+    );
+    await createdGroupRow
+      .getByRole("button", { name: "Gruptan çıkar", exact: true })
+      .click();
+    const confirmRemoveMember = createdGroupRow.getByRole("button", {
+      name: "Gruptan çıkar",
+      exact: true,
+    });
+    await confirmRemoveMember.click();
+    assert.equal(await confirmRemoveMember.isDisabled(), true);
+    assert.equal(await confirmRemoveMember.locator(".spinner").count(), 1);
+    await window
+      .getByText("Kullanıcı gruptan çıkarıldı.", { exact: true })
+      .waitFor();
+    assert.equal(
+      (
+        await application.evaluate(() => globalThis.__adminGroupMemberRequests)
+      ).filter((item) => item.method === "DELETE").length,
+      1,
+    );
+    await window
+      .getByRole("button", { name: "İngilizce", exact: true })
+      .click();
+    await window
+      .getByRole("button", { name: "Search groups", exact: true })
+      .waitFor();
     await createdGroupRow
       .getByRole("button", { name: "Delete group", exact: true })
       .click();

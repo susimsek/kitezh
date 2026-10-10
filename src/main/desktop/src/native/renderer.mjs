@@ -171,6 +171,35 @@ async function request(path, options = {}) {
   return response.body;
 }
 
+async function loadGroupMembership(groupId) {
+  const current = state.data.groupMembers?.[groupId] ?? {};
+  const membersQuery = new URLSearchParams({
+    q: current.membersQuery ?? "",
+    page: "0",
+    size: "10",
+    sort: "username,asc",
+  });
+  const availableQuery = new URLSearchParams({
+    q: current.availableQuery ?? "",
+    page: "0",
+    size: "10",
+    sort: "username,asc",
+  });
+  const [members, available] = await Promise.all([
+    request(`/api/admin/groups/${groupId}/users?${membersQuery.toString()}`),
+    request(
+      `/api/admin/groups/${groupId}/available-users?${availableQuery.toString()}`,
+    ),
+  ]);
+  state.data.groupMembers ??= {};
+  state.data.groupMembers[groupId] = {
+    ...current,
+    members,
+    available,
+    removeConfirmId: current.removeConfirmId ?? null,
+  };
+}
+
 function violations(body) {
   return Object.fromEntries(
     (body?.violations ?? [])
@@ -405,10 +434,46 @@ function adminGroupsContent() {
       const controls = confirming
         ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteGroupPrompt"))}</span>${button(text("adminDeleteGroup"), { action: "admin-group-delete-confirm", id: group.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminDeleteGroup"), { action: "admin-group-delete-request", id: group.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div>${controls}</article>`;
+      const memberState = state.data.groupMembers?.[group.id];
+      const memberPanel =
+        Number(state.data.groupMembersOpenId) === Number(group.id)
+          ? renderGroupMembers(group.id, memberState)
+          : "";
+      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${controls}</div>${memberPanel}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function renderGroupMembers(groupId, memberState) {
+  if (!memberState)
+    return `<div class="notice" role="status">${escapeHtml(text("adminGroupMembers"))}…</div>`;
+  const members = Array.isArray(memberState.members?.content)
+    ? memberState.members.content
+    : [];
+  const available = Array.isArray(memberState.available?.content)
+    ? memberState.available.content
+    : [];
+  const removeConfirmId = memberState.removeConfirmId;
+  const memberRows = members.length
+    ? members
+        .map((user) => {
+          const confirming = Number(removeConfirmId) === Number(user.id);
+          const busy =
+            state.busy === `group-member-remove:${groupId}:${user.id}`;
+          return `<div class="list-item"><div><strong>${escapeHtml(user.username)}</strong><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div>${confirming ? `<div class="actions"><span role="status">${escapeHtml(text("adminRemoveGroupUserPrompt"))}</span>${button(text("adminRemoveGroupUser"), { action: "admin-group-member-remove-confirm", id: user.id, provider: groupId, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-member-remove-cancel" data-provider="${escapeHtml(groupId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>` : button(text("adminRemoveGroupUser"), { action: "admin-group-member-remove-request", id: user.id, provider: groupId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        })
+        .join("")
+    : `<div class="empty" role="status">${escapeHtml(text("adminNoGroupMembers"))}</div>`;
+  const availableRows = available.length
+    ? available
+        .map((user) => {
+          const busy = state.busy === `group-member-add:${groupId}:${user.id}`;
+          return `<div class="list-item"><div><strong>${escapeHtml(user.username)}</strong><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div>${button(text("adminAddGroupUser"), { action: "admin-group-member-add", id: user.id, provider: groupId, busy, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        })
+        .join("")
+    : `<div class="empty" role="status">${escapeHtml(text("adminNoAvailableUsers"))}</div>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminGroupMembers"))}"><h3>${escapeHtml(text("adminGroupMembers"))}</h3>${memberRows}<h3>${escapeHtml(text("adminAvailableUsers"))}</h3>${availableRows}</section>`;
 }
 
 function adminGroupCreateContent() {
@@ -1851,6 +1916,121 @@ async function action(action, element) {
   if (action === "admin-group-delete-cancel") {
     if (state.busy) return;
     state.data.groupDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (action === "admin-group-members-toggle") {
+    if (state.busy || state.offline) return;
+    const groupId = Number(element.dataset.id);
+    const groups = state.data.groups?.content ?? [];
+    if (
+      !Number.isSafeInteger(groupId) ||
+      groupId < 1 ||
+      !groups.some((group) => Number(group.id) === groupId)
+    )
+      return;
+    if (Number(state.data.groupMembersOpenId) === groupId) {
+      state.data.groupMembersOpenId = null;
+      render();
+      return;
+    }
+    state.data.groupMembersOpenId = groupId;
+    state.busy = `group-members:${groupId}`;
+    state.error = null;
+    render();
+    try {
+      await loadGroupMembership(groupId);
+    } catch {
+      /* request rendered localized transport or authorization feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-group-member-remove-request" ||
+    action === "admin-group-member-remove-cancel"
+  ) {
+    if (state.busy) return;
+    const groupId = Number(element.dataset.provider);
+    const userId = Number(element.dataset.id);
+    const memberState = state.data.groupMembers?.[groupId];
+    if (!Number.isSafeInteger(groupId) || groupId < 1 || !memberState) return;
+    if (action === "admin-group-member-remove-cancel") {
+      memberState.removeConfirmId = null;
+      render();
+      return;
+    }
+    if (
+      state.offline ||
+      !Number.isSafeInteger(userId) ||
+      userId < 1 ||
+      !(memberState.members?.content ?? []).some(
+        (user) => Number(user.id) === userId,
+      )
+    )
+      return;
+    memberState.removeConfirmId = userId;
+    render();
+    return;
+  }
+  if (
+    action === "admin-group-member-add" ||
+    action === "admin-group-member-remove-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const groupId = Number(element.dataset.provider);
+    const userId = Number(element.dataset.id);
+    const memberState = state.data.groupMembers?.[groupId];
+    const userList =
+      action === "admin-group-member-add"
+        ? memberState?.available?.content
+        : memberState?.members?.content;
+    if (
+      !Number.isSafeInteger(groupId) ||
+      groupId < 1 ||
+      !Number.isSafeInteger(userId) ||
+      userId < 1 ||
+      !Array.isArray(userList) ||
+      !userList.some((user) => Number(user.id) === userId) ||
+      (action === "admin-group-member-remove-confirm" &&
+        Number(memberState.removeConfirmId) !== userId)
+    )
+      return;
+    const adding = action === "admin-group-member-add";
+    state.busy = `group-member-${adding ? "add" : "remove"}:${groupId}:${userId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(
+        `/api/admin/groups/${groupId}/users${adding ? "" : `/${userId}`}`,
+        adding ? { method: "POST", body: { userId } } : { method: "DELETE" },
+      );
+      if (!adding) memberState.removeConfirmId = null;
+      await loadGroupMembership(groupId);
+      const groups = state.data.groups?.content ?? [];
+      state.data.groups = {
+        ...state.data.groups,
+        content: groups.map((group) =>
+          Number(group.id) === groupId
+            ? {
+                ...group,
+                userCount: Math.max(
+                  0,
+                  Number(group.userCount ?? 0) + (adding ? 1 : -1),
+                ),
+              }
+            : group,
+        ),
+      };
+      state.notice = text(
+        adding ? "adminGroupUserAdded" : "adminGroupUserRemoved",
+      );
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
     render();
     return;
   }

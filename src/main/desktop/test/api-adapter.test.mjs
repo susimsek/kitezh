@@ -166,6 +166,29 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdGroup.status, 200);
+  const groupMembers = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/users?q=alice&page=0&size=10&sort=username,asc",
+  });
+  assert.equal(groupMembers.status, 200);
+  const availableGroupUsers = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/available-users?page=0&size=10&sort=username,asc",
+  });
+  assert.equal(availableGroupUsers.status, 200);
+  const addedGroupUser = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/users",
+    method: "POST",
+    body: { userId: 7 },
+  });
+  assert.equal(addedGroupUser.status, 200);
+  const removedGroupUser = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/users/7",
+    method: "DELETE",
+  });
+  assert.equal(removedGroupUser.status, 200);
   const deletedGroup = await adapter.request({
     console: "admin",
     path: "/api/admin/groups/12",
@@ -498,7 +521,15 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/groups/1/users/2",
+      path: "/api/admin/groups/1/users/2/nested",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/groups/9007199254740992/users/2",
       method: "DELETE",
     }),
     /not allowed/,
