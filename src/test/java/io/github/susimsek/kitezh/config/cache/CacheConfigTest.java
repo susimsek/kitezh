@@ -10,6 +10,7 @@ import io.github.susimsek.kitezh.domain.AuthorizationConsentEntity;
 import io.github.susimsek.kitezh.domain.BrandingSettingsEntity;
 import io.github.susimsek.kitezh.domain.CibaPolicyEntity;
 import io.github.susimsek.kitezh.domain.ClientRoleEntity;
+import io.github.susimsek.kitezh.domain.ClientScopeEntity;
 import io.github.susimsek.kitezh.domain.EmailSettingsEntity;
 import io.github.susimsek.kitezh.domain.GroupEntity;
 import io.github.susimsek.kitezh.domain.LocalizationMessageOverrideEntity;
@@ -83,6 +84,7 @@ class CacheConfigTest {
         assertThat(cacheManager).isInstanceOf(CaffeineCacheManager.class);
         Cache cache = cacheManager.getCache(UserRepository.USER_BY_USERNAME_CACHE);
         assertThat(cache).isNotNull();
+        assertThat(cacheManager.getCache(ClientScopeEntity.class.getName())).isNotNull();
         assertThat(cacheManager.getCache(DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE))
                 .isNotNull();
         cache.put("key", "value");

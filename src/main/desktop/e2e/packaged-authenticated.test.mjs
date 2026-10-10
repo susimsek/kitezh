@@ -424,6 +424,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
   let application;
   let mainWindow;
   let packagedRoleName;
+  let packagedScopeId;
 
   application = await electron.launch({
     executablePath: packagedExecutable,
@@ -522,6 +523,26 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     assert.equal(accountResponse.status, 401);
     assert.equal(accountResponse.kind, "unauthorized");
 
+    const staleScopeCleanup = await mainWindow.evaluate(async () => {
+      const listed = await window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/client-scopes?q=packaged-scope-&page=0&size=100&sort=name,asc",
+      });
+      if (listed.status !== 200) return listed.status;
+      for (const scope of listed.body.content ?? []) {
+        if (!scope.name.startsWith("packaged-scope-")) continue;
+        const deleted = await window.desktopApi.api.request({
+          console: "admin",
+          method: "DELETE",
+          path: `/api/admin/client-scopes/${encodeURIComponent(scope.id)}`,
+        });
+        if (deleted.status !== 204 && deleted.status !== 404)
+          return deleted.status;
+      }
+      return 200;
+    });
+    assert.equal(staleScopeCleanup, 200);
+
     await mainWindow
       .getByRole("button", { name: "Client scopes", exact: true })
       .click();
@@ -576,21 +597,170 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       "Packaged Windows role updated",
     );
 
-    const roleDelete = roleRow.getByRole("button", {
+    await mainWindow
+      .getByRole("button", { name: "Client scopes", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Client scopes", exact: true })
+      .waitFor();
+    await mainWindow
+      .locator(".topbar")
+      .getByRole("button", { name: "Create client scope", exact: true })
+      .click();
+    const scopeName = `packaged-scope-${Date.now()}`;
+    const scopeCreateForm = mainWindow.locator(
+      'form[data-form="admin-client-scope-create"]',
+    );
+    await scopeCreateForm.locator('[name="name"]').fill(scopeName);
+    await scopeCreateForm
+      .locator('[name="displayName"]')
+      .fill("Packaged role mapping scope");
+    await scopeCreateForm
+      .getByRole("button", { name: "Create client scope", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Client scope created.", { exact: true })
+      .waitFor();
+    const scopeLookup = await mainWindow.evaluate(async (name) => {
+      const response = await window.desktopApi.api.request({
+        console: "admin",
+        path: `/api/admin/client-scopes?q=${encodeURIComponent(name)}&page=0&size=20&sort=name,asc`,
+      });
+      return response;
+    }, scopeName);
+    assert.equal(scopeLookup.status, 200);
+    const createdScope = scopeLookup.body.content.find(
+      (scope) => scope.name === scopeName,
+    );
+    assert.ok(createdScope);
+    packagedScopeId = createdScope.id;
+
+    await mainWindow
+      .getByRole("button", { name: "Roles", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Roles", exact: true })
+      .waitFor();
+    await mainWindow
+      .getByRole("button", { name: "Client scopes", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Client scopes", exact: true })
+      .waitFor();
+    const scopeSearch = mainWindow.locator("#admin-client-scope-search");
+    await scopeSearch.locator('[name="q"]').fill(scopeName);
+    await scopeSearch.locator('button[type="submit"]').click();
+    const scopeRow = mainWindow.locator(
+      `[data-client-scope-id="${packagedScopeId}"]`,
+    );
+    await scopeRow.waitFor();
+    assert.equal(
+      await scopeRow
+        .locator('[data-form="admin-client-scope-edit"]')
+        .getAttribute("data-scope-name"),
+      scopeName,
+    );
+    await scopeRow
+      .getByRole("button", { name: "Manage role mappings", exact: true })
+      .click();
+    const roleMappings = scopeRow.locator(
+      "[data-client-scope-role-mappings-panel]",
+    );
+    await roleMappings.waitFor();
+    const roleCandidateSearch = roleMappings.locator(
+      'form[data-form="admin-client-scope-role-candidate-search"][data-role-kind="applicationRoles"]',
+    );
+    await roleCandidateSearch.locator('[name="q"]').fill(packagedRoleName);
+    await roleCandidateSearch.locator('button[type="submit"]').click();
+    const packagedRoleCandidate = roleMappings.getByRole("checkbox", {
+      name: new RegExp(packagedRoleName),
+    });
+    await packagedRoleCandidate.waitFor();
+    await packagedRoleCandidate.check();
+    await application.evaluate(() => {
+      globalThis.__packagedRoleMappingStatuses = [];
+      const originalFetch = globalThis.fetch.bind(globalThis);
+      globalThis.fetch = async (input, init) => {
+        const response = await originalFetch(input, init);
+        const requestUrl = new URL(String(input));
+        if (
+          /\/api\/admin\/client-scopes\/[^/]+\/role-mappings$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__packagedRoleMappingStatuses.push({
+            method: String(init?.method ?? "GET").toUpperCase(),
+            status: response.status,
+          });
+        }
+        return response;
+      };
+    });
+    await roleMappings
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    let mappingStatuses = [];
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      mappingStatuses = await application.evaluate(
+        () => globalThis.__packagedRoleMappingStatuses,
+      );
+      if (mappingStatuses.some(({ method }) => method === "PUT")) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.deepEqual(mappingStatuses, [{ method: "PUT", status: 200 }]);
+    await mainWindow
+      .getByText("Client scope role mappings updated.", { exact: true })
+      .waitFor();
+    const savedMappings = await mainWindow.evaluate(async (scopeId) => {
+      const response = await window.desktopApi.api.request({
+        console: "admin",
+        path: `/api/admin/client-scopes/${encodeURIComponent(scopeId)}/role-mappings`,
+      });
+      return response;
+    }, packagedScopeId);
+    assert.equal(savedMappings.status, 200);
+    assert.ok(savedMappings.body.applicationRoles.includes(packagedRoleName));
+
+    await mainWindow
+      .getByRole("button", { name: "Roles", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Roles", exact: true })
+      .waitFor();
+    const updatedRoleRow = mainWindow.locator(
+      `article[data-role-name="${packagedRoleName}"]`,
+    );
+    await updatedRoleRow.waitFor();
+    const roleDelete = updatedRoleRow.getByRole("button", {
       name: "Delete role",
       exact: true,
     });
     await roleDelete.click();
-    await roleRow.getByText(/Delete this role\?/).waitFor();
-    await roleRow
+    await updatedRoleRow.getByText(/Delete this role\?/).waitFor();
+    await updatedRoleRow
       .getByRole("button", { name: "Delete role", exact: true })
       .click();
     await mainWindow.getByText("Role deleted.", { exact: true }).waitFor();
-    await roleRow.waitFor({ state: "detached" });
+    await updatedRoleRow.waitFor({ state: "detached" });
     packagedRoleName = null;
   } finally {
     if (application) {
       try {
+        if (packagedScopeId && mainWindow) {
+          const cleanup = await mainWindow.evaluate(
+            async (scopeId) =>
+              window.desktopApi.api.request({
+                console: "admin",
+                method: "DELETE",
+                path: `/api/admin/client-scopes/${encodeURIComponent(scopeId)}`,
+              }),
+            packagedScopeId,
+          );
+          if (cleanup.status !== 204 && cleanup.status !== 404)
+            throw new Error(
+              `Packaged client scope cleanup failed with status ${cleanup.status}`,
+            );
+        }
         if (packagedRoleName && mainWindow) {
           const cleanup = await mainWindow.evaluate(
             async (name) =>

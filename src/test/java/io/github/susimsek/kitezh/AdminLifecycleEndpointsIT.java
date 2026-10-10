@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,65 @@ class AdminLifecycleEndpointsIT {
             mockMvc.perform(delete("/api/admin/roles/{name}/users/2", role).with(admin()))
                     .andExpect(status().isOk());
         } finally {
+            mockMvc.perform(delete("/api/admin/roles/{name}", role).with(admin()))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
+    @Test
+    void administratorCanUpdateCustomClientScopeRoleMappings() throws Exception {
+        String role =
+                "ROLE_SCOPE_IT_"
+                        + UUID.randomUUID().toString().toUpperCase(Locale.ROOT).replace("-", "");
+        String scopeName = "scope-it-" + UUID.randomUUID();
+        String scopeId = null;
+        try {
+            mockMvc.perform(
+                            post("/api/admin/roles")
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"name\":\""
+                                                    + role
+                                                    + "\",\"description\":\"Scope mapping IT\"}"))
+                    .andExpect(status().isCreated());
+
+            String scopeResponse =
+                    mockMvc.perform(
+                                    post("/api/admin/client-scopes")
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"name\":\""
+                                                            + scopeName
+                                                            + "\",\"displayName\":\"Scope mapping"
+                                                            + " IT\"}"))
+                            .andExpect(status().isCreated())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            scopeId = JSON.readTree(scopeResponse).path("id").asString();
+
+            String mappingResponse =
+                    mockMvc.perform(
+                                    put("/api/admin/client-scopes/{id}/role-mappings", scopeId)
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"applicationRoles\":[\""
+                                                            + role
+                                                            + "\"],\"clientRoleIds\":[]}"))
+                            .andExpect(status().isOk())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            assertThat(JSON.readTree(mappingResponse).path("applicationRoles").toString())
+                    .contains(role);
+        } finally {
+            if (scopeId != null) {
+                mockMvc.perform(delete("/api/admin/client-scopes/{id}", scopeId).with(admin()))
+                        .andExpect(status().isNoContent());
+            }
             mockMvc.perform(delete("/api/admin/roles/{name}", role).with(admin()))
                     .andExpect(status().isNoContent());
         }
