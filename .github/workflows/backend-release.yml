@@ -1,42 +1,30 @@
-name: Backend Release
+name: Backend Release Build
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Version tag to build
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: backend-release-${{ github.ref }}
-  cancel-in-progress: false
-
 env:
   NODE_VERSION: "24.18.0"
   PNPM_VERSION: "11.22.0"
-  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 jobs:
-  verify:
-    name: Verify release commit
+  web-build:
+    name: Build release web assets
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-
+    timeout-minutes: 30
     steps:
-      - name: Check out source
+      - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.sha }}
-
-      - name: Set up GraalVM
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
-        with:
-          java-version: "25"
-          distribution: graalvm-community
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          cache: "maven"
+          ref: ${{ inputs.release_tag }}
 
       - name: Set up Node.js and pnpm
         uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
@@ -47,21 +35,58 @@ jobs:
           cache-dependency-path: src/main/web/pnpm-lock.yaml
           install: false
 
-      - name: Make Maven wrapper executable
-        run: chmod +x mvnw
-
       - name: Install web dependencies
-        run: pnpm --dir src/main/web install --frozen-lockfile
+        working-directory: src/main/web
+        run: pnpm install --frozen-lockfile
 
       - name: Build web assets
-        run: pnpm --dir src/main/web build
+        working-directory: src/main/web
+        run: pnpm build
+
+      - name: Upload web assets for backend native builds
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-web-assets
+          path: src/main/web/out/
+          if-no-files-found: error
+          retention-days: 1
+
+  verify:
+    name: Verify backend release commit
+    needs: web-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - name: Download web assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-web-assets
+          path: src/main/web/out
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
 
       - name: Verify backend
         run: ./mvnw -B -ntp verify -Dskip.frontend=true
 
   native-image:
-    name: Release image (${{ matrix.architecture }})
-    needs: verify
+    name: Build backend image binary (${{ matrix.architecture }})
+    needs:
+      - web-build
+      - verify
     strategy:
       fail-fast: false
       matrix:
@@ -70,27 +95,29 @@ jobs:
             runner: ubuntu-24.04
             native_image_musl: "true"
             native_image_args: "--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g"
-            runtime_image: scratch
           - architecture: arm64
             runner: ubuntu-24.04-arm
             native_image_musl: "false"
             native_image_args: "--no-fallback,-Os,--static-nolibc,-J-Xmx10g"
-            runtime_image: gcr.io/distroless/base-debian12:nonroot
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
-    environment: backend-release
     env:
       NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
       NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
-      NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
-      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
     steps:
-      - name: Check out source
+      - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.release_tag }}
+
+      - name: Download web assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-web-assets
+          path: src/main/web/out
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
 
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
@@ -101,26 +128,9 @@ jobs:
           cache: "maven"
           native-image-musl: ${{ matrix.native_image_musl }}
 
-      - name: Set up Node.js and pnpm
-        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          runtime: node@${{ env.NODE_VERSION }}
-          cache: true
-          cache-dependency-path: src/main/web/pnpm-lock.yaml
-          install: false
-
-      - name: Make Maven wrapper executable
-        run: chmod +x mvnw
-
-      - name: Install web dependencies
-        run: pnpm --dir src/main/web install --frozen-lockfile
-
-      - name: Build web assets
-        run: pnpm --dir src/main/web build
-
       - name: Install UPX
         run: |
+          set -euo pipefail
           UPX_VERSION=5.1.0
           UPX_ARCHIVE="upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux.tar.xz"
           curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
@@ -149,135 +159,10 @@ jobs:
       - name: Compress native executable
         run: upx --lzma --best target/native-executable
 
-      - name: Publish versioned architecture image
-        env:
-          VERSION_TAG: ${{ github.ref_name }}
-        run: |
-          VERSION="${VERSION_TAG#v}"
-          ./mvnw -ntp -Pprod,native -DskipTests \
-            -Dskip.frontend=true \
-            -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
-            -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
-            jib:build \
-            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/kitezh:${VERSION}-${NATIVE_ARCHITECTURE}" \
-            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
-            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
-
-  publish-manifest:
-    name: Publish release multi-arch image
-    needs: native-image
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment: backend-release
-    env:
-      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Upload native executable for gated Docker publishing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          ref: ${{ github.sha }}
-
-      - name: Check Docker Hub credentials
-        run: |
-          test -n "${DOCKERHUB_USERNAME}"
-          test -n "${DOCKERHUB_TOKEN}"
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
-
-      - name: Create and verify release manifest
-        env:
-          VERSION_TAG: ${{ github.ref_name }}
-        run: |
-          VERSION="${VERSION_TAG#v}"
-          IMAGE="docker.io/${DOCKERHUB_USERNAME}/kitezh"
-          docker buildx imagetools create \
-            --tag "${IMAGE}:${VERSION}" \
-            "${IMAGE}:${VERSION}-amd64" \
-            "${IMAGE}:${VERSION}-arm64"
-          docker buildx imagetools create \
-            --tag "${IMAGE}:latest" \
-            "${IMAGE}:${VERSION}-amd64" \
-            "${IMAGE}:${VERSION}-arm64"
-          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
-          docker buildx imagetools inspect "${IMAGE}:latest"
-
-      - name: Update Docker Hub description
-        run: |
-          README_PATH="docs/README-dockerhub.md"
-          if [ ! -f "${README_PATH}" ]; then
-            echo "${README_PATH} not found; skipping Docker Hub README update."
-            exit 0
-          fi
-
-          TOKEN="$(
-            jq -n \
-              --arg identifier "${DOCKERHUB_USERNAME}" \
-              --arg secret "${DOCKERHUB_TOKEN}" \
-              '{identifier: $identifier, secret: $secret}' \
-            | curl -fsS -X POST \
-              -H 'Content-Type: application/json' \
-              --data-binary @- \
-              https://hub.docker.com/v2/auth/token \
-            | jq -er '.access_token')"
-
-          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
-            | curl -fsS -X PATCH \
-              -H "Authorization: Bearer ${TOKEN}" \
-              -H 'Content-Type: application/json' \
-              --data-binary @- \
-              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/kitezh"
-
-  prepare-github-release:
-    name: Prepare shared GitHub Release
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Create draft release record
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
-            gh release create "${RELEASE_TAG}" \
-              --repo "${GH_REPO}" \
-              --verify-tag \
-              --draft \
-              --title "${RELEASE_TAG}" \
-              --generate-notes
-          else
-            gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --draft
-          fi
-
-  deploy-render-release:
-    name: Deploy release image to Render
-    needs: publish-manifest
-    if: ${{ always() && needs.publish-manifest.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: backend-release
-    env:
-      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
-      RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.RENDER_RELEASE_DEPLOY_HOOK_URL }}
-
-    steps:
-      - name: Skip Render release deploy when hook is not configured
-        if: ${{ env.RENDER_RELEASE_DEPLOY_HOOK_URL == '' }}
-        run: echo "RENDER_RELEASE_DEPLOY_HOOK_URL is not configured; skipping release deployment."
-
-      - name: Trigger Render release deploy
-        if: ${{ env.RENDER_RELEASE_DEPLOY_HOOK_URL != '' }}
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
-            --get \
-            --data-urlencode "imgURL=docker.io/${DOCKERHUB_USERNAME}/kitezh:${VERSION}" \
-            "${RENDER_RELEASE_DEPLOY_HOOK_URL}"
+          name: backend-native-${{ matrix.architecture }}
+          path: target/native-executable
+          if-no-files-found: error
+          retention-days: 1
