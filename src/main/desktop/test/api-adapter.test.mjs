@@ -121,6 +121,21 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdUser.status, 200);
+  const updatedUser = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2",
+    method: "PUT",
+    body: {
+      username: "updated-user",
+      firstName: "Updated",
+      lastName: "User",
+      email: "updated-user@example.test",
+      emailVerified: true,
+      enabled: true,
+      roles: ["ROLE_USER"],
+    },
+  });
+  assert.equal(updatedUser.status, 200);
   const disabledUser = await adapter.request({
     console: "admin",
     path: "/api/admin/users/1/enabled",
@@ -474,6 +489,22 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/users/1/enabled/nested",
+      method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/9007199254740992",
+      method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/password",
       method: "PUT",
     }),
     /not allowed/,

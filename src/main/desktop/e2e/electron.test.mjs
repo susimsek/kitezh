@@ -516,6 +516,44 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         }
         if (
           /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
+          requestMethod === "PUT"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-1));
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminUserUpdateRequests ??= [];
+          globalThis.__adminUserUpdateRequests.push({ id, body });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.firstName === "Invalid")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the user fields.",
+                violations: [
+                  { field: "firstName", message: "First name is invalid." },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          globalThis.__adminUserOverrides ??= {};
+          globalThis.__adminUserOverrides[id] = {
+            id,
+            ...body,
+            authorities: body.roles,
+            assignedRoles: body.roles,
+            effectiveRoles: body.roles,
+          };
+          return new Response(
+            JSON.stringify(globalThis.__adminUserOverrides[id]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "DELETE"
         ) {
           const id = Number(requestUrl.pathname.split("/").at(-1));
@@ -588,12 +626,20 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             {
               id: page + 1,
               username,
+              firstName: username === "admin" ? "Admin" : "Alice",
+              lastName: "Example",
               email: `${username}@example.test`,
+              emailVerified: true,
               enabled: globalThis.__userEnabledStates?.[page + 1] ?? true,
               authorities: ["ROLE_USER"],
+              assignedRoles: ["ROLE_USER"],
               effectiveRoles: ["ROLE_USER"],
             },
           ];
+          content[0] = {
+            ...content[0],
+            ...(globalThis.__adminUserOverrides?.[page + 1] ?? {}),
+          };
           if (!query && page === 0)
             content.push(...(globalThis.__createdUsers ?? []));
           return new Response(
@@ -707,7 +753,8 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             );
           }
           globalThis.__adminRoleRequests ??= [];
-          globalThis.__adminRoleRequests.push(requestUrl.search);
+          if (requestUrl.searchParams.get("size") !== "100")
+            globalThis.__adminRoleRequests.push(requestUrl.search);
           await new Promise((resolve) => setTimeout(resolve, 350));
           const page = Number(requestUrl.searchParams.get("page") ?? 0);
           const query = requestUrl.searchParams.get("q") ?? "";
@@ -1868,6 +1915,38 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     assert.equal(new URLSearchParams(requestedQueries[1]).get("q"), "alice");
     const aliceRow = window.locator('article[data-user-id="2"]');
+    await aliceRow
+      .getByRole("button", { name: "Edit user", exact: true })
+      .click();
+    const userEditForm = aliceRow.locator('form[data-form="admin-user-edit"]');
+    await userEditForm.locator('[name="firstName"]').fill("Invalid");
+    const userEditSubmit = userEditForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await userEditSubmit.click();
+    assert.equal(await userEditSubmit.isDisabled(), true);
+    assert.equal(await userEditSubmit.locator(".spinner").count(), 1);
+    await userEditForm
+      .getByText("First name is invalid.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await userEditForm.locator('[name="firstName"]').inputValue(),
+      "Invalid",
+    );
+    await userEditForm.locator('[name="firstName"]').fill("Alice Updated");
+    await userEditSubmit.click();
+    assert.equal(await userEditSubmit.isDisabled(), true);
+    assert.equal(await userEditSubmit.locator(".spinner").count(), 1);
+    await window.getByText("User updated.", { exact: true }).waitFor();
+    const userUpdateRequests = await application.evaluate(
+      () => globalThis.__adminUserUpdateRequests,
+    );
+    assert.equal(userUpdateRequests.length, 2);
+    assert.equal(userUpdateRequests[1].id, 2);
+    assert.equal(userUpdateRequests[1].body.firstName, "Alice Updated");
+    assert.deepEqual(userUpdateRequests[1].body.roles, ["ROLE_USER"]);
+    assert.equal(Object.hasOwn(userUpdateRequests[1].body, "password"), false);
     await aliceRow
       .getByRole("button", { name: "Disable user", exact: true })
       .click();

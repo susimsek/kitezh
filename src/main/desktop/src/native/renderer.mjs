@@ -358,6 +358,14 @@ function adminUsersContent() {
   const userRows = users
     .map((user) => {
       const busy = state.busy === `user-enabled:${user.id}`;
+      const editDraft = state.data.userEditDrafts?.[user.id] ?? {};
+      const editRoles = Array.isArray(state.data.userEditRoles)
+        ? state.data.userEditRoles
+        : [];
+      const editErrors =
+        Number(state.data.userEditErrorId) === Number(user.id)
+          ? violations(state.error?.body)
+          : {};
       const confirming =
         Number(state.data.userDisableConfirmId) === Number(user.id);
       const enabledControls = confirming
@@ -369,7 +377,15 @@ function adminUsersContent() {
       const deleteControls = deleteConfirming
         ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteUserPrompt"))}</span>${button(text("adminDeleteUser"), { action: "admin-user-delete-confirm", id: user.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminDeleteUser"), { action: "admin-user-delete-request", id: user.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div><div>${enabledControls}${deleteControls}</div></article>`;
+      const editing = Number(state.data.userEditOpenId) === Number(user.id);
+      const selectedRoles = Array.isArray(editDraft.roles)
+        ? editDraft.roles
+        : (user.assignedRoles ?? user.authorities ?? []);
+      const updateBusy = state.busy === `user-update:${user.id}`;
+      const editForm = editing
+        ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        : "";
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${enabledControls}${deleteControls}</div>${editForm}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1180,6 +1196,19 @@ function preserveOfflineDrafts() {
           (input) => input.value,
         ),
       };
+    } else if (form.dataset.form === "admin-user-edit") {
+      const id = Number(form.dataset.userId);
+      if (Number.isSafeInteger(id) && id > 0) {
+        state.data.userEditDrafts ??= {};
+        state.data.userEditDrafts[id] = {
+          ...values,
+          emailVerified: form.elements.namedItem("emailVerified").checked,
+          enabled: form.elements.namedItem("enabled").checked,
+          roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+            (input) => input.value,
+          ),
+        };
+      }
     } else if (form.dataset.form === "admin-role-create") {
       state.data.adminRoleCreateDraft = values;
     } else if (form.dataset.form === "admin-role-edit") {
@@ -1207,6 +1236,55 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-user-edit") {
+    const id = Number(form.dataset.userId);
+    const users = state.data.users?.content ?? [];
+    const user = users.find((candidate) => Number(candidate.id) === id);
+    if (!Number.isSafeInteger(id) || id < 1 || !user || !form.reportValidity())
+      return;
+    const body = {
+      username: String(values.username ?? "").trim(),
+      firstName: String(values.firstName ?? "").trim() || null,
+      lastName: String(values.lastName ?? "").trim() || null,
+      email: String(values.email ?? "").trim() || null,
+      emailVerified: form.elements.namedItem("emailVerified").checked,
+      enabled: form.elements.namedItem("enabled").checked,
+      roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+        (input) => input.value,
+      ),
+    };
+    if (!body.email) body.emailVerified = false;
+    if (!body.username || body.username.length > 100) return;
+    if (body.roles.length === 0) {
+      state.data.userEditDrafts ??= {};
+      state.data.userEditDrafts[id] = body;
+      state.data.userEditErrorId = id;
+      state.data.userEditLocalError = text("adminUserRoleRequired");
+      render();
+      return;
+    }
+    state.data.userEditDrafts ??= {};
+    state.data.userEditDrafts[id] = body;
+    state.data.userEditErrorId = id;
+    state.data.userEditLocalError = null;
+    state.error = null;
+    state.notice = null;
+    state.busy = `user-update:${id}`;
+    render();
+    try {
+      await request(`/api/admin/users/${id}`, { method: "PUT", body });
+      delete state.data.userEditDrafts[id];
+      state.data.userEditErrorId = null;
+      state.data.userEditOpenId = null;
+      await loadRoute({ keepContent: true });
+      state.notice = text("adminUserProfileUpdated");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-localization-message-create") {
     if (!form.reportValidity()) return;
     const body = {
@@ -1789,6 +1867,53 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "admin-user-edit-toggle") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    if (Number(state.data.userEditOpenId) === id) {
+      state.data.userEditOpenId = null;
+      render();
+      return;
+    }
+    if (!Array.isArray(state.data.userEditRoles)) {
+      state.busy = `user-edit-roles:${id}`;
+      state.error = null;
+      render();
+      try {
+        const rolePage = await request(
+          "/api/admin/roles?page=0&size=100&sort=name,asc",
+        );
+        state.data.userEditRoles = Array.isArray(rolePage?.content)
+          ? rolePage.content
+          : [];
+      } catch {
+        state.busy = null;
+        render();
+        return;
+      }
+      state.busy = null;
+    }
+    state.data.userEditOpenId = id;
+    state.data.userEditErrorId = null;
+    state.data.userEditLocalError = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-edit-cancel") {
+    if (state.busy) return;
+    const id = Number(element.dataset.id);
+    if (!Number.isSafeInteger(id) || id < 1) return;
+    if (state.data.userEditDrafts) delete state.data.userEditDrafts[id];
+    state.data.userEditOpenId = null;
+    state.data.userEditErrorId = null;
+    state.data.userEditLocalError = null;
+    render();
+    return;
+  }
   if (
     action === "admin-user-toggle-enabled" ||
     action === "admin-user-toggle-confirm"

@@ -308,6 +308,8 @@ export const messages = {
     adminCreateUser: "Create user",
     adminCreateUserDescription: "Create a user account and assign realm roles.",
     adminUserCreated: "User created.",
+    adminEditUser: "Edit user",
+    adminUserProfileUpdated: "User updated.",
     adminUserTemporaryPassword: "Require password change at next sign-in",
     adminUserEmailVerified: "Email verified",
     adminUserRoleRequired: "Select at least one role.",
@@ -749,6 +751,8 @@ export const messages = {
     adminCreateUserDescription:
       "Kullanıcı hesabı oluşturun ve rollerini atayın.",
     adminUserCreated: "Kullanıcı oluşturuldu.",
+    adminEditUser: "Kullanıcıyı düzenle",
+    adminUserProfileUpdated: "Kullanıcı güncellendi.",
     adminUserTemporaryPassword: "Sonraki girişte parola değiştirilsin",
     adminUserEmailVerified: "E-posta doğrulandı",
     adminUserRoleRequired: "En az bir rol seçin.",
