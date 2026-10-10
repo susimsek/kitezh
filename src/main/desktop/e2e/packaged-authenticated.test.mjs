@@ -241,6 +241,9 @@ test("recovers from canceled PKCE and completes login in the packaged Windows ap
         .count(),
       1,
     );
+    await mainWindow
+      .getByRole("heading", { name: "First name & Last name" })
+      .waitFor();
     assert.equal(
       await mainWindow
         .getByRole("heading", { name: "First name & Last name" })
