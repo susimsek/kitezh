@@ -84,6 +84,12 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(localizationMessageMatch[1]))
     )
       return true;
+    if (
+      method === "DELETE" &&
+      localizationMessageMatch &&
+      Number.isSafeInteger(Number(localizationMessageMatch[1]))
+    )
+      return true;
     if (method !== "GET") return false;
     if (path === "/api/admin/dashboard") return true;
     if (

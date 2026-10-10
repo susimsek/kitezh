@@ -181,6 +181,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdMessageOverride.status, 200);
+  const deletedMessageOverride = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/localization/messages/7",
+    method: "DELETE",
+  });
+  assert.equal(deletedMessageOverride.status, 200);
   const roles = await adapter.request({
     console: "admin",
     path: "/api/admin/roles?q=USER&page=0&size=20&sort=name,asc",
@@ -445,6 +451,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/settings/localization/messages/0",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization/messages/0",
+      method: "DELETE",
     }),
     /not allowed/,
   );

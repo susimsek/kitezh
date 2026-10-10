@@ -1450,6 +1450,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          /^\/api\/admin\/settings\/localization\/messages\/[1-9]\d*$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-1));
+          globalThis.__localizationMessageDeletes ??= [];
+          globalThis.__localizationMessageDeletes.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__createdLocalizationMessages = (
+            globalThis.__createdLocalizationMessages ?? []
+          ).filter((item) => item.id !== id);
+          return new Response(null, { status: 204 });
+        }
+        if (
           requestUrl.pathname === "/api/admin/settings/localization/messages"
         ) {
           globalThis.__localizationMessageRequests ??= [];
@@ -2792,6 +2807,41 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           messageValue: "Yeni <b>mesaj</b>",
         },
       ],
+    );
+    const createdOverrideRow = window
+      .locator('form[data-form="admin-localization-message"][data-id="2"]')
+      .locator("..");
+    await createdOverrideRow
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    await createdOverrideRow
+      .getByText("Delete this message override?", { exact: true })
+      .waitFor();
+    await createdOverrideRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__localizationMessageDeletes ?? [],
+      ),
+      [],
+    );
+    await createdOverrideRow
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+    const confirmOverrideDelete = createdOverrideRow.getByRole("button", {
+      name: "Delete",
+      exact: true,
+    });
+    await confirmOverrideDelete.click();
+    assert.equal(await confirmOverrideDelete.isDisabled(), true);
+    assert.equal(await confirmOverrideDelete.locator(".spinner").count(), 1);
+    await window
+      .getByText("Message override deleted.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__localizationMessageDeletes),
+      [2],
     );
     await window.getByRole("button", { name: "Turkish" }).click();
     await window

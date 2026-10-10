@@ -38,7 +38,7 @@ const escapeHtml = (value) =>
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const button = (label, options = {}) =>
-  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${(options.icon ?? (label === text("save") ? "check" : null)) && icons[options.icon ?? "check"] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon ?? "check"].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${(options.icon ?? (label === text("save") ? "check" : null)) && icons[options.icon ?? "check"] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon ?? "check"].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
 const field = (
   name,
   label,
@@ -603,7 +603,13 @@ function adminAdminLocalizationContent() {
             const values = drafts[item.id] ?? item;
             const itemErrors =
               messageErrorTarget === `update:${item.id}` ? errors : {};
-            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, itemErrors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, itemErrors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, itemErrors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(itemErrors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(itemErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form></article>`;
+            const deletePending =
+              String(state.data.adminMessageDeleteConfirmId) ===
+              String(item.id);
+            const deleteControls = deletePending
+              ? `<div class="actions"><span role="status">${escapeHtml(text("adminMessageOverrideDeletePrompt"))}</span>${button(text("adminMessageOverrideDelete"), { action: "admin-message-delete-confirm", id: item.id, danger: true, busy: state.busy === `admin-message-delete:${item.id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-message-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+              : `<div class="actions">${button(text("adminMessageOverrideDelete"), { action: "admin-message-delete-request", id: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, itemErrors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, itemErrors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, itemErrors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(itemErrors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(itemErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form>${deleteControls}</article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`
@@ -1848,6 +1854,51 @@ async function action(action, element) {
       state.busy = null;
       render();
     }
+  }
+  if (action === "admin-message-delete-request") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    if (!Number.isSafeInteger(id) || id < 1) return;
+    state.data.adminMessageDeleteConfirmId = id;
+    render();
+    return;
+  }
+  if (action === "admin-message-delete-cancel") {
+    if (state.busy) return;
+    state.data.adminMessageDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (action === "admin-message-delete-confirm") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    if (
+      !Number.isSafeInteger(id) ||
+      id < 1 ||
+      Number(state.data.adminMessageDeleteConfirmId) !== id
+    )
+      return;
+    state.busy = `admin-message-delete:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/settings/localization/messages/${id}`, {
+        method: "DELETE",
+      });
+      const page = state.data.adminMessageOverrides ?? { content: [] };
+      state.data.adminMessageOverrides = {
+        ...page,
+        content: page.content.filter((item) => item.id !== id),
+      };
+      state.data.adminMessageDeleteConfirmId = null;
+      state.notice = text("adminMessageOverrideDeleted");
+    } catch {
+      /* request rendered localized transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
   }
   if (action === "social-start") {
     if (state.busy || state.offline) return;
