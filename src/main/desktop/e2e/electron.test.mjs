@@ -194,7 +194,7 @@ test("opens the trusted renderer and exposes the narrow desktop bridge", async (
 test("opens settings in a separate window without requiring login", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow.waitForLoadState("domcontentloaded");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -458,7 +458,7 @@ test("opens settings in a separate window without requiring login", async () => 
 test("opens the native quick access companion from View", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -528,7 +528,7 @@ test("opens the native quick access companion from View", async () => {
 test("handles a second launch while the E2E app stays hidden", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow.waitForLoadState("domcontentloaded");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -555,7 +555,7 @@ test("handles a second launch while the E2E app stays hidden", async () => {
 test("keeps developer tools closed and the app hidden", async () => {
   const application = await launchDesktop({ devTools: true });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow.waitForLoadState("domcontentloaded");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -601,7 +601,7 @@ test("keeps developer tools closed and the app hidden", async () => {
 test("completes a desktop OAuth callback and keeps credentials out of diagnostics", async () => {
   const application = await launchDesktop();
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -693,7 +693,7 @@ test("shows the available update dialog from the application menu", async () => 
     updatePreviewState: "available",
   });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -750,7 +750,7 @@ test("shows an up-to-date result when no update is available", async () => {
     updatePreviewState: "not-available",
   });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -783,7 +783,7 @@ test("reports a recovered update after the previous version starts", async () =>
     },
   });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -827,7 +827,7 @@ test("shows the update error in the renderer when checking fails", async () => {
 test("localizes and themes the update dialog with desktop preferences", async () => {
   const application = await launchDesktop({ updatePreviewState: "available" });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
