@@ -139,6 +139,11 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/sessions?q=alice&status=expired&page=0&size=20&sort=lastAccessTime,desc",
   });
   assert.equal(sessions.status, 200);
+  const consents = await adapter.request({
+    console: "admin",
+    path: "/api/admin/consents?q=account&page=0&size=20&sort=id.principalName,asc",
+  });
+  assert.equal(consents.status, 200);
   await assert.rejects(
     adapter.request({
       console: "admin",

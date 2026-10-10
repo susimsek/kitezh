@@ -495,6 +495,37 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/consents") {
+          globalThis.__adminConsentRequests ??= [];
+          globalThis.__adminConsentRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const clientId = query ? "admin-console" : "account-console";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  clientId,
+                  clientName:
+                    clientId === "admin-console"
+                      ? "Admin Console"
+                      : "Account Console",
+                  principalName: "alice",
+                  userId: 9,
+                  authorities: ["openid", "admin-api"],
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -738,6 +769,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       "expired",
     );
     assert.equal(new URLSearchParams(sessionRequests[1]).get("q"), "alice");
+    const consentsNavigation = window.getByRole("button", {
+      name: "Consents",
+      exact: true,
+    });
+    await consentsNavigation.click();
+    assert.equal(await consentsNavigation.isDisabled(), true);
+    assert.equal(await consentsNavigation.locator(".spinner").count(), 1);
+    await window
+      .locator(".list-item strong")
+      .filter({ hasText: "Account Console" })
+      .waitFor();
+    await window
+      .getByRole("searchbox", { name: "Search consents" })
+      .fill("admin");
+    await window.getByRole("button", { name: "Search consents" }).click();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Search consents" })
+        .isDisabled(),
+      true,
+    );
+    await window
+      .locator(".list-item strong")
+      .filter({ hasText: "Admin Console" })
+      .waitFor();
+    const consentRequests = await application.evaluate(
+      () => globalThis.__adminConsentRequests,
+    );
+    assert.equal(new URLSearchParams(consentRequests[1]).get("q"), "admin");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
