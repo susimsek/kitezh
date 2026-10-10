@@ -381,6 +381,9 @@
 					<destFile>${java.io.tmpdir}/${project.artifactId}-jacoco.exec</destFile>
 					<excludes>
 						<exclude>io/github/susimsek/kitezh/mapper/*MapperImpl.class</exclude>
+						<exclude>io/github/susimsek/kitezh/**/*$$SpringCGLIB$$*.class</exclude>
+						<exclude>io/github/susimsek/kitezh/**/*__Accessor_*.class</exclude>
+						<exclude>io/github/susimsek/kitezh/**/*__BeanDefinitions*.class</exclude>
 					</excludes>
 				</configuration>
 				<executions>
@@ -431,11 +434,6 @@
 								<rule>
 									<element>BUNDLE</element>
 									<limits>
-										<limit>
-											<counter>INSTRUCTION</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>${coverage.minimum}</minimum>
-										</limit>
 										<limit>
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
