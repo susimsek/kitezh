@@ -40,6 +40,7 @@ uses typed, capability-scoped API calls.
 ## Latest focused evidence
 
 - Web desktop-release failures now log a fixed message without raw exception content; `components/download/DownloadPage.test.tsx` verifies sensitive rejected details are not emitted.
+- Backend mail and API failure logging omits recipient addresses, raw exception messages, and stack traces; focused `MailServiceTest` and `ApiExceptionHandlerTest` assertions verify the emitted log events.
 - `pnpm --dir src/main/desktop run test:unit`: 25/25 passed, including diagnostics redaction and EN/TR catalog parity.
 - `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 13/13 passed, including email settings, shared icon semantics, exact external navigation/callback rejection, diagnostics copy busy-state, and forced-colors system token checks.
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.

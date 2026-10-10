@@ -11,6 +11,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.service.EmailSettingsService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
@@ -23,6 +26,7 @@ import java.util.Map;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -115,6 +119,37 @@ class MailServiceTest {
                 .sendEmail("user@example.com", "Subject", "Body", false);
 
         verify(mailSender).send(mimeMessage);
+    }
+
+    @Test
+    void doesNotLogRecipientOrMailFailureDetails() throws Exception {
+        MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        doThrow(new MailSendException("token=secret recipient=ada@example.com"))
+                .when(mailSender)
+                .send(mimeMessage);
+        Logger logger = (Logger) LoggerFactory.getLogger(MailService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            new MailService(properties(true), mailSender, messageSource, templateEngine, null)
+                    .sendEmail("ada@example.com", "Sensitive subject", "Sensitive body", false);
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list)
+                .singleElement()
+                .satisfies(
+                        event -> {
+                            assertThat(event.getFormattedMessage())
+                                    .contains("Email delivery failed")
+                                    .doesNotContain("ada@example.com", "token=secret");
+                            assertThat(event.getThrowableProxy()).isNull();
+                        });
     }
 
     @Test
