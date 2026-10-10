@@ -58,6 +58,7 @@ uses typed, capability-scoped API calls.
 - The same packaged Windows smoke injects synthetic rejected-promise and uncaught-exception-monitor events containing authorization and personal-data sentinels; the diagnostics API and Settings preview omit the sentinels, and manual copy remains busy with one clipboard write and an inline spinner until it completes.
 - Packaged Windows Admin E2E signs in through PKCE, reads `/api/admin/dashboard`, confirms only the Admin session namespace is populated, and verifies an Account profile request without an Account session returns 401.
 - Packaged Windows Admin E2E now also creates a unique realm role, updates its description through the bounded Admin form, and deletes it with confirmation against the local seeded backend; both packaged authenticated tests pass (2/2), and the Admin-only session still receives 401 on Account API access.
+- Rebuilt packaged Windows PKCE E2E cancels the initial sign-in, rejects its stale protocol callback, retries with fresh state, then completes authenticated Account login; packaged authenticated suite passes 2/2. The new portable and NSIS `.exe` outputs are `NotSigned` according to `Get-AuthenticodeSignature`.
 - `package-metadata.test.mjs` now checks AppX identity/publisher, Windows targets, icon and packaged file globs, ASAR enablement, output directory, protocol registration, and platform artifact naming.
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.
 - `git diff --check` passed for the committed slices.

@@ -59,7 +59,7 @@ async function accountProfile(mainWindow) {
   );
 }
 
-test("completes authenticated PKCE login in the packaged Windows app", async () => {
+test("recovers from canceled PKCE and completes login in the packaged Windows app", async () => {
   const userDataDirectory = await mkdtemp(
     path.join(os.tmpdir(), "kitezh-packaged-auth-e2e-"),
   );
@@ -149,7 +149,41 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
       .waitFor();
     await mainWindow.getByRole("button", { name: "Account Console" }).click();
 
+    const canceledAuthorizationUrl = await externalUrlFromDesktop(application);
+    const canceledState = new URL(canceledAuthorizationUrl).searchParams.get(
+      "state",
+    );
+    assert.ok(canceledState);
+    const cancelSignIn = mainWindow.getByRole("button", {
+      name: "Cancel sign-in",
+      exact: true,
+    });
+    await cancelSignIn.click();
+    await cancelSignIn.locator(".spinner").waitFor({ state: "visible" });
+    await mainWindow
+      .getByText("Sign-in canceled. You can try again.", { exact: true })
+      .waitFor();
+    await application.evaluate(({ app }, state) => {
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=stale-packaged-code`,
+      );
+      globalThis.__e2eExternalUrl = null;
+    }, canceledState);
+    assert.equal(
+      await mainWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("account"),
+      ),
+      false,
+    );
+    await mainWindow
+      .getByRole("button", { name: "Sign in", exact: true })
+      .click();
     const authorizationUrl = await externalUrlFromDesktop(application);
+    const retryState = new URL(authorizationUrl).searchParams.get("state");
+    assert.ok(retryState);
+    assert.notEqual(retryState, canceledState);
     const browserWindowPromise = application.waitForEvent("window");
     await application.evaluate(({ BrowserWindow }, url) => {
       const browserWindow = new BrowserWindow({
