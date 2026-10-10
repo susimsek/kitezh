@@ -17,9 +17,22 @@ import {
   deleteAdminUser,
   setAdminUserEnabled,
   createAdminUser,
+  updateAdminUser,
+  createAdminClient,
   updateAdminClient,
+  deleteAdminClient,
+  createAdminClientScope,
+  updateAdminClientScope,
+  deleteAdminClientScope,
+  createAdminRole,
+  updateAdminRole,
+  deleteAdminRole,
+  createAdminGroup,
+  updateAdminGroup,
   deleteAdminGroup,
   createAdminIdentityProvider,
+  updateAdminIdentityProvider,
+  deleteAdminIdentityProvider,
   listAdminKeys,
   rotateAdminKey,
   listAdminEvents,
@@ -45,7 +58,10 @@ test("admin dashboard uses the admin API scope endpoint", async () => {
       sessions: 2,
       consents: 1,
     });
-    assert.equal(request?.toString(), "https://kitezh.onrender.com/api/admin/dashboard");
+    assert.equal(
+      request?.toString(),
+      "https://kitezh.onrender.com/api/admin/dashboard",
+    );
     assert.equal(authorization, "Bearer access-token");
   } finally {
     globalThis.fetch = originalFetch;
@@ -79,7 +95,8 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
   try {
     await assert.rejects(
       getAdminDashboard("access-token"),
-      (error: unknown) => error instanceof AdminApiError && error.status === 403,
+      (error: unknown) =>
+        error instanceof AdminApiError && error.status === 403,
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -92,7 +109,8 @@ test("admin requests classify timeout and offline failures", async () => {
     new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener(
         "abort",
-        () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+        () =>
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
         { once: true },
       );
     });
@@ -126,7 +144,13 @@ test("admin users request encodes search and pagination parameters", async () =>
   globalThis.fetch = async (input) => {
     request = input.toString();
     return new Response(
-      JSON.stringify({ content: [], number: 1, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 1,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
@@ -181,10 +205,13 @@ test("native admin resource mutations use JSON contracts and protected paths", a
       method: init?.method ?? "GET",
       url: input.toString(),
     });
-    return new Response(JSON.stringify({ client: { id: "client-1" }, clientSecret: null }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ client: { id: "client-1" }, clientSecret: null }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   };
   try {
     await createAdminUser("access-token", {
@@ -244,12 +271,106 @@ test("native admin resource mutations use JSON contracts and protected paths", a
       calls.map(({ method, url }) => ({ method, url })),
       [
         { method: "POST", url: "https://kitezh.onrender.com/api/admin/users" },
-        { method: "PUT", url: "https://kitezh.onrender.com/api/admin/clients/client-1" },
-        { method: "DELETE", url: "https://kitezh.onrender.com/api/admin/groups/12" },
-        { method: "POST", url: "https://kitezh.onrender.com/api/admin/identity-providers" },
+        {
+          method: "PUT",
+          url: "https://kitezh.onrender.com/api/admin/clients/client-1",
+        },
+        {
+          method: "DELETE",
+          url: "https://kitezh.onrender.com/api/admin/groups/12",
+        },
+        {
+          method: "POST",
+          url: "https://kitezh.onrender.com/api/admin/identity-providers",
+        },
       ],
     );
     assert.match(calls[0].body ?? "", /native-user/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin CRUD wrappers send the expected JSON methods and encoded resource paths", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      body: init?.body?.toString() ?? null,
+      method: init?.method ?? "GET",
+      url: input.toString(),
+    });
+    return new Response(JSON.stringify({ id: "created" }), { status: 200 });
+  };
+  const payload = { name: "native-resource" } as never;
+  try {
+    await updateAdminUser("token", 4, payload);
+    await createAdminClient("token", payload);
+    await deleteAdminClient("token", "client/one");
+    await createAdminClientScope("token", payload);
+    await updateAdminClientScope("token", "scope/one", payload);
+    await deleteAdminClientScope("token", "scope/one");
+    await createAdminRole("token", payload);
+    await updateAdminRole("token", "ROLE/ADMIN", payload);
+    await deleteAdminRole("token", "ROLE/ADMIN");
+    await createAdminGroup("token", payload);
+    await updateAdminGroup("token", 12, payload);
+    await updateAdminIdentityProvider("token", "oidc/one", payload);
+    await deleteAdminIdentityProvider("token", "oidc/one");
+
+    assert.deepEqual(
+      calls.map(({ method, url }) => ({ method, url })),
+      [
+        { method: "PUT", url: "https://kitezh.onrender.com/api/admin/users/4" },
+        {
+          method: "POST",
+          url: "https://kitezh.onrender.com/api/admin/clients",
+        },
+        {
+          method: "DELETE",
+          url: "https://kitezh.onrender.com/api/admin/clients/client%2Fone",
+        },
+        {
+          method: "POST",
+          url: "https://kitezh.onrender.com/api/admin/client-scopes",
+        },
+        {
+          method: "PUT",
+          url: "https://kitezh.onrender.com/api/admin/client-scopes/scope%2Fone",
+        },
+        {
+          method: "DELETE",
+          url: "https://kitezh.onrender.com/api/admin/client-scopes/scope%2Fone",
+        },
+        { method: "POST", url: "https://kitezh.onrender.com/api/admin/roles" },
+        {
+          method: "PUT",
+          url: "https://kitezh.onrender.com/api/admin/roles/ROLE%2FADMIN",
+        },
+        {
+          method: "DELETE",
+          url: "https://kitezh.onrender.com/api/admin/roles/ROLE%2FADMIN",
+        },
+        { method: "POST", url: "https://kitezh.onrender.com/api/admin/groups" },
+        {
+          method: "PUT",
+          url: "https://kitezh.onrender.com/api/admin/groups/12",
+        },
+        {
+          method: "PUT",
+          url: "https://kitezh.onrender.com/api/admin/identity-providers/oidc%2Fone",
+        },
+        {
+          method: "DELETE",
+          url: "https://kitezh.onrender.com/api/admin/identity-providers/oidc%2Fone",
+        },
+      ],
+    );
+    assert.ok(
+      calls
+        .filter(({ body }) => body !== null)
+        .every(({ body }) => body === JSON.stringify(payload)),
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -261,7 +382,13 @@ test("admin clients request uses a bounded sorted page", async () => {
   globalThis.fetch = async (input) => {
     request = input.toString();
     return new Response(
-      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
@@ -282,7 +409,13 @@ test("admin client scopes request uses a bounded sorted page", async () => {
   globalThis.fetch = async (input) => {
     request = input.toString();
     return new Response(
-      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
@@ -303,7 +436,13 @@ test("admin roles and groups requests use bounded sorted pages", async () => {
   globalThis.fetch = async (input) => {
     requests.push(input.toString());
     return new Response(
-      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
@@ -325,7 +464,13 @@ test("admin identity providers request uses the login-order sort", async () => {
   globalThis.fetch = async (input) => {
     request = input.toString();
     return new Response(
-      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
@@ -346,12 +491,25 @@ test("admin sessions request encodes status and client filters", async () => {
   globalThis.fetch = async (input) => {
     request = input.toString();
     return new Response(
-      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
   try {
-    await listAdminSessions("access-token", "ada", "active", "account-console", 0, 10);
+    await listAdminSessions(
+      "access-token",
+      "ada",
+      "active",
+      "account-console",
+      0,
+      10,
+    );
     assert.equal(
       request,
       "https://kitezh.onrender.com/api/admin/sessions?q=ada&clientId=account-console&status=active&page=0&size=10&sort=lastAccessTime%2Cdesc",
@@ -373,7 +531,10 @@ test("admin session deletion uses the protected delete endpoint", async () => {
   try {
     await deleteAdminSession("access-token", "session/one");
     assert.equal(method, "DELETE");
-    assert.equal(request, "https://kitezh.onrender.com/api/admin/sessions/session%2Fone");
+    assert.equal(
+      request,
+      "https://kitezh.onrender.com/api/admin/sessions/session%2Fone",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -385,12 +546,24 @@ test("admin consents request encodes all filters and stable sort", async () => {
   globalThis.fetch = async (input) => {
     request = input.toString();
     return new Response(
-      JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }),
+      JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
       { status: 200 },
     );
   };
   try {
-    await listAdminConsents("access-token", "account", "account-console", "ada", "openid");
+    await listAdminConsents(
+      "access-token",
+      "account",
+      "account-console",
+      "ada",
+      "openid",
+    );
     assert.equal(
       request,
       "https://kitezh.onrender.com/api/admin/consents?q=account&clientId=account-console&username=ada&scope=openid&page=0&size=10&sort=id.principalName%2Casc",
@@ -428,7 +601,16 @@ test("admin keys and events expose bounded native management endpoints", async (
     requests.push({ url: input.toString(), method: init?.method ?? "GET" });
     return init?.method === "POST" || init?.method === "DELETE"
       ? new Response(null, { status: 204 })
-      : new Response(JSON.stringify({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 }), { status: 200 });
+      : new Response(
+          JSON.stringify({
+            content: [],
+            number: 0,
+            size: 10,
+            totalElements: 0,
+            totalPages: 0,
+          }),
+          { status: 200 },
+        );
   };
   try {
     await listAdminKeys("access-token", "rsa", true);
@@ -436,9 +618,18 @@ test("admin keys and events expose bounded native management endpoints", async (
     await listAdminEvents("access-token", "user.updated");
     await deleteAdminEvents("access-token");
     assert.deepEqual(requests, [
-      { url: "https://kitezh.onrender.com/api/admin/keys?q=rsa&page=0&size=10&sort=createdAt%2Cdesc&active=true", method: "GET" },
-      { url: "https://kitezh.onrender.com/api/admin/keys/rotate", method: "POST" },
-      { url: "https://kitezh.onrender.com/api/admin/events?q=user.updated&action=&targetType=&targetId=&page=0&size=10&sort=occurredAt%2Cdesc", method: "GET" },
+      {
+        url: "https://kitezh.onrender.com/api/admin/keys?q=rsa&page=0&size=10&sort=createdAt%2Cdesc&active=true",
+        method: "GET",
+      },
+      {
+        url: "https://kitezh.onrender.com/api/admin/keys/rotate",
+        method: "POST",
+      },
+      {
+        url: "https://kitezh.onrender.com/api/admin/events?q=user.updated&action=&targetType=&targetId=&page=0&size=10&sort=occurredAt%2Cdesc",
+        method: "GET",
+      },
       { url: "https://kitezh.onrender.com/api/admin/events", method: "DELETE" },
     ]);
   } finally {

@@ -1,4 +1,4 @@
-import { authorizationServerIssuer } from "@/config";
+import { authorizationServerIssuer } from "../config.ts";
 import type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
 import {
   classifyApiError,

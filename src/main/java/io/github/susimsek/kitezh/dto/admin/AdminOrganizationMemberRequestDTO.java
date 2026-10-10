@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.dto.admin;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import java.util.Locale;
 
 @Schema(name = "AdminOrganizationMemberRequest", description = "Organization membership request.")
 public record AdminOrganizationMemberRequestDTO(
@@ -22,6 +23,6 @@ public record AdminOrganizationMemberRequestDTO(
                 String role) {
 
     public String roleValue() {
-        return role == null || role.isBlank() ? "MEMBER" : role.trim().toUpperCase();
+        return role == null || role.isBlank() ? "MEMBER" : role.trim().toUpperCase(Locale.ROOT);
     }
 }

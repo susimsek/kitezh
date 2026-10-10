@@ -17,5 +17,8 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "exclude": [
+    "src/**/*.coverage.test.tsx"
   ]
 }

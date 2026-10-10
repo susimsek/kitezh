@@ -186,6 +186,24 @@ describe("AdminAuthProvider", () => {
     );
   });
 
+  it("clears the session when an authorization response has the wrong nonce", async () => {
+    renderProvider();
+    storeTransaction("nonce-state");
+    mockPost.mockResolvedValueOnce({
+      data: {
+        access_token: jwt({ sub: "u1", exp: Math.floor(Date.now() / 1000) + 60 }),
+        expires_in: 60,
+        id_token: jwt({ nonce: "wrong-nonce", sub: "u1" }),
+      },
+    });
+
+    await expect(auth.completeAuthorization("code", "nonce-state")).rejects.toThrow(
+      "Invalid nonce",
+    );
+    expect(auth.authenticated).toBe(false);
+    expect(localStorage.getItem("AUTH_CONSOLE_TOKEN:admin")).toBeNull();
+  });
+
   it("exchanges a code, stores token state, and refreshes it", async () => {
     renderProvider();
     storeTransaction("state");
@@ -318,6 +336,38 @@ describe("AdminAuthProvider", () => {
     });
     expect(auth.authenticated).toBe(false);
     expect(localStorage.getItem("AUTH_CONSOLE_TOKEN:admin")).toBeNull();
+  });
+
+  it("skips a healthy refresh and clears the session after a 401 refresh rejection", async () => {
+    storeTokens();
+    renderProvider();
+    await waitFor(() => expect(auth.authenticated).toBe(true));
+
+    await expect(auth.refreshAccessToken(30)).resolves.not.toBeNull();
+    expect(mockPost).not.toHaveBeenCalled();
+
+    mockPost.mockRejectedValueOnce(
+      Object.assign(new Error("refresh token rejected"), {
+        isAxiosError: true,
+        response: { status: 401 },
+      }),
+    );
+    await act(async () => {
+      await expect(auth.refreshAccessToken(-1)).resolves.toBeNull();
+    });
+    expect(auth.authenticated).toBe(false);
+    expect(localStorage.getItem("AUTH_CONSOLE_TOKEN:admin")).toBeNull();
+  });
+
+  it("clears local logout state when the server already revoked the session", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    renderProvider();
+
+    await act(async () => auth.logout("en", { sessionAlreadyRevoked: true }));
+
+    expect(auth.isLoggingOut).toBe(true);
+    expect(mockPost).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("allows access state to be updated by guards", async () => {

@@ -24,6 +24,7 @@
     "test:unit": "jest",
     "test:unit:coverage": "jest --coverage",
     "test:unit:sonar-coverage": "jest --coverage --runInBand && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/web",
+    "test:mobile:sonar-coverage": "jest --config jest.mobile.config.ts --coverage --runInBand && node ../../../scripts/prefix-lcov-paths.mjs ../mobile/coverage/ui/lcov.info src/main/mobile",
     "test:e2e": "playwright test",
     "test:e2e:chrome": "playwright test --project=chromium",
     "test:e2e:admin": "playwright test e2e/admin-console.spec.ts",

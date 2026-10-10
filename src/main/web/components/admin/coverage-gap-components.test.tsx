@@ -11,6 +11,7 @@ import { EntityRelatedData } from "./EntityRelatedData";
 import { GroupsTable } from "./GroupsTable";
 import { IdentityProviderForm } from "./IdentityProviderForm";
 import { IdentityProvidersTable } from "./IdentityProvidersTable";
+import { OrganizationsTable } from "./OrganizationsTable";
 import ServerInfoPage from "./ServerInfo";
 
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
@@ -164,6 +165,63 @@ describe("previously uncovered administration components", () => {
     await waitFor(() =>
       expect(screen.getByText(dictionary.admin.groups.operationError)).toBeVisible(),
     );
+  });
+
+  it("renders organizations, pagination, and authorized create actions", async () => {
+    mockAdminRequest.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        content: [
+          {
+            id: 7,
+            alias: "north",
+            name: "North Region",
+            displayName: "Northern Region",
+            enabled: true,
+            memberCount: 4,
+            domainCount: 2,
+            groupCount: 3,
+          },
+        ],
+        totalPages: 2,
+        totalElements: 11,
+      },
+    } as never);
+
+    render(<OrganizationsTable dictionary={dictionary} />);
+
+    expect(await screen.findByText("Northern Region")).toBeVisible();
+    expect(screen.getByText("north")).toBeVisible();
+    expect(screen.getByText("4")).toBeVisible();
+    expect(screen.getByText("2")).toBeVisible();
+    expect(screen.getByText("3")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: dictionary.admin.organizations.create }),
+    ).toHaveAttribute("href", "/admin/organizations/new");
+    expect(screen.getByText("pagination")).toBeVisible();
+    expect(mockAdminRequest).toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({
+        url: "/api/admin/organizations?q=&page=0&size=10&sort=name%2Casc",
+      }),
+    );
+  });
+
+  it("shows organization load errors and empty results without create permission", async () => {
+    authState.access = {
+      isAdmin: false,
+      manageClients: false,
+      manageUsers: false,
+      manageConsents: false,
+    };
+    mockAdminRequest.mockResolvedValueOnce({ status: 503, data: null } as never);
+
+    render(<OrganizationsTable dictionary={dictionary} />);
+
+    expect(await screen.findByText(dictionary.admin.organizations.operationError)).toBeVisible();
+    expect(screen.queryByRole("link", { name: dictionary.admin.organizations.create })).toBeNull();
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+    expect(screen.queryByText("pagination")).toBeNull();
   });
 
   it("edits and deletes client scopes, including server errors", async () => {

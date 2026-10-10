@@ -470,3 +470,104 @@ it("shows a spinner while saving a role", async () => {
   completeSave({ status: 201, data: role });
   await waitFor(() => expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.roles.saved));
 });
+
+it("searches and assigns client and realm composite roles", async () => {
+  const request = jest.mocked(adminRequest);
+  const clientComposite = { id: 10, clientId: "orders-client", name: "orders.audit" };
+  const realmComposite = { name: "ROLE_AUDITOR", description: "Audit access" };
+  request.mockImplementation(async (_token, config) => {
+    if (config.url?.includes("available-composites")) {
+      return {
+        status: 200,
+        data: { content: [clientComposite], totalPages: 1, totalElements: 1 },
+      } as never;
+    }
+    if (config.url?.includes("available-realm-composites")) {
+      return {
+        status: 200,
+        data: { content: [realmComposite], totalPages: 1, totalElements: 1 },
+      } as never;
+    }
+    if (config.method === "DELETE" && config.url?.includes("/composites/")) {
+      return { status: 200, data: detail } as never;
+    }
+    if (config.method === "DELETE" && config.url?.includes("/realm-composites/")) {
+      return { status: 200, data: detail } as never;
+    }
+    if (config.method === "POST" && config.url?.includes("/composites/")) {
+      return {
+        status: 200,
+        data: { ...detail, compositeRoles: [clientComposite] },
+      } as never;
+    }
+    if (config.method === "POST" && config.url?.includes("/realm-composites/")) {
+      return {
+        status: 200,
+        data: { ...detail, compositeRealmRoles: [realmComposite] },
+      } as never;
+    }
+    if (config.url?.includes("/roles/9?")) return { status: 200, data: detail } as never;
+    return {
+      status: 200,
+      data: { content: [role], totalPages: 1, totalElements: 1 },
+    } as never;
+  });
+
+  render(<ClientRoles clientId="orders-client" dictionary={en} />);
+  fireEvent.click(await screen.findByRole("button", { name: role.name }));
+
+  fireEvent.change(await screen.findByLabelText(en.admin.clients.roles.assignComposite), {
+    target: { value: "orders.audit" },
+  });
+  fireEvent.click(await screen.findByRole("button", { name: clientComposite.name }));
+  fireEvent.click(screen.getAllByRole("button", { name: en.admin.clients.roles.assign })[2]);
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ method: "POST", url: expect.stringContaining("/composites/10") }),
+    ),
+  );
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: en.admin.clients.roles.remove,
+    }),
+  );
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({
+        method: "DELETE",
+        url: expect.stringContaining("/composites/10"),
+      }),
+    ),
+  );
+
+  fireEvent.change(await screen.findByLabelText(en.admin.clients.roles.assignRealmComposite), {
+    target: { value: "ROLE_AUDITOR" },
+  });
+  fireEvent.click(await screen.findByRole("button", { name: realmComposite.name }));
+  fireEvent.click(screen.getAllByRole("button", { name: en.admin.clients.roles.assign })[3]);
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({
+        method: "POST",
+        url: expect.stringContaining("/realm-composites/"),
+      }),
+    ),
+  );
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: en.admin.clients.roles.remove,
+    }),
+  );
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({
+        method: "DELETE",
+        url: expect.stringContaining("/realm-composites/ROLE_AUDITOR"),
+      }),
+    ),
+  );
+});

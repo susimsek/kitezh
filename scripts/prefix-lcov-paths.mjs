@@ -8,7 +8,9 @@ if (!reportPath || !sourcePrefix || sourcePrefix.includes("..")) {
 
 const report = await readFile(reportPath, "utf8");
 const normalizedReport = report.replace(/^SF:(?!\/)(.+)$/gm, (_, sourcePath) => {
-  const normalizedSourcePath = sourcePath.replaceAll("\\", "/");
+  const normalizedSourcePath = sourcePath
+    .replaceAll("\\", "/")
+    .replace(/^\.\.\/mobile\//, "");
   if (normalizedSourcePath.startsWith(`${sourcePrefix}/`)) {
     return `SF:${normalizedSourcePath}`;
   }

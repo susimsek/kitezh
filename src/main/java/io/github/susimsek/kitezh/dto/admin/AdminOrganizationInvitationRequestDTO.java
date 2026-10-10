@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
+import java.util.Locale;
 
 @Schema(
         name = "AdminOrganizationInvitationRequest",
@@ -29,6 +30,6 @@ public record AdminOrganizationInvitationRequestDTO(
                 Instant expiresAt) {
 
     public String roleValue() {
-        return role == null || role.isBlank() ? "MEMBER" : role.trim().toUpperCase();
+        return role == null || role.isBlank() ? "MEMBER" : role.trim().toUpperCase(Locale.ROOT);
     }
 }
