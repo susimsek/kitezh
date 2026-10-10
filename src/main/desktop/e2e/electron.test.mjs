@@ -2626,6 +2626,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     const roleEditForm = window.locator(
       'form[data-form="admin-role-edit"][data-role-name="ROLE_NATIVE_VIEWER"]',
     );
+    await roleEditForm.getByLabel("Açıklama").waitFor();
     await roleEditForm
       .locator('[name="description"]')
       .fill("Rejected description");
@@ -3280,6 +3281,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       'form[data-form="admin-identity-provider-policy"]',
     );
     await providerPolicyForm.waitFor();
+    await providerPolicyForm.getByLabel("Sync mode").waitFor();
     await providerPolicyForm
       .locator('[name="displayName"]')
       .fill("Rejected policy");

@@ -21,6 +21,27 @@ test("shared English and Turkish catalogs contain the same non-empty message key
   }
 });
 
+test("native renderer static message references exist in both shared catalogs", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "src", "native", "renderer.mjs"),
+    "utf8",
+  );
+  const keys = [...source.matchAll(/\btext\(\s*["']([^"']+)["']\s*\)/g)].map(
+    (match) => match[1],
+  );
+
+  assert.ok(keys.length > 0, "native renderer should use shared message keys");
+  const missingKeys = [...new Set(keys)].filter(
+    (key) =>
+      !Object.hasOwn(messages.en, key) || !Object.hasOwn(messages.tr, key),
+  );
+  assert.deepEqual(
+    missingKeys,
+    [],
+    "all renderer message keys need EN and TR values",
+  );
+});
+
 test("native desktop renderer does not depend on the Web component tree", async () => {
   const source = await readFile(
     path.join(desktopDirectory, "src", "native", "renderer.mjs"),

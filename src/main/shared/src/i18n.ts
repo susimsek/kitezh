@@ -57,6 +57,7 @@ export const messages = {
     adminProviderTrustEmail: "Trust provider email",
     adminProviderRequireMfa: "Require MFA after sign-in",
     adminProviderOrder: "Login order",
+    adminProviderSyncMode: "Sync mode",
     adminProviderAccountVisibility: "Account Console visibility",
     adminProviderAlways: "Always",
     adminProviderWhenLinked: "When linked",
@@ -275,6 +276,7 @@ export const messages = {
     adminRoleDeleted: "Role deleted.",
     adminRoleUpdated: "Role description updated.",
     adminRoleName: "Role name",
+    adminRoleDescription: "Description",
     adminRoleNameRequired: "Role name is required.",
     adminRoleNameFormat:
       "Use ROLE_ followed by uppercase letters, numbers, or underscores.",
@@ -548,6 +550,7 @@ export const messages = {
     adminProviderTrustEmail: "Sağlayıcı e-postasına güven",
     adminProviderRequireMfa: "Oturum açtıktan sonra MFA iste",
     adminProviderOrder: "Oturum açma sırası",
+    adminProviderSyncMode: "Eşitleme modu",
     adminProviderAccountVisibility: "Hesap Konsolu görünürlüğü",
     adminProviderAlways: "Her zaman",
     adminProviderWhenLinked: "Bağlı olduğunda",
@@ -768,6 +771,7 @@ export const messages = {
     adminRoleDeleted: "Rol silindi.",
     adminRoleUpdated: "Rol açıklaması güncellendi.",
     adminRoleName: "Rol adı",
+    adminRoleDescription: "Açıklama",
     adminRoleNameRequired: "Rol adı gereklidir.",
     adminRoleNameFormat:
       "ROLE_ sonrasında büyük harf, rakam veya alt çizgi kullanın.",
