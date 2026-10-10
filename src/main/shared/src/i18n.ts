@@ -191,6 +191,20 @@ export const messages = {
     adminSearchClientScopes: "Search client scopes",
     adminNoClientScopes: "No client scopes found.",
     adminClientScopesLoadError: "We could not load client scopes.",
+    adminCreateClientScope: "Create client scope",
+    adminCreateClientScopeDescription:
+      "Add a scope to the authorization catalog with safe defaults.",
+    adminClientScopeCreated: "Client scope created.",
+    adminClientScopeName: "Scope name",
+    adminClientScopeNameRequired: "Scope name is required.",
+    adminClientScopeDisplayName: "Display name",
+    adminClientScopeDescription: "Scope description",
+    adminClientScopeDefaults:
+      "Consent display and group mapping stay disabled; token scope is included by default.",
+    adminClientScopeDisplayNameTooLong:
+      "Display name must be 200 characters or fewer.",
+    adminClientScopeDescriptionTooLong:
+      "Scope description must be 500 characters or fewer.",
     adminSearchRoles: "Search roles",
     adminCreateRole: "Create role",
     adminCreateRoleDescription: "Create a realm role for access control.",
@@ -573,6 +587,20 @@ export const messages = {
     adminSearchClientScopes: "İstemci kapsamı ara",
     adminNoClientScopes: "İstemci kapsamı bulunamadı.",
     adminClientScopesLoadError: "İstemci kapsamları yüklenemedi.",
+    adminCreateClientScope: "İstemci kapsamı oluştur",
+    adminCreateClientScopeDescription:
+      "Güvenli varsayılanlarla yetkilendirme kataloğuna kapsam ekleyin.",
+    adminClientScopeCreated: "İstemci kapsamı oluşturuldu.",
+    adminClientScopeName: "Kapsam adı",
+    adminClientScopeNameRequired: "Kapsam adı gereklidir.",
+    adminClientScopeDisplayName: "Görünen ad",
+    adminClientScopeDescription: "Kapsam açıklaması",
+    adminClientScopeDefaults:
+      "Rıza ekranı ve grup eşlemesi kapalı kalır; kapsam varsayılan olarak belirtece eklenir.",
+    adminClientScopeDisplayNameTooLong:
+      "Görünen ad en fazla 200 karakter olabilir.",
+    adminClientScopeDescriptionTooLong:
+      "Kapsam açıklaması en fazla 500 karakter olabilir.",
     adminSearchRoles: "Rol ara",
     adminCreateRole: "Rol oluştur",
     adminCreateRoleDescription:

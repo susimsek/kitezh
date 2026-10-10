@@ -140,6 +140,17 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdGroup.status, 200);
+  const createdClientScope = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes",
+    method: "POST",
+    body: {
+      name: "native-observer",
+      displayName: "Native observer",
+      description: "Read-only native console scope",
+    },
+  });
+  assert.equal(createdClientScope.status, 200);
   const roles = await adapter.request({
     console: "admin",
     path: "/api/admin/roles?q=USER&page=0&size=20&sort=name,asc",
@@ -371,6 +382,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/groups/1",
+      method: "POST",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/client-scopes/native-observer",
       method: "POST",
     }),
     /not allowed/,

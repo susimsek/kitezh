@@ -729,22 +729,63 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (requestUrl.pathname === "/api/admin/client-scopes") {
+          if (requestMethod === "POST") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__adminClientScopeCreateRequests ??= [];
+            globalThis.__adminClientScopeCreateRequests.push(body);
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            if (body.name === "account-api")
+              return new Response(
+                JSON.stringify({
+                  detail: "Correct the client scope fields.",
+                  violations: [
+                    {
+                      field: "name",
+                      message: "Client scope name is already registered.",
+                    },
+                  ],
+                }),
+                {
+                  status: 409,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            globalThis.__createdClientScopes ??= [];
+            globalThis.__createdClientScopes.push({
+              id: "scope-native-observer",
+              name: body.name,
+              displayName: body.displayName,
+              description: body.description,
+              builtIn: false,
+            });
+            return new Response(
+              JSON.stringify(globalThis.__createdClientScopes.at(-1)),
+              {
+                status: 201,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
           globalThis.__adminClientScopeRequests ??= [];
           globalThis.__adminClientScopeRequests.push(requestUrl.search);
           await new Promise((resolve) => setTimeout(resolve, 350));
+          const page = Number(requestUrl.searchParams.get("page") ?? 0);
           const query = requestUrl.searchParams.get("q") ?? "";
           const name = query ? "account-api" : "openid";
+          const content = [
+            {
+              id: `scope-${name}`,
+              name,
+              displayName: name === "openid" ? "OpenID" : "Account API",
+              description: "Read-only scope description",
+              builtIn: name === "openid",
+            },
+          ];
+          if (!query && page === 0)
+            content.push(...(globalThis.__createdClientScopes ?? []));
           return new Response(
             JSON.stringify({
-              content: [
-                {
-                  id: `scope-${name}`,
-                  name,
-                  displayName: name === "openid" ? "OpenID" : "Account API",
-                  description: "Read-only scope description",
-                  builtIn: name === "openid",
-                },
-              ],
+              content,
               number: 0,
               totalPages: 1,
               totalElements: 1,
@@ -1839,6 +1880,80 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       new URLSearchParams(clientScopeRequests[1]).get("q"),
       "account",
     );
+    await window
+      .locator(".topbar")
+      .getByRole("button", { name: "Create client scope", exact: true })
+      .click();
+    await window
+      .getByRole("heading", {
+        name: "Create client scope",
+        exact: true,
+      })
+      .waitFor();
+    const clientScopeCreateForm = window.locator(
+      'form[data-form="admin-client-scope-create"]',
+    );
+    await clientScopeCreateForm.locator('[name="name"]').fill("account-api");
+    await clientScopeCreateForm
+      .locator('[name="displayName"]')
+      .fill("Native observer");
+    await clientScopeCreateForm
+      .locator('[name="description"]')
+      .fill("Read-only native console scope");
+    const clientScopeCreateSubmit = clientScopeCreateForm.getByRole("button", {
+      name: "Create client scope",
+      exact: true,
+    });
+    await clientScopeCreateSubmit.click();
+    assert.equal(await clientScopeCreateSubmit.isDisabled(), true);
+    assert.equal(await clientScopeCreateSubmit.locator(".spinner").count(), 1);
+    await window
+      .getByText("Client scope name is already registered.", { exact: true })
+      .waitFor();
+    await clientScopeCreateForm
+      .locator('[name="name"]')
+      .fill("native-observer");
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", {
+        name: "İstemci kapsamı oluştur",
+        exact: true,
+      })
+      .waitFor();
+    await window.waitForFunction(() => {
+      const localeButton = document.querySelector(
+        '.sidebar-footer button[data-action="toggle-locale"]',
+      );
+      return localeButton && !localeButton.disabled;
+    });
+    await clientScopeCreateForm
+      .getByRole("button", { name: "İstemci kapsamı oluştur", exact: true })
+      .click();
+    await window
+      .getByText("İstemci kapsamı oluşturuldu.", { exact: true })
+      .waitFor();
+    await window.getByText("Native observer", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientScopeCreateRequests,
+      ),
+      [
+        {
+          name: "account-api",
+          displayName: "Native observer",
+          description: "Read-only native console scope",
+        },
+        {
+          name: "native-observer",
+          displayName: "Native observer",
+          description: "Read-only native console scope",
+        },
+      ],
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window
+      .getByRole("button", { name: "Search client scopes" })
+      .waitFor();
     const clientsNavigation = window.getByRole("button", {
       name: "Clients",
       exact: true,

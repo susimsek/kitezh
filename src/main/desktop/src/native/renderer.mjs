@@ -58,6 +58,10 @@ const pageHeader = (title, description) => {
   const createGroup =
     state.route === "groups" ||
     (state.route === "group-create" && state.busy === "group-create-route");
+  const createClientScope =
+    state.route === "client-scopes" ||
+    (state.route === "client-scope-create" &&
+      state.busy === "client-scope-create-route");
   const createAction =
     state.console === "admin" && createUser
       ? button(text("adminCreateUser"), {
@@ -85,7 +89,16 @@ const pageHeader = (title, description) => {
               disabled: state.offline || Boolean(state.busy),
               icon: "add",
             })
-          : "";
+          : state.console === "admin" && createClientScope
+            ? button(text("adminCreateClientScope"), {
+                action: "create-client-scope",
+                busy:
+                  state.busy === "client-scope-create-route" ||
+                  state.busy === "route:client-scopes",
+                disabled: state.offline || Boolean(state.busy),
+                icon: "add",
+              })
+            : "";
   return `<div class="topbar"><div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><div class="actions">${createAction}${button(text("signOut"), { action: "logout", busy: state.busy === "logout", icon: "logout" })}</div></div>`;
 };
 
@@ -189,6 +202,7 @@ function routeTitle() {
       groups: text("adminGroups"),
       "group-create": text("adminCreateGroup"),
       "client-scopes": text("adminClientScopes"),
+      "client-scope-create": text("adminCreateClientScope"),
       clients: text("adminClients"),
       "identity-providers": text("adminIdentityProviders"),
       sessions: text("adminSessions"),
@@ -223,6 +237,7 @@ function routeDescription() {
       groups: text("adminSearchGroups"),
       "group-create": text("adminCreateGroupDescription"),
       "client-scopes": text("adminSearchClientScopes"),
+      "client-scope-create": text("adminCreateClientScopeDescription"),
       clients: text("adminSearchClients"),
       "identity-providers": text("adminSearchIdentityProviders"),
       sessions: text("adminSearchSessions"),
@@ -276,6 +291,8 @@ function adminContent() {
   if (state.route === "groups") return adminGroupsContent();
   if (state.route === "group-create") return adminGroupCreateContent();
   if (state.route === "client-scopes") return adminClientScopesContent();
+  if (state.route === "client-scope-create")
+    return adminClientScopeCreateContent();
   if (state.route === "clients") return adminClientsContent();
   if (state.route === "identity-providers")
     return adminIdentityProvidersContent();
@@ -337,7 +354,7 @@ function adminRolesContent() {
 function adminRoleCreateContent() {
   const draft = state.data.adminRoleCreateDraft ?? {};
   const errors = violations(state.error?.body);
-  return `<section class="card"><form data-form="admin-role-create" novalidate>${field("name", text("adminRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="50" pattern="ROLE_[A-Z0-9_]+" autocomplete="off" required')}${field("description", text("description"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}${button(text("adminCreateRole"), { type: "submit", busy: state.busy === "role-create", disabled: state.offline })}</form></section>`;
+  return `<section class="card"><form data-form="admin-role-create" novalidate>${field("name", text("adminRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="50" pattern="ROLE_[A-Z0-9_]+" autocomplete="off" required')}${field("description", text("adminRoleDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}${button(text("adminCreateRole"), { type: "submit", busy: state.busy === "role-create", disabled: state.offline })}</form></section>`;
 }
 
 function adminGroupsContent() {
@@ -368,6 +385,12 @@ function adminClientScopesContent() {
     ? page.totalPages
     : 0;
   return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopes.map((scope) => `<article class="list-item"><div><strong>${escapeHtml(scope.displayName || scope.name)}</strong><span class="muted">${escapeHtml(scope.description ?? scope.name)}</span></div><span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminClientScopeCreateContent() {
+  const draft = state.data.adminClientScopeCreateDraft ?? {};
+  const errors = violations(state.error?.body);
+  return `<section class="card"><form data-form="admin-client-scope-create" novalidate>${field("name", text("adminClientScopeName"), draft.name ?? "", errors.name, "text", 'maxlength="100" autocomplete="off" required')}${field("displayName", text("adminClientScopeDisplayName"), draft.displayName ?? "", errors.displayName, "text", 'maxlength="200"')}${field("description", text("adminClientScopeDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="muted">${escapeHtml(text("adminClientScopeDefaults"))}</div>${button(text("adminCreateClientScope"), { type: "submit", busy: state.busy === "client-scope-create", disabled: state.offline })}</form></section>`;
 }
 
 function adminClientsContent() {
@@ -975,6 +998,8 @@ function preserveOfflineDrafts() {
       state.data.adminRoleCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
       state.data.adminGroupCreateDraft = values;
+    } else if (form.dataset.form === "admin-client-scope-create") {
+      state.data.adminClientScopeCreateDraft = values;
     }
   }
 }
@@ -1067,6 +1092,58 @@ async function submitForm(form) {
       state.route = "groups";
       await loadRoute();
       state.notice = text("adminGroupCreated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-client-scope-create") {
+    const body = {
+      name: String(values.name ?? "").trim(),
+      displayName: String(values.displayName ?? "").trim() || null,
+      description: String(values.description ?? "").trim() || null,
+    };
+    const localErrors = {};
+    if (!body.name) localErrors.name = text("adminClientScopeNameRequired");
+    if ((body.displayName?.length ?? 0) > 200)
+      localErrors.displayName = text("adminClientScopeDisplayNameTooLong");
+    if ((body.description?.length ?? 0) > 500)
+      localErrors.description = text("adminClientScopeDescriptionTooLong");
+    if (Object.keys(localErrors).length > 0) {
+      state.data.adminClientScopeCreateDraft = {
+        name: body.name,
+        displayName: body.displayName ?? "",
+        description: body.description ?? "",
+      };
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: Object.values(localErrors)[0],
+          violations: Object.entries(localErrors).map(([field, message]) => ({
+            field,
+            message,
+          })),
+        },
+      };
+      render();
+      return;
+    }
+    if (!form.reportValidity()) return;
+    state.data.adminClientScopeCreateDraft = body;
+    state.error = null;
+    state.notice = null;
+    state.busy = "client-scope-create";
+    render();
+    try {
+      await request("/api/admin/client-scopes", { method: "POST", body });
+      state.data.adminClientScopeCreateDraft = null;
+      state.data.clientScopeQuery = "";
+      state.data.clientScopePage = 0;
+      state.route = "client-scopes";
+      await loadRoute();
+      state.notice = text("adminClientScopeCreated");
     } catch {
       /* request rendered localized server validation or transport feedback */
     }
@@ -1484,6 +1561,18 @@ async function action(action, element) {
     state.busy = "group-create-route";
     state.route = "group-create";
     state.data.adminGroupCreateDraft = null;
+    state.error = null;
+    state.notice = null;
+    await loadRoute();
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "create-client-scope") {
+    if (state.busy || state.offline) return;
+    state.busy = "client-scope-create-route";
+    state.route = "client-scope-create";
+    state.data.adminClientScopeCreateDraft = null;
     state.error = null;
     state.notice = null;
     await loadRoute();
