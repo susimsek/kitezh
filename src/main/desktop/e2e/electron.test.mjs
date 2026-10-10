@@ -282,6 +282,16 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
             JSON.stringify({ available: true, enabled: false, digits: 6 }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        if (
+          requestUrl.pathname === "/api/account/mfa/setup" &&
+          method === "POST"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          return new Response(
+            JSON.stringify({ secret: "test-totp-secret", digits: 6 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
         if (requestUrl.pathname === "/api/account/mfa/recovery-codes")
           return new Response(
             JSON.stringify({ available: true, remaining: 0 }),
@@ -422,6 +432,27 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
     await window
       .getByRole("button", { name: "Set up authenticator" })
       .waitFor();
+    const setupAuthenticator = window.getByRole("button", {
+      name: "Set up authenticator",
+    });
+    await setupAuthenticator.click();
+    assert.equal(await setupAuthenticator.isDisabled(), true);
+    assert.equal(await setupAuthenticator.locator(".spinner").count(), 1);
+    const securityPasswordForm = window.locator('form[data-form="password"]');
+    const deleteAccountForm = window.locator('form[data-form="delete"]');
+    await securityPasswordForm
+      .locator('[name="currentPassword"]')
+      .fill("TEMPORARY_CURRENT_PASSWORD");
+    await securityPasswordForm
+      .locator('[name="newPassword"]')
+      .fill("TEMPORARY_NEW_PASSWORD");
+    await securityPasswordForm
+      .locator('[name="confirmPassword"]')
+      .fill("TEMPORARY_NEW_PASSWORD");
+    await deleteAccountForm
+      .locator('[name="deletePassword"]')
+      .fill("TEMPORARY_DELETE_PASSWORD");
+    await window.locator('[name="mfaCode"]').fill("123456");
     await window.evaluate(() => {
       Object.defineProperty(navigator, "onLine", {
         configurable: true,
@@ -437,7 +468,7 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
     );
     assert.equal(
       await window
-        .getByRole("button", { name: "Set up authenticator" })
+        .getByRole("button", { name: "Enable two-factor authentication" })
         .isDisabled(),
       true,
     );
@@ -447,6 +478,27 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
         .isDisabled(),
       true,
     );
+    assert.equal(
+      await securityPasswordForm
+        .locator('[name="currentPassword"]')
+        .inputValue(),
+      "",
+    );
+    assert.equal(
+      await securityPasswordForm.locator('[name="newPassword"]').inputValue(),
+      "",
+    );
+    assert.equal(
+      await securityPasswordForm
+        .locator('[name="confirmPassword"]')
+        .inputValue(),
+      "",
+    );
+    assert.equal(
+      await deleteAccountForm.locator('[name="deletePassword"]').inputValue(),
+      "",
+    );
+    assert.equal(await window.locator('[name="mfaCode"]').inputValue(), "");
     assert.deepEqual(
       await application.evaluate(() => globalThis.__accountWrites),
       accountWrites,
