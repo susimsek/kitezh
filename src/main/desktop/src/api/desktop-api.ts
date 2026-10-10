@@ -11,7 +11,9 @@ type DesktopSession = NativeSession & { version: 1 };
 
 type AdapterOptions = {
   apiBaseUrl: string;
-  readSession: (namespace: NativeSessionNamespace) => Promise<DesktopSession | null>;
+  readSession: (
+    namespace: NativeSessionNamespace,
+  ) => Promise<DesktopSession | null>;
   writeSession: (
     namespace: NativeSessionNamespace,
     session: DesktopSession,
@@ -39,10 +41,44 @@ const ACCOUNT_ALLOWED_PATHS = [
   "/api/ciba/",
 ];
 
-function isAllowedApiPath(namespace: NativeSessionNamespace, path: string) {
-  if (namespace === "admin" && path === "/api/admin/dashboard") return true;
-  return namespace === "account" && ACCOUNT_ALLOWED_PATHS.some(
-    (prefix) => path === prefix || path.startsWith(prefix),
+function isAllowedApiPath(
+  namespace: NativeSessionNamespace,
+  method: string,
+  path: string,
+) {
+  if (namespace === "admin") {
+    if (method !== "GET") return false;
+    if (path === "/api/admin/dashboard") return true;
+    try {
+      const url = new URL(path, "https://desktop.invalid");
+      const allowedParameters = new Set(["q", "page", "size", "sort"]);
+      return (
+        url.pathname === "/api/admin/users" &&
+        url.origin === "https://desktop.invalid" &&
+        !url.hash &&
+        [...url.searchParams.keys()].every((key) =>
+          allowedParameters.has(key),
+        ) &&
+        [...allowedParameters].every(
+          (key) => url.searchParams.getAll(key).length <= 1,
+        ) &&
+        (url.searchParams.get("q")?.length ?? 0) <= 200 &&
+        /^\d+$/.test(url.searchParams.get("page") ?? "0") &&
+        Number(url.searchParams.get("page") ?? 0) <= 1_000_000 &&
+        /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&
+        ["username,asc", "username,desc"].includes(
+          url.searchParams.get("sort") ?? "username,asc",
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
+  return (
+    namespace === "account" &&
+    ACCOUNT_ALLOWED_PATHS.some(
+      (prefix) => path === prefix || path.startsWith(prefix),
+    )
   );
 }
 
@@ -67,7 +103,8 @@ function tokenResponseToSession(
   return {
     accessToken: value.access_token,
     expiresAt: Date.now() + value.expires_in * 1000,
-    idToken: typeof value.id_token === "string" ? value.id_token : previous.idToken,
+    idToken:
+      typeof value.id_token === "string" ? value.id_token : previous.idToken,
     refreshToken:
       typeof value.refresh_token === "string"
         ? value.refresh_token
@@ -142,7 +179,8 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
             ? {}
             : { "Content-Type": "application/json" }),
         },
-        body: request.body === undefined ? undefined : JSON.stringify(request.body),
+        body:
+          request.body === undefined ? undefined : JSON.stringify(request.body),
         signal: controller.signal,
       });
       return {
@@ -165,7 +203,11 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
     async request(request: NativeApiRequest): Promise<NativeApiResponse> {
       if (
         !request.path.startsWith("/") ||
-        !isAllowedApiPath(request.console, request.path)
+        !isAllowedApiPath(
+          request.console,
+          request.method ?? "GET",
+          request.path,
+        )
       ) {
         throw new Error("Native API path is not allowed");
       }

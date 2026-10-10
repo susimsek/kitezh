@@ -130,17 +130,21 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? navButton("dashboard", text("adminDashboard"))
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
 
 function navButton(route, label) {
-  return `<button type="button" data-route="${route}" aria-current="${state.route === route ? "page" : "false"}">${escapeHtml(label)}</button>`;
+  const busy = state.busy === `route:${route}`;
+  return `<button type="button" data-route="${route}" aria-current="${state.route === route ? "page" : "false"}" ${busy ? 'disabled aria-busy="true"' : ""}>${spin(busy)}${escapeHtml(label)}</button>`;
 }
 
 function routeTitle() {
-  if (state.console === "admin") return text("adminDashboard");
+  if (state.console === "admin")
+    return state.route === "users"
+      ? text("adminUsers")
+      : text("adminDashboard");
   return {
     profile: text("accountTitle"),
     security: text("securityTitle"),
@@ -151,7 +155,10 @@ function routeTitle() {
 }
 
 function routeDescription() {
-  if (state.console === "admin") return text("adminOverview");
+  if (state.console === "admin")
+    return state.route === "users"
+      ? text("adminSearchUsers")
+      : text("adminOverview");
   return {
     profile:
       state.locale === "tr"
@@ -183,6 +190,7 @@ function content() {
 }
 
 function adminContent() {
+  if (state.route === "users") return adminUsersContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -191,6 +199,16 @@ function adminContent() {
     ["consents", "adminStatConsents"],
   ];
   return `<section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${stats.map(([key, label]) => `<article class="card stat-card"><h2>${escapeHtml(text(label))}</h2><p class="stat-value">${Number.isSafeInteger(dashboard[key]) && dashboard[key] >= 0 ? dashboard[key] : 0}</p></article>`).join("")}</section>`;
+}
+
+function adminUsersContent() {
+  const page = state.data.users ?? { content: [], number: 0, totalPages: 0 };
+  const users = Array.isArray(page.content) ? page.content : [];
+  const currentPage = Number.isSafeInteger(page.number) ? page.number : 0;
+  const totalPages = Number.isSafeInteger(page.totalPages)
+    ? page.totalPages
+    : 0;
+  return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${users.map((user) => `<article class="list-item"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span></div><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function profileContent() {
@@ -259,13 +277,22 @@ async function loadProfile() {
   }
 }
 
-async function loadRoute({ preserveError = false } = {}) {
-  state.loading = true;
+async function loadRoute({ preserveError = false, keepContent = false } = {}) {
+  state.loading = !keepContent;
   if (!preserveError) state.error = null;
   render();
   try {
     if (state.console === "admin" && state.route === "dashboard")
       state.data.dashboard = await request("/api/admin/dashboard");
+    if (state.console === "admin" && state.route === "users") {
+      const query = new URLSearchParams({
+        q: state.data.userQuery ?? "",
+        page: String(state.data.userPage ?? 0),
+        size: "20",
+        sort: "username,asc",
+      });
+      state.data.users = await request(`/api/admin/users?${query.toString()}`);
+    }
     if (state.route === "profile")
       state.profile = await request("/api/account/profile");
     if (state.route === "sessions")
@@ -623,9 +650,42 @@ async function action(action, element) {
 function bind() {
   document.querySelectorAll("[data-route]").forEach((element) =>
     element.addEventListener("click", () => {
+      if (state.busy || element.disabled) return;
       state.route = element.dataset.route;
       state.notice = null;
-      void loadRoute();
+      state.busy = `route:${state.route}`;
+      void loadRoute().finally(() => {
+        state.busy = null;
+        render();
+      });
+    }),
+  );
+  document
+    .getElementById("admin-user-search")
+    ?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (state.busy) return;
+      state.data.userQuery = String(
+        new FormData(event.currentTarget).get("q") ?? "",
+      ).trim();
+      state.data.userPage = 0;
+      state.busy = "users-search";
+      void loadRoute({ keepContent: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
+    });
+  document.querySelectorAll("[data-page]").forEach((element) =>
+    element.addEventListener("click", () => {
+      if (state.busy || element.disabled) return;
+      const nextPage = Number(element.dataset.page);
+      if (!Number.isSafeInteger(nextPage) || nextPage < 0) return;
+      state.data.userPage = nextPage;
+      state.busy = `users-page-${nextPage < Number(state.data.users?.number ?? 0) ? "prev" : "next"}`;
+      void loadRoute({ keepContent: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
     }),
   );
   document.querySelectorAll("[data-action]").forEach((element) =>

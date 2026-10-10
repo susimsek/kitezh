@@ -51,18 +51,32 @@ test("refreshes once and retries concurrent requests without exposing refresh da
     });
   });
 
-  const first = adapter.request({ console: "account", path: "/api/account/profile" });
-  const second = adapter.request({ console: "account", path: "/api/account/sessions?page=0&size=20" });
+  const first = adapter.request({
+    console: "account",
+    path: "/api/account/profile",
+  });
+  const second = adapter.request({
+    console: "account",
+    path: "/api/account/sessions?page=0&size=20",
+  });
   const results = await Promise.all([first, second]);
 
   assert.equal(refreshes, 1);
-  assert.deepEqual(results.map((result) => result.status), [200, 200]);
+  assert.deepEqual(
+    results.map((result) => result.status),
+    [200, 200],
+  );
   assert.equal(readSession().accessToken, "new-access");
 });
 
 test("keeps forbidden responses authoritative and rejects unapproved API paths", async () => {
-  const { adapter } = harness(async () => new Response("forbidden", { status: 403 }));
-  const response = await adapter.request({ console: "account", path: "/api/account/profile" });
+  const { adapter } = harness(
+    async () => new Response("forbidden", { status: 403 }),
+  );
+  const response = await adapter.request({
+    console: "account",
+    path: "/api/account/profile",
+  });
   assert.equal(response.kind, "forbidden");
   await assert.rejects(
     adapter.request({ console: "account", path: "/oauth2/token" }),
@@ -70,12 +84,16 @@ test("keeps forbidden responses authoritative and rejects unapproved API paths",
   );
 });
 
-test("limits the Admin namespace to its dashboard contract", async () => {
-  const { adapter } = harness(async () =>
-    new Response(JSON.stringify({ clients: 2, users: 3, sessions: 4, consents: 5 }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
+test("limits the Admin namespace to read-only dashboard and bounded user-list contracts", async () => {
+  const { adapter } = harness(
+    async () =>
+      new Response(
+        JSON.stringify({ clients: 2, users: 3, sessions: 4, consents: 5 }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
   );
   const response = await adapter.request({
     console: "admin",
@@ -86,8 +104,25 @@ test("limits the Admin namespace to its dashboard contract", async () => {
     adapter.request({ console: "account", path: "/api/admin/dashboard" }),
     /not allowed/,
   );
+  const users = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users?q=alice&page=1&size=20&sort=username,asc",
+  });
+  assert.equal(users.status, 200);
   await assert.rejects(
-    adapter.request({ console: "admin", path: "/api/admin/users" }),
+    adapter.request({ console: "admin", path: "/api/admin/users/2" }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({ console: "admin", path: "/api/admin/users?size=101" }),
     /not allowed/,
   );
 });
@@ -96,7 +131,10 @@ test("maps transport failures to a recoverable offline result", async () => {
   const { adapter } = harness(async () => {
     throw new TypeError("network unavailable");
   });
-  const response = await adapter.request({ console: "account", path: "/api/account/profile" });
+  const response = await adapter.request({
+    console: "account",
+    path: "/api/account/profile",
+  });
   assert.equal(response.status, 0);
   assert.equal(response.kind, "offline");
 });
@@ -123,17 +161,18 @@ test("maps request timeouts and validation problems to typed responses", async (
   });
   assert.equal(timeoutResponse.kind, "timeout");
 
-  const { adapter } = harness(async () =>
-    new Response(
-      JSON.stringify({
-        detail: "Correct the request.",
-        violations: [{ field: "name", message: "Required." }],
-      }),
-      {
-        status: 400,
-        headers: { "content-type": "application/problem+json" },
-      },
-    ),
+  const { adapter } = harness(
+    async () =>
+      new Response(
+        JSON.stringify({
+          detail: "Correct the request.",
+          violations: [{ field: "name", message: "Required." }],
+        }),
+        {
+          status: 400,
+          headers: { "content-type": "application/problem+json" },
+        },
+      ),
   );
   const validationResponse = await adapter.request({
     console: "admin",

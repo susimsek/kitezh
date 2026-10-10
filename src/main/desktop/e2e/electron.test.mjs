@@ -278,6 +278,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               headers: { "Content-Type": "application/json" },
             },
           );
+        if (requestUrl.pathname === "/api/admin/users") {
+          globalThis.__adminUserRequests ??= [];
+          globalThis.__adminUserRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const page = Number(requestUrl.searchParams.get("page") ?? 0);
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const username = query
+            ? `alice-${page + 1}`
+            : page === 0
+              ? "admin"
+              : "user";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: page + 1,
+                  username,
+                  email: `${username}@example.test`,
+                  enabled: true,
+                  authorities: ["ROLE_USER"],
+                  effectiveRoles: ["ROLE_USER"],
+                },
+              ],
+              number: page,
+              totalPages: 2,
+              totalElements: 2,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -317,10 +351,48 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .waitFor();
     await window.getByText("Registered clients").waitFor();
     await window.locator(".stat-value").first().waitFor();
-    assert.deepEqual(
-      await window.locator(".stat-value").allTextContents(),
-      ["4", "12", "6", "8"],
+    assert.deepEqual(await window.locator(".stat-value").allTextContents(), [
+      "4",
+      "12",
+      "6",
+      "8",
+    ]);
+    const usersNavigation = window.getByRole("button", {
+      name: "Users",
+      exact: true,
+    });
+    await usersNavigation.click();
+    assert.equal(await usersNavigation.isDisabled(), true);
+    assert.equal(await usersNavigation.locator(".spinner").count(), 1);
+    const usersButton = window.getByRole("button", {
+      name: "Search users",
+      exact: true,
+    });
+    await usersButton.waitFor();
+    await window.getByText("admin@example.test").waitFor();
+    const userQuery = window.getByRole("searchbox", { name: "Search users" });
+    await userQuery.fill("alice");
+    await usersButton.click();
+    assert.equal(await usersButton.isDisabled(), true);
+    await window.getByText("alice-1@example.test").waitFor();
+    assert.match(
+      await window.locator('[aria-label="Users pagination"]').innerText(),
+      /Page 1 \/ 2/,
     );
+    const nextPage = window.getByRole("button", { name: "Next" });
+    await nextPage.click();
+    assert.equal(await nextPage.isDisabled(), true);
+    assert.equal(await nextPage.locator(".spinner").count(), 1);
+    await window.getByText("alice-2@example.test").waitFor();
+    const requestedQueries = await application.evaluate(
+      () => globalThis.__adminUserRequests,
+    );
+    assert.deepEqual(
+      requestedQueries.map((query) => new URLSearchParams(query).get("page")),
+      ["0", "0", "1"],
+    );
+    assert.equal(new URLSearchParams(requestedQueries[1]).get("q"), "alice");
+    await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
         if (new URL(String(url)).pathname !== "/api/admin/dashboard")
@@ -332,21 +404,28 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Dashboard" }).click();
     const forbidden = window.getByRole("alert");
     await forbidden
-      .getByText("You do not have permission to use the administration console.")
+      .getByText(
+        "You do not have permission to use the administration console.",
+      )
       .waitFor();
     const retry = forbidden.getByRole("button", { name: "Retry" });
     await retry.click();
     assert.equal(await retry.isDisabled(), true);
     assert.equal(await retry.locator(".spinner").count(), 1);
     await forbidden
-      .getByText("You do not have permission to use the administration console.")
+      .getByText(
+        "You do not have permission to use the administration console.",
+      )
       .waitFor();
     await window.waitForFunction(
       () => !document.querySelector('[data-action="retry"]')?.disabled,
     );
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("button", { name: "İngilizce" }).waitFor();
-    assert.match(await forbidden.innerText(), /Yönetim konsolunu kullanma yetkiniz yok\./);
+    assert.match(
+      await forbidden.innerText(),
+      /Yönetim konsolunu kullanma yetkiniz yok\./,
+    );
     await window.waitForTimeout(500);
     assert.deepEqual(
       await window.evaluate(async () => ({
