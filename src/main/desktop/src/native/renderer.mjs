@@ -59,6 +59,7 @@ const actionIcons = {
   "admin-user-toggle-enabled": "check",
   "admin-user-totp-reset-request": "reset",
   "admin-user-totp-reset-confirm": "reset",
+  "admin-user-unlock": "reset",
   "admin-client-scope-delete-request": "delete",
   "admin-client-scope-delete-confirm": "delete",
   "admin-client-scope-role-mappings-toggle": "edit",
@@ -440,9 +441,21 @@ function adminUsersContent() {
       const totpConfirming =
         Number(state.data.userTotpResetConfirmId) === Number(user.id);
       const totpBusy = state.busy === `user-totp-reset:${user.id}`;
-      const totpControls = totpConfirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminResetAuthenticatorPrompt"))}</span>${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-confirm", id: user.id, danger: true, busy: totpBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-totp-reset-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-        : `<div class="actions">${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-request", id: user.id, icon: "reset", disabled: state.offline || Boolean(state.busy) })}</div>`;
+      const totpControls = !user.totpEnabled
+        ? ""
+        : totpConfirming
+          ? `<div class="actions"><span role="status">${escapeHtml(text("adminResetAuthenticatorPrompt"))}</span>${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-confirm", id: user.id, danger: true, busy: totpBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-totp-reset-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+          : `<div class="actions">${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-request", id: user.id, icon: "reset", disabled: state.offline || Boolean(state.busy) })}</div>`;
+      const unlockBusy = state.busy === `user-unlock:${user.id}`;
+      const unlockControl = user.locked
+        ? button(text("adminUnlockUser"), {
+            action: "admin-user-unlock",
+            id: user.id,
+            icon: "reset",
+            busy: unlockBusy,
+            disabled: state.offline || Boolean(state.busy),
+          })
+        : "";
       const editing = Number(state.data.userEditOpenId) === Number(user.id);
       const selectedRoles = Array.isArray(editDraft.roles)
         ? editDraft.roles
@@ -451,7 +464,7 @@ function adminUsersContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${totpControls}${enabledControls}${deleteControls}</div>${editForm}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${unlockControl}${totpControls}${enabledControls}${deleteControls}</div>${editForm}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -2811,6 +2824,34 @@ async function action(action, element) {
       await request(`/api/admin/users/${id}/totp`, { method: "DELETE" });
       state.data.userTotpResetConfirmId = null;
       state.notice = text("adminAuthenticatorReset");
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-unlock") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const users = state.data.users?.content ?? [];
+    const user = users.find((candidate) => Number(candidate.id) === id);
+    if (!Number.isSafeInteger(id) || id < 1 || !user?.locked) return;
+    state.busy = `user-unlock:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/users/${id}/unlock`, { method: "POST" });
+      state.data.users = {
+        ...state.data.users,
+        content: users.map((item) =>
+          Number(item.id) === id
+            ? { ...item, locked: false, lockedUntil: null, failedLoginCount: 0 }
+            : item,
+        ),
+      };
+      state.notice = text("adminUserUnlocked");
     } catch {
       /* request rendered localized authorization or transport feedback */
     }

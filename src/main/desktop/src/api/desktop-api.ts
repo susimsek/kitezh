@@ -73,6 +73,15 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userTotpResetMatch[1]))
     )
       return true;
+    const userUnlockMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/unlock$/,
+    );
+    if (
+      method === "POST" &&
+      userUnlockMatch &&
+      Number.isSafeInteger(Number(userUnlockMatch[1]))
+    )
+      return true;
     if (
       method === "DELETE" &&
       /^\/api\/admin\/users\/[1-9]\d*$/.test(path) &&

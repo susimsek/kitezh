@@ -869,6 +869,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/unlock$/.test(requestUrl.pathname) &&
+          requestMethod === "POST"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          globalThis.__adminUserUnlockRequests ??= [];
+          globalThis.__adminUserUnlockRequests.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__userUnlockedStates ??= {};
+          globalThis.__userUnlockedStates[id] = true;
+          return new Response(null, { status: 204 });
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "PUT"
         ) {
@@ -985,6 +997,10 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               email: `${username}@example.test`,
               emailVerified: true,
               enabled: globalThis.__userEnabledStates?.[page + 1] ?? true,
+              locked:
+                username === "alice-2" &&
+                !globalThis.__userUnlockedStates?.[page + 1],
+              totpEnabled: username === "alice-2",
               authorities: ["ROLE_USER"],
               assignedRoles: ["ROLE_USER"],
               effectiveRoles: ["ROLE_USER"],
@@ -2710,6 +2726,23 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     assert.equal(new URLSearchParams(requestedQueries[1]).get("q"), "alice");
     const aliceRow = window.locator('article[data-user-id="2"]');
+    await aliceRow.getByText("Locked", { exact: true }).waitFor();
+    const unlockAlice = aliceRow.getByRole("button", {
+      name: "Unlock user",
+      exact: true,
+    });
+    await unlockAlice.click();
+    assert.equal(await unlockAlice.isDisabled(), true);
+    assert.equal(await unlockAlice.locator(".spinner").count(), 1);
+    await window.getByText("User account unlocked.", { exact: true }).waitFor();
+    assert.equal(
+      await aliceRow.getByText("Locked", { exact: true }).count(),
+      0,
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminUserUnlockRequests),
+      [2],
+    );
     await aliceRow
       .getByRole("button", { name: "Edit user", exact: true })
       .click();
