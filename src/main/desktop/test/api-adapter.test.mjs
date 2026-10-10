@@ -146,12 +146,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { enabled: false },
   });
   assert.equal(disabledUser.status, 200);
-  const verificationEmail = await adapter.request({
+  const userActionEmail = await adapter.request({
     console: "admin",
-    path: "/api/admin/users/2/send-verify-email",
+    path: "/api/admin/users/2/execute-actions-email?lifespan=43200",
     method: "PUT",
+    body: ["UPDATE_PASSWORD"],
   });
-  assert.equal(verificationEmail.status, 200);
+  assert.equal(userActionEmail.status, 200);
   const resetUserAuthenticator = await adapter.request({
     console: "admin",
     path: "/api/admin/users/2/totp",
@@ -734,14 +735,16 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     }),
     /not allowed/,
   );
-  await assert.rejects(
-    adapter.request({
-      console: "admin",
-      path: "/api/admin/users/2/send-verify-email?lifespan=invalid",
-      method: "PUT",
-    }),
-    /not allowed/,
-  );
+  for (const lifespan of ["0", "1200", "86401", "1e5"]) {
+    await assert.rejects(
+      adapter.request({
+        console: "admin",
+        path: `/api/admin/users/2/execute-actions-email?lifespan=${lifespan}`,
+        method: "PUT",
+      }),
+      /not allowed/,
+    );
+  }
   await assert.rejects(
     adapter.request({
       console: "admin",

@@ -869,14 +869,19 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
-          /^\/api\/admin\/users\/[1-9]\d*\/send-verify-email$/.test(
+          /^\/api\/admin\/users\/[1-9]\d*\/execute-actions-email$/.test(
             requestUrl.pathname,
           ) &&
           requestMethod === "PUT"
         ) {
           const id = Number(requestUrl.pathname.split("/").at(-2));
-          globalThis.__adminVerificationEmailRequests ??= [];
-          globalThis.__adminVerificationEmailRequests.push({ id });
+          const actions = JSON.parse(init?.body ?? "[]");
+          globalThis.__adminActionEmailRequests ??= [];
+          globalThis.__adminActionEmailRequests.push({
+            id,
+            actions,
+            lifespan: requestUrl.searchParams.get("lifespan"),
+          });
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(null, { status: 204 });
         }
@@ -1230,7 +1235,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               firstName: username === "admin" ? "Admin" : "Alice",
               lastName: "Example",
               email: `${username}@example.test`,
-              emailVerified: username !== "alice-2",
+              emailVerified: true,
               enabled: globalThis.__userEnabledStates?.[page + 1] ?? true,
               locked:
                 username === "alice-2" &&
@@ -3010,28 +3015,56 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(userUpdateRequests[1].body.firstName, "Alice Updated");
     assert.deepEqual(userUpdateRequests[1].body.roles, ["ROLE_USER"]);
     assert.equal(Object.hasOwn(userUpdateRequests[1].body, "password"), false);
-    const sendVerificationEmail = aliceRow.getByRole("button", {
-      name: "Send verification email",
+    const openActionEmail = aliceRow.getByRole("button", {
+      name: "Send action email",
       exact: true,
     });
-    assert.equal(
-      await window
-        .locator('article[data-user-id="1"]')
-        .getByRole("button", { name: "Send verification email", exact: true })
-        .count(),
-      0,
-    );
-    await sendVerificationEmail.click();
-    assert.equal(await sendVerificationEmail.isDisabled(), true);
-    assert.equal(await sendVerificationEmail.locator(".spinner").count(), 1);
+    await openActionEmail.click();
+    const actionEmailPanel = aliceRow.getByRole("region", {
+      name: "Send action email",
+    });
+    const actionSelect = actionEmailPanel.locator('[name="action"]');
+    const lifespanSelect = actionEmailPanel.locator('[name="lifespan"]');
+    const sendActionEmail = actionEmailPanel.getByRole("button", {
+      name: "Send action email",
+      exact: true,
+    });
+    await actionSelect.selectOption("VERIFY_EMAIL");
+    await lifespanSelect.selectOption("86400");
+    await sendActionEmail.click();
+    assert.equal(await sendActionEmail.isDisabled(), true);
+    assert.equal(await sendActionEmail.locator(".spinner").count(), 1);
     await window
-      .getByText("Verification email sent.", { exact: true })
+      .getByText("Required action email sent.", { exact: true })
       .waitFor();
     assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__adminVerificationEmailRequests,
+      await application.evaluate(() => globalThis.__adminActionEmailRequests),
+      [{ id: 2, actions: ["VERIFY_EMAIL"], lifespan: "86400" }],
+    );
+    await openActionEmail.click();
+    await actionEmailPanel.waitFor();
+    await actionSelect.selectOption("UPDATE_PASSWORD");
+    await lifespanSelect.selectOption("43200");
+    await sendActionEmail.click();
+    assert.equal(await sendActionEmail.isDisabled(), true);
+    assert.equal(await sendActionEmail.locator(".spinner").count(), 1);
+    await window
+      .getByText("Required action email sent.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminActionEmailRequests),
+      [
+        { id: 2, actions: ["VERIFY_EMAIL"], lifespan: "86400" },
+        { id: 2, actions: ["UPDATE_PASSWORD"], lifespan: "43200" },
+      ],
+    );
+    assert.equal(
+      await application.evaluate(() =>
+        globalThis.__adminActionEmailRequests.some((entry) =>
+          Object.hasOwn(entry, "email"),
+        ),
       ),
-      [{ id: 2 }],
+      false,
     );
     const manageProfileAttributes = aliceRow.getByRole("button", {
       name: "Profile attributes",
