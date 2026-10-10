@@ -6810,10 +6810,18 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await clickApplicationMenuItem(application, "Settings…");
     const settingsWindow = await settingsWindowPromise;
     await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+    const companionWindowPromise = application.waitForEvent("window");
+    await clickViewMenuItem(application, "Quick Access…");
+    const companionWindow = await companionWindowPromise;
+    await companionWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("radio", { name: "Dark" }).click();
     await mainWindow.waitForFunction(
       () => document.documentElement.dataset.theme === "dark",
+    );
+    await companionWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
     );
     assert.equal(
       await mainWindow.evaluate(() =>
@@ -6829,6 +6837,15 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       .getByRole("heading", { name: "Bir konsol seçin" })
       .waitFor();
     await settingsWindow.getByRole("heading", { name: "Ayarlar" }).waitFor();
+    await companionWindow.waitForFunction(
+      () => document.documentElement.lang === "tr",
+    );
+    assert.equal(
+      await companionWindow
+        .getByRole("button", { name: "Yönetim Konsolu", exact: true })
+        .count(),
+      1,
+    );
     const settingsClosed = settingsWindow.waitForEvent("close");
     await closeNativeSettings(application);
     await settingsClosed;
@@ -6862,6 +6879,15 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await availableWindow
       .getByRole("heading", { name: "A new version of Kitezh is available!" })
       .waitFor();
+    await companionWindow.waitForFunction(
+      () => document.documentElement.lang === "en",
+    );
+    assert.equal(
+      await companionWindow
+        .getByRole("button", { name: "Admin Console", exact: true })
+        .count(),
+      1,
+    );
     assert.equal(
       await availableWindow
         .getByRole("button", { name: "Skip This Version" })
@@ -6872,6 +6898,9 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await availableWindow
       .getByRole("heading", { name: "Yeni bir Kitezh sürümü var!" })
       .waitFor();
+    await companionWindow.waitForFunction(
+      () => document.documentElement.lang === "tr",
+    );
     assert.equal(
       await availableWindow.evaluate(
         () => getComputedStyle(document.body).backgroundColor,
@@ -6880,6 +6909,11 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     );
     await mainWindow.evaluate(async () => window.desktopApi.theme.set("light"));
     await availableWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor ===
+        "rgb(247, 249, 252)",
+    );
+    await companionWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
         "rgb(247, 249, 252)",
@@ -6893,6 +6927,11 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     const systemDialogBackground =
       systemTheme === "dark" ? "rgb(17, 20, 24)" : "rgb(247, 249, 252)";
     await availableWindow.waitForFunction(
+      (background) =>
+        getComputedStyle(document.body).backgroundColor === background,
+      systemDialogBackground,
+    );
+    await companionWindow.waitForFunction(
       (background) =>
         getComputedStyle(document.body).backgroundColor === background,
       systemDialogBackground,
