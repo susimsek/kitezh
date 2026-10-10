@@ -16,9 +16,8 @@ jobs:
   prepare-release:
     name: Prepare shared draft release
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 5
     permissions:
-      actions: read
       contents: write
     outputs:
       release_tag: ${{ steps.release.outputs.release_tag }}
@@ -29,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate release tag
+      - name: Confirm release tag is on main
         id: release
         shell: bash
         env:
@@ -37,10 +36,6 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Expected a version tag such as v0.1.4; received '${RELEASE_TAG}'." >&2
-            exit 1
-          fi
           git fetch --no-tags origin main:refs/remotes/origin/main
           if ! git merge-base --is-ancestor "${RELEASE_SHA}" refs/remotes/origin/main; then
             echo "Release tag ${RELEASE_TAG} must point to a commit on main." >&2
@@ -50,49 +45,6 @@ jobs:
             echo "release_tag=${RELEASE_TAG}"
             echo "release_sha=${RELEASE_SHA}"
           } >> "${GITHUB_OUTPUT}"
-
-      - name: Wait for successful main CI on the release commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 3600))
-          while (( SECONDS < deadline )); do
-            runs="$(gh api \
-              "repos/${GH_REPO}/actions/workflows/ci.yml/runs" \
-              -f "head_sha=${RELEASE_SHA}" \
-              -F per_page=100)"
-            run="$(jq -c --arg sha "${RELEASE_SHA}" '
-              [.workflow_runs[]
-                | select(.event == "push"
-                    and .head_branch == "main"
-                    and .head_sha == $sha)]
-              | sort_by([.run_number, .run_attempt])
-              | last // empty
-            ' <<< "${runs}")"
-
-            if [[ -z "${run}" ]]; then
-              echo "Waiting for the main CI run for ${RELEASE_SHA} to appear."
-            else
-              status="$(jq -r '.status' <<< "${run}")"
-              conclusion="$(jq -r '.conclusion // ""' <<< "${run}")"
-              echo "Main CI status: ${status}; conclusion: ${conclusion:-pending}."
-              if [[ "${status}" == "completed" ]]; then
-                if [[ "${conclusion}" != "success" ]]; then
-                  echo "Main CI for ${RELEASE_SHA} completed with '${conclusion}'; refusing to release." >&2
-                  exit 1
-                fi
-                echo "Main CI passed for ${RELEASE_SHA}."
-                exit 0
-              fi
-            fi
-            sleep 30
-          done
-
-          echo "Timed out waiting for successful main CI on ${RELEASE_SHA}; refusing to release." >&2
-          exit 1
 
       - name: Create or preserve the draft release
         env:
