@@ -215,6 +215,10 @@ export const messages = {
     adminCreateRole: "Create role",
     adminCreateRoleDescription: "Create a realm role for access control.",
     adminRoleCreated: "Role created.",
+    adminDeleteRole: "Delete role",
+    adminDeleteRolePrompt:
+      "Delete this role? Protected roles and roles assigned to users cannot be deleted.",
+    adminRoleDeleted: "Role deleted.",
     adminRoleUpdated: "Role description updated.",
     adminRoleName: "Role name",
     adminRoleNameRequired: "Role name is required.",
@@ -631,6 +635,10 @@ export const messages = {
     adminCreateRoleDescription:
       "Erişim denetimi için bir realm rolü oluşturun.",
     adminRoleCreated: "Rol oluşturuldu.",
+    adminDeleteRole: "Rolü sil",
+    adminDeleteRolePrompt:
+      "Bu rol silinsin mi? Korunan ve kullanıcılara atanmış roller silinemez.",
+    adminRoleDeleted: "Rol silindi.",
     adminRoleUpdated: "Rol açıklaması güncellendi.",
     adminRoleName: "Rol adı",
     adminRoleNameRequired: "Rol adı gereklidir.",

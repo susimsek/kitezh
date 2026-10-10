@@ -372,8 +372,13 @@ function adminRolesContent() {
       const roleErrors =
         state.data.adminRoleErrorName === role.name ? errors : {};
       const busy = state.busy === `role-update:${role.name}`;
+      const deleting = state.busy === `role-delete:${role.name}`;
+      const confirming = state.data.roleDeleteConfirmName === role.name;
       const descriptionId = `role-description-${role.name}`;
-      return `<article class="list-item"><strong>${escapeHtml(role.name)}</strong><form class="actions" data-form="admin-role-edit" data-role-name="${escapeHtml(role.name)}"><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminRoleDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? role.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(roleErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form></article>`;
+      const deleteControls = confirming
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteRolePrompt"))}</span>${button(text("adminDeleteRole"), { action: "admin-role-delete-confirm", id: role.name, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        : `<div class="actions">${button(text("adminDeleteRole"), { action: "admin-role-delete-request", id: role.name, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item" data-role-name="${escapeHtml(role.name)}"><strong>${escapeHtml(role.name)}</strong><form class="actions" data-form="admin-role-edit" data-role-name="${escapeHtml(role.name)}"><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminRoleDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? role.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(roleErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form>${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminRoles"))}"><form id="admin-role-search" class="actions" role="search"><input id="admin-role-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchRoles"))}" value="${escapeHtml(state.data.roleQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchRoles"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "roles-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "roles-search")}${escapeHtml(text("adminSearchRoles"))}</button></form>${roles.length ? `<div class="list">${roleRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminRoles"))} pagination"><button class="secondary-button" type="button" data-role-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-role-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1804,6 +1809,50 @@ async function action(action, element) {
   if (action === "admin-group-delete-cancel") {
     if (state.busy) return;
     state.data.groupDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-role-delete-request" ||
+    action === "admin-role-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const name = element.dataset.id;
+    const roles = state.data.roles?.content ?? [];
+    if (
+      typeof name !== "string" ||
+      !/^ROLE_[A-Z0-9_]{1,45}$/.test(name) ||
+      !roles.some((role) => role.name === name)
+    )
+      return;
+    if (action === "admin-role-delete-request") {
+      state.data.roleDeleteConfirmName = name;
+      render();
+      return;
+    }
+    if (state.data.roleDeleteConfirmName !== name) return;
+    state.busy = `role-delete:${name}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/roles/${name}`, { method: "DELETE" });
+      state.data.roles = {
+        ...state.data.roles,
+        content: roles.filter((role) => role.name !== name),
+      };
+      state.data.roleDeleteConfirmName = null;
+      state.notice = text("adminRoleDeleted");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-role-delete-cancel") {
+    if (state.busy) return;
+    state.data.roleDeleteConfirmName = null;
     render();
     return;
   }

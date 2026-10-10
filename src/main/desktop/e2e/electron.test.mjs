@@ -614,6 +614,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(
             requestUrl.pathname,
           ) &&
+          requestMethod === "DELETE"
+        ) {
+          const roleName = requestUrl.pathname.split("/").at(-1);
+          globalThis.__adminRoleDeleteRequests ??= [];
+          globalThis.__adminRoleDeleteRequests.push(roleName);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__createdRoles = (globalThis.__createdRoles ?? []).filter(
+            (role) => role.name !== roleName,
+          );
+          return new Response(null, { status: 204 });
+        }
+        if (
+          /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(
+            requestUrl.pathname,
+          ) &&
           requestMethod === "PUT"
         ) {
           const roleName = requestUrl.pathname.split("/").at(-1);
@@ -2054,6 +2069,43 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(
       await application.evaluate(() => globalThis.__trayTooltips.at(-1)),
       "Kitezh — secure identity console",
+    );
+    const createdRoleRow = window.locator(
+      '[data-role-name="ROLE_NATIVE_VIEWER"]',
+    );
+    await createdRoleRow
+      .getByRole("button", { name: "Delete role", exact: true })
+      .click();
+    await createdRoleRow
+      .getByText(
+        "Delete this role? Protected roles and roles assigned to users cannot be deleted.",
+        { exact: true },
+      )
+      .waitFor();
+    await createdRoleRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminRoleDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await createdRoleRow
+      .getByRole("button", { name: "Delete role", exact: true })
+      .click();
+    const confirmRoleDelete = createdRoleRow.getByRole("button", {
+      name: "Delete role",
+      exact: true,
+    });
+    await confirmRoleDelete.click();
+    assert.equal(await confirmRoleDelete.isDisabled(), true);
+    assert.equal(await confirmRoleDelete.locator(".spinner").count(), 1);
+    await window.getByText("Role deleted.", { exact: true }).waitFor();
+    assert.equal(await createdRoleRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminRoleDeleteRequests),
+      ["ROLE_NATIVE_VIEWER"],
     );
     const groupsNavigation = window.getByRole("button", {
       name: "Groups",

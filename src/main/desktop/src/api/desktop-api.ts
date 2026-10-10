@@ -69,6 +69,11 @@ function isAllowedApiPath(
       /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
     )
       return true;
+    if (
+      method === "DELETE" &&
+      /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/groups") return true;
     if (
       method === "DELETE" &&
