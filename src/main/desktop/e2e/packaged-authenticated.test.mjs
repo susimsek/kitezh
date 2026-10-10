@@ -271,6 +271,22 @@ test("completes authenticated PKCE login in the packaged Windows app", async () 
     assert.equal(socialLinkCompletions[0].code, "packaged-social-link-code");
     assert.match(socialLinkCompletions[0].codeVerifier, /^[A-Za-z0-9_-]{43}$/);
 
+    const sensitiveDiagnostic =
+      "Authorization: Bearer PACKAGED_ACCESS email=packaged@example.test refresh_token=PACKAGED_REFRESH";
+    await application.evaluate((message) => {
+      process.emit("unhandledRejection", new Error(message));
+    }, sensitiveDiagnostic);
+    const packagedDiagnostics = await mainWindow.evaluate(() =>
+      window.desktopApi.diagnostics.get(),
+    );
+    const packagedDiagnosticText = packagedDiagnostics.events.join("\n");
+    assert.equal(packagedDiagnostics.packaged, true);
+    assert.match(packagedDiagnosticText, /unhandled-rejection/);
+    assert.doesNotMatch(
+      packagedDiagnosticText,
+      /PACKAGED_ACCESS|packaged@example\.test|PACKAGED_REFRESH/,
+    );
+
     await application.close();
     application = await launchPackaged();
     const restartedWindow = await nativeMainWindow(application);
