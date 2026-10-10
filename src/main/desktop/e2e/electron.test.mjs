@@ -285,11 +285,14 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
   }
 });
 
-test("preserves Account profile drafts offline and blocks saves until reconnect", async () => {
+test("preserves Account profile drafts offline and completes native social linking", async () => {
   const application = await launchDesktop();
   try {
     await application.evaluate(({ shell }) => {
       globalThis.__accountWrites = [];
+      globalThis.__socialLinkRequests = [];
+      globalThis.__socialLinkCompletions = [];
+      globalThis.__socialLinkCompleted = false;
       shell.openExternal = async (url) => {
         globalThis.__pendingAuthorizationUrl = url;
       };
@@ -338,10 +341,56 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
             },
           );
         if (requestUrl.pathname === "/api/account/social-links")
-          return new Response(JSON.stringify([]), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
+          return new Response(
+            JSON.stringify([
+              {
+                provider: "github",
+                displayName: "GitHub",
+                linked: globalThis.__socialLinkCompleted,
+                configured: true,
+                enabled: true,
+              },
+            ]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        if (
+          requestUrl.pathname ===
+            "/api/account/social-links/github/desktop/start" &&
+          method === "POST"
+        ) {
+          const body = JSON.parse(String(init.body));
+          globalThis.__socialLinkRequests.push({
+            path: requestUrl.pathname,
+            body,
           });
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return new Response(
+            JSON.stringify({
+              state: body.state,
+              authorizationUrl:
+                "http://127.0.0.1:9090/account/social-links/github/desktop/authorize?transaction=server-transaction",
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            }),
+            {
+              status: 202,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          requestUrl.pathname ===
+            "/api/account/social-links/desktop/complete" &&
+          method === "POST"
+        ) {
+          globalThis.__socialLinkCompletions.push(
+            JSON.parse(String(init.body)),
+          );
+          globalThis.__socialLinkCompleted = true;
+          return new Response(null, { status: 204 });
+        }
         if (
           (requestUrl.pathname === "/api/account/profile" ||
             requestUrl.pathname === "/api/auth/localization/me") &&
@@ -540,6 +589,65 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
       await application.evaluate(() => globalThis.__accountWrites),
       accountWrites,
     );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    const connectProvider = window.getByRole("button", {
+      name: "Connect in browser",
+    });
+    await connectProvider.click();
+    assert.equal(await connectProvider.isDisabled(), true);
+    assert.equal(await connectProvider.locator(".spinner").count(), 1);
+    await connectProvider.dispatchEvent("click");
+    await window
+      .getByRole("status")
+      .getByText("Complete the provider sign-in in your browser.")
+      .waitFor();
+    const socialStartRequests = await application.evaluate(
+      () => globalThis.__socialLinkRequests,
+    );
+    assert.equal(socialStartRequests.length, 1);
+    assert.deepEqual(Object.keys(socialStartRequests[0].body).sort(), [
+      "codeChallenge",
+      "state",
+    ]);
+    assert.match(
+      socialStartRequests[0].body.codeChallenge,
+      /^[A-Za-z0-9_-]{43}$/,
+    );
+    const authorizeUrl = await application.evaluate(
+      () => globalThis.__pendingAuthorizationUrl,
+    );
+    assert.equal(
+      new URL(authorizeUrl).pathname,
+      "/account/social-links/github/desktop/authorize",
+    );
+    assert.equal(
+      new URL(authorizeUrl).searchParams.get("transaction"),
+      "server-transaction",
+    );
+    await application.evaluate(({ app }) => {
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://social-link/callback?state=${globalThis.__socialLinkRequests[0].body.state}&code=test-social-link-code`,
+      );
+    });
+    await window
+      .getByRole("status")
+      .getByText("Social account link was added.")
+      .waitFor();
+    await window.getByText("Connected", { exact: true }).waitFor();
+    const socialLinkCompletions = await application.evaluate(
+      () => globalThis.__socialLinkCompletions,
+    );
+    assert.equal(socialLinkCompletions.length, 1);
+    assert.equal(socialLinkCompletions[0].code, "test-social-link-code");
+    assert.match(socialLinkCompletions[0].codeVerifier, /^[A-Za-z0-9_-]{43}$/);
   } finally {
     await application.close();
   }

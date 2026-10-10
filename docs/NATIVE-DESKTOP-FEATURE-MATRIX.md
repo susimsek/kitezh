@@ -45,6 +45,8 @@ uses typed, capability-scoped API calls.
 - `pnpm --dir src/main/desktop run test:unit`: 27/27 passed, including diagnostics byte/line retention and native-renderer EN/TR key coverage.
 - `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 13/13 passed, including email settings, shared icon semantics, exact external navigation/callback rejection, diagnostics copy busy-state, and forced-colors system token checks.
 - Latest targeted Windows Electron E2E runs passed: diagnostics retention/privacy 1/1 and authenticated Admin localization/role/provider workflows 1/1 (325 seconds).
+- Windows Account Electron E2E verifies social-link start sends only state and PKCE challenge, opens the exact registered provider authorization path, completes the callback with the native verifier, refreshes linked status, and blocks duplicate starts; packaged social-link smoke remains open.
+- After correcting the provider dataset binding, the targeted Windows Account social-link E2E passed 1/1; it fails if the provider value is not forwarded to the main-process start contract.
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.
 - `git diff --check` passed for the committed slices.
 
