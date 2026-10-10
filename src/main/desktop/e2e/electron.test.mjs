@@ -583,6 +583,43 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (requestUrl.pathname === "/api/admin/roles") {
+          if (requestMethod === "POST") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__adminRoleCreateRequests ??= [];
+            globalThis.__adminRoleCreateRequests.push({
+              name: body.name,
+              description: body.description,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            if (body.name === "ROLE_AUDITOR")
+              return new Response(
+                JSON.stringify({
+                  detail: "Correct the role fields.",
+                  violations: [
+                    {
+                      field: "name",
+                      message: "This role name is already registered.",
+                    },
+                  ],
+                }),
+                {
+                  status: 409,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            globalThis.__createdRoles ??= [];
+            globalThis.__createdRoles.push({
+              name: body.name,
+              description: body.description,
+            });
+            return new Response(
+              JSON.stringify(globalThis.__createdRoles.at(-1)),
+              {
+                status: 201,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
           globalThis.__adminRoleRequests ??= [];
           globalThis.__adminRoleRequests.push(requestUrl.search);
           await new Promise((resolve) => setTimeout(resolve, 350));
@@ -600,6 +637,8 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
                   { name: "ROLE_ADMIN", description: "Administrator role" },
                 ]
               : [{ name, description: "Scoped authorization role" }];
+          if (!query && page === 0)
+            roles.push(...(globalThis.__createdRoles ?? []));
           return new Response(
             JSON.stringify({
               content: roles,
@@ -1561,6 +1600,73 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     });
     await rolesNav.click();
     await window.getByRole("button", { name: "Search roles" }).waitFor();
+    await window
+      .locator(".topbar")
+      .getByRole("button", { name: "Create role", exact: true })
+      .click();
+    await window
+      .getByRole("heading", { name: "Create role", exact: true })
+      .waitFor();
+    const roleCreateForm = window.locator(
+      'form[data-form="admin-role-create"]',
+    );
+    await roleCreateForm.locator('[name="name"]').fill("ROLE_AUDITOR");
+    await roleCreateForm
+      .locator('[name="description"]')
+      .fill("Audits role creation");
+    const roleCreateSubmit = roleCreateForm.getByRole("button", {
+      name: "Create role",
+      exact: true,
+    });
+    await roleCreateSubmit.click();
+    assert.equal(await roleCreateSubmit.isDisabled(), true);
+    assert.equal(await roleCreateSubmit.locator(".spinner").count(), 1);
+    await window
+      .getByText("This role name is already registered.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await roleCreateForm.locator('[name="name"]').inputValue(),
+      "ROLE_AUDITOR",
+    );
+    await roleCreateForm.locator('[name="name"]').fill("badrole");
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Rol oluştur", exact: true })
+      .waitFor();
+    await window.waitForFunction(() => {
+      const localeButton = document.querySelector(
+        '.sidebar-footer button[data-action="toggle-locale"]',
+      );
+      return localeButton && !localeButton.disabled;
+    });
+    assert.equal(
+      await roleCreateForm.locator('[name="name"]').inputValue(),
+      "badrole",
+    );
+    await roleCreateForm
+      .getByRole("button", { name: "Rol oluştur", exact: true })
+      .click();
+    await window
+      .getByText(
+        "ROLE_ sonrasında büyük harf, rakam veya alt çizgi kullanın.",
+        { exact: true },
+      )
+      .waitFor();
+    await roleCreateForm.locator('[name="name"]').fill("ROLE_NATIVE_VIEWER");
+    await roleCreateForm
+      .getByRole("button", { name: "Rol oluştur", exact: true })
+      .click();
+    await window.getByText("Rol oluşturuldu.", { exact: true }).waitFor();
+    await window.getByText("ROLE_NATIVE_VIEWER", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminRoleCreateRequests),
+      [
+        { name: "ROLE_AUDITOR", description: "Audits role creation" },
+        { name: "ROLE_NATIVE_VIEWER", description: "Audits role creation" },
+      ],
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.getByRole("button", { name: "Search roles" }).waitFor();
     await application.evaluate(({ Tray }) => {
       globalThis.__trayTooltips = [];
       const originalSetToolTip = Tray.prototype.setToolTip;
@@ -1571,7 +1677,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     });
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("button", { name: "Rol ara" }).waitFor();
-    assert.equal(await window.getByText("ROLE_AUDITOR").count(), 1);
+    assert.equal(await window.getByText("ROLE_NATIVE_VIEWER").count(), 1);
     assert.equal(
       await application.evaluate(() => globalThis.__trayTooltips.at(-1)),
       "Kitezh — güvenli kimlik konsolu",

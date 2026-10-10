@@ -192,6 +192,15 @@ export const messages = {
     adminNoClientScopes: "No client scopes found.",
     adminClientScopesLoadError: "We could not load client scopes.",
     adminSearchRoles: "Search roles",
+    adminCreateRole: "Create role",
+    adminCreateRoleDescription: "Create a realm role for access control.",
+    adminRoleCreated: "Role created.",
+    adminRoleName: "Role name",
+    adminRoleNameRequired: "Role name is required.",
+    adminRoleNameFormat:
+      "Use ROLE_ followed by uppercase letters, numbers, or underscores.",
+    adminRoleDescriptionTooLong:
+      "Role description must be 500 characters or fewer.",
     adminNoRoles: "No roles found.",
     adminRolesLoadError: "We could not load roles.",
     adminSearchGroups: "Search groups",
@@ -558,6 +567,16 @@ export const messages = {
     adminNoClientScopes: "İstemci kapsamı bulunamadı.",
     adminClientScopesLoadError: "İstemci kapsamları yüklenemedi.",
     adminSearchRoles: "Rol ara",
+    adminCreateRole: "Rol oluştur",
+    adminCreateRoleDescription:
+      "Erişim denetimi için bir realm rolü oluşturun.",
+    adminRoleCreated: "Rol oluşturuldu.",
+    adminRoleName: "Rol adı",
+    adminRoleNameRequired: "Rol adı gereklidir.",
+    adminRoleNameFormat:
+      "ROLE_ sonrasında büyük harf, rakam veya alt çizgi kullanın.",
+    adminRoleDescriptionTooLong:
+      "Rol açıklaması en fazla 500 karakter olabilir.",
     adminNoRoles: "Rol bulunamadı.",
     adminRolesLoadError: "Roller yüklenemedi.",
     adminSearchGroups: "Grup ara",
