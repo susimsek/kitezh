@@ -266,6 +266,12 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
   listener = nextListener;
   if (!isSupported()) {
     publish({ state: "unsupported" });
+    if (
+      isUpdatePreviewEnabled() &&
+      process.env.DESKTOP_UPDATE_PREVIEW_AUTOMATIC === "true"
+    ) {
+      setTimeout(() => void checkForUpdates(), 600);
+    }
     return;
   }
 

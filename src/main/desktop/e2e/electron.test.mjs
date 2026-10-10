@@ -23,6 +23,7 @@ async function launchDesktop({
   autoUpdate = "false",
   updatePreviewState,
   updatePreviewVersion = "0.1.1",
+  updatePreviewAutomatic = false,
 } = {}) {
   const userDataDirectory = await mkdtemp(
     path.join(os.tmpdir(), "kitezh-desktop-e2e-"),
@@ -45,6 +46,9 @@ async function launchDesktop({
             DESKTOP_UPDATE_PREVIEW: "true",
             DESKTOP_UPDATE_PREVIEW_STATE: updatePreviewState,
             DESKTOP_UPDATE_PREVIEW_VERSION: updatePreviewVersion,
+            ...(updatePreviewAutomatic
+              ? { DESKTOP_UPDATE_PREVIEW_AUTOMATIC: "true" }
+              : {}),
           }
         : {}),
     },
@@ -5551,6 +5555,69 @@ test("keeps developer tools closed until toggled from View", async () => {
       ),
       true,
     );
+  } finally {
+    await application.close();
+  }
+});
+
+test("opens the update dialog when the desktop notification is clicked", async () => {
+  const application = await launchDesktop({
+    updatePreviewState: "available",
+    updatePreviewAutomatic: true,
+  });
+  try {
+    const mainWindow = await nativeMainWindow(application);
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    await application.evaluate(({ BrowserWindow, Notification }) => {
+      Object.defineProperty(Notification, "isSupported", {
+        configurable: true,
+        value: () => true,
+      });
+      const originalOn = Notification.prototype.on;
+      Notification.prototype.on = function (event, listener) {
+        if (event === "click") globalThis.__updateNotificationClick = listener;
+        return originalOn.call(this, event, listener);
+      };
+      Notification.prototype.show = function () {
+        globalThis.__updateNotification = {
+          title: this.title,
+          body: this.body,
+        };
+      };
+      const window = BrowserWindow.getAllWindows().find((candidate) =>
+        candidate.webContents.getURL().startsWith("app://renderer/native"),
+      );
+      window?.hide();
+    });
+    let notification;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      notification = await application.evaluate(
+        () => globalThis.__updateNotification ?? null,
+      );
+      if (notification) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(notification, "Update notification was not shown");
+    assert.deepEqual(notification, {
+      title: "Kitezh update available",
+      body: "Version 0.1.1 is ready to download.",
+    });
+
+    const firstDialog = await windowWithHeading(
+      application,
+      "A new version of Kitezh is available!",
+    );
+    await firstDialog.close();
+    const reopenedDialogPromise = application.waitForEvent("window");
+    await application.evaluate(() => globalThis.__updateNotificationClick());
+    const reopenedDialog = await reopenedDialogPromise;
+    await reopenedDialog
+      .getByRole("heading", {
+        name: "A new version of Kitezh is available!",
+      })
+      .waitFor();
   } finally {
     await application.close();
   }
