@@ -52,8 +52,13 @@ function isAllowedApiPath(
     try {
       const url = new URL(path, "https://desktop.invalid");
       const allowedParameters = new Set(["q", "page", "size", "sort"]);
+      const isUsers = url.pathname === "/api/admin/users";
+      const isRoles = url.pathname === "/api/admin/roles";
+      const sortFields = isUsers
+        ? ["username,asc", "username,desc"]
+        : ["name,asc", "name,desc"];
       return (
-        url.pathname === "/api/admin/users" &&
+        (isUsers || isRoles) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -66,8 +71,9 @@ function isAllowedApiPath(
         /^\d+$/.test(url.searchParams.get("page") ?? "0") &&
         Number(url.searchParams.get("page") ?? 0) <= 1_000_000 &&
         /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&
-        ["username,asc", "username,desc"].includes(
-          url.searchParams.get("sort") ?? "username,asc",
+        sortFields.includes(
+          url.searchParams.get("sort") ??
+            (isUsers ? "username,asc" : "name,asc"),
         )
       );
     } catch {

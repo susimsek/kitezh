@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -142,9 +142,11 @@ function navButton(route, label) {
 
 function routeTitle() {
   if (state.console === "admin")
-    return state.route === "users"
-      ? text("adminUsers")
-      : text("adminDashboard");
+    return {
+      users: text("adminUsers"),
+      roles: text("adminRoles"),
+      dashboard: text("adminDashboard"),
+    }[state.route];
   return {
     profile: text("accountTitle"),
     security: text("securityTitle"),
@@ -156,9 +158,11 @@ function routeTitle() {
 
 function routeDescription() {
   if (state.console === "admin")
-    return state.route === "users"
-      ? text("adminSearchUsers")
-      : text("adminOverview");
+    return {
+      users: text("adminSearchUsers"),
+      roles: text("adminSearchRoles"),
+      dashboard: text("adminOverview"),
+    }[state.route];
   return {
     profile:
       state.locale === "tr"
@@ -191,6 +195,7 @@ function content() {
 
 function adminContent() {
   if (state.route === "users") return adminUsersContent();
+  if (state.route === "roles") return adminRolesContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -209,6 +214,16 @@ function adminUsersContent() {
     ? page.totalPages
     : 0;
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${users.map((user) => `<article class="list-item"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span></div><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminRolesContent() {
+  const page = state.data.roles ?? { content: [], number: 0, totalPages: 0 };
+  const roles = Array.isArray(page.content) ? page.content : [];
+  const currentPage = Number.isSafeInteger(page.number) ? page.number : 0;
+  const totalPages = Number.isSafeInteger(page.totalPages)
+    ? page.totalPages
+    : 0;
+  return `<section class="card" aria-label="${escapeHtml(text("adminRoles"))}"><form id="admin-role-search" class="actions" role="search"><input id="admin-role-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchRoles"))}" value="${escapeHtml(state.data.roleQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchRoles"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "roles-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "roles-search")}${escapeHtml(text("adminSearchRoles"))}</button></form>${roles.length ? `<div class="list">${roles.map((role) => `<article class="list-item"><div><strong>${escapeHtml(role.name)}</strong>${role.description ? `<span class="muted">${escapeHtml(role.description)}</span>` : ""}</div></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminRoles"))} pagination"><button class="secondary-button" type="button" data-role-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-role-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function profileContent() {
@@ -292,6 +307,15 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         sort: "username,asc",
       });
       state.data.users = await request(`/api/admin/users?${query.toString()}`);
+    }
+    if (state.console === "admin" && state.route === "roles") {
+      const query = new URLSearchParams({
+        q: state.data.roleQuery ?? "",
+        page: String(state.data.rolePage ?? 0),
+        size: "20",
+        sort: "name,asc",
+      });
+      state.data.roles = await request(`/api/admin/roles?${query.toString()}`);
     }
     if (state.route === "profile")
       state.profile = await request("/api/account/profile");
@@ -682,6 +706,34 @@ function bind() {
       if (!Number.isSafeInteger(nextPage) || nextPage < 0) return;
       state.data.userPage = nextPage;
       state.busy = `users-page-${nextPage < Number(state.data.users?.number ?? 0) ? "prev" : "next"}`;
+      void loadRoute({ keepContent: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
+    }),
+  );
+  document
+    .getElementById("admin-role-search")
+    ?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (state.busy) return;
+      state.data.roleQuery = String(
+        new FormData(event.currentTarget).get("q") ?? "",
+      ).trim();
+      state.data.rolePage = 0;
+      state.busy = "roles-search";
+      void loadRoute({ keepContent: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
+    });
+  document.querySelectorAll("[data-role-page]").forEach((element) =>
+    element.addEventListener("click", () => {
+      if (state.busy || element.disabled) return;
+      const nextPage = Number(element.dataset.rolePage);
+      if (!Number.isSafeInteger(nextPage) || nextPage < 0) return;
+      state.data.rolePage = nextPage;
+      state.busy = `roles-page-${nextPage < Number(state.data.roles?.number ?? 0) ? "prev" : "next"}`;
       void loadRoute({ keepContent: true }).finally(() => {
         state.busy = null;
         render();

@@ -312,6 +312,31 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/roles") {
+          globalThis.__adminRoleRequests ??= [];
+          globalThis.__adminRoleRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const page = Number(requestUrl.searchParams.get("page") ?? 0);
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const name = query
+            ? "ROLE_AUDITOR"
+            : page === 0
+              ? "ROLE_ADMIN"
+              : "ROLE_USER";
+          return new Response(
+            JSON.stringify({
+              content: [{ name, description: "Scoped authorization role" }],
+              number: page,
+              totalPages: 2,
+              totalElements: 2,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -392,6 +417,34 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ["0", "0", "1"],
     );
     assert.equal(new URLSearchParams(requestedQueries[1]).get("q"), "alice");
+    const rolesNavigation = window.getByRole("button", {
+      name: "Roles",
+      exact: true,
+    });
+    await rolesNavigation.click();
+    assert.equal(await rolesNavigation.isDisabled(), true);
+    assert.equal(await rolesNavigation.locator(".spinner").count(), 1);
+    await window.getByText("ROLE_ADMIN").waitFor();
+    const roleQuery = window.getByRole("searchbox", { name: "Search roles" });
+    await roleQuery.fill("AUDITOR");
+    await window.getByRole("button", { name: "Search roles" }).click();
+    assert.equal(
+      await window.getByRole("button", { name: "Search roles" }).isDisabled(),
+      true,
+    );
+    await window.getByText("ROLE_AUDITOR").waitFor();
+    const roleRequests = await application.evaluate(
+      () => globalThis.__adminRoleRequests,
+    );
+    assert.deepEqual(
+      roleRequests.map((query) => new URLSearchParams(query).get("page")),
+      ["0", "0"],
+    );
+    assert.equal(new URLSearchParams(roleRequests[1]).get("q"), "AUDITOR");
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("button", { name: "Rol ara" }).waitFor();
+    assert.equal(await window.getByText("ROLE_AUDITOR").count(), 1);
+    await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
