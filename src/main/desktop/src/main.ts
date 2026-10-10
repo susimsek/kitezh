@@ -2188,9 +2188,15 @@ async function showUpdateConfirmation() {
 }
 
 async function showUpdateDialog(version: string, force = false) {
-  if (updateAvailableWindow && !updateAvailableWindow.isDestroyed()) {
-    updateAvailableWindow.focus();
-    return;
+  const existingWindow = updateAvailableWindow;
+  if (existingWindow && !existingWindow.isDestroyed()) {
+    if (existingWindow.isVisible()) {
+      existingWindow.focus();
+      return;
+    }
+    if (updateAvailableWindow === existingWindow) {
+      updateAvailableWindow = null;
+    }
   }
   if (!force && promptedUpdateVersion === version) return;
   promptedUpdateVersion = version;
@@ -2209,7 +2215,7 @@ async function showUpdateDialog(version: string, force = false) {
   const skipLabel = isTurkish ? "Bu sürümü atla" : "Skip This Version";
   const laterLabel = isTurkish ? "Daha sonra hatırlat" : "Remind Me Later";
   const installLabel = isTurkish ? "Güncellemeyi kur" : "Install Update";
-  updateAvailableWindow = new BrowserWindow({
+  const dialogWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
     width: 1200,
@@ -2224,15 +2230,18 @@ async function showUpdateDialog(version: string, force = false) {
       sandbox: true,
     },
   });
-  updateAvailableWindow.on("closed", () => {
-    updateAvailableWindow = null;
+  updateAvailableWindow = dialogWindow;
+  dialogWindow.on("closed", () => {
+    if (updateAvailableWindow === dialogWindow) {
+      updateAvailableWindow = null;
+    }
   });
-  updateAvailableWindow.webContents.on("will-navigate", (event, url) => {
+  dialogWindow.webContents.on("will-navigate", (event, url) => {
     if (!url.startsWith(`${DESKTOP_PROTOCOL}://update-action/`)) return;
     event.preventDefault();
     const actionUrl = new URL(url);
     const action = actionUrl.pathname.slice(1);
-    closeUpdateAvailableWindow();
+    closeUpdateAvailableWindow(dialogWindow);
     const automaticDownload =
       actionUrl.searchParams.get("automatic") !== "false";
     void readUpdatePreferences()
@@ -2302,18 +2311,21 @@ async function showUpdateDialog(version: string, force = false) {
     </footer>
   </body>
 </html>`;
-  await updateAvailableWindow.loadURL(
+  await dialogWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
-  updateAvailableWindow.center();
-  updateAvailableWindow.show();
+  dialogWindow.center();
+  dialogWindow.show();
 }
 
-function closeUpdateAvailableWindow() {
-  if (updateAvailableWindow && !updateAvailableWindow.isDestroyed()) {
-    updateAvailableWindow.close();
+function closeUpdateAvailableWindow(window = updateAvailableWindow) {
+  if (!window) return;
+  if (!window.isDestroyed()) {
+    window.close();
   }
-  updateAvailableWindow = null;
+  if (updateAvailableWindow === window) {
+    updateAvailableWindow = null;
+  }
 }
 
 function setLogoutMenuVisible(visible: boolean) {
