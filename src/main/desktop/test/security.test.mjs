@@ -21,10 +21,7 @@ import {
 
 test("preserves an initial desktop protocol callback on first launch", () => {
   assert.equal(
-    findDesktopDeepLink([
-      "electron",
-      "kitezh://oauth/callback?state=state",
-    ]),
+    findDesktopDeepLink(["electron", "kitezh://oauth/callback?state=state"]),
     "kitezh://oauth/callback?state=state",
   );
   assert.equal(findDesktopDeepLink(["electron", "--no-sandbox"]), null);
@@ -41,10 +38,7 @@ test("accepts only the expected desktop callback route", () => {
     ),
     { state: "state-2", code: null, error: "access_denied" },
   );
-  assert.equal(
-    parseAuthCallback("kitezh://other/callback?state=state"),
-    null,
-  );
+  assert.equal(parseAuthCallback("kitezh://other/callback?state=state"), null);
   assert.equal(
     parseAuthCallback("https://example.test/callback?state=state"),
     null,
@@ -88,7 +82,9 @@ test("accepts only a social-link callback without fragment data", () => {
     null,
   );
   assert.equal(
-    parseSocialLinkCallback("https://example.test/social-link/callback?state=state-1"),
+    parseSocialLinkCallback(
+      "https://example.test/social-link/callback?state=state-1",
+    ),
     null,
   );
 });
@@ -163,6 +159,20 @@ test("accepts only configured API and external origins", () => {
     /deployed Render host/,
   );
   assert.equal(isAllowedExternalUrl("https://github.com/example/oauth"), true);
+  assert.equal(
+    isAllowedExternalUrl("https://github.com:8443/example/oauth"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://user:pass@github.com/example/oauth"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "https://github.com/example/oauth#access_token=secret",
+    ),
+    false,
+  );
   assert.equal(isAllowedExternalUrl("https://evil.example/oauth"), false);
   assert.equal(isAllowedExternalUrl("javascript:alert(1)"), false);
 });

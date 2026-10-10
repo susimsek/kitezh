@@ -3,8 +3,7 @@ import { URL } from "node:url";
 export const DESKTOP_PROTOCOL = "kitezh";
 export const RENDERER_PROTOCOL = "app";
 export const RENDERER_HOST = "renderer";
-export const DEFAULT_API_BASE_URL =
-  "https://kitezh.onrender.com";
+export const DEFAULT_API_BASE_URL = "https://kitezh.onrender.com";
 export const LOCAL_API_BASE_URL = "http://localhost:9090";
 const DEPLOYED_API_HOST = "kitezh.onrender.com";
 const ALLOWED_EXTERNAL_HOSTS = new Set([
@@ -51,8 +50,11 @@ export function getApiBaseUrl(
 export function isAllowedExternalUrl(value: string): boolean {
   try {
     const url = new URL(value);
+    if (url.username || url.password || url.hash) return false;
     return (
-      (url.protocol === "https:" && ALLOWED_EXTERNAL_HOSTS.has(url.hostname)) ||
+      (url.protocol === "https:" &&
+        url.port === "" &&
+        ALLOWED_EXTERNAL_HOSTS.has(url.hostname)) ||
       (url.protocol === "http:" && isLocalHost(url.hostname))
     );
   } catch {
