@@ -186,20 +186,6 @@ jobs:
           mkdir -p "${cache_dir}"
           echo "ELECTRON_BUILDER_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
 
-      - name: Test desktop shell
-        working-directory: src/main/desktop
-        run: pnpm test
-
-      - name: Run Electron E2E tests
-        shell: bash
-        working-directory: src/main/desktop
-        run: |
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            xvfb-run -a pnpm test:e2e
-          else
-            pnpm test:e2e
-          fi
-
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
         shell: bash

@@ -25,17 +25,16 @@ The first CI slice must cover:
 5. Turkish/English and system/light/dark persistence, including a large-text accessibility pass;
 6. native notice announcement, dismiss, and auto-dismiss behavior.
 
-The repository has the fixture contract test and Expo config. All four checked-in Maestro flows
-pass on iPhone 17 Pro / iOS 26.5. An earlier local run passed all four on Android
-`Medium_Phone_API_37.0`; the 2026-10-10 rerun could not complete after the emulator stopped
-responding to ADB. The user requested device-level verification on iOS and Desktop, so reproducing
-Android emulator E2E is not an acceptance gate; Android builds, source-level contracts, and CI
-quality checks remain required. The flows cover cold start/branding, Turkish/light-dark settings,
-cold/warm email-verification and password-reset deep links, and the fixture-backed system-browser
-callback, profile, and logout. The authenticated flow switches from Turkish to English when needed
-and accepts the separate first-run iOS confirmation for the local fixture domain during sign-in and
-logout. OAuth transaction resume/replay, offline, timeout, refresh, and accessibility cases remain
-outstanding, so the broad native E2E gate remains **In progress**.
+The shared Maestro flows have passed on iPhone 17 Pro / iOS 26.5. An earlier local run passed all
+four on Android `Medium_Phone_API_37.0`; the 2026-10-10 rerun could not complete after the emulator
+stopped responding to ADB. The reusable `.github/workflows/mobile-native-e2e.yml` workflow runs the
+same four flows on a headless iOS Simulator and Android Emulator for pull requests and main-branch
+CI. Android device-level CI evidence remains pending until that workflow completes successfully.
+The release workflow packages the tagged source after its PR/main CI validation and does not rerun
+the full E2E suite. The flows cover cold start/branding, Turkish/light-dark settings, cold/warm
+email-verification and password-reset deep links, and the fixture-backed system-browser callback,
+profile, and logout. OAuth transaction resume/replay, offline, timeout, refresh, and accessibility
+cases remain outstanding, so the broad native E2E gate remains **In progress**.
 
 The API unit suite separately verifies transport-offline classification, request-timeout
 classification, and one refresh retry after a 401. These tests do not count as device-level E2E
@@ -55,28 +54,30 @@ fixture account link in the system browser before waiting for the native callbac
 simulator because `clearState` does not erase iOS Keychain credentials. For a local reset, erase the
 simulator and reinstall the development build before running the authenticated flow.
 
-The `.github/workflows/mobile-release.yml` workflow provisions an iOS simulator, creates the Expo
-native project, starts Metro and the fixture, installs the development build, and runs all four
-flows before packaging. It uses `simctl` and `xcodebuild` directly, so it does not open or activate
-the Simulator desktop window. Android device E2E is outside the current acceptance scope; Android
-build and source-level checks remain useful evidence.
+The reusable `.github/workflows/mobile-native-e2e.yml` provisions a headless iOS Simulator and a
+headless Android Emulator, creates each Expo native project, starts Metro and the fixture, installs
+the development build, and runs the same four flows. CI invokes it for pull requests and main; the
+release workflow packages the already-validated tagged source without repeating the suite.
 
 Run them only against an Expo development build with the `io.github.susimsek.kitezh.mobile`
-package ID. On macOS, run the background driver below; it boots and controls the simulator through
-`simctl` without opening Simulator.app. Set `SIMULATOR_UDID` to choose a particular iPhone; otherwise
-the script reuses a booted iPhone simulator or selects an available one.
+package ID. On macOS, the iOS background driver uses `simctl` and `xcodebuild` without opening
+Simulator.app. The Android background driver expects a booted emulator and uses the host's
+`10.0.2.2` address for Metro and the local fixture. Both run the same flow files.
 
 ```bash
 bash e2e/run-ios-background.sh
 ```
 
-These flows deliberately avoid real credentials and token-bearing callbacks. The release workflow
-starts the fixture server without exposing its runtime token values. The authenticated fixture flow
-has passed on the Android emulator and iPhone 17 Pro simulator, including browser callback, profile
-load, and logout. All four checked-in Maestro flows have passed on both platforms with synthetic
-invalid deep-link data. For current acceptance, iOS and Desktop device evidence is required;
-Android emulator evidence is optional. OAuth callback resume/replay, offline, timeout, refresh, and
-accessibility flows still require additional coverage before the broad E2E gate is complete.
+```bash
+bash e2e/run-android-background.sh
+```
+
+These flows deliberately avoid real credentials and token-bearing callbacks. The fixture server
+creates runtime-only credentials and does not print them. The authenticated fixture flow has passed
+on the Android emulator and iPhone 17 Pro simulator, including browser callback, profile load, and
+logout. CI now reruns the same flow set on both platforms. OAuth callback resume/replay, offline,
+timeout, refresh, and accessibility flows still require additional coverage before the broad E2E
+gate is complete.
 
 OAuth callbacks are validated by the shared native contract before code exchange: the callback must
 contain the original state and use the registered `kitezh://` redirect host/path. A browser result

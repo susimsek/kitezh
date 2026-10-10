@@ -75,49 +75,9 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
         run: gh release view "${RELEASE_TAG}" >/dev/null
 
-  ios-e2e:
-    name: Run iOS native E2E in Simulator
-    needs: resolve-release
-    runs-on: macos-14
-    timeout-minutes: 60
-    steps:
-      - name: Check out release source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ needs.resolve-release.outputs.release_sha }}
-
-      - name: Set up Node.js and pnpm
-        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          runtime: node@${{ env.NODE_VERSION }}
-          cache: false
-          install: false
-
-      - name: Install mobile dependencies
-        working-directory: src/main/mobile
-        run: pnpm install --frozen-lockfile
-
-      - name: Run iOS Maestro flows in headless Simulator
-        shell: bash
-        env:
-          MAESTRO_VERSION: "2.11.0"
-        run: |
-          set -euo pipefail
-          maestro_dir="${RUNNER_TEMP}/maestro"
-          mkdir -p "${maestro_dir}"
-          curl --proto '=https' --tlsv1.2 -fsSLo "${RUNNER_TEMP}/maestro.zip" \
-            "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
-          unzip -q "${RUNNER_TEMP}/maestro.zip" -d "${maestro_dir}"
-          export PATH="${maestro_dir}/maestro/bin:${PATH}"
-          cd src/main/mobile
-          bash e2e/run-ios-background.sh
-
   android:
     name: Build signed Android APK
-    needs:
-      - resolve-release
-      - ios-e2e
+    needs: resolve-release
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: mobile-release
@@ -217,7 +177,6 @@ jobs:
     name: Build iOS IPA
     needs:
       - resolve-release
-      - ios-e2e
     runs-on: macos-latest
     timeout-minutes: 60
     environment: mobile-release

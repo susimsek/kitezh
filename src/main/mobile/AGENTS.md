@@ -150,9 +150,14 @@ Electron-specific implementation details do not apply directly to React Native.
   web-equivalent behavior where the backend contract is shared.
 - Do not consider a web Playwright pass to be mobile E2E coverage. Native E2E must launch the
   mobile build and exercise the real navigation/authentication boundaries.
+- Pull request and main CI run the same Maestro flows on headless iOS Simulator and Android
+  Emulator jobs. Keep platform setup separate while reusing `e2e/maestro/*.yaml`; release workflows
+  package a commit already validated by CI and do not rerun the full E2E suite.
 - On macOS, run local iOS E2E with `bash e2e/run-ios-background.sh`; it boots, installs, and launches
-  through `simctl`/`xcodebuild` without opening Simulator.app. Do not use `expo run:ios` in the
-  automated E2E path because it opens the Simulator desktop window.
+  through `simctl`/`xcodebuild` without opening Simulator.app. On Android, run
+  `bash e2e/run-android-background.sh` with a booted emulator; it uses `10.0.2.2` to reach host-side
+  Metro and the fixture server. Do not use `expo run:ios` in the automated E2E path because it opens
+  the Simulator desktop window.
 - Run `git diff --check` after changes. Keep changes focused and do not commit, push, merge, or
   rewrite history without explicit user permission.
 

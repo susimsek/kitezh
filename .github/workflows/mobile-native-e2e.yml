@@ -1,0 +1,126 @@
+name: Mobile Native E2E
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        description: Git ref containing the mobile application to test
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24.18.0"
+  PNPM_VERSION: "11.22.0"
+  MAESTRO_VERSION: "2.11.0"
+
+jobs:
+  ios:
+    name: iOS native E2E (headless Simulator)
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5ac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: false
+          install: false
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          maestro_dir="${RUNNER_TEMP}/maestro"
+          mkdir -p "${maestro_dir}"
+          curl --proto '=https' --tlsv1.2 -fsSLo "${RUNNER_TEMP}/maestro.zip" \
+            "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          unzip -q "${RUNNER_TEMP}/maestro.zip" -d "${maestro_dir}"
+          echo "${maestro_dir}/maestro/bin" >> "${GITHUB_PATH}"
+
+      - name: Run shared Maestro flows without opening Simulator.app
+        working-directory: src/main/mobile
+        run: bash e2e/run-ios-background.sh
+
+      - name: Upload iOS E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-ios-e2e-diagnostics
+          path: ${{ runner.temp }}/kitezh-ios-e2e
+          if-no-files-found: ignore
+
+  android:
+    name: Android native E2E (headless Emulator)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5ac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: false
+          install: false
+
+      - name: Set up Java
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          maestro_dir="${RUNNER_TEMP}/maestro"
+          mkdir -p "${maestro_dir}"
+          curl --proto '=https' --tlsv1.2 -fsSLo "${RUNNER_TEMP}/maestro.zip" \
+            "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          unzip -q "${RUNNER_TEMP}/maestro.zip" -d "${maestro_dir}"
+          echo "${maestro_dir}/maestro/bin" >> "${GITHUB_PATH}"
+
+      - name: Run shared Maestro flows without an emulator window
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          heap-size: 2048M
+          disk-size: 8G
+          disable-animations: true
+          disable-spellchecker: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: cd src/main/mobile && bash e2e/run-android-background.sh
+
+      - name: Upload Android E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-android-e2e-diagnostics
+          path: ${{ runner.temp }}/kitezh-android-e2e
+          if-no-files-found: ignore

@@ -76,7 +76,7 @@ test "$fixture_ready" = true
 
 metro_ready=false
 for attempt in $(seq 1 60); do
-  if curl --fail --silent http://127.0.0.1:8081/status | rg -q 'packager-status:running'; then
+  if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then
     metro_ready=true
     break
   fi

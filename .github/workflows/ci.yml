@@ -137,6 +137,13 @@ jobs:
             -Dsonar.organization=susimsek \
             -Dsonar.token="${SONAR_TOKEN}"
 
+  mobile-native-e2e:
+    name: Mobile native E2E
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
+    uses: ./.github/workflows/mobile-native-e2e.yml
+    with:
+      source-ref: ${{ github.sha }}
+
   mobile-quality:
     name: Mobile quality checks
     runs-on: ubuntu-latest
