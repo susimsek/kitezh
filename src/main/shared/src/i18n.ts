@@ -130,6 +130,7 @@ export const messages = {
     adminLocalizationDescription:
       "Review enabled languages and message overrides.",
     adminLocalizationSettings: "Localization settings",
+    adminLocalizationSaved: "Localization settings saved.",
     adminLocalizationEnabled: "Localization enabled",
     adminDefaultLocale: "Default language",
     adminSupportedLocales: "Supported languages",
@@ -484,6 +485,7 @@ export const messages = {
     adminLocalizationDescription:
       "Etkin dilleri ve ileti geçersiz kılmalarını inceleyin.",
     adminLocalizationSettings: "Yerelleştirme ayarları",
+    adminLocalizationSaved: "Yerelleştirme ayarları kaydedildi.",
     adminLocalizationEnabled: "Yerelleştirme etkin",
     adminDefaultLocale: "Varsayılan dil",
     adminSupportedLocales: "Desteklenen diller",

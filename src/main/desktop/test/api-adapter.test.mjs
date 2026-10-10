@@ -215,6 +215,17 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/localization",
   });
   assert.equal(localizationSettings.status, 200);
+  const updatedLocalizationSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/localization",
+    method: "PUT",
+    body: {
+      internationalizationEnabled: true,
+      defaultLocale: "en",
+      supportedLocales: ["en", "tr"],
+    },
+  });
+  assert.equal(updatedLocalizationSettings.status, 200);
   const ldapProviders = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/ldap",
@@ -295,6 +306,14 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     adapter.request({
       console: "admin",
       path: "/api/admin/settings/localization/messages/9007199254740992",
+      method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization?unexpected=true",
       method: "PUT",
     }),
     /not allowed/,

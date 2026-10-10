@@ -828,6 +828,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          requestUrl.pathname === "/api/admin/settings/localization" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__localizationSettingsUpdates ??= [];
+          globalThis.__localizationSettingsUpdates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (!body.supportedLocales.includes(body.defaultLocale))
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the localization settings.",
+                violations: [
+                  {
+                    field: "defaultLocale",
+                    message: "Default language must be enabled.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         if (requestUrl.pathname === "/api/admin/settings/localization") {
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
@@ -1505,6 +1534,49 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window
       .getByRole("heading", { name: "Localization settings" })
       .waitFor();
+    const localizationSettingsForm = window.locator(
+      'form[data-form="admin-localization-settings"]',
+    );
+    const trLocale = localizationSettingsForm.locator(
+      'input[name="supportedLocales"][value="tr"]',
+    );
+    await trLocale.uncheck();
+    await localizationSettingsForm
+      .locator('[name="defaultLocale"]')
+      .selectOption("tr");
+    const localizationSave = localizationSettingsForm.getByRole("button", {
+      name: "Save",
+    });
+    await localizationSave.click();
+    assert.equal(await localizationSave.isDisabled(), true);
+    assert.equal(await localizationSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Default language must be enabled.", { exact: true })
+      .waitFor();
+    assert.equal(await trLocale.isChecked(), false);
+    assert.equal(
+      await localizationSettingsForm
+        .locator('[name="defaultLocale"]')
+        .inputValue(),
+      "tr",
+    );
+    await trLocale.check();
+    await localizationSave.click();
+    assert.equal(await localizationSave.isDisabled(), true);
+    assert.equal(await localizationSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Localization settings saved.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__localizationSettingsUpdates.at(-1),
+      ),
+      {
+        internationalizationEnabled: true,
+        defaultLocale: "tr",
+        supportedLocales: ["en", "tr"],
+      },
+    );
     await window
       .getByText("tr · admin · login.title", { exact: true })
       .waitFor();
@@ -1542,6 +1614,15 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Turkish" }).click();
     await window
       .getByRole("heading", { name: "Yerelleştirme ayarları" })
+      .waitFor();
+    await localizationSettingsForm
+      .locator('[name="defaultLocale"]')
+      .selectOption("en");
+    await localizationSettingsForm
+      .getByRole("button", { name: "Kaydet" })
+      .click();
+    await window
+      .getByText("Yerelleştirme ayarları kaydedildi.", { exact: true })
       .waitFor();
     await overrideValue.fill("Oturum aç");
     await overrideForm.getByRole("button", { name: "Kaydet" }).click();

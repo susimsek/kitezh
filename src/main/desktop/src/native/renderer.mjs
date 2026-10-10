@@ -445,10 +445,18 @@ function adminAdminLocalizationContent() {
   const page = state.data.adminMessageOverrides ?? { content: [] };
   const overrides = Array.isArray(page.content) ? page.content : [];
   const draft = state.data.adminMessageOverrideDraft;
+  const localizationDraft = state.data.adminLocalizationDraft ?? settings;
   const errors = violations(state.error?.body);
   const row = (label, value) =>
     `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
   const list = (values) => (Array.isArray(values) ? values.join(", ") : null);
+  const availableLocales = Array.isArray(settings.availableLocales)
+    ? settings.availableLocales
+    : ["en", "tr"];
+  const supportedLocales = Array.isArray(localizationDraft.supportedLocales)
+    ? localizationDraft.supportedLocales
+    : [];
+  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${localizationDraft.defaultLocale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => `<label class="settings-row"><input type="checkbox" name="supportedLocales" value="${escapeHtml(locale)}" ${supportedLocales.includes(locale) ? "checked" : ""}/>${escapeHtml(locale)}</label>`).join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings" })}</div></form>`;
   const overrideField = (item, name, label, value, error) => {
     const id = `override-${item.id}-${name}`;
     return `<div class="field"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" name="${name}" value="${escapeHtml(value ?? "")}" aria-invalid="${Boolean(error)}" required maxlength="${name === "messageValue" ? 4000 : name === "locale" ? 10 : name === "bundle" ? 50 : 255}"/><div class="field-error" id="${id}-error">${escapeHtml(error ?? "")}</div></div>`;
@@ -462,7 +470,7 @@ function adminAdminLocalizationContent() {
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`
-  }</section></div>`;
+  }${localizationSettingsForm}</section></div>`;
 }
 
 function adminAdminLdapContent() {
@@ -816,6 +824,35 @@ function formValues(form) {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-localization-settings") {
+    const body = {
+      internationalizationEnabled: form.elements.namedItem(
+        "internationalizationEnabled",
+      ).checked,
+      defaultLocale: String(values.defaultLocale ?? ""),
+      supportedLocales: [
+        ...form.querySelectorAll('input[name="supportedLocales"]:checked'),
+      ].map((input) => input.value),
+    };
+    state.data.adminLocalizationDraft = body;
+    state.busy = "admin-localization-settings";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminLocalization = await request(
+        "/api/admin/settings/localization",
+        { method: "PUT", body },
+      );
+      state.data.adminLocalizationDraft = null;
+      state.notice = text("adminLocalizationSaved");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-localization-message") {
     const id = Number(form.dataset.id);
     if (!Number.isSafeInteger(id) || id < 1) return;
