@@ -348,7 +348,18 @@ function adminRolesContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminRoles"))}"><form id="admin-role-search" class="actions" role="search"><input id="admin-role-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchRoles"))}" value="${escapeHtml(state.data.roleQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchRoles"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "roles-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "roles-search")}${escapeHtml(text("adminSearchRoles"))}</button></form>${roles.length ? `<div class="list">${roles.map((role) => `<article class="list-item"><div><strong>${escapeHtml(role.name)}</strong>${role.description ? `<span class="muted">${escapeHtml(role.description)}</span>` : ""}</div></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminRoles"))} pagination"><button class="secondary-button" type="button" data-role-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-role-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const errors = violations(state.error?.body);
+  const roleRows = roles
+    .map((role) => {
+      const draft = state.data.adminRoleDrafts?.[role.name] ?? {};
+      const roleErrors =
+        state.data.adminRoleErrorName === role.name ? errors : {};
+      const busy = state.busy === `role-update:${role.name}`;
+      const descriptionId = `role-description-${role.name}`;
+      return `<article class="list-item"><strong>${escapeHtml(role.name)}</strong><form class="actions" data-form="admin-role-edit" data-role-name="${escapeHtml(role.name)}"><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminRoleDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? role.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(roleErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form></article>`;
+    })
+    .join("");
+  return `<section class="card" aria-label="${escapeHtml(text("adminRoles"))}"><form id="admin-role-search" class="actions" role="search"><input id="admin-role-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchRoles"))}" value="${escapeHtml(state.data.roleQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchRoles"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "roles-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "roles-search")}${escapeHtml(text("adminSearchRoles"))}</button></form>${roles.length ? `<div class="list">${roleRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminRoles"))} pagination"><button class="secondary-button" type="button" data-role-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-role-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminRoleCreateContent() {
@@ -996,6 +1007,12 @@ function preserveOfflineDrafts() {
       };
     } else if (form.dataset.form === "admin-role-create") {
       state.data.adminRoleCreateDraft = values;
+    } else if (form.dataset.form === "admin-role-edit") {
+      const roleName = form.dataset.roleName;
+      if (/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName ?? "")) {
+        state.data.adminRoleDrafts ??= {};
+        state.data.adminRoleDrafts[roleName] = values;
+      }
     } else if (form.dataset.form === "admin-group-create") {
       state.data.adminGroupCreateDraft = values;
     } else if (form.dataset.form === "admin-client-scope-create") {
@@ -1007,6 +1024,36 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-role-edit") {
+    const roleName = form.dataset.roleName ?? "";
+    if (!/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName)) return;
+    if (!form.reportValidity()) return;
+    const description = String(values.description ?? "").trim() || null;
+    state.data.adminRoleDrafts ??= {};
+    state.data.adminRoleDrafts[roleName] = {
+      description: description ?? "",
+    };
+    state.error = null;
+    state.notice = null;
+    state.data.adminRoleErrorName = roleName;
+    state.busy = `role-update:${roleName}`;
+    render();
+    try {
+      await request(`/api/admin/roles/${encodeURIComponent(roleName)}`, {
+        method: "PUT",
+        body: { name: roleName, description },
+      });
+      delete state.data.adminRoleDrafts[roleName];
+      state.data.adminRoleErrorName = null;
+      await loadRoute({ keepContent: true });
+      state.notice = text("adminRoleUpdated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-role-create") {
     const body = {
       name: String(values.name ?? "").trim(),

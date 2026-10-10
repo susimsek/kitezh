@@ -49,6 +49,11 @@ function isAllowedApiPath(
   if (namespace === "admin") {
     if (method === "POST" && path === "/api/admin/users") return true;
     if (method === "POST" && path === "/api/admin/roles") return true;
+    if (
+      method === "PUT" &&
+      /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/groups") return true;
     if (method === "POST" && path === "/api/admin/client-scopes") return true;
     if (

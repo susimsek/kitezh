@@ -209,6 +209,7 @@ export const messages = {
     adminCreateRole: "Create role",
     adminCreateRoleDescription: "Create a realm role for access control.",
     adminRoleCreated: "Role created.",
+    adminRoleUpdated: "Role description updated.",
     adminRoleName: "Role name",
     adminRoleNameRequired: "Role name is required.",
     adminRoleNameFormat:
@@ -606,6 +607,7 @@ export const messages = {
     adminCreateRoleDescription:
       "Erişim denetimi için bir realm rolü oluşturun.",
     adminRoleCreated: "Rol oluşturuldu.",
+    adminRoleUpdated: "Rol açıklaması güncellendi.",
     adminRoleName: "Rol adı",
     adminRoleNameRequired: "Rol adı gereklidir.",
     adminRoleNameFormat:

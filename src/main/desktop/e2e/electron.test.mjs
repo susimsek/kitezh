@@ -582,6 +582,49 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const roleName = requestUrl.pathname.split("/").at(-1);
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminRoleUpdateRequests ??= [];
+          globalThis.__adminRoleUpdateRequests.push({
+            name: roleName,
+            description: body.description,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.description === "Rejected description")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the role fields.",
+                violations: [
+                  {
+                    field: "description",
+                    message: "Açıklama reddedildi.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          globalThis.__updatedRoles ??= {};
+          globalThis.__updatedRoles[roleName] = {
+            name: roleName,
+            description: body.description,
+          };
+          return new Response(
+            JSON.stringify(globalThis.__updatedRoles[roleName]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/roles") {
           if (requestMethod === "POST") {
             const body = JSON.parse(init?.body ?? "{}");
@@ -638,7 +681,11 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
                 ]
               : [{ name, description: "Scoped authorization role" }];
           if (!query && page === 0)
-            roles.push(...(globalThis.__createdRoles ?? []));
+            roles.push(
+              ...(globalThis.__createdRoles ?? []).map(
+                (role) => globalThis.__updatedRoles?.[role.name] ?? role,
+              ),
+            );
           return new Response(
             JSON.stringify({
               content: roles,
@@ -1745,6 +1792,45 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       [
         { name: "ROLE_AUDITOR", description: "Audits role creation" },
         { name: "ROLE_NATIVE_VIEWER", description: "Audits role creation" },
+      ],
+    );
+    const roleEditForm = window.locator(
+      'form[data-form="admin-role-edit"][data-role-name="ROLE_NATIVE_VIEWER"]',
+    );
+    await roleEditForm
+      .locator('[name="description"]')
+      .fill("Rejected description");
+    const roleUpdateSubmit = roleEditForm.getByRole("button", {
+      name: "Kaydet",
+      exact: true,
+    });
+    await roleUpdateSubmit.click();
+    assert.equal(await roleUpdateSubmit.isDisabled(), true);
+    assert.equal(await roleUpdateSubmit.locator(".spinner").count(), 1);
+    await roleEditForm
+      .getByText("Açıklama reddedildi.", { exact: true })
+      .waitFor();
+    await roleEditForm
+      .locator('[name="description"]')
+      .fill("Native viewer access");
+    await roleUpdateSubmit.click();
+    assert.equal(await roleUpdateSubmit.isDisabled(), true);
+    assert.equal(await roleUpdateSubmit.locator(".spinner").count(), 1);
+    await window
+      .getByText("Rol açıklaması güncellendi.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await roleEditForm.locator('[name="description"]').inputValue(),
+      "Native viewer access",
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminRoleUpdateRequests),
+      [
+        {
+          name: "ROLE_NATIVE_VIEWER",
+          description: "Rejected description",
+        },
+        { name: "ROLE_NATIVE_VIEWER", description: "Native viewer access" },
       ],
     );
     await window.getByRole("button", { name: "İngilizce" }).click();

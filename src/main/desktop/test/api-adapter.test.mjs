@@ -128,6 +128,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { name: "ROLE_NATIVE_VIEWER", description: "Native viewer access" },
   });
   assert.equal(createdRole.status, 200);
+  const updatedRole = await adapter.request({
+    console: "admin",
+    path: "/api/admin/roles/ROLE_AUDITOR",
+    method: "PUT",
+    body: { name: "ROLE_AUDITOR", description: "Native audit reader" },
+  });
+  assert.equal(updatedRole.status, 200);
   const createdGroup = await adapter.request({
     console: "admin",
     path: "/api/admin/groups",
@@ -373,7 +380,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/roles/ROLE_NATIVE_VIEWER",
+      path: "/api/admin/roles/ROLE_NATIVE_VIEWER/users/1",
       method: "PUT",
     }),
     /not allowed/,
