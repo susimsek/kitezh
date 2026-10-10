@@ -384,7 +384,11 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
   );
   await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
 
-  const application = await electron.launch({
+  let application;
+  let mainWindow;
+  let packagedRoleName;
+
+  application = await electron.launch({
     executablePath: packagedExecutable,
     args: [`--user-data-dir=${userDataDirectory}`],
     env: {
@@ -401,7 +405,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
         globalThis.__e2eExternalUrl = url;
       };
     });
-    const mainWindow = await nativeMainWindow(application);
+    mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -496,7 +500,78 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
         .count(),
       0,
     );
+
+    packagedRoleName = `ROLE_PACKAGED_E2E_${Date.now()}`;
+    await mainWindow
+      .getByRole("button", { name: "Roles", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Roles", exact: true })
+      .waitFor();
+    await mainWindow
+      .locator(".topbar")
+      .getByRole("button", { name: "Create role", exact: true })
+      .click();
+    const roleCreateForm = mainWindow.locator(
+      'form[data-form="admin-role-create"]',
+    );
+    await roleCreateForm.locator('[name="name"]').fill(packagedRoleName);
+    await roleCreateForm
+      .locator('[name="description"]')
+      .fill("Packaged Windows role");
+    await roleCreateForm
+      .getByRole("button", { name: "Create role", exact: true })
+      .click();
+    await mainWindow.getByText("Role created.", { exact: true }).waitFor();
+
+    const roleRow = mainWindow.locator(
+      `article[data-role-name="${packagedRoleName}"]`,
+    );
+    await roleRow.waitFor();
+    const roleDescription = roleRow.locator('[name="description"]');
+    await roleDescription.fill("Packaged Windows role updated");
+    await roleRow.getByRole("button", { name: "Save", exact: true }).click();
+    await mainWindow
+      .getByText("Role description updated.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await roleRow.locator('[name="description"]').inputValue(),
+      "Packaged Windows role updated",
+    );
+
+    const roleDelete = roleRow.getByRole("button", {
+      name: "Delete role",
+      exact: true,
+    });
+    await roleDelete.click();
+    await roleRow.getByText(/Delete this role\?/).waitFor();
+    await roleRow
+      .getByRole("button", { name: "Delete role", exact: true })
+      .click();
+    await mainWindow.getByText("Role deleted.", { exact: true }).waitFor();
+    await roleRow.waitFor({ state: "detached" });
+    packagedRoleName = null;
   } finally {
-    await application.close();
+    if (application) {
+      try {
+        if (packagedRoleName && mainWindow) {
+          const cleanup = await mainWindow.evaluate(
+            async (name) =>
+              window.desktopApi.api.request({
+                console: "admin",
+                method: "DELETE",
+                path: `/api/admin/roles/${encodeURIComponent(name)}`,
+              }),
+            packagedRoleName,
+          );
+          if (cleanup.status !== 204 && cleanup.status !== 404)
+            throw new Error(
+              `Packaged role cleanup failed with status ${cleanup.status}`,
+            );
+        }
+      } finally {
+        await application.close();
+      }
+    }
   }
 });
