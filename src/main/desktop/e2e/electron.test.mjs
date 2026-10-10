@@ -4996,6 +4996,79 @@ test("opens settings in a separate window without requiring login", async () => 
   }
 });
 
+test("keeps native windows isolated, sandboxed, and without Node integration", async () => {
+  const application = await launchDesktop({ updatePreviewState: "available" });
+  try {
+    const mainWindow = await nativeMainWindow(application);
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+
+    const openMenuItem = async (menuLabel, itemLabel) => {
+      const windowPromise = application.waitForEvent("window");
+      const found = await application.evaluate(
+        ({ Menu }, { menuLabel: requestedMenu, itemLabel: requestedItem }) => {
+          const menu = Menu.getApplicationMenu();
+          const parent = menu?.items.find(
+            (item) => item.label === requestedMenu,
+          );
+          const item = parent?.submenu?.items.find(
+            (candidate) => candidate.label === requestedItem,
+          );
+          item?.click();
+          return Boolean(item);
+        },
+        { menuLabel, itemLabel },
+      );
+      assert.equal(found, true, `Could not find menu item: ${itemLabel}`);
+      return windowPromise;
+    };
+
+    const aboutWindow = await openMenuItem("Kitezh", "About Kitezh");
+    await aboutWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+
+    const settingsWindow = await openMenuItem("Kitezh", "Settings…");
+    await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+
+    const companionWindow = await openMenuItem("View", "Quick Access…");
+    await companionWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+
+    const { nextWindowPromise: availableWindowPromise } =
+      await openManualUpdateCheck(application);
+    const availableWindow = await availableWindowPromise;
+    await availableWindow
+      .getByRole("heading", { name: "A new version of Kitezh is available!" })
+      .waitFor();
+
+    const nativeWindowCount = await application.evaluate(
+      ({ BrowserWindow }) => {
+        const windows = BrowserWindow.getAllWindows();
+        const unsafe = windows
+          .map((window) => ({
+            url: window.webContents.getURL(),
+            preferences: window.webContents.getLastWebPreferences(),
+          }))
+          .filter(
+            ({ preferences }) =>
+              !preferences ||
+              preferences.contextIsolation !== true ||
+              preferences.nodeIntegration !== false ||
+              preferences.sandbox !== true,
+          );
+        if (unsafe.length > 0) {
+          throw new Error(
+            `Native windows have unsafe WebPreferences: ${JSON.stringify(unsafe)}`,
+          );
+        }
+        return windows.length;
+      },
+    );
+    assert.ok(nativeWindowCount >= 5);
+  } finally {
+    await application.close();
+  }
+});
+
 test("opens the native quick access companion from View", async () => {
   const application = await launchDesktop();
   try {
