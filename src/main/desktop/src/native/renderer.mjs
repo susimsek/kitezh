@@ -55,6 +55,9 @@ const pageHeader = (title, description) => {
   const createRole =
     state.route === "roles" ||
     (state.route === "role-create" && state.busy === "role-create-route");
+  const createGroup =
+    state.route === "groups" ||
+    (state.route === "group-create" && state.busy === "group-create-route");
   const createAction =
     state.console === "admin" && createUser
       ? button(text("adminCreateUser"), {
@@ -73,7 +76,16 @@ const pageHeader = (title, description) => {
             disabled: state.offline || Boolean(state.busy),
             icon: "add",
           })
-        : "";
+        : state.console === "admin" && createGroup
+          ? button(text("adminCreateGroup"), {
+              action: "create-group",
+              busy:
+                state.busy === "group-create-route" ||
+                state.busy === "route:groups",
+              disabled: state.offline || Boolean(state.busy),
+              icon: "add",
+            })
+          : "";
   return `<div class="topbar"><div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><div class="actions">${createAction}${button(text("signOut"), { action: "logout", busy: state.busy === "logout", icon: "logout" })}</div></div>`;
 };
 
@@ -175,6 +187,7 @@ function routeTitle() {
       roles: text("adminRoles"),
       "role-create": text("adminCreateRole"),
       groups: text("adminGroups"),
+      "group-create": text("adminCreateGroup"),
       "client-scopes": text("adminClientScopes"),
       clients: text("adminClients"),
       "identity-providers": text("adminIdentityProviders"),
@@ -208,6 +221,7 @@ function routeDescription() {
       roles: text("adminSearchRoles"),
       "role-create": text("adminCreateRoleDescription"),
       groups: text("adminSearchGroups"),
+      "group-create": text("adminCreateGroupDescription"),
       "client-scopes": text("adminSearchClientScopes"),
       clients: text("adminSearchClients"),
       "identity-providers": text("adminSearchIdentityProviders"),
@@ -260,6 +274,7 @@ function adminContent() {
   if (state.route === "roles") return adminRolesContent();
   if (state.route === "role-create") return adminRoleCreateContent();
   if (state.route === "groups") return adminGroupsContent();
+  if (state.route === "group-create") return adminGroupCreateContent();
   if (state.route === "client-scopes") return adminClientScopesContent();
   if (state.route === "clients") return adminClientsContent();
   if (state.route === "identity-providers")
@@ -333,6 +348,12 @@ function adminGroupsContent() {
     ? page.totalPages
     : 0;
   return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? `<div class="list">${groups.map((group) => `<article class="list-item"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span></div><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminGroupCreateContent() {
+  const draft = state.data.adminGroupCreateDraft ?? {};
+  const errors = violations(state.error?.body);
+  return `<section class="card"><form data-form="admin-group-create" novalidate>${field("name", text("adminGroupName"), draft.name ?? "", errors.name, "text", 'maxlength="100" autocomplete="off" required')}<div class="muted">${escapeHtml(text("adminGroupRootOnly"))}</div>${button(text("adminCreateGroup"), { type: "submit", busy: state.busy === "group-create", disabled: state.offline })}</form></section>`;
 }
 
 function adminClientScopesContent() {
@@ -952,6 +973,8 @@ function preserveOfflineDrafts() {
       };
     } else if (form.dataset.form === "admin-role-create") {
       state.data.adminRoleCreateDraft = values;
+    } else if (form.dataset.form === "admin-group-create") {
+      state.data.adminGroupCreateDraft = values;
     }
   }
 }
@@ -1002,6 +1025,48 @@ async function submitForm(form) {
       state.route = "roles";
       await loadRoute();
       state.notice = text("adminRoleCreated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-group-create") {
+    const body = {
+      name: String(values.name ?? "").trim(),
+      parentId: null,
+      attributes: {},
+      defaultGroup: false,
+    };
+    if (!body.name) {
+      state.data.adminGroupCreateDraft = { name: body.name };
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: text("adminGroupNameRequired"),
+          violations: [
+            { field: "name", message: text("adminGroupNameRequired") },
+          ],
+        },
+      };
+      render();
+      return;
+    }
+    if (!form.reportValidity()) return;
+    state.data.adminGroupCreateDraft = { name: body.name };
+    state.error = null;
+    state.notice = null;
+    state.busy = "group-create";
+    render();
+    try {
+      await request("/api/admin/groups", { method: "POST", body });
+      state.data.adminGroupCreateDraft = null;
+      state.data.groupQuery = "";
+      state.data.groupPage = 0;
+      state.route = "groups";
+      await loadRoute();
+      state.notice = text("adminGroupCreated");
     } catch {
       /* request rendered localized server validation or transport feedback */
     }
@@ -1407,6 +1472,18 @@ async function action(action, element) {
     state.busy = "role-create-route";
     state.route = "role-create";
     state.data.adminRoleCreateDraft = null;
+    state.error = null;
+    state.notice = null;
+    await loadRoute();
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "create-group") {
+    if (state.busy || state.offline) return;
+    state.busy = "group-create-route";
+    state.route = "group-create";
+    state.data.adminGroupCreateDraft = null;
     state.error = null;
     state.notice = null;
     await loadRoute();

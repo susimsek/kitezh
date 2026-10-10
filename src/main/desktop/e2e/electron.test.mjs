@@ -654,6 +654,44 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (requestUrl.pathname === "/api/admin/groups") {
+          if (requestMethod === "POST") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__adminGroupCreateRequests ??= [];
+            globalThis.__adminGroupCreateRequests.push(body);
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            if (body.name === "finance")
+              return new Response(
+                JSON.stringify({
+                  detail: "Correct the group fields.",
+                  violations: [
+                    {
+                      field: "name",
+                      message: "Group name is already registered.",
+                    },
+                  ],
+                }),
+                {
+                  status: 409,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            globalThis.__createdGroups ??= [];
+            globalThis.__createdGroups.push({
+              id: 99,
+              name: body.name,
+              path: `Organization / ${body.name}`,
+              roles: [],
+              effectiveRoles: [],
+              userCount: 0,
+            });
+            return new Response(
+              JSON.stringify(globalThis.__createdGroups.at(-1)),
+              {
+                status: 201,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
           globalThis.__adminGroupRequests ??= [];
           globalThis.__adminGroupRequests.push(requestUrl.search);
           await new Promise((resolve) => setTimeout(resolve, 350));
@@ -664,18 +702,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             : page === 0
               ? "finance"
               : "support";
+          const content = [
+            {
+              id: page + 1,
+              name,
+              path: `Organization / ${name}`,
+              roles: ["ROLE_USER_VIEWER"],
+              effectiveRoles: ["ROLE_USER_VIEWER"],
+              userCount: 3,
+            },
+          ];
+          if (!query && page === 0)
+            content.push(...(globalThis.__createdGroups ?? []));
           return new Response(
             JSON.stringify({
-              content: [
-                {
-                  id: page + 1,
-                  name,
-                  path: `Organization / ${name}`,
-                  roles: ["ROLE_USER_VIEWER"],
-                  effectiveRoles: ["ROLE_USER_VIEWER"],
-                  userCount: 3,
-                },
-              ],
+              content,
               number: page,
               totalPages: 2,
               totalElements: 2,
@@ -1711,6 +1752,66 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ["0", "0"],
     );
     assert.equal(new URLSearchParams(groupRequests[1]).get("q"), "audit");
+    await window
+      .locator(".topbar")
+      .getByRole("button", { name: "Create group", exact: true })
+      .click();
+    await window
+      .getByRole("heading", { name: "Create group", exact: true })
+      .waitFor();
+    const groupCreateForm = window.locator(
+      'form[data-form="admin-group-create"]',
+    );
+    await groupCreateForm.locator('[name="name"]').fill("finance");
+    const groupCreateSubmit = groupCreateForm.getByRole("button", {
+      name: "Create group",
+      exact: true,
+    });
+    await groupCreateSubmit.click();
+    assert.equal(await groupCreateSubmit.isDisabled(), true);
+    assert.equal(await groupCreateSubmit.locator(".spinner").count(), 1);
+    await window
+      .getByText("Group name is already registered.", { exact: true })
+      .waitFor();
+    await groupCreateForm.locator('[name="name"]').fill("native-operators");
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Grup oluştur", exact: true })
+      .waitFor();
+    await window.waitForFunction(() => {
+      const localeButton = document.querySelector(
+        '.sidebar-footer button[data-action="toggle-locale"]',
+      );
+      return localeButton && !localeButton.disabled;
+    });
+    assert.equal(
+      await groupCreateForm.locator('[name="name"]').inputValue(),
+      "native-operators",
+    );
+    await groupCreateForm
+      .getByRole("button", { name: "Grup oluştur", exact: true })
+      .click();
+    await window.getByText("Grup oluşturuldu.", { exact: true }).waitFor();
+    await window.getByText("Organization / native-operators").waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminGroupCreateRequests),
+      [
+        {
+          name: "finance",
+          parentId: null,
+          attributes: {},
+          defaultGroup: false,
+        },
+        {
+          name: "native-operators",
+          parentId: null,
+          attributes: {},
+          defaultGroup: false,
+        },
+      ],
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.getByRole("button", { name: "Search groups" }).waitFor();
     const clientScopesNavigation = window.getByRole("button", {
       name: "Client scopes",
       exact: true,
