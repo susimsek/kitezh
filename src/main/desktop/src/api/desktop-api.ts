@@ -47,6 +47,7 @@ function isAllowedApiPath(
   path: string,
 ) {
   if (namespace === "admin") {
+    if (method === "POST" && path === "/api/admin/keys/rotate") return true;
     if (method === "GET" && path === "/api/admin/profile-attributes")
       return true;
     if (method === "POST" && path === "/api/admin/users") return true;

@@ -2467,6 +2467,32 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          requestUrl.pathname === "/api/admin/keys/rotate" &&
+          requestMethod === "POST"
+        ) {
+          globalThis.__adminKeyRotationRequests ??= [];
+          globalThis.__adminKeyRotationRequests.push({
+            method: requestMethod,
+            path: requestUrl.pathname,
+            bodyPresent: Boolean(init?.body),
+          });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          globalThis.__adminKeyRotated = true;
+          const rotationNumber = globalThis.__adminKeyRotationRequests.length;
+          return new Response(
+            JSON.stringify({
+              id: "rotated-key-id",
+              kid: `rsa-rotated-${rotationNumber}`,
+              type: "RSA",
+              algorithm: "RS256",
+              use: "sig",
+              active: true,
+              privateKey: "SECRET_PRIVATE_KEY_NEVER_RENDER",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/keys") {
           globalThis.__adminKeyRequests ??= [];
           globalThis.__adminKeyRequests.push(requestUrl.search);
@@ -2477,7 +2503,13 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               content: [
                 {
                   id: "key-id",
-                  kid: query ? "rsa-retired" : "rsa-active",
+                  kid:
+                    globalThis.__adminKeyRotated &&
+                    requestUrl.searchParams.get("active") !== "false"
+                      ? `rsa-rotated-${globalThis.__adminKeyRotationRequests?.length ?? 1}`
+                      : query
+                        ? "rsa-retired"
+                        : "rsa-active",
                   type: "RSA",
                   algorithm: "RS256",
                   use: "sig",
@@ -5331,6 +5363,126 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     assert.equal(new URLSearchParams(keyRequests[1]).get("q"), "rsa");
     assert.equal(new URLSearchParams(keyRequests[1]).get("active"), "false");
+    const rotateSigningKey = window.getByRole("button", {
+      name: "Rotate signing key",
+      exact: true,
+    });
+    await window.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await window.waitForFunction(() =>
+      document
+        .querySelector('[data-action="admin-key-rotate-request"]')
+        ?.hasAttribute("disabled"),
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminKeyRotationRequests ?? [],
+      ),
+      [],
+    );
+    await window.evaluate(() => window.dispatchEvent(new Event("online")));
+    await rotateSigningKey.waitFor({ state: "visible" });
+    await rotateSigningKey.click();
+    await window
+      .getByText(
+        "Rotate the active signing key? Previous keys remain available to verify existing tokens.",
+        { exact: true },
+      )
+      .waitFor();
+    await window.locator('[data-action="admin-key-rotate-cancel"]').click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminKeyRotationRequests ?? [],
+      ),
+      [],
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("button", { name: "İngilizce" }).waitFor();
+    await window
+      .getByRole("button", { name: "İmzalama anahtarını döndür", exact: true })
+      .click();
+    await window
+      .getByText(
+        "Etkin imzalama anahtarı döndürülsün mü? Önceki anahtarlar mevcut belirteçleri doğrulamak için kullanılmaya devam eder.",
+        { exact: true },
+      )
+      .waitFor();
+    const confirmSigningKeyRotation = window.getByRole("button", {
+      name: "Anahtarı döndür",
+      exact: true,
+    });
+    await confirmSigningKeyRotation.click();
+    assert.equal(await confirmSigningKeyRotation.isDisabled(), true);
+    assert.equal(
+      await confirmSigningKeyRotation.locator(".spinner").count(),
+      1,
+    );
+    await confirmSigningKeyRotation.evaluate((button) => button.click());
+    await window
+      .getByText("İmzalama anahtarı döndürüldü.", { exact: true })
+      .waitFor();
+    await window.getByText("rsa-rotated-1", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminKeyRotationRequests),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/keys/rotate",
+          bodyPresent: false,
+        },
+      ],
+    );
+    assert.equal(
+      await window.getByText("SECRET_PRIVATE_KEY_NEVER_RENDER").count(),
+      0,
+    );
+    await window.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await window.waitForFunction(() =>
+      document
+        .querySelector('[data-action="admin-key-rotate-request"]')
+        ?.hasAttribute("disabled"),
+    );
+    await window
+      .locator('[data-action="admin-key-rotate-request"]')
+      .evaluate((button) => button.click());
+    assert.equal(
+      (await application.evaluate(() => globalThis.__adminKeyRotationRequests))
+        .length,
+      1,
+    );
+    await window.evaluate(() => window.dispatchEvent(new Event("online")));
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.getByRole("button", { name: "Turkish" }).waitFor();
+    await window
+      .getByRole("button", { name: "Rotate signing key", exact: true })
+      .click();
+    await window
+      .getByText(
+        "Rotate the active signing key? Previous keys remain available to verify existing tokens.",
+        { exact: true },
+      )
+      .waitFor();
+    const confirmEnglishSigningKeyRotation = window.getByRole("button", {
+      name: "Rotate key",
+      exact: true,
+    });
+    await confirmEnglishSigningKeyRotation.click();
+    assert.equal(await confirmEnglishSigningKeyRotation.isDisabled(), true);
+    assert.equal(
+      await confirmEnglishSigningKeyRotation.locator(".spinner").count(),
+      1,
+    );
+    await confirmEnglishSigningKeyRotation.evaluate((button) => button.click());
+    await window.getByText("Signing key rotated.", { exact: true }).waitFor();
+    await window.getByText("rsa-rotated-2", { exact: true }).waitFor();
+    assert.equal(
+      (await application.evaluate(() => globalThis.__adminKeyRotationRequests))
+        .length,
+      2,
+    );
+    assert.equal(
+      await window.getByText("SECRET_PRIVATE_KEY_NEVER_RENDER").count(),
+      0,
+    );
     const policiesNavigation = window.getByRole("button", {
       name: "Policies",
       exact: true,

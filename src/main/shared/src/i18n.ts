@@ -142,6 +142,11 @@ export const messages = {
     adminNoKeys: "No signing keys found.",
     adminKeyActive: "Active",
     adminKeyInactive: "Inactive",
+    adminRotateSigningKey: "Rotate signing key",
+    adminRotateSigningKeyConfirm:
+      "Rotate the active signing key? Previous keys remain available to verify existing tokens.",
+    adminRotateSigningKeyNow: "Rotate key",
+    adminSigningKeyRotated: "Signing key rotated.",
     adminPolicies: "Policies",
     adminPoliciesDescription:
       "Review authentication and offline access policies.",
@@ -772,6 +777,11 @@ export const messages = {
     adminNoKeys: "İmzalama anahtarı bulunamadı.",
     adminKeyActive: "Etkin",
     adminKeyInactive: "Etkin değil",
+    adminRotateSigningKey: "İmzalama anahtarını döndür",
+    adminRotateSigningKeyConfirm:
+      "Etkin imzalama anahtarı döndürülsün mü? Önceki anahtarlar mevcut belirteçleri doğrulamak için kullanılmaya devam eder.",
+    adminRotateSigningKeyNow: "Anahtarı döndür",
+    adminSigningKeyRotated: "İmzalama anahtarı döndürüldü.",
     adminPolicies: "Politikalar",
     adminPoliciesDescription:
       "Kimlik doğrulama ve çevrimdışı erişim politikalarını inceleyin.",

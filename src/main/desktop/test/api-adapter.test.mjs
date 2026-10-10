@@ -1175,14 +1175,21 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     }),
     /not allowed/,
   );
-  await assert.rejects(
-    adapter.request({
-      console: "admin",
-      path: "/api/admin/keys/rotate",
-      method: "POST",
-    }),
-    /not allowed/,
-  );
+  const rotatedKey = await adapter.request({
+    console: "admin",
+    path: "/api/admin/keys/rotate",
+    method: "POST",
+  });
+  assert.equal(rotatedKey.status, 200);
+  for (const path of [
+    "/api/admin/keys/rotate?force=true",
+    "/api/admin/keys/rotate/other",
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method: "POST" }),
+      /not allowed/,
+    );
+  }
   await assert.rejects(
     adapter.request({
       console: "admin",
