@@ -146,6 +146,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { enabled: false },
   });
   assert.equal(disabledUser.status, 200);
+  const resetUserAuthenticator = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/totp",
+    method: "DELETE",
+  });
+  assert.equal(resetUserAuthenticator.status, 200);
   const deletedClient = await adapter.request({
     console: "admin",
     path: "/api/admin/clients/client-42",
@@ -662,6 +668,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/users/2/password",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/totp/nested",
+      method: "DELETE",
     }),
     /not allowed/,
   );

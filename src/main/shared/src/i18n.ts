@@ -375,6 +375,10 @@ export const messages = {
     adminDisableUserPrompt:
       "Disable this user account? Active sessions will end.",
     adminUserEnabledUpdated: "User account status updated.",
+    adminResetAuthenticator: "Reset authenticator",
+    adminResetAuthenticatorPrompt:
+      "Remove this user's authenticator? They will need to set it up again.",
+    adminAuthenticatorReset: "User authenticator reset.",
     adminDeleteUser: "Delete user",
     adminDeleteUserPrompt:
       "Delete this user? Their sessions and authorizations will be revoked.",
@@ -907,6 +911,10 @@ export const messages = {
     adminDisableUserPrompt:
       "Bu kullanıcı devre dışı bırakılsın mı? Açık oturumlar kapatılır.",
     adminUserEnabledUpdated: "Kullanıcı hesap durumu güncellendi.",
+    adminResetAuthenticator: "Kimlik doğrulayıcıyı sıfırla",
+    adminResetAuthenticatorPrompt:
+      "Bu kullanıcının kimlik doğrulayıcısı kaldırılsın mı? Yeniden kurması gerekir.",
+    adminAuthenticatorReset: "Kullanıcının kimlik doğrulayıcısı sıfırlandı.",
     adminDeleteUser: "Kullanıcıyı sil",
     adminDeleteUserPrompt:
       "Bu kullanıcı silinsin mi? Oturumları ve yetkilendirmeleri iptal edilir.",

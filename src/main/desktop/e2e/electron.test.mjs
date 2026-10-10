@@ -859,6 +859,16 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/totp$/.test(requestUrl.pathname) &&
+          requestMethod === "DELETE"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          globalThis.__adminTotpResetRequests ??= [];
+          globalThis.__adminTotpResetRequests.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "PUT"
         ) {
@@ -2732,6 +2742,60 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(userUpdateRequests[1].body.firstName, "Alice Updated");
     assert.deepEqual(userUpdateRequests[1].body.roles, ["ROLE_USER"]);
     assert.equal(Object.hasOwn(userUpdateRequests[1].body, "password"), false);
+    const resetAuthenticator = aliceRow.getByRole("button", {
+      name: "Reset authenticator",
+      exact: true,
+    });
+    await resetAuthenticator.click();
+    await aliceRow
+      .getByText(
+        "Remove this user's authenticator? They will need to set it up again.",
+        { exact: true },
+      )
+      .waitFor();
+    await aliceRow.getByRole("button", { name: "Cancel", exact: true }).click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminTotpResetRequests ?? [],
+      ),
+      [],
+    );
+    await aliceRow
+      .getByRole("button", { name: "Reset authenticator", exact: true })
+      .click();
+    const confirmAuthenticatorReset = aliceRow.getByRole("button", {
+      name: "Reset authenticator",
+      exact: true,
+    });
+    await confirmAuthenticatorReset.click();
+    assert.equal(await confirmAuthenticatorReset.isDisabled(), true);
+    assert.equal(
+      await confirmAuthenticatorReset.locator(".spinner").count(),
+      1,
+    );
+    await window
+      .getByText("User authenticator reset.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminTotpResetRequests),
+      [2],
+    );
+    await languageToggle.click();
+    const resetAuthenticatorTurkish = aliceRow.getByRole("button", {
+      name: "Kimlik doğrulayıcıyı sıfırla",
+      exact: true,
+    });
+    await resetAuthenticatorTurkish.click();
+    await aliceRow
+      .getByText(
+        "Bu kullanıcının kimlik doğrulayıcısı kaldırılsın mı? Yeniden kurması gerekir.",
+        { exact: true },
+      )
+      .waitFor();
+    await aliceRow.getByRole("button", { name: "Vazgeç", exact: true }).click();
+    await window
+      .getByRole("button", { name: "İngilizce", exact: true })
+      .click();
     await aliceRow
       .getByRole("button", { name: "Disable user", exact: true })
       .click();

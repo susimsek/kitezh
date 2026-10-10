@@ -64,6 +64,15 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userEnabledMatch[1]))
     )
       return true;
+    const userTotpResetMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/totp$/,
+    );
+    if (
+      method === "DELETE" &&
+      userTotpResetMatch &&
+      Number.isSafeInteger(Number(userTotpResetMatch[1]))
+    )
+      return true;
     if (
       method === "DELETE" &&
       /^\/api\/admin\/users\/[1-9]\d*$/.test(path) &&
