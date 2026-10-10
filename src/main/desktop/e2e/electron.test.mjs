@@ -845,6 +845,33 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          requestUrl.pathname ===
+            "/api/admin/settings/localization/messages/1" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__localizationMessageUpdates ??= [];
+          globalThis.__localizationMessageUpdates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.locale !== "tr")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the localization fields.",
+                violations: [
+                  { field: "locale", message: "Use a supported locale." },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(JSON.stringify({ id: 1, ...body }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (
           requestUrl.pathname === "/api/admin/settings/localization/messages"
         ) {
           globalThis.__localizationMessageRequests ??= [];
@@ -1485,6 +1512,42 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .getByText("<img src=x onerror=alert(1)>", { exact: true })
       .waitFor();
     assert.equal(await window.locator("img[src=x]").count(), 0);
+    const overrideForm = window.locator(
+      'form[data-form="admin-localization-message"]',
+    );
+    const overrideLocale = overrideForm.locator('[name="locale"]');
+    const overrideValue = overrideForm.locator('[name="messageValue"]');
+    await overrideLocale.fill("en_US");
+    await overrideValue.fill("<strong>Sign in</strong>");
+    const overrideSave = overrideForm.getByRole("button", { name: "Save" });
+    await overrideSave.click();
+    assert.equal(await overrideSave.isDisabled(), true);
+    assert.equal(await overrideSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Use a supported locale.", { exact: true })
+      .waitFor();
+    assert.equal(await overrideLocale.inputValue(), "en_US");
+    assert.equal(await overrideValue.inputValue(), "<strong>Sign in</strong>");
+    await overrideLocale.fill("tr");
+    await overrideSave.click();
+    assert.equal(await overrideSave.isDisabled(), true);
+    assert.equal(await overrideSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Message override saved.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await window.locator("strong").filter({ hasText: "Sign in" }).count(),
+      0,
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Yerelleştirme ayarları" })
+      .waitFor();
+    await overrideValue.fill("Oturum aç");
+    await overrideForm.getByRole("button", { name: "Kaydet" }).click();
+    await window
+      .getByText("İleti geçersiz kılması kaydedildi.", { exact: true })
+      .waitFor();
     const localizationRequests = await application.evaluate(
       () => globalThis.__localizationMessageRequests,
     );
@@ -1496,10 +1559,6 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       new URLSearchParams(localizationRequests[0]).get("sort"),
       "locale,asc",
     );
-    await window.getByRole("button", { name: "Turkish" }).click();
-    await window
-      .getByRole("heading", { name: "Yerelleştirme ayarları" })
-      .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     const ldapNavigation = window.getByRole("button", {
       name: "LDAP federation",

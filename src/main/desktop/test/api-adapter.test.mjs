@@ -240,6 +240,18 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/localization/messages?q=login&locale=tr&bundle=admin&page=0&size=20&sort=locale,asc",
   });
   assert.equal(messageOverrides.status, 200);
+  const updatedMessageOverride = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/localization/messages/7",
+    method: "PUT",
+    body: {
+      locale: "tr",
+      bundle: "admin",
+      messageKey: "login.title",
+      messageValue: "Oturum aç",
+    },
+  });
+  assert.equal(updatedMessageOverride.status, 200);
   await assert.rejects(
     adapter.request({
       console: "account",
@@ -268,6 +280,22 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
       console: "admin",
       path: "/api/admin/settings/localization/messages",
       method: "POST",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization/messages/0",
+      method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization/messages/9007199254740992",
+      method: "PUT",
     }),
     /not allowed/,
   );

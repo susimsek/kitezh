@@ -54,6 +54,15 @@ function isAllowedApiPath(
         path === "/api/admin/settings/branding")
     )
       return true;
+    const localizationMessageMatch = path.match(
+      /^\/api\/admin\/settings\/localization\/messages\/([1-9]\d*)$/,
+    );
+    if (
+      method === "PUT" &&
+      localizationMessageMatch &&
+      Number.isSafeInteger(Number(localizationMessageMatch[1]))
+    )
+      return true;
     if (method !== "GET") return false;
     if (path === "/api/admin/dashboard") return true;
     if (
