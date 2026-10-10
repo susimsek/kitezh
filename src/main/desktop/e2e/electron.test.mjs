@@ -255,7 +255,11 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
     await window.evaluate(() => {
       const originalSetTimeout = window.setTimeout.bind(window);
       window.setTimeout = (callback, delay, ...args) =>
-        originalSetTimeout(callback, delay === 300_000 ? 25 : delay, ...args);
+        originalSetTimeout(
+          callback,
+          delay === 300_000 ? 1_000 : delay,
+          ...args,
+        );
     });
     await window
       .getByRole("button", { name: "Account Console", exact: true })
