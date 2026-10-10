@@ -37,8 +37,37 @@ const escapeHtml = (value) =>
   );
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
-const button = (label, options = {}) =>
-  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${(options.icon ?? (label === text("save") ? "check" : null)) && icons[options.icon ?? "check"] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon ?? "check"].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+const actionIcons = {
+  "admin-client-scope-delete-request": "delete",
+  "admin-client-scope-delete-confirm": "delete",
+  "admin-consent-revoke-request": "delete",
+  "admin-consent-revoke-confirm": "delete",
+  "admin-group-delete-request": "delete",
+  "admin-group-delete-confirm": "delete",
+  "admin-group-roles-toggle": "edit",
+  "admin-identity-provider-delete-request": "delete",
+  "admin-identity-provider-delete-confirm": "delete",
+  "admin-offline-session-revoke-request": "delete",
+  "admin-offline-session-revoke-confirm": "delete",
+  "admin-provider-mapper-delete-request": "delete",
+  "admin-provider-mapper-delete-confirm": "delete",
+  "admin-provider-mapper-edit": "edit",
+  "admin-role-delete-request": "delete",
+  "admin-role-delete-confirm": "delete",
+  "admin-session-delete-request": "delete",
+  "admin-session-delete-confirm": "delete",
+  "admin-user-delete-request": "delete",
+  "admin-user-delete-confirm": "delete",
+  "admin-user-edit-toggle": "edit",
+};
+const button = (label, options = {}) => {
+  const iconName =
+    options.icon ??
+    actionIcons[options.action] ??
+    (label === text("save") ? "check" : null);
+  const icon = iconName ? icons[iconName] : null;
+  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+};
 const field = (
   name,
   label,

@@ -3041,9 +3041,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     const existingMapperRow = identityProviderRow.locator(
       '[data-provider-mapper-id="mapper-1"]',
     );
-    await existingMapperRow
-      .getByRole("button", { name: "Eşleyiciyi düzenle", exact: true })
-      .click();
+    const editMapperButton = existingMapperRow.getByRole("button", {
+      name: "Eşleyiciyi düzenle",
+      exact: true,
+    });
+    assert.equal(
+      await editMapperButton.locator(".button-icon").textContent(),
+      "✎",
+    );
+    assert.equal(
+      await editMapperButton
+        .locator(".button-icon")
+        .getAttribute("aria-hidden"),
+      "true",
+    );
+    await editMapperButton.click();
     const mapperEditForm = identityProviderRow.locator(
       'form[data-form="admin-provider-mapper"]',
     );
@@ -3096,9 +3108,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       },
     ]);
     await window.getByRole("button", { name: "İngilizce" }).click();
-    await mapperRow
-      .getByRole("button", { name: "Delete mapper", exact: true })
-      .click();
+    const requestMapperDelete = mapperRow.getByRole("button", {
+      name: "Delete mapper",
+      exact: true,
+    });
+    assert.equal(
+      await requestMapperDelete.locator(".button-icon").textContent(),
+      "×",
+    );
+    assert.equal(
+      await requestMapperDelete
+        .locator(".button-icon")
+        .getAttribute("aria-hidden"),
+      "true",
+    );
+    await requestMapperDelete.click();
     await mapperRow
       .getByText(
         "Delete this provider mapper? The change can affect claims in future sign-ins.",
