@@ -158,6 +158,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     method: "POST",
   });
   assert.equal(unlockUser.status, 200);
+  const resetUserPassword = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/password",
+    method: "PUT",
+    body: { password: "test-password-not-a-secret", temporary: true },
+  });
+  assert.equal(resetUserPassword.status, 200);
   const deletedClient = await adapter.request({
     console: "admin",
     path: "/api/admin/clients/client-42",
@@ -672,7 +679,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/users/2/password",
+      path: "/api/admin/users/2/password/nested",
       method: "PUT",
     }),
     /not allowed/,

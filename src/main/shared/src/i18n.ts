@@ -381,6 +381,9 @@ export const messages = {
     adminAuthenticatorReset: "User authenticator reset.",
     adminUnlockUser: "Unlock user",
     adminUserUnlocked: "User account unlocked.",
+    adminResetPassword: "Reset password",
+    adminSetPassword: "Set password",
+    adminPasswordReset: "User password reset.",
     adminDeleteUser: "Delete user",
     adminDeleteUserPrompt:
       "Delete this user? Their sessions and authorizations will be revoked.",
@@ -919,6 +922,9 @@ export const messages = {
     adminAuthenticatorReset: "Kullanıcının kimlik doğrulayıcısı sıfırlandı.",
     adminUnlockUser: "Kullanıcının kilidini aç",
     adminUserUnlocked: "Kullanıcı hesabının kilidi açıldı.",
+    adminResetPassword: "Parolayı sıfırla",
+    adminSetPassword: "Parolayı belirle",
+    adminPasswordReset: "Kullanıcı parolası sıfırlandı.",
     adminDeleteUser: "Kullanıcıyı sil",
     adminDeleteUserPrompt:
       "Bu kullanıcı silinsin mi? Oturumları ve yetkilendirmeleri iptal edilir.",

@@ -881,6 +881,39 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/password$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminPasswordResetRequests ??= [];
+          globalThis.__adminPasswordResetRequests.push({
+            id,
+            passwordLength: String(body.password ?? "").length,
+            temporary: body.temporary,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.password === "Rejected-password12!")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the password.",
+                violations: [
+                  {
+                    field: "password",
+                    message: "Choose a different password.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(null, { status: 204 });
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "PUT"
         ) {
@@ -2775,6 +2808,52 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(userUpdateRequests[1].body.firstName, "Alice Updated");
     assert.deepEqual(userUpdateRequests[1].body.roles, ["ROLE_USER"]);
     assert.equal(Object.hasOwn(userUpdateRequests[1].body, "password"), false);
+    await aliceRow
+      .getByRole("button", { name: "Reset password", exact: true })
+      .click();
+    const passwordResetForm = aliceRow.locator(
+      'form[data-form="admin-user-password-reset"]',
+    );
+    const passwordResetInput = passwordResetForm.locator('[name="password"]');
+    await passwordResetInput.fill("Rejected-password12!");
+    const passwordResetSubmit = passwordResetForm.getByRole("button", {
+      name: "Set password",
+      exact: true,
+    });
+    await passwordResetSubmit.click();
+    assert.equal(await passwordResetSubmit.isDisabled(), true);
+    assert.equal(await passwordResetSubmit.locator(".spinner").count(), 1);
+    await passwordResetForm
+      .getByText("Choose a different password.", { exact: true })
+      .waitFor();
+    assert.equal(await passwordResetInput.inputValue(), "");
+    await passwordResetInput.fill("Strong-password12!");
+    await passwordResetForm.locator('[name="temporary"]').check();
+    await passwordResetSubmit.click();
+    assert.equal(await passwordResetSubmit.isDisabled(), true);
+    assert.equal(await passwordResetSubmit.locator(".spinner").count(), 1);
+    await window.getByText("User password reset.", { exact: true }).waitFor();
+    assert.equal(
+      await aliceRow
+        .locator('form[data-form="admin-user-password-reset"]')
+        .count(),
+      0,
+    );
+    const passwordResetRequests = await application.evaluate(
+      () => globalThis.__adminPasswordResetRequests,
+    );
+    assert.equal(passwordResetRequests.length, 2);
+    assert.deepEqual(
+      passwordResetRequests.map(({ id, temporary }) => ({ id, temporary })),
+      [
+        { id: 2, temporary: false },
+        { id: 2, temporary: true },
+      ],
+    );
+    assert.equal(
+      passwordResetRequests.some((entry) => Object.hasOwn(entry, "password")),
+      false,
+    );
     const resetAuthenticator = aliceRow.getByRole("button", {
       name: "Reset authenticator",
       exact: true,

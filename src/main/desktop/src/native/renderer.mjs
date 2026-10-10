@@ -60,6 +60,7 @@ const actionIcons = {
   "admin-user-totp-reset-request": "reset",
   "admin-user-totp-reset-confirm": "reset",
   "admin-user-unlock": "reset",
+  "admin-user-password-reset-toggle": "reset",
   "admin-client-scope-delete-request": "delete",
   "admin-client-scope-delete-confirm": "delete",
   "admin-client-scope-role-mappings-toggle": "edit",
@@ -456,6 +457,22 @@ function adminUsersContent() {
             disabled: state.offline || Boolean(state.busy),
           })
         : "";
+      const passwordResetOpen =
+        Number(state.data.userPasswordResetOpenId) === Number(user.id);
+      const passwordResetErrors =
+        Number(state.data.userPasswordResetErrorId) === Number(user.id)
+          ? violations(state.error?.body)
+          : {};
+      const passwordResetBusy = state.busy === `user-password-reset:${user.id}`;
+      const passwordResetControl = button(text("adminResetPassword"), {
+        action: "admin-user-password-reset-toggle",
+        id: user.id,
+        icon: "reset",
+        disabled: state.offline || Boolean(state.busy),
+      });
+      const passwordResetForm = passwordResetOpen
+        ? `<form class="card" data-form="admin-user-password-reset" data-user-id="${escapeHtml(user.id)}" novalidate><div class="field"><label for="user-password-${escapeHtml(user.id)}">${escapeHtml(text("newPassword"))}</label><input id="user-password-${escapeHtml(user.id)}" name="password" type="password" aria-invalid="${Boolean(passwordResetErrors.password)}" minlength="12" maxlength="128" autocomplete="new-password" required/><div class="field-error">${escapeHtml(passwordResetErrors.password ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="temporary"/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><div class="actions">${button(text("adminSetPassword"), { type: "submit", busy: passwordResetBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-password-reset-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        : "";
       const editing = Number(state.data.userEditOpenId) === Number(user.id);
       const selectedRoles = Array.isArray(editDraft.roles)
         ? editDraft.roles
@@ -464,7 +481,7 @@ function adminUsersContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${unlockControl}${totpControls}${enabledControls}${deleteControls}</div>${editForm}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${passwordResetControl}${unlockControl}${totpControls}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1596,6 +1613,45 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-user-password-reset") {
+    const id = Number(form.dataset.userId);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    const password = String(values.password ?? "");
+    if (
+      state.offline ||
+      !Number.isSafeInteger(id) ||
+      id < 1 ||
+      !user ||
+      !form.reportValidity() ||
+      password.length < 12 ||
+      password.length > 128
+    )
+      return;
+    state.data.userPasswordResetErrorId = id;
+    state.error = null;
+    state.notice = null;
+    state.busy = `user-password-reset:${id}`;
+    render();
+    try {
+      await request(`/api/admin/users/${id}/password`, {
+        method: "PUT",
+        body: {
+          password,
+          temporary: form.elements.namedItem("temporary").checked,
+        },
+      });
+      state.data.userPasswordResetOpenId = null;
+      state.data.userPasswordResetErrorId = null;
+      state.notice = text("adminPasswordReset");
+    } catch {
+      /* Keep the form open without retaining the submitted password. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-client-scope-role-candidate-search") {
     const scopeId = form.dataset.scopeId ?? "";
     const kind = form.dataset.roleKind ?? "";
@@ -2856,6 +2912,26 @@ async function action(action, element) {
       /* request rendered localized authorization or transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-password-reset-toggle" ||
+    action === "admin-user-password-reset-cancel"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    state.data.userPasswordResetOpenId =
+      action === "admin-user-password-reset-cancel" ||
+      Number(state.data.userPasswordResetOpenId) === id
+        ? null
+        : id;
+    state.data.userPasswordResetErrorId = null;
+    state.error = null;
     render();
     return;
   }
