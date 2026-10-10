@@ -42,13 +42,16 @@ jobs:
           set -euo pipefail
           release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | sort -V | tail -n 1)"
           if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "No version release tag points at ${RELEASE_SHA}." >&2
-            exit 1
+            echo "::notice::Skipping stale release completion for ${RELEASE_SHA}; no version tag points at this commit."
+            echo "current_release=false" >> "${GITHUB_OUTPUT}"
+            exit 0
           fi
+          echo "current_release=true" >> "${GITHUB_OUTPUT}"
           echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Confirm backend, desktop, and mobile workflows succeeded
         id: check_release_runs
+        if: ${{ steps.release.outputs.current_release == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -68,7 +71,7 @@ jobs:
           echo "ready=true" >> "${GITHUB_OUTPUT}"
 
       - name: Confirm expected release assets are present
-        if: ${{ steps.check_release_runs.outputs.ready == 'true' }}
+        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -84,7 +87,7 @@ jobs:
           done
 
       - name: Publish GitHub Release
-        if: ${{ steps.check_release_runs.outputs.ready == 'true' }}
+        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
