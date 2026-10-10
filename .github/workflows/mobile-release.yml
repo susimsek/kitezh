@@ -91,8 +91,8 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
-          cache: true
-          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          cache: false
+          install: false
 
       - name: Install mobile dependencies
         working-directory: src/main/mobile
@@ -139,8 +139,8 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
-          cache: true
-          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          cache: false
+          install: false
 
       - name: Set up Java
         uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
@@ -240,8 +240,8 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
-          cache: true
-          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          cache: false
+          install: false
 
       - name: Install mobile dependencies
         working-directory: src/main/mobile
