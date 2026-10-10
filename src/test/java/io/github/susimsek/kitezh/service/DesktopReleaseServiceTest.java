@@ -33,6 +33,9 @@ class DesktopReleaseServiceTest {
                                     {"name": "kitezh-0.1.0-linux-x86_64.AppImage"},
                                     {"name": "kitezh-0.1.0-linux-arm64.deb"},
                                     {"name": "kitezh-0.1.0-macos-universal.dmg"},
+                                    {"name": "kitezh-0.1.0-android.apk"},
+                                    {"name": "kitezh-0.1.0-ios.ipa"},
+                                    {"name": "kitezh-0.1.0-ios-unsigned.ipa"},
                                     {"name": "kitezh-0.1.0-SHA256SUMS"}
                                   ]
                                 }
@@ -66,6 +69,18 @@ class DesktopReleaseServiceTest {
                         "macosUniversal",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
                                 + "kitezh-0.1.0-macos-universal.dmg")
+                .containsEntry(
+                        "androidApk",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-android.apk")
+                .containsEntry(
+                        "iosIpa",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-ios.ipa")
+                .containsEntry(
+                        "iosUnsignedIpa",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-ios-unsigned.ipa")
                 .doesNotContainKey("linuxX64Snap");
         server.verify();
     }

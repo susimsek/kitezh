@@ -55,12 +55,11 @@ fixture account link in the system browser before waiting for the native callbac
 simulator because `clearState` does not erase iOS Keychain credentials. For a local reset, erase the
 simulator and reinstall the development build before running the authenticated flow.
 
-The manually triggered `.github/workflows/mobile-native-e2e.yml` workflow provisions an iOS
-simulator, creates the Expo native project, starts Metro and the fixture, installs the development
-build, and runs all four flows. It uses `simctl` and `xcodebuild` directly, so it does not open or
-activate the Simulator desktop window. It is intentionally separate from push/PR CI because native
-runners are slower. Android device E2E is outside the current acceptance scope; Android build and
-source-level checks remain useful evidence.
+The `.github/workflows/mobile-release.yml` workflow provisions an iOS simulator, creates the Expo
+native project, starts Metro and the fixture, installs the development build, and runs all four
+flows before packaging. It uses `simctl` and `xcodebuild` directly, so it does not open or activate
+the Simulator desktop window. Android device E2E is outside the current acceptance scope; Android
+build and source-level checks remain useful evidence.
 
 Run them only against an Expo development build with the `io.github.susimsek.kitezh.mobile`
 package ID. On macOS, run the background driver below; it boots and controls the simulator through
@@ -71,7 +70,7 @@ the script reuses a booted iPhone simulator or selects an available one.
 bash e2e/run-ios-background.sh
 ```
 
-These flows deliberately avoid real credentials and token-bearing callbacks. The native workflow
+These flows deliberately avoid real credentials and token-bearing callbacks. The release workflow
 starts the fixture server without exposing its runtime token values. The authenticated fixture flow
 has passed on the Android emulator and iPhone 17 Pro simulator, including browser callback, profile
 load, and logout. All four checked-in Maestro flows have passed on both platforms with synthetic

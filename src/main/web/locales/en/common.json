@@ -166,6 +166,26 @@
         "intel": "Intel"
       }
     },
+    "android": {
+      "title": "Android",
+      "description": "Install the Android package directly on your device.",
+      "architecture": "APK",
+      "asset": "Download APK",
+      "installationNote": "If prompted, allow your browser to install apps from this source."
+    },
+    "ios": {
+      "title": "iPhone and iPad",
+      "description": "Unsigned IPA for testing on a personal device.",
+      "signedDescription": "Install the signed iOS test build on a registered personal device.",
+      "architecture": "Test build",
+      "asset": "Download unsigned IPA",
+      "signedAsset": "Download signed IPA",
+      "installationNote": "Install with AltStore or Sideloadly using your Apple Account. Free signing lasts 7 days and must be refreshed. Initial installation requires a Mac or PC.",
+      "signedInstallationNote": "This ad hoc build installs only on devices included in its provisioning profile.",
+      "altStore": "AltStore setup",
+      "sideloadly": "Sideloadly"
+    },
+    "unavailable": "Not included in the latest release yet.",
     "checksums": "Verify your download with the published SHA-256 checksums.",
     "downloadChecksums": "SHA-256 checksums",
     "releaseNotes": "View release notes"

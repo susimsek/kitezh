@@ -20,7 +20,7 @@ export async function fetchLatestDesktopRelease(signal?: AbortSignal): Promise<D
   return (await response.json()) as DesktopRelease;
 }
 
-export function findDesktopAssetUrl(
+export function findReleaseAssetUrl(
   release: DesktopRelease | null,
   matcher: RegExp,
 ): string | undefined {

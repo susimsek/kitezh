@@ -43,7 +43,7 @@ redirect URIs for Account. The native Admin client is deliberately separate:
 namespace. Set `EXPO_PUBLIC_MOBILE_ADMIN_CLIENT_ID` only when a deployment uses a different
 registered client ID; never reuse the browser or Account client for Admin.
 
-## Native release profiles
+## Native release profiles and direct downloads
 
 `eas.json` defines the supported build boundaries:
 
@@ -56,16 +56,38 @@ The iOS bundle identifier and Android package are both
 in the EAS project or CI secret store and must never be committed here. The runtime contract is
 the app version, so a native store build cannot load an incompatible JavaScript bundle.
 
-The current release path is store-first. No mobile update button or OTA channel is exposed until
-an EAS project, update URL, privacy disclosure, staged rollout, and rollback owner are configured.
+`mobile-release.yml` runs the iOS Maestro Simulator flows before packaging and adds direct-download
+test builds to the same GitHub Release as the desktop packages. It builds an Android APK signed
+with a stable release keystore and, by default, an unsigned iOS IPA for personal-device sideloading.
+Android signing is configured in the GitHub Actions `mobile-release` environment
+with `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEYSTORE_PASSWORD`,
+`ANDROID_RELEASE_KEY_ALIAS`, and `ANDROID_RELEASE_KEY_PASSWORD`. Keep a secure backup of that
+keystore; replacing it prevents existing Android installs from accepting an in-place update.
+
+Optional iOS distribution signing uses the same environment with
+`IOS_DISTRIBUTION_CERTIFICATE_BASE64` (Apple Distribution `.p12`),
+`IOS_DISTRIBUTION_CERTIFICATE_PASSWORD`, `IOS_PROVISIONING_PROFILE_BASE64` (ad hoc profile), and
+`IOS_TEAM_ID`. Set the environment variable `IOS_SIGNING_MODE` to `signed` and configure all four
+secrets to produce a signed ad hoc IPA. It is currently `unsigned`, so the workflow produces an
+unsigned IPA. Partial signing configuration fails before the Xcode build.
+
+The iOS IPA is for testing, not App Store or TestFlight submission. The user signs it with a personal
+Apple Account through AltStore or Sideloadly; free provisioning expires after seven days and needs
+to be refreshed. Initial sideload setup requires a Mac or PC. These GitHub download builds do not
+provide automatic mobile updates. The separate EAS production profile remains available for store
+builds. Do not expose an OTA update channel until an EAS project, update URL, privacy disclosure,
+staged rollout, and rollback owner are configured.
+
 To roll back a store release, stop the rollout and promote the last compatible build; do not use an
 OTA rollback to cross a native runtime boundary. Device builds must be validated on both Android
 and iOS before a production submission.
 
 GitHub Actions runs the mobile quality gate on every push and pull request through the
 `mobile-quality` job in `.github/workflows/ci.yml`. It installs the locked dependencies and runs
-type checking, linting, unit/contract tests, and the Expo web export. Native EAS builds, store
-submissions, and OTA updates are intentionally not triggered by CI yet because the repository does
-not contain an EAS project identifier, `updates.url`, signing credentials, rollout metadata, or an
-`EXPO_TOKEN`. Adding those values to the protected release environment is required before a native
-release workflow can be enabled; no token or signing material belongs in this repository.
+type checking, linting, unit/contract tests, and the Expo web export. The iOS Maestro Simulator
+flows run as a required job in `mobile-release.yml` before either package is built and published.
+That workflow builds and attaches the APK and IPA after the desktop release completes, or can be
+dispatched for an existing release tag. EAS store submissions and OTA updates are not triggered by
+CI; they still require an EAS project,
+signing credentials, rollout metadata, and an `EXPO_TOKEN`. No token or signing material belongs in
+this repository.

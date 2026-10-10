@@ -1,0 +1,455 @@
+name: Mobile Release
+
+on:
+  workflow_run:
+    workflows:
+      - Desktop Release
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to add mobile packages to
+        required: true
+        default: v0.1.4
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24.18.0"
+  PNPM_VERSION: "11.22.0"
+
+jobs:
+  resolve-release:
+    name: Resolve release version
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch' || github.event.workflow_run.event == 'workflow_run')) }}
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      release_version: ${{ steps.release.outputs.release_version }}
+      android_version_code: ${{ steps.release.outputs.android_version_code }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Resolve release tag and version
+        id: release
+        shell: bash
+        env:
+          DISPATCH_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
+          RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${DISPATCH_TAG}" ]]; then
+            release_tag="${DISPATCH_TAG}"
+            RELEASE_SHA="$(git rev-list -n 1 "${release_tag}")"
+          else
+            release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | sort -V | tail -n 1)"
+          fi
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a version tag such as v0.1.4; received '${release_tag}'." >&2
+            exit 1
+          fi
+          release_version="${release_tag#v}"
+          IFS=. read -r major minor patch <<< "${release_version}"
+          android_version_code="$((major * 1000000 + minor * 1000 + patch))"
+          {
+            echo "release_tag=${release_tag}"
+            echo "release_sha=${RELEASE_SHA}"
+            echo "release_version=${release_version}"
+            echo "android_version_code=${android_version_code}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Verify desktop release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: gh release view "${RELEASE_TAG}" >/dev/null
+
+  ios-e2e:
+    name: Run iOS native E2E in Simulator
+    needs: resolve-release
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Run iOS Maestro flows in headless Simulator
+        shell: bash
+        env:
+          MAESTRO_VERSION: "2.11.0"
+        run: |
+          set -euo pipefail
+          maestro_dir="${RUNNER_TEMP}/maestro"
+          mkdir -p "${maestro_dir}"
+          curl --proto '=https' --tlsv1.2 -fsSLo "${RUNNER_TEMP}/maestro.zip" \
+            "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          unzip -q "${RUNNER_TEMP}/maestro.zip" -d "${maestro_dir}"
+          export PATH="${maestro_dir}/maestro/bin:${PATH}"
+          cd src/main/mobile
+          bash e2e/run-ios-background.sh
+
+  android:
+    name: Build signed Android APK
+    needs:
+      - resolve-release
+      - ios-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: mobile-release
+    permissions:
+      contents: read
+    env:
+      ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+      ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+      ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+      ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+
+      - name: Set up Java
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Set mobile release version
+        working-directory: src/main/mobile
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+          ANDROID_VERSION_CODE: ${{ needs.resolve-release.outputs.android_version_code }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const appConfig = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          appConfig.expo.version = process.env.RELEASE_VERSION;
+          appConfig.expo.android.versionCode = Number(process.env.ANDROID_VERSION_CODE);
+          fs.writeFileSync('app.json', `${JSON.stringify(appConfig, null, 2)}\n`);
+          NODE
+
+      - name: Check Android signing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for secret_name in \
+            ANDROID_RELEASE_KEYSTORE_BASE64 \
+            ANDROID_RELEASE_KEYSTORE_PASSWORD \
+            ANDROID_RELEASE_KEY_ALIAS \
+            ANDROID_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!secret_name}" ]]; then
+              echo "${secret_name} must be configured in the mobile-release environment." >&2
+              exit 1
+            fi
+          done
+
+      - name: Generate native Android project
+        working-directory: src/main/mobile
+        run: pnpm exec expo prebuild --clean --platform android
+
+      - name: Build and sign release APK
+        working-directory: src/main/mobile/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore_path="${RUNNER_TEMP}/kitezh-release.keystore"
+          printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
+          ./gradlew --no-daemon --stacktrace assembleRelease \
+            "-Pandroid.injected.signing.store.file=${keystore_path}" \
+            "-Pandroid.injected.signing.store.password=${KEYSTORE_PASSWORD}" \
+            "-Pandroid.injected.signing.key.alias=${KEY_ALIAS}" \
+            "-Pandroid.injected.signing.key.password=${KEY_PASSWORD}"
+          mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
+          cp app/build/outputs/apk/release/app-release.apk \
+            "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-android.apk"
+
+      - name: Upload Android package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-android
+          path: ${{ runner.temp }}/mobile-release-assets/*.apk
+          if-no-files-found: error
+
+  ios:
+    name: Build iOS IPA
+    needs:
+      - resolve-release
+      - ios-e2e
+    runs-on: macos-latest
+    timeout-minutes: 60
+    environment: mobile-release
+    permissions:
+      contents: read
+    env:
+      IOS_SIGNING_MODE: ${{ vars.IOS_SIGNING_MODE || 'unsigned' }}
+      IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 || '' }}
+      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD || '' }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 || '' }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID || '' }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Set mobile release version
+        working-directory: src/main/mobile
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+          IOS_BUILD_NUMBER: ${{ needs.resolve-release.outputs.android_version_code }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const appConfig = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          appConfig.expo.version = process.env.RELEASE_VERSION;
+          appConfig.expo.ios.buildNumber = process.env.IOS_BUILD_NUMBER;
+          fs.writeFileSync('app.json', `${JSON.stringify(appConfig, null, 2)}\n`);
+          NODE
+
+      - name: Generate native iOS project
+        working-directory: src/main/mobile
+        run: pnpm exec expo prebuild --clean --platform ios
+
+      - name: Resolve iOS signing mode
+        id: ios-signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          signing_values=(
+            IOS_DISTRIBUTION_CERTIFICATE_BASE64
+            IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+            IOS_PROVISIONING_PROFILE_BASE64
+            IOS_TEAM_ID
+          )
+          case "${IOS_SIGNING_MODE}" in
+            unsigned)
+              echo "mode=unsigned" >> "${GITHUB_OUTPUT}"
+              echo "iOS signing mode is unsigned; producing an IPA for personal sideloading."
+              ;;
+            signed)
+              for secret_name in "${signing_values[@]}"; do
+                if [[ -z "${!secret_name}" ]]; then
+                  echo "${secret_name} is required when IOS_SIGNING_MODE=signed." >&2
+                  exit 1
+                fi
+              done
+              echo "mode=signed" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "IOS_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Install iOS distribution credentials
+        if: steps.ios-signing.outputs.mode == 'signed'
+        id: ios-credentials
+        shell: bash
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          certificate_path="${RUNNER_TEMP}/kitezh-distribution.p12"
+          profile_path="${RUNNER_TEMP}/kitezh.mobileprovision"
+          keychain_path="${RUNNER_TEMP}/kitezh-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "${CERTIFICATE_BASE64}" | base64 -D > "${certificate_path}"
+          printf '%s' "${PROVISIONING_PROFILE_BASE64}" | base64 -D > "${profile_path}"
+          security create-keychain -p "${keychain_password}" "${keychain_path}"
+          security set-keychain-settings -lut 21600 "${keychain_path}"
+          security unlock-keychain -p "${keychain_password}" "${keychain_path}"
+          security import "${certificate_path}" \
+            -P "${CERTIFICATE_PASSWORD}" \
+            -A \
+            -f pkcs12 \
+            -k "${keychain_path}"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "${keychain_password}" \
+            "${keychain_path}"
+          security list-keychains -d user -s "${keychain_path}"
+          profile_directory="${HOME}/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "${profile_directory}"
+          security cms -D -i "${profile_path}" > "${RUNNER_TEMP}/kitezh-profile.plist"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print UUID' "${RUNNER_TEMP}/kitezh-profile.plist")"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print Name' "${RUNNER_TEMP}/kitezh-profile.plist")"
+          cp "${profile_path}" "${profile_directory}/${profile_uuid}.mobileprovision"
+          {
+            echo "keychain_path=${keychain_path}"
+            echo "profile_uuid=${profile_uuid}"
+            echo "profile_name=${profile_name}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build unsigned iOS app
+        if: steps.ios-signing.outputs.mode == 'unsigned'
+        working-directory: src/main/mobile
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace ios/Kitezh.xcworkspace \
+            -scheme Kitezh \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "${RUNNER_TEMP}/kitezh-ios-build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+          app_path="${RUNNER_TEMP}/kitezh-ios-build/Build/Products/Release-iphoneos/Kitezh.app"
+          test -d "${app_path}"
+          package_directory="${RUNNER_TEMP}/kitezh-ios-package/Payload"
+          mkdir -p "${package_directory}"
+          ditto "${app_path}" "${package_directory}/Kitezh.app"
+          mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
+          (cd "${RUNNER_TEMP}/kitezh-ios-package" && zip -qry \
+            "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios-unsigned.ipa" Payload)
+          unzip -l "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios-unsigned.ipa" | grep -F 'Payload/Kitezh.app/' >/dev/null
+
+      - name: Archive and export signed iOS IPA
+        if: steps.ios-signing.outputs.mode == 'signed'
+        working-directory: src/main/mobile
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_PROFILE_UUID: ${{ steps.ios-credentials.outputs.profile_uuid }}
+          IOS_PROFILE_NAME: ${{ steps.ios-credentials.outputs.profile_name }}
+          IOS_BUNDLE_IDENTIFIER: io.github.susimsek.kitezh.mobile
+        run: |
+          set -euo pipefail
+          archive_path="${RUNNER_TEMP}/Kitezh.xcarchive"
+          export_path="${RUNNER_TEMP}/kitezh-ios-export"
+          export_options="${RUNNER_TEMP}/kitezh-export-options.plist"
+          xcodebuild \
+            -workspace ios/Kitezh.xcworkspace \
+            -scheme Kitezh \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "${archive_path}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            DEVELOPMENT_TEAM="${IOS_TEAM_ID}" \
+            PROVISIONING_PROFILE="${IOS_PROFILE_UUID}" \
+            PROVISIONING_PROFILE_SPECIFIER="${IOS_PROFILE_NAME}" \
+            archive
+          plutil -create xml1 "${export_options}"
+          /usr/libexec/PlistBuddy -c 'Add :method string ad-hoc' "${export_options}"
+          /usr/libexec/PlistBuddy -c "Add :teamID string ${IOS_TEAM_ID}" "${export_options}"
+          /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "${export_options}"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "${export_options}"
+          /usr/libexec/PlistBuddy -c \
+            "Add :provisioningProfiles:${IOS_BUNDLE_IDENTIFIER} string ${IOS_PROFILE_NAME}" \
+            "${export_options}"
+          xcodebuild \
+            -exportArchive \
+            -archivePath "${archive_path}" \
+            -exportPath "${export_path}" \
+            -exportOptionsPlist "${export_options}"
+          mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
+          cp "${export_path}/Kitezh.ipa" \
+            "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios.ipa"
+          codesign --verify --deep --strict "${export_path}/Payload/Kitezh.app"
+
+      - name: Remove temporary iOS signing credentials
+        if: always() && steps.ios-credentials.outputs.keychain_path != ''
+        env:
+          KEYCHAIN_PATH: ${{ steps.ios-credentials.outputs.keychain_path }}
+        run: security delete-keychain "${KEYCHAIN_PATH}"
+
+      - name: Upload iOS package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-ios
+          path: ${{ runner.temp }}/mobile-release-assets/*.ipa
+          if-no-files-found: error
+
+  publish:
+    name: Add mobile packages to GitHub Release
+    needs:
+      - resolve-release
+      - android
+      - ios
+    if: ${{ needs.resolve-release.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download mobile packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: mobile-*
+          path: mobile-release-assets
+          merge-multiple: true
+
+      - name: Upload packages to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(mobile-release-assets/*)
+          if [[ ${#assets[@]} -ne 2 ]]; then
+            echo "Expected the Android APK and iOS IPA, received ${#assets[@]} files." >&2
+            exit 1
+          fi
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber

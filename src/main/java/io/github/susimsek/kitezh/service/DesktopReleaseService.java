@@ -31,7 +31,10 @@ public class DesktopReleaseService {
                     new AssetRule("linuxArm64AppImage", "-linux-arm64.AppImage"),
                     new AssetRule("linuxArm64Deb", "-linux-arm64.deb"),
                     new AssetRule("macosUniversal", "-macos-universal.dmg"),
-                    new AssetRule("macosIntel", "-macos-x64.dmg"));
+                    new AssetRule("macosIntel", "-macos-x64.dmg"),
+                    new AssetRule("androidApk", "-android.apk"),
+                    new AssetRule("iosIpa", "-ios.ipa"),
+                    new AssetRule("iosUnsignedIpa", "-ios-unsigned.ipa"));
 
     private final DesktopReleaseClient desktopReleaseClient;
 

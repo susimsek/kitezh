@@ -300,6 +300,18 @@ textarea.form-control {
   min-width: 9rem;
 }
 
+.download-asset-unavailable {
+  display: flex;
+  flex: 1 1 9rem;
+  min-width: 9rem;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.download-asset-unavailable .download-asset-button {
+  width: 100%;
+}
+
 .download-asset-button .svg-inline--fa {
   margin-right: 0.5rem;
 }

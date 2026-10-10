@@ -260,8 +260,8 @@ refresh retry (`pnpm run test`, 29/29); these are unit tests, not replacements f
 flows on an emulator. The local run used
 `EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER=http://10.0.2.2:8080` for Android and
 `http://127.0.0.1:8080` for iOS; fixture tokens are generated per run and are not recorded here.
-The same four flows are wired into the manually triggered
-`.github/workflows/mobile-native-e2e.yml`; a hosted GitHub Actions run has not yet been recorded.
+The same four flows are wired as a required pre-package job in
+`.github/workflows/mobile-release.yml`; a hosted GitHub Actions run has not yet been recorded.
 
 ### Explicit native blockers
 

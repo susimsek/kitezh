@@ -166,6 +166,26 @@
         "intel": "Intel"
       }
     },
+    "android": {
+      "title": "Android",
+      "description": "Android paketini doğrudan cihazınıza yükleyin.",
+      "architecture": "APK",
+      "asset": "APK'yı indir",
+      "installationNote": "İstenirse tarayıcınızın bu kaynaktan uygulama yüklemesine izin verin."
+    },
+    "ios": {
+      "title": "iPhone ve iPad",
+      "description": "Kişisel cihazda denemek için imzasız IPA.",
+      "signedDescription": "Kayıtlı kişisel cihazınıza imzalı iOS test sürümünü yükleyin.",
+      "architecture": "Test sürümü",
+      "asset": "İmzasız IPA'yı indir",
+      "signedAsset": "İmzalı IPA'yı indir",
+      "installationNote": "Apple hesabınızla AltStore veya Sideloadly üzerinden yükleyin. Ücretsiz imza 7 gün geçerlidir ve yenilenmelidir. İlk kurulum için Mac veya PC gerekir.",
+      "signedInstallationNote": "Bu ad hoc sürüm yalnızca provizyon profiline eklenmiş cihazlara yüklenebilir.",
+      "altStore": "AltStore kurulumu",
+      "sideloadly": "Sideloadly"
+    },
+    "unavailable": "Henüz en son sürüme eklenmedi.",
     "checksums": "İndirdiğiniz dosyayı yayınlanan SHA-256 değerleriyle doğrulayabilirsiniz.",
     "downloadChecksums": "SHA-256 değerleri",
     "releaseNotes": "Sürüm notlarını görüntüle"
