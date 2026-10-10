@@ -250,10 +250,12 @@ jobs:
       - name: Create draft release record
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
+              --repo "${GH_REPO}" \
               --verify-tag \
               --draft \
               --title "${RELEASE_TAG}" \
