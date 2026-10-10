@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -156,6 +156,7 @@ function routeTitle() {
       keys: text("adminKeys"),
       policies: text("adminPolicies"),
       configuration: text("adminConfiguration"),
+      "login-email": text("adminLoginEmail"),
       dashboard: text("adminDashboard"),
     }[state.route];
   return {
@@ -183,6 +184,7 @@ function routeDescription() {
       keys: text("adminSearchKeys"),
       policies: text("adminPoliciesDescription"),
       configuration: text("adminConfigurationDescription"),
+      "login-email": text("adminLoginEmailDescription"),
       dashboard: text("adminOverview"),
     }[state.route];
   return {
@@ -231,6 +233,7 @@ function adminContent() {
   if (state.route === "keys") return adminAdminKeysContent();
   if (state.route === "policies") return adminAdminPoliciesContent();
   if (state.route === "configuration") return adminAdminConfigurationContent();
+  if (state.route === "login-email") return adminAdminLoginEmailContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -408,6 +411,22 @@ function adminAdminConfigurationContent() {
   ];
   const activeKey = server.activeSigningKey;
   return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminApplicationName"), branding.applicationName)}${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}${row(text("adminPrimaryColor"), branding.primaryColor)}${row(text("adminAccentColor"), branding.accentColor)}${row(text("adminBackgroundColor"), branding.backgroundColor)}</div></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
+}
+
+function adminAdminLoginEmailContent() {
+  const login = state.data.adminLoginSettings ?? {};
+  const email = state.data.adminEmailSettings ?? {};
+  const row = (label, value) =>
+    `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
+  const enabled = (value) =>
+    value === true
+      ? text("adminEnabled")
+      : value === false
+        ? text("adminDisabled")
+        : undefined;
+  const minutes = (value) =>
+    value == null ? undefined : `${value} ${text("adminMinutes")}`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLoginPolicy"))}"><h2>${escapeHtml(text("adminLoginPolicy"))}</h2><div class="list">${row(text("adminRegistrationEnabled"), enabled(login.userRegistration))}${row(text("adminForgotPasswordEnabled"), enabled(login.forgotPassword))}${row(text("adminRememberMeEnabled"), enabled(login.rememberMe))}${row(text("adminLoginWithEmail"), enabled(login.loginWithEmail))}${row(text("adminVerifyEmail"), enabled(login.verifyEmail))}${row(text("adminSessionTimeout"), minutes(login.sessionTimeoutMinutes))}${row(text("adminPasswordLength"), login.passwordMinimumLength)}${row(text("adminBruteForceProtection"), enabled(login.bruteForceEnabled))}${row(text("adminLoginFailureLimit"), login.bruteForceMaxFailures)}${row(text("adminOtpEnabled"), enabled(login.otpEnabled))}${row(text("adminOtpRequired"), enabled(login.otpRequired))}${row(text("adminPasskeysEnabled"), enabled(login.passkeys))}</div></section><section class="card" aria-label="${escapeHtml(text("adminEmailDelivery"))}"><h2>${escapeHtml(text("adminEmailDelivery"))}</h2><div class="list">${row(text("adminEmailEnabled"), enabled(email.enabled))}${row(text("adminSmtpHost"), email.host)}${row(text("adminSmtpPort"), email.port)}${row(text("adminSmtpAuthentication"), enabled(email.smtpAuth))}${row(text("adminSmtpPasswordConfigured"), enabled(email.passwordConfigured))}${row(text("adminStartTls"), enabled(email.starttls))}${row(text("adminSslTls"), enabled(email.ssl))}</div></section></div>`;
 }
 
 function profileContent() {
@@ -613,6 +632,13 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         await Promise.all([
           request("/api/admin/settings/branding"),
           request("/api/admin/server-info"),
+        ]);
+    }
+    if (state.console === "admin" && state.route === "login-email") {
+      [state.data.adminLoginSettings, state.data.adminEmailSettings] =
+        await Promise.all([
+          request("/api/admin/settings/login"),
+          request("/api/admin/settings/email"),
         ]);
     }
     if (state.route === "profile")

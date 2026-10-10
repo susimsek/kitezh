@@ -179,6 +179,16 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/server-info",
   });
   assert.equal(serverInfo.status, 200);
+  const loginSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/login",
+  });
+  assert.equal(loginSettings.status, 200);
+  const emailSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/email",
+  });
+  assert.equal(emailSettings.status, 200);
   await assert.rejects(
     adapter.request({
       console: "account",
@@ -190,6 +200,14 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     adapter.request({
       console: "admin",
       path: "/api/admin/settings/branding",
+      method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/login",
       method: "PUT",
     }),
     /not allowed/,

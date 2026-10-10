@@ -693,6 +693,50 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/settings/login") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              userRegistration: true,
+              forgotPassword: true,
+              rememberMe: true,
+              loginWithEmail: true,
+              verifyEmail: true,
+              sessionTimeoutMinutes: 30,
+              passwordMinimumLength: 12,
+              bruteForceEnabled: true,
+              bruteForceMaxFailures: 5,
+              otpEnabled: true,
+              otpRequired: false,
+              passkeys: true,
+              passwordCommonPasswords: "SECRET_COMMON_PASSWORDS_NEVER_RENDER",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (requestUrl.pathname === "/api/admin/settings/email") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              enabled: true,
+              host: "smtp.example.test",
+              port: 587,
+              username: "private-mailbox@example.test",
+              passwordConfigured: true,
+              smtpAuth: true,
+              starttls: true,
+              ssl: false,
+              smtpPassword: "SECRET_SMTP_PASSWORD_NEVER_RENDER",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -1082,6 +1126,31 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window
       .getByRole("heading", { name: "Markalama", exact: true })
       .waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const loginEmailNavigation = window.getByRole("button", {
+      name: "Login & email",
+      exact: true,
+    });
+    await loginEmailNavigation.click();
+    assert.equal(await loginEmailNavigation.isDisabled(), true);
+    assert.equal(await loginEmailNavigation.locator(".spinner").count(), 1);
+    await window.getByRole("heading", { name: "Login policy" }).waitFor();
+    await window.getByText("smtp.example.test", { exact: true }).waitFor();
+    await window.getByText("12", { exact: true }).waitFor();
+    assert.equal(
+      await window.getByText("SECRET_COMMON_PASSWORDS_NEVER_RENDER").count(),
+      0,
+    );
+    assert.equal(
+      await window.getByText("SECRET_SMTP_PASSWORD_NEVER_RENDER").count(),
+      0,
+    );
+    assert.equal(
+      await window.getByText("private-mailbox@example.test").count(),
+      0,
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("heading", { name: "Giriş politikası" }).waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
