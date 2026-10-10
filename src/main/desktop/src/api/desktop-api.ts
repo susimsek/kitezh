@@ -124,6 +124,13 @@ function isAllowedApiPath(
       /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
+    if (
+      method === "DELETE" &&
+      /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers\/[A-Za-z0-9_-]{1,100}$/.test(
+        path,
+      )
+    )
+      return true;
     const consentRevokeMatch = path.match(
       /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/,
     );
@@ -217,6 +224,10 @@ function isAllowedApiPath(
       const isClients = url.pathname === "/api/admin/clients";
       const isIdentityProviders =
         url.pathname === "/api/admin/identity-providers";
+      const providerMappersMatch = url.pathname.match(
+        /^\/api\/admin\/identity-providers\/([A-Za-z0-9_-]{1,100})\/mappers$/,
+      );
+      const isProviderMappers = Boolean(providerMappersMatch);
       const isSessions = url.pathname === "/api/admin/sessions";
       const isConsents = url.pathname === "/api/admin/consents";
       const isOfflineSessions = url.pathname === "/api/admin/offline-sessions";
@@ -271,6 +282,7 @@ function isAllowedApiPath(
           isClientScopes ||
           isClients ||
           isIdentityProviders ||
+          isProviderMappers ||
           isSessions ||
           isConsents ||
           isOfflineSessions ||

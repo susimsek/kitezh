@@ -1148,6 +1148,52 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(null, { status: 204 });
         }
+        if (
+          /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const mapperId = requestUrl.pathname.split("/").at(-1);
+          globalThis.__adminProviderMapperDeleteRequests ??= [];
+          globalThis.__adminProviderMapperDeleteRequests.push(mapperId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (
+          /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__adminProviderMapperRequests ??= [];
+          globalThis.__adminProviderMapperRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "mapper-1",
+                  providerAlias: "google",
+                  name: "email-mapper",
+                  sourceClaim: "email",
+                  target: "email",
+                  mapperType: "user-attribute",
+                  syncMode: "import",
+                  addToIdToken: true,
+                  addToAccessToken: true,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/identity-providers") {
           globalThis.__adminIdentityProviderRequests ??= [];
           globalThis.__adminIdentityProviderRequests.push(requestUrl.search);
@@ -2822,6 +2868,61 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(new URLSearchParams(providerRequests[1]).get("q"), "google");
     const identityProviderRow = window.locator(
       '[data-identity-provider-id="provider-1"]',
+    );
+    const manageMappers = identityProviderRow.getByRole("button", {
+      name: "Manage mappers",
+      exact: true,
+    });
+    await manageMappers.click();
+    assert.equal(await manageMappers.isDisabled(), true);
+    assert.equal(await manageMappers.locator(".spinner").count(), 1);
+    const mapperRow = identityProviderRow.locator(
+      '[data-provider-mapper-id="mapper-1"]',
+    );
+    await mapperRow.waitFor();
+    const mapperSearchRequests = await application.evaluate(
+      () => globalThis.__adminProviderMapperRequests,
+    );
+    assert.equal(
+      new URLSearchParams(mapperSearchRequests[0]).get("size"),
+      "20",
+    );
+    await mapperRow
+      .getByRole("button", { name: "Delete mapper", exact: true })
+      .click();
+    await mapperRow
+      .getByText(
+        "Delete this provider mapper? The change can affect claims in future sign-ins.",
+        { exact: true },
+      )
+      .waitFor();
+    await mapperRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminProviderMapperDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await mapperRow
+      .getByRole("button", { name: "Delete mapper", exact: true })
+      .click();
+    const confirmMapperDelete = mapperRow.getByRole("button", {
+      name: "Delete mapper",
+      exact: true,
+    });
+    await confirmMapperDelete.click();
+    assert.equal(await confirmMapperDelete.isDisabled(), true);
+    assert.equal(await confirmMapperDelete.locator(".spinner").count(), 1);
+    await window
+      .getByText("Provider mapper deleted.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminProviderMapperDeleteRequests,
+      ),
+      ["mapper-1"],
     );
     await identityProviderRow
       .getByRole("button", { name: "Delete provider", exact: true })

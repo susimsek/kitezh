@@ -566,6 +566,31 @@ function adminClientsContent() {
   return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clients.map((client) => `<article class="list-item"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
+function renderIdentityProviderMappers(providerId) {
+  if (state.data.identityProviderMappersOpenId !== providerId) return "";
+  const mappers = state.data.identityProviderMappers?.[providerId] ?? [];
+  if (!Array.isArray(mappers)) return "";
+  return `<section class="card" aria-label="${escapeHtml(text("adminProviderMappers"))}"><div class="list">${
+    mappers.length
+      ? mappers
+          .map((mapper) => {
+            const confirmation = state.data.providerMapperDeleteConfirm;
+            const confirming =
+              confirmation?.providerId === providerId &&
+              confirmation?.mapperId === mapper.id;
+            const busy =
+              state.busy ===
+              `provider-mapper-delete:${providerId}:${mapper.id}`;
+            const controls = confirming
+              ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteProviderMapperPrompt"))}</span>${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-confirm", provider: providerId, id: mapper.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-delete-cancel" data-provider="${escapeHtml(providerId)}" data-id="${escapeHtml(mapper.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+              : `<div class="actions">${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-request", provider: providerId, id: mapper.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+            return `<article class="list-item" data-provider-mapper-id="${escapeHtml(mapper.id)}"><div><strong>${escapeHtml(mapper.name)}</strong><span class="muted">${escapeHtml(`${mapper.sourceClaim} → ${mapper.target} · ${mapper.mapperType}`)}</span></div><span>${escapeHtml(mapper.syncMode)}</span>${controls}</article>`;
+          })
+          .join("")
+      : `<div class="empty" role="status">${escapeHtml(text("adminNoProviderMappers"))}</div>`
+  }</div></section>`;
+}
+
 function adminIdentityProvidersContent() {
   const page = state.data.identityProviders ?? {
     content: [],
@@ -587,7 +612,15 @@ function adminIdentityProvidersContent() {
             const controls = confirming
               ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteIdentityProviderPrompt"))}</span>${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-confirm", id, danger: true, busy: state.busy === `identity-provider-delete:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
               : `<div class="actions">${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span>${controls}</article>`;
+            const mapperBusy = state.busy === `provider-mappers:${id}`;
+            const mapperButton = button(text("adminManageProviderMappers"), {
+              action: "admin-provider-mappers-toggle",
+              id,
+              busy: mapperBusy,
+              disabled: state.offline || Boolean(state.busy),
+            });
+            const mapperPanel = renderIdentityProviderMappers(id);
+            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${mapperButton}${controls}</div>${mapperPanel}</article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoIdentityProviders"))}</div>`
@@ -2320,6 +2353,120 @@ async function action(action, element) {
   if (action === "admin-role-delete-cancel") {
     if (state.busy) return;
     state.data.roleDeleteConfirmName = null;
+    render();
+    return;
+  }
+  if (action === "admin-provider-mappers-toggle") {
+    if (state.busy || state.offline) return;
+    const id = element.dataset.id;
+    const providers = state.data.identityProviders?.content ?? [];
+    if (
+      typeof id !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !providers.some((provider) => provider.id === id)
+    )
+      return;
+    if (state.data.identityProviderMappersOpenId === id) {
+      state.data.identityProviderMappersOpenId = null;
+      render();
+      return;
+    }
+    const cached = state.data.identityProviderMappers?.[id];
+    if (Array.isArray(cached)) {
+      state.data.identityProviderMappersOpenId = id;
+      render();
+      return;
+    }
+    state.busy = `provider-mappers:${id}`;
+    state.error = null;
+    render();
+    try {
+      const page = await request(
+        `/api/admin/identity-providers/${id}/mappers?page=0&size=20&sort=name,asc`,
+      );
+      state.data.identityProviderMappers ??= {};
+      state.data.identityProviderMappers[id] = Array.isArray(page?.content)
+        ? page.content
+        : [];
+      state.data.identityProviderMappersOpenId = id;
+    } catch {
+      /* request rendered localized transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-provider-mapper-delete-request" ||
+    action === "admin-provider-mapper-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const providerId = element.dataset.provider;
+    const mapperId = element.dataset.id;
+    const providers = state.data.identityProviders?.content ?? [];
+    const mappers = state.data.identityProviderMappers?.[providerId] ?? [];
+    if (
+      typeof providerId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(providerId) ||
+      typeof mapperId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(mapperId) ||
+      !providers.some((provider) => provider.id === providerId) ||
+      !Array.isArray(mappers) ||
+      !mappers.some((mapper) => mapper.id === mapperId)
+    )
+      return;
+    if (action === "admin-provider-mapper-delete-request") {
+      state.data.providerMapperDeleteConfirm = { providerId, mapperId };
+      render();
+      return;
+    }
+    const confirmation = state.data.providerMapperDeleteConfirm;
+    if (
+      confirmation?.providerId !== providerId ||
+      confirmation?.mapperId !== mapperId
+    )
+      return;
+    state.busy = `provider-mapper-delete:${providerId}:${mapperId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(
+        `/api/admin/identity-providers/${providerId}/mappers/${mapperId}`,
+        { method: "DELETE" },
+      );
+      state.data.identityProviderMappers[providerId] = mappers.filter(
+        (mapper) => mapper.id !== mapperId,
+      );
+      state.data.identityProviders = {
+        ...state.data.identityProviders,
+        content: providers.map((provider) =>
+          provider.id === providerId
+            ? {
+                ...provider,
+                mapperCount: Math.max(0, provider.mapperCount - 1),
+              }
+            : provider,
+        ),
+      };
+      state.data.providerMapperDeleteConfirm = null;
+      state.notice = text("adminProviderMapperDeleted");
+    } catch {
+      /* request rendered localized server or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-provider-mapper-delete-cancel") {
+    if (state.busy) return;
+    const confirmation = state.data.providerMapperDeleteConfirm;
+    if (
+      confirmation?.providerId !== element.dataset.provider ||
+      confirmation?.mapperId !== element.dataset.id
+    )
+      return;
+    state.data.providerMapperDeleteConfirm = null;
     render();
     return;
   }

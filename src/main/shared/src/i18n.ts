@@ -50,6 +50,12 @@ export const messages = {
     adminDeleteIdentityProviderPrompt:
       "Delete this identity provider and its mapper configuration? Providers with linked accounts cannot be deleted.",
     adminIdentityProviderDeleted: "Identity provider deleted.",
+    adminManageProviderMappers: "Manage mappers",
+    adminDeleteProviderMapper: "Delete mapper",
+    adminDeleteProviderMapperPrompt:
+      "Delete this provider mapper? The change can affect claims in future sign-ins.",
+    adminProviderMapperDeleted: "Provider mapper deleted.",
+    adminNoProviderMappers: "No mappers are configured for this provider.",
     adminSessions: "Sessions",
     adminOfflineSessions: "Offline sessions",
     adminRevokeOfflineSession: "Revoke offline session",
@@ -497,6 +503,12 @@ export const messages = {
     adminDeleteIdentityProviderPrompt:
       "Bu kimlik sağlayıcı ve eşleyici yapılandırması silinsin mi? Bağlı hesapları olan sağlayıcılar silinemez.",
     adminIdentityProviderDeleted: "Kimlik sağlayıcı silindi.",
+    adminManageProviderMappers: "Eşleyicileri yönet",
+    adminDeleteProviderMapper: "Eşleyiciyi sil",
+    adminDeleteProviderMapperPrompt:
+      "Bu sağlayıcı eşleyicisi silinsin mi? Değişiklik sonraki oturum açmalarda talepleri etkileyebilir.",
+    adminProviderMapperDeleted: "Sağlayıcı eşleyicisi silindi.",
+    adminNoProviderMappers: "Bu sağlayıcı için eşleyici yapılandırılmamış.",
     adminSessions: "Oturumlar",
     adminOfflineSessions: "Çevrimdışı oturumlar",
     adminRevokeOfflineSession: "Çevrimdışı oturumu iptal et",

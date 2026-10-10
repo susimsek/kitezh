@@ -306,6 +306,17 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/identity-providers?q=google&page=0&size=20&sort=guiOrder,asc",
   });
   assert.equal(identityProviders.status, 200);
+  const providerMappers = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-1/mappers?page=0&size=20&sort=name,asc",
+  });
+  assert.equal(providerMappers.status, 200);
+  const deletedProviderMapper = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-1/mappers/mapper-1",
+    method: "DELETE",
+  });
+  assert.equal(deletedProviderMapper.status, 200);
   const deletedIdentityProvider = await adapter.request({
     console: "admin",
     path: "/api/admin/identity-providers/provider-1",
@@ -621,7 +632,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/identity-providers/provider-1/mappers/1",
+      path: "/api/admin/identity-providers/provider-1/mappers/1/nested",
       method: "DELETE",
     }),
     /not allowed/,
