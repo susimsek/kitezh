@@ -277,6 +277,24 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        if (requestUrl.pathname === "/api/account/mfa")
+          return new Response(
+            JSON.stringify({ available: true, enabled: false, digits: 6 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/mfa/recovery-codes")
+          return new Response(
+            JSON.stringify({ available: true, remaining: 0 }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        if (requestUrl.pathname === "/api/account/social-links")
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         if (
           (requestUrl.pathname === "/api/account/profile" ||
             requestUrl.pathname === "/api/auth/localization/me") &&
@@ -400,6 +418,39 @@ test("preserves Account profile drafts offline and blocks saves until reconnect"
       },
       { path: "/api/auth/localization/me", body: { locale: "tr" } },
     ]);
+    await window.getByRole("button", { name: "Security", exact: true }).click();
+    await window
+      .getByRole("button", { name: "Set up authenticator" })
+      .waitFor();
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Save", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Set up authenticator" })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Delete account", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__accountWrites),
+      accountWrites,
+    );
   } finally {
     await application.close();
   }
