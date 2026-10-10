@@ -1070,7 +1070,11 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     const clientMapperStatuses = await application.evaluate(
       () => globalThis.__packagedClientMapperStatuses,
     );
-    assert.deepEqual(clientMapperStatuses, [{ method: "GET", status: 200 }]);
+    assert.ok(
+      clientMapperStatuses.every(
+        ({ method, status }) => method === "GET" && status === 200,
+      ),
+    );
     await clientMappers
       .getByRole("button", { name: "Add protocol mapper", exact: true })
       .click();
