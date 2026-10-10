@@ -33,6 +33,9 @@ test("native renderer static message references exist in both shared catalogs", 
     ...[...source.matchAll(/\[\s*["']([^"']+)["']\s*,\s*server\./g)].map(
       (match) => match[1],
     ),
+    ...[...source.matchAll(/["'](admin[A-Z][A-Za-z0-9]+)["']/g)].map(
+      (match) => match[1],
+    ),
   ];
 
   assert.ok(keys.length > 0, "native renderer should use shared message keys");
