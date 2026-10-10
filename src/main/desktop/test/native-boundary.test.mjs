@@ -28,6 +28,9 @@ test("native Admin selection does not call Account APIs", async () => {
     "utf8",
   );
   assert.match(source, /if \(state\.console === "admin"\) return adminContent\(\)/);
-  assert.match(source, /adminComingSoon/);
-  assert.match(source, /state\.session && state\.console === "account"/);
+  assert.match(source, /\/api\/admin\/dashboard/);
+  assert.match(
+    source,
+    /state\.route = state\.console === "admin" \? "dashboard" : "profile"/,
+  );
 });

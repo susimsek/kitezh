@@ -258,18 +258,27 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         globalThis.__pendingAuthorizationUrl = url;
       };
       globalThis.fetch = async (url) => {
-        if (!String(url).endsWith("/oauth2/token"))
-          throw new Error("Unexpected Account API request");
-        return new Response(
-          JSON.stringify({
-            access_token: "test-admin-access-token",
-            expires_in: 3600,
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
+        const requestUrl = new URL(String(url));
+        if (requestUrl.pathname === "/oauth2/token")
+          return new Response(
+            JSON.stringify({
+              access_token: "test-admin-access-token",
+              expires_in: 3600,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        if (requestUrl.pathname === "/api/admin/dashboard")
+          return new Response(
+            JSON.stringify({ clients: 4, users: 12, sessions: 6, consents: 8 }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        throw new Error("Unexpected Admin API request");
       };
     });
     const window = await nativeMainWindow(application);
@@ -304,8 +313,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       );
     });
     await window
-      .getByRole("button", { name: "Sign out", exact: true })
+      .getByRole("heading", { name: "Dashboard", exact: true })
       .waitFor();
+    await window.getByText("Registered clients").waitFor();
+    await window.locator(".stat-value").first().waitFor();
+    assert.deepEqual(
+      await window.locator(".stat-value").allTextContents(),
+      ["4", "12", "6", "8"],
+    );
+    await application.evaluate(() => {
+      globalThis.fetch = async (url) => {
+        if (new URL(String(url)).pathname !== "/api/admin/dashboard")
+          throw new Error("Unexpected Admin API request");
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return new Response("{}", { status: 403 });
+      };
+    });
+    await window.getByRole("button", { name: "Dashboard" }).click();
+    const forbidden = window.getByRole("alert");
+    await forbidden
+      .getByText("You do not have permission to use the administration console.")
+      .waitFor();
+    const retry = forbidden.getByRole("button", { name: "Retry" });
+    await retry.click();
+    assert.equal(await retry.isDisabled(), true);
+    assert.equal(await retry.locator(".spinner").count(), 1);
+    await forbidden
+      .getByText("You do not have permission to use the administration console.")
+      .waitFor();
+    await window.waitForFunction(
+      () => !document.querySelector('[data-action="retry"]')?.disabled,
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("button", { name: "İngilizce" }).waitFor();
+    assert.match(await forbidden.innerText(), /Yönetim konsolunu kullanma yetkiniz yok\./);
     await window.waitForTimeout(500);
     assert.deepEqual(
       await window.evaluate(async () => ({
@@ -320,7 +361,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await window.reload();
     await window
-      .getByRole("button", { name: "Sign out", exact: true })
+      .getByRole("heading", { name: "Kontrol paneli", exact: true })
       .waitFor();
     await window.waitForTimeout(500);
     assert.equal(

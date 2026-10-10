@@ -64,6 +64,8 @@ function problemMessage(error) {
     return state.locale === "tr"
       ? "İstek zaman aşımına uğradı. Tekrar deneyin."
       : "The request timed out. Try again.";
+  if (error?.kind === "forbidden" && state.console === "admin")
+    return text("adminForbidden");
   if (error?.kind === "forbidden")
     return state.locale === "tr"
       ? "Bu işlemi yapma yetkiniz yok."
@@ -128,9 +130,9 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? ""
+      ? navButton("dashboard", text("adminDashboard"))
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
-  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(state.error.message)} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(text("sessionsRetry"), { action: "retry" })}</div>` : ""}${content()}</div></main></div>`;
+  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
 
 function navButton(route, label) {
@@ -138,7 +140,7 @@ function navButton(route, label) {
 }
 
 function routeTitle() {
-  if (state.console === "admin") return text("adminTitle");
+  if (state.console === "admin") return text("adminDashboard");
   return {
     profile: text("accountTitle"),
     security: text("securityTitle"),
@@ -181,7 +183,14 @@ function content() {
 }
 
 function adminContent() {
-  return `<section class="card"><h2>${escapeHtml(text("adminTitle"))}</h2><p>${escapeHtml(text("adminComingSoon"))}</p></section>`;
+  const dashboard = state.data.dashboard ?? {};
+  const stats = [
+    ["clients", "adminStatClients"],
+    ["users", "adminStatUsers"],
+    ["sessions", "adminStatSessions"],
+    ["consents", "adminStatConsents"],
+  ];
+  return `<section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${stats.map(([key, label]) => `<article class="card stat-card"><h2>${escapeHtml(text(label))}</h2><p class="stat-value">${Number.isSafeInteger(dashboard[key]) && dashboard[key] >= 0 ? dashboard[key] : 0}</p></article>`).join("")}</section>`;
 }
 
 function profileContent() {
@@ -250,11 +259,13 @@ async function loadProfile() {
   }
 }
 
-async function loadRoute() {
+async function loadRoute({ preserveError = false } = {}) {
   state.loading = true;
-  state.error = null;
+  if (!preserveError) state.error = null;
   render();
   try {
+    if (state.console === "admin" && state.route === "dashboard")
+      state.data.dashboard = await request("/api/admin/dashboard");
     if (state.route === "profile")
       state.profile = await request("/api/account/profile");
     if (state.route === "sessions")
@@ -275,6 +286,7 @@ async function loadRoute() {
       );
       state.data.social = await request("/api/account/social-links");
     }
+    state.error = null;
     state.loading = false;
     render();
   } catch {
@@ -444,22 +456,39 @@ async function action(action, element) {
     if (action === "sign-in") return signIn();
     if (action === "switch-console" || action === "switch-account") {
       state.console = state.console === "admin" ? "account" : "admin";
+      state.route = state.console === "admin" ? "dashboard" : "profile";
       state.session = null;
       state.error = null;
       render();
       return signIn();
     }
     if (action === "toggle-locale") {
+      if (state.busy) return;
+      state.busy = "locale";
+      render();
       const next = state.locale === "en" ? "tr" : "en";
-      await api.language.set(next);
-      state.locale = next;
+      try {
+        await api.language.set(next);
+        state.locale = next;
+        if (state.error) state.error.message = problemMessage(state.error);
+      } finally {
+        state.busy = null;
+      }
       render();
       return;
     }
-    if (action === "retry") return loadRoute();
+    if (action === "retry") {
+      if (state.busy) return;
+      state.busy = "retry";
+      await loadRoute({ preserveError: true });
+      state.busy = null;
+      render();
+      return;
+    }
   }
   if (action === "choose-admin" || action === "choose-account") {
     state.console = action === "choose-admin" ? "admin" : "account";
+    state.route = state.console === "admin" ? "dashboard" : "profile";
     history.replaceState(null, "", `?console=${state.console}`);
     return signIn();
   }
@@ -635,13 +664,16 @@ async function hydrate() {
   }
   state.loading = false;
   render();
-  if (state.session && state.console === "account") void loadRoute();
-  else if (!state.session && hasConsoleSelection()) void signIn();
+  if (state.session) {
+    state.route = state.console === "admin" ? "dashboard" : "profile";
+    void loadRoute();
+  } else if (hasConsoleSelection()) void signIn();
 }
 
 api.theme.onChanged(setTheme);
 api.language.onChanged((locale) => {
   state.locale = locale;
+  if (state.error) state.error.message = problemMessage(state.error);
   render();
 });
 api.onAuthCallback((callback) => {

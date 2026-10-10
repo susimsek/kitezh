@@ -60,12 +60,34 @@ test("refreshes once and retries concurrent requests without exposing refresh da
   assert.equal(readSession().accessToken, "new-access");
 });
 
-test("keeps forbidden responses authoritative and rejects non-account paths", async () => {
+test("keeps forbidden responses authoritative and rejects unapproved API paths", async () => {
   const { adapter } = harness(async () => new Response("forbidden", { status: 403 }));
   const response = await adapter.request({ console: "account", path: "/api/account/profile" });
   assert.equal(response.kind, "forbidden");
   await assert.rejects(
     adapter.request({ console: "account", path: "/oauth2/token" }),
+    /not allowed/,
+  );
+});
+
+test("limits the Admin namespace to its dashboard contract", async () => {
+  const { adapter } = harness(async () =>
+    new Response(JSON.stringify({ clients: 2, users: 3, sessions: 4, consents: 5 }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  const response = await adapter.request({
+    console: "admin",
+    path: "/api/admin/dashboard",
+  });
+  assert.equal(response.status, 200);
+  await assert.rejects(
+    adapter.request({ console: "account", path: "/api/admin/dashboard" }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({ console: "admin", path: "/api/admin/users" }),
     /not allowed/,
   );
 });
@@ -77,4 +99,46 @@ test("maps transport failures to a recoverable offline result", async () => {
   const response = await adapter.request({ console: "account", path: "/api/account/profile" });
   assert.equal(response.status, 0);
   assert.equal(response.kind, "offline");
+});
+
+test("maps request timeouts and validation problems to typed responses", async () => {
+  const timedOut = createDesktopApiAdapter({
+    apiBaseUrl: "https://kitezh.onrender.com",
+    fetcher: async (_url, options) =>
+      new Promise((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => {
+          const error = new Error("request aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      }),
+    readSession: async () => session,
+    writeSession: async () => {},
+    clearSession: async () => {},
+    timeoutMs: 1,
+  });
+  const timeoutResponse = await timedOut.request({
+    console: "admin",
+    path: "/api/admin/dashboard",
+  });
+  assert.equal(timeoutResponse.kind, "timeout");
+
+  const { adapter } = harness(async () =>
+    new Response(
+      JSON.stringify({
+        detail: "Correct the request.",
+        violations: [{ field: "name", message: "Required." }],
+      }),
+      {
+        status: 400,
+        headers: { "content-type": "application/problem+json" },
+      },
+    ),
+  );
+  const validationResponse = await adapter.request({
+    console: "admin",
+    path: "/api/admin/dashboard",
+  });
+  assert.equal(validationResponse.kind, "validation");
+  assert.equal(validationResponse.body.violations[0].field, "name");
 });

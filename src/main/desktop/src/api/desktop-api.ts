@@ -33,14 +33,15 @@ const CLIENT_IDS: Record<NativeSessionNamespace, string> = {
   admin: "desktop-admin-console",
 };
 
-const ALLOWED_PATHS = [
+const ACCOUNT_ALLOWED_PATHS = [
   "/api/account",
   "/api/auth/localization/me",
   "/api/ciba/",
 ];
 
-function isAllowedApiPath(path: string) {
-  return ALLOWED_PATHS.some(
+function isAllowedApiPath(namespace: NativeSessionNamespace, path: string) {
+  if (namespace === "admin" && path === "/api/admin/dashboard") return true;
+  return namespace === "account" && ACCOUNT_ALLOWED_PATHS.some(
     (prefix) => path === prefix || path.startsWith(prefix),
   );
 }
@@ -76,7 +77,7 @@ function tokenResponseToSession(
 }
 
 export function createDesktopApiAdapter(options: AdapterOptions) {
-  const fetcher = options.fetcher ?? fetch;
+  const fetcher = options.fetcher ?? ((...args) => globalThis.fetch(...args));
   const timeoutMs = options.timeoutMs ?? 10_000;
   const refreshFlights = new Map<
     NativeSessionNamespace,
@@ -162,7 +163,10 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
 
   return {
     async request(request: NativeApiRequest): Promise<NativeApiResponse> {
-      if (!isAllowedApiPath(request.path) || !request.path.startsWith("/")) {
+      if (
+        !request.path.startsWith("/") ||
+        !isAllowedApiPath(request.console, request.path)
+      ) {
         throw new Error("Native API path is not allowed");
       }
       const namespace = request.console;
