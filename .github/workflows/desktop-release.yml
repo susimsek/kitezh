@@ -393,7 +393,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish GitHub Release
+    name: Upload Desktop Assets
     needs:
       - resolve-release
       - package
