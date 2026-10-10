@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -149,6 +149,7 @@ function routeTitle() {
       "client-scopes": text("adminClientScopes"),
       clients: text("adminClients"),
       "identity-providers": text("adminIdentityProviders"),
+      sessions: text("adminSessions"),
       dashboard: text("adminDashboard"),
     }[state.route];
   return {
@@ -169,6 +170,7 @@ function routeDescription() {
       "client-scopes": text("adminSearchClientScopes"),
       clients: text("adminSearchClients"),
       "identity-providers": text("adminSearchIdentityProviders"),
+      sessions: text("adminSearchSessions"),
       dashboard: text("adminOverview"),
     }[state.route];
   return {
@@ -209,6 +211,7 @@ function adminContent() {
   if (state.route === "clients") return adminClientsContent();
   if (state.route === "identity-providers")
     return adminIdentityProvidersContent();
+  if (state.route === "sessions") return adminAdminSessionsContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -285,6 +288,20 @@ function adminIdentityProvidersContent() {
     ? page.totalPages
     : 0;
   return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${providers.length ? `<div class="list">${providers.map((provider) => `<article class="list-item"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoIdentityProviders"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminIdentityProviders"))} pagination"><button class="secondary-button" type="button" data-identity-provider-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-identity-provider-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminAdminSessionsContent() {
+  const page = state.data.adminSessions ?? {
+    content: [],
+    number: 0,
+    totalPages: 0,
+  };
+  const sessions = Array.isArray(page.content) ? page.content : [];
+  const currentPage = Number.isSafeInteger(page.number) ? page.number : 0;
+  const totalPages = Number.isSafeInteger(page.totalPages)
+    ? page.totalPages
+    : 0;
+  return `<section class="card" aria-label="${escapeHtml(text("adminSessions"))}"><form id="admin-session-search" class="actions" role="search"><input id="admin-session-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchSessions"))}" value="${escapeHtml(state.data.adminSessionQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchSessions"))}" maxlength="200"/><select id="admin-session-status" name="status" aria-label="${escapeHtml(text("adminSessions"))}"><option value="active" ${state.data.adminSessionStatus !== "expired" ? "selected" : ""}>${escapeHtml(text("adminActive"))}</option><option value="expired" ${state.data.adminSessionStatus === "expired" ? "selected" : ""}>${escapeHtml(text("adminExpired"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-sessions-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-sessions-search")}${escapeHtml(text("adminSearchSessions"))}</button></form>${sessions.length ? `<div class="list">${sessions.map((session) => `<article class="list-item"><div><strong>${escapeHtml(session.username)}</strong><span class="muted">${Number.isSafeInteger(session.authorizationCount) ? session.authorizationCount : 0} ${escapeHtml(text("adminAuthorizations"))}</span></div><span>${escapeHtml(session.active ? text("adminActive") : text("adminExpired"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoSessions"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminSessions"))} pagination"><button class="secondary-button" type="button" data-admin-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function profileContent() {
@@ -420,6 +437,18 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
       });
       state.data.identityProviders = await request(
         `/api/admin/identity-providers?${query.toString()}`,
+      );
+    }
+    if (state.console === "admin" && state.route === "sessions") {
+      const query = new URLSearchParams({
+        q: state.data.adminSessionQuery ?? "",
+        status: state.data.adminSessionStatus ?? "active",
+        page: String(state.data.adminSessionPage ?? 0),
+        size: "20",
+        sort: "lastAccessTime,desc",
+      });
+      state.data.adminSessions = await request(
+        `/api/admin/sessions?${query.toString()}`,
       );
     }
     if (state.route === "profile")
@@ -959,6 +988,34 @@ function bind() {
         });
       }),
     );
+  document
+    .getElementById("admin-session-search")
+    ?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (state.busy) return;
+      const values = new FormData(event.currentTarget);
+      state.data.adminSessionQuery = String(values.get("q") ?? "").trim();
+      state.data.adminSessionStatus = String(values.get("status") ?? "active");
+      state.data.adminSessionPage = 0;
+      state.busy = "admin-sessions-search";
+      void loadRoute({ keepContent: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
+    });
+  document.querySelectorAll("[data-admin-session-page]").forEach((element) =>
+    element.addEventListener("click", () => {
+      if (state.busy || element.disabled) return;
+      const nextPage = Number(element.dataset.adminSessionPage);
+      if (!Number.isSafeInteger(nextPage) || nextPage < 0) return;
+      state.data.adminSessionPage = nextPage;
+      state.busy = `admin-sessions-page-${nextPage < Number(state.data.adminSessions?.number ?? 0) ? "prev" : "next"}`;
+      void loadRoute({ keepContent: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
+    }),
+  );
   document.querySelectorAll("[data-action]").forEach((element) =>
     element.addEventListener("click", () => {
       if (element.disabled) return;

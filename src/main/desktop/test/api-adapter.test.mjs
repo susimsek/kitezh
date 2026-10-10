@@ -134,6 +134,18 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/identity-providers?q=google&page=0&size=20&sort=guiOrder,asc",
   });
   assert.equal(identityProviders.status, 200);
+  const sessions = await adapter.request({
+    console: "admin",
+    path: "/api/admin/sessions?q=alice&status=expired&page=0&size=20&sort=lastAccessTime,desc",
+  });
+  assert.equal(sessions.status, 200);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/sessions?status=all",
+    }),
+    /not allowed/,
+  );
   await assert.rejects(
     adapter.request({ console: "admin", path: "/api/admin/roles/ROLE_USER" }),
     /not allowed/,

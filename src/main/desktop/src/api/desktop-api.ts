@@ -51,7 +51,6 @@ function isAllowedApiPath(
     if (path === "/api/admin/dashboard") return true;
     try {
       const url = new URL(path, "https://desktop.invalid");
-      const allowedParameters = new Set(["q", "page", "size", "sort"]);
       const isUsers = url.pathname === "/api/admin/users";
       const isRoles = url.pathname === "/api/admin/roles";
       const isGroups = url.pathname === "/api/admin/groups";
@@ -59,20 +58,31 @@ function isAllowedApiPath(
       const isClients = url.pathname === "/api/admin/clients";
       const isIdentityProviders =
         url.pathname === "/api/admin/identity-providers";
+      const isSessions = url.pathname === "/api/admin/sessions";
+      const allowedParameters = new Set([
+        "q",
+        "page",
+        "size",
+        "sort",
+        ...(isSessions ? ["status"] : []),
+      ]);
       const sortFields = isUsers
         ? ["username,asc", "username,desc"]
         : isClients
           ? ["clientId,asc", "clientId,desc"]
           : isIdentityProviders
             ? ["guiOrder,asc", "guiOrder,desc"]
-            : ["name,asc", "name,desc"];
+            : isSessions
+              ? ["lastAccessTime,asc", "lastAccessTime,desc"]
+              : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
           isGroups ||
           isClientScopes ||
           isClients ||
-          isIdentityProviders) &&
+          isIdentityProviders ||
+          isSessions) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -93,7 +103,12 @@ function isAllowedApiPath(
                 ? "clientId,asc"
                 : isIdentityProviders
                   ? "guiOrder,asc"
-                  : "name,asc"),
+                  : isSessions
+                    ? "lastAccessTime,desc"
+                    : "name,asc"),
+        ) &&
+        ["active", "expired"].includes(
+          url.searchParams.get("status") ?? "active",
         )
       );
     } catch {

@@ -464,6 +464,37 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/sessions") {
+          globalThis.__adminSessionRequests ??= [];
+          globalThis.__adminSessionRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const status = requestUrl.searchParams.get("status") ?? "active";
+          const username = requestUrl.searchParams.get("q")
+            ? "alice"
+            : status === "active"
+              ? "admin"
+              : "user";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "session-secret-should-not-render",
+                  username,
+                  authorizationCount: 2,
+                  active: status === "active",
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -675,6 +706,38 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       () => globalThis.__adminIdentityProviderRequests,
     );
     assert.equal(new URLSearchParams(providerRequests[1]).get("q"), "google");
+    const sessionsNavigation = window.getByRole("button", {
+      name: "Sessions",
+      exact: true,
+    });
+    await sessionsNavigation.click();
+    assert.equal(await sessionsNavigation.isDisabled(), true);
+    assert.equal(await sessionsNavigation.locator(".spinner").count(), 1);
+    await window.getByText("admin", { exact: true }).waitFor();
+    assert.equal(
+      await window.getByText("session-secret-should-not-render").count(),
+      0,
+    );
+    await window
+      .getByRole("searchbox", { name: "Search sessions" })
+      .fill("alice");
+    await window.locator("#admin-session-status").selectOption("expired");
+    await window.getByRole("button", { name: "Search sessions" }).click();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Search sessions" })
+        .isDisabled(),
+      true,
+    );
+    await window.getByText("alice", { exact: true }).waitFor();
+    const sessionRequests = await application.evaluate(
+      () => globalThis.__adminSessionRequests,
+    );
+    assert.equal(
+      new URLSearchParams(sessionRequests[1]).get("status"),
+      "expired",
+    );
+    assert.equal(new URLSearchParams(sessionRequests[1]).get("q"), "alice");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
