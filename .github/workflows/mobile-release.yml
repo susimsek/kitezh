@@ -215,6 +215,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Cache CocoaPods downloads
+        id: cocoapods-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/Library/Caches/CocoaPods
@@ -247,12 +248,32 @@ jobs:
         run: echo "version=$(xcodebuild -version | tr '\n' '-' | tr ' ' '-')" >> "${GITHUB_OUTPUT}"
 
       - name: Cache Xcode build products
+        id: xcode-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}/kitezh-ios-build
           key: xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile.lock') }}-${{ github.event.workflow_run.head_sha || github.sha }}
           restore-keys: |
             xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile.lock') }}-
+
+      - name: Report iOS build cache status
+        env:
+          COCOAPODS_CACHE_HIT: ${{ steps.cocoapods-cache.outputs.cache-hit }}
+          XCODE_CACHE_HIT: ${{ steps.xcode-cache.outputs.cache-hit }}
+        run: |
+          {
+            echo '### Build cache status'
+            if [[ "${COCOAPODS_CACHE_HIT}" == "true" ]]; then
+              echo '- CocoaPods downloads: exact cache hit'
+            else
+              echo '- CocoaPods downloads: no exact hit (restore-key match or cache miss)'
+            fi
+            if [[ "${XCODE_CACHE_HIT}" == "true" ]]; then
+              echo '- Xcode DerivedData: exact cache hit'
+            else
+              echo '- Xcode DerivedData: no exact hit (restore-key match or cache miss)'
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Resolve iOS signing mode
         id: ios-signing
@@ -328,6 +349,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "${RUNNER_TEMP}/kitezh-ios-build" \
+            -showBuildTimingSummary \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
@@ -362,6 +384,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "${archive_path}" \
             -derivedDataPath "${RUNNER_TEMP}/kitezh-ios-build" \
+            -showBuildTimingSummary \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY='Apple Distribution' \
             DEVELOPMENT_TEAM="${IOS_TEAM_ID}" \
