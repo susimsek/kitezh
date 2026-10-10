@@ -810,7 +810,7 @@ test("reports a recovered update after the previous version starts", async () =>
 test("shows the update error in the renderer when checking fails", async () => {
   const application = await launchDesktop({ updatePreviewState: "error" });
   try {
-    const mainWindow = await application.firstWindow();
+    const mainWindow = await waitForWindowRoute(application, "/");
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
