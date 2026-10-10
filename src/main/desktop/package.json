@@ -21,6 +21,7 @@
     "build:renderer": "node scripts/build-renderer.mjs",
     "build:native": "node scripts/build-native-renderer.mjs",
     "typecheck": "tsc --noEmit",
+    "pretypecheck": "pnpm run build:shared",
     "build:shared": "pnpm --dir ../shared run build",
     "build:main": "pnpm run build:shared && tsc -p tsconfig.json",
     "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",

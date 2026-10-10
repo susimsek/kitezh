@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axios from "axios";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { StoreProvider } from "@/store/StoreProvider";
 
 const navigation = {

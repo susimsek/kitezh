@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import en from "@/locales/en/common.json";
+import en from "@kitezh/shared/web-messages/en";
 import { adminRequest } from "@/lib/admin-api";
 
 import { ClientRoles } from "./ClientRoles";

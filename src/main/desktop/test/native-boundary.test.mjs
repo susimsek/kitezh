@@ -3,7 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { messages } from "../../shared/dist/i18n.js";
+import { messages } from "../../shared/dist/catalog.js";
 
 const desktopDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -47,15 +47,61 @@ async function runtimeSourceFiles(rootDirectory) {
 }
 
 test("shared English and Turkish catalogs contain the same non-empty message keys", () => {
-  const englishKeys = Object.keys(messages.en).sort();
-  assert.deepEqual(Object.keys(messages.tr).sort(), englishKeys);
+  const englishKeys = Object.keys(messages.en.native).sort();
+  assert.deepEqual(Object.keys(messages.tr.native).sort(), englishKeys);
   for (const key of englishKeys) {
-    assert.equal(typeof messages.en[key], "string", `English message: ${key}`);
-    assert.ok(messages.en[key].trim(), `English message is empty: ${key}`);
-    assert.equal(typeof messages.tr[key], "string", `Turkish message: ${key}`);
-    assert.ok(messages.tr[key].trim(), `Turkish message is empty: ${key}`);
+    assert.equal(
+      typeof messages.en.native[key],
+      "string",
+      `English message: ${key}`,
+    );
+    assert.ok(
+      messages.en.native[key].trim(),
+      `English message is empty: ${key}`,
+    );
+    assert.equal(
+      typeof messages.tr.native[key],
+      "string",
+      `Turkish message: ${key}`,
+    );
+    assert.ok(
+      messages.tr.native[key].trim(),
+      `Turkish message is empty: ${key}`,
+    );
   }
 });
+
+test("shared Web catalogs align keys and message placeholders across locales", () => {
+  const english = flattenMessages(messages.en.web);
+  const turkish = flattenMessages(messages.tr.web);
+  const englishKeys = Object.keys(english).sort();
+  assert.deepEqual(Object.keys(turkish).sort(), englishKeys);
+  for (const key of englishKeys) {
+    assert.ok(english[key].trim(), `English message is empty: ${key}`);
+    assert.ok(turkish[key].trim(), `Turkish message is empty: ${key}`);
+    assert.deepEqual(
+      placeholders(turkish[key]),
+      placeholders(english[key]),
+      `Message placeholders differ: ${key}`,
+    );
+  }
+});
+
+function flattenMessages(value, prefix = "") {
+  return Object.entries(value).reduce((result, [key, child]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (typeof child === "string") result[path] = child;
+    else if (child && typeof child === "object" && !Array.isArray(child))
+      Object.assign(result, flattenMessages(child, path));
+    return result;
+  }, {});
+}
+
+function placeholders(message) {
+  return [...message.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)]
+    .map((match) => match[1])
+    .sort();
+}
 
 test("native renderer static message references exist in both shared catalogs", async () => {
   const source = await readFile(
@@ -77,7 +123,8 @@ test("native renderer static message references exist in both shared catalogs", 
   assert.ok(keys.length > 0, "native renderer should use shared message keys");
   const missingKeys = [...new Set(keys)].filter(
     (key) =>
-      !Object.hasOwn(messages.en, key) || !Object.hasOwn(messages.tr, key),
+      !Object.hasOwn(messages.en.native, key) ||
+      !Object.hasOwn(messages.tr.native, key),
   );
   assert.deepEqual(
     missingKeys,

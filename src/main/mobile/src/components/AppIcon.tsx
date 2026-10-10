@@ -8,10 +8,13 @@ import {
   faHouse,
   faLayerGroup,
   faMoon,
+  faPenToSquare,
+  faPlus,
   faRightFromBracket,
   faRotate,
   faShieldHalved,
   faSun,
+  faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import type { IconProp } from "@fortawesome/fontawesome-svg-core";
 import type { ComponentProps } from "react";
@@ -19,9 +22,12 @@ import type { ComponentProps } from "react";
 import type { AppIconName } from "@kitezh/shared/icons";
 
 const icons = {
+  add: faPlus,
   arrowLeft: faArrowLeft,
   arrowRight: faArrowRight,
   check: faCheck,
+  delete: faTrashCan,
+  edit: faPenToSquare,
   logout: faRightFromBracket,
   reset: faRotate,
   gear: faGear,
@@ -31,7 +37,7 @@ const icons = {
   moon: faMoon,
   shield: faShieldHalved,
   sun: faSun,
-} satisfies Record<string, IconProp>;
+} satisfies Record<AppIconName, IconProp>;
 
 type AppIconProps = Omit<ComponentProps<typeof FontAwesomeIcon>, "icon"> & {
   name: AppIconName;

@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import i18next from "i18next";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { adminRequest } from "@/lib/admin-api";
 
 import { AdminResources } from "./AdminResources";

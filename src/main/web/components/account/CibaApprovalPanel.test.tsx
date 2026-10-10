@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nProvider } from "next-i18next/client";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import config from "@/i18n.config";
 
 import { CibaApprovalPanel } from "./CibaApprovalPanel";
