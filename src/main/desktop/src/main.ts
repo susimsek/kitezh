@@ -2738,33 +2738,12 @@ function registerIpc() {
     },
   );
   ipcMain.handle(
-    "desktop:auth-get-session",
-    async (event, consoleName: unknown) => {
-      assertTrustedSender(event);
-      assertConsole(consoleName);
-      const vault = await readVault();
-      return vault[consoleName] ?? null;
-    },
-  );
-  ipcMain.handle(
     "desktop:auth-has-session",
     async (event, consoleName: unknown) => {
       assertTrustedSender(event);
       assertConsole(consoleName);
       const vault = await readVault();
       return Boolean(vault[consoleName]);
-    },
-  );
-  ipcMain.handle(
-    "desktop:auth-set-session",
-    async (event, consoleName: unknown, tokens: unknown) => {
-      assertTrustedSender(event);
-      assertConsole(consoleName);
-      assertTokens(tokens);
-      const vault = await readVault();
-      vault[consoleName] = tokens;
-      await writeVault(vault);
-      setLogoutMenuVisible(true);
     },
   );
   ipcMain.handle(

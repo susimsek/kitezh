@@ -5028,6 +5028,12 @@ test("keeps native windows isolated, sandboxed, and without Node integration", a
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
+    const exposedAuthMethods = await mainWindow.evaluate(() =>
+      Object.keys(window.desktopApi.auth),
+    );
+    assert.ok(!exposedAuthMethods.includes("getSession"));
+    assert.ok(!exposedAuthMethods.includes("setSession"));
+    assert.ok(!exposedAuthMethods.includes("getTokens"));
 
     const openMenuItem = async (menuLabel, itemLabel) => {
       const windowPromise = application.waitForEvent("window");

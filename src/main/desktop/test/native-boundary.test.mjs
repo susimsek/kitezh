@@ -66,6 +66,17 @@ test("native desktop renderer does not depend on the Web component tree", async 
   assert.match(source, /onCallback/);
 });
 
+test("native renderer cannot read or replace sessions through IPC", async () => {
+  const [mainSource, preloadSource] = await Promise.all([
+    readFile(path.join(desktopDirectory, "src", "main.ts"), "utf8"),
+    readFile(path.join(desktopDirectory, "src", "preload.ts"), "utf8"),
+  ]);
+
+  assert.doesNotMatch(mainSource, /desktop:auth-(get-session|set-session)/);
+  assert.match(preloadSource, /startLogin: \(consoleName: ConsoleName\)/);
+  assert.doesNotMatch(preloadSource, /getSession|setSession|refreshToken|accessToken/);
+});
+
 test("native Admin selection does not call Account APIs", async () => {
   const source = await readFile(
     path.join(desktopDirectory, "src", "native", "renderer.mjs"),
