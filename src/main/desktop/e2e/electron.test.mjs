@@ -1267,6 +1267,27 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       "6",
       "8",
     ]);
+    const signOut = window.getByRole("button", {
+      name: "Sign out",
+      exact: true,
+    });
+    assert.equal(await signOut.locator(".button-icon").textContent(), "↪");
+    assert.equal(
+      await signOut.locator(".button-icon").getAttribute("aria-hidden"),
+      "true",
+    );
+    const languageToggle = window.getByRole("button", {
+      name: "Turkish",
+      exact: true,
+    });
+    assert.equal(
+      await languageToggle.locator(".button-icon").textContent(),
+      "◎",
+    );
+    assert.equal(
+      await languageToggle.locator(".button-icon").getAttribute("aria-hidden"),
+      "true",
+    );
     const usersNavigation = window.getByRole("button", {
       name: "Users",
       exact: true,

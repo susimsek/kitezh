@@ -22,7 +22,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { colors, messages, type ThemeMode } from "@kitezh/shared";
+import { colors, iconMetadata, messages, type ThemeMode } from "@kitezh/shared";
 
 import {
   DESKTOP_PROTOCOL,
@@ -370,6 +370,7 @@ async function nativeRendererHtml() {
     theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
     messages,
     colors,
+    icons: iconMetadata,
   }).replace(/</g, "\\u003c");
   return source.replace(
     '<script type="module" src="app://renderer/native/renderer.mjs"></script>',
