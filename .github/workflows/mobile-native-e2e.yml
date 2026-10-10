@@ -19,7 +19,7 @@ env:
 jobs:
   ios:
     name: iOS native E2E (headless Simulator)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - name: Check out source
