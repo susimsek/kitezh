@@ -1872,6 +1872,51 @@ test("opens settings in a separate window without requiring login", async () => 
       await settingsWindow.getByRole("radio", { name: "System" }).count(),
       1,
     );
+    await mainWindow.evaluate(async () => window.desktopApi.theme.set("light"));
+    await mainWindow.waitForFunction(
+      () => document.documentElement.dataset.theme === "light",
+    );
+    await settingsWindow.getByRole("radio", { name: "Dark" }).click();
+    await mainWindow.waitForFunction(
+      () => document.documentElement.dataset.theme === "dark",
+    );
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("heading", { name: "Appearance" }).waitFor();
+    await settingsWindow.getByRole("radio", { name: "System" }).click();
+    assert.equal(
+      await settingsWindow.evaluate(() => window.desktopApi.theme.get()),
+      "system",
+    );
+    await mainWindow.waitForFunction(() =>
+      ["light", "dark"].includes(document.documentElement.dataset.theme),
+    );
+    await settingsWindow.getByRole("button", { name: "General" }).click();
+    await settingsWindow.locator("#desktop-language").selectOption("tr");
+    await settingsWindow
+      .getByRole("heading", { name: "Ayarlar", exact: true })
+      .waitFor();
+    await mainWindow
+      .getByRole("heading", { name: "Bir konsol seçin", exact: true })
+      .waitFor();
+    const turkishMenuLabels = await application.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu().items[0].submenu.items.map(
+        (item) => item.label,
+      ),
+    );
+    assert.equal(turkishMenuLabels.includes("Ayarlar…"), true);
+    await settingsWindow.locator("#desktop-language").selectOption("en");
+    await settingsWindow
+      .getByRole("heading", { name: "Settings", exact: true })
+      .waitFor();
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console", exact: true })
+      .waitFor();
+    const englishMenuLabels = await application.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu().items[0].submenu.items.map(
+        (item) => item.label,
+      ),
+    );
+    assert.equal(englishMenuLabels.includes("Settings…"), true);
     await settingsWindow.getByRole("button", { name: "General" }).click();
     assert.equal(await settingsWindow.locator("#desktop-language").count(), 1);
     assert.equal(
