@@ -277,6 +277,63 @@ test("opens only exact approved external paths and rejects unsafe redirects", as
   }
 });
 
+test("native popup and navigation handlers deny untrusted destinations", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__popupExternalUrls = [];
+      shell.openExternal = async (url) => {
+        globalThis.__popupExternalUrls.push(url);
+      };
+    });
+    const window = await nativeMainWindow(application);
+    const initialWindowUrl = await window.url();
+    const popupsDenied = await window.evaluate(() => {
+      const approved = window.open(
+        "https://github.com/login/oauth/authorize?client_id=desktop-e2e",
+        "_blank",
+      );
+      const unapproved = window.open(
+        "https://github.com/arbitrary/path",
+        "_blank",
+      );
+      return approved === null && unapproved === null;
+    });
+    assert.equal(popupsDenied, true);
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const opened = await application.evaluate(
+        () => globalThis.__popupExternalUrls.length,
+      );
+      if (opened > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__popupExternalUrls),
+      ["https://github.com/login/oauth/authorize?client_id=desktop-e2e"],
+    );
+    const windowUrls = await Promise.all(
+      application.windows().map((candidate) => candidate.url()),
+    );
+    assert.equal(
+      windowUrls.some((url) => url.startsWith("https://github.com/")),
+      false,
+      `An external URL loaded in an app window: ${windowUrls.join(", ")}`,
+    );
+
+    await window.evaluate(() => {
+      window.location.assign("https://github.com/arbitrary/path");
+    });
+    await window.waitForTimeout(100);
+    assert.equal(await window.url(), initialWindowUrl);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__popupExternalUrls),
+      ["https://github.com/login/oauth/authorize?client_id=desktop-e2e"],
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("keeps native sign-in busy until callback and rejects duplicate authorization", async () => {
   const application = await launchDesktop();
   try {
