@@ -127,6 +127,41 @@ test("uploads only bounded Admin avatar payloads as multipart data", async () =>
   );
 });
 
+test("allows only exact client scope protocol mapper routes", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, init) => {
+    requests.push({ url: String(url), method: init.method });
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  for (const [method, path] of [
+    [
+      "GET",
+      "/api/admin/client-scopes/scope-main/mappers?page=0&size=20&sort=name,asc",
+    ],
+    ["POST", "/api/admin/client-scopes/scope-main/mappers"],
+    ["PUT", "/api/admin/client-scopes/scope-main/mappers/12"],
+    ["DELETE", "/api/admin/client-scopes/scope-main/mappers/12"],
+  ]) {
+    const response = await adapter.request({ console: "admin", path, method });
+    assert.equal(response.status, 200);
+  }
+  assert.equal(requests.length, 4);
+  for (const [method, path] of [
+    ["POST", "/api/admin/client-scopes/scope-main/mappers/12"],
+    ["PUT", "/api/admin/client-scopes/scope-main/mappers/0"],
+    ["DELETE", "/api/admin/client-scopes/scope-main/mappers/12/nested"],
+    ["GET", "/api/admin/client-scopes/scope-main/mappers?size=1000"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method }),
+      /not allowed/,
+    );
+  }
+});
+
 test("limits the Admin namespace to approved settings writes and bounded read contracts", async () => {
   const requestLanguages = [];
   const { adapter } = harness(async (_url, init) => {
@@ -914,7 +949,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/client-scopes/scope-native-observer/mappers/1",
+      path: "/api/admin/client-scopes/scope-native-observer/mappers/1/nested",
       method: "PUT",
     }),
     /not allowed/,
@@ -922,7 +957,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/client-scopes/scope-native-observer/mappers/1",
+      path: "/api/admin/client-scopes/scope-native-observer/mappers/0",
       method: "DELETE",
     }),
     /not allowed/,

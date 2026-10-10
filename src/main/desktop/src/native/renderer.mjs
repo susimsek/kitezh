@@ -81,6 +81,11 @@ const actionIcons = {
   "admin-client-scope-delete-confirm": "delete",
   "admin-client-scope-role-mappings-toggle": "edit",
   "admin-client-scope-role-mappings-save": "check",
+  "admin-client-scope-mappers-toggle": "edit",
+  "admin-client-scope-mapper-create": "add",
+  "admin-client-scope-mapper-edit": "edit",
+  "admin-client-scope-mapper-delete-request": "delete",
+  "admin-client-scope-mapper-delete-confirm": "delete",
   "admin-client-delete-request": "delete",
   "admin-client-delete-confirm": "delete",
   "admin-consent-revoke-request": "delete",
@@ -125,7 +130,7 @@ const button = (label, options = {}) => {
     actionIcons[options.action] ??
     (label === text("save") ? "check" : null);
   const icon = iconName ? icons[iconName] : null;
-  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.mapper != null ? `data-mapper="${escapeHtml(options.mapper)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
 };
 const field = (
   name,
@@ -1026,6 +1031,61 @@ function clientScopeRoleMappingPanel(scopeId) {
   return `<section class="card" data-client-scope-role-mappings-panel="true" data-scope-id="${escapeHtml(scopeId)}"><h3>${escapeHtml(text("adminClientScopeRoleMappings"))}</h3><fieldset><legend>${escapeHtml(text("adminApplicationRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="applicationRoles"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchApplicationRoles"))}" value="${escapeHtml(applicationQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === `client-scope-role-candidates:${scopeId}:applicationRoles` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-scope-role-candidates:${scopeId}:applicationRoles`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(applicationRoles, "applicationRoles", applicationRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) - 1}" ${Number(applicationPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:applicationRoles`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${applicationPage.totalPages ? Number(applicationPage.number) + 1 : 0} / ${Number(applicationPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) + 1}" ${Number(applicationPage.number ?? 0) + 1 >= Number(applicationPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:applicationRoles`)}${escapeHtml(text("adminNext"))}</button></div></fieldset><fieldset><legend>${escapeHtml(text("adminClientRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="clientRoleIds"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchClientRoles"))}" value="${escapeHtml(clientQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === `client-scope-role-candidates:${scopeId}:clientRoleIds` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-scope-role-candidates:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(clientRoles, "clientRoleIds", clientRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) - 1}" ${Number(clientPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${clientPage.totalPages ? Number(clientPage.number) + 1 : 0} / ${Number(clientPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) + 1}" ${Number(clientPage.number ?? 0) + 1 >= Number(clientPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminNext"))}</button></div></fieldset><div class="actions">${button(text("save"), { action: "admin-client-scope-role-mappings-save", id: scopeId, busy: state.busy === `client-scope-role-mappings-save:${scopeId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-role-mappings-cancel" data-id="${escapeHtml(scopeId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
 }
 
+function clientScopeMappersPanel(scopeId) {
+  if (state.data.clientScopeMappersOpenId !== scopeId) return "";
+  const mappers = state.data.clientScopeMappers?.[scopeId] ?? [];
+  const editor = state.data.clientScopeMapperEditor;
+  const mapperId = editor?.scopeId === scopeId ? editor.mapperId : null;
+  const mapper =
+    mapperId === null
+      ? null
+      : mappers.find((item) => String(item.id) === mapperId);
+  const draftKey = mapperId ?? "new";
+  const draft = state.data.clientScopeMapperDrafts?.[scopeId]?.[draftKey] ?? {};
+  const errorKey = `${scopeId}:${draftKey}`;
+  const errors =
+    state.data.clientScopeMapperErrorKey === errorKey
+      ? violations(state.error?.body)
+      : {};
+  const busy = state.busy === `client-scope-mapper-save:${errorKey}`;
+  const options = [
+    "user-property",
+    "user-attribute",
+    "group-membership",
+    "group-attribute",
+    "application-role",
+    "client-role",
+    "audience",
+    "audience-resolve",
+    "hardcoded-claim",
+    "email",
+    "full-name",
+    "locale",
+    "username",
+  ];
+  const editorForm =
+    editor?.scopeId === scopeId
+      ? `<form class="card" data-form="admin-client-scope-mapper" data-scope-id="${escapeHtml(scopeId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(text(mapperId ? "adminEditClientScopeMapper" : "adminCreateClientScopeMapper"))}</h3>${field("name", text("adminClientScopeMapperName"), draft.name ?? mapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("source", text("adminClientScopeMapperSource"), draft.source ?? mapper?.source ?? "", errors.source, "text", 'maxlength="200"')}<div class="field"><label for="client-scope-mapper-type">${escapeHtml(text("adminClientScopeMapperType"))}</label><select id="client-scope-mapper-type" name="mapperType">${options.map((option) => `<option value="${option}" ${(draft.mapperType ?? mapper?.mapperType ?? "email") === option ? "selected" : ""}>${option}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div>${field("claimName", text("adminClientScopeMapperClaim"), draft.claimName ?? mapper?.claimName ?? "email", errors.claimName, "text", 'maxlength="200"')}${field("value", text("adminClientScopeMapperValue"), draft.value ?? mapper?.value ?? "", errors.value, "text", 'maxlength="1000"')}${field("priority", text("adminClientScopeMapperPriority"), draft.priority ?? mapper?.priority ?? 100, errors.priority, "number", 'min="0" max="10000" step="1"')}<label class="settings-row"><input type="checkbox" name="addToIdToken" ${(draft.addToIdToken ?? mapper?.addToIdToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${(draft.addToAccessToken ?? mapper?.addToAccessToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-mapper-editor-cancel" data-id="${escapeHtml(scopeId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+      : "";
+  const deleteConfirm = state.data.clientScopeMapperDeleteConfirm;
+  const rows = mappers.length
+    ? mappers
+        .map((item) => {
+          const confirming =
+            deleteConfirm?.scopeId === scopeId &&
+            deleteConfirm?.mapperId === String(item.id);
+          const deleting =
+            state.busy === `client-scope-mapper-delete:${scopeId}:${item.id}`;
+          const controls = confirming
+            ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopeMapperPrompt"))}</span>${button(text("adminDeleteClientScopeMapper"), { action: "admin-client-scope-mapper-delete-confirm", id: scopeId, mapper: item.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-mapper-delete-cancel" data-id="${escapeHtml(scopeId)}" data-mapper="${escapeHtml(item.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+            : `<div class="actions">${button(text("adminEditClientScopeMapper"), { action: "admin-client-scope-mapper-edit", id: scopeId, mapper: item.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientScopeMapper"), { action: "admin-client-scope-mapper-delete-request", id: scopeId, mapper: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          return `<article class="list-item" data-client-scope-mapper-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.name)}</strong><span class="muted">${escapeHtml(`${item.mapperType} · ${item.claimName}`)}</span></div><span>${escapeHtml(text(item.addToIdToken ? "adminMapperAddToIdToken" : "adminMapperAddToAccessToken"))}</span>${controls}</article>`;
+        })
+        .join("")
+    : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopeMappers"))}</div>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminClientScopeMappers"))}"><div class="list">${rows}</div><div class="actions">${button(text("adminAddClientScopeMapper"), { action: "admin-client-scope-mapper-create", id: scopeId, disabled: state.offline || Boolean(state.busy) })}</div>${editorForm}</section>`;
+}
+
 function adminClientScopesContent() {
   const page = state.data.clientScopes ?? {
     content: [],
@@ -1064,7 +1124,12 @@ function adminClientScopesContent() {
       const roleMappingPanel = roleMappingsOpen
         ? clientScopeRoleMappingPanel(scope.id)
         : "";
-      return `<article class="list-item" data-client-scope-id="${escapeHtml(scope.id)}">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span>${deleteControls}${roleMappingControls}${roleMappingPanel}</article>`;
+      const mappersOpen = state.data.clientScopeMappersOpenId === scope.id;
+      const mapperControls = scope.builtIn
+        ? ""
+        : `<div class="actions">${button(text("adminManageClientScopeMappers"), { action: "admin-client-scope-mappers-toggle", id: scope.id, busy: state.busy === `client-scope-mappers:${scope.id}`, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      const mapperPanel = mappersOpen ? clientScopeMappersPanel(scope.id) : "";
+      return `<article class="list-item" data-client-scope-id="${escapeHtml(scope.id)}">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span>${deleteControls}${roleMappingControls}${roleMappingPanel}${mapperControls}${mapperPanel}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopeRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1987,6 +2052,21 @@ function preserveOfflineDrafts() {
           addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
         };
       }
+    } else if (form.dataset.form === "admin-client-scope-mapper") {
+      const scopeId = form.dataset.scopeId;
+      const mapperId = form.dataset.mapperId || "new";
+      if (
+        /^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "") &&
+        (mapperId === "new" || /^[1-9]\d*$/.test(mapperId))
+      ) {
+        state.data.clientScopeMapperDrafts ??= {};
+        state.data.clientScopeMapperDrafts[scopeId] ??= {};
+        state.data.clientScopeMapperDrafts[scopeId][mapperId] = {
+          ...values,
+          addToIdToken: form.elements.namedItem("addToIdToken").checked,
+          addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
+        };
+      }
     } else if (form.dataset.form === "admin-localization-message-create") {
       state.data.adminMessageOverrideCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
@@ -2377,6 +2457,133 @@ async function submitForm(form) {
       state.data.providerMapperErrorKey = null;
       state.notice = text(
         mapperId ? "adminProviderMapperUpdated" : "adminProviderMapperCreated",
+      );
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-client-scope-mapper") {
+    const scopeId = form.dataset.scopeId ?? "";
+    const mapperId = form.dataset.mapperId || null;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (item) => item.id === scopeId,
+    );
+    const mappers = state.data.clientScopeMappers?.[scopeId] ?? [];
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
+      !scope ||
+      scope.builtIn ||
+      !Array.isArray(mappers) ||
+      (mapperId !== null &&
+        (!/^[1-9]\d*$/.test(mapperId) ||
+          !mappers.some((item) => String(item.id) === mapperId)))
+    )
+      return;
+    const body = {
+      name: String(values.name ?? "").trim(),
+      mapperType: String(values.mapperType ?? ""),
+      source: String(values.source ?? "").trim() || null,
+      claimName: String(values.claimName ?? "").trim() || null,
+      value: String(values.value ?? "").trim() || null,
+      priority: Number(values.priority ?? 100),
+      addToIdToken: form.elements.namedItem("addToIdToken").checked,
+      addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
+    };
+    const needsSource = [
+      "user-property",
+      "user-attribute",
+      "group-attribute",
+    ].includes(body.mapperType);
+    const needsValue = ["hardcoded-claim", "audience"].includes(
+      body.mapperType,
+    );
+    const usesAudienceClaim = ["audience", "audience-resolve"].includes(
+      body.mapperType,
+    );
+    form.elements
+      .namedItem("source")
+      .setCustomValidity(
+        needsSource && !body.source ? text("apiValidation") : "",
+      );
+    form.elements
+      .namedItem("value")
+      .setCustomValidity(
+        needsValue && !body.value ? text("apiValidation") : "",
+      );
+    form.elements
+      .namedItem("claimName")
+      .setCustomValidity(
+        !usesAudienceClaim && !body.claimName ? text("apiValidation") : "",
+      );
+    const idTokenTarget = form.elements.namedItem("addToIdToken");
+    const accessClaimTarget = form.elements.namedItem("addToAccessToken");
+    idTokenTarget.setCustomValidity(
+      !body.addToIdToken && !body.addToAccessToken ? text("apiValidation") : "",
+    );
+    accessClaimTarget.setCustomValidity("");
+    if (!form.reportValidity()) return;
+    if (
+      !body.name ||
+      body.name.length > 100 ||
+      ![
+        "user-property",
+        "user-attribute",
+        "group-membership",
+        "group-attribute",
+        "application-role",
+        "client-role",
+        "audience",
+        "audience-resolve",
+        "hardcoded-claim",
+        "email",
+        "full-name",
+        "locale",
+        "username",
+      ].includes(body.mapperType) ||
+      (needsSource && !body.source) ||
+      (needsValue && !body.value) ||
+      (!usesAudienceClaim && !body.claimName) ||
+      (body.source?.length ?? 0) > 200 ||
+      (body.claimName?.length ?? 0) > 200 ||
+      (body.value?.length ?? 0) > 1000 ||
+      !Number.isSafeInteger(body.priority) ||
+      body.priority < 0 ||
+      body.priority > 10000 ||
+      (!body.addToIdToken && !body.addToAccessToken)
+    )
+      return;
+    const draftKey = mapperId ?? "new";
+    const errorKey = `${scopeId}:${draftKey}`;
+    state.data.clientScopeMapperDrafts ??= {};
+    state.data.clientScopeMapperDrafts[scopeId] ??= {};
+    state.data.clientScopeMapperDrafts[scopeId][draftKey] = body;
+    state.data.clientScopeMapperErrorKey = errorKey;
+    state.error = null;
+    state.notice = null;
+    state.busy = `client-scope-mapper-save:${errorKey}`;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/client-scopes/${scopeId}/mappers${mapperId ? `/${mapperId}` : ""}`,
+        {
+          method: mapperId ? "PUT" : "POST",
+          body,
+        },
+      );
+      state.data.clientScopeMappers[scopeId] = mapperId
+        ? mappers.map((item) => (String(item.id) === mapperId ? saved : item))
+        : [...mappers, saved];
+      delete state.data.clientScopeMapperDrafts[scopeId][draftKey];
+      state.data.clientScopeMapperEditor = null;
+      state.data.clientScopeMapperErrorKey = null;
+      state.notice = text(
+        mapperId
+          ? "adminClientScopeMapperUpdated"
+          : "adminClientScopeMapperCreated",
       );
     } catch {
       /* request rendered localized server validation or transport feedback */
@@ -3298,6 +3505,170 @@ async function action(action, element) {
     };
     state.data.adminClientScopeRoleMappingsOpenId = null;
     state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-mappers-toggle") {
+    if (state.busy || state.offline) return;
+    const scopeId = element.dataset.id;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (item) => item.id === scopeId,
+    );
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "") ||
+      !scope ||
+      scope.builtIn
+    )
+      return;
+    if (state.data.clientScopeMappersOpenId === scopeId) {
+      state.data.clientScopeMappersOpenId = null;
+      render();
+      return;
+    }
+    const cached = state.data.clientScopeMappers?.[scopeId];
+    if (Array.isArray(cached)) {
+      state.data.clientScopeMappersOpenId = scopeId;
+      render();
+      return;
+    }
+    state.busy = `client-scope-mappers:${scopeId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const page = await request(
+        `/api/admin/client-scopes/${scopeId}/mappers?page=0&size=20&sort=name,asc`,
+      );
+      state.data.clientScopeMappers ??= {};
+      state.data.clientScopeMappers[scopeId] = Array.isArray(page?.content)
+        ? page.content
+        : [];
+      state.data.clientScopeMappersOpenId = scopeId;
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-mapper-create") {
+    if (state.busy || state.offline) return;
+    const scopeId = element.dataset.id;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (item) => item.id === scopeId,
+    );
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "") ||
+      !scope ||
+      scope.builtIn ||
+      !Array.isArray(state.data.clientScopeMappers?.[scopeId])
+    )
+      return;
+    state.data.clientScopeMappersOpenId = scopeId;
+    state.data.clientScopeMapperEditor = { scopeId, mapperId: null };
+    state.data.clientScopeMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-mapper-edit") {
+    if (state.busy || state.offline) return;
+    const scopeId = element.dataset.id;
+    const mapperId = element.dataset.mapper;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (item) => item.id === scopeId,
+    );
+    const mappers = state.data.clientScopeMappers?.[scopeId] ?? [];
+    if (
+      !scope ||
+      scope.builtIn ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "") ||
+      !/^[1-9]\d*$/.test(mapperId ?? "") ||
+      !Array.isArray(mappers) ||
+      !mappers.some((item) => String(item.id) === mapperId)
+    )
+      return;
+    state.data.clientScopeMappersOpenId = scopeId;
+    state.data.clientScopeMapperEditor = { scopeId, mapperId };
+    state.data.clientScopeMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-mapper-editor-cancel") {
+    if (state.busy) return;
+    const scopeId = element.dataset.id;
+    const editor = state.data.clientScopeMapperEditor;
+    if (editor?.scopeId !== scopeId) return;
+    delete state.data.clientScopeMapperDrafts?.[scopeId]?.[
+      editor.mapperId ?? "new"
+    ];
+    state.data.clientScopeMapperEditor = null;
+    state.data.clientScopeMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-client-scope-mapper-delete-request" ||
+    action === "admin-client-scope-mapper-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const scopeId = element.dataset.id;
+    const mapperId = element.dataset.mapper;
+    const scope = (state.data.clientScopes?.content ?? []).find(
+      (item) => item.id === scopeId,
+    );
+    const mappers = state.data.clientScopeMappers?.[scopeId] ?? [];
+    if (
+      !scope ||
+      scope.builtIn ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "") ||
+      !/^[1-9]\d*$/.test(mapperId ?? "") ||
+      !Array.isArray(mappers) ||
+      !mappers.some((item) => String(item.id) === mapperId)
+    )
+      return;
+    if (action === "admin-client-scope-mapper-delete-request") {
+      state.data.clientScopeMapperDeleteConfirm = { scopeId, mapperId };
+      render();
+      return;
+    }
+    const confirmation = state.data.clientScopeMapperDeleteConfirm;
+    if (
+      confirmation?.scopeId !== scopeId ||
+      confirmation?.mapperId !== mapperId
+    )
+      return;
+    state.busy = `client-scope-mapper-delete:${scopeId}:${mapperId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/client-scopes/${scopeId}/mappers/${mapperId}`, {
+        method: "DELETE",
+      });
+      state.data.clientScopeMappers[scopeId] = mappers.filter(
+        (item) => String(item.id) !== mapperId,
+      );
+      state.data.clientScopeMapperDeleteConfirm = null;
+      state.notice = text("adminClientScopeMapperDeleted");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-mapper-delete-cancel") {
+    if (state.busy) return;
+    const confirmation = state.data.clientScopeMapperDeleteConfirm;
+    if (
+      confirmation?.scopeId !== element.dataset.id ||
+      confirmation?.mapperId !== element.dataset.mapper
+    )
+      return;
+    state.data.clientScopeMapperDeleteConfirm = null;
     render();
     return;
   }

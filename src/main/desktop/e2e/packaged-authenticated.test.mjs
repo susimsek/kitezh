@@ -680,6 +680,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await packagedRoleCandidate.check();
     await application.evaluate(() => {
       globalThis.__packagedRoleMappingStatuses = [];
+      globalThis.__packagedScopeMapperStatuses = [];
       globalThis.__packagedPolicyStatuses = [];
       globalThis.__packagedBrandingStatuses = [];
       globalThis.__packagedLocalizationStatuses = [];
@@ -699,6 +700,18 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
             method,
             status: response.status,
           });
+        }
+        if (
+          /^\/api\/admin\/client-scopes\/[^/]+\/mappers(?:\/[1-9]\d*)?$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__packagedScopeMapperStatuses.push({
+            method,
+            status: response.status,
+          });
+          if (method !== "GET")
+            await new Promise((resolve) => setTimeout(resolve, 300));
         }
         if (
           method === "PUT" &&
@@ -780,6 +793,150 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     assert.equal(savedMappings.status, 200);
     assert.ok(savedMappings.body.applicationRoles.includes(packagedRoleName));
 
+    await scopeRow
+      .getByRole("button", { name: "Manage protocol mappers", exact: true })
+      .click();
+    const scopeMappers = scopeRow.getByRole("region", {
+      name: "Client scope protocol mappers",
+    });
+    await scopeMappers.waitFor();
+    await scopeMappers
+      .getByRole("button", { name: "Add protocol mapper", exact: true })
+      .click();
+    const mapperForm = scopeMappers.locator(
+      'form[data-form="admin-client-scope-mapper"]',
+    );
+    await mapperForm.waitFor();
+    const packagedMapperName = `packaged-mapper-${Date.now()}`;
+    await mapperForm.locator('[name="name"]').fill(packagedMapperName);
+    await mapperForm
+      .locator('[name="mapperType"]')
+      .selectOption("user-property");
+    await mapperForm.locator('[name="claimName"]').fill("packaged_email");
+    await mapperForm.locator('[name="priority"]').fill("50");
+    await mapperForm.evaluate((form) => form.requestSubmit());
+    assert.equal(
+      await mapperForm
+        .locator('[name="source"]')
+        .evaluate((input) => input.validity.customError),
+      true,
+    );
+    await mapperForm.locator('[name="source"]').fill("email");
+    const createMapperSave = mapperForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await createMapperSave.click();
+    assert.equal(await createMapperSave.isDisabled(), true);
+    assert.equal(await createMapperSave.getAttribute("aria-busy"), "true");
+    await createMapperSave.evaluate((button) => button.click());
+    await mainWindow
+      .getByText("Client scope protocol mapper created.", { exact: true })
+      .waitFor();
+    let scopeMapperStatuses = await application.evaluate(
+      () => globalThis.__packagedScopeMapperStatuses,
+    );
+    assert.deepEqual(scopeMapperStatuses, [
+      { method: "GET", status: 200 },
+      { method: "POST", status: 201 },
+    ]);
+    let savedScopeMappers = await mainWindow.evaluate(
+      async (scopeId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/client-scopes/${encodeURIComponent(scopeId)}/mappers?page=0&size=20&sort=name,asc`,
+        }),
+      packagedScopeId,
+    );
+    assert.equal(savedScopeMappers.status, 200);
+    let savedScopeMapper = savedScopeMappers.body.content.find(
+      (item) => item.name === packagedMapperName,
+    );
+    assert.ok(savedScopeMapper);
+    assert.equal(savedScopeMapper.claimName, "packaged_email");
+
+    const mapperRow = scopeMappers.locator(
+      `[data-client-scope-mapper-id="${savedScopeMapper.id}"]`,
+    );
+    await mapperRow
+      .getByRole("button", { name: "Edit protocol mapper", exact: true })
+      .click();
+    const editMapperForm = scopeMappers.locator(
+      'form[data-form="admin-client-scope-mapper"]',
+    );
+    await editMapperForm
+      .locator('[name="claimName"]')
+      .fill("packaged_email_updated");
+    assert.deepEqual(
+      await editMapperForm.evaluate((form) => ({
+        valid: form.checkValidity(),
+        invalidFields: [...form.elements]
+          .filter((item) => item.willValidate && !item.validity.valid)
+          .map((item) => item.name),
+      })),
+      { valid: true, invalidFields: [] },
+    );
+    const updateMapperSave = editMapperForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await updateMapperSave.click();
+    assert.equal(await updateMapperSave.isDisabled(), true);
+    assert.equal(await updateMapperSave.getAttribute("aria-busy"), "true");
+    await updateMapperSave.evaluate((button) => button.click());
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      scopeMapperStatuses = await application.evaluate(
+        () => globalThis.__packagedScopeMapperStatuses,
+      );
+      if (scopeMapperStatuses.some(({ method }) => method === "PUT")) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.deepEqual(
+      scopeMapperStatuses.filter(({ method }) => method === "PUT"),
+      [{ method: "PUT", status: 200 }],
+    );
+    await mainWindow
+      .getByText("Client scope protocol mapper updated.", { exact: true })
+      .waitFor();
+    savedScopeMappers = await mainWindow.evaluate(
+      async (scopeId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/client-scopes/${encodeURIComponent(scopeId)}/mappers?page=0&size=20&sort=name,asc`,
+        }),
+      packagedScopeId,
+    );
+    savedScopeMapper = savedScopeMappers.body.content.find(
+      (item) => item.name === packagedMapperName,
+    );
+    assert.equal(savedScopeMapper.claimName, "packaged_email_updated");
+    await mapperRow
+      .getByRole("button", { name: "Delete protocol mapper", exact: true })
+      .click();
+    await mapperRow.getByText(/Delete this protocol mapper\?/).waitFor();
+    const confirmMapperDelete = mapperRow.getByRole("button", {
+      name: "Delete protocol mapper",
+      exact: true,
+    });
+    await confirmMapperDelete.click();
+    assert.equal(await confirmMapperDelete.isDisabled(), true);
+    assert.equal(await confirmMapperDelete.getAttribute("aria-busy"), "true");
+    await confirmMapperDelete.evaluate((button) => button.click());
+    await mainWindow
+      .getByText("Client scope protocol mapper deleted.", { exact: true })
+      .waitFor();
+    scopeMapperStatuses = await application.evaluate(
+      () => globalThis.__packagedScopeMapperStatuses,
+    );
+    assert.deepEqual(
+      scopeMapperStatuses.filter(({ method }) => method !== "GET"),
+      [
+        { method: "POST", status: 201 },
+        { method: "PUT", status: 200 },
+        { method: "DELETE", status: 204 },
+      ],
+    );
+
     await mainWindow
       .getByRole("button", { name: "Policies", exact: true })
       .click();
@@ -788,7 +945,10 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     const cibaLifespan = await cibaForm
       .locator('[name="requestLifespanSeconds"]')
       .inputValue();
-    const cibaSave = cibaForm.getByRole("button", { name: "Save", exact: true });
+    const cibaSave = cibaForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
     await cibaSave.click();
     await mainWindow
       .getByText("Policy settings saved.", { exact: true })
@@ -828,14 +988,19 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       ]),
     );
     assert.equal(persistedPolicies[0].status, 200);
-    assert.equal(persistedPolicies[0].body.requestLifespanSeconds, Number(cibaLifespan));
+    assert.equal(
+      persistedPolicies[0].body.requestLifespanSeconds,
+      Number(cibaLifespan),
+    );
     assert.equal(persistedPolicies[1].status, 200);
     assert.equal(persistedPolicies[1].body.idleTimeout, offlineIdleTimeout);
 
     await mainWindow
       .getByRole("button", { name: "Server & branding", exact: true })
       .click();
-    await mainWindow.getByRole("heading", { name: "Branding", exact: true }).waitFor();
+    await mainWindow
+      .getByRole("heading", { name: "Branding", exact: true })
+      .waitFor();
     const brandingForm = mainWindow.locator('form[data-form="admin-branding"]');
     const brandingValues = {};
     for (const name of [
@@ -844,7 +1009,9 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       "accentColor",
       "backgroundColor",
     ]) {
-      brandingValues[name] = await brandingForm.locator(`[name="${name}"]`).inputValue();
+      brandingValues[name] = await brandingForm
+        .locator(`[name="${name}"]`)
+        .inputValue();
     }
     await brandingForm
       .getByRole("button", { name: "Save", exact: true })
@@ -930,12 +1097,14 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await mainWindow
       .getByText("Message override created.", { exact: true })
       .waitFor();
-    const messageLookup = await mainWindow.evaluate(async (key) =>
-      window.desktopApi.api.request({
-        console: "admin",
-        path: `/api/admin/settings/localization/messages?q=${encodeURIComponent(key)}&page=0&size=20&sort=locale,asc`,
-      }),
-    messageKey);
+    const messageLookup = await mainWindow.evaluate(
+      async (key) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/settings/localization/messages?q=${encodeURIComponent(key)}&page=0&size=20&sort=locale,asc`,
+        }),
+      messageKey,
+    );
     assert.equal(messageLookup.status, 200);
     const createdMessage = messageLookup.body.content.find(
       (message) => message.messageKey === messageKey,
@@ -954,19 +1123,23 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await mainWindow
       .getByText("Message override saved.", { exact: true })
       .waitFor();
-    const updatedMessage = await mainWindow.evaluate(async (key) =>
-      window.desktopApi.api.request({
-        console: "admin",
-        path: `/api/admin/settings/localization/messages?q=${encodeURIComponent(key)}&page=0&size=20&sort=locale,asc`,
-      }),
-    messageKey);
+    const updatedMessage = await mainWindow.evaluate(
+      async (key) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/settings/localization/messages?q=${encodeURIComponent(key)}&page=0&size=20&sort=locale,asc`,
+        }),
+      messageKey,
+    );
     assert.equal(updatedMessage.status, 200);
     assert.equal(
       updatedMessage.body.content[0].messageValue,
       "Packaged message after edit",
     );
     const messageRow = messageForm.locator("..");
-    await messageRow.getByRole("button", { name: "Delete", exact: true }).click();
+    await messageRow
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
     await messageRow
       .getByText("Delete this message override?", { exact: true })
       .waitFor();
@@ -1060,7 +1233,9 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await emailSettingsForm
       .getByRole("button", { name: "Save", exact: true })
       .click();
-    await mainWindow.getByText("Email settings saved.", { exact: true }).waitFor();
+    await mainWindow
+      .getByText("Email settings saved.", { exact: true })
+      .waitFor();
     const emailAfter = await mainWindow.evaluate(() =>
       window.desktopApi.api.request({
         console: "admin",
@@ -1073,9 +1248,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       emailBefore.body.passwordConfigured,
     );
     assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__packagedLoginEmailStatuses,
-      ),
+      await application.evaluate(() => globalThis.__packagedLoginEmailStatuses),
       [
         {
           path: "/api/admin/settings/login/native",

@@ -206,6 +206,18 @@ function isAllowedApiPath(
       )
     )
       return true;
+    const clientScopeMapperPath = path.match(
+      /^\/api\/admin\/client-scopes\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/,
+    );
+    if (
+      clientScopeMapperPath &&
+      (method === "POST" || method === "PUT" || method === "DELETE") &&
+      (method === "POST"
+        ? clientScopeMapperPath[2] === undefined
+        : clientScopeMapperPath[2] !== undefined &&
+          Number.isSafeInteger(Number(clientScopeMapperPath[2])))
+    )
+      return true;
     if (
       method === "DELETE" &&
       /^\/api\/admin\/offline-sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
@@ -373,6 +385,10 @@ function isAllowedApiPath(
         /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings$/.test(
           url.pathname,
         );
+      const isClientScopeMappers =
+        /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/mappers$/.test(
+          url.pathname,
+        );
       const isClientScopeRoleCandidates =
         /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings\/(?:application-roles|client-roles)$/.test(
           url.pathname,
@@ -437,6 +453,7 @@ function isAllowedApiPath(
           isGroupMemberSearch ||
           isClientScopes ||
           isClientScopeRoleMappings ||
+          isClientScopeMappers ||
           isClientScopeRoleCandidates ||
           isClients ||
           isIdentityProviders ||
