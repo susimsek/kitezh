@@ -213,6 +213,18 @@ function isAllowedApiPath(
       )
     )
       return true;
+    const clientMapperPath = path.match(
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/,
+    );
+    if (
+      clientMapperPath &&
+      (method === "POST" || method === "PUT" || method === "DELETE") &&
+      (method === "POST"
+        ? clientMapperPath[2] === undefined
+        : clientMapperPath[2] !== undefined &&
+          Number.isSafeInteger(Number(clientMapperPath[2])))
+    )
+      return true;
     const clientScopeMapperPath = path.match(
       /^\/api\/admin\/client-scopes\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/,
     );
@@ -392,6 +404,10 @@ function isAllowedApiPath(
         /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/scope-assignments$/.test(
           url.pathname,
         );
+      const isClientMappers =
+        /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/mappers$/.test(
+          url.pathname,
+        );
       const isClientScopeRoleMappings =
         /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings$/.test(
           url.pathname,
@@ -464,6 +480,7 @@ function isAllowedApiPath(
           isGroupMemberSearch ||
           isClientScopes ||
           isClientScopeAssignments ||
+          isClientMappers ||
           isClientScopeRoleMappings ||
           isClientScopeMappers ||
           isClientScopeRoleCandidates ||

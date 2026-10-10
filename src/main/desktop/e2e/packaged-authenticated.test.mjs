@@ -682,6 +682,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       globalThis.__packagedRoleMappingStatuses = [];
       globalThis.__packagedScopeMapperStatuses = [];
       globalThis.__packagedScopeAssignmentStatuses = [];
+      globalThis.__packagedClientMapperStatuses = [];
       globalThis.__packagedPolicyStatuses = [];
       globalThis.__packagedBrandingStatuses = [];
       globalThis.__packagedLocalizationStatuses = [];
@@ -724,6 +725,18 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
             status: response.status,
           });
           if (method === "PUT")
+            await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        if (
+          /^\/api\/admin\/clients\/[^/]+\/mappers(?:\/[1-9]\d*)?$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__packagedClientMapperStatuses.push({
+            method,
+            status: response.status,
+          });
+          if (method !== "GET")
             await new Promise((resolve) => setTimeout(resolve, 300));
         }
         if (
@@ -1043,6 +1056,157 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     );
     assert.equal(restoredAssignments.status, 200);
     assert.ok(!restoredAssignments.body.optionalScopes.includes(scopeName));
+
+    await demoClientRow
+      .getByRole("button", { name: "Manage protocol mappers", exact: true })
+      .click();
+    const clientMappers = demoClientRow.getByRole("region", {
+      name: "Client protocol mappers",
+    });
+    await clientMappers.waitFor();
+    await clientMappers
+      .getByRole("button", { name: "Add protocol mapper", exact: true })
+      .waitFor();
+    const clientMapperStatuses = await application.evaluate(
+      () => globalThis.__packagedClientMapperStatuses,
+    );
+    assert.deepEqual(clientMapperStatuses, [{ method: "GET", status: 200 }]);
+    await clientMappers
+      .getByRole("button", { name: "Add protocol mapper", exact: true })
+      .click();
+    const clientMapperForm = clientMappers.locator(
+      'form[data-form="admin-client-mapper"]',
+    );
+    const packagedClientMapperName = `packaged-client-mapper-${Date.now()}`;
+    await clientMapperForm
+      .locator('[name="name"]')
+      .fill(packagedClientMapperName);
+    await clientMapperForm
+      .locator('[name="mapperType"]')
+      .selectOption("user-property");
+    await clientMapperForm
+      .locator('[name="claimName"]')
+      .fill("packaged_client_email");
+    await clientMapperForm.locator('[name="priority"]').fill("50");
+    await clientMapperForm.evaluate((form) => form.requestSubmit());
+    assert.equal(
+      await clientMapperForm
+        .locator('[name="source"]')
+        .evaluate((input) => input.validity.customError),
+      true,
+    );
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__packagedClientMapperStatuses.filter(
+          ({ method }) => method === "POST",
+        ),
+      ),
+      [],
+    );
+    await clientMapperForm.locator('[name="source"]').fill("email");
+    const saveClientMapper = clientMapperForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveClientMapper.click();
+    assert.equal(await saveClientMapper.isDisabled(), true);
+    assert.equal(await saveClientMapper.getAttribute("aria-busy"), "true");
+    await saveClientMapper.evaluate((button) => button.click());
+    await mainWindow
+      .getByText("Client protocol mapper created.", { exact: true })
+      .waitFor();
+    let persistedClientMappers = await mainWindow.evaluate(
+      async (clientId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
+        }),
+      demoClient.id,
+    );
+    assert.equal(persistedClientMappers.status, 200);
+    let persistedClientMapper = persistedClientMappers.body.content.find(
+      (item) => item.name === packagedClientMapperName,
+    );
+    assert.ok(persistedClientMapper);
+    assert.equal(persistedClientMapper.claimName, "packaged_client_email");
+    await clientMappers
+      .locator(`[data-client-mapper-id="${persistedClientMapper.id}"]`)
+      .getByRole("button", { name: "Edit protocol mapper", exact: true })
+      .click();
+    await clientMapperForm
+      .locator('[name="claimName"]')
+      .fill("packaged_email_v2");
+    await clientMapperForm
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Client protocol mapper updated.", { exact: true })
+      .waitFor();
+    persistedClientMappers = await mainWindow.evaluate(
+      async (clientId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
+        }),
+      demoClient.id,
+    );
+    persistedClientMapper = persistedClientMappers.body.content.find(
+      (item) => item.id === persistedClientMapper.id,
+    );
+    assert.equal(persistedClientMapper.claimName, "packaged_email_v2");
+    const clientMapperRow = clientMappers.locator(
+      `[data-client-mapper-id="${persistedClientMapper.id}"]`,
+    );
+    await clientMapperRow
+      .getByRole("button", { name: "Delete protocol mapper", exact: true })
+      .click();
+    await clientMapperRow
+      .getByText(
+        "Delete this protocol mapper? It changes claims in tokens issued to this client.",
+        { exact: true },
+      )
+      .waitFor();
+    const confirmClientMapperDelete = clientMapperRow.getByRole("button", {
+      name: "Delete protocol mapper",
+      exact: true,
+    });
+    await confirmClientMapperDelete.click();
+    assert.equal(await confirmClientMapperDelete.isDisabled(), true);
+    assert.equal(
+      await confirmClientMapperDelete.getAttribute("aria-busy"),
+      "true",
+    );
+    await confirmClientMapperDelete.evaluate((button) => button.click());
+    await mainWindow
+      .getByText("Client protocol mapper deleted.", { exact: true })
+      .waitFor();
+    persistedClientMappers = await mainWindow.evaluate(
+      async (clientId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
+        }),
+      demoClient.id,
+    );
+    assert.equal(persistedClientMappers.status, 200);
+    assert.ok(
+      !persistedClientMappers.body.content.some(
+        (item) => item.id === persistedClientMapper.id,
+      ),
+    );
+    const clientMapperWrites = await application.evaluate(() =>
+      globalThis.__packagedClientMapperStatuses.filter(
+        ({ method }) => method !== "GET",
+      ),
+    );
+    assert.deepEqual(
+      clientMapperWrites.map(({ method, status }) => ({ method, status })),
+      [
+        { method: "POST", status: 200 },
+        { method: "PUT", status: 200 },
+        { method: "DELETE", status: 204 },
+      ],
+    );
 
     await mainWindow
       .getByRole("button", { name: "Policies", exact: true })

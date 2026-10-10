@@ -190,6 +190,39 @@ test("allows only the client scope assignment read and replacement routes", asyn
   }
 });
 
+test("allows only exact client protocol mapper routes", async () => {
+  const { adapter } = harness(
+    async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  for (const [method, path] of [
+    [
+      "GET",
+      "/api/admin/clients/client-main/mappers?page=0&size=20&sort=name,asc",
+    ],
+    ["POST", "/api/admin/clients/client-main/mappers"],
+    ["PUT", "/api/admin/clients/client-main/mappers/12"],
+    ["DELETE", "/api/admin/clients/client-main/mappers/12"],
+  ]) {
+    const response = await adapter.request({ console: "admin", path, method });
+    assert.equal(response.status, 200);
+  }
+  for (const [method, path] of [
+    ["POST", "/api/admin/clients/client-main/mappers/12"],
+    ["PUT", "/api/admin/clients/client-main/mappers/0"],
+    ["DELETE", "/api/admin/clients/client-main/mappers/12/nested"],
+    ["GET", "/api/admin/clients/client-main/mappers?size=1000"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method }),
+      /not allowed/,
+    );
+  }
+});
+
 test("limits the Admin namespace to approved settings writes and bounded read contracts", async () => {
   const requestLanguages = [];
   const { adapter } = harness(async (_url, init) => {

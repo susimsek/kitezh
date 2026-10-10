@@ -90,6 +90,11 @@ const actionIcons = {
   "admin-client-delete-confirm": "delete",
   "admin-client-scope-assignments-toggle": "edit",
   "admin-client-scope-assignments-save": "check",
+  "admin-client-mappers-toggle": "edit",
+  "admin-client-mapper-create": "add",
+  "admin-client-mapper-edit": "edit",
+  "admin-client-mapper-delete-request": "delete",
+  "admin-client-mapper-delete-confirm": "delete",
   "admin-consent-revoke-request": "delete",
   "admin-consent-revoke-confirm": "delete",
   "admin-group-delete-request": "delete",
@@ -1088,6 +1093,61 @@ function clientScopeMappersPanel(scopeId) {
   return `<section class="card" aria-label="${escapeHtml(text("adminClientScopeMappers"))}"><div class="list">${rows}</div><div class="actions">${button(text("adminAddClientScopeMapper"), { action: "admin-client-scope-mapper-create", id: scopeId, disabled: state.offline || Boolean(state.busy) })}</div>${editorForm}</section>`;
 }
 
+function clientMappersPanel(clientId) {
+  if (state.data.clientMappersOpenId !== clientId) return "";
+  const mappers = state.data.clientMappers?.[clientId] ?? [];
+  const editor = state.data.clientMapperEditor;
+  const mapperId = editor?.clientId === clientId ? editor.mapperId : null;
+  const mapper =
+    mapperId === null
+      ? null
+      : mappers.find((item) => String(item.id) === mapperId);
+  const draftKey = mapperId ?? "new";
+  const draft = state.data.clientMapperDrafts?.[clientId]?.[draftKey] ?? {};
+  const errorKey = `${clientId}:${draftKey}`;
+  const errors =
+    state.data.clientMapperErrorKey === errorKey
+      ? violations(state.error?.body)
+      : {};
+  const busy = state.busy === `client-mapper-save:${errorKey}`;
+  const options = [
+    "user-property",
+    "user-attribute",
+    "group-membership",
+    "group-attribute",
+    "application-role",
+    "client-role",
+    "audience",
+    "audience-resolve",
+    "hardcoded-claim",
+    "email",
+    "full-name",
+    "locale",
+    "username",
+  ];
+  const editorForm =
+    editor?.clientId === clientId
+      ? `<form class="card" data-form="admin-client-mapper" data-client-id="${escapeHtml(clientId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(text(mapperId ? "adminEditClientMapper" : "adminCreateClientMapper"))}</h3>${field("name", text("adminClientMapperName"), draft.name ?? mapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("source", text("adminClientMapperSource"), draft.source ?? mapper?.source ?? "", errors.source, "text", 'maxlength="200"')}<div class="field"><label for="client-mapper-type">${escapeHtml(text("adminClientMapperType"))}</label><select id="client-mapper-type" name="mapperType">${options.map((option) => `<option value="${option}" ${(draft.mapperType ?? mapper?.mapperType ?? "email") === option ? "selected" : ""}>${option}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div>${field("claimName", text("adminClientMapperClaim"), draft.claimName ?? mapper?.claimName ?? "email", errors.claimName, "text", 'maxlength="200"')}${field("value", text("adminClientMapperValue"), draft.value ?? mapper?.value ?? "", errors.value, "text", 'maxlength="1000"')}${field("priority", text("adminClientMapperPriority"), draft.priority ?? mapper?.priority ?? 100, errors.priority, "number", 'min="0" max="10000" step="1"')}<label class="settings-row"><input type="checkbox" name="addToIdToken" ${(draft.addToIdToken ?? mapper?.addToIdToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${(draft.addToAccessToken ?? mapper?.addToAccessToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-mapper-editor-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+      : "";
+  const deleteConfirm = state.data.clientMapperDeleteConfirm;
+  const rows = mappers.length
+    ? mappers
+        .map((item) => {
+          const confirming =
+            deleteConfirm?.clientId === clientId &&
+            deleteConfirm?.mapperId === String(item.id);
+          const deleting =
+            state.busy === `client-mapper-delete:${clientId}:${item.id}`;
+          const controls = confirming
+            ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientMapperPrompt"))}</span>${button(text("adminDeleteClientMapper"), { action: "admin-client-mapper-delete-confirm", id: clientId, mapper: item.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-mapper-delete-cancel" data-id="${escapeHtml(clientId)}" data-mapper="${escapeHtml(item.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+            : `<div class="actions">${button(text("adminEditClientMapper"), { action: "admin-client-mapper-edit", id: clientId, mapper: item.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientMapper"), { action: "admin-client-mapper-delete-request", id: clientId, mapper: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          return `<article class="list-item" data-client-mapper-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.name)}</strong><span class="muted">${escapeHtml(`${item.mapperType} · ${item.claimName}`)}</span></div><span>${escapeHtml(text(item.addToIdToken ? "adminMapperAddToIdToken" : "adminMapperAddToAccessToken"))}</span>${controls}</article>`;
+        })
+        .join("")
+    : `<div class="empty" role="status">${escapeHtml(text("adminNoClientMappers"))}</div>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminClientMappers"))}"><div class="list">${rows}</div><div class="actions">${button(text("adminAddClientMapper"), { action: "admin-client-mapper-create", id: clientId, disabled: state.offline || Boolean(state.busy) })}</div>${editorForm}</section>`;
+}
+
 function adminClientScopesContent() {
   const page = state.data.clientScopes ?? {
     content: [],
@@ -1205,6 +1265,14 @@ function adminClientsContent() {
       const assignmentsPanel = assignmentsOpen
         ? clientScopeAssignmentsPanel(id)
         : "";
+      const mappersOpen = state.data.clientMappersOpenId === id;
+      const mappersToggle = button(text("adminManageClientMappers"), {
+        action: "admin-client-mappers-toggle",
+        id,
+        busy: state.busy === `client-mappers-load:${id}`,
+        disabled: state.offline || Boolean(state.busy),
+      });
+      const mappersPanel = mappersOpen ? clientMappersPanel(id) : "";
       const protectedClient = PLATFORM_CONSOLE_CLIENT_IDS.has(client.clientId);
       const confirming = state.data.clientDeleteConfirmId === id;
       const deleting = state.busy === `client-delete:${id}`;
@@ -1213,7 +1281,7 @@ function adminClientsContent() {
         : confirming
           ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
           : `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${assignmentsToggle}</div>${editForm}${assignmentsPanel}${deleteControls}</article>`;
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${assignmentsToggle}${mappersToggle}</div>${editForm}${assignmentsPanel}${mappersPanel}${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -2125,6 +2193,21 @@ function preserveOfflineDrafts() {
           addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
         };
       }
+    } else if (form.dataset.form === "admin-client-mapper") {
+      const clientId = form.dataset.clientId;
+      const mapperId = form.dataset.mapperId || "new";
+      if (
+        /^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") &&
+        (mapperId === "new" || /^[1-9]\d*$/.test(mapperId))
+      ) {
+        state.data.clientMapperDrafts ??= {};
+        state.data.clientMapperDrafts[clientId] ??= {};
+        state.data.clientMapperDrafts[clientId][mapperId] = {
+          ...values,
+          addToIdToken: form.elements.namedItem("addToIdToken").checked,
+          addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
+        };
+      }
     } else if (form.dataset.form === "admin-localization-message-create") {
       state.data.adminMessageOverrideCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
@@ -2710,6 +2793,128 @@ async function submitForm(form) {
         mapperId
           ? "adminClientScopeMapperUpdated"
           : "adminClientScopeMapperCreated",
+      );
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-client-mapper") {
+    const clientId = form.dataset.clientId ?? "";
+    const mapperId = form.dataset.mapperId || null;
+    const client = (state.data.clients?.content ?? []).find(
+      (item) => String(item.id) === clientId,
+    );
+    const mappers = state.data.clientMappers?.[clientId] ?? [];
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !client ||
+      !Array.isArray(mappers) ||
+      (mapperId !== null &&
+        (!/^[1-9]\d*$/.test(mapperId) ||
+          !mappers.some((item) => String(item.id) === mapperId)))
+    )
+      return;
+    const body = {
+      name: String(values.name ?? "").trim(),
+      mapperType: String(values.mapperType ?? ""),
+      source: String(values.source ?? "").trim() || null,
+      claimName: String(values.claimName ?? "").trim() || null,
+      value: String(values.value ?? "").trim() || null,
+      priority: Number(values.priority ?? 100),
+      addToIdToken: form.elements.namedItem("addToIdToken").checked,
+      addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
+    };
+    const needsSource = [
+      "user-property",
+      "user-attribute",
+      "group-attribute",
+    ].includes(body.mapperType);
+    const needsValue = ["hardcoded-claim", "audience"].includes(
+      body.mapperType,
+    );
+    const usesAudienceClaim = ["audience", "audience-resolve"].includes(
+      body.mapperType,
+    );
+    form.elements
+      .namedItem("source")
+      .setCustomValidity(
+        needsSource && !body.source ? text("apiValidation") : "",
+      );
+    form.elements
+      .namedItem("value")
+      .setCustomValidity(
+        needsValue && !body.value ? text("apiValidation") : "",
+      );
+    form.elements
+      .namedItem("claimName")
+      .setCustomValidity(
+        !usesAudienceClaim && !body.claimName ? text("apiValidation") : "",
+      );
+    const idTokenTarget = form.elements.namedItem("addToIdToken");
+    const accessClaimTarget = form.elements.namedItem("addToAccessToken");
+    idTokenTarget.setCustomValidity(
+      !body.addToIdToken && !body.addToAccessToken ? text("apiValidation") : "",
+    );
+    accessClaimTarget.setCustomValidity("");
+    if (!form.reportValidity()) return;
+    const mapperTypes = [
+      "user-property",
+      "user-attribute",
+      "group-membership",
+      "group-attribute",
+      "application-role",
+      "client-role",
+      "audience",
+      "audience-resolve",
+      "hardcoded-claim",
+      "email",
+      "full-name",
+      "locale",
+      "username",
+    ];
+    if (
+      !body.name ||
+      body.name.length > 100 ||
+      !mapperTypes.includes(body.mapperType) ||
+      (needsSource && !body.source) ||
+      (needsValue && !body.value) ||
+      (!usesAudienceClaim && !body.claimName) ||
+      (body.source?.length ?? 0) > 200 ||
+      (body.claimName?.length ?? 0) > 200 ||
+      (body.value?.length ?? 0) > 1000 ||
+      !Number.isSafeInteger(body.priority) ||
+      body.priority < 0 ||
+      body.priority > 10000 ||
+      (!body.addToIdToken && !body.addToAccessToken)
+    )
+      return;
+    const draftKey = mapperId ?? "new";
+    const errorKey = `${clientId}:${draftKey}`;
+    state.data.clientMapperDrafts ??= {};
+    state.data.clientMapperDrafts[clientId] ??= {};
+    state.data.clientMapperDrafts[clientId][draftKey] = body;
+    state.data.clientMapperErrorKey = errorKey;
+    state.error = null;
+    state.notice = null;
+    state.busy = `client-mapper-save:${errorKey}`;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers${mapperId ? `/${mapperId}` : ""}`,
+        { method: mapperId ? "PUT" : "POST", body },
+      );
+      state.data.clientMappers[clientId] = mapperId
+        ? mappers.map((item) => (String(item.id) === mapperId ? saved : item))
+        : [...mappers, saved];
+      delete state.data.clientMapperDrafts[clientId][draftKey];
+      state.data.clientMapperEditor = null;
+      state.data.clientMapperErrorKey = null;
+      state.notice = text(
+        mapperId ? "adminClientMapperUpdated" : "adminClientMapperCreated",
       );
     } catch {
       /* request rendered localized server validation or transport feedback */
@@ -3674,6 +3879,159 @@ async function action(action, element) {
       /* request rendered localized authorization or transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-mappers-toggle") {
+    if (state.busy || state.offline) return;
+    const clientId = element.dataset.id;
+    const client = (state.data.clients?.content ?? []).find(
+      (item) => String(item.id) === clientId,
+    );
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") || !client) return;
+    if (state.data.clientMappersOpenId === clientId) {
+      state.data.clientMappersOpenId = null;
+      render();
+      return;
+    }
+    state.data.clientMappersOpenId = clientId;
+    if (Array.isArray(state.data.clientMappers?.[clientId])) {
+      render();
+      return;
+    }
+    state.busy = `client-mappers-load:${clientId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const page = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
+      );
+      state.data.clientMappers ??= {};
+      state.data.clientMappers[clientId] = Array.isArray(page?.content)
+        ? page.content
+        : [];
+    } catch {
+      state.data.clientMappersOpenId = null;
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-mapper-create") {
+    if (state.busy || state.offline) return;
+    const clientId = element.dataset.id;
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") ||
+      !(state.data.clients?.content ?? []).some(
+        (item) => String(item.id) === clientId,
+      ) ||
+      !Array.isArray(state.data.clientMappers?.[clientId])
+    )
+      return;
+    state.data.clientMappersOpenId = clientId;
+    state.data.clientMapperEditor = { clientId, mapperId: null };
+    state.data.clientMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-mapper-edit") {
+    if (state.busy || state.offline) return;
+    const clientId = element.dataset.id;
+    const mapperId = element.dataset.mapper;
+    const mappers = state.data.clientMappers?.[clientId] ?? [];
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") ||
+      !/^[1-9]\d*$/.test(mapperId ?? "") ||
+      !(state.data.clients?.content ?? []).some(
+        (item) => String(item.id) === clientId,
+      ) ||
+      !Array.isArray(mappers) ||
+      !mappers.some((item) => String(item.id) === mapperId)
+    )
+      return;
+    state.data.clientMappersOpenId = clientId;
+    state.data.clientMapperEditor = { clientId, mapperId };
+    state.data.clientMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-mapper-editor-cancel") {
+    if (state.busy) return;
+    const clientId = element.dataset.id;
+    const editor = state.data.clientMapperEditor;
+    if (editor?.clientId !== clientId) return;
+    delete state.data.clientMapperDrafts?.[clientId]?.[
+      editor.mapperId ?? "new"
+    ];
+    state.data.clientMapperEditor = null;
+    state.data.clientMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-client-mapper-delete-request" ||
+    action === "admin-client-mapper-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const clientId = element.dataset.id;
+    const mapperId = element.dataset.mapper;
+    const mappers = state.data.clientMappers?.[clientId] ?? [];
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") ||
+      !/^[1-9]\d*$/.test(mapperId ?? "") ||
+      !(state.data.clients?.content ?? []).some(
+        (item) => String(item.id) === clientId,
+      ) ||
+      !Array.isArray(mappers) ||
+      !mappers.some((item) => String(item.id) === mapperId)
+    )
+      return;
+    if (action === "admin-client-mapper-delete-request") {
+      state.data.clientMapperDeleteConfirm = { clientId, mapperId };
+      render();
+      return;
+    }
+    const confirmation = state.data.clientMapperDeleteConfirm;
+    if (
+      confirmation?.clientId !== clientId ||
+      confirmation?.mapperId !== mapperId
+    )
+      return;
+    state.busy = `client-mapper-delete:${clientId}:${mapperId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers/${mapperId}`,
+        { method: "DELETE" },
+      );
+      state.data.clientMappers[clientId] = mappers.filter(
+        (item) => String(item.id) !== mapperId,
+      );
+      state.data.clientMapperDeleteConfirm = null;
+      state.notice = text("adminClientMapperDeleted");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-mapper-delete-cancel") {
+    if (state.busy) return;
+    const confirmation = state.data.clientMapperDeleteConfirm;
+    if (
+      confirmation?.clientId !== element.dataset.id ||
+      confirmation?.mapperId !== element.dataset.mapper
+    )
+      return;
+    state.data.clientMapperDeleteConfirm = null;
     render();
     return;
   }
