@@ -189,6 +189,16 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/email",
   });
   assert.equal(emailSettings.status, 200);
+  const localizationSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/localization",
+  });
+  assert.equal(localizationSettings.status, 200);
+  const messageOverrides = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/localization/messages?q=login&locale=tr&bundle=admin&page=0&size=20&sort=locale,asc",
+  });
+  assert.equal(messageOverrides.status, 200);
   await assert.rejects(
     adapter.request({
       console: "account",
@@ -209,6 +219,28 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
       console: "admin",
       path: "/api/admin/settings/login",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization/messages",
+      method: "POST",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization/messages?locale=tr&messageKey=auth.token",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/localization/messages?locale=../../secret&page=0&size=20&sort=locale,asc",
     }),
     /not allowed/,
   );

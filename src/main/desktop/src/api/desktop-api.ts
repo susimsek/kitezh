@@ -58,6 +58,7 @@ function isAllowedApiPath(
       path === "/api/admin/settings/email"
     )
       return true;
+    if (path === "/api/admin/settings/localization") return true;
     try {
       const url = new URL(path, "https://desktop.invalid");
       const isUsers = url.pathname === "/api/admin/users";
@@ -72,11 +73,14 @@ function isAllowedApiPath(
       const isOfflineSessions = url.pathname === "/api/admin/offline-sessions";
       const isEvents = url.pathname === "/api/admin/events";
       const isKeys = url.pathname === "/api/admin/keys";
+      const isLocalizationMessages =
+        url.pathname === "/api/admin/settings/localization/messages";
       const allowedParameters = new Set([
         "q",
         "page",
         "size",
         "sort",
+        ...(isLocalizationMessages ? ["locale", "bundle"] : []),
         ...(isSessions ? ["status"] : []),
         ...(isKeys ? ["active"] : []),
       ]);
@@ -96,7 +100,14 @@ function isAllowedApiPath(
                     ? ["occurredAt,asc", "occurredAt,desc"]
                     : isKeys
                       ? ["createdAt,asc", "createdAt,desc"]
-                      : ["name,asc", "name,desc"];
+                      : isLocalizationMessages
+                        ? [
+                            "locale,asc",
+                            "locale,desc",
+                            "messageKey,asc",
+                            "messageKey,desc",
+                          ]
+                        : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
@@ -108,7 +119,8 @@ function isAllowedApiPath(
           isConsents ||
           isOfflineSessions ||
           isEvents ||
-          isKeys) &&
+          isKeys ||
+          isLocalizationMessages) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -118,6 +130,13 @@ function isAllowedApiPath(
           (key) => url.searchParams.getAll(key).length <= 1,
         ) &&
         (url.searchParams.get("q")?.length ?? 0) <= 200 &&
+        (!isLocalizationMessages ||
+          (/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(
+            url.searchParams.get("locale") ?? "en",
+          ) &&
+            /^[A-Za-z0-9_-]{1,64}$/.test(
+              url.searchParams.get("bundle") ?? "backend",
+            ))) &&
         /^\d+$/.test(url.searchParams.get("page") ?? "0") &&
         Number(url.searchParams.get("page") ?? 0) <= 1_000_000 &&
         /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&

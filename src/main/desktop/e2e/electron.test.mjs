@@ -737,6 +737,50 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/settings/localization") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              internationalizationEnabled: true,
+              defaultLocale: "en",
+              supportedLocales: ["en", "tr"],
+              availableLocales: ["en", "tr"],
+              availableBundles: ["backend", "common"],
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          requestUrl.pathname === "/api/admin/settings/localization/messages"
+        ) {
+          globalThis.__localizationMessageRequests ??= [];
+          globalThis.__localizationMessageRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: 1,
+                  locale: "tr",
+                  bundle: "admin",
+                  messageKey: "login.title",
+                  messageValue: "<img src=x onerror=alert(1)>",
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -1151,6 +1195,39 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("heading", { name: "Giriş politikası" }).waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const localizationNavigation = window.getByRole("button", {
+      name: "Localization",
+      exact: true,
+    });
+    await localizationNavigation.click();
+    assert.equal(await localizationNavigation.isDisabled(), true);
+    assert.equal(await localizationNavigation.locator(".spinner").count(), 1);
+    await window
+      .getByRole("heading", { name: "Localization settings" })
+      .waitFor();
+    await window
+      .getByText("tr · admin · login.title", { exact: true })
+      .waitFor();
+    await window
+      .getByText("<img src=x onerror=alert(1)>", { exact: true })
+      .waitFor();
+    assert.equal(await window.locator("img[src=x]").count(), 0);
+    const localizationRequests = await application.evaluate(
+      () => globalThis.__localizationMessageRequests,
+    );
+    assert.equal(
+      new URLSearchParams(localizationRequests[0]).get("size"),
+      "20",
+    );
+    assert.equal(
+      new URLSearchParams(localizationRequests[0]).get("sort"),
+      "locale,asc",
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Yerelleştirme ayarları" })
+      .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
