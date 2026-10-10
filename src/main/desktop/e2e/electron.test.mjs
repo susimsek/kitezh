@@ -371,6 +371,34 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/client-scopes") {
+          globalThis.__adminClientScopeRequests ??= [];
+          globalThis.__adminClientScopeRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const name = query ? "account-api" : "openid";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: `scope-${name}`,
+                  name,
+                  displayName: name === "openid" ? "OpenID" : "Account API",
+                  description: "Read-only scope description",
+                  builtIn: name === "openid",
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -503,6 +531,33 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ["0", "0"],
     );
     assert.equal(new URLSearchParams(groupRequests[1]).get("q"), "audit");
+    const clientScopesNavigation = window.getByRole("button", {
+      name: "Client scopes",
+      exact: true,
+    });
+    await clientScopesNavigation.click();
+    assert.equal(await clientScopesNavigation.isDisabled(), true);
+    assert.equal(await clientScopesNavigation.locator(".spinner").count(), 1);
+    await window.getByText("OpenID").waitFor();
+    const clientScopeQuery = window.getByRole("searchbox", {
+      name: "Search client scopes",
+    });
+    await clientScopeQuery.fill("account");
+    await window.getByRole("button", { name: "Search client scopes" }).click();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Search client scopes" })
+        .isDisabled(),
+      true,
+    );
+    await window.getByText("Account API").waitFor();
+    const clientScopeRequests = await application.evaluate(
+      () => globalThis.__adminClientScopeRequests,
+    );
+    assert.equal(
+      new URLSearchParams(clientScopeRequests[1]).get("q"),
+      "account",
+    );
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {

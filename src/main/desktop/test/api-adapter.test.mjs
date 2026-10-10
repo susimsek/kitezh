@@ -119,6 +119,11 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/groups?q=finance&page=0&size=20&sort=name,asc",
   });
   assert.equal(groups.status, 200);
+  const clientScopes = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes?q=account&page=0&size=20&sort=name,asc",
+  });
+  assert.equal(clientScopes.status, 200);
   await assert.rejects(
     adapter.request({ console: "admin", path: "/api/admin/roles/ROLE_USER" }),
     /not allowed/,

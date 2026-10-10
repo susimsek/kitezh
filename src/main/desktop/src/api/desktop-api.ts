@@ -55,11 +55,12 @@ function isAllowedApiPath(
       const isUsers = url.pathname === "/api/admin/users";
       const isRoles = url.pathname === "/api/admin/roles";
       const isGroups = url.pathname === "/api/admin/groups";
+      const isClientScopes = url.pathname === "/api/admin/client-scopes";
       const sortFields = isUsers
         ? ["username,asc", "username,desc"]
         : ["name,asc", "name,desc"];
       return (
-        (isUsers || isRoles || isGroups) &&
+        (isUsers || isRoles || isGroups || isClientScopes) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
