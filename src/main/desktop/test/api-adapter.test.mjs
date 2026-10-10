@@ -194,6 +194,11 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/localization",
   });
   assert.equal(localizationSettings.status, 200);
+  const ldapProviders = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/ldap",
+  });
+  assert.equal(ldapProviders.status, 200);
   const messageOverrides = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization/messages?q=login&locale=tr&bundle=admin&page=0&size=20&sort=locale,asc",
@@ -227,6 +232,14 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
       console: "admin",
       path: "/api/admin/settings/localization/messages",
       method: "POST",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/ldap",
+      method: "PUT",
     }),
     /not allowed/,
   );

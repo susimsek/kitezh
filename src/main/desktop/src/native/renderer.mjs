@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}${navButton("localization", text("adminLocalization"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}${navButton("localization", text("adminLocalization"))}${navButton("ldap", text("adminLdap"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -158,6 +158,7 @@ function routeTitle() {
       configuration: text("adminConfiguration"),
       "login-email": text("adminLoginEmail"),
       localization: text("adminLocalization"),
+      ldap: text("adminLdap"),
       dashboard: text("adminDashboard"),
     }[state.route];
   return {
@@ -187,6 +188,7 @@ function routeDescription() {
       configuration: text("adminConfigurationDescription"),
       "login-email": text("adminLoginEmailDescription"),
       localization: text("adminLocalizationDescription"),
+      ldap: text("adminLdapDescription"),
       dashboard: text("adminOverview"),
     }[state.route];
   return {
@@ -237,6 +239,7 @@ function adminContent() {
   if (state.route === "configuration") return adminAdminConfigurationContent();
   if (state.route === "login-email") return adminAdminLoginEmailContent();
   if (state.route === "localization") return adminAdminLocalizationContent();
+  if (state.route === "ldap") return adminAdminLdapContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -440,6 +443,28 @@ function adminAdminLocalizationContent() {
     `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
   const list = (values) => (Array.isArray(values) ? values.join(", ") : null);
   return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLocalizationSettings"))}"><h2>${escapeHtml(text("adminLocalizationSettings"))}</h2><div class="list">${row(text("adminLocalizationEnabled"), settings.internationalizationEnabled === true ? text("adminEnabled") : settings.internationalizationEnabled === false ? text("adminDisabled") : undefined)}${row(text("adminDefaultLocale"), settings.defaultLocale)}${row(text("adminSupportedLocales"), list(settings.supportedLocales))}${row(text("adminAvailableLocales"), list(settings.availableLocales))}${row(text("adminAvailableBundles"), list(settings.availableBundles))}</div></section><section class="card" aria-label="${escapeHtml(text("adminMessageOverrides"))}"><h2>${escapeHtml(text("adminMessageOverrides"))}</h2>${overrides.length ? `<div class="list">${overrides.map((item) => `<article class="list-item"><div><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><span class="muted">${escapeHtml(item.messageValue)}</span></div></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`}</section></div>`;
+}
+
+function adminAdminLdapContent() {
+  const providers = Array.isArray(state.data.adminLdapProviders)
+    ? state.data.adminLdapProviders
+    : [];
+  const enabled = (value) =>
+    value === true
+      ? text("adminEnabled")
+      : value === false
+        ? text("adminDisabled")
+        : text("adminNotConfigured");
+  const count = (value) =>
+    Number.isSafeInteger(value) && value >= 0 ? String(value) : "0";
+  if (providers.length === 0)
+    return `<section class="card" aria-label="${escapeHtml(text("adminLdap"))}"><div class="empty" role="status">${escapeHtml(text("adminNoLdapProviders"))}</div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminLdap"))}"><div class="list">${providers
+    .map(
+      (provider) =>
+        `<article class="list-item"><div><strong>${escapeHtml(provider.name)}</strong><span class="muted">${escapeHtml(`${provider.vendor ?? "LDAP"} · ${provider.authenticationType ?? ""} · ${provider.editMode ?? ""}`)}</span><span class="muted">${escapeHtml(text("adminLdapSyncSummary"))}: ${escapeHtml(count(provider.lastSyncImported))} ${escapeHtml(text("adminLdapImported"))} · ${escapeHtml(count(provider.lastSyncUpdated))} ${escapeHtml(text("adminLdapUpdated"))}</span>${provider.lastSyncAt ? `<time class="muted" datetime="${escapeHtml(provider.lastSyncAt)}">${escapeHtml(new Date(provider.lastSyncAt).toLocaleString(state.locale === "tr" ? "tr-TR" : "en-US"))}</time>` : ""}</div><div><span>${escapeHtml(provider.enabled ? text("adminEnabled") : text("adminDisabled"))}</span><span class="muted">${escapeHtml(text("adminLdapImportUsers"))}: ${escapeHtml(enabled(provider.importUsers))}</span><span class="muted">${escapeHtml(text("adminLdapTrustEmail"))}: ${escapeHtml(enabled(provider.trustEmail))}</span>${provider.lastSyncStatus ? `<span class="muted">${escapeHtml(text("adminLdapSyncStatus"))}: ${escapeHtml(provider.lastSyncStatus)}</span>` : ""}</div></article>`,
+    )
+    .join("")}</div></section>`;
 }
 
 function profileContent() {
@@ -663,6 +688,8 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
           ),
         ]);
     }
+    if (state.console === "admin" && state.route === "ldap")
+      state.data.adminLdapProviders = await request("/api/admin/settings/ldap");
     if (state.route === "profile")
       state.profile = await request("/api/account/profile");
     if (state.route === "sessions")

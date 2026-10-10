@@ -781,6 +781,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/settings/ldap") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify([
+              {
+                id: "directory-1",
+                name: "Corporate Directory",
+                enabled: true,
+                vendor: "Active Directory",
+                authenticationType: "SIMPLE",
+                editMode: "READ_ONLY",
+                importUsers: true,
+                trustEmail: false,
+                lastSyncAt: "2026-10-10T07:00:00Z",
+                lastSyncStatus: "SUCCESS",
+                lastSyncImported: 12,
+                lastSyncUpdated: 3,
+                connectionUrl: "ldaps://private-directory.internal:636",
+                bindDn: "CN=secret-service-account",
+                lastSyncError: "PRIVATE_DIRECTORY_ERROR_NEVER_RENDER",
+                bindPassword: "SECRET_LDAP_PASSWORD_NEVER_RENDER",
+              },
+            ]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -1227,6 +1256,36 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Turkish" }).click();
     await window
       .getByRole("heading", { name: "Yerelleştirme ayarları" })
+      .waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const ldapNavigation = window.getByRole("button", {
+      name: "LDAP federation",
+      exact: true,
+    });
+    await ldapNavigation.click();
+    assert.equal(await ldapNavigation.isDisabled(), true);
+    assert.equal(await ldapNavigation.locator(".spinner").count(), 1);
+    await window.getByText("Corporate Directory", { exact: true }).waitFor();
+    await window.getByText(/12 imported · 3 updated/).waitFor();
+    assert.equal(
+      await window.getByText("ldaps://private-directory.internal:636").count(),
+      0,
+    );
+    assert.equal(
+      await window.getByText("CN=secret-service-account").count(),
+      0,
+    );
+    assert.equal(
+      await window.getByText("PRIVATE_DIRECTORY_ERROR_NEVER_RENDER").count(),
+      0,
+    );
+    assert.equal(
+      await window.getByText("SECRET_LDAP_PASSWORD_NEVER_RENDER").count(),
+      0,
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "LDAP federasyonu", exact: true })
       .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();

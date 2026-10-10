@@ -55,7 +55,8 @@ function isAllowedApiPath(
       path === "/api/admin/settings/branding" ||
       path === "/api/admin/server-info" ||
       path === "/api/admin/settings/login" ||
-      path === "/api/admin/settings/email"
+      path === "/api/admin/settings/email" ||
+      path === "/api/admin/settings/ldap"
     )
       return true;
     if (path === "/api/admin/settings/localization") return true;
