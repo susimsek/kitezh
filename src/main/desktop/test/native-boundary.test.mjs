@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,42 @@ const desktopDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
+
+async function runtimeSourceFiles(rootDirectory) {
+  const pendingDirectories = [rootDirectory];
+  const sourceFiles = [];
+  const excludedDirectories = new Set([
+    ".expo",
+    ".next",
+    "build",
+    "coverage",
+    "dist",
+    "e2e",
+    "node_modules",
+    "test",
+  ]);
+  const sourceExtension = /\.(?:ts|tsx|mjs)$/;
+  const testFile = /\.(?:test|spec)\.[^.]+$/;
+
+  while (pendingDirectories.length > 0) {
+    const directory = pendingDirectories.pop();
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory() && !excludedDirectories.has(entry.name)) {
+        pendingDirectories.push(entryPath);
+      } else if (
+        entry.isFile() &&
+        sourceExtension.test(entry.name) &&
+        !testFile.test(entry.name)
+      ) {
+        sourceFiles.push(entryPath);
+      }
+    }
+  }
+
+  return sourceFiles;
+}
 
 test("shared English and Turkish catalogs contain the same non-empty message keys", () => {
   const englishKeys = Object.keys(messages.en).sort();
@@ -84,6 +120,39 @@ test("desktop runtime sources do not write directly to console logs", async () =
       `${path.relative(desktopDirectory, sourcePaths[index])} must not log runtime data directly`,
     );
   }
+});
+
+test("Web and Mobile runtime logging cannot expose rejected exception values", async () => {
+  const repositoryDirectory = path.resolve(desktopDirectory, "..", "..", "..");
+  const webDirectory = path.join(repositoryDirectory, "src", "main", "web");
+  const mobileDirectory = path.join(
+    repositoryDirectory,
+    "src",
+    "main",
+    "mobile",
+    "src",
+  );
+  const [webFiles, mobileFiles] = await Promise.all([
+    runtimeSourceFiles(webDirectory),
+    runtimeSourceFiles(mobileDirectory),
+  ]);
+  const [webSources, mobileSources] = await Promise.all([
+    Promise.all(webFiles.map((file) => readFile(file, "utf8"))),
+    Promise.all(mobileFiles.map((file) => readFile(file, "utf8"))),
+  ]);
+  const consoleCall =
+    /\bconsole\.(?:log|info|warn|error|debug|trace)\s*\(([^)]*)\)/gs;
+  const webCalls = webSources.flatMap((source) =>
+    [...source.matchAll(consoleCall)].map((match) => match[1].trim()),
+  );
+  const mobileCalls = mobileSources.flatMap((source) =>
+    [...source.matchAll(consoleCall)].map((match) => match[1].trim()),
+  );
+
+  assert.deepEqual(webCalls, [
+    '"Unable to resolve the latest desktop release"',
+  ]);
+  assert.deepEqual(mobileCalls, []);
 });
 
 test("native renderer cannot read or replace sessions through IPC", async () => {
