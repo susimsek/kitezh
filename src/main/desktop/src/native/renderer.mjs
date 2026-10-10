@@ -419,8 +419,14 @@ function adminUsersContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
+  const selectedUserIds = new Set(
+    (state.data.adminSelectedUserIds ?? [])
+      .filter((id) => Number.isSafeInteger(Number(id)) && Number(id) > 0)
+      .map(Number),
+  );
   const userRows = users
     .map((user) => {
+      const userSelected = selectedUserIds.has(Number(user.id));
       const busy = state.busy === `user-enabled:${user.id}`;
       const editDraft = state.data.userEditDrafts?.[user.id] ?? {};
       const editRoles = Array.isArray(state.data.userEditRoles)
@@ -509,10 +515,21 @@ function adminUsersContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.email && !user.emailVerified ? `<span>${escapeHtml(text("adminUserEmailNotVerified"))}</span>` : ""}${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${actionEmailControl}${profileAttributesControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${actionEmailOpen ? adminUserActionEmailContent(user.id) : ""}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><label class="settings-row"><input type="checkbox" data-action="admin-user-bulk-select" data-id="${escapeHtml(user.id)}" aria-label="${escapeHtml(text("adminSelectUser"))} ${escapeHtml(user.username)}" ${userSelected ? "checked" : ""} ${state.busy || state.offline ? "disabled" : ""}/>${escapeHtml(text("adminSelectUser"))}</label><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.email && !user.emailVerified ? `<span>${escapeHtml(text("adminUserEmailNotVerified"))}</span>` : ""}${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${actionEmailControl}${profileAttributesControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${actionEmailOpen ? adminUserActionEmailContent(user.id) : ""}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const bulkAction = state.data.adminUserBulkConfirmAction;
+  const bulkButton = (action, label, danger = false) =>
+    button(text(label), {
+      action: `admin-user-bulk-${action.toLowerCase()}`,
+      danger,
+      disabled:
+        state.offline || Boolean(state.busy) || selectedUserIds.size === 0,
+    });
+  const bulkControls = selectedUserIds.size
+    ? `<section class="card" aria-label="${escapeHtml(text("adminSelectedUsers"))}"><span>${escapeHtml(text("adminSelectedUsers"))}: ${selectedUserIds.size}</span><div class="actions">${bulkButton("ENABLE", "adminBulkEnableUsers")}${bulkButton("DISABLE", "adminBulkDisableUsers")}${bulkButton("DELETE", "adminBulkDeleteUsers", true)}</div>${bulkAction ? `<div class="actions"><span role="status">${escapeHtml(text("adminBulkUserPrompt"))}</span>${button(text(bulkAction === "ENABLE" ? "adminBulkEnableUsers" : bulkAction === "DISABLE" ? "adminBulkDisableUsers" : "adminBulkDeleteUsers"), { action: "admin-user-bulk-confirm", danger: bulkAction === "DELETE", busy: state.busy === "user-bulk-action", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-bulk-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>` : ""}</section>`
+    : "";
+  return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${bulkControls}${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminUserActionEmailContent(userId) {
@@ -3098,6 +3115,81 @@ async function action(action, element) {
     render();
     return;
   }
+  if (action === "admin-user-bulk-select") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    if (
+      !Number.isSafeInteger(id) ||
+      id < 1 ||
+      !(state.data.users?.content ?? []).some((user) => Number(user.id) === id)
+    )
+      return;
+    const selected = new Set(
+      (state.data.adminSelectedUserIds ?? []).map(Number),
+    );
+    if (element.checked) selected.add(id);
+    else selected.delete(id);
+    state.data.adminSelectedUserIds = [...selected].slice(0, 100);
+    state.data.adminUserBulkConfirmAction = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-bulk-enable" ||
+    action === "admin-user-bulk-disable" ||
+    action === "admin-user-bulk-delete"
+  ) {
+    if (state.busy || state.offline) return;
+    const selected = state.data.adminSelectedUserIds ?? [];
+    if (!selected.length || selected.length > 100) return;
+    state.data.adminUserBulkConfirmAction = action
+      .slice("admin-user-bulk-".length)
+      .toUpperCase();
+    render();
+    return;
+  }
+  if (action === "admin-user-bulk-cancel") {
+    if (state.busy) return;
+    state.data.adminUserBulkConfirmAction = null;
+    render();
+    return;
+  }
+  if (action === "admin-user-bulk-confirm") {
+    if (state.busy || state.offline) return;
+    const userIds = [
+      ...new Set(
+        (state.data.adminSelectedUserIds ?? [])
+          .map(Number)
+          .filter((id) => Number.isSafeInteger(id) && id > 0),
+      ),
+    ];
+    const bulkAction = state.data.adminUserBulkConfirmAction;
+    if (
+      !userIds.length ||
+      userIds.length > 100 ||
+      !["ENABLE", "DISABLE", "DELETE"].includes(bulkAction)
+    )
+      return;
+    state.busy = "user-bulk-action";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request("/api/admin/users/bulk", {
+        method: "POST",
+        body: { userIds, action: bulkAction },
+      });
+      state.data.adminSelectedUserIds = [];
+      state.data.adminUserBulkConfirmAction = null;
+      await loadRoute({ keepContent: true });
+      state.notice = text("adminBulkUsersUpdated");
+    } catch {
+      /* request rendered localized authorization, validation, or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (
     action === "admin-user-profile-attributes-toggle" ||
     action === "admin-user-profile-attributes-close"
@@ -4656,6 +4748,8 @@ function bind() {
         new FormData(event.currentTarget).get("q") ?? "",
       ).trim();
       state.data.userPage = 0;
+      state.data.adminSelectedUserIds = [];
+      state.data.adminUserBulkConfirmAction = null;
       state.busy = "users-search";
       void loadRoute({ keepContent: true }).finally(() => {
         state.busy = null;
@@ -4668,6 +4762,8 @@ function bind() {
       const nextPage = Number(element.dataset.page);
       if (!Number.isSafeInteger(nextPage) || nextPage < 0) return;
       state.data.userPage = nextPage;
+      state.data.adminSelectedUserIds = [];
+      state.data.adminUserBulkConfirmAction = null;
       state.busy = `users-page-${nextPage < Number(state.data.users?.number ?? 0) ? "prev" : "next"}`;
       void loadRoute({ keepContent: true }).finally(() => {
         state.busy = null;

@@ -48,6 +48,7 @@ function isAllowedApiPath(
 ) {
   if (namespace === "admin") {
     if (method === "POST" && path === "/api/admin/users") return true;
+    if (method === "POST" && path === "/api/admin/users/bulk") return true;
     const userUpdateMatch = path.match(/^\/api\/admin\/users\/([1-9]\d*)$/);
     if (
       method === "PUT" &&

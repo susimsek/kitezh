@@ -124,6 +124,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdUser.status, 200);
+  const bulkUserAction = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/bulk",
+    method: "POST",
+    body: { userIds: [2], action: "ENABLE" },
+  });
+  assert.equal(bulkUserAction.status, 200);
   const updatedUser = await adapter.request({
     console: "admin",
     path: "/api/admin/users/2",
@@ -718,6 +725,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/users/2/password/nested",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/bulk/nested",
+      method: "POST",
     }),
     /not allowed/,
   );

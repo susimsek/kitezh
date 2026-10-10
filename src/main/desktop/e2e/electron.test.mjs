@@ -859,6 +859,30 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          requestUrl.pathname === "/api/admin/users/bulk" &&
+          requestMethod === "POST"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminBulkUserRequests ??= [];
+          globalThis.__adminBulkUserRequests.push({
+            action: body.action,
+            userIds: body.userIds,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.action === "ENABLE" || body.action === "DISABLE") {
+            globalThis.__userEnabledStates ??= {};
+            for (const id of body.userIds ?? [])
+              globalThis.__userEnabledStates[id] = body.action === "ENABLE";
+          }
+          return new Response(
+            JSON.stringify({
+              action: body.action,
+              affectedCount: body.userIds?.length ?? 0,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*\/totp$/.test(requestUrl.pathname) &&
           requestMethod === "DELETE"
         ) {
@@ -2967,6 +2991,46 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(new URLSearchParams(requestedQueries[1]).get("q"), "alice");
     const aliceRow = window.locator('article[data-user-id="2"]');
     await aliceRow.getByText("Locked", { exact: true }).waitFor();
+    const selectAliceForBulk = aliceRow.locator(
+      'input[data-action="admin-user-bulk-select"]',
+    );
+    await selectAliceForBulk.check();
+    const bulkUsersPanel = window.getByRole("region", {
+      name: "Selected users",
+    });
+    const enableSelectedUsers = bulkUsersPanel.getByRole("button", {
+      name: "Enable selected",
+      exact: true,
+    });
+    await enableSelectedUsers.click();
+    await bulkUsersPanel
+      .getByText("Apply this action to the selected users?", { exact: true })
+      .waitFor();
+    await bulkUsersPanel
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminBulkUserRequests ?? [],
+      ),
+      [],
+    );
+    await bulkUsersPanel
+      .getByRole("button", { name: "Enable selected", exact: true })
+      .click();
+    const confirmBulkEnable = bulkUsersPanel.locator(
+      'button[data-action="admin-user-bulk-confirm"]',
+    );
+    await confirmBulkEnable.click();
+    assert.equal(await confirmBulkEnable.isDisabled(), true);
+    assert.equal(await confirmBulkEnable.locator(".spinner").count(), 1);
+    await window
+      .getByText("Selected users updated.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminBulkUserRequests),
+      [{ action: "ENABLE", userIds: [2] }],
+    );
     const unlockAlice = aliceRow.getByRole("button", {
       name: "Unlock user",
       exact: true,
