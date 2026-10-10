@@ -1018,11 +1018,46 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          requestUrl.pathname === "/api/admin/settings/email" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__emailSettingsUpdates ??= [];
+          globalThis.__emailSettingsUpdates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.host === "invalid.example.test")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the email settings.",
+                violations: [
+                  { field: "host", message: "SMTP host is invalid." },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          const { password: _password, ...safeSettings } = body;
+          return new Response(
+            JSON.stringify({
+              ...safeSettings,
+              passwordConfigured: true,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/settings/email") {
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
             JSON.stringify({
               enabled: true,
+              fromAddress: "noreply@example.test",
+              baseUrl: "https://app.example.test",
               host: "smtp.example.test",
               port: 587,
               username: "private-mailbox@example.test",
@@ -1797,7 +1832,46 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(await loginEmailNavigation.isDisabled(), true);
     assert.equal(await loginEmailNavigation.locator(".spinner").count(), 1);
     await window.getByRole("heading", { name: "Login policy" }).waitFor();
-    await window.getByText("smtp.example.test", { exact: true }).waitFor();
+    const emailForm = window.locator('form[data-form="admin-email-settings"]');
+    await window.getByLabel("SMTP host", { exact: true }).waitFor();
+    assert.equal(await emailForm.locator('[name="password"]').inputValue(), "");
+    assert.equal(
+      await window
+        .getByText("private-mailbox@example.test", { exact: true })
+        .count(),
+      0,
+    );
+    const emailHost = emailForm.locator('[name="host"]');
+    await emailHost.fill("invalid.example.test");
+    const emailSave = emailForm.getByRole("button", { name: "Save" });
+    await emailSave.click();
+    assert.equal(await emailSave.isDisabled(), true);
+    assert.equal(await emailSave.locator(".spinner").count(), 1);
+    await window.getByText("SMTP host is invalid.", { exact: true }).waitFor();
+    assert.equal(await emailHost.inputValue(), "invalid.example.test");
+    assert.equal(await emailForm.locator('[name="password"]').inputValue(), "");
+    await emailHost.fill("smtp.example.test");
+    await emailSave.click();
+    assert.equal(await emailSave.isDisabled(), true);
+    assert.equal(await emailSave.locator(".spinner").count(), 1);
+    await window.getByText("Email settings saved.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__emailSettingsUpdates.at(-1),
+      ),
+      {
+        enabled: true,
+        fromAddress: "noreply@example.test",
+        baseUrl: "https://app.example.test",
+        host: "smtp.example.test",
+        port: 587,
+        username: "private-mailbox@example.test",
+        password: "",
+        smtpAuth: true,
+        starttls: true,
+        ssl: false,
+      },
+    );
     await window.getByText("12", { exact: true }).waitFor();
     assert.equal(
       await window.getByText("SECRET_COMMON_PASSWORDS_NEVER_RENDER").count(),
@@ -1813,6 +1887,10 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("heading", { name: "Giriş politikası" }).waitFor();
+    await emailForm.getByRole("button", { name: "Kaydet" }).click();
+    await window
+      .getByText("E-posta ayarları kaydedildi.", { exact: true })
+      .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     const localizationNavigation = window.getByRole("button", {
       name: "Localization",

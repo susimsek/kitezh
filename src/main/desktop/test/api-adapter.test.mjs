@@ -84,7 +84,7 @@ test("keeps forbidden responses authoritative and rejects unapproved API paths",
   );
 });
 
-test("limits the Admin namespace to read-only dashboard and bounded user-list contracts", async () => {
+test("limits the Admin namespace to approved settings writes and bounded read contracts", async () => {
   const { adapter } = harness(
     async () =>
       new Response(
@@ -210,6 +210,24 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/email",
   });
   assert.equal(emailSettings.status, 200);
+  const updatedEmailSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/email",
+    method: "PUT",
+    body: {
+      enabled: true,
+      fromAddress: "noreply@example.test",
+      baseUrl: "https://example.test",
+      host: "smtp.example.test",
+      port: 587,
+      username: "",
+      password: "",
+      smtpAuth: true,
+      starttls: true,
+      ssl: false,
+    },
+  });
+  assert.equal(updatedEmailSettings.status, 200);
   const localizationSettings = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization",
@@ -282,6 +300,14 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     adapter.request({
       console: "admin",
       path: "/api/admin/settings/login",
+      method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/email?unexpected=true",
       method: "PUT",
     }),
     /not allowed/,

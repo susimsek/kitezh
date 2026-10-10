@@ -428,6 +428,8 @@ function adminAdminConfigurationContent() {
 function adminAdminLoginEmailContent() {
   const login = state.data.adminLoginSettings ?? {};
   const email = state.data.adminEmailSettings ?? {};
+  const emailDraft = state.data.adminEmailDraft ?? email;
+  const errors = violations(state.error?.body);
   const row = (label, value) =>
     `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
   const enabled = (value) =>
@@ -438,7 +440,7 @@ function adminAdminLoginEmailContent() {
         : undefined;
   const minutes = (value) =>
     value == null ? undefined : `${value} ${text("adminMinutes")}`;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLoginPolicy"))}"><h2>${escapeHtml(text("adminLoginPolicy"))}</h2><div class="list">${row(text("adminRegistrationEnabled"), enabled(login.userRegistration))}${row(text("adminForgotPasswordEnabled"), enabled(login.forgotPassword))}${row(text("adminRememberMeEnabled"), enabled(login.rememberMe))}${row(text("adminLoginWithEmail"), enabled(login.loginWithEmail))}${row(text("adminVerifyEmail"), enabled(login.verifyEmail))}${row(text("adminSessionTimeout"), minutes(login.sessionTimeoutMinutes))}${row(text("adminPasswordLength"), login.passwordMinimumLength)}${row(text("adminBruteForceProtection"), enabled(login.bruteForceEnabled))}${row(text("adminLoginFailureLimit"), login.bruteForceMaxFailures)}${row(text("adminOtpEnabled"), enabled(login.otpEnabled))}${row(text("adminOtpRequired"), enabled(login.otpRequired))}${row(text("adminPasskeysEnabled"), enabled(login.passkeys))}</div></section><section class="card" aria-label="${escapeHtml(text("adminEmailDelivery"))}"><h2>${escapeHtml(text("adminEmailDelivery"))}</h2><div class="list">${row(text("adminEmailEnabled"), enabled(email.enabled))}${row(text("adminSmtpHost"), email.host)}${row(text("adminSmtpPort"), email.port)}${row(text("adminSmtpAuthentication"), enabled(email.smtpAuth))}${row(text("adminSmtpPasswordConfigured"), enabled(email.passwordConfigured))}${row(text("adminStartTls"), enabled(email.starttls))}${row(text("adminSslTls"), enabled(email.ssl))}</div></section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLoginPolicy"))}"><h2>${escapeHtml(text("adminLoginPolicy"))}</h2><div class="list">${row(text("adminRegistrationEnabled"), enabled(login.userRegistration))}${row(text("adminForgotPasswordEnabled"), enabled(login.forgotPassword))}${row(text("adminRememberMeEnabled"), enabled(login.rememberMe))}${row(text("adminLoginWithEmail"), enabled(login.loginWithEmail))}${row(text("adminVerifyEmail"), enabled(login.verifyEmail))}${row(text("adminSessionTimeout"), minutes(login.sessionTimeoutMinutes))}${row(text("adminPasswordLength"), login.passwordMinimumLength)}${row(text("adminBruteForceProtection"), enabled(login.bruteForceEnabled))}${row(text("adminLoginFailureLimit"), login.bruteForceMaxFailures)}${row(text("adminOtpEnabled"), enabled(login.otpEnabled))}${row(text("adminOtpRequired"), enabled(login.otpRequired))}${row(text("adminPasskeysEnabled"), enabled(login.passkeys))}</div></section><section class="card" aria-label="${escapeHtml(text("adminEmailDelivery"))}"><h2>${escapeHtml(text("adminEmailDelivery"))}</h2><form data-form="admin-email-settings" novalidate><label class="settings-row"><input type="checkbox" name="enabled" ${emailDraft.enabled ? "checked" : ""}/>${escapeHtml(text("adminEmailEnabled"))}</label>${field("fromAddress", text("adminEmailFromAddress"), emailDraft.fromAddress ?? "", errors.fromAddress, "email", 'required maxlength="255"')}${field("baseUrl", text("adminEmailBaseUrl"), emailDraft.baseUrl ?? "", errors.baseUrl, "url", 'required maxlength="255"')}${field("host", text("adminEmailHost"), emailDraft.host ?? "", errors.host, "text", 'required maxlength="255"')}${field("port", text("adminSmtpPort"), emailDraft.port ?? "", errors.port, "number", 'min="1" max="65535" required')}${field("username", text("adminSmtpUsername"), emailDraft.username && emailDraft !== email ? emailDraft.username : "", errors.username, "text", 'maxlength="255"')}${field("password", text("adminSmtpPassword"), "", errors.password, "password", 'maxlength="1000" autocomplete="new-password"')}<label class="settings-row"><input type="checkbox" name="smtpAuth" ${emailDraft.smtpAuth ? "checked" : ""}/>${escapeHtml(text("adminSmtpAuthentication"))}</label><label class="settings-row"><input type="checkbox" name="starttls" ${emailDraft.starttls ? "checked" : ""}/>${escapeHtml(text("adminStartTls"))}</label><label class="settings-row"><input type="checkbox" name="ssl" ${emailDraft.ssl ? "checked" : ""}/>${escapeHtml(text("adminSslTls"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-email-settings", disabled: state.offline })}</div></form></section></div>`;
 }
 
 function adminAdminLocalizationContent() {
@@ -853,6 +855,15 @@ function preserveOfflineDrafts() {
       };
     } else if (form.dataset.form === "admin-branding") {
       state.data.adminBrandingDraft = values;
+    } else if (form.dataset.form === "admin-email-settings") {
+      state.data.adminEmailDraft = {
+        ...values,
+        enabled: form.elements.namedItem("enabled").checked,
+        smtpAuth: form.elements.namedItem("smtpAuth").checked,
+        starttls: form.elements.namedItem("starttls").checked,
+        ssl: form.elements.namedItem("ssl").checked,
+      };
+      delete state.data.adminEmailDraft.password;
     } else if (form.dataset.form === "admin-localization-settings") {
       state.data.adminLocalizationDraft = {
         internationalizationEnabled: form.elements.namedItem(
@@ -958,6 +969,46 @@ async function submitForm(form) {
       });
       state.data.adminBrandingDraft = null;
       state.notice = text("adminBrandingSaved");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-email-settings") {
+    const current = state.data.adminEmailSettings ?? {};
+    const draft = state.data.adminEmailDraft ?? {};
+    const body = {
+      enabled: form.elements.namedItem("enabled").checked,
+      fromAddress: String(values.fromAddress ?? "").trim(),
+      baseUrl: String(values.baseUrl ?? "").trim(),
+      host: String(values.host ?? "").trim(),
+      port: Number(values.port),
+      username:
+        String(values.username ?? "").trim() ||
+        draft.username ||
+        current.username ||
+        "",
+      password: String(values.password ?? ""),
+      smtpAuth: form.elements.namedItem("smtpAuth").checked,
+      starttls: form.elements.namedItem("starttls").checked,
+      ssl: form.elements.namedItem("ssl").checked,
+    };
+    if (!form.reportValidity()) return;
+    state.data.adminEmailDraft = { ...body };
+    delete state.data.adminEmailDraft.password;
+    state.busy = "admin-email-settings";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminEmailSettings = await request(
+        "/api/admin/settings/email",
+        { method: "PUT", body },
+      );
+      state.data.adminEmailDraft = null;
+      state.notice = text("adminEmailSettingsSaved");
     } catch {
       /* request rendered localized server validation or transport feedback */
     }

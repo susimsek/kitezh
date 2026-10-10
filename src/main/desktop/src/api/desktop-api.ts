@@ -52,7 +52,8 @@ function isAllowedApiPath(
       (path === "/api/admin/settings/ciba-policy" ||
         path === "/api/admin/settings/offline-access" ||
         path === "/api/admin/settings/branding" ||
-        path === "/api/admin/settings/localization")
+        path === "/api/admin/settings/localization" ||
+        path === "/api/admin/settings/email")
     )
       return true;
     const localizationMessageMatch = path.match(
