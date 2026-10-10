@@ -146,6 +146,11 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(localizationMessageMatch[1]))
     )
       return true;
+    if (
+      method === "DELETE" &&
+      /^\/api\/admin\/sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    )
+      return true;
     if (method !== "GET") return false;
     if (path === "/api/admin/dashboard") return true;
     if (

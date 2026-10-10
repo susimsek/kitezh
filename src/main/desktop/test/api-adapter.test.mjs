@@ -212,6 +212,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     method: "DELETE",
   });
   assert.equal(revokedConsent.status, 200);
+  const deletedAdminSession = await adapter.request({
+    console: "admin",
+    path: "/api/admin/sessions/session-secret-id",
+    method: "DELETE",
+  });
+  assert.equal(deletedAdminSession.status, 200);
   const createdMessageOverride = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization/messages",
@@ -533,6 +539,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/consents/consents/client%2Fother/alice",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/sessions/session-secret-id/authorizations",
       method: "DELETE",
     }),
     /not allowed/,

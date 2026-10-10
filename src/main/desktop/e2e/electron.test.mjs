@@ -1026,6 +1026,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/sessions\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const sessionId = requestUrl.pathname.split("/").at(-1);
+          globalThis.__adminSessionDeleteRequests ??= [];
+          globalThis.__adminSessionDeleteRequests.push(sessionId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
         if (requestUrl.pathname === "/api/admin/sessions") {
           globalThis.__adminSessionRequests ??= [];
           globalThis.__adminSessionRequests.push(requestUrl.search);
@@ -2565,6 +2577,43 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       true,
     );
     await window.getByText("alice", { exact: true }).waitFor();
+    const adminSessionRow = window
+      .locator(".list-item")
+      .filter({ hasText: "alice" });
+    await adminSessionRow
+      .getByRole("button", { name: "Sign out session", exact: true })
+      .click();
+    await adminSessionRow
+      .getByText("Sign out this session for the user?", { exact: true })
+      .waitFor();
+    await adminSessionRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminSessionDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await adminSessionRow
+      .getByRole("button", { name: "Sign out session", exact: true })
+      .click();
+    const confirmAdminSessionDelete = adminSessionRow.getByRole("button", {
+      name: "Sign out session",
+      exact: true,
+    });
+    await confirmAdminSessionDelete.click();
+    assert.equal(await confirmAdminSessionDelete.isDisabled(), true);
+    assert.equal(
+      await confirmAdminSessionDelete.locator(".spinner").count(),
+      1,
+    );
+    await window.getByText("Session signed out.", { exact: true }).waitFor();
+    assert.equal(await adminSessionRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminSessionDeleteRequests),
+      ["session-secret-should-not-render"],
+    );
     const sessionRequests = await application.evaluate(
       () => globalThis.__adminSessionRequests,
     );
