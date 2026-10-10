@@ -2346,6 +2346,20 @@ test("localizes and themes the update dialog with desktop preferences", async ()
         .count(),
       1,
     );
+    await mainWindow.evaluate(async () => window.desktopApi.language.set("en"));
+    await availableWindow
+      .getByRole("heading", { name: "A new version of Kitezh is available!" })
+      .waitFor();
+    assert.equal(
+      await availableWindow
+        .getByRole("button", { name: "Skip This Version" })
+        .count(),
+      1,
+    );
+    await mainWindow.evaluate(async () => window.desktopApi.language.set("tr"));
+    await availableWindow
+      .getByRole("heading", { name: "Yeni bir Kitezh sürümü var!" })
+      .waitFor();
     assert.equal(
       await availableWindow.evaluate(
         () => getComputedStyle(document.body).backgroundColor,

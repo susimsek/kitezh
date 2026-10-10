@@ -211,6 +211,7 @@ async function applyDesktopLanguage(value: unknown) {
   }
   installApplicationMenu();
   updateTrayMenu();
+  updateOpenUpdateDialogLanguage();
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
       window.webContents.send("desktop:language-changed", desktopLanguage);
@@ -1803,6 +1804,45 @@ function updateTrayMenu() {
   );
 }
 
+function updateOpenUpdateDialogLanguage() {
+  if (!updateAvailableWindow || updateAvailableWindow.isDestroyed()) return;
+  const isTurkish = isTurkishDesktop();
+  const version = promptedUpdateVersion;
+  const copy = isTurkish
+    ? {
+        title: `Yeni bir ${DESKTOP_APP_NAME} sürümü var!`,
+        detail: `${DESKTOP_APP_NAME} ${version} kullanıma hazır; mevcut sürümünüz ${app.getVersion()}. Şimdi indirmek ister misiniz?`,
+        automatic: "Gelecekteki güncellemeleri otomatik olarak indir ve kur",
+        skip: "Bu sürümü atla",
+        later: "Daha sonra hatırlat",
+        install: "Güncellemeyi kur",
+      }
+    : {
+        title: `A new version of ${DESKTOP_APP_NAME} is available!`,
+        detail: `${DESKTOP_APP_NAME} ${version} is now available—you have ${app.getVersion()}. Would you like to download it now?`,
+        automatic: "Automatically download and install updates in the future",
+        skip: "Skip This Version",
+        later: "Remind Me Later",
+        install: "Install Update",
+      };
+  updateAvailableWindow.setTitle(copy.title);
+  void updateAvailableWindow.webContents
+    .executeJavaScript(
+      `(() => {
+        const copy = ${JSON.stringify(copy)};
+        document.documentElement.lang = ${JSON.stringify(isTurkish ? "tr" : "en")};
+        document.title = copy.title;
+        document.getElementById("update-title").textContent = copy.title;
+        document.getElementById("update-detail").textContent = copy.detail;
+        document.getElementById("automatic-label").textContent = copy.automatic;
+        document.getElementById("skip-update").textContent = copy.skip;
+        document.getElementById("remind-later").textContent = copy.later;
+        document.getElementById("install-update").textContent = copy.install;
+      })()`,
+    )
+    .catch(() => undefined);
+}
+
 function notifyDesktop(title: string, body: string, onClick?: () => void) {
   if (!Notification.isSupported()) return;
   void readDesktopPreferences().then((preferences) => {
@@ -2232,15 +2272,15 @@ async function showUpdateDialog(version: string, force = false) {
     <main>
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
-        <h1>${title}</h1>
-        <p>${detail}</p>
-        <label><input id="automatic" type="checkbox" checked>${automaticLabel}</label>
+        <h1 id="update-title">${title}</h1>
+        <p id="update-detail">${detail}</p>
+        <label><input id="automatic" type="checkbox" checked><span id="automatic-label">${automaticLabel}</span></label>
       </section>
     </main>
     <footer>
-      <button type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
-      <button type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
-      <button class="primary" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
+      <button id="skip-update" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
+      <button id="remind-later" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
+      <button id="install-update" class="primary" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
     </footer>
   </body>
 </html>`;
