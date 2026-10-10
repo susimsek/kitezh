@@ -28,16 +28,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Resolve triggering release run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          upstream_run="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs/${UPSTREAM_RUN_ID}")"
+          release_sha="$(jq -r '.head_sha' <<< "${upstream_run}")"
+          if [[ ! "${release_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve a valid release commit from workflow run ${UPSTREAM_RUN_ID}." >&2
+            exit 1
+          fi
+          echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
+
       - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ steps.source.outputs.release_sha }}
           fetch-depth: 0
 
       - name: Resolve release tag
         id: release
         env:
-          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
         run: |
           set -euo pipefail
           release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | sort -V | tail -n 1)"
@@ -55,7 +71,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
         run: |
           set -euo pipefail
           runs="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100")"
@@ -70,8 +86,33 @@ jobs:
           done
           echo "ready=true" >> "${GITHUB_OUTPUT}"
 
-      - name: Confirm expected release assets are present
+      - name: Let only the last completed package workflow publish
+        id: publish_gate
         if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          runs="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100")"
+          latest_package_run_id="$(jq -r '
+            [.workflow_runs[]
+              | select((.name == "Desktop Release" or .name == "Mobile Release") and .status == "completed" and .conclusion == "success")]
+            | sort_by(.updated_at)
+            | last
+            | .id // empty
+          ' <<< "${runs}")"
+          if [[ "${TRIGGER_RUN_ID}" != "${latest_package_run_id}" ]]; then
+            echo "A later package workflow completion will publish this release."
+            echo "should_publish=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "should_publish=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Confirm expected release assets are present
+        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' && steps.publish_gate.outputs.should_publish == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -87,7 +128,7 @@ jobs:
           done
 
       - name: Publish GitHub Release
-        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' }}
+        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' && steps.publish_gate.outputs.should_publish == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

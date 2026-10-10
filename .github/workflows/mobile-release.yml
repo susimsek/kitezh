@@ -14,6 +14,7 @@ on:
         default: v0.1.4
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -46,15 +47,25 @@ jobs:
         id: release
         shell: bash
         env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id || '' }}
           DISPATCH_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
-          RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           if [[ -n "${DISPATCH_TAG}" ]]; then
             release_tag="${DISPATCH_TAG}"
             RELEASE_SHA="$(git rev-list -n 1 "${release_tag}")"
           else
-            release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | sort -V | tail -n 1)"
+            upstream_run="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs/${UPSTREAM_RUN_ID}")"
+            upstream_name="$(jq -r '.name' <<< "${upstream_run}")"
+            upstream_event="$(jq -r '.event' <<< "${upstream_run}")"
+            release_tag="$(jq -r '.head_branch' <<< "${upstream_run}")"
+            RELEASE_SHA="$(jq -r '.head_sha' <<< "${upstream_run}")"
+            if [[ "${upstream_name}" != "Backend Release" || "${upstream_event}" != "push" ]]; then
+              echo "Expected a Backend Release tag push; received ${upstream_name} (${upstream_event})." >&2
+              exit 1
+            fi
           fi
           if [[ -z "${release_tag}" ]]; then
             echo "::notice::Skipping stale release run for ${RELEASE_SHA}; no version tag points at this commit."
