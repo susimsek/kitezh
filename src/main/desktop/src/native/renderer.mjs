@@ -508,7 +508,21 @@ function adminAdminConsentsContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminConsents"))}"><form id="admin-consent-search" class="actions" role="search"><input id="admin-consent-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchConsents"))}" value="${escapeHtml(state.data.adminConsentQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchConsents"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "admin-consents-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-consents-search")}${escapeHtml(text("adminSearchConsents"))}</button></form>${consents.length ? `<div class="list">${consents.map((consent) => `<article class="list-item"><div><strong>${escapeHtml(consent.clientName || consent.clientId)}</strong><span class="muted">${escapeHtml(consent.principalName)}</span><span class="muted">${escapeHtml((consent.authorities ?? []).join(", "))}</span></div></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoConsents"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminConsents"))} pagination"><button class="secondary-button" type="button" data-admin-consent-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-consent-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const rows = consents
+    .map((consent, index) => {
+      const consentKey = JSON.stringify([
+        consent.clientId,
+        consent.principalName,
+      ]);
+      const confirming = state.data.consentRevokeConfirmKey === consentKey;
+      const busy = state.busy === `admin-consent-revoke:${index}`;
+      const controls = confirming
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminConsentRevokeConfirm"))}</span>${button(text("adminConsentRevoke"), { action: "admin-consent-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-consent-revoke-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        : `<div class="actions">${button(text("adminConsentRevoke"), { action: "admin-consent-revoke-request", index, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item"><div><strong>${escapeHtml(consent.clientName || consent.clientId)}</strong><span class="muted">${escapeHtml(consent.principalName)}</span><span class="muted">${escapeHtml((consent.authorities ?? []).join(", "))}</span></div>${controls}</article>`;
+    })
+    .join("");
+  return `<section class="card" aria-label="${escapeHtml(text("adminConsents"))}"><form id="admin-consent-search" class="actions" role="search"><input id="admin-consent-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchConsents"))}" value="${escapeHtml(state.data.adminConsentQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchConsents"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "admin-consents-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-consents-search")}${escapeHtml(text("adminSearchConsents"))}</button></form>${consents.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoConsents"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminConsents"))} pagination"><button class="secondary-button" type="button" data-admin-consent-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-consent-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminOfflineSessionsContent() {
@@ -524,7 +538,8 @@ function adminAdminOfflineSessionsContent() {
     : 0;
   const rows = sessions
     .map((session, index) => {
-      const confirming = state.data.offlineSessionDeleteConfirmIndex === index;
+      const confirming =
+        state.data.offlineSessionDeleteConfirmId === session.id;
       const busy = state.busy === `admin-offline-session-delete:${index}`;
       const controls = confirming
         ? `<div class="actions"><span role="status">${escapeHtml(text("adminOfflineSessionRevokePrompt"))}</span>${button(text("adminRevokeOfflineSession"), { action: "admin-offline-session-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-offline-session-revoke-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
@@ -1936,11 +1951,11 @@ async function action(action, element) {
     )
       return;
     if (action === "admin-offline-session-revoke-request") {
-      state.data.offlineSessionDeleteConfirmIndex = index;
+      state.data.offlineSessionDeleteConfirmId = session.id;
       render();
       return;
     }
-    if (state.data.offlineSessionDeleteConfirmIndex !== index) return;
+    if (state.data.offlineSessionDeleteConfirmId !== session.id) return;
     state.busy = `admin-offline-session-delete:${index}`;
     state.error = null;
     state.notice = null;
@@ -1953,7 +1968,7 @@ async function action(action, element) {
         ...state.data.adminOfflineSessions,
         content: sessions.filter((_, itemIndex) => itemIndex !== index),
       };
-      state.data.offlineSessionDeleteConfirmIndex = null;
+      state.data.offlineSessionDeleteConfirmId = null;
       state.notice = text("adminOfflineSessionRevoked");
     } catch {
       /* request rendered localized validation or transport feedback */
@@ -1964,7 +1979,68 @@ async function action(action, element) {
   }
   if (action === "admin-offline-session-revoke-cancel") {
     if (state.busy) return;
-    state.data.offlineSessionDeleteConfirmIndex = null;
+    state.data.offlineSessionDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-consent-revoke-request" ||
+    action === "admin-consent-revoke-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const index = Number(element.dataset.index);
+    const consents = state.data.adminConsents?.content ?? [];
+    const consent = consents[index];
+    if (
+      !Number.isSafeInteger(index) ||
+      index < 0 ||
+      !consent ||
+      typeof consent.clientId !== "string" ||
+      consent.clientId.length === 0 ||
+      consent.clientId.length > 100 ||
+      typeof consent.principalName !== "string" ||
+      consent.principalName.length === 0 ||
+      consent.principalName.length > 100
+    )
+      return;
+    if (action === "admin-consent-revoke-request") {
+      state.data.consentRevokeConfirmKey = JSON.stringify([
+        consent.clientId,
+        consent.principalName,
+      ]);
+      render();
+      return;
+    }
+    if (
+      state.data.consentRevokeConfirmKey !==
+      JSON.stringify([consent.clientId, consent.principalName])
+    )
+      return;
+    state.busy = `admin-consent-revoke:${index}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(
+        `/api/admin/consents/consents/${encodeURIComponent(consent.clientId)}/${encodeURIComponent(consent.principalName)}`,
+        { method: "DELETE" },
+      );
+      state.data.adminConsents = {
+        ...state.data.adminConsents,
+        content: consents.filter((_, itemIndex) => itemIndex !== index),
+      };
+      state.data.consentRevokeConfirmKey = null;
+      state.notice = text("adminConsentRevoked");
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-consent-revoke-cancel") {
+    if (state.busy) return;
+    state.data.consentRevokeConfirmKey = null;
     render();
     return;
   }

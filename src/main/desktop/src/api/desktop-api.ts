@@ -92,6 +92,26 @@ function isAllowedApiPath(
       /^\/api\/admin\/offline-sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
+    const consentRevokeMatch = path.match(
+      /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/,
+    );
+    if (method === "DELETE" && consentRevokeMatch) {
+      try {
+        const clientId = decodeURIComponent(consentRevokeMatch[1]);
+        const username = decodeURIComponent(consentRevokeMatch[2]);
+        return [clientId, username].every(
+          (segment) =>
+            segment.length > 0 &&
+            segment.length <= 100 &&
+            !segment.includes("/") &&
+            !segment.includes("\\") &&
+            segment !== "." &&
+            segment !== "..",
+        );
+      } catch {
+        return false;
+      }
+    }
     if (
       method === "PUT" &&
       /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(path)

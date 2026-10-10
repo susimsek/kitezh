@@ -1057,6 +1057,17 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/consents\/consents\/[A-Za-z0-9._~-]{1,100}\/[A-Za-z0-9._~-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          globalThis.__adminConsentRevokeRequests ??= [];
+          globalThis.__adminConsentRevokeRequests.push(requestUrl.pathname);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
         if (requestUrl.pathname === "/api/admin/consents") {
           globalThis.__adminConsentRequests ??= [];
           globalThis.__adminConsentRequests.push(requestUrl.search);
@@ -2087,12 +2098,31 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     });
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("button", { name: "Rol ara" }).waitFor();
+    await application.evaluate(async () => {
+      const expected = "Kitezh — güvenli kimlik konsolu";
+      const deadline = Date.now() + 1000;
+      while (globalThis.__trayTooltips.at(-1) !== expected) {
+        if (Date.now() >= deadline)
+          throw new Error("Turkish tray label did not update");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    });
     assert.equal(await window.getByText("ROLE_NATIVE_VIEWER").count(), 1);
     assert.equal(
       await application.evaluate(() => globalThis.__trayTooltips.at(-1)),
       "Kitezh — güvenli kimlik konsolu",
     );
     await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.getByRole("button", { name: "Search roles" }).waitFor();
+    await application.evaluate(async () => {
+      const expected = "Kitezh — secure identity console";
+      const deadline = Date.now() + 1000;
+      while (globalThis.__trayTooltips.at(-1) !== expected) {
+        if (Date.now() >= deadline)
+          throw new Error("English tray label did not update");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    });
     assert.equal(
       await application.evaluate(() => globalThis.__trayTooltips.at(-1)),
       "Kitezh — secure identity console",
@@ -2554,6 +2584,42 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .locator(".list-item strong")
       .filter({ hasText: "Account Console" })
       .waitFor();
+    const consentRow = window
+      .locator(".list-item")
+      .filter({ hasText: "Account Console" });
+    await consentRow
+      .getByRole("button", { name: "Revoke consent", exact: true })
+      .click();
+    await consentRow
+      .getByText("Revoke this user's consent for the client?", {
+        exact: true,
+      })
+      .waitFor();
+    await consentRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminConsentRevokeRequests ?? [],
+      ),
+      [],
+    );
+    await consentRow
+      .getByRole("button", { name: "Revoke consent", exact: true })
+      .click();
+    const confirmConsentRevoke = consentRow.getByRole("button", {
+      name: "Revoke consent",
+      exact: true,
+    });
+    await confirmConsentRevoke.click();
+    assert.equal(await confirmConsentRevoke.isDisabled(), true);
+    assert.equal(await confirmConsentRevoke.locator(".spinner").count(), 1);
+    await window.getByText("Consent revoked.", { exact: true }).waitFor();
+    assert.equal(await consentRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminConsentRevokeRequests),
+      ["/api/admin/consents/consents/account-console/alice"],
+    );
     await window
       .getByRole("searchbox", { name: "Search consents" })
       .fill("admin");

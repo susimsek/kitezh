@@ -206,6 +206,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     method: "DELETE",
   });
   assert.equal(revokedOfflineSession.status, 200);
+  const revokedConsent = await adapter.request({
+    console: "admin",
+    path: "/api/admin/consents/consents/account-console/alice",
+    method: "DELETE",
+  });
+  assert.equal(revokedConsent.status, 200);
   const createdMessageOverride = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization/messages",
@@ -519,6 +525,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/offline-sessions/offline-auth-opaque-id/mappers/1",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/consents/consents/client%2Fother/alice",
       method: "DELETE",
     }),
     /not allowed/,
