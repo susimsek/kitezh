@@ -48,6 +48,7 @@ jobs:
           echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Confirm backend, desktop, and mobile workflows succeeded
+        id: check_release_runs
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -59,12 +60,15 @@ jobs:
             if ! jq -e --arg sha "${RELEASE_SHA}" --arg name "${workflow_name}" \
               '.workflow_runs | any(.[]; .head_sha == $sha and .name == $name and .status == "completed" and .conclusion == "success")' \
               <<< "${runs}" >/dev/null; then
-              echo "${workflow_name} has not succeeded for ${RELEASE_SHA}; leaving the release as a draft." >&2
-              exit 1
+              echo "${workflow_name} has not succeeded for ${RELEASE_SHA}; leaving the release as a draft."
+              echo "ready=false" >> "${GITHUB_OUTPUT}"
+              exit 0
             fi
           done
+          echo "ready=true" >> "${GITHUB_OUTPUT}"
 
       - name: Confirm expected release assets are present
+        if: ${{ steps.check_release_runs.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -80,6 +84,7 @@ jobs:
           done
 
       - name: Publish GitHub Release
+        if: ${{ steps.check_release_runs.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
