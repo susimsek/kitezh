@@ -1702,7 +1702,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
-        if (requestUrl.pathname === "/api/admin/settings/login") {
+        if (
+          requestUrl.pathname === "/api/admin/settings/login/native" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__nativeLoginPolicyUpdates ??= [];
+          globalThis.__nativeLoginPolicyUpdates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.passwordMinimumLength === 9)
+            return new Response(
+              JSON.stringify({
+                violations: [
+                  {
+                    field: "passwordMinimumLength",
+                    message: "Server requires at least 10 characters.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (requestUrl.pathname === "/api/admin/settings/login/native") {
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
             JSON.stringify({
@@ -1718,7 +1746,6 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               otpEnabled: true,
               otpRequired: false,
               passkeys: true,
-              passwordCommonPasswords: "SECRET_COMMON_PASSWORDS_NEVER_RENDER",
             }),
             {
               status: 200,
@@ -3745,6 +3772,119 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(await loginEmailNavigation.isDisabled(), true);
     assert.equal(await loginEmailNavigation.locator(".spinner").count(), 1);
     await window.getByRole("heading", { name: "Login policy" }).waitFor();
+    const loginPolicyForm = window.locator(
+      'form[data-form="admin-login-settings"]',
+    );
+    await loginPolicyForm.locator('[name="otpEnabled"]').uncheck();
+    await loginPolicyForm.locator('[name="otpRequired"]').check();
+    await loginPolicyForm.getByRole("button", { name: "Save" }).click();
+    await window
+      .getByText("Enable TOTP before requiring it.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__nativeLoginPolicyUpdates?.length ?? 0,
+      ),
+      0,
+    );
+    await loginPolicyForm.locator('[name="otpEnabled"]').check();
+    await loginPolicyForm.locator('[name="otpRequired"]').uncheck();
+    const passwordMinimumLength = loginPolicyForm.locator(
+      '[name="passwordMinimumLength"]',
+    );
+    await passwordMinimumLength.fill("9");
+    const loginPolicySave = loginPolicyForm.getByRole("button", {
+      name: "Save",
+    });
+    await loginPolicySave.click();
+    assert.equal(await loginPolicySave.isDisabled(), true);
+    assert.equal(await loginPolicySave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Server requires at least 10 characters.", { exact: true })
+      .waitFor();
+    assert.equal(await passwordMinimumLength.inputValue(), "9");
+    await passwordMinimumLength.fill("10");
+    await loginPolicySave.click();
+    assert.equal(await loginPolicySave.isDisabled(), true);
+    assert.equal(await loginPolicySave.locator(".spinner").count(), 1);
+    await loginPolicySave.evaluate((button) => button.click());
+    await window
+      .getByText("Login policy settings saved.", { exact: true })
+      .waitFor();
+    const loginPolicyUpdates = await application.evaluate(
+      () => globalThis.__nativeLoginPolicyUpdates,
+    );
+    assert.equal(loginPolicyUpdates.length, 2);
+    assert.equal(loginPolicyUpdates[1].passwordMinimumLength, 10);
+    assert.equal("passwordCommonPasswords" in loginPolicyUpdates[1], false);
+    assert.equal(
+      await window.getByText("SECRET_COMMON_PASSWORDS_NEVER_RENDER").count(),
+      0,
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await loginPolicyForm.locator('[name="sessionTimeoutMinutes"]').fill("60");
+    await loginPolicyForm.getByRole("button", { name: "Kaydet" }).click();
+    await window
+      .getByText("Giriş politikası ayarları kaydedildi.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () =>
+          globalThis.__nativeLoginPolicyUpdates.at(-1).sessionTimeoutMinutes,
+      ),
+      60,
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const loginSessionTimeout = loginPolicyForm.locator(
+      '[name="sessionTimeoutMinutes"]',
+    );
+    await loginSessionTimeout.fill("61");
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    await window
+      .getByText(
+        "Offline mode: safe mutations are disabled until connectivity returns.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.equal(await loginPolicySave.isDisabled(), true);
+    await loginSessionTimeout.fill("62");
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__nativeLoginPolicyUpdates.length,
+      ),
+      3,
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await window
+      .getByText(
+        "Offline mode: safe mutations are disabled until connectivity returns.",
+        { exact: true },
+      )
+      .waitFor({ state: "detached" });
+    assert.equal(await loginSessionTimeout.inputValue(), "62");
+    await loginPolicySave.click();
+    await window
+      .getByText("Login policy settings saved.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () =>
+          globalThis.__nativeLoginPolicyUpdates.at(-1).sessionTimeoutMinutes,
+      ),
+      62,
+    );
     const emailForm = window.locator('form[data-form="admin-email-settings"]');
     await window.getByLabel("SMTP host", { exact: true }).waitFor();
     assert.equal(await emailForm.locator('[name="password"]').inputValue(), "");
@@ -3790,7 +3930,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         ssl: false,
       },
     );
-    await window.getByText("12", { exact: true }).waitFor();
+    assert.equal(await passwordMinimumLength.inputValue(), "10");
     assert.equal(
       await window.getByText("SECRET_COMMON_PASSWORDS_NEVER_RENDER").count(),
       0,

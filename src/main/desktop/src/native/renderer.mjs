@@ -844,20 +844,13 @@ function adminAdminConfigurationContent() {
 
 function adminAdminLoginEmailContent() {
   const login = state.data.adminLoginSettings ?? {};
+  const loginDraft = state.data.adminLoginSettingsDraft ?? login;
+  const loginErrors = violations(state.error?.body);
   const email = state.data.adminEmailSettings ?? {};
   const emailDraft = state.data.adminEmailDraft ?? email;
   const errors = violations(state.error?.body);
-  const row = (label, value) =>
-    `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
-  const enabled = (value) =>
-    value === true
-      ? text("adminEnabled")
-      : value === false
-        ? text("adminDisabled")
-        : undefined;
-  const minutes = (value) =>
-    value == null ? undefined : `${value} ${text("adminMinutes")}`;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLoginPolicy"))}"><h2>${escapeHtml(text("adminLoginPolicy"))}</h2><div class="list">${row(text("adminRegistrationEnabled"), enabled(login.userRegistration))}${row(text("adminForgotPasswordEnabled"), enabled(login.forgotPassword))}${row(text("adminRememberMeEnabled"), enabled(login.rememberMe))}${row(text("adminLoginWithEmail"), enabled(login.loginWithEmail))}${row(text("adminVerifyEmail"), enabled(login.verifyEmail))}${row(text("adminSessionTimeout"), minutes(login.sessionTimeoutMinutes))}${row(text("adminPasswordLength"), login.passwordMinimumLength)}${row(text("adminBruteForceProtection"), enabled(login.bruteForceEnabled))}${row(text("adminLoginFailureLimit"), login.bruteForceMaxFailures)}${row(text("adminOtpEnabled"), enabled(login.otpEnabled))}${row(text("adminOtpRequired"), enabled(login.otpRequired))}${row(text("adminPasskeysEnabled"), enabled(login.passkeys))}</div></section><section class="card" aria-label="${escapeHtml(text("adminEmailDelivery"))}"><h2>${escapeHtml(text("adminEmailDelivery"))}</h2><form data-form="admin-email-settings" novalidate><label class="settings-row"><input type="checkbox" name="enabled" ${emailDraft.enabled ? "checked" : ""}/>${escapeHtml(text("adminEmailEnabled"))}</label>${field("fromAddress", text("adminEmailFromAddress"), emailDraft.fromAddress ?? "", errors.fromAddress, "email", 'required maxlength="255"')}${field("baseUrl", text("adminEmailBaseUrl"), emailDraft.baseUrl ?? "", errors.baseUrl, "url", 'required maxlength="255"')}${field("host", text("adminEmailHost"), emailDraft.host ?? "", errors.host, "text", 'required maxlength="255"')}${field("port", text("adminSmtpPort"), emailDraft.port ?? "", errors.port, "number", 'min="1" max="65535" required')}${field("username", text("adminSmtpUsername"), emailDraft.username && emailDraft !== email ? emailDraft.username : "", errors.username, "text", 'maxlength="255"')}${field("password", text("adminSmtpPassword"), "", errors.password, "password", 'maxlength="1000" autocomplete="new-password"')}<label class="settings-row"><input type="checkbox" name="smtpAuth" ${emailDraft.smtpAuth ? "checked" : ""}/>${escapeHtml(text("adminSmtpAuthentication"))}</label><label class="settings-row"><input type="checkbox" name="starttls" ${emailDraft.starttls ? "checked" : ""}/>${escapeHtml(text("adminStartTls"))}</label><label class="settings-row"><input type="checkbox" name="ssl" ${emailDraft.ssl ? "checked" : ""}/>${escapeHtml(text("adminSslTls"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-email-settings", disabled: state.offline })}</div></form></section></div>`;
+  const loginCard = `<section class="card" aria-label="${escapeHtml(text("adminLoginPolicy"))}"><h2>${escapeHtml(text("adminLoginPolicy"))}</h2><form data-form="admin-login-settings" novalidate><label class="settings-row"><input type="checkbox" name="userRegistration" ${loginDraft.userRegistration ? "checked" : ""}/>${escapeHtml(text("adminRegistrationEnabled"))}</label><label class="settings-row"><input type="checkbox" name="forgotPassword" ${loginDraft.forgotPassword ? "checked" : ""}/>${escapeHtml(text("adminForgotPasswordEnabled"))}</label><label class="settings-row"><input type="checkbox" name="rememberMe" ${loginDraft.rememberMe ? "checked" : ""}/>${escapeHtml(text("adminRememberMeEnabled"))}</label><label class="settings-row"><input type="checkbox" name="loginWithEmail" ${loginDraft.loginWithEmail ? "checked" : ""}/>${escapeHtml(text("adminLoginWithEmail"))}</label><label class="settings-row"><input type="checkbox" name="verifyEmail" ${loginDraft.verifyEmail ? "checked" : ""}/>${escapeHtml(text("adminVerifyEmail"))}</label>${field("sessionTimeoutMinutes", text("adminSessionTimeout"), loginDraft.sessionTimeoutMinutes ?? "", loginErrors.sessionTimeoutMinutes, "number", 'min="1" max="1440" required')}${field("passwordMinimumLength", text("adminPasswordLength"), loginDraft.passwordMinimumLength ?? "", loginErrors.passwordMinimumLength, "number", 'min="8" max="128" required')}<label class="settings-row"><input type="checkbox" name="bruteForceEnabled" ${loginDraft.bruteForceEnabled ? "checked" : ""}/>${escapeHtml(text("adminBruteForceProtection"))}</label>${field("bruteForceMaxFailures", text("adminLoginFailureLimit"), loginDraft.bruteForceMaxFailures ?? "", loginErrors.bruteForceMaxFailures, "number", 'min="1" max="100" required')}<label class="settings-row"><input type="checkbox" name="otpEnabled" ${loginDraft.otpEnabled ? "checked" : ""}/>${escapeHtml(text("adminOtpEnabled"))}</label><label class="settings-row"><input type="checkbox" name="otpRequired" ${loginDraft.otpRequired ? "checked" : ""}/>${escapeHtml(text("adminOtpRequired"))}</label><div class="field-error">${escapeHtml(loginErrors.otpRequired ?? "")}</div><label class="settings-row"><input type="checkbox" name="passkeys" ${loginDraft.passkeys ? "checked" : ""}/>${escapeHtml(text("adminPasskeysEnabled"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-login-settings", disabled: state.offline })}</div></form></section>`;
+  return `<div class="grid two-col">${loginCard}<section class="card" aria-label="${escapeHtml(text("adminEmailDelivery"))}"><h2>${escapeHtml(text("adminEmailDelivery"))}</h2><form data-form="admin-email-settings" novalidate><label class="settings-row"><input type="checkbox" name="enabled" ${emailDraft.enabled ? "checked" : ""}/>${escapeHtml(text("adminEmailEnabled"))}</label>${field("fromAddress", text("adminEmailFromAddress"), emailDraft.fromAddress ?? "", errors.fromAddress, "email", 'required maxlength="255"')}${field("baseUrl", text("adminEmailBaseUrl"), emailDraft.baseUrl ?? "", errors.baseUrl, "url", 'required maxlength="255"')}${field("host", text("adminEmailHost"), emailDraft.host ?? "", errors.host, "text", 'required maxlength="255"')}${field("port", text("adminSmtpPort"), emailDraft.port ?? "", errors.port, "number", 'min="1" max="65535" required')}${field("username", text("adminSmtpUsername"), emailDraft.username && emailDraft !== email ? emailDraft.username : "", errors.username, "text", 'maxlength="255"')}${field("password", text("adminSmtpPassword"), "", errors.password, "password", 'maxlength="1000" autocomplete="new-password"')}<label class="settings-row"><input type="checkbox" name="smtpAuth" ${emailDraft.smtpAuth ? "checked" : ""}/>${escapeHtml(text("adminSmtpAuthentication"))}</label><label class="settings-row"><input type="checkbox" name="starttls" ${emailDraft.starttls ? "checked" : ""}/>${escapeHtml(text("adminStartTls"))}</label><label class="settings-row"><input type="checkbox" name="ssl" ${emailDraft.ssl ? "checked" : ""}/>${escapeHtml(text("adminSslTls"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-email-settings", disabled: state.offline })}</div></form></section></div>`;
 }
 
 function adminAdminLocalizationContent() {
@@ -1166,7 +1159,7 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
     if (state.console === "admin" && state.route === "login-email") {
       [state.data.adminLoginSettings, state.data.adminEmailSettings] =
         await Promise.all([
-          request("/api/admin/settings/login"),
+          request("/api/admin/settings/login/native"),
           request("/api/admin/settings/email"),
         ]);
     }
@@ -1298,6 +1291,21 @@ function preserveOfflineDrafts() {
         idleTimeout: values.idleTimeout,
         maxLifespan: values.maxLifespan,
         maxLimited: form.elements.namedItem("maxLimited").checked,
+      };
+    } else if (form.dataset.form === "admin-login-settings") {
+      state.data.adminLoginSettingsDraft = {
+        userRegistration: form.elements.namedItem("userRegistration").checked,
+        forgotPassword: form.elements.namedItem("forgotPassword").checked,
+        rememberMe: form.elements.namedItem("rememberMe").checked,
+        loginWithEmail: form.elements.namedItem("loginWithEmail").checked,
+        verifyEmail: form.elements.namedItem("verifyEmail").checked,
+        sessionTimeoutMinutes: values.sessionTimeoutMinutes,
+        passwordMinimumLength: values.passwordMinimumLength,
+        bruteForceEnabled: form.elements.namedItem("bruteForceEnabled").checked,
+        bruteForceMaxFailures: values.bruteForceMaxFailures,
+        otpEnabled: form.elements.namedItem("otpEnabled").checked,
+        otpRequired: form.elements.namedItem("otpRequired").checked,
+        passkeys: form.elements.namedItem("passkeys").checked,
       };
     } else if (form.dataset.form === "admin-branding") {
       state.data.adminBrandingDraft = values;
@@ -1962,6 +1970,50 @@ async function submitForm(form) {
       state.notice = text("adminBrandingSaved");
     } catch {
       /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-login-settings") {
+    const body = {
+      userRegistration: form.elements.namedItem("userRegistration").checked,
+      forgotPassword: form.elements.namedItem("forgotPassword").checked,
+      rememberMe: form.elements.namedItem("rememberMe").checked,
+      loginWithEmail: form.elements.namedItem("loginWithEmail").checked,
+      verifyEmail: form.elements.namedItem("verifyEmail").checked,
+      sessionTimeoutMinutes: Number(values.sessionTimeoutMinutes),
+      passwordMinimumLength: Number(values.passwordMinimumLength),
+      bruteForceEnabled: form.elements.namedItem("bruteForceEnabled").checked,
+      bruteForceMaxFailures: Number(values.bruteForceMaxFailures),
+      otpEnabled: form.elements.namedItem("otpEnabled").checked,
+      otpRequired: form.elements.namedItem("otpRequired").checked,
+      passkeys: form.elements.namedItem("passkeys").checked,
+    };
+    if (!form.reportValidity()) return;
+    state.data.adminLoginSettingsDraft = body;
+    if (body.otpRequired && !body.otpEnabled) {
+      const message = text("adminOtpRequiredNeedsEnabled");
+      state.error = {
+        message,
+        body: { violations: [{ field: "otpRequired", message }] },
+      };
+      render();
+      return;
+    }
+    state.busy = "admin-login-settings";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminLoginSettings = await request(
+        "/api/admin/settings/login/native",
+        { method: "PUT", body },
+      );
+      state.data.adminLoginSettingsDraft = null;
+      state.notice = text("adminLoginPolicySaved");
+    } catch {
+      /* request rendered localized authorization or validation feedback */
     }
     state.busy = null;
     render();

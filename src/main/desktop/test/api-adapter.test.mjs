@@ -788,6 +788,27 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     method: "POST",
   });
   assert.equal(revokeAll.status, 200);
+  const nativeLoginSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/login/native",
+  });
+  assert.equal(nativeLoginSettings.status, 200);
+  const nativeLoginUpdate = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/login/native",
+    method: "PUT",
+    body: { passwordMinimumLength: 12 },
+  });
+  assert.equal(nativeLoginUpdate.status, 200);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/settings/login/native?all=true",
+      method: "PUT",
+      body: {},
+    }),
+    /not allowed/,
+  );
   await assert.rejects(
     adapter.request({
       console: "admin",

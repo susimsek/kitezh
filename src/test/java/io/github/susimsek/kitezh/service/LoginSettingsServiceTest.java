@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminLoginSettingsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.NativeAdminLoginSettingsRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.WebAuthnPolicyDTO;
 import io.github.susimsek.kitezh.mapper.LoginSettingsMapper;
 import io.github.susimsek.kitezh.repository.LoginSettingsRepository;
@@ -115,6 +116,47 @@ class LoginSettingsServiceTest {
         assertThat(settings.getOtpIssuer()).isEqualTo("New Issuer");
         verify(repository).save(settings);
         verify(auditEventService).record("login.settings.updated", "login-settings", "default");
+    }
+
+    @Test
+    void updatesOnlyNativeSafeSettingsAndPreservesHiddenPasswordList() {
+        JpaIndexedSessionRepository sessionRepository = mock(JpaIndexedSessionRepository.class);
+        LoginSettingsService configuredService =
+                new LoginSettingsService(
+                        repository,
+                        auditEventService,
+                        sessionRepository,
+                        Mappers.getMapper(LoginSettingsMapper.class),
+                        null);
+        NativeAdminLoginSettingsRequestDTO request =
+                new NativeAdminLoginSettingsRequestDTO(
+                        false, false, true, false, true, 45, 14, false, 7, true, false, true);
+
+        assertThat(configuredService.updateNativeAdminSettings(request).userRegistration())
+                .isFalse();
+        assertThat(settings.getPasswordCommonPasswords()).isEqualTo("password");
+        assertThat(settings.getSessionTimeoutMinutes()).isEqualTo(45);
+        assertThat(settings.isOtpRequired()).isFalse();
+        verify(repository).save(settings);
+        verify(sessionRepository).setDefaultMaxInactiveInterval(Duration.ofMinutes(45));
+        verify(auditEventService).record("login.settings.updated", "login-settings", "default");
+    }
+
+    @Test
+    void rejectsNativePolicyThatViolatesExistingPasswordAndOtpBounds() {
+        NativeAdminLoginSettingsRequestDTO invalidPasswordRequest =
+                new NativeAdminLoginSettingsRequestDTO(
+                        true, true, true, true, true, 30, 129, true, 5, true, true, false);
+
+        assertThatThrownBy(() -> service.updateNativeAdminSettings(invalidPasswordRequest))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.updateNativeAdminSettings(
+                                        new NativeAdminLoginSettingsRequestDTO(
+                                                true, true, true, true, true, 30, 12, true, 5,
+                                                false, true, false)))
+                .isInstanceOf(ApiException.class);
     }
 
     @Test

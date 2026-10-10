@@ -15,6 +15,8 @@ import io.github.susimsek.kitezh.dto.admin.LocalizationMessageOverrideDTO;
 import io.github.susimsek.kitezh.dto.admin.LocalizationMessageOverrideRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.LocalizationSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.LocalizationSettingsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.NativeAdminLoginSettingsDTO;
+import io.github.susimsek.kitezh.dto.admin.NativeAdminLoginSettingsRequestDTO;
 import io.github.susimsek.kitezh.dto.userprofile.UserProfileAttributeDefinitionDTO;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
 import io.github.susimsek.kitezh.service.SocialProviderSettingsService;
@@ -69,9 +71,17 @@ class AdminSettingsControllerTest {
         AdminLoginSettingsRequestDTO loginRequest = mock(AdminLoginSettingsRequestDTO.class);
         when(loginService.adminLoginSettings()).thenReturn(loginSettings);
         when(loginService.update(loginRequest)).thenReturn(loginSettings);
+        NativeAdminLoginSettingsDTO nativeSettings = mock(NativeAdminLoginSettingsDTO.class);
+        NativeAdminLoginSettingsRequestDTO nativeRequest =
+                mock(NativeAdminLoginSettingsRequestDTO.class);
+        when(loginService.nativeAdminLoginSettings()).thenReturn(nativeSettings);
+        when(loginService.updateNativeAdminSettings(nativeRequest)).thenReturn(nativeSettings);
 
         assertThat(loginController.get()).isSameAs(loginSettings);
         assertThat(loginController.update(loginRequest)).isSameAs(loginSettings);
+        assertThat(loginController.getNativeAdminSettings()).isSameAs(nativeSettings);
+        assertThat(loginController.updateNativeAdminSettings(nativeRequest))
+                .isSameAs(nativeSettings);
 
         RegistrationCaptchaSettingsService captchaService =
                 mock(RegistrationCaptchaSettingsService.class);

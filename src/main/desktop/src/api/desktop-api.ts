@@ -176,7 +176,8 @@ function isAllowedApiPath(
         path === "/api/admin/settings/offline-access" ||
         path === "/api/admin/settings/branding" ||
         path === "/api/admin/settings/localization" ||
-        path === "/api/admin/settings/email")
+        path === "/api/admin/settings/email" ||
+        path === "/api/admin/settings/login/native")
     )
       return true;
     if (
@@ -218,7 +219,8 @@ function isAllowedApiPath(
       path === "/api/admin/server-info" ||
       path === "/api/admin/settings/login" ||
       path === "/api/admin/settings/email" ||
-      path === "/api/admin/settings/ldap"
+      path === "/api/admin/settings/ldap" ||
+      path === "/api/admin/settings/login/native"
     )
       return true;
     if (path === "/api/admin/settings/localization") return true;
