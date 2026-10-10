@@ -169,6 +169,20 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/offline-access",
   });
   assert.equal(offlineAccessPolicy.status, 200);
+  const updatedCibaPolicy = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/ciba-policy",
+    method: "PUT",
+    body: { requestLifespanSeconds: 300 },
+  });
+  assert.equal(updatedCibaPolicy.status, 200);
+  const updatedOfflineAccessPolicy = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/offline-access",
+    method: "PUT",
+    body: { idleTimeout: "P30D", maxLimited: false },
+  });
+  assert.equal(updatedOfflineAccessPolicy.status, 200);
   const branding = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/branding",
@@ -290,7 +304,7 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/settings/ciba-policy",
+      path: "/api/admin/settings/ciba-policy?unexpected=true",
       method: "PUT",
     }),
     /not allowed/,

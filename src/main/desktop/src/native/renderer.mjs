@@ -395,11 +395,10 @@ function adminAdminKeysContent() {
 function adminAdminPoliciesContent() {
   const ciba = state.data.cibaPolicy ?? {};
   const offline = state.data.offlineAccessPolicy ?? {};
-  const policyValue = (value) =>
-    escapeHtml(value ?? text("adminNotConfigured"));
-  const row = (label, value) =>
-    `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${policyValue(value)}</span></div>`;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><div class="list">${row(text("adminRequestLifespan"), ciba.requestLifespanSeconds)}${row(text("adminPollingInterval"), ciba.pollingIntervalSeconds)}${row(text("adminDeliveryMode"), ciba.deliveryMode)}${row(text("adminUserVerification"), ciba.userVerification)}${row(text("adminMfaRequired"), ciba.mfaRequired === true ? text("adminRequired") : ciba.mfaRequired === false ? text("adminNotRequired") : undefined)}${row(text("adminStepUpRequired"), ciba.stepUpRequired === true ? text("adminRequired") : ciba.stepUpRequired === false ? text("adminNotRequired") : undefined)}${ciba.stepUpAcr ? row(text("adminStepUpAcr"), ciba.stepUpAcr) : ""}</div></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><div class="list">${row(text("adminIdleTimeout"), offline.idleTimeout)}${row(text("adminMaxLifespan"), offline.maxLifespan)}${row(text("adminMaxLimited"), offline.maxLimited === true ? text("adminRequired") : offline.maxLimited === false ? text("adminNotRequired") : undefined)}${offline.revokedBefore ? row(text("adminRevokedBefore"), offline.revokedBefore) : ""}</div></section></div>`;
+  const cibaDraft = state.data.cibaPolicyDraft ?? ciba;
+  const offlineDraft = state.data.offlineAccessPolicyDraft ?? offline;
+  const errors = violations(state.error?.body);
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><form data-form="admin-ciba-policy" novalidate>${field("requestLifespanSeconds", text("adminRequestLifespan"), cibaDraft.requestLifespanSeconds ?? "", errors.requestLifespanSeconds, "number", 'min="30" max="3600" required')}${field("pollingIntervalSeconds", text("adminPollingInterval"), cibaDraft.pollingIntervalSeconds ?? "", errors.pollingIntervalSeconds, "number", 'min="1" max="300" required')}<div class="field"><label for="deliveryMode">${escapeHtml(text("adminDeliveryMode"))}</label><select id="deliveryMode" name="deliveryMode"><option value="all" ${cibaDraft.deliveryMode === "all" ? "selected" : ""}>all</option><option value="poll" ${cibaDraft.deliveryMode === "poll" ? "selected" : ""}>poll</option><option value="ping" ${cibaDraft.deliveryMode === "ping" ? "selected" : ""}>ping</option><option value="push" ${cibaDraft.deliveryMode === "push" ? "selected" : ""}>push</option></select><div class="field-error">${escapeHtml(errors.deliveryMode ?? "")}</div></div><div class="field"><label for="userVerification">${escapeHtml(text("adminUserVerification"))}</label><select id="userVerification" name="userVerification"><option value="required" ${cibaDraft.userVerification === "required" ? "selected" : ""}>required</option><option value="preferred" ${cibaDraft.userVerification === "preferred" ? "selected" : ""}>preferred</option><option value="discouraged" ${cibaDraft.userVerification === "discouraged" ? "selected" : ""}>discouraged</option></select><div class="field-error">${escapeHtml(errors.userVerification ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="mfaRequired" ${cibaDraft.mfaRequired ? "checked" : ""}/>${escapeHtml(text("adminMfaRequired"))}</label><label class="settings-row"><input type="checkbox" name="stepUpRequired" ${cibaDraft.stepUpRequired ? "checked" : ""}/>${escapeHtml(text("adminStepUpRequired"))}</label>${field("stepUpAcr", text("adminStepUpAcr"), cibaDraft.stepUpAcr ?? "", errors.stepUpAcr, "text", 'maxlength="100"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-ciba-policy" })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><form data-form="admin-offline-access-policy" novalidate>${field("idleTimeout", text("adminIdleTimeout"), offlineDraft.idleTimeout ?? "", errors.idleTimeout, "text", 'required placeholder="P30D"')}${field("maxLifespan", text("adminMaxLifespan"), offlineDraft.maxLifespan ?? "", errors.maxLifespan, "text", 'placeholder="P180D"')}<div class="field"><label class="settings-row"><input type="checkbox" name="maxLimited" ${offlineDraft.maxLimited ? "checked" : ""}/>${escapeHtml(text("adminMaxLimited"))}</label><div class="field-error">${escapeHtml(errors.maxLimited ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-offline-access-policy" })}</div></form></section></div>`;
 }
 
 function adminAdminConfigurationContent() {
@@ -800,6 +799,60 @@ function formValues(form) {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-ciba-policy") {
+    const body = {
+      requestLifespanSeconds: Number(values.requestLifespanSeconds),
+      pollingIntervalSeconds: Number(values.pollingIntervalSeconds),
+      deliveryMode: String(values.deliveryMode),
+      userVerification: String(values.userVerification),
+      mfaRequired: form.elements.namedItem("mfaRequired").checked,
+      stepUpRequired: form.elements.namedItem("stepUpRequired").checked,
+      stepUpAcr: String(values.stepUpAcr ?? "").trim() || null,
+    };
+    state.data.cibaPolicyDraft = body;
+    state.busy = "admin-ciba-policy";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.cibaPolicy = await request("/api/admin/settings/ciba-policy", {
+        method: "PUT",
+        body,
+      });
+      state.data.cibaPolicyDraft = null;
+      state.notice = text("adminPolicySaved");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-offline-access-policy") {
+    const body = {
+      idleTimeout: String(values.idleTimeout ?? "").trim(),
+      maxLifespan: String(values.maxLifespan ?? "").trim() || null,
+      maxLimited: form.elements.namedItem("maxLimited").checked,
+    };
+    state.data.offlineAccessPolicyDraft = body;
+    state.busy = "admin-offline-access-policy";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.offlineAccessPolicy = await request(
+        "/api/admin/settings/offline-access",
+        { method: "PUT", body },
+      );
+      state.data.offlineAccessPolicyDraft = null;
+      state.notice = text("adminPolicySaved");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "profile") {
     if (values.email && !/^\S+@\S+\.\S+$/.test(values.email)) {
       state.error = {

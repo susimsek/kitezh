@@ -75,6 +75,7 @@ export const messages = {
     adminRequired: "Required",
     adminNotRequired: "Not required",
     adminNotConfigured: "Not configured",
+    adminPolicySaved: "Policy settings saved.",
     adminConfiguration: "Server & branding",
     adminConfigurationDescription:
       "Review server endpoints and public branding.",
@@ -422,6 +423,7 @@ export const messages = {
     adminRequired: "Gerekli",
     adminNotRequired: "Gerekli değil",
     adminNotConfigured: "Yapılandırılmadı",
+    adminPolicySaved: "Politika ayarları kaydedildi.",
     adminConfiguration: "Sunucu ve markalama",
     adminConfigurationDescription:
       "Sunucu uç noktalarını ve herkese açık markalamayı inceleyin.",

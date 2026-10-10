@@ -257,8 +257,17 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         globalThis.__authorizationOpens += 1;
         globalThis.__pendingAuthorizationUrl = url;
       };
-      globalThis.fetch = async (url) => {
+      globalThis.fetch = async (url, init) => {
         const requestUrl = new URL(String(url));
+        const requestMethod = String(init?.method ?? "GET").toUpperCase();
+        if (
+          requestMethod === "PUT" &&
+          [
+            "/api/admin/settings/ciba-policy",
+            "/api/admin/settings/offline-access",
+          ].includes(requestUrl.pathname)
+        )
+          globalThis.__requestBody = init?.body;
         if (requestUrl.pathname === "/oauth2/token")
           return new Response(
             JSON.stringify({
@@ -611,6 +620,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          requestUrl.pathname === "/api/admin/settings/ciba-policy" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(globalThis.__requestBody);
+          globalThis.__cibaPolicyUpdates ??= [];
+          globalThis.__cibaPolicyUpdates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.requestLifespanSeconds > 3600)
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the policy fields.",
+                violations: [
+                  {
+                    field: "requestLifespanSeconds",
+                    message: "Lifetime must not exceed 3600 seconds.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         if (requestUrl.pathname === "/api/admin/settings/ciba-policy") {
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
@@ -623,6 +661,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               stepUpRequired: false,
               stepUpAcr: "urn:kitezh:loa:2",
             }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          requestUrl.pathname === "/api/admin/settings/offline-access" &&
+          requestMethod === "PUT"
+        ) {
+          const body = JSON.parse(globalThis.__requestBody);
+          globalThis.__offlineAccessPolicyUpdate = body;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({ ...body, revokedBefore: "2026-01-01T00:00:00Z" }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
@@ -1225,11 +1278,67 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(await policiesNavigation.isDisabled(), true);
     assert.equal(await policiesNavigation.locator(".spinner").count(), 1);
     await window.getByRole("heading", { name: "CIBA policy" }).waitFor();
-    await window.getByText("300", { exact: true }).waitFor();
-    await window.getByText("P30D", { exact: true }).waitFor();
-    await window.getByText("urn:kitezh:loa:2", { exact: true }).waitFor();
+    const cibaForm = window.locator('form[data-form="admin-ciba-policy"]');
+    assert.equal(
+      await cibaForm.locator('[name="requestLifespanSeconds"]').inputValue(),
+      "300",
+    );
+    assert.equal(
+      await cibaForm.locator('[name="pollingIntervalSeconds"]').inputValue(),
+      "5",
+    );
+    assert.equal(
+      await cibaForm.locator('[name="stepUpAcr"]').inputValue(),
+      "urn:kitezh:loa:2",
+    );
+    const offlineForm = window.locator(
+      'form[data-form="admin-offline-access-policy"]',
+    );
+    assert.equal(
+      await offlineForm.locator('[name="idleTimeout"]').inputValue(),
+      "P30D",
+    );
+    assert.equal(
+      await offlineForm.locator('[name="maxLifespan"]').inputValue(),
+      "P180D",
+    );
+    const cibaLifespan = cibaForm.locator('[name="requestLifespanSeconds"]');
+    await cibaLifespan.fill("5000");
+    const cibaSave = cibaForm.getByRole("button", { name: "Save" });
+    await cibaSave.click();
+    assert.equal(await cibaSave.isDisabled(), true);
+    assert.equal(await cibaSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Lifetime must not exceed 3600 seconds.", { exact: true })
+      .waitFor();
+    assert.equal(await cibaLifespan.getAttribute("aria-invalid"), "true");
+    assert.equal(await cibaLifespan.inputValue(), "5000");
+    await cibaLifespan.fill("600");
+    await cibaSave.click();
+    assert.equal(await cibaSave.isDisabled(), true);
+    assert.equal(await cibaSave.locator(".spinner").count(), 1);
+    await window.getByText("Policy settings saved.").waitFor();
+    const cibaUpdates = await application.evaluate(
+      () => globalThis.__cibaPolicyUpdates,
+    );
+    assert.equal(cibaUpdates[1].requestLifespanSeconds, 600);
+    await offlineForm.locator('[name="idleTimeout"]').fill("P45D");
+    await offlineForm.locator('[name="maxLifespan"]').fill("P365D");
+    await offlineForm.locator('[name="maxLimited"]').check();
+    const offlineSave = offlineForm.getByRole("button", { name: "Save" });
+    await offlineSave.click();
+    assert.equal(await offlineSave.isDisabled(), true);
+    assert.equal(await offlineSave.locator(".spinner").count(), 1);
+    await window.getByText("Policy settings saved.").waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__offlineAccessPolicyUpdate),
+      { idleTimeout: "P45D", maxLifespan: "P365D", maxLimited: true },
+    );
     await window.getByRole("button", { name: "Turkish" }).click();
-    await window.getByRole("heading", { name: "CIBA politikası" }).waitFor();
+    await window
+      .getByRole("heading", { name: "Politikalar", exact: true })
+      .waitFor();
+    await window.getByText("İstek ömrü (saniye)", { exact: true }).waitFor();
     await window.getByText("MFA gerekli", { exact: true }).waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     const configurationNavigation = window.getByRole("button", {
