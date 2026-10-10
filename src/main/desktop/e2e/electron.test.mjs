@@ -430,6 +430,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/identity-providers") {
+          globalThis.__adminIdentityProviderRequests ??= [];
+          globalThis.__adminIdentityProviderRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const query = requestUrl.searchParams.get("q") ?? "";
+          const alias = query ? "google" : "github";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "provider-1",
+                  registrationId: alias,
+                  providerType: "oidc",
+                  displayName: alias === "google" ? "Google" : "GitHub",
+                  alias,
+                  enabled: true,
+                  configured: true,
+                  clientId: "public-client-id",
+                  clientSecretConfigured: true,
+                  samlIdpCertificate: "SECRET_CERT_NEVER_RENDER",
+                  mapperCount: 2,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -611,6 +645,36 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       () => globalThis.__adminClientRequests,
     );
     assert.equal(new URLSearchParams(clientRequests[1]).get("q"), "admin");
+    const identityProvidersNavigation = window.getByRole("button", {
+      name: "Identity providers",
+      exact: true,
+    });
+    await identityProvidersNavigation.click();
+    assert.equal(await identityProvidersNavigation.isDisabled(), true);
+    assert.equal(
+      await identityProvidersNavigation.locator(".spinner").count(),
+      1,
+    );
+    await window.getByText("GitHub", { exact: true }).waitFor();
+    assert.equal(await window.getByText("SECRET_CERT_NEVER_RENDER").count(), 0);
+    const providerQuery = window.getByRole("searchbox", {
+      name: "Search identity providers",
+    });
+    await providerQuery.fill("google");
+    await window
+      .getByRole("button", { name: "Search identity providers" })
+      .click();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Search identity providers" })
+        .isDisabled(),
+      true,
+    );
+    await window.getByText("Google", { exact: true }).waitFor();
+    const providerRequests = await application.evaluate(
+      () => globalThis.__adminIdentityProviderRequests,
+    );
+    assert.equal(new URLSearchParams(providerRequests[1]).get("q"), "google");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {

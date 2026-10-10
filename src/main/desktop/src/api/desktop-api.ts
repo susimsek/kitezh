@@ -57,13 +57,22 @@ function isAllowedApiPath(
       const isGroups = url.pathname === "/api/admin/groups";
       const isClientScopes = url.pathname === "/api/admin/client-scopes";
       const isClients = url.pathname === "/api/admin/clients";
+      const isIdentityProviders =
+        url.pathname === "/api/admin/identity-providers";
       const sortFields = isUsers
         ? ["username,asc", "username,desc"]
         : isClients
           ? ["clientId,asc", "clientId,desc"]
-          : ["name,asc", "name,desc"];
+          : isIdentityProviders
+            ? ["guiOrder,asc", "guiOrder,desc"]
+            : ["name,asc", "name,desc"];
       return (
-        (isUsers || isRoles || isGroups || isClientScopes || isClients) &&
+        (isUsers ||
+          isRoles ||
+          isGroups ||
+          isClientScopes ||
+          isClients ||
+          isIdentityProviders) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -82,7 +91,9 @@ function isAllowedApiPath(
               ? "username,asc"
               : isClients
                 ? "clientId,asc"
-                : "name,asc"),
+                : isIdentityProviders
+                  ? "guiOrder,asc"
+                  : "name,asc"),
         )
       );
     } catch {
