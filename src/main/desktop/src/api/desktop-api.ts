@@ -70,6 +70,12 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/groups") return true;
+    if (
+      method === "DELETE" &&
+      /^\/api\/admin\/groups\/[1-9]\d*$/.test(path) &&
+      Number.isSafeInteger(Number(path.split("/").at(-1)))
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/client-scopes") return true;
     if (
       method === "PUT" &&

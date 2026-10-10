@@ -728,6 +728,19 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/groups\/[1-9]\d*$/.test(requestUrl.pathname) &&
+          requestMethod === "DELETE"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-1));
+          globalThis.__adminGroupDeleteRequests ??= [];
+          globalThis.__adminGroupDeleteRequests.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__createdGroups = (
+            globalThis.__createdGroups ?? []
+          ).filter((group) => group.id !== id);
+          return new Response(null, { status: 204 });
+        }
         if (requestUrl.pathname === "/api/admin/groups") {
           if (requestMethod === "POST") {
             const body = JSON.parse(init?.body ?? "{}");
@@ -2126,6 +2139,41 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Search groups" }).waitFor();
+    const createdGroupRow = window.locator('[data-group-id="99"]');
+    await createdGroupRow
+      .getByRole("button", { name: "Delete group", exact: true })
+      .click();
+    await createdGroupRow
+      .getByText(
+        "Delete this group? Its members will be removed and their access revoked. Groups with child groups cannot be deleted.",
+        { exact: true },
+      )
+      .waitFor();
+    await createdGroupRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminGroupDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await createdGroupRow
+      .getByRole("button", { name: "Delete group", exact: true })
+      .click();
+    const confirmGroupDelete = createdGroupRow.getByRole("button", {
+      name: "Delete group",
+      exact: true,
+    });
+    await confirmGroupDelete.click();
+    assert.equal(await confirmGroupDelete.isDisabled(), true);
+    assert.equal(await confirmGroupDelete.locator(".spinner").count(), 1);
+    await window.getByText("Group deleted.", { exact: true }).waitFor();
+    assert.equal(await createdGroupRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminGroupDeleteRequests),
+      [99],
+    );
     const clientScopesNavigation = window.getByRole("button", {
       name: "Client scopes",
       exact: true,

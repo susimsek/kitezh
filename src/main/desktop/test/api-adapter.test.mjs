@@ -160,6 +160,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdGroup.status, 200);
+  const deletedGroup = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12",
+    method: "DELETE",
+  });
+  assert.equal(deletedGroup.status, 200);
   const createdClientScope = await adapter.request({
     console: "admin",
     path: "/api/admin/client-scopes",
@@ -448,6 +454,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/groups/1",
       method: "POST",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/groups/1/users/2",
+      method: "DELETE",
     }),
     /not allowed/,
   );
