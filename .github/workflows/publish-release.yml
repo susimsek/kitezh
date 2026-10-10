@@ -3,32 +3,31 @@ name: Publish GitHub Release
 on:
   workflow_run:
     workflows:
-      - Desktop Release
-      - Mobile Release
+      - Backend Release
     types:
       - completed
 
 permissions:
-  actions: read
+  actions: write
   contents: write
 
 concurrency:
-  group: publish-github-release-${{ github.event.workflow_run.head_sha }}
+  group: publish-github-release-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish after all release assets are ready
+  release:
+    name: Build packages and publish once
     if: >-
       ${{
         github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_repository.full_name == github.repository &&
-        (github.event.workflow_run.event == 'workflow_run' || github.event.workflow_run.event == 'workflow_dispatch')
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
       }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 120
     steps:
-      - name: Resolve triggering release run
+      - name: Resolve the completed backend release
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -37,37 +36,47 @@ jobs:
         run: |
           set -euo pipefail
           upstream_run="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs/${UPSTREAM_RUN_ID}")"
+          workflow_name="$(jq -r '.name' <<< "${upstream_run}")"
+          event_name="$(jq -r '.event' <<< "${upstream_run}")"
+          release_tag="$(jq -r '.head_branch' <<< "${upstream_run}")"
           release_sha="$(jq -r '.head_sha' <<< "${upstream_run}")"
-          if [[ ! "${release_sha}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Could not resolve a valid release commit from workflow run ${UPSTREAM_RUN_ID}." >&2
+          if [[ "${workflow_name}" != "Backend Release" || "${event_name}" != "push" ]]; then
+            echo "Expected a successful Backend Release tag run; received ${workflow_name} (${event_name})." >&2
             exit 1
           fi
-          echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a version tag such as v0.1.4; received '${release_tag}'." >&2
+            exit 1
+          fi
+          if [[ ! "${release_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Backend Release run ${UPSTREAM_RUN_ID} has an invalid commit SHA." >&2
+            exit 1
+          fi
+          {
+            echo "release_tag=${release_tag}"
+            echo "release_sha=${release_sha}"
+          } >> "${GITHUB_OUTPUT}"
 
-      - name: Check out release source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ steps.source.outputs.release_sha }}
-          fetch-depth: 0
-
-      - name: Resolve release tag
-        id: release
+      - name: Ensure the shared release is a draft
         env:
-          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
         run: |
           set -euo pipefail
-          release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | sort -V | tail -n 1)"
-          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::notice::Skipping stale release completion for ${RELEASE_SHA}; no version tag points at this commit."
-            echo "current_release=false" >> "${GITHUB_OUTPUT}"
-            exit 0
+          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --repo "${GH_REPO}" \
+              --verify-tag \
+              --draft \
+              --title "${RELEASE_TAG}" \
+              --generate-notes
+          else
+            gh release edit "${RELEASE_TAG}" --draft --repo "${GH_REPO}"
           fi
-          echo "current_release=true" >> "${GITHUB_OUTPUT}"
-          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
 
-      - name: Confirm backend, desktop, and mobile workflows succeeded
-        id: check_release_runs
-        if: ${{ steps.release.outputs.current_release == 'true' }}
+      - name: Record existing package workflow runs
+        id: baseline
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -75,48 +84,60 @@ jobs:
         run: |
           set -euo pipefail
           runs="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100")"
-          for workflow_name in "Backend Release" "Desktop Release" "Mobile Release"; do
-            if ! jq -e --arg sha "${RELEASE_SHA}" --arg name "${workflow_name}" \
-              '.workflow_runs | any(.[]; .head_sha == $sha and .name == $name and .status == "completed" and .conclusion == "success")' \
-              <<< "${runs}" >/dev/null; then
-              echo "${workflow_name} has not succeeded for ${RELEASE_SHA}; leaving the release as a draft."
-              echo "ready=false" >> "${GITHUB_OUTPUT}"
+          existing_ids="$(jq -c '[.workflow_runs[] | select(.name == "Desktop Release" or .name == "Mobile Release") | .id]' <<< "${runs}")"
+          echo "existing_ids=${existing_ids}" >> "${GITHUB_OUTPUT}"
+
+      - name: Start desktop and mobile packaging in parallel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh workflow run desktop-release.yml --repo "${GH_REPO}" --ref "${RELEASE_TAG}" -f "release_tag=${RELEASE_TAG}"
+          gh workflow run mobile-release.yml --repo "${GH_REPO}" --ref "${RELEASE_TAG}" -f "release_tag=${RELEASE_TAG}"
+
+      - name: Wait for both package workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
+          EXISTING_RUN_IDS: ${{ steps.baseline.outputs.existing_ids }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 6600))
+          while (( SECONDS < deadline )); do
+            runs="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100")"
+            statuses="$(jq -c --arg sha "${RELEASE_SHA}" --argjson existing "${EXISTING_RUN_IDS}" '
+              [.workflow_runs[]
+                | select((.name == "Desktop Release" or .name == "Mobile Release")
+                    and .event == "workflow_dispatch"
+                    and .head_sha == $sha
+                    and (.id as $run_id | ($existing | index($run_id)) == null))
+                | {name, id, status, conclusion}]
+            ' <<< "${runs}")"
+            desktop="$(jq -r '[.[] | select(.name == "Desktop Release")] | sort_by(.id) | last // empty | .status' <<< "${statuses}")"
+            mobile="$(jq -r '[.[] | select(.name == "Mobile Release")] | sort_by(.id) | last // empty | .status' <<< "${statuses}")"
+            desktop_result="$(jq -r '[.[] | select(.name == "Desktop Release")] | sort_by(.id) | last // empty | .conclusion' <<< "${statuses}")"
+            mobile_result="$(jq -r '[.[] | select(.name == "Mobile Release")] | sort_by(.id) | last // empty | .conclusion' <<< "${statuses}")"
+            echo "Desktop Release: ${desktop:-waiting}; Mobile Release: ${mobile:-waiting}"
+            if [[ "${desktop}" == "completed" && "${mobile}" == "completed" ]]; then
+              if [[ "${desktop_result}" != "success" || "${mobile_result}" != "success" ]]; then
+                echo "Package workflows failed (desktop=${desktop_result}, mobile=${mobile_result}); release remains a draft." >&2
+                exit 1
+              fi
               exit 0
             fi
+            sleep 30
           done
-          echo "ready=true" >> "${GITHUB_OUTPUT}"
+          echo "Timed out waiting for desktop and mobile packages; release remains a draft." >&2
+          exit 1
 
-      - name: Let only the last completed package workflow publish
-        id: publish_gate
-        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' }}
+      - name: Confirm all desktop and mobile assets are present
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_SHA: ${{ steps.source.outputs.release_sha }}
-          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
-        run: |
-          set -euo pipefail
-          runs="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100")"
-          latest_package_run_id="$(jq -r '
-            [.workflow_runs[]
-              | select((.name == "Desktop Release" or .name == "Mobile Release") and .status == "completed" and .conclusion == "success")]
-            | sort_by(.updated_at)
-            | last
-            | .id // empty
-          ' <<< "${runs}")"
-          if [[ "${TRIGGER_RUN_ID}" != "${latest_package_run_id}" ]]; then
-            echo "A later package workflow completion will publish this release."
-            echo "should_publish=false" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-          echo "should_publish=true" >> "${GITHUB_OUTPUT}"
-
-      - name: Confirm expected release assets are present
-        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' && steps.publish_gate.outputs.should_publish == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
         run: |
           set -euo pipefail
           assets="$(gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" --json assets --jq '.assets | map(.name)')"
@@ -128,9 +149,8 @@ jobs:
           done
 
       - name: Publish GitHub Release
-        if: ${{ steps.release.outputs.current_release == 'true' && steps.check_release_runs.outputs.ready == 'true' && steps.publish_gate.outputs.should_publish == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
         run: gh release edit "${RELEASE_TAG}" --draft=false --repo "${GH_REPO}"

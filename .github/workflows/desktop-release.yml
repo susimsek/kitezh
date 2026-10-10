@@ -1,11 +1,6 @@
 name: Desktop Release
 
 on:
-  workflow_run:
-    workflows:
-      - Backend Release
-    types:
-      - completed
   workflow_dispatch:
     inputs:
       release_tag:
@@ -14,11 +9,10 @@ on:
         default: v0.1.0
 
 permissions:
-  actions: read
   contents: read
 
 concurrency:
-  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.id }}
+  group: desktop-release-${{ inputs.release_tag }}
   cancel-in-progress: false
 
 env:
@@ -28,7 +22,6 @@ env:
 jobs:
   resolve-release:
     name: Resolve release version
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -39,42 +32,22 @@ jobs:
       - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.event.workflow_run.head_sha }}
+          ref: ${{ format('refs/tags/{0}', inputs.release_tag) }}
           fetch-depth: 0
 
       - name: Resolve release tag
         id: release
         shell: bash
         env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id || '' }}
-          DISPATCH_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
+          DISPATCH_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          if [[ -n "${DISPATCH_TAG}" ]]; then
-            release_tag="${DISPATCH_TAG}"
-            RELEASE_SHA="$(git rev-parse "${release_tag}^{commit}")"
-          else
-            upstream_run="$(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/actions/runs/${UPSTREAM_RUN_ID}")"
-            upstream_name="$(jq -r '.name' <<< "${upstream_run}")"
-            upstream_event="$(jq -r '.event' <<< "${upstream_run}")"
-            release_tag="$(jq -r '.head_branch' <<< "${upstream_run}")"
-            RELEASE_SHA="$(jq -r '.head_sha' <<< "${upstream_run}")"
-            if [[ "${upstream_name}" != "Backend Release" || "${upstream_event}" != "push" ]]; then
-              echo "Expected a Backend Release tag push; received ${upstream_name} (${upstream_event})." >&2
-              exit 1
-            fi
-          fi
-          if [[ -z "${release_tag}" ]]; then
-            echo "::notice::Skipping stale release run for ${RELEASE_SHA}; no version tag points at this commit."
-            echo "current_release=false" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
+          release_tag="${DISPATCH_TAG}"
           if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Expected a version tag such as v0.1.4; received '${release_tag}'." >&2
             exit 1
           fi
+          RELEASE_SHA="$(git rev-parse "${release_tag}^{commit}")"
           {
             echo "release_tag=${release_tag}"
             echo "release_sha=${RELEASE_SHA}"
@@ -236,7 +209,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: src/main/web/.next/cache
-          key: next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.event.workflow_run.head_sha || github.sha }}
+          key: next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
 
