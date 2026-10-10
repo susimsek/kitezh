@@ -526,6 +526,33 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/offline-sessions") {
+          globalThis.__adminOfflineSessionRequests ??= [];
+          globalThis.__adminOfflineSessionRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const page = Number(requestUrl.searchParams.get("page") ?? 0);
+          const username = page === 0 ? "alice" : "bob";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "offline-auth-opaque-id",
+                  username,
+                  clientId: "account-console",
+                  clientName: "Account Console",
+                },
+              ],
+              number: page,
+              totalPages: 2,
+              totalElements: 2,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -798,6 +825,32 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       () => globalThis.__adminConsentRequests,
     );
     assert.equal(new URLSearchParams(consentRequests[1]).get("q"), "admin");
+    const offlineSessionsNavigation = window.getByRole("button", {
+      name: "Offline sessions",
+      exact: true,
+    });
+    await offlineSessionsNavigation.click();
+    assert.equal(await offlineSessionsNavigation.isDisabled(), true);
+    assert.equal(
+      await offlineSessionsNavigation.locator(".spinner").count(),
+      1,
+    );
+    await window.getByText("alice", { exact: true }).waitFor();
+    assert.equal(await window.getByText("offline-auth-opaque-id").count(), 0);
+    const nextOfflineSessionPage = window.getByRole("button", { name: "Next" });
+    await nextOfflineSessionPage.click();
+    assert.equal(await nextOfflineSessionPage.isDisabled(), true);
+    assert.equal(await nextOfflineSessionPage.locator(".spinner").count(), 1);
+    await window.getByText("bob", { exact: true }).waitFor();
+    const offlineSessionRequests = await application.evaluate(
+      () => globalThis.__adminOfflineSessionRequests,
+    );
+    assert.deepEqual(
+      offlineSessionRequests.map((query) =>
+        new URLSearchParams(query).get("page"),
+      ),
+      ["0", "1"],
+    );
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {

@@ -60,6 +60,7 @@ function isAllowedApiPath(
         url.pathname === "/api/admin/identity-providers";
       const isSessions = url.pathname === "/api/admin/sessions";
       const isConsents = url.pathname === "/api/admin/consents";
+      const isOfflineSessions = url.pathname === "/api/admin/offline-sessions";
       const allowedParameters = new Set([
         "q",
         "page",
@@ -77,7 +78,9 @@ function isAllowedApiPath(
               ? ["lastAccessTime,asc", "lastAccessTime,desc"]
               : isConsents
                 ? ["id.principalName,asc", "id.principalName,desc"]
-                : ["name,asc", "name,desc"];
+                : isOfflineSessions
+                  ? ["refreshTokenIssuedAt,asc", "refreshTokenIssuedAt,desc"]
+                  : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
@@ -86,7 +89,8 @@ function isAllowedApiPath(
           isClients ||
           isIdentityProviders ||
           isSessions ||
-          isConsents) &&
+          isConsents ||
+          isOfflineSessions) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -111,7 +115,9 @@ function isAllowedApiPath(
                     ? "lastAccessTime,desc"
                     : isConsents
                       ? "id.principalName,asc"
-                      : "name,asc"),
+                      : isOfflineSessions
+                        ? "refreshTokenIssuedAt,desc"
+                        : "name,asc"),
         ) &&
         ["active", "expired"].includes(
           url.searchParams.get("status") ?? "active",

@@ -144,6 +144,11 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/consents?q=account&page=0&size=20&sort=id.principalName,asc",
   });
   assert.equal(consents.status, 200);
+  const offlineSessions = await adapter.request({
+    console: "admin",
+    path: "/api/admin/offline-sessions?page=0&size=20&sort=refreshTokenIssuedAt,desc",
+  });
+  assert.equal(offlineSessions.status, 200);
   await assert.rejects(
     adapter.request({
       console: "admin",
