@@ -44,6 +44,20 @@ const escapeHtml = (value) =>
         character
       ],
   );
+function userAvatarSource(user) {
+  if (
+    typeof boot.apiBaseUrl !== "string" ||
+    !/^\/avatars\/[A-Fa-f0-9-]{36}\?v=\d+$/.test(user.avatarUrl ?? "")
+  )
+    return null;
+  try {
+    const base = new URL(boot.apiBaseUrl);
+    const image = new URL(user.avatarUrl, base);
+    return image.origin === base.origin ? image.href : null;
+  } catch {
+    return null;
+  }
+}
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const actionIcons = {
@@ -90,6 +104,9 @@ const actionIcons = {
   "admin-user-delete-request": "delete",
   "admin-user-delete-confirm": "delete",
   "admin-user-edit-toggle": "edit",
+  "admin-user-avatar-toggle": "edit",
+  "admin-user-avatar-delete-request": "delete",
+  "admin-user-avatar-delete-confirm": "delete",
   "choose-account": "home",
   "choose-admin": "shield",
   "delete-account": "delete",
@@ -507,6 +524,13 @@ function adminUsersContent() {
         busy: profileAttributesLoading,
         disabled: state.offline || Boolean(state.busy),
       });
+      const avatarOpen =
+        Number(state.data.userAvatarOpenId) === Number(user.id);
+      const avatarControl = button(text("adminUserAvatar"), {
+        action: "admin-user-avatar-toggle",
+        id: user.id,
+        disabled: state.offline || Boolean(state.busy),
+      });
       const editing = Number(state.data.userEditOpenId) === Number(user.id);
       const selectedRoles = Array.isArray(editDraft.roles)
         ? editDraft.roles
@@ -515,7 +539,7 @@ function adminUsersContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><label class="settings-row"><input type="checkbox" data-action="admin-user-bulk-select" data-id="${escapeHtml(user.id)}" aria-label="${escapeHtml(text("adminSelectUser"))} ${escapeHtml(user.username)}" ${userSelected ? "checked" : ""} ${state.busy || state.offline ? "disabled" : ""}/>${escapeHtml(text("adminSelectUser"))}</label><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.email && !user.emailVerified ? `<span>${escapeHtml(text("adminUserEmailNotVerified"))}</span>` : ""}${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${actionEmailControl}${profileAttributesControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${actionEmailOpen ? adminUserActionEmailContent(user.id) : ""}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><label class="settings-row"><input type="checkbox" data-action="admin-user-bulk-select" data-id="${escapeHtml(user.id)}" aria-label="${escapeHtml(text("adminSelectUser"))} ${escapeHtml(user.username)}" ${userSelected ? "checked" : ""} ${state.busy || state.offline ? "disabled" : ""}/>${escapeHtml(text("adminSelectUser"))}</label><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.email && !user.emailVerified ? `<span>${escapeHtml(text("adminUserEmailNotVerified"))}</span>` : ""}${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${actionEmailControl}${profileAttributesControl}${avatarControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${actionEmailOpen ? adminUserActionEmailContent(user.id) : ""}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}${avatarOpen ? adminUserAvatarContent(user) : ""}</article>`;
     })
     .join("");
   const bulkAction = state.data.adminUserBulkConfirmAction;
@@ -602,6 +626,25 @@ function adminUserProfileAttributesContent(userId) {
     .join("");
   const saveBusy = state.busy === `user-profile-attributes-save:${userId}`;
   return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><form data-form="admin-user-profile-attributes" data-user-id="${escapeHtml(userId)}" novalidate><div class="form-grid">${fields || `<div class="empty" role="status">${escapeHtml(text("adminNoProfileAttributes"))}</div>`}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: saveBusy, disabled: state.offline || definitions.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-profile-attributes-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
+}
+
+function adminUserAvatarContent(user) {
+  const userId = Number(user.id);
+  const source = userAvatarSource(user);
+  const error = state.data.adminAvatarErrors?.[userId];
+  const confirming = Number(state.data.adminAvatarDeleteConfirmId) === userId;
+  const uploadBusy = state.busy === `admin-avatar-upload:${userId}`;
+  const deleteBusy = state.busy === `admin-avatar-delete:${userId}`;
+  const deleteControl = source
+    ? confirming
+      ? `<div class="actions"><span role="status">${escapeHtml(text("adminUserAvatarRemovePrompt"))}</span>${button(text("adminUserAvatarRemove"), { action: "admin-user-avatar-delete-confirm", id: userId, danger: true, busy: deleteBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-avatar-delete-cancel" data-id="${userId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+      : button(text("adminUserAvatarRemove"), {
+          action: "admin-user-avatar-delete-request",
+          id: userId,
+          disabled: state.offline || Boolean(state.busy),
+        })
+    : "";
+  return `<section class="card" aria-label="${escapeHtml(text("adminUserAvatar"))}">${source ? `<img class="admin-user-avatar" src="${escapeHtml(source)}" alt="${escapeHtml(text("adminUserAvatar"))}"/>` : `<p>${escapeHtml(text("adminUserAvatarEmpty"))}</p>`}<label class="field" for="admin-user-avatar-file-${userId}">${escapeHtml(text("adminUserAvatar"))}<input id="admin-user-avatar-file-${userId}" type="file" accept="image/jpeg,image/png" data-admin-avatar-file="${userId}" ${state.offline || state.busy ? "disabled" : ""}/></label><p class="muted">${escapeHtml(text("adminUserAvatarHelp"))}</p>${error ? `<p class="field-error" role="alert">${escapeHtml(error)}</p>` : ""}<div class="actions">${button(text("adminUserAvatarUpload"), { action: "admin-user-avatar-upload", id: userId, busy: uploadBusy, disabled: state.offline })}${deleteControl}<button class="secondary-button" type="button" data-action="admin-user-avatar-close" data-id="${userId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
 }
 
 function adminUserPasskeysContent(userId) {
@@ -1762,6 +1805,28 @@ function profileAttributeValues(form) {
       return [input.dataset.profileAttribute, values];
     }),
   );
+}
+
+async function encodeAvatarFile(file) {
+  if (
+    !["image/jpeg", "image/png"].includes(file.type) ||
+    file.size === 0 ||
+    file.size > 2 * 1024 * 1024
+  )
+    throw new Error("invalid_avatar");
+  const bitmap = await createImageBitmap(file);
+  const tooLarge =
+    bitmap.width > 4096 ||
+    bitmap.height > 4096 ||
+    bitmap.width * bitmap.height > 4_000_000;
+  bitmap.close();
+  if (tooLarge) throw new Error("invalid_avatar");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return { contentType: file.type, dataBase64: btoa(binary) };
 }
 
 function preserveOfflineDrafts() {
@@ -3344,6 +3409,110 @@ async function action(action, element) {
     }
     state.busy = null;
     render();
+    return;
+  }
+  if (
+    action === "admin-user-avatar-toggle" ||
+    action === "admin-user-avatar-close"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    state.data.userAvatarOpenId =
+      action === "admin-user-avatar-close" ||
+      Number(state.data.userAvatarOpenId) === id
+        ? null
+        : id;
+    state.data.adminAvatarDeleteConfirmId = null;
+    delete state.data.adminAvatarErrors?.[id];
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-avatar-delete-request" ||
+    action === "admin-user-avatar-delete-cancel"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    state.data.adminAvatarDeleteConfirmId =
+      action === "admin-user-avatar-delete-request" && userAvatarSource(user)
+        ? id
+        : null;
+    render();
+    return;
+  }
+  if (action === "admin-user-avatar-upload") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    const fileInput = element
+      .closest("article")
+      ?.querySelector(`[data-admin-avatar-file="${id}"]`);
+    const file = fileInput?.files?.[0];
+    if (!Number.isSafeInteger(id) || id < 1 || !user || !file) {
+      state.data.adminAvatarErrors ??= {};
+      state.data.adminAvatarErrors[id] = text("adminUserAvatarHelp");
+      render();
+      return;
+    }
+    state.data.adminAvatarErrors ??= {};
+    state.busy = `admin-avatar-upload:${id}`;
+    delete state.data.adminAvatarErrors[id];
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const payload = await encodeAvatarFile(file);
+      const result = await request(`/api/admin/users/${id}/avatar`, {
+        method: "PUT",
+        body: payload,
+      });
+      if (typeof result?.avatarUrl !== "string")
+        throw new Error("Invalid avatar response");
+      user.avatarUrl = result.avatarUrl;
+      state.notice = text("adminUserAvatarUpdated");
+    } catch (error) {
+      if (error?.message === "invalid_avatar") {
+        state.data.adminAvatarErrors[id] = text("adminUserAvatarHelp");
+      }
+    } finally {
+      state.busy = null;
+      render();
+    }
+    return;
+  }
+  if (action === "admin-user-avatar-delete-confirm") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !userAvatarSource(user ?? {}))
+      return;
+    state.busy = `admin-avatar-delete:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/users/${id}/avatar`, { method: "DELETE" });
+      user.avatarUrl = null;
+      state.data.adminAvatarDeleteConfirmId = null;
+      state.notice = text("adminUserAvatarRemoved");
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    } finally {
+      state.busy = null;
+      render();
+    }
     return;
   }
   if (

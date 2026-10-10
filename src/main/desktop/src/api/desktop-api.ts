@@ -50,6 +50,15 @@ function isAllowedApiPath(
     if (method === "GET" && path === "/api/admin/profile-attributes")
       return true;
     if (method === "POST" && path === "/api/admin/users") return true;
+    const userAvatarMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/avatar$/,
+    );
+    if (
+      userAvatarMatch &&
+      Number.isSafeInteger(Number(userAvatarMatch[1])) &&
+      ["PUT", "DELETE"].includes(method)
+    )
+      return true;
     if (method === "POST" && path === "/api/admin/users/bulk") return true;
     const userUpdateMatch = path.match(/^\/api\/admin\/users\/([1-9]\d*)$/);
     if (
@@ -527,6 +536,36 @@ function tokenResponseToSession(
   };
 }
 
+function avatarFormData(body: unknown) {
+  if (!body || typeof body !== "object")
+    throw new Error("Invalid native avatar payload");
+  const payload = body as Record<string, unknown>;
+  if (
+    Object.keys(payload).length !== 2 ||
+    !["image/jpeg", "image/png"].includes(String(payload.contentType)) ||
+    typeof payload.dataBase64 !== "string" ||
+    payload.dataBase64.length > 2_796_204 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+      payload.dataBase64,
+    )
+  )
+    throw new Error("Invalid native avatar payload");
+  const bytes = Buffer.from(payload.dataBase64, "base64");
+  if (
+    bytes.byteLength === 0 ||
+    bytes.byteLength > 2 * 1024 * 1024 ||
+    bytes.toString("base64") !== payload.dataBase64
+  )
+    throw new Error("Invalid native avatar payload");
+  const form = new FormData();
+  form.append(
+    "file",
+    new Blob([new Uint8Array(bytes)], { type: String(payload.contentType) }),
+    String(payload.contentType) === "image/png" ? "avatar.png" : "avatar.jpg",
+  );
+  return form;
+}
+
 export function createDesktopApiAdapter(options: AdapterOptions) {
   const fetcher = options.fetcher ?? ((...args) => globalThis.fetch(...args));
   const timeoutMs = options.timeoutMs ?? 10_000;
@@ -581,6 +620,14 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
     accessToken: string,
   ): Promise<NativeApiResponse> {
     const method = request.method ?? "GET";
+    const avatarUpload =
+      method === "PUT" &&
+      /^\/api\/admin\/users\/[1-9]\d*\/avatar$/.test(request.path);
+    const body = avatarUpload
+      ? avatarFormData(request.body)
+      : request.body === undefined
+        ? undefined
+        : JSON.stringify(request.body);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -590,12 +637,11 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
           Accept: "application/json",
           "Accept-Language": request.locale === "tr" ? "tr" : "en",
           Authorization: `Bearer ${accessToken}`,
-          ...(request.body === undefined
+          ...(request.body === undefined || avatarUpload
             ? {}
             : { "Content-Type": "application/json" }),
         },
-        body:
-          request.body === undefined ? undefined : JSON.stringify(request.body),
+        body,
         signal: controller.signal,
       });
       return {

@@ -399,6 +399,15 @@ export const messages = {
     adminProfileAttributesHelp: "Enter one value per line for multiple values.",
     adminUserCreatedProfileSaveFailed:
       "The user was created, but profile attributes could not be saved. Retry the profile save below.",
+    adminUserAvatar: "User avatar",
+    adminUserAvatarEmpty: "No avatar is set.",
+    adminUserAvatarHelp:
+      "Choose a JPEG or PNG image up to 2 MiB and 4 megapixels.",
+    adminUserAvatarUpload: "Upload avatar",
+    adminUserAvatarUpdated: "Avatar updated.",
+    adminUserAvatarRemove: "Remove avatar",
+    adminUserAvatarRemovePrompt: "Remove this user's avatar?",
+    adminUserAvatarRemoved: "Avatar removed.",
     adminUserEmailNotVerified: "Email not verified",
     adminSendActionEmail: "Send action email",
     adminActionEmailAction: "Required action",
@@ -974,6 +983,15 @@ export const messages = {
       "Birden çok değer için her satıra bir değer girin.",
     adminUserCreatedProfileSaveFailed:
       "Kullanıcı oluşturuldu ancak profil özellikleri kaydedilemedi. Aşağıdan profil kaydını yeniden deneyin.",
+    adminUserAvatar: "Kullanıcı profili fotoğrafı",
+    adminUserAvatarEmpty: "Profil fotoğrafı ayarlanmamış.",
+    adminUserAvatarHelp: "En fazla 2 MiB ve 4 megapiksel JPEG veya PNG seçin.",
+    adminUserAvatarUpload: "Profil fotoğrafını yükle",
+    adminUserAvatarUpdated: "Profil fotoğrafı güncellendi.",
+    adminUserAvatarRemove: "Profil fotoğrafını kaldır",
+    adminUserAvatarRemovePrompt:
+      "Kullanıcının profil fotoğrafı kaldırılsın mı?",
+    adminUserAvatarRemoved: "Profil fotoğrafı kaldırıldı.",
     adminUserEmailNotVerified: "E-posta doğrulanmadı",
     adminSendActionEmail: "İşlem e-postası gönder",
     adminActionEmailAction: "Gerekli işlem",

@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
 
 import { _electron as electron } from "playwright-core";
 
@@ -17,6 +18,36 @@ const electronExecutable = require("electron");
 const packageVersion = JSON.parse(
   await readFile(path.join(desktopDirectory, "package.json"), "utf8"),
 ).version;
+
+function pngChunk(type, data) {
+  const name = Buffer.from(type);
+  const checksumInput = Buffer.concat([name, data]);
+  let checksum = 0xffffffff;
+  for (const byte of checksumInput) {
+    checksum ^= byte;
+    for (let bit = 0; bit < 8; bit += 1)
+      checksum = (checksum >>> 1) ^ (checksum & 1 ? 0xedb88320 : 0);
+  }
+  const length = Buffer.alloc(4);
+  const crc = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  crc.writeUInt32BE((checksum ^ 0xffffffff) >>> 0);
+  return Buffer.concat([length, checksumInput, crc]);
+}
+
+function onePixelPng() {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(1, 0);
+  header.writeUInt32BE(1, 4);
+  header[8] = 8;
+  header[9] = 6;
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(Buffer.from([0, 255, 0, 0, 255]))),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
 
 async function launchDesktop({
   devTools = false,
@@ -1067,6 +1098,36 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        }
+        if (
+          /^\/api\/admin\/users\/[1-9]\d*\/avatar$/.test(requestUrl.pathname) &&
+          requestMethod === "PUT"
+        ) {
+          const userId = Number(requestUrl.pathname.split("/").at(-2));
+          const file = init?.body?.get("file");
+          globalThis.__adminAvatarWrites ??= [];
+          globalThis.__adminAvatarWrites.push({
+            userId,
+            contentType: file?.type,
+            size: file?.size,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              avatarUrl: "/avatars/00000000-0000-4000-8000-000000000007?v=1",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/users\/[1-9]\d*\/avatar$/.test(requestUrl.pathname) &&
+          requestMethod === "DELETE"
+        ) {
+          const userId = Number(requestUrl.pathname.split("/").at(-2));
+          globalThis.__adminAvatarDeletes ??= [];
+          globalThis.__adminAvatarDeletes.push(userId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
         }
         if (
           /^\/api\/admin\/users\/[1-9]\d*\/webauthn\/credentials$/.test(
@@ -3250,6 +3311,73 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await profileAttributesPanel
       .locator('button[data-action="admin-user-profile-attributes-close"]')
+      .click();
+    const avatarToggle = aliceRow.getByRole("button", {
+      name: "User avatar",
+      exact: true,
+    });
+    await avatarToggle.click();
+    const avatarPanel = aliceRow.getByRole("region", {
+      name: "User avatar",
+    });
+    await avatarPanel.waitFor();
+    await avatarPanel.locator('input[type="file"]').setInputFiles({
+      name: "avatar.png",
+      mimeType: "image/png",
+      buffer: onePixelPng(),
+    });
+    const uploadAvatar = avatarPanel.locator(
+      'button[data-action="admin-user-avatar-upload"]',
+    );
+    await uploadAvatar.click();
+    assert.equal(await uploadAvatar.isDisabled(), true);
+    assert.equal(await uploadAvatar.locator(".spinner").count(), 1);
+    await window.waitForFunction(() => {
+      const upload = document.querySelector(
+        'button[data-action="admin-user-avatar-upload"]',
+      );
+      return upload && !upload.disabled;
+    });
+    const avatarStatus = {
+      panel: await avatarPanel.innerText(),
+      alerts: await window.locator('[role="alert"]').allTextContents(),
+      writes: await application.evaluate(
+        () => globalThis.__adminAvatarWrites ?? [],
+      ),
+    };
+    assert.equal(
+      await window.getByText("Avatar updated.", { exact: true }).count(),
+      1,
+      JSON.stringify(avatarStatus),
+    );
+    await window.getByText("Avatar updated.", { exact: true }).waitFor();
+    assert.equal(
+      await avatarPanel.locator("img").getAttribute("src"),
+      "http://127.0.0.1:9090/avatars/00000000-0000-4000-8000-000000000007?v=1",
+    );
+    const requestAvatarDelete = avatarPanel.locator(
+      'button[data-action="admin-user-avatar-delete-request"]',
+    );
+    await requestAvatarDelete.click();
+    await avatarPanel.getByRole("status").waitFor();
+    const confirmAvatarDelete = avatarPanel.locator(
+      'button[data-action="admin-user-avatar-delete-confirm"]',
+    );
+    await confirmAvatarDelete.click();
+    assert.equal(await confirmAvatarDelete.isDisabled(), true);
+    assert.equal(await confirmAvatarDelete.locator(".spinner").count(), 1);
+    await window.getByText("Avatar removed.", { exact: true }).waitFor();
+    assert.equal(await avatarPanel.locator("img").count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminAvatarWrites),
+      [{ userId: 2, contentType: "image/png", size: 70 }],
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminAvatarDeletes),
+      [2],
+    );
+    await avatarPanel
+      .locator('button[data-action="admin-user-avatar-close"]')
       .click();
     await aliceRow
       .getByRole("button", { name: "Reset password", exact: true })

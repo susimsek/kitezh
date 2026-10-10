@@ -84,6 +84,49 @@ test("keeps forbidden responses authoritative and rejects unapproved API paths",
   );
 });
 
+test("uploads only bounded Admin avatar payloads as multipart data", async () => {
+  let captured;
+  const { adapter } = harness(async (_url, init) => {
+    captured = init;
+    return new Response(JSON.stringify({ avatarUrl: "/avatars/test?v=1" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const bytes = Buffer.from("avatar-bytes");
+  const response = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/7/avatar",
+    method: "PUT",
+    body: { contentType: "image/png", dataBase64: bytes.toString("base64") },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(captured.headers["Content-Type"], undefined);
+  assert.ok(captured.body instanceof FormData);
+  const file = captured.body.get("file");
+  assert.equal(file.type, "image/png");
+  assert.equal(file.size, bytes.length);
+  assert.deepEqual(Buffer.from(await file.arrayBuffer()), bytes);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/7/avatar",
+      method: "PUT",
+      body: { contentType: "image/svg+xml", dataBase64: "PHN2Zz4=" },
+    }),
+    /Invalid native avatar payload/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/7/avatar?override=true",
+      method: "PUT",
+      body: { contentType: "image/png", dataBase64: bytes.toString("base64") },
+    }),
+    /not allowed/,
+  );
+});
+
 test("limits the Admin namespace to approved settings writes and bounded read contracts", async () => {
   const requestLanguages = [];
   const { adapter } = harness(async (_url, init) => {

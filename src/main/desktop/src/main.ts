@@ -379,6 +379,7 @@ async function nativeRendererHtml() {
     "utf8",
   );
   const bootstrap = JSON.stringify({
+    apiBaseUrl: getApiBaseUrl(),
     locale: desktopLanguage,
     theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
     messages,
