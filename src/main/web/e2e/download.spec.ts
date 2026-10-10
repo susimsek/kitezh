@@ -66,7 +66,9 @@ test.describe("download page", () => {
     await expect(page.getByText(/Free signing lasts 7 days|Ücretsiz imza 7 gün/i)).toBeVisible();
   });
 
-  test("explains when mobile packages are absent from the latest release", async ({ page }) => {
+  test("hides mobile platforms when the latest release has no mobile packages", async ({
+    page,
+  }) => {
     await page.route("**/api/public/desktop-release", async (route) => {
       await route.fulfill({
         contentType: "application/json",
@@ -80,12 +82,41 @@ test.describe("download page", () => {
     });
     await page.goto("/download");
 
-    await expect(page.getByText(/Not included in the latest release yet/i)).toHaveCount(13);
-    await expect(page.getByRole("button", { name: /Download APK|APK'yı indir/i })).toBeDisabled();
+    await expect(page.getByRole("heading", { name: /Windows|Linux|macOS/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Android" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "iPhone and iPad" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Download APK|APK'yı indir/i })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /Download unsigned IPA|İmzasız IPA'yı indir/i }),
-    ).toBeDisabled();
-    await expect(page.getByText(/Free signing lasts 7 days|Ücretsiz imza 7 gün/i)).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByText(/Free signing lasts 7 days|Ücretsiz imza 7 gün/i)).toHaveCount(0);
+  });
+
+  test("shows only the mobile platform whose package is in the latest release", async ({
+    page,
+  }) => {
+    await page.route("**/api/public/desktop-release", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          tag: "v0.1.0",
+          version: "0.1.0",
+          releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v0.1.0",
+          assets: {
+            androidApk:
+              "https://github.com/susimsek/kitezh/releases/download/v0.1.0/kitezh-0.1.0-android.apk",
+          },
+        }),
+      });
+    });
+    await page.goto("/download");
+
+    await expect(page.getByRole("heading", { name: "Android" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "iPhone and iPad" })).toHaveCount(0);
+    await expect(page.locator('a[href$="-android.apk"]')).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Download unsigned IPA|İmzasız IPA'yı indir/i }),
+    ).toHaveCount(0);
   });
 
   test("shows signed iOS installation guidance when the release includes an ad hoc IPA", async ({
