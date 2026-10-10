@@ -46,6 +46,10 @@ export const messages = {
     adminRoles: "Roles",
     adminGroups: "Groups",
     adminIdentityProviders: "Identity providers",
+    adminDeleteIdentityProvider: "Delete provider",
+    adminDeleteIdentityProviderPrompt:
+      "Delete this identity provider and its mapper configuration? Providers with linked accounts cannot be deleted.",
+    adminIdentityProviderDeleted: "Identity provider deleted.",
     adminSessions: "Sessions",
     adminOfflineSessions: "Offline sessions",
     adminRevokeOfflineSession: "Revoke offline session",
@@ -489,6 +493,10 @@ export const messages = {
     adminRoles: "Roller",
     adminGroups: "Gruplar",
     adminIdentityProviders: "Kimlik sağlayıcıları",
+    adminDeleteIdentityProvider: "Sağlayıcıyı sil",
+    adminDeleteIdentityProviderPrompt:
+      "Bu kimlik sağlayıcı ve eşleyici yapılandırması silinsin mi? Bağlı hesapları olan sağlayıcılar silinemez.",
+    adminIdentityProviderDeleted: "Kimlik sağlayıcı silindi.",
     adminSessions: "Oturumlar",
     adminOfflineSessions: "Çevrimdışı oturumlar",
     adminRevokeOfflineSession: "Çevrimdışı oturumu iptal et",

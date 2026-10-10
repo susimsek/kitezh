@@ -119,6 +119,11 @@ function isAllowedApiPath(
       /^\/api\/admin\/offline-sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
+    if (
+      method === "DELETE" &&
+      /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    )
+      return true;
     const consentRevokeMatch = path.match(
       /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/,
     );

@@ -306,6 +306,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/identity-providers?q=google&page=0&size=20&sort=guiOrder,asc",
   });
   assert.equal(identityProviders.status, 200);
+  const deletedIdentityProvider = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-1",
+    method: "DELETE",
+  });
+  assert.equal(deletedIdentityProvider.status, 200);
   const sessions = await adapter.request({
     console: "admin",
     path: "/api/admin/sessions?q=alice&status=expired&page=0&size=20&sort=lastAccessTime,desc",
@@ -608,6 +614,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/offline-sessions/offline-auth-opaque-id/mappers/1",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/identity-providers/provider-1/mappers/1",
       method: "DELETE",
     }),
     /not allowed/,

@@ -1136,6 +1136,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const providerId = requestUrl.pathname.split("/").at(-1);
+          globalThis.__adminIdentityProviderDeleteRequests ??= [];
+          globalThis.__adminIdentityProviderDeleteRequests.push(providerId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
         if (requestUrl.pathname === "/api/admin/identity-providers") {
           globalThis.__adminIdentityProviderRequests ??= [];
           globalThis.__adminIdentityProviderRequests.push(requestUrl.search);
@@ -2808,6 +2820,46 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       () => globalThis.__adminIdentityProviderRequests,
     );
     assert.equal(new URLSearchParams(providerRequests[1]).get("q"), "google");
+    const identityProviderRow = window.locator(
+      '[data-identity-provider-id="provider-1"]',
+    );
+    await identityProviderRow
+      .getByRole("button", { name: "Delete provider", exact: true })
+      .click();
+    await identityProviderRow
+      .getByText(
+        "Delete this identity provider and its mapper configuration? Providers with linked accounts cannot be deleted.",
+        { exact: true },
+      )
+      .waitFor();
+    await identityProviderRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminIdentityProviderDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await identityProviderRow
+      .getByRole("button", { name: "Delete provider", exact: true })
+      .click();
+    const confirmProviderDelete = identityProviderRow.getByRole("button", {
+      name: "Delete provider",
+      exact: true,
+    });
+    await confirmProviderDelete.click();
+    assert.equal(await confirmProviderDelete.isDisabled(), true);
+    assert.equal(await confirmProviderDelete.locator(".spinner").count(), 1);
+    await window
+      .getByText("Identity provider deleted.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminIdentityProviderDeleteRequests,
+      ),
+      ["provider-1"],
+    );
     const sessionsNavigation = window.getByRole("button", {
       name: "Sessions",
       exact: true,
