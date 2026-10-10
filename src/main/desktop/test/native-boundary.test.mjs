@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { messages } from "../../shared/dist/catalog.js";
+import { iconMetadata } from "../../shared/dist/icons.js";
 
 const desktopDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -85,6 +86,24 @@ test("shared Web catalogs align keys and message placeholders across locales", (
       `Message placeholders differ: ${key}`,
     );
   }
+});
+
+test("shared icon metadata resolves generic action labels in both locales", () => {
+  for (const [name, metadata] of Object.entries(iconMetadata)) {
+    assert.ok(metadata.unicode.trim(), `${name} icon needs a glyph`);
+    assert.ok(
+      messages.en.native[metadata.labelKey],
+      `English label is missing for ${name}`,
+    );
+    assert.ok(
+      messages.tr.native[metadata.labelKey],
+      `Turkish label is missing for ${name}`,
+    );
+  }
+
+  assert.equal(iconMetadata.add.labelKey, "actionAdd");
+  assert.equal(iconMetadata.delete.labelKey, "actionDelete");
+  assert.equal(iconMetadata.edit.labelKey, "actionEdit");
 });
 
 function flattenMessages(value, prefix = "") {

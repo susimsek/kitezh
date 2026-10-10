@@ -4,6 +4,9 @@ export type SupportedLocale = Exclude<Locale, "system">;
 export const messages = {
   en: {
     appTagline: "Secure identity and access for your organization.",
+    actionAdd: "Add",
+    actionDelete: "Delete",
+    actionEdit: "Edit",
     continue: "Continue",
     mobilePreview: "Mobile app foundation",
     signIn: "Sign in",
@@ -528,6 +531,9 @@ export const messages = {
   },
   tr: {
     appTagline: "Kurumunuz için güvenli kimlik ve erişim.",
+    actionAdd: "Ekle",
+    actionDelete: "Sil",
+    actionEdit: "Düzenle",
     continue: "Devam et",
     mobilePreview: "Mobil uygulama temeli",
     signIn: "Giriş yap",

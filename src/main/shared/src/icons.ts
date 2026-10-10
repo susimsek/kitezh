@@ -22,12 +22,12 @@ export const iconMetadata: Record<
   AppIconName,
   { labelKey: string; unicode: string }
 > = {
-  add: { labelKey: "adminCreateUser", unicode: "+" },
+  add: { labelKey: "actionAdd", unicode: "+" },
   arrowLeft: { labelKey: "back", unicode: "←" },
   arrowRight: { labelKey: "continue", unicode: "→" },
   check: { labelKey: "save", unicode: "✓" },
-  delete: { labelKey: "adminDeleteUser", unicode: "×" },
-  edit: { labelKey: "adminEditUser", unicode: "✎" },
+  delete: { labelKey: "actionDelete", unicode: "×" },
+  edit: { labelKey: "actionEdit", unicode: "✎" },
   logout: { labelKey: "signOut", unicode: "↪" },
   reset: { labelKey: "resetDefaults", unicode: "↺" },
   gear: { labelKey: "settings", unicode: "⚙" },
