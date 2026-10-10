@@ -109,6 +109,19 @@ const emptyPage = {
   totalPages: 0,
 };
 
+async function refreshTokenFromCall(call: readonly unknown[] | undefined) {
+  const options = call?.at(-1);
+  if (
+    !options ||
+    typeof options !== "object" ||
+    !("refreshAccessToken" in options)
+  )
+    return undefined;
+  return (
+    options as { refreshAccessToken?: () => Promise<string | null> }
+  ).refreshAccessToken?.();
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   const { mockAuthState } = jest.requireMock("@/auth/MobileAuthProvider");
@@ -453,6 +466,9 @@ it("creates a mobile admin user after validating the required password", async (
       expect.any(Object),
     ),
   );
+  await expect(
+    refreshTokenFromCall(adminApi.createAdminUser.mock.calls.at(-1)),
+  ).resolves.toBe("access");
 });
 
 it("hydrates an existing user editor and prevents duplicate saves while pending", async () => {
@@ -512,6 +528,9 @@ it("hydrates an existing user editor and prevents duplicate saves while pending"
     }),
     expect.any(Object),
   );
+  await expect(
+    refreshTokenFromCall(adminApi.updateAdminUser.mock.calls.at(-1)),
+  ).resolves.toBe("access");
 
   completeUpdate();
   await waitFor(() =>
@@ -566,6 +585,9 @@ it("creates each native admin resource through its typed editor flow", async () 
     }
     fireEvent.click(screen.getByRole("button", { name: "adminSave" }));
     await waitFor(() => expect(scenario.mutation).toHaveBeenCalledTimes(1));
+    await expect(
+      refreshTokenFromCall(scenario.mutation.mock.calls.at(-1)),
+    ).resolves.toBe("access");
     await waitFor(() =>
       expect(screen.queryByText("adminSave")).not.toBeInTheDocument(),
     );
@@ -673,6 +695,9 @@ it("hydrates and updates each editable native admin resource", async () => {
         expect.any(Object),
       ),
     );
+    await expect(
+      refreshTokenFromCall(scenario.update.mock.calls.at(-1)),
+    ).resolves.toBe("access");
     await waitFor(() =>
       expect(screen.queryByText("adminSave")).not.toBeInTheDocument(),
     );
@@ -726,6 +751,9 @@ it("enables and unlocks users and rotates signing keys", async () => {
       expect.any(Object),
     ),
   );
+  await expect(
+    refreshTokenFromCall(adminApi.setAdminUserEnabled.mock.calls.at(-1)),
+  ).resolves.toBe("access");
   fireEvent.click(screen.getByRole("button", { name: "adminUserUnlock" }));
   await waitFor(() =>
     expect(adminApi.unlockAdminUser).toHaveBeenCalledWith(
@@ -734,6 +762,9 @@ it("enables and unlocks users and rotates signing keys", async () => {
       expect.any(Object),
     ),
   );
+  await expect(
+    refreshTokenFromCall(adminApi.unlockAdminUser.mock.calls.at(-1)),
+  ).resolves.toBe("access");
 
   fireEvent.click(screen.getByRole("tab", { name: "adminKeys" }));
   expect(await screen.findByText("active-key")).toBeVisible();
@@ -744,6 +775,9 @@ it("enables and unlocks users and rotates signing keys", async () => {
       expect.any(Object),
     ),
   );
+  await expect(
+    refreshTokenFromCall(adminApi.rotateAdminKey.mock.calls.at(-1)),
+  ).resolves.toBe("access");
 });
 
 it("confirms and deletes native resources from their mobile resource lists", async () => {
@@ -849,6 +883,9 @@ it("confirms and deletes native resources from their mobile resource lists", asy
         expect.any(Object),
       ),
     );
+    await expect(
+      refreshTokenFromCall(scenario.remove.mock.calls.at(-1)),
+    ).resolves.toBe("access");
   }
 });
 
@@ -961,6 +998,9 @@ it("deletes mobile users, events, sessions, and consent through confirmed action
     expect(confirm?.onPress).toBeDefined();
     confirm?.onPress?.();
     await waitFor(() => expect(scenario.remove).toHaveBeenCalled());
+    await expect(
+      refreshTokenFromCall(scenario.remove.mock.calls.at(-1)),
+    ).resolves.toBe("access");
   }
 
   expect(adminApi.deleteAdminUser).toHaveBeenCalledWith(
