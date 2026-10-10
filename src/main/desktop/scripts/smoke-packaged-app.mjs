@@ -149,5 +149,10 @@ try {
   console.log(`Packaged Kitezh ${packageJson.version} smoke test passed.`);
 } finally {
   if (application) await application.close();
-  await rm(userDataDirectory, { force: true, recursive: true });
+  await rm(userDataDirectory, {
+    force: true,
+    maxRetries: 10,
+    recursive: true,
+    retryDelay: 500,
+  });
 }
