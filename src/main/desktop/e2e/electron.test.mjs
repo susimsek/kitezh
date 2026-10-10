@@ -3321,14 +3321,31 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       name: "User avatar",
     });
     await avatarPanel.waitFor();
+    const uploadAvatar = avatarPanel.locator(
+      'button[data-action="admin-user-avatar-upload"]',
+    );
+    const avatarFile = avatarPanel.locator('input[type="file"]');
+    await avatarFile.setInputFiles({
+      name: "avatar.svg",
+      mimeType: "image/svg+xml",
+      buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+    });
+    await uploadAvatar.click();
+    const avatarValidation = avatarPanel.locator('[role="alert"]');
+    await avatarValidation.waitFor();
+    assert.equal(
+      await avatarValidation.innerText(),
+      "Choose a JPEG or PNG image up to 2 MiB and 4 megapixels.",
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminAvatarWrites ?? []),
+      [],
+    );
     await avatarPanel.locator('input[type="file"]').setInputFiles({
       name: "avatar.png",
       mimeType: "image/png",
       buffer: onePixelPng(),
     });
-    const uploadAvatar = avatarPanel.locator(
-      'button[data-action="admin-user-avatar-upload"]',
-    );
     await uploadAvatar.click();
     assert.equal(await uploadAvatar.isDisabled(), true);
     assert.equal(await uploadAvatar.locator(".spinner").count(), 1);
