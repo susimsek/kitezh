@@ -38,6 +38,16 @@ const escapeHtml = (value) =>
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const actionIcons = {
+  "admin-group-member-add": "add",
+  "admin-group-member-remove-request": "delete",
+  "admin-group-member-remove-confirm": "delete",
+  "admin-group-members-toggle": "edit",
+  "admin-provider-mappers-toggle": "edit",
+  "admin-message-delete-request": "delete",
+  "admin-message-delete-confirm": "delete",
+  "admin-provider-mapper-create": "add",
+  "admin-user-toggle-confirm": "check",
+  "admin-user-toggle-enabled": "check",
   "admin-client-scope-delete-request": "delete",
   "admin-client-scope-delete-confirm": "delete",
   "admin-consent-revoke-request": "delete",
@@ -61,6 +71,17 @@ const actionIcons = {
   "admin-user-delete-request": "delete",
   "admin-user-delete-confirm": "delete",
   "admin-user-edit-toggle": "edit",
+  "choose-account": "home",
+  "choose-admin": "shield",
+  "delete-account": "delete",
+  "delete-other-sessions": "delete",
+  "delete-session": "delete",
+  "mfa-disable": "delete",
+  "revoke-application": "delete",
+  "revoke-offline": "delete",
+  retry: "reset",
+  "sign-in": "arrowRight",
+  "social-remove": "delete",
 };
 const button = (label, options = {}) => {
   const iconName =

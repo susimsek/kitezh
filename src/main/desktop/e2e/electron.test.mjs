@@ -2651,6 +2651,14 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       name: "Add to group",
       exact: true,
     });
+    assert.equal(
+      await addGroupMember.locator(".button-icon").textContent(),
+      "+",
+    );
+    assert.equal(
+      await addGroupMember.locator(".button-icon").getAttribute("aria-hidden"),
+      "true",
+    );
     await addGroupMember.click();
     assert.equal(await addGroupMember.isDisabled(), true);
     assert.equal(await addGroupMember.locator(".spinner").count(), 1);
@@ -2659,9 +2667,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window
       .getByRole("button", { name: "Gruptan çıkar", exact: true })
       .waitFor();
-    await createdGroupRow
-      .getByRole("button", { name: "Gruptan çıkar", exact: true })
-      .click();
+    const requestRemoveMember = createdGroupRow.getByRole("button", {
+      name: "Gruptan çıkar",
+      exact: true,
+    });
+    assert.equal(
+      await requestRemoveMember.locator(".button-icon").textContent(),
+      "×",
+    );
+    assert.equal(
+      await requestRemoveMember
+        .locator(".button-icon")
+        .getAttribute("aria-hidden"),
+      "true",
+    );
+    await requestRemoveMember.click();
     await createdGroupRow
       .getByText("Bu kullanıcı gruptan çıkarılsın mı? Erişimi güncellenecek.", {
         exact: true,
@@ -3014,9 +3034,15 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       new URLSearchParams(mapperSearchRequests[0]).get("size"),
       "20",
     );
-    await identityProviderRow
-      .getByRole("button", { name: "Add mapper", exact: true })
-      .click();
+    const addMapperButton = identityProviderRow.getByRole("button", {
+      name: "Add mapper",
+      exact: true,
+    });
+    assert.equal(
+      await addMapperButton.locator(".button-icon").textContent(),
+      "+",
+    );
+    await addMapperButton.click();
     const mapperCreateForm = identityProviderRow.locator(
       'form[data-form="admin-provider-mapper"]',
     );
