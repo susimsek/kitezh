@@ -19,6 +19,7 @@ const state = {
   notice: null,
   offline: !navigator.onLine,
   authStarting: false,
+  authCanceling: false,
 };
 const PLATFORM_CONSOLE_CLIENT_IDS = new Set([
   "admin-console",
@@ -1144,7 +1145,7 @@ function loginContent() {
   }
   const title =
     state.console === "admin" ? text("adminTitle") : text("accountTitle");
-  return `<div class="login"><section class="card login-card"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text("signInNote"))}</p>${state.error ? `<div class="notice error" role="alert">${escapeHtml(state.error.message)}</div>` : ""}<div class="actions">${button(text("signIn"), { action: "sign-in", busy: state.authStarting })}${button(state.console === "admin" ? text("accountTitle") : text("adminTitle"), { action: "switch-console" })}</div></section></div>`;
+  return `<div class="login"><section class="card login-card"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text("signInNote"))}</p>${state.error ? `<div class="notice error" role="alert">${escapeHtml(state.error.message)}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}<div class="actions">${button(text("signIn"), { action: "sign-in", busy: state.authStarting && !state.authCanceling, disabled: state.authStarting })}${state.authStarting ? button(text("cancelSignIn"), { action: "cancel-sign-in", busy: state.authCanceling, disabled: state.authCanceling }) : button(state.console === "admin" ? text("accountTitle") : text("adminTitle"), { action: "switch-console" })}</div></section></div>`;
 }
 
 function render() {
@@ -1376,26 +1377,38 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
   }
 }
 
+async function cancelSignIn(timedOut = false) {
+  if (!state.authStarting || state.authCanceling) return;
+  const consoleName = state.console;
+  state.authCanceling = true;
+  render();
+  try {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await api.auth.cancelLogin(consoleName);
+    clearTimeout(authTimeout);
+    authTimeout = undefined;
+    if (state.authStarting) {
+      state.authStarting = false;
+      state.error = timedOut ? { message: text("authTimeout") } : null;
+      state.notice = timedOut ? null : text("authCanceled");
+    }
+  } catch {
+    state.error = { message: text("authCancelError") };
+  } finally {
+    state.authCanceling = false;
+    render();
+  }
+}
+
 async function signIn() {
   if (state.authStarting) return;
   state.authStarting = true;
+  state.authCanceling = false;
   state.error = null;
+  state.notice = null;
   render();
   clearTimeout(authTimeout);
-  authTimeout = setTimeout(
-    () => {
-      void api.auth
-        .cancelLogin(state.console)
-        .catch(() => undefined)
-        .finally(() => {
-          if (!state.authStarting) return;
-          state.authStarting = false;
-          state.error = { message: text("authTimeout") };
-          render();
-        });
-    },
-    5 * 60 * 1000,
-  );
+  authTimeout = setTimeout(() => void cancelSignIn(true), 5 * 60 * 1000);
   try {
     await api.auth.startLogin(state.console);
   } catch {
@@ -3674,6 +3687,7 @@ async function action(action, element) {
     [
       "logout",
       "sign-in",
+      "cancel-sign-in",
       "switch-console",
       "switch-account",
       "toggle-locale",
@@ -3682,6 +3696,7 @@ async function action(action, element) {
   ) {
     if (action === "logout") return logout();
     if (action === "sign-in") return signIn();
+    if (action === "cancel-sign-in") return cancelSignIn();
     if (action === "switch-console" || action === "switch-account") {
       state.console = state.console === "admin" ? "account" : "admin";
       state.route = state.console === "admin" ? "dashboard" : "profile";
@@ -4363,6 +4378,7 @@ api.language.onChanged((locale) => {
 });
 api.onAuthCallback((callback) => {
   clearTimeout(authTimeout);
+  state.authCanceling = false;
   if (callback.error) {
     state.error = { message: text("authError") };
     state.authStarting = false;

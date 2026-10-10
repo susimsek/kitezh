@@ -334,6 +334,81 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
   }
 });
 
+test("cancels a pending system-browser sign-in and rejects its stale callback", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__cancelAuthorizationUrls = [];
+      shell.openExternal = async (url) => {
+        globalThis.__cancelAuthorizationUrls.push(url);
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window
+      .getByRole("button", { name: "Account Console", exact: true })
+      .click();
+    const signIn = window.getByRole("button", { name: "Sign in", exact: true });
+    await signIn.waitFor();
+    const firstAuthorizationUrl = await application.evaluate(
+      () => globalThis.__pendingAuthorizationUrl,
+    );
+    const firstState = new URL(firstAuthorizationUrl).searchParams.get("state");
+    assert.ok(firstState);
+
+    const cancelSignIn = window.getByRole("button", {
+      name: "Cancel sign-in",
+      exact: true,
+    });
+    await cancelSignIn.click();
+    await cancelSignIn.locator(".spinner").waitFor({ state: "visible" });
+    assert.equal(await cancelSignIn.isDisabled(), true);
+    assert.equal(await cancelSignIn.getAttribute("aria-busy"), "true");
+    await cancelSignIn.evaluate((button) => button.click());
+    await window
+      .getByText("Sign-in canceled. You can try again.", { exact: true })
+      .waitFor();
+    assert.equal(await signIn.isEnabled(), true);
+    assert.equal(
+      await window.getByRole("button", { name: "Cancel sign-in" }).count(),
+      0,
+    );
+
+    await application.evaluate(({ app }, state) => {
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=stale-canceled-code`,
+      );
+    }, firstState);
+    assert.equal(
+      await window.evaluate(() => window.desktopApi.auth.hasSession("account")),
+      false,
+    );
+
+    await signIn.click();
+    await signIn.locator(".spinner").waitFor({ state: "visible" });
+    const authorizationUrls = await application.evaluate(
+      () => globalThis.__cancelAuthorizationUrls,
+    );
+    assert.equal(authorizationUrls.length, 2);
+    const retryState = new URL(authorizationUrls[1]).searchParams.get("state");
+    assert.ok(retryState);
+    assert.notEqual(retryState, firstState);
+    await application.evaluate(({ app }, state) => {
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&error=access_denied`,
+      );
+    }, retryState);
+    await window.getByRole("alert").waitFor();
+    assert.equal(await signIn.isEnabled(), true);
+  } finally {
+    await application.close();
+  }
+});
+
 test("preserves Account profile drafts offline and completes native social linking", async () => {
   const application = await launchDesktop();
   try {
