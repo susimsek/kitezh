@@ -775,6 +775,47 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const scopeId = requestUrl.pathname.split("/").at(-1);
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminClientScopeUpdateRequests ??= [];
+          globalThis.__adminClientScopeUpdateRequests.push({
+            id: scopeId,
+            ...body,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.displayName === "Rejected scope name")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the client scope fields.",
+                violations: [
+                  { field: "displayName", message: "Görünen ad reddedildi." },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          globalThis.__updatedClientScopes ??= {};
+          globalThis.__updatedClientScopes[scopeId] = {
+            id: scopeId,
+            ...body,
+            builtIn: false,
+          };
+          return new Response(
+            JSON.stringify(globalThis.__updatedClientScopes[scopeId]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/client-scopes") {
           if (requestMethod === "POST") {
             const body = JSON.parse(init?.body ?? "{}");
@@ -829,7 +870,12 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           ];
           if (!query && page === 0)
-            content.push(...(globalThis.__createdClientScopes ?? []));
+            content.push(
+              ...(globalThis.__createdClientScopes ?? []).map(
+                (scope) =>
+                  globalThis.__updatedClientScopes?.[scope.id] ?? scope,
+              ),
+            );
           return new Response(
             JSON.stringify({
               content,
@@ -1958,7 +2004,11 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         .isDisabled(),
       true,
     );
-    await window.getByText("Account API").waitFor();
+    await window
+      .locator(
+        'form[data-form="admin-client-scope-edit"][data-scope-id="scope-account-api"]',
+      )
+      .waitFor();
     const clientScopeRequests = await application.evaluate(
       () => globalThis.__adminClientScopeRequests,
     );
@@ -2018,7 +2068,14 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window
       .getByText("İstemci kapsamı oluşturuldu.", { exact: true })
       .waitFor();
-    await window.getByText("Native observer", { exact: true }).waitFor();
+    const createdScopeForm = window.locator(
+      'form[data-form="admin-client-scope-edit"][data-scope-id="scope-native-observer"]',
+    );
+    await createdScopeForm.waitFor();
+    assert.equal(
+      await createdScopeForm.locator('[name="displayName"]').inputValue(),
+      "Native observer",
+    );
     assert.deepEqual(
       await application.evaluate(
         () => globalThis.__adminClientScopeCreateRequests,
@@ -2032,6 +2089,59 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         {
           name: "native-observer",
           displayName: "Native observer",
+          description: "Read-only native console scope",
+        },
+      ],
+    );
+    const scopeEditForm = window.locator(
+      'form[data-form="admin-client-scope-edit"][data-scope-id="scope-native-observer"]',
+    );
+    await scopeEditForm
+      .locator('[name="displayName"]')
+      .fill("Rejected scope name");
+    const scopeUpdateSubmit = scopeEditForm.getByRole("button", {
+      name: "Kaydet",
+      exact: true,
+    });
+    await scopeUpdateSubmit.click();
+    assert.equal(await scopeUpdateSubmit.isDisabled(), true);
+    assert.equal(await scopeUpdateSubmit.locator(".spinner").count(), 1);
+    await scopeEditForm
+      .getByText("Görünen ad reddedildi.", { exact: true })
+      .waitFor();
+    await scopeEditForm
+      .locator('[name="displayName"]')
+      .fill("Native observer updated");
+    await scopeUpdateSubmit.click();
+    assert.equal(await scopeUpdateSubmit.isDisabled(), true);
+    assert.equal(await scopeUpdateSubmit.locator(".spinner").count(), 1);
+    await window
+      .getByText("İstemci kapsamı güncellendi.", { exact: true })
+      .waitFor();
+    await window
+      .locator(
+        'form[data-form="admin-client-scope-edit"][data-scope-id="scope-native-observer"] [name="displayName"]',
+      )
+      .waitFor({ state: "visible" });
+    assert.equal(
+      await scopeEditForm.locator('[name="displayName"]').inputValue(),
+      "Native observer updated",
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientScopeUpdateRequests,
+      ),
+      [
+        {
+          id: "scope-native-observer",
+          name: "native-observer",
+          displayName: "Rejected scope name",
+          description: "Read-only native console scope",
+        },
+        {
+          id: "scope-native-observer",
+          name: "native-observer",
+          displayName: "Native observer updated",
           description: "Read-only native console scope",
         },
       ],

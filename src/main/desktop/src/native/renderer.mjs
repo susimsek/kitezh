@@ -395,7 +395,22 @@ function adminClientScopesContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopes.map((scope) => `<article class="list-item"><div><strong>${escapeHtml(scope.displayName || scope.name)}</strong><span class="muted">${escapeHtml(scope.description ?? scope.name)}</span></div><span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const errors = violations(state.error?.body);
+  const scopeRows = scopes
+    .map((scope) => {
+      const draft = state.data.adminClientScopeDrafts?.[scope.id] ?? {};
+      const scopeErrors =
+        state.data.adminClientScopeErrorId === scope.id ? errors : {};
+      const busy = state.busy === `client-scope-update:${scope.id}`;
+      const displayNameId = `client-scope-display-name-${scope.id}`;
+      const descriptionId = `client-scope-description-${scope.id}`;
+      const metadata = scope.builtIn
+        ? `<div><strong>${escapeHtml(scope.displayName || scope.name)}</strong><span class="muted">${escapeHtml(scope.description ?? scope.name)}</span></div>`
+        : `<form class="actions" data-form="admin-client-scope-edit" data-scope-id="${escapeHtml(scope.id)}" data-scope-name="${escapeHtml(scope.name)}"><div class="field"><label for="${escapeHtml(displayNameId)}">${escapeHtml(text("adminClientScopeDisplayName"))}</label><input id="${escapeHtml(displayNameId)}" name="displayName" type="text" value="${escapeHtml(draft.displayName ?? scope.displayName ?? "")}" maxlength="200"/><div class="field-error">${escapeHtml(scopeErrors.displayName ?? "")}</div></div><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminClientScopeDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? scope.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(scopeErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form>`;
+      return `<article class="list-item">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></article>`;
+    })
+    .join("");
+  return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopeRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminClientScopeCreateContent() {
@@ -1013,6 +1028,12 @@ function preserveOfflineDrafts() {
         state.data.adminRoleDrafts ??= {};
         state.data.adminRoleDrafts[roleName] = values;
       }
+    } else if (form.dataset.form === "admin-client-scope-edit") {
+      const scopeId = form.dataset.scopeId;
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "")) {
+        state.data.adminClientScopeDrafts ??= {};
+        state.data.adminClientScopeDrafts[scopeId] = values;
+      }
     } else if (form.dataset.form === "admin-group-create") {
       state.data.adminGroupCreateDraft = values;
     } else if (form.dataset.form === "admin-client-scope-create") {
@@ -1024,6 +1045,39 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-client-scope-edit") {
+    const scopeId = form.dataset.scopeId ?? "";
+    const scopeName = form.dataset.scopeName ?? "";
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(scopeId)) return;
+    if (!scopeName || !form.reportValidity()) return;
+    const body = {
+      name: scopeName,
+      displayName: String(values.displayName ?? "").trim() || null,
+      description: String(values.description ?? "").trim() || null,
+    };
+    state.data.adminClientScopeDrafts ??= {};
+    state.data.adminClientScopeDrafts[scopeId] = body;
+    state.data.adminClientScopeErrorId = scopeId;
+    state.error = null;
+    state.notice = null;
+    state.busy = `client-scope-update:${scopeId}`;
+    render();
+    try {
+      await request(`/api/admin/client-scopes/${encodeURIComponent(scopeId)}`, {
+        method: "PUT",
+        body,
+      });
+      delete state.data.adminClientScopeDrafts[scopeId];
+      state.data.adminClientScopeErrorId = null;
+      await loadRoute({ keepContent: true });
+      state.notice = text("adminClientScopeUpdated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-role-edit") {
     const roleName = form.dataset.roleName ?? "";
     if (!/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName)) return;
