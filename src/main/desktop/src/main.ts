@@ -71,6 +71,15 @@ const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const backgroundE2e = process.env.DESKTOP_E2E_BACKGROUND === "true";
+if (
+  process.platform === "linux" &&
+  !app.isPackaged &&
+  backgroundE2e &&
+  process.env.DESKTOP_E2E_TEST_STORAGE === "true"
+) {
+  // CI has no desktop keyring; the E2E profile is disposable and must not use this outside tests.
+  safeStorage.setUsePlainTextEncryption(true);
+}
 app.setName(DESKTOP_APP_NAME);
 
 function showWindow(window: BrowserWindow) {

@@ -37,7 +37,6 @@ async function launchDesktop({
   }
   return electron.launch({
     args: [
-      ...(process.platform === "linux" ? ["--password-store=basic"] : []),
       `--user-data-dir=${userDataDirectory}`,
       desktopDirectory,
     ],
@@ -47,6 +46,9 @@ async function launchDesktop({
       DESKTOP_API_BASE_URL: apiBaseUrl,
       DESKTOP_AUTO_UPDATE: "false",
       DESKTOP_E2E_BACKGROUND: "true",
+      ...(process.platform === "linux"
+        ? { DESKTOP_E2E_TEST_STORAGE: "true" }
+        : {}),
       DESKTOP_DEVTOOLS: devTools ? "true" : "false",
       ...(updatePreviewState
         ? {
@@ -61,18 +63,35 @@ async function launchDesktop({
 }
 
 async function captureBackgroundWindow(application, window, screenshotPath) {
-  const screenshot = await application.evaluate(
-    async ({ BrowserWindow }, targetUrl) => {
-      const target = BrowserWindow.getAllWindows().find(
-        (candidate) => candidate.webContents.getURL() === targetUrl,
-      );
-      if (!target) throw new Error("Could not find the background window");
-      const image = await target.webContents.capturePage();
-      return image.toPNG().toString("base64");
-    },
-    window.url(),
-  );
-  await writeFile(screenshotPath, Buffer.from(screenshot, "base64"));
+  try {
+    const screenshot = await application.evaluate(
+      async ({ BrowserWindow }, targetUrl) => {
+        const target = BrowserWindow.getAllWindows().find(
+          (candidate) => candidate.webContents.getURL() === targetUrl,
+        );
+        if (!target) throw new Error("Could not find the background window");
+        const image = await target.webContents.capturePage();
+        return image.toPNG().toString("base64");
+      },
+      window.url(),
+    );
+    await writeFile(screenshotPath, Buffer.from(screenshot, "base64"));
+  } catch (error) {
+    // Some headless Linux runners cannot capture a hidden BrowserWindow; screenshots are optional.
+    if (!String(error).includes("UnknownVizError")) throw error;
+  }
+}
+
+async function waitForWindowRoute(application, route) {
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    const window = application
+      .windows()
+      .find((candidate) => new URL(candidate.url()).pathname === route);
+    if (window) return window;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Could not find the renderer window for ${route}`);
 }
 
 async function clickApplicationMenuItem(application, label) {
@@ -122,7 +141,7 @@ async function openManualUpdateCheck(
 test("opens the trusted renderer and exposes the narrow desktop bridge", async () => {
   const application = await launchDesktop();
   try {
-    const window = await application.firstWindow();
+    const window = await waitForWindowRoute(application, "/");
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("heading", { name: "Choose a console" }).waitFor();
 
