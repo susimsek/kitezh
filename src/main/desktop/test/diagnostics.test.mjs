@@ -1,7 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { redactDiagnosticText } from "../dist/security/diagnostics.js";
+import {
+  appendBoundedDiagnosticLine,
+  redactDiagnosticText,
+} from "../dist/security/diagnostics.js";
+
+test("bounds diagnostic retention in UTF-8 bytes and keeps complete lines", () => {
+  const result = appendBoundedDiagnosticLine(
+    "old event\nrecent event\n",
+    "new event\n",
+    23,
+  );
+
+  assert.equal(result, "recent event\nnew event\n");
+  assert.equal(Buffer.byteLength(result, "utf8"), 23);
+  assert.equal(
+    Buffer.byteLength(appendBoundedDiagnosticLine("", "🛡️".repeat(20), 16)),
+    0,
+  );
+});
 
 test("redacts diagnostic credentials, personal data, URL details, and user paths", () => {
   const result = redactDiagnosticText(

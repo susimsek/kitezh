@@ -42,7 +42,10 @@ import {
   type DesktopTokens,
   type PendingAuthorization as PendingAuthorizationData,
 } from "./security/auth-flow";
-import { redactDiagnosticText } from "./security/diagnostics";
+import {
+  appendBoundedDiagnosticLine,
+  redactDiagnosticText,
+} from "./security/diagnostics";
 import type {
   DesktopSocialLinkCompleteRequest,
   DesktopSocialLinkStartRequest,
@@ -72,6 +75,7 @@ const DESKTOP_THEME_FILE = "desktop-theme.json";
 const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
 const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
+let diagnosticsWriteQueue: Promise<void> = Promise.resolve();
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 app.setName(DESKTOP_APP_NAME);
 
@@ -328,16 +332,24 @@ async function appendDiagnosticEvent(
       .map(([key, value]) => [key, redactDiagnosticText(String(value))]),
   );
   const line = `${new Date().toISOString()} ${name}${Object.keys(safeDetails).length ? ` ${JSON.stringify(safeDetails)}` : ""}\n`;
-  try {
+  const write = diagnosticsWriteQueue.then(async () => {
     const current = await readFile(diagnosticsLogPath(), "utf8").catch(
       () => "",
     );
-    const next = `${current}${line}`.slice(-MAX_DIAGNOSTICS_LOG_BYTES);
+    const next = appendBoundedDiagnosticLine(
+      current,
+      line,
+      MAX_DIAGNOSTICS_LOG_BYTES,
+    );
     await mkdir(path.dirname(diagnosticsLogPath()), { recursive: true });
     await writeFile(diagnosticsLogPath(), next, {
       encoding: "utf8",
       mode: 0o600,
     });
+  });
+  diagnosticsWriteQueue = write.catch(() => undefined);
+  try {
+    await write;
   } catch {
     // Diagnostics must never interfere with the desktop application.
   }
@@ -345,6 +357,7 @@ async function appendDiagnosticEvent(
 
 async function readDiagnosticEvents() {
   try {
+    await diagnosticsWriteQueue;
     const content = await readFile(diagnosticsLogPath(), "utf8");
     return content.trim().split("\n").filter(Boolean).slice(-50);
   } catch {
