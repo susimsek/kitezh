@@ -2352,6 +2352,25 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       ),
       "rgb(32, 33, 36)",
     );
+    await mainWindow.evaluate(async () => window.desktopApi.theme.set("light"));
+    await availableWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor ===
+        "rgb(248, 249, 250)",
+    );
+    await mainWindow.evaluate(async () =>
+      window.desktopApi.theme.set("system"),
+    );
+    const systemTheme = await mainWindow.evaluate(
+      () => document.documentElement.dataset.theme,
+    );
+    const systemDialogBackground =
+      systemTheme === "dark" ? "rgb(32, 33, 36)" : "rgb(248, 249, 250)";
+    await availableWindow.waitForFunction(
+      (background) =>
+        getComputedStyle(document.body).backgroundColor === background,
+      systemDialogBackground,
+    );
   } finally {
     await application.close();
   }

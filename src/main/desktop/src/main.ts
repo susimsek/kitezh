@@ -128,12 +128,47 @@ function applyDesktopTheme(value: unknown) {
   for (const window of BrowserWindow.getAllWindows()) {
     window.setBackgroundColor(backgroundColor);
     if (!window.isDestroyed()) {
-      window.webContents.send(
-        "desktop:theme-changed",
-        nativeTheme.shouldUseDarkColors ? "dark" : "light",
-      );
+      updateOpenWindowTheme(window);
     }
   }
+}
+
+function updateOpenWindowTheme(window: BrowserWindow) {
+  const dark = nativeTheme.shouldUseDarkColors;
+  window.webContents.send("desktop:theme-changed", dark ? "dark" : "light");
+  void window.webContents
+    .executeJavaScript(
+      `(() => {
+        const values = ${JSON.stringify(
+          dark
+            ? {
+                background: "#202124",
+                foreground: "#f1f3f4",
+                secondary: "#d4d8da",
+                button: "#343d42",
+                buttonHover: "#414c52",
+                border: "#3a4246",
+              }
+            : {
+                background: "#f8f9fa",
+                foreground: "#202124",
+                secondary: "#5f6368",
+                button: "#e8eaed",
+                buttonHover: "#dfe1e5",
+                border: "#dadce0",
+              },
+        )};
+        const root = document.documentElement;
+        root.style.colorScheme = ${JSON.stringify(dark ? "dark" : "light")};
+        root.style.setProperty("--dialog-background", values.background);
+        root.style.setProperty("--dialog-foreground", values.foreground);
+        root.style.setProperty("--dialog-secondary", values.secondary);
+        root.style.setProperty("--dialog-button", values.button);
+        root.style.setProperty("--dialog-button-hover", values.buttonHover);
+        root.style.setProperty("--dialog-border", values.border);
+      })()`,
+    )
+    .catch(() => undefined);
 }
 
 nativeTheme.on("updated", () => {
@@ -141,10 +176,7 @@ nativeTheme.on("updated", () => {
   for (const window of BrowserWindow.getAllWindows()) {
     if (window.isDestroyed()) continue;
     window.setBackgroundColor(backgroundColor);
-    window.webContents.send(
-      "desktop:theme-changed",
-      nativeTheme.shouldUseDarkColors ? "dark" : "light",
-    );
+    updateOpenWindowTheme(window);
   }
 });
 
