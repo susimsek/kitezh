@@ -24,6 +24,9 @@ import { GroupsTable } from "@/components/admin/GroupsTable";
 import { GroupCreateForm } from "@/components/admin/GroupCreateForm";
 import { GroupDetail } from "@/components/admin/GroupDetail";
 import { GroupEntityRoute } from "@/components/admin/GroupEntityRoute";
+import { OrganizationsTable } from "@/components/admin/OrganizationsTable";
+import { OrganizationCreateForm } from "@/components/admin/OrganizationCreateForm";
+import { OrganizationDetail } from "@/components/admin/OrganizationDetail";
 import { RolesTable } from "@/components/admin/RolesTable";
 import { RoleCreateForm } from "@/components/admin/RoleCreateForm";
 import { RoleEntityRoute } from "@/components/admin/RoleEntityRoute";
@@ -69,6 +72,7 @@ import AdminEvents from "@/components/admin/AdminEvents";
 import ServerInfo from "@/components/admin/ServerInfo";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminAuthentication from "@/components/admin/AdminAuthentication";
+import AuthenticationFlows from "@/components/admin/AuthenticationFlows";
 import {
   ForgotPasswordForm,
   ResetPasswordForm,
@@ -163,6 +167,12 @@ function EntityDetail({ entity }: { entity: "group" | "consent" | "client-scope"
   if (entity === "group") return <GroupDetail key={id} {...props} id={id} />;
   if (entity === "client-scope") return <ClientScopeDetail key={id} {...props} id={id} />;
   return <ConsentDetail key={id} {...props} routeKey={id} />;
+}
+
+function OrganizationEntityRoute() {
+  const { id = "" } = useParams<{ id: string }>();
+  const dictionary = useDictionary();
+  return <OrganizationDetail key={id} dictionary={dictionary} id={id} />;
 }
 
 function UserProfileEditPage() {
@@ -360,6 +370,26 @@ export function AppRoutes() {
           }
         />
         <Route path="groups/:id/:section?" element={<GroupEntityRoute {...props} />} />
+        <Route path="organizations" element={<OrganizationsTable dictionary={dictionary} />} />
+        <Route
+          path="organizations/new"
+          element={
+            <>
+              <AdminBreadcrumb
+                items={[
+                  { label: dictionary.admin.organizations.title, href: "/admin/organizations" },
+                  { label: dictionary.admin.organizations.create },
+                ]}
+              />
+              <AdminPageHeader
+                title={dictionary.admin.organizations.createTitle}
+                description={dictionary.admin.organizations.createSubtitle}
+              />
+              <OrganizationCreateForm dictionary={dictionary} />
+            </>
+          }
+        />
+        <Route path="organizations/:id" element={<OrganizationEntityRoute />} />
         <Route path="roles" element={<RolesTable dictionary={dictionary} />} />
         <Route
           path="roles/new"
@@ -452,6 +482,7 @@ export function AppRoutes() {
         <Route path="events" element={<AdminEvents />} />
         <Route path="server-info" element={<ServerInfo />} />
         <Route path="authentication" element={<AdminAuthentication />} />
+        <Route path="authentication/flows" element={<AuthenticationFlows />} />
         <Route path="authentication/policies/:policy" element={<AdminAuthentication />} />
         <Route
           path="settings/user-profile/new"

@@ -6,6 +6,7 @@ import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
+import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -70,11 +71,13 @@ public class AccountApiSecurityConfig {
     JwtDecoder accountApiJwtDecoder(
             JWKSource<SecurityContext> jwkSource,
             ApplicationProperties applicationProperties,
-            AuthorizationRepository authorizationRepository) {
+            AuthorizationRepository authorizationRepository,
+            AuthorizationRevocationPolicyService revocationPolicyService) {
         return ConsoleJwtDecoderFactory.create(
                 jwkSource,
                 applicationProperties.authorizationServer().issuer(),
                 ConsoleClients.ACCOUNT_CLIENTS,
-                authorizationRepository);
+                authorizationRepository,
+                revocationPolicyService);
     }
 }

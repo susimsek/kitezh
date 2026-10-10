@@ -9,6 +9,7 @@ import { adminRequest } from "@/lib/admin-api";
 import { AdminResources } from "./AdminResources";
 
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
+const mockLogout = jest.fn().mockResolvedValue(undefined);
 jest.mock("@/routing/navigation", () => ({
   usePathname: () => window.location.pathname,
 }));
@@ -17,6 +18,8 @@ jest.mock("@/lib/admin-api", () => ({ adminRequest: jest.fn() }));
 jest.mock("./AdminAuthProvider", () => ({
   useAdminAuth: () => ({
     accessToken: "token",
+    logout: mockLogout,
+    username: "admin",
     access: {
       manageUsers: true,
       manageSessions: true,
@@ -81,6 +84,7 @@ describe("AdminResources", () => {
   );
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLogout.mockResolvedValue(undefined);
   });
 
   it("lists users and applies enable and delete actions after confirmation", async () => {
@@ -185,6 +189,88 @@ describe("AdminResources", () => {
         }),
       ),
     );
+  });
+
+  it("revokes every active application session after confirmation", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: page([
+            {
+              id: "session-1",
+              username: "ada",
+              createdAt: "2026-01-01T12:00:00Z",
+              lastAccessedAt: "2026-01-01T12:30:00Z",
+              expiresAt: "2026-01-01T13:00:00Z",
+              authorizationCount: 1,
+              active: true,
+            },
+          ]),
+        } as never;
+      }
+      return { status: 204, data: null } as never;
+    });
+
+    render(<AdminResources copy={dictionary.admin.resources} locale="en" resource="sessions" />);
+    await screen.findByText("ada");
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.resources.revokeAllSessions }),
+    );
+    expect(screen.getByText(dictionary.admin.resources.revokeAllSessionsConfirm)).toBeVisible();
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.revokeAllSessions,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith("token", {
+        method: "POST",
+        url: "/api/admin/sessions/revoke-all",
+      }),
+    );
+    expect(mockLogout).toHaveBeenCalledWith("en", { sessionAlreadyRevoked: true });
+  });
+
+  it("logs out the current user after deleting all of their sessions", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: page([
+            {
+              id: "session-admin",
+              username: "admin",
+              createdAt: "2026-01-01T12:00:00Z",
+              lastAccessedAt: "2026-01-01T12:30:00Z",
+              expiresAt: "2026-01-01T13:00:00Z",
+              authorizationCount: 1,
+              active: true,
+            },
+          ]),
+        } as never;
+      }
+      return { status: 204, data: null } as never;
+    });
+
+    render(<AdminResources copy={dictionary.admin.resources} locale="en" resource="sessions" />);
+    await screen.findByText("admin");
+    fireEvent.click(screen.getByRole("button", { name: "Session actions" }));
+    fireEvent.click(screen.getByText(dictionary.admin.resources.signOutAll));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.signOutAll,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockAdminRequest).toHaveBeenCalledWith("token", {
+        method: "DELETE",
+        url: "/api/admin/users/admin/sessions",
+      });
+      expect(mockLogout).toHaveBeenCalledWith("en", { sessionAlreadyRevoked: true });
+    });
   });
 
   it("manages session, consent, and key resource actions", async () => {

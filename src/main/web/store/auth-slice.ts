@@ -13,6 +13,9 @@ export type AdminAccess = {
   queryGroups?: boolean;
   viewGroups?: boolean;
   manageGroups?: boolean;
+  queryOrganizations?: boolean;
+  viewOrganizations?: boolean;
+  manageOrganizations?: boolean;
   impersonateUsers: boolean;
   viewRoles: boolean;
   manageRoles: boolean;

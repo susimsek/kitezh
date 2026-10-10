@@ -107,6 +107,27 @@ public class AdminWhoAmIController {
                                         AuthoritiesConstants.GROUP_MANAGER,
                                         AuthoritiesConstants.USER_MANAGER)),
                         Map.entry(
+                                "queryOrganizations",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.ORGANIZATION_QUERY,
+                                        AuthoritiesConstants.ORGANIZATION_VIEWER,
+                                        AuthoritiesConstants.ORGANIZATION_MANAGER)),
+                        Map.entry(
+                                "viewOrganizations",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.ORGANIZATION_VIEWER,
+                                        AuthoritiesConstants.ORGANIZATION_MANAGER)),
+                        Map.entry(
+                                "manageOrganizations",
+                                hasAny(
+                                        authorities,
+                                        AuthoritiesConstants.ADMIN,
+                                        AuthoritiesConstants.ORGANIZATION_MANAGER)),
+                        Map.entry(
                                 "manageUsers",
                                 hasAny(
                                         authorities,

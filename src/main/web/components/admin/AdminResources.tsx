@@ -12,9 +12,11 @@ import type { Dictionary } from "@/i18n/get-dictionary";
 import { adminRequest } from "@/lib/admin-api";
 import type { PageResponse } from "@/lib/api-types";
 import { encodeConsentRouteKey } from "@/lib/consent-route";
+import type { ConsoleLogoutOptions } from "@/lib/console-auth";
 import { apiUrl } from "@/lib/desktop-api";
 
 import { useAdminAuth } from "./AdminAuthProvider";
+import { useConsoleAlerts } from "@/components/auth/ConsoleAlerts";
 import { AdminActionIcon } from "./AdminActionIcon";
 import { ConfirmModal } from "./ConfirmModal";
 import { AdminPageHeader } from "./AdminPageHeader";
@@ -100,7 +102,8 @@ function AdminResourcesContent({
   copy: Copy;
   locale?: Locale;
 }) {
-  const { access, accessToken } = useAdminAuth();
+  const { access, accessToken, logout, username: currentUsername } = useAdminAuth();
+  const alerts = useConsoleAlerts();
   const [items, setItems] = useState<User[] | Session[] | Consent[] | Key[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
@@ -110,6 +113,8 @@ function AdminResourcesContent({
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState<UserBulkAction | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [globalSessionConfirm, setGlobalSessionConfirm] = useState(false);
+  const [globalSessionBusy, setGlobalSessionBusy] = useState(false);
   const [result, setResult] = useState<{ title: string; message: string; value?: string } | null>(
     null,
   );
@@ -210,6 +215,7 @@ function AdminResourcesContent({
     method: "DELETE" | "POST" | "PUT",
     data?: unknown,
     refresh = true,
+    onSuccess?: () => Promise<void> | void,
   ): Promise<T | undefined> => {
     if (!accessToken) return undefined;
     if (refresh) setLoading(true);
@@ -218,9 +224,11 @@ function AdminResourcesContent({
       if (response.status >= 300) {
         throw new Error("Administration operation failed");
       }
+      await onSuccess?.();
       setReloadVersion((current) => current + 1);
       return response.data as T;
     } catch {
+      alerts.addError(copy.operationError);
       setError(true);
       if (refresh) setLoading(false);
       return undefined;
@@ -260,6 +268,31 @@ function AdminResourcesContent({
       setLoading(false);
     } finally {
       setBulkBusy(false);
+    }
+  };
+
+  const revokeAllSessions = async () => {
+    if (!accessToken) return;
+    setGlobalSessionBusy(true);
+    try {
+      const response = await adminRequest(accessToken, {
+        method: "POST",
+        url: "/api/admin/sessions/revoke-all",
+      });
+      if (response.status >= 300) throw new Error("Session revocation failed");
+      alerts.addAlert(copy.sessionTerminated);
+      setGlobalSessionConfirm(false);
+      if (locale && logout) {
+        await logout(locale, { sessionAlreadyRevoked: true });
+      } else {
+        setReloadVersion((current) => current + 1);
+      }
+    } catch {
+      alerts.addError(copy.operationError);
+      setError(true);
+      setLoading(false);
+    } finally {
+      setGlobalSessionBusy(false);
     }
   };
 
@@ -323,6 +356,20 @@ function AdminResourcesContent({
                   <AdminActionIcon action="rotate" />
                 )}
                 {copy.rotateKey}
+              </Button>
+            )}
+            {resource === "sessions" && access?.manageSessions && (
+              <Button
+                disabled={globalSessionBusy}
+                variant="danger"
+                onClick={() => setGlobalSessionConfirm(true)}
+              >
+                {globalSessionBusy ? (
+                  <Spinner animation="border" aria-hidden="true" className="me-2" size="sm" />
+                ) : (
+                  <AdminActionIcon action="logout" />
+                )}
+                {copy.revokeAllSessions}
               </Button>
             )}
           </>
@@ -467,6 +514,9 @@ function AdminResourcesContent({
             copy={copy}
             canManage={access?.manageSessions ?? false}
             accessToken={accessToken}
+            currentUsername={currentUsername}
+            locale={locale}
+            logout={logout}
           />
         )}
         {resource === "consents" && (
@@ -516,6 +566,18 @@ function AdminResourcesContent({
         }}
         onConfirm={() => void runBulkUserAction()}
         show={resource === "users" && bulkAction !== null}
+      />
+      <ConfirmModal
+        cancelLabel={copy.cancel}
+        confirmLabel={copy.revokeAllSessions}
+        confirmAction="logout"
+        busy={globalSessionBusy}
+        message={copy.revokeAllSessionsConfirm}
+        onCancel={() => {
+          if (!globalSessionBusy) setGlobalSessionConfirm(false);
+        }}
+        onConfirm={() => void revokeAllSessions()}
+        show={resource === "sessions" && globalSessionConfirm}
       />
     </>
   );
@@ -677,21 +739,29 @@ function SessionsTable({
   copy,
   canManage,
   accessToken,
+  currentUsername,
+  locale,
+  logout,
 }: {
   items: Session[];
   request: AdminRequest;
   copy: Copy;
   canManage: boolean;
   accessToken: string | null;
+  currentUsername: string | null;
+  locale?: Locale;
+  logout?: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
 }) {
   const date = useDateTimeFormatter();
   const [sessionAction, setSessionAction] = useState<{
     url: string;
     label: string;
     message: string;
+    username: string | null;
   } | null>(null);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [sessionActionBusy, setSessionActionBusy] = useState(false);
 
   const showDetail = async (id: string) => {
     if (!accessToken) return;
@@ -772,6 +842,7 @@ function SessionsTable({
                             url: `/api/admin/sessions/${encodeURIComponent(session.id)}`,
                             label: copy.signOut,
                             message: copy.signOutConfirm,
+                            username: session.username,
                           })
                         }
                       >
@@ -786,6 +857,7 @@ function SessionsTable({
                               url: `/api/admin/users/${encodeURIComponent(session.username ?? "")}/sessions`,
                               label: copy.signOutAll,
                               message: copy.signOutAllConfirm,
+                              username: session.username,
                             })
                           }
                         >
@@ -802,13 +874,25 @@ function SessionsTable({
         })}
       </tbody>
       <ConfirmModal
+        busy={sessionActionBusy}
         cancelLabel={copy.cancel}
         confirmLabel={sessionAction?.label ?? copy.signOut}
         message={sessionAction?.message ?? ""}
-        onCancel={() => setSessionAction(null)}
+        onCancel={() => {
+          if (!sessionActionBusy) setSessionAction(null);
+        }}
         onConfirm={() => {
-          if (sessionAction) void request(sessionAction.url, "DELETE");
-          setSessionAction(null);
+          const action = sessionAction;
+          if (!action || sessionActionBusy) return;
+          setSessionActionBusy(true);
+          void request(action.url, "DELETE", undefined, true, async () => {
+            if (action.username === currentUsername && locale && logout) {
+              await logout(locale, { sessionAlreadyRevoked: true });
+            }
+          }).finally(() => {
+            setSessionActionBusy(false);
+            setSessionAction(null);
+          });
         }}
         show={sessionAction !== null}
       />
@@ -1038,4 +1122,6 @@ type AdminRequest = <T>(
   url: string,
   method: "DELETE" | "POST" | "PUT",
   data?: unknown,
+  refresh?: boolean,
+  onSuccess?: () => Promise<void> | void,
 ) => Promise<T | undefined>;
