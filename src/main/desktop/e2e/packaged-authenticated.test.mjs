@@ -679,17 +679,31 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await packagedRoleCandidate.check();
     await application.evaluate(() => {
       globalThis.__packagedRoleMappingStatuses = [];
+      globalThis.__packagedPolicyStatuses = [];
       const originalFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (input, init) => {
         const response = await originalFetch(input, init);
         const requestUrl = new URL(String(input));
+        const method = String(init?.method ?? "GET").toUpperCase();
         if (
           /\/api\/admin\/client-scopes\/[^/]+\/role-mappings$/.test(
             requestUrl.pathname,
           )
         ) {
           globalThis.__packagedRoleMappingStatuses.push({
-            method: String(init?.method ?? "GET").toUpperCase(),
+            method,
+            status: response.status,
+          });
+        }
+        if (
+          method === "PUT" &&
+          [
+            "/api/admin/settings/ciba-policy",
+            "/api/admin/settings/offline-access",
+          ].includes(requestUrl.pathname)
+        ) {
+          globalThis.__packagedPolicyStatuses.push({
+            path: requestUrl.pathname,
             status: response.status,
           });
         }
@@ -720,6 +734,58 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     }, packagedScopeId);
     assert.equal(savedMappings.status, 200);
     assert.ok(savedMappings.body.applicationRoles.includes(packagedRoleName));
+
+    await mainWindow
+      .getByRole("button", { name: "Policies", exact: true })
+      .click();
+    await mainWindow.getByRole("heading", { name: "CIBA policy" }).waitFor();
+    const cibaForm = mainWindow.locator('form[data-form="admin-ciba-policy"]');
+    const cibaLifespan = await cibaForm
+      .locator('[name="requestLifespanSeconds"]')
+      .inputValue();
+    const cibaSave = cibaForm.getByRole("button", { name: "Save", exact: true });
+    await cibaSave.click();
+    await mainWindow
+      .getByText("Policy settings saved.", { exact: true })
+      .waitFor();
+
+    const offlineForm = mainWindow.locator(
+      'form[data-form="admin-offline-access-policy"]',
+    );
+    const offlineIdleTimeout = await offlineForm
+      .locator('[name="idleTimeout"]')
+      .inputValue();
+    const offlineSave = offlineForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await offlineSave.click();
+    await mainWindow
+      .getByText("Policy settings saved.", { exact: true })
+      .waitFor();
+    const policyStatuses = await application.evaluate(
+      () => globalThis.__packagedPolicyStatuses,
+    );
+    assert.deepEqual(policyStatuses, [
+      { path: "/api/admin/settings/ciba-policy", status: 200 },
+      { path: "/api/admin/settings/offline-access", status: 200 },
+    ]);
+    const persistedPolicies = await mainWindow.evaluate(async () =>
+      Promise.all([
+        window.desktopApi.api.request({
+          console: "admin",
+          path: "/api/admin/settings/ciba-policy",
+        }),
+        window.desktopApi.api.request({
+          console: "admin",
+          path: "/api/admin/settings/offline-access",
+        }),
+      ]),
+    );
+    assert.equal(persistedPolicies[0].status, 200);
+    assert.equal(persistedPolicies[0].body.requestLifespanSeconds, Number(cibaLifespan));
+    assert.equal(persistedPolicies[1].status, 200);
+    assert.equal(persistedPolicies[1].body.idleTimeout, offlineIdleTimeout);
 
     await mainWindow
       .getByRole("button", { name: "Roles", exact: true })
