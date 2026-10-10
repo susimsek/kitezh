@@ -194,6 +194,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(updatedClientScope.status, 200);
+  const deletedClientScope = await adapter.request({
+    console: "admin",
+    path: "/api/admin/client-scopes/scope-native-observer",
+    method: "DELETE",
+  });
+  assert.equal(deletedClientScope.status, 200);
   const createdMessageOverride = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization/messages",
@@ -492,6 +498,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/client-scopes/scope-native-observer/mappers/1",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/client-scopes/scope-native-observer/mappers/1",
+      method: "DELETE",
     }),
     /not allowed/,
   );

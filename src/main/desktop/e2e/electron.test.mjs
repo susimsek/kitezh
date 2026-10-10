@@ -835,6 +835,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(
             requestUrl.pathname,
           ) &&
+          requestMethod === "DELETE"
+        ) {
+          const scopeId = requestUrl.pathname.split("/").at(-1);
+          globalThis.__adminClientScopeDeleteRequests ??= [];
+          globalThis.__adminClientScopeDeleteRequests.push(scopeId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__createdClientScopes = (
+            globalThis.__createdClientScopes ?? []
+          ).filter((scope) => scope.id !== scopeId);
+          return new Response(null, { status: 204 });
+        }
+        if (
+          /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
           requestMethod === "PUT"
         ) {
           const scopeId = requestUrl.pathname.split("/").at(-1);
@@ -2386,6 +2401,47 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           description: "Read-only native console scope",
         },
       ],
+    );
+    const createdScopeRow = window.locator(
+      '[data-client-scope-id="scope-native-observer"]',
+    );
+    await createdScopeRow
+      .getByRole("button", { name: "İstemci kapsamını sil", exact: true })
+      .click();
+    await createdScopeRow
+      .getByText(
+        "Bu istemci kapsamı silinsin mi? Atanmış kapsamlar silinemez.",
+        { exact: true },
+      )
+      .waitFor();
+    await createdScopeRow
+      .getByRole("button", { name: "Vazgeç", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientScopeDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await createdScopeRow
+      .getByRole("button", { name: "İstemci kapsamını sil", exact: true })
+      .click();
+    const confirmClientScopeDelete = createdScopeRow.getByRole("button", {
+      name: "İstemci kapsamını sil",
+      exact: true,
+    });
+    await confirmClientScopeDelete.click();
+    assert.equal(await confirmClientScopeDelete.isDisabled(), true);
+    assert.equal(await confirmClientScopeDelete.locator(".spinner").count(), 1);
+    await window
+      .getByText("İstemci kapsamı silindi.", { exact: true })
+      .waitFor();
+    assert.equal(await createdScopeRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientScopeDeleteRequests,
+      ),
+      ["scope-native-observer"],
     );
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window

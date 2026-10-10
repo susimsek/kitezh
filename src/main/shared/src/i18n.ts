@@ -200,6 +200,10 @@ export const messages = {
     adminCreateClientScopeDescription:
       "Add a scope to the authorization catalog with safe defaults.",
     adminClientScopeCreated: "Client scope created.",
+    adminDeleteClientScope: "Delete client scope",
+    adminDeleteClientScopePrompt:
+      "Delete this client scope? Assigned scopes cannot be deleted.",
+    adminClientScopeDeleted: "Client scope deleted.",
     adminClientScopeUpdated: "Client scope updated.",
     adminClientScopeName: "Scope name",
     adminClientScopeNameRequired: "Scope name is required.",
@@ -619,6 +623,10 @@ export const messages = {
     adminCreateClientScopeDescription:
       "Güvenli varsayılanlarla yetkilendirme kataloğuna kapsam ekleyin.",
     adminClientScopeCreated: "İstemci kapsamı oluşturuldu.",
+    adminDeleteClientScope: "İstemci kapsamını sil",
+    adminDeleteClientScopePrompt:
+      "Bu istemci kapsamı silinsin mi? Atanmış kapsamlar silinemez.",
+    adminClientScopeDeleted: "İstemci kapsamı silindi.",
     adminClientScopeUpdated: "İstemci kapsamı güncellendi.",
     adminClientScopeName: "Kapsam adı",
     adminClientScopeNameRequired: "Kapsam adı gereklidir.",

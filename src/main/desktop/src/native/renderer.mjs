@@ -435,12 +435,19 @@ function adminClientScopesContent() {
       const scopeErrors =
         state.data.adminClientScopeErrorId === scope.id ? errors : {};
       const busy = state.busy === `client-scope-update:${scope.id}`;
+      const deleting = state.busy === `client-scope-delete:${scope.id}`;
+      const confirming = state.data.clientScopeDeleteConfirmId === scope.id;
       const displayNameId = `client-scope-display-name-${scope.id}`;
       const descriptionId = `client-scope-description-${scope.id}`;
       const metadata = scope.builtIn
         ? `<div><strong>${escapeHtml(scope.displayName || scope.name)}</strong><span class="muted">${escapeHtml(scope.description ?? scope.name)}</span></div>`
         : `<form class="actions" data-form="admin-client-scope-edit" data-scope-id="${escapeHtml(scope.id)}" data-scope-name="${escapeHtml(scope.name)}"><div class="field"><label for="${escapeHtml(displayNameId)}">${escapeHtml(text("adminClientScopeDisplayName"))}</label><input id="${escapeHtml(displayNameId)}" name="displayName" type="text" value="${escapeHtml(draft.displayName ?? scope.displayName ?? "")}" maxlength="200"/><div class="field-error">${escapeHtml(scopeErrors.displayName ?? "")}</div></div><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminClientScopeDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? scope.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(scopeErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form>`;
-      return `<article class="list-item">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></article>`;
+      const deleteControls = scope.builtIn
+        ? ""
+        : confirming
+          ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopePrompt"))}</span>${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-confirm", id: scope.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+          : `<div class="actions">${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-request", id: scope.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item" data-client-scope-id="${escapeHtml(scope.id)}">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span>${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopeRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1853,6 +1860,52 @@ async function action(action, element) {
   if (action === "admin-role-delete-cancel") {
     if (state.busy) return;
     state.data.roleDeleteConfirmName = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-client-scope-delete-request" ||
+    action === "admin-client-scope-delete-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = element.dataset.id;
+    const scopes = state.data.clientScopes?.content ?? [];
+    const scope = scopes.find((candidate) => candidate.id === id);
+    if (
+      typeof id !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !scope ||
+      scope.builtIn
+    )
+      return;
+    if (action === "admin-client-scope-delete-request") {
+      state.data.clientScopeDeleteConfirmId = id;
+      render();
+      return;
+    }
+    if (state.data.clientScopeDeleteConfirmId !== id) return;
+    state.busy = `client-scope-delete:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/client-scopes/${id}`, { method: "DELETE" });
+      state.data.clientScopes = {
+        ...state.data.clientScopes,
+        content: scopes.filter((item) => item.id !== id),
+      };
+      state.data.clientScopeDeleteConfirmId = null;
+      state.notice = text("adminClientScopeDeleted");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-delete-cancel") {
+    if (state.busy) return;
+    state.data.clientScopeDeleteConfirmId = null;
     render();
     return;
   }
