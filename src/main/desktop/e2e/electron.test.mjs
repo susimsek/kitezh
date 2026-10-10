@@ -1302,6 +1302,22 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       "6",
       "8",
     ]);
+    await window.emulateMedia({ forcedColors: "active" });
+    assert.deepEqual(
+      await window.evaluate(() => ({
+        background: getComputedStyle(document.documentElement)
+          .getPropertyValue("--background")
+          .trim(),
+        primary: getComputedStyle(document.documentElement)
+          .getPropertyValue("--primary")
+          .trim(),
+        text: getComputedStyle(document.documentElement)
+          .getPropertyValue("--text")
+          .trim(),
+      })),
+      { background: "Canvas", primary: "Highlight", text: "CanvasText" },
+    );
+    await window.emulateMedia({ forcedColors: "none" });
     const signOut = window.getByRole("button", {
       name: "Sign out",
       exact: true,

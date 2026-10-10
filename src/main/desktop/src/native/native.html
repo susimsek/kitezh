@@ -86,6 +86,7 @@
       dialog::backdrop { background: rgb(0 0 0 / 45%); }
       @media (max-width: 800px) { .app { grid-template-columns: 1fr; } .sidebar { border-right: 0; border-bottom: 1px solid var(--border); } .nav { grid-template-columns: repeat(3, 1fr); } .sidebar-footer { grid-template-columns: 1fr 1fr; } .two-col, .form-grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .content { padding: 18px; } .topbar { padding: 16px 18px; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+      @media (forced-colors: active) { :root, :root[data-theme="dark"] { color-scheme: light dark; --background: Canvas; --surface: Canvas; --surface-muted: Canvas; --text: CanvasText; --text-muted: CanvasText; --primary: Highlight; --primary-pressed: Highlight; --on-primary: HighlightText; --danger: LinkText; --on-danger: Canvas; --success: CanvasText; --warning: CanvasText; --focus: Highlight; --border: CanvasText; } .primary-button, .danger-button, .brand-mark { border: 1px solid ButtonText; } }
     </style>
   </head>
   <body>

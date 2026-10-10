@@ -30,17 +30,17 @@ uses typed, capability-scoped API calls.
 
 ## Shared cross-client contracts
 
-| Contract                         | Status      | Evidence / remaining work                                                                                                                                                                                                                                                                                |
-| -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Localization catalog             | In progress | Shared English/Turkish message keys; native policy, branding, localization settings, and override edits have save-feedback E2E coverage in both locales. Audit remaining native flows for parity.                                                                                                        |
-| Design tokens and icon semantics | In progress | Native renderer CSS and native dialog themes use shared semantic color tokens. Native logout and language buttons consume shared icon metadata; Windows E2E verifies the icon glyphs are decorative and accessible button labels stay unchanged. High-contrast coverage and broader icon mapping remain. |
-| Audit and privacy                | In progress | Backend audit events exist for policy/branding writes; native rendering omits sensitive settings and escapes override content. Desktop diagnostic privacy is tested; complete cross-client redaction and retention review.                                                                               |
-| Environment and endpoint policy  | In progress | Configured API origin and external navigation policy have focused security tests and Windows E2E; packaged platform evidence remains.                                                                                                                                                                    |
+| Contract                         | Status      | Evidence / remaining work                                                                                                                                                                                                                                                                                   |
+| -------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Localization catalog             | In progress | Shared English/Turkish message keys; native policy, branding, localization settings, and override edits have save-feedback E2E coverage in both locales. Audit remaining native flows for parity.                                                                                                           |
+| Design tokens and icon semantics | In progress | Native renderer CSS and native dialog themes use shared semantic color tokens. Native logout and language buttons consume shared icon metadata; Windows E2E verifies decorative icon accessibility and forced-colors system tokens. Real Windows high-contrast OS evidence and broader icon mapping remain. |
+| Audit and privacy                | In progress | Backend audit events exist for policy/branding writes; native rendering omits sensitive settings and escapes override content. Desktop diagnostic privacy is tested; complete cross-client redaction and retention review.                                                                                  |
+| Environment and endpoint policy  | In progress | Configured API origin and external navigation policy have focused security tests and Windows E2E; packaged platform evidence remains.                                                                                                                                                                       |
 
 ## Latest focused evidence
 
 - `pnpm --dir src/main/desktop run test:unit`: 23/23 passed, including diagnostics redaction.
-- `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 12/12 passed, including native email settings validation and save flows.
+- `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 12/12 passed, including native email settings validation/save and forced-colors system token checks.
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.
 - `git diff --check` passed for the committed slices.
 
