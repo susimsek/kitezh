@@ -1108,6 +1108,27 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       name: "Save",
       exact: true,
     });
+    await mainWindow.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await saveClientMapper.waitFor({ state: "visible" });
+    assert.equal(await saveClientMapper.isDisabled(), true);
+    assert.equal(
+      await clientMapperForm.locator('[name="source"]').inputValue(),
+      "email",
+    );
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__packagedClientMapperStatuses.filter(
+          ({ method }) => method === "POST",
+        ),
+      ),
+      [],
+    );
+    await mainWindow.evaluate(() => window.dispatchEvent(new Event("online")));
+    await saveClientMapper.waitFor({ state: "visible" });
+    assert.equal(
+      await clientMapperForm.locator('[name="source"]').inputValue(),
+      "email",
+    );
     await saveClientMapper.click();
     assert.equal(await saveClientMapper.isDisabled(), true);
     assert.equal(await saveClientMapper.getAttribute("aria-busy"), "true");
