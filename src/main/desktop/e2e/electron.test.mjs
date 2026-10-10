@@ -4744,6 +4744,9 @@ test("opens settings in a separate window without requiring login", async () => 
           "person@example.test access_token=ACCESS_E2E refresh_token=REFRESH_E2E code=AUTH_E2E cookie=COOKIE_E2E provider_subject=SUBJECT_E2E first_name=NAME_E2E",
         ),
       );
+      process.emit("unhandledRejection", new TypeError("private detail"));
+      process.emit("unhandledRejection", new RangeError("private detail"));
+      process.emit("unhandledRejection", new SyntaxError("private detail"));
     });
     await settingsWindow.waitForTimeout(200);
     await settingsWindow
@@ -4752,6 +4755,14 @@ test("opens settings in a separate window without requiring login", async () => 
     await settingsWindow
       .getByRole("heading", { name: /Diagnostics|Tanı bilgileri/ })
       .waitFor();
+    await settingsWindow.waitForFunction(() => {
+      const text = document.querySelector("#desktop-diagnostics")?.textContent;
+      return (
+        text?.includes("TypeError") &&
+        text.includes("RangeError") &&
+        text.includes("SyntaxError")
+      );
+    });
     assert.equal(
       await settingsWindow
         .getByRole("button", {
