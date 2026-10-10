@@ -3317,9 +3317,9 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       exact: true,
     });
     await avatarToggle.click();
-    const avatarPanel = aliceRow.getByRole("region", {
-      name: "User avatar",
-    });
+    const avatarPanel = aliceRow.locator(
+      'section.card:has([data-admin-avatar-file="2"])',
+    );
     await avatarPanel.waitFor();
     const uploadAvatar = avatarPanel.locator(
       'button[data-action="admin-user-avatar-upload"]',
@@ -3341,6 +3341,29 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       await application.evaluate(() => globalThis.__adminAvatarWrites ?? []),
       [],
     );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    if ((await avatarPanel.count()) === 0) {
+      await aliceRow
+        .locator('button[data-action="admin-user-avatar-toggle"]')
+        .click();
+      await avatarPanel.waitFor();
+    }
+    await avatarFile.setInputFiles({
+      name: "avatar.svg",
+      mimeType: "image/svg+xml",
+      buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+    });
+    await uploadAvatar.click();
+    await avatarValidation.waitFor();
+    assert.equal(
+      await avatarValidation.innerText(),
+      "En fazla 2 MiB ve 4 megapiksel JPEG veya PNG seçin.",
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminAvatarWrites ?? []),
+      [],
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
     await avatarPanel.locator('input[type="file"]').setInputFiles({
       name: "avatar.png",
       mimeType: "image/png",
