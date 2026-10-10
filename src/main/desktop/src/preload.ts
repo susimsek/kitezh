@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { ConsoleName } from "@kitezh/shared";
 
 const config = ipcRenderer.sendSync("desktop:config-sync") as {
   apiBaseUrl: string;
@@ -10,8 +11,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
   apiBaseUrl: config.apiBaseUrl,
   protocol: config.protocol,
   auth: {
-    startLogin: (request: unknown) =>
-      ipcRenderer.invoke("desktop:auth-start-login", request),
+    startLogin: (consoleName: ConsoleName) =>
+      ipcRenderer.invoke("desktop:auth-start-login", consoleName),
     hasSession: (consoleName: unknown) =>
       ipcRenderer.invoke("desktop:auth-has-session", consoleName),
     clearSession: (consoleName: unknown) =>
@@ -34,7 +35,8 @@ contextBridge.exposeInMainWorld("desktopApi", {
           value: { provider: string; error?: string },
         ) => listener(value);
         ipcRenderer.on("desktop:social-link-callback", callback);
-        return () => ipcRenderer.removeListener("desktop:social-link-callback", callback);
+        return () =>
+          ipcRenderer.removeListener("desktop:social-link-callback", callback);
       },
     },
   },

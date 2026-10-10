@@ -267,6 +267,31 @@ test("keeps native sign-in busy until callback and rejects duplicate authorizati
       }
     });
     assert.equal(duplicateRejected, true);
+    const originalAuthorizationUrl = await application.evaluate(
+      () => globalThis.__pendingAuthorizationUrl,
+    );
+    const rendererTransactionRejected = await window.evaluate(async () => {
+      try {
+        await window.desktopApi.auth.startLogin({
+          console: "admin",
+          authorizationUrl:
+            "http://127.0.0.1:9090/oauth2/authorize?client_id=desktop-admin-console",
+          state: "renderer-controlled-state-1234567890",
+          codeVerifier:
+            "renderer-controlled-verifier-1234567890123456789012345678901234567890",
+          clientId: "desktop-admin-console",
+          redirectUri: "kitezh://oauth/callback",
+        });
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    assert.equal(rendererTransactionRejected, true);
+    assert.equal(
+      await application.evaluate(() => globalThis.__pendingAuthorizationUrl),
+      originalAuthorizationUrl,
+    );
     await application.evaluate(({ app }) => {
       const state = new URL(
         globalThis.__pendingAuthorizationUrl,

@@ -2721,71 +2721,20 @@ function registerIpc() {
     "desktop:auth-start-login",
     async (event, request: unknown) => {
       assertTrustedSender(event);
-      if (typeof request === "string") {
-        assertConsole(request);
-        const existing = pendingAuthorizations.get(request);
-        if (existing && isPendingAuthorizationValid(existing, existing.state)) {
-          throw new Error("Desktop authorization is already in progress");
-        }
-        const nativeRequest = nativeAuthorizationRequest(request);
-        pendingAuthorizations.set(request, nativeRequest.pending);
-        try {
-          await shell.openExternal(nativeRequest.authorizationUrl.toString());
-        } catch {
-          pendingAuthorizations.delete(request);
-          throw new Error("Desktop authorization browser could not be opened");
-        }
-        return;
+      if (typeof request !== "string") throw new Error("Invalid login request");
+      assertConsole(request);
+      const existing = pendingAuthorizations.get(request);
+      if (existing && isPendingAuthorizationValid(existing, existing.state)) {
+        throw new Error("Desktop authorization is already in progress");
       }
-      if (!request || typeof request !== "object")
-        throw new Error("Invalid login request");
-      const value = request as Partial<{
-        console: ConsoleName;
-        authorizationUrl: string;
-        state: string;
-        codeVerifier: string;
-        clientId: string;
-        redirectUri: string;
-      }>;
-      assertConsole(value.console);
-      if (
-        typeof value.authorizationUrl !== "string" ||
-        !isAllowedExternalUrl(value.authorizationUrl)
-      ) {
-        throw new Error("Authorization URL is not allowed");
+      const nativeRequest = nativeAuthorizationRequest(request);
+      pendingAuthorizations.set(request, nativeRequest.pending);
+      try {
+        await shell.openExternal(nativeRequest.authorizationUrl.toString());
+      } catch {
+        pendingAuthorizations.delete(request);
+        throw new Error("Desktop authorization browser could not be opened");
       }
-      if (new URL(value.authorizationUrl).origin !== getApiBaseUrl()) {
-        throw new Error(
-          "Authorization URL must use the configured authorization server",
-        );
-      }
-      if (
-        typeof value.state !== "string" ||
-        value.state.length < 16 ||
-        value.state.length > 256
-      ) {
-        throw new Error("Invalid authorization state");
-      }
-      if (
-        typeof value.codeVerifier !== "string" ||
-        value.codeVerifier.length < 43 ||
-        value.codeVerifier.length > 128 ||
-        typeof value.clientId !== "string" ||
-        !["desktop-admin-console", "desktop-account-console"].includes(
-          value.clientId,
-        ) ||
-        value.redirectUri !== "kitezh://oauth/callback"
-      ) {
-        throw new Error("Invalid desktop authorization request");
-      }
-      pendingAuthorizations.set(value.console, {
-        state: value.state,
-        codeVerifier: value.codeVerifier,
-        clientId: value.clientId,
-        redirectUri: value.redirectUri,
-        createdAt: Date.now(),
-      });
-      await shell.openExternal(value.authorizationUrl);
     },
   );
   ipcMain.handle(
