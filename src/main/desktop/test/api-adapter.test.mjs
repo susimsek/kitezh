@@ -154,6 +154,19 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/events?q=admin&page=0&size=20&sort=occurredAt,desc",
   });
   assert.equal(events.status, 200);
+  const keys = await adapter.request({
+    console: "admin",
+    path: "/api/admin/keys?q=rsa&active=false&page=0&size=20&sort=createdAt,desc",
+  });
+  assert.equal(keys.status, 200);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/keys/rotate",
+      method: "POST",
+    }),
+    /not allowed/,
+  );
   await assert.rejects(
     adapter.request({
       console: "admin",

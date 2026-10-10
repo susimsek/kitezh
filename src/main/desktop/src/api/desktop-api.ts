@@ -62,12 +62,14 @@ function isAllowedApiPath(
       const isConsents = url.pathname === "/api/admin/consents";
       const isOfflineSessions = url.pathname === "/api/admin/offline-sessions";
       const isEvents = url.pathname === "/api/admin/events";
+      const isKeys = url.pathname === "/api/admin/keys";
       const allowedParameters = new Set([
         "q",
         "page",
         "size",
         "sort",
         ...(isSessions ? ["status"] : []),
+        ...(isKeys ? ["active"] : []),
       ]);
       const sortFields = isUsers
         ? ["username,asc", "username,desc"]
@@ -83,7 +85,9 @@ function isAllowedApiPath(
                   ? ["refreshTokenIssuedAt,asc", "refreshTokenIssuedAt,desc"]
                   : isEvents
                     ? ["occurredAt,asc", "occurredAt,desc"]
-                    : ["name,asc", "name,desc"];
+                    : isKeys
+                      ? ["createdAt,asc", "createdAt,desc"]
+                      : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
@@ -94,7 +98,8 @@ function isAllowedApiPath(
           isSessions ||
           isConsents ||
           isOfflineSessions ||
-          isEvents) &&
+          isEvents ||
+          isKeys) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
@@ -123,11 +128,14 @@ function isAllowedApiPath(
                         ? "refreshTokenIssuedAt,desc"
                         : isEvents
                           ? "occurredAt,desc"
-                          : "name,asc"),
+                          : isKeys
+                            ? "createdAt,desc"
+                            : "name,asc"),
         ) &&
         ["active", "expired"].includes(
           url.searchParams.get("status") ?? "active",
-        )
+        ) &&
+        ["true", "false"].includes(url.searchParams.get("active") ?? "true")
       );
     } catch {
       return false;

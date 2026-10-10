@@ -582,6 +582,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/keys") {
+          globalThis.__adminKeyRequests ??= [];
+          globalThis.__adminKeyRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const query = requestUrl.searchParams.get("q") ?? "";
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "key-id",
+                  kid: query ? "rsa-retired" : "rsa-active",
+                  type: "RSA",
+                  algorithm: "RS256",
+                  use: "sig",
+                  active: requestUrl.searchParams.get("active") !== "false",
+                  privateKey: "SECRET_PRIVATE_KEY_NEVER_RENDER",
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -905,6 +934,35 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       () => globalThis.__adminEventRequests,
     );
     assert.equal(new URLSearchParams(eventRequests[1]).get("q"), "admin");
+    const keysNavigation = window.getByRole("button", {
+      name: "Signing keys",
+      exact: true,
+    });
+    await keysNavigation.click();
+    assert.equal(await keysNavigation.isDisabled(), true);
+    assert.equal(await keysNavigation.locator(".spinner").count(), 1);
+    await window.getByText("rsa-active", { exact: true }).waitFor();
+    assert.equal(
+      await window.getByText("SECRET_PRIVATE_KEY_NEVER_RENDER").count(),
+      0,
+    );
+    await window
+      .getByRole("searchbox", { name: "Search signing keys" })
+      .fill("rsa");
+    await window.locator("#admin-key-active").selectOption("false");
+    await window.getByRole("button", { name: "Search signing keys" }).click();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Search signing keys" })
+        .isDisabled(),
+      true,
+    );
+    await window.getByText("rsa-retired", { exact: true }).waitFor();
+    const keyRequests = await application.evaluate(
+      () => globalThis.__adminKeyRequests,
+    );
+    assert.equal(new URLSearchParams(keyRequests[1]).get("q"), "rsa");
+    assert.equal(new URLSearchParams(keyRequests[1]).get("active"), "false");
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {
