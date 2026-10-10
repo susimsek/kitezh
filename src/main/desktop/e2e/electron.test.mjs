@@ -20,6 +20,7 @@ const packageVersion = JSON.parse(
 
 async function launchDesktop({
   devTools = false,
+  autoUpdate = "false",
   updatePreviewState,
   updatePreviewVersion = "0.1.1",
 } = {}) {
@@ -37,7 +38,7 @@ async function launchDesktop({
     env: {
       ...process.env,
       DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
-      DESKTOP_AUTO_UPDATE: "false",
+      DESKTOP_AUTO_UPDATE: autoUpdate,
       DESKTOP_DEVTOOLS: devTools ? "true" : "false",
       ...(updatePreviewState
         ? {
@@ -5557,6 +5558,55 @@ test("shows an up-to-date result when no update is available", async () => {
       /There are no new updates available/,
     );
     await resultWindow.getByRole("button", { name: "Done" }).click();
+  } finally {
+    await application.close();
+  }
+});
+
+test("rejects an unsigned update manifest in the Windows main process", async () => {
+  const application = await launchDesktop({ autoUpdate: "true" });
+  try {
+    const mainWindow = await nativeMainWindow(application);
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    await application.evaluate(({ app, net }) => {
+      Object.defineProperty(app, "isPackaged", {
+        configurable: true,
+        value: true,
+      });
+      globalThis.__updateManifestRequests = [];
+      net.fetch = async (url) => {
+        const requestUrl = String(url);
+        globalThis.__updateManifestRequests.push(requestUrl);
+        if (requestUrl.endsWith(".sig"))
+          return new Response(null, { status: 404 });
+        return new Response("version: 0.1.4\n", { status: 200 });
+      };
+    });
+    const errorPromise = mainWindow.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let remove;
+          remove = window.desktopApi?.updates.onStatus((status) => {
+            if (status?.state !== "error") return;
+            remove?.();
+            resolve(status);
+          });
+        }),
+    );
+    await mainWindow.evaluate(() => window.desktopApi?.updates.check());
+    assert.deepEqual(await errorPromise, {
+      state: "error",
+      message: "Desktop update could not be checked.",
+    });
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__updateManifestRequests),
+      [
+        "https://github.com/susimsek/kitezh/releases/latest/download/latest.yml",
+        "https://github.com/susimsek/kitezh/releases/latest/download/latest.yml.sig",
+      ],
+    );
   } finally {
     await application.close();
   }

@@ -82,10 +82,7 @@ async function verifyPublishedManifest() {
   const manifest = Buffer.from(await manifestResponse.arrayBuffer());
   const signatureResponse = await net.fetch(`${updateManifestUrl()}.sig`);
   if (signatureResponse.status === 404) {
-    if (process.env.DESKTOP_UPDATE_REQUIRE_SIGNATURE === "true") {
-      throw new Error("The update manifest signature is missing.");
-    }
-    return;
+    throw new Error("The update manifest signature is missing.");
   }
   if (!signatureResponse.ok) {
     throw new Error(
@@ -99,6 +96,17 @@ async function verifyPublishedManifest() {
   const publicKey = await readFile(
     path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
   );
+  assertUpdateManifestSignature(manifest, signature, publicKey);
+}
+
+export function assertUpdateManifestSignature(
+  manifest: Buffer,
+  signature: Buffer,
+  publicKey: string | Buffer,
+) {
+  if (signature.length === 0) {
+    throw new Error("The update manifest signature is missing.");
+  }
   if (!verifyUpdateManifestSignature(manifest, signature, publicKey)) {
     throw new Error("The update manifest signature is invalid.");
   }

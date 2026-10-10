@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import test from "node:test";
 
-import { verifyUpdateManifestSignature } from "../dist/update.js";
+import {
+  assertUpdateManifestSignature,
+  verifyUpdateManifestSignature,
+} from "../dist/update.js";
 
 test("accepts a signed update manifest and rejects changed content", () => {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -22,5 +25,21 @@ test("accepts a signed update manifest and rejects changed content", () => {
       publicKey,
     ),
     false,
+  );
+  assert.doesNotThrow(() =>
+    assertUpdateManifestSignature(manifest, signature, publicKey),
+  );
+  assert.throws(
+    () => assertUpdateManifestSignature(manifest, Buffer.alloc(0), publicKey),
+    /signature is missing/,
+  );
+  assert.throws(
+    () =>
+      assertUpdateManifestSignature(
+        Buffer.from("version: 0.1.4\n"),
+        signature,
+        publicKey,
+      ),
+    /signature is invalid/,
   );
 });

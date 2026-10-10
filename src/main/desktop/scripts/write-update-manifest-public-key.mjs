@@ -1,5 +1,5 @@
 import { createPrivateKey, createPublicKey } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,13 +7,16 @@ const assetsDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../assets",
 );
-const publicKeyPath = path.join(assetsDirectory, "update-manifest-public-key.pem");
+const publicKeyPath = path.join(
+  assetsDirectory,
+  "update-manifest-public-key.pem",
+);
 const privateKeyValue = process.env.UPDATE_MANIFEST_SIGNING_KEY;
 
 if (!privateKeyValue) {
-  await unlink(publicKeyPath).catch(() => undefined);
-  console.log("Update manifest signing is not configured; no public key was bundled.");
-  process.exit(0);
+  throw new Error(
+    "UPDATE_MANIFEST_SIGNING_KEY is required for desktop releases.",
+  );
 }
 
 const publicKey = createPublicKey(createPrivateKey(privateKeyValue)).export({
