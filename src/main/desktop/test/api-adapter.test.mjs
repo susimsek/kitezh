@@ -199,6 +199,21 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
     path: "/api/admin/settings/ldap",
   });
   assert.equal(ldapProviders.status, 200);
+  const authenticationFlows = await adapter.request({
+    console: "admin",
+    path: "/api/admin/authentication/flows?page=0&size=20&sort=name,asc",
+  });
+  assert.equal(authenticationFlows.status, 200);
+  const authenticationBindings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/authentication/bindings",
+  });
+  assert.equal(authenticationBindings.status, 200);
+  const executionProviders = await adapter.request({
+    console: "admin",
+    path: "/api/admin/authentication/execution-providers",
+  });
+  assert.equal(executionProviders.status, 200);
   const messageOverrides = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization/messages?q=login&locale=tr&bundle=admin&page=0&size=20&sort=locale,asc",
@@ -240,6 +255,21 @@ test("limits the Admin namespace to read-only dashboard and bounded user-list co
       console: "admin",
       path: "/api/admin/settings/ldap",
       method: "PUT",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/authentication/flows/1",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/authentication/flows?q=browser&page=0&size=20",
     }),
     /not allowed/,
   );

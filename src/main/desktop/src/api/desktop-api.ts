@@ -60,6 +60,11 @@ function isAllowedApiPath(
     )
       return true;
     if (path === "/api/admin/settings/localization") return true;
+    if (
+      path === "/api/admin/authentication/bindings" ||
+      path === "/api/admin/authentication/execution-providers"
+    )
+      return true;
     try {
       const url = new URL(path, "https://desktop.invalid");
       const isUsers = url.pathname === "/api/admin/users";
@@ -76,6 +81,8 @@ function isAllowedApiPath(
       const isKeys = url.pathname === "/api/admin/keys";
       const isLocalizationMessages =
         url.pathname === "/api/admin/settings/localization/messages";
+      const isAuthenticationFlows =
+        url.pathname === "/api/admin/authentication/flows";
       const allowedParameters = new Set([
         "q",
         "page",
@@ -108,7 +115,9 @@ function isAllowedApiPath(
                             "messageKey,asc",
                             "messageKey,desc",
                           ]
-                        : ["name,asc", "name,desc"];
+                        : isAuthenticationFlows
+                          ? ["name,asc", "name,desc"]
+                          : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
@@ -121,12 +130,14 @@ function isAllowedApiPath(
           isOfflineSessions ||
           isEvents ||
           isKeys ||
-          isLocalizationMessages) &&
+          isLocalizationMessages ||
+          isAuthenticationFlows) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
         [...url.searchParams.keys()].every((key) =>
           allowedParameters.has(key),
         ) &&
+        (!isAuthenticationFlows || !url.searchParams.has("q")) &&
         [...allowedParameters].every(
           (key) => url.searchParams.getAll(key).length <= 1,
         ) &&

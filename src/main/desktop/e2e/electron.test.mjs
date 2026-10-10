@@ -810,6 +810,61 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/authentication/flows") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: 1,
+                  alias: "browser",
+                  name: "Browser",
+                  description: "Primary browser authentication flow",
+                  flowType: "BASIC",
+                  topLevel: true,
+                  builtIn: true,
+                  requirement: null,
+                  priority: 0,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (requestUrl.pathname === "/api/admin/authentication/bindings") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify([
+              {
+                bindingType: "BROWSER",
+                flowId: 1,
+                flowAlias: "browser",
+                flowName: "Browser",
+              },
+            ]),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          requestUrl.pathname ===
+          "/api/admin/authentication/execution-providers"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(JSON.stringify(["password", "totp"]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -1286,6 +1341,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Turkish" }).click();
     await window
       .getByRole("heading", { name: "LDAP federasyonu", exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const authenticationNavigation = window.getByRole("button", {
+      name: "Authentication flows",
+      exact: true,
+    });
+    await authenticationNavigation.click();
+    assert.equal(await authenticationNavigation.isDisabled(), true);
+    assert.equal(await authenticationNavigation.locator(".spinner").count(), 1);
+    await window.getByText("Primary browser authentication flow").waitFor();
+    await window.getByText("BROWSER", { exact: true }).waitFor();
+    await window.getByText("password", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("heading", { name: "Kimlik doğrulama akışları", exact: true })
       .waitFor();
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();

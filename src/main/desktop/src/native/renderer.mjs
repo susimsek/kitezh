@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}${navButton("localization", text("adminLocalization"))}${navButton("ldap", text("adminLdap"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}${navButton("localization", text("adminLocalization"))}${navButton("ldap", text("adminLdap"))}${navButton("authentication", text("adminAuthentication"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -159,6 +159,7 @@ function routeTitle() {
       "login-email": text("adminLoginEmail"),
       localization: text("adminLocalization"),
       ldap: text("adminLdap"),
+      authentication: text("adminAuthentication"),
       dashboard: text("adminDashboard"),
     }[state.route];
   return {
@@ -189,6 +190,7 @@ function routeDescription() {
       "login-email": text("adminLoginEmailDescription"),
       localization: text("adminLocalizationDescription"),
       ldap: text("adminLdapDescription"),
+      authentication: text("adminAuthenticationDescription"),
       dashboard: text("adminOverview"),
     }[state.route];
   return {
@@ -240,6 +242,8 @@ function adminContent() {
   if (state.route === "login-email") return adminAdminLoginEmailContent();
   if (state.route === "localization") return adminAdminLocalizationContent();
   if (state.route === "ldap") return adminAdminLdapContent();
+  if (state.route === "authentication")
+    return adminAdminAuthenticationContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -467,6 +471,17 @@ function adminAdminLdapContent() {
     .join("")}</div></section>`;
 }
 
+function adminAdminAuthenticationContent() {
+  const flows = state.data.adminAuthenticationFlows?.content ?? [];
+  const bindings = Array.isArray(state.data.adminAuthenticationBindings)
+    ? state.data.adminAuthenticationBindings
+    : [];
+  const providers = Array.isArray(state.data.adminExecutionProviders)
+    ? state.data.adminExecutionProviders
+    : [];
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminAuthenticationFlows"))}"><h2>${escapeHtml(text("adminAuthenticationFlows"))}</h2>${flows.length ? `<div class="list">${flows.map((flow) => `<article class="list-item"><div><strong>${escapeHtml(flow.name)}</strong><span class="muted">${escapeHtml(`${flow.alias} · ${flow.flowType}`)}</span>${flow.description ? `<span class="muted">${escapeHtml(flow.description)}</span>` : ""}</div><span>${escapeHtml(flow.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoAuthenticationFlows"))}</div>`}</section><section class="card" aria-label="${escapeHtml(text("adminAuthenticationBindings"))}"><h2>${escapeHtml(text("adminAuthenticationBindings"))}</h2>${bindings.length ? `<div class="list">${bindings.map((binding) => `<article class="list-item"><strong>${escapeHtml(binding.bindingType)}</strong><span>${escapeHtml(binding.flowName ?? text("adminNotConfigured"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoAuthenticationBindings"))}</div>`}</section><section class="card" aria-label="${escapeHtml(text("adminExecutionProviders"))}"><h2>${escapeHtml(text("adminExecutionProviders"))}</h2>${providers.length ? `<div class="list">${providers.map((provider) => `<div class="list-item"><span>${escapeHtml(provider)}</span></div>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoExecutionProviders"))}</div>`}</section></div>`;
+}
+
 function profileContent() {
   const profile = state.profile ?? {};
   const errors = violations(state.error?.body);
@@ -690,6 +705,17 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
     }
     if (state.console === "admin" && state.route === "ldap")
       state.data.adminLdapProviders = await request("/api/admin/settings/ldap");
+    if (state.console === "admin" && state.route === "authentication") {
+      [
+        state.data.adminAuthenticationFlows,
+        state.data.adminAuthenticationBindings,
+        state.data.adminExecutionProviders,
+      ] = await Promise.all([
+        request("/api/admin/authentication/flows?page=0&size=20&sort=name,asc"),
+        request("/api/admin/authentication/bindings"),
+        request("/api/admin/authentication/execution-providers"),
+      ]);
+    }
     if (state.route === "profile")
       state.profile = await request("/api/account/profile");
     if (state.route === "sessions")
