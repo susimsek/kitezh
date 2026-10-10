@@ -49,6 +49,11 @@ function isAllowedApiPath(
   if (namespace === "admin") {
     if (method !== "GET") return false;
     if (path === "/api/admin/dashboard") return true;
+    if (
+      path === "/api/admin/settings/ciba-policy" ||
+      path === "/api/admin/settings/offline-access"
+    )
+      return true;
     try {
       const url = new URL(path, "https://desktop.invalid");
       const isUsers = url.pathname === "/api/admin/users";

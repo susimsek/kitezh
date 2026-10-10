@@ -611,6 +611,39 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/settings/ciba-policy") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              requestLifespanSeconds: 300,
+              pollingIntervalSeconds: 5,
+              deliveryMode: "all",
+              userVerification: "preferred",
+              mfaRequired: true,
+              stepUpRequired: false,
+              stepUpAcr: "urn:kitezh:loa:2",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (requestUrl.pathname === "/api/admin/settings/offline-access") {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              idleTimeout: "P30D",
+              maxLifespan: "P180D",
+              maxLimited: true,
+              revokedBefore: "2026-01-01T00:00:00Z",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         throw new Error("Unexpected Admin API request");
       };
     });
@@ -963,6 +996,21 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     assert.equal(new URLSearchParams(keyRequests[1]).get("q"), "rsa");
     assert.equal(new URLSearchParams(keyRequests[1]).get("active"), "false");
+    const policiesNavigation = window.getByRole("button", {
+      name: "Policies",
+      exact: true,
+    });
+    await policiesNavigation.click();
+    assert.equal(await policiesNavigation.isDisabled(), true);
+    assert.equal(await policiesNavigation.locator(".spinner").count(), 1);
+    await window.getByRole("heading", { name: "CIBA policy" }).waitFor();
+    await window.getByText("300", { exact: true }).waitFor();
+    await window.getByText("P30D", { exact: true }).waitFor();
+    await window.getByText("urn:kitezh:loa:2", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("heading", { name: "CIBA politikası" }).waitFor();
+    await window.getByText("MFA gerekli", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.fetch = async (url) => {

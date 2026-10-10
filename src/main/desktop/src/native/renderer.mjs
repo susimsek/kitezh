@@ -130,7 +130,7 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}`
+      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
@@ -154,6 +154,7 @@ function routeTitle() {
       "offline-sessions": text("adminOfflineSessions"),
       events: text("adminEvents"),
       keys: text("adminKeys"),
+      policies: text("adminPolicies"),
       dashboard: text("adminDashboard"),
     }[state.route];
   return {
@@ -179,6 +180,7 @@ function routeDescription() {
       "offline-sessions": text("offlineSessionsHelp"),
       events: text("adminSearchEvents"),
       keys: text("adminSearchKeys"),
+      policies: text("adminPoliciesDescription"),
       dashboard: text("adminOverview"),
     }[state.route];
   return {
@@ -225,6 +227,7 @@ function adminContent() {
     return adminAdminOfflineSessionsContent();
   if (state.route === "events") return adminAdminEventsContent();
   if (state.route === "keys") return adminAdminKeysContent();
+  if (state.route === "policies") return adminAdminPoliciesContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
     ["clients", "adminStatClients"],
@@ -371,6 +374,16 @@ function adminAdminKeysContent() {
     ? page.totalPages
     : 0;
   return `<section class="card" aria-label="${escapeHtml(text("adminKeys"))}"><form id="admin-key-search" class="actions" role="search"><input id="admin-key-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchKeys"))}" value="${escapeHtml(state.data.adminKeyQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchKeys"))}" maxlength="200"/><select id="admin-key-active" name="active" aria-label="${escapeHtml(text("adminKeys"))}"><option value="all" ${state.data.adminKeyActive === "all" ? "selected" : ""}>${escapeHtml(text("adminKeys"))}</option><option value="true" ${state.data.adminKeyActive !== "all" && state.data.adminKeyActive !== "false" ? "selected" : ""}>${escapeHtml(text("adminKeyActive"))}</option><option value="false" ${state.data.adminKeyActive === "false" ? "selected" : ""}>${escapeHtml(text("adminKeyInactive"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-keys-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-keys-search")}${escapeHtml(text("adminSearchKeys"))}</button></form>${keys.length ? `<div class="list">${keys.map((key) => `<article class="list-item"><div><strong>${escapeHtml(key.kid)}</strong><span class="muted">${escapeHtml(`${key.type} · ${key.algorithm} · ${key.use}`)}</span></div><span>${escapeHtml(key.active ? text("adminKeyActive") : text("adminKeyInactive"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoKeys"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminKeys"))} pagination"><button class="secondary-button" type="button" data-admin-key-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-keys-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-key-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-keys-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminAdminPoliciesContent() {
+  const ciba = state.data.cibaPolicy ?? {};
+  const offline = state.data.offlineAccessPolicy ?? {};
+  const policyValue = (value) =>
+    escapeHtml(value ?? text("adminNotConfigured"));
+  const row = (label, value) =>
+    `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${policyValue(value)}</span></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><div class="list">${row(text("adminRequestLifespan"), ciba.requestLifespanSeconds)}${row(text("adminPollingInterval"), ciba.pollingIntervalSeconds)}${row(text("adminDeliveryMode"), ciba.deliveryMode)}${row(text("adminUserVerification"), ciba.userVerification)}${row(text("adminMfaRequired"), ciba.mfaRequired === true ? text("adminRequired") : ciba.mfaRequired === false ? text("adminNotRequired") : undefined)}${row(text("adminStepUpRequired"), ciba.stepUpRequired === true ? text("adminRequired") : ciba.stepUpRequired === false ? text("adminNotRequired") : undefined)}${ciba.stepUpAcr ? row(text("adminStepUpAcr"), ciba.stepUpAcr) : ""}</div></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><div class="list">${row(text("adminIdleTimeout"), offline.idleTimeout)}${row(text("adminMaxLifespan"), offline.maxLifespan)}${row(text("adminMaxLimited"), offline.maxLimited === true ? text("adminRequired") : offline.maxLimited === false ? text("adminNotRequired") : undefined)}${offline.revokedBefore ? row(text("adminRevokedBefore"), offline.revokedBefore) : ""}</div></section></div>`;
 }
 
 function profileContent() {
@@ -563,6 +576,13 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
       state.data.adminKeys = await request(
         `/api/admin/keys?${query.toString()}`,
       );
+    }
+    if (state.console === "admin" && state.route === "policies") {
+      [state.data.cibaPolicy, state.data.offlineAccessPolicy] =
+        await Promise.all([
+          request("/api/admin/settings/ciba-policy"),
+          request("/api/admin/settings/offline-access"),
+        ]);
     }
     if (state.route === "profile")
       state.profile = await request("/api/account/profile");
