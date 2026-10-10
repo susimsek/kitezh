@@ -1398,10 +1398,26 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ["0", "0"],
     );
     assert.equal(new URLSearchParams(roleRequests[1]).get("q"), "AUDITOR");
+    await application.evaluate(({ Tray }) => {
+      globalThis.__trayTooltips = [];
+      const originalSetToolTip = Tray.prototype.setToolTip;
+      Tray.prototype.setToolTip = function (value) {
+        globalThis.__trayTooltips.push(value);
+        return originalSetToolTip.call(this, value);
+      };
+    });
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("button", { name: "Rol ara" }).waitFor();
     assert.equal(await window.getByText("ROLE_AUDITOR").count(), 1);
+    assert.equal(
+      await application.evaluate(() => globalThis.__trayTooltips.at(-1)),
+      "Kitezh — güvenli kimlik konsolu",
+    );
     await window.getByRole("button", { name: "İngilizce" }).click();
+    assert.equal(
+      await application.evaluate(() => globalThis.__trayTooltips.at(-1)),
+      "Kitezh — secure identity console",
+    );
     const groupsNavigation = window.getByRole("button", {
       name: "Groups",
       exact: true,

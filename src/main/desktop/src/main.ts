@@ -1771,6 +1771,11 @@ function setDockVisibility(visible: boolean) {
 function updateTrayMenu() {
   if (!tray) return;
   const isTurkish = isTurkishDesktop();
+  tray.setToolTip(
+    isTurkish
+      ? `${DESKTOP_APP_NAME} — güvenli kimlik konsolu`
+      : `${DESKTOP_APP_NAME} — secure identity console`,
+  );
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
