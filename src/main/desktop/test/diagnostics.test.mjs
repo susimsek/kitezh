@@ -36,3 +36,25 @@ test("redacts sensitive JSON fields and bounds diagnostic text", () => {
   assert.equal(result.includes("PASSWORD"), false);
   assert.equal(redactDiagnosticText("x".repeat(600)).length, 500);
 });
+
+test("redacts headers, cookies, provider identity, and personal profile fields", () => {
+  const result = redactDiagnosticText(
+    'Authorization: Bearer SECRET api_key=API session_id=SESSION Set-Cookie: auth=COOKIE provider_subject=SUB first_name="Ada" lastName=Lovelace phone=5551212 address="12 Main Street" state=STATE csrf=CSRF',
+  );
+
+  for (const sensitiveValue of [
+    "SECRET",
+    "API",
+    "SESSION",
+    "COOKIE",
+    "SUB",
+    "Ada",
+    "Lovelace",
+    "5551212",
+    "12 Main Street",
+    "STATE",
+    "CSRF",
+  ]) {
+    assert.equal(result.includes(sensitiveValue), false);
+  }
+});

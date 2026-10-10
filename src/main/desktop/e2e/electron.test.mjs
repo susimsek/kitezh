@@ -4522,7 +4522,7 @@ test("opens settings in a separate window without requiring login", async () => 
       process.emit(
         "unhandledRejection",
         new Error(
-          "person@example.test access_token=ACCESS_E2E refresh_token=REFRESH_E2E code=AUTH_E2E",
+          "person@example.test access_token=ACCESS_E2E refresh_token=REFRESH_E2E code=AUTH_E2E cookie=COOKIE_E2E provider_subject=SUBJECT_E2E first_name=NAME_E2E",
         ),
       );
     });
@@ -4541,6 +4541,31 @@ test("opens settings in a separate window without requiring login", async () => 
         .count(),
       1,
     );
+    await settingsWindow.evaluate(() => {
+      globalThis.__diagnosticCopyCount = 0;
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        configurable: true,
+        value: async () => {
+          globalThis.__diagnosticCopyCount += 1;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        },
+      });
+    });
+    const copyDiagnostics = settingsWindow.locator("#desktop-copy-diagnostics");
+    await copyDiagnostics.click();
+    assert.equal(await copyDiagnostics.isDisabled(), true);
+    assert.equal(await copyDiagnostics.getAttribute("aria-busy"), "true");
+    assert.equal(await copyDiagnostics.locator(".inline-spinner").count(), 1);
+    await copyDiagnostics.dispatchEvent("click");
+    assert.equal(
+      await settingsWindow.evaluate(() => globalThis.__diagnosticCopyCount),
+      1,
+    );
+    await settingsWindow
+      .getByText(/Copied|Kopyalandı/, { exact: true })
+      .waitFor();
+    assert.equal(await copyDiagnostics.isDisabled(), false);
+    assert.equal(await copyDiagnostics.locator(".inline-spinner").count(), 0);
     const diagnosticText = await settingsWindow
       .locator("#desktop-diagnostics")
       .innerText();
@@ -4550,6 +4575,9 @@ test("opens settings in a separate window without requiring login", async () => 
       "ACCESS_E2E",
       "REFRESH_E2E",
       "AUTH_E2E",
+      "COOKIE_E2E",
+      "SUBJECT_E2E",
+      "NAME_E2E",
     ]) {
       assert.equal(diagnosticText.includes(sensitiveValue), false);
     }

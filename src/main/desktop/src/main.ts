@@ -541,7 +541,8 @@ async function desktopSettingsHtml() {
         checkForUpdates: "Güncellemeleri denetle",
         reset: "Varsayılanlara sıfırla",
         close: "Kapat",
-        diagnosticsHelp: "Sorun giderme için redakte edilmiş tanı bilgileri.",
+        diagnosticsHelp:
+          "Redakte edilmiş kayıtlar yalnızca bu cihazda tutulur (en fazla 64 KB); ekranda son 50 olay gösterilir. Kopyalama yalnızca siz istediğinizde yapılır.",
         copyDiagnostics: "Tanı bilgilerini kopyala",
         copied: "Kopyalandı",
         saving: "Kaydediliyor…",
@@ -577,7 +578,8 @@ async function desktopSettingsHtml() {
         checkForUpdates: "Check for updates",
         reset: "Reset to defaults",
         close: "Close",
-        diagnosticsHelp: "Redacted runtime information for troubleshooting.",
+        diagnosticsHelp:
+          "Redacted diagnostics stay on this device (up to 64 KB); only the latest 50 events are shown. Copying happens only when you request it.",
         copyDiagnostics: "Copy diagnostics",
         copied: "Copied",
         saving: "Saving…",
@@ -627,6 +629,8 @@ async function desktopSettingsHtml() {
       button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 8px; background: #1683ff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
       button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
       button:disabled { cursor: wait; opacity: .65; }
+      .inline-spinner { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: diagnostics-spin .7s linear infinite; vertical-align: -2px; }
+      @keyframes diagnostics-spin { to { transform: rotate(360deg); } }
       .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
       pre { overflow: auto; max-height: 300px; padding: 14px; border-radius: 8px; background: var(--dialog-button); color: var(--dialog-secondary); white-space: pre-wrap; word-break: break-word; }
     </style>
@@ -696,6 +700,7 @@ async function desktopSettingsHtml() {
       const shortcutStatus = document.getElementById("desktop-shortcut-status");
       const setStatus = (value) => { status.textContent = value; };
       const setBusy = (busy) => { document.querySelectorAll("button, select, input").forEach((control) => { if (control.id !== "desktop-global-shortcut") control.disabled = busy; }); };
+      const setButtonBusy = (button, busy) => { let spinner = button.querySelector(".inline-spinner"); if (busy) { if (!spinner) { spinner = document.createElement("span"); spinner.className = "inline-spinner"; spinner.setAttribute("aria-hidden", "true"); button.prepend(spinner); } button.disabled = true; button.setAttribute("aria-busy", "true"); } else { spinner?.remove(); button.disabled = false; button.removeAttribute("aria-busy"); } };
       const showSection = (name) => { sections.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.section === name))); panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; }); if (name === "diagnostics") void loadDiagnostics(); };
       sections.forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section)));
       search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); let visible = 0; sections.forEach((button) => { const matches = !query || button.textContent.toLocaleLowerCase().includes(query); button.hidden = !matches; if (matches) visible += 1; }); noResults.hidden = visible > 0; if (visible === 0) panels.forEach((panel) => { panel.hidden = true; }); });
@@ -711,9 +716,9 @@ async function desktopSettingsHtml() {
       document.getElementById("desktop-automatic-download").addEventListener("change", (event) => void setPreferences({ automaticDownload: event.target.checked }));
       const shortcut = document.getElementById("desktop-global-shortcut"); shortcut.addEventListener("keydown", (event) => { event.preventDefault(); const parts = []; if (event.metaKey) parts.push("Command"); else if (event.ctrlKey) parts.push("CommandOrControl"); if (event.altKey) parts.push("Alt"); if (event.shiftKey) parts.push("Shift"); const key = event.key.length === 1 ? event.key.toUpperCase() : ({ " ": "Space", Escape: "Escape", Enter: "Enter", Tab: "Tab" }[event.key] || event.key); if (parts.length && key) void setPreferences({ globalShortcut: parts.concat(key).join("+") }); });
       document.querySelectorAll("input[name='desktop-theme']").forEach((control) => control.addEventListener("change", async (event) => { setBusy(true); try { await api.theme.set(event.target.value); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } }));
-      document.getElementById("desktop-check-for-updates").addEventListener("click", async () => { setBusy(true); try { await api.updates.check(); } finally { setBusy(false); } });
-      document.getElementById("desktop-copy-diagnostics").addEventListener("click", async () => { try { await navigator.clipboard.writeText(document.getElementById("desktop-diagnostics").textContent); setStatus(labels.copied); } catch { setStatus(labels.unavailable); } });
-      document.getElementById("desktop-reset").addEventListener("click", async () => { setBusy(true); setStatus(labels.saving); try { applyPreferences(await api.preferences.reset()); await api.language.set("system"); await api.theme.set("system"); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } });
+      document.getElementById("desktop-check-for-updates").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); setBusy(true); try { await api.updates.check(); } finally { setBusy(false); setButtonBusy(button, false); } });
+      document.getElementById("desktop-copy-diagnostics").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); try { await navigator.clipboard.writeText(document.getElementById("desktop-diagnostics").textContent); setStatus(labels.copied); } catch { setStatus(labels.unavailable); } finally { setButtonBusy(button, false); } });
+      document.getElementById("desktop-reset").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); setBusy(true); setStatus(labels.saving); try { applyPreferences(await api.preferences.reset()); await api.language.set("system"); await api.theme.set("system"); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); setButtonBusy(button, false); } });
       api.language.onChanged(() => window.location.reload());
       void api.settings.ready();
       void loadPreferences();
