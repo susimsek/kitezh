@@ -158,7 +158,35 @@ test("accepts only configured API and external origins", () => {
     () => getApiBaseUrl("https://example.test"),
     /deployed Render host/,
   );
-  assert.equal(isAllowedExternalUrl("https://github.com/example/oauth"), true);
+  assert.equal(isAllowedExternalUrl("https://github.com/example/oauth"), false);
+  assert.equal(
+    isAllowedExternalUrl("https://github.com/login/oauth/authorize"),
+    true,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://github.com/attacker/redirect"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "https://github.com/login/oauth/authorize?redirect_uri=https%3A%2F%2Fevil.example%2Fcallback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "http://localhost:9090/unrelated?redirect_uri=https://evil.test",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://kitezh.onrender.com/oauth2/authorize"),
+    true,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://kitezh.onrender.com/admin"),
+    false,
+  );
   assert.equal(
     isAllowedExternalUrl("https://github.com:8443/example/oauth"),
     false,

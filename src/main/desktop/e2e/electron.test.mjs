@@ -204,6 +204,43 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
   }
 });
 
+test("opens only exact approved external paths and rejects unsafe redirects", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__openedExternalUrls = [];
+      shell.openExternal = async (url) => {
+        globalThis.__openedExternalUrls.push(url);
+      };
+    });
+    const window = await nativeMainWindow(application);
+    const outcomes = await window.evaluate(async () => {
+      const urls = [
+        "https://github.com/login/oauth/authorize?client_id=demo",
+        "https://github.com/arbitrary/path",
+        "https://github.com/login/oauth/authorize?redirect_uri=https%3A%2F%2Fevil.example%2Fcallback",
+      ];
+      return Promise.all(
+        urls.map(async (url) => {
+          try {
+            await window.desktopApi.openExternal(url);
+            return true;
+          } catch {
+            return false;
+          }
+        }),
+      );
+    });
+    assert.deepEqual(outcomes, [true, false, false]);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__openedExternalUrls),
+      ["https://github.com/login/oauth/authorize?client_id=demo"],
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("keeps native sign-in busy until callback and rejects duplicate authorization", async () => {
   const application = await launchDesktop();
   try {
