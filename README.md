@@ -1441,20 +1441,22 @@ database URL, username, password, and public issuer because those values are mar
 
 Live demo: [Render](https://kitezh.onrender.com)
 
-Create a GitHub Actions repository secret named `RENDER_RELEASE_DEPLOY_HOOK_URL` from the service's
-Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest`
+Configure `DOCKERHUB_USERNAME` as a variable and `DOCKERHUB_TOKEN` plus
+`RENDER_RELEASE_DEPLOY_HOOK_URL` as secrets in the GitHub Actions `backend-release` environment.
+The Render secret should contain the service's Render Deploy Hook. A successful `v*` release publishes the immutable release image and refreshes the `latest`
 manifest before calling the hook. `autoDeploy` is disabled in the Blueprint, so branch builds and
 registry pushes never restart Render. The same hook is reused by the release workflow for now: a
 `v0.1.0` tag deploys the immutable `0.1.0` image to this service. A separate production service
 and hook can be added later without changing the image build process.
 
-Environment variables:
+GitHub Actions configuration:
 
-- SonarCloud: `SONAR_TOKEN` (optional)
-- Snyk: `SNYK_TOKEN` (optional)
-- Docker Hub push: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (only on `v*` tags)
-- Render release deploy: `RENDER_RELEASE_DEPLOY_HOOK_URL` (optional; only on `v*` tags)
-- GitHub Releases API: `GITHUB_API_TOKEN` (optional on local development; configure as a Render secret)
+- Repository secrets shared by CI and release workflows: `SONAR_TOKEN`, `SNYK_TOKEN`.
+- `backend-release` environment variable: `DOCKERHUB_USERNAME`.
+- `backend-release` environment secrets used by versioned releases: `DOCKERHUB_TOKEN`,
+  `RENDER_RELEASE_DEPLOY_HOOK_URL` (the Render hook is optional).
+- `GITHUB_API_TOKEN` is optional for local development; configure it as a Render service secret when
+  the deployed application needs GitHub Releases API access.
 
 ## Project Policies
 
