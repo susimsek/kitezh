@@ -680,6 +680,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await application.evaluate(() => {
       globalThis.__packagedRoleMappingStatuses = [];
       globalThis.__packagedPolicyStatuses = [];
+      globalThis.__packagedBrandingStatuses = [];
       const originalFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (input, init) => {
         const response = await originalFetch(input, init);
@@ -706,6 +707,12 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
             path: requestUrl.pathname,
             status: response.status,
           });
+        }
+        if (
+          method === "PUT" &&
+          requestUrl.pathname === "/api/admin/settings/branding"
+        ) {
+          globalThis.__packagedBrandingStatuses.push(response.status);
         }
         return response;
       };
@@ -786,6 +793,41 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     assert.equal(persistedPolicies[0].body.requestLifespanSeconds, Number(cibaLifespan));
     assert.equal(persistedPolicies[1].status, 200);
     assert.equal(persistedPolicies[1].body.idleTimeout, offlineIdleTimeout);
+
+    await mainWindow
+      .getByRole("button", { name: "Server & branding", exact: true })
+      .click();
+    await mainWindow.getByRole("heading", { name: "Branding", exact: true }).waitFor();
+    const brandingForm = mainWindow.locator('form[data-form="admin-branding"]');
+    const brandingValues = {};
+    for (const name of [
+      "applicationName",
+      "primaryColor",
+      "accentColor",
+      "backgroundColor",
+    ]) {
+      brandingValues[name] = await brandingForm.locator(`[name="${name}"]`).inputValue();
+    }
+    await brandingForm
+      .getByRole("button", { name: "Save", exact: true })
+      .click();
+    await mainWindow
+      .getByText("Branding settings saved.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__packagedBrandingStatuses),
+      [200],
+    );
+    const persistedBranding = await mainWindow.evaluate(() =>
+      window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/settings/branding",
+      }),
+    );
+    assert.equal(persistedBranding.status, 200);
+    for (const [name, value] of Object.entries(brandingValues)) {
+      assert.equal(persistedBranding.body[name], value);
+    }
 
     await mainWindow
       .getByRole("button", { name: "Roles", exact: true })
