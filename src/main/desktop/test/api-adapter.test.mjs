@@ -85,21 +85,24 @@ test("keeps forbidden responses authoritative and rejects unapproved API paths",
 });
 
 test("limits the Admin namespace to approved settings writes and bounded read contracts", async () => {
-  const { adapter } = harness(
-    async () =>
-      new Response(
-        JSON.stringify({ clients: 2, users: 3, sessions: 4, consents: 5 }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      ),
-  );
+  const requestLanguages = [];
+  const { adapter } = harness(async (_url, init) => {
+    requestLanguages.push(init.headers["Accept-Language"]);
+    return new Response(
+      JSON.stringify({ clients: 2, users: 3, sessions: 4, consents: 5 }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  });
   const response = await adapter.request({
     console: "admin",
     path: "/api/admin/dashboard",
+    locale: "tr",
   });
   assert.equal(response.status, 200);
+  assert.equal(requestLanguages[0], "tr");
   await assert.rejects(
     adapter.request({ console: "account", path: "/api/admin/dashboard" }),
     /not allowed/,
@@ -311,6 +314,36 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/identity-providers/provider-1/mappers?page=0&size=20&sort=name,asc",
   });
   assert.equal(providerMappers.status, 200);
+  const createdProviderMapper = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-1/mappers",
+    method: "POST",
+    body: {
+      name: "email-mapper",
+      sourceClaim: "email",
+      target: "email",
+      mapperType: "user-attribute",
+      syncMode: "import",
+      addToIdToken: true,
+      addToAccessToken: true,
+    },
+  });
+  assert.equal(createdProviderMapper.status, 200);
+  const updatedProviderMapper = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-1/mappers/mapper-1",
+    method: "PUT",
+    body: {
+      name: "email-mapper",
+      sourceClaim: "email",
+      target: "profile.email",
+      mapperType: "user-attribute",
+      syncMode: "import",
+      addToIdToken: true,
+      addToAccessToken: false,
+    },
+  });
+  assert.equal(updatedProviderMapper.status, 200);
   const deletedProviderMapper = await adapter.request({
     console: "admin",
     path: "/api/admin/identity-providers/provider-1/mappers/mapper-1",

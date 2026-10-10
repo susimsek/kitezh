@@ -1161,6 +1161,60 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers(?:\/[A-Za-z0-9_-]{1,100})?$/.test(
+            requestUrl.pathname,
+          ) &&
+          ["POST", "PUT"].includes(requestMethod)
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          const mapperId = requestUrl.pathname.split("/").at(-1);
+          if (requestMethod === "PUT") {
+            globalThis.__adminProviderMapperUpdateRequests ??= [];
+            globalThis.__adminProviderMapperUpdateRequests.push(body);
+            if (globalThis.__adminProviderMapperUpdateRequests.length === 1) {
+              await new Promise((resolve) => setTimeout(resolve, 350));
+              const messageLanguage =
+                init?.headers?.["Accept-Language"] === "tr" ? "tr" : "en";
+              return new Response(
+                JSON.stringify({
+                  detail:
+                    messageLanguage === "tr"
+                      ? "Eşleyici alanlarını denetleyin."
+                      : "Check the mapper fields.",
+                  violations: [
+                    {
+                      field: "target",
+                      message:
+                        messageLanguage === "tr"
+                          ? "Hedef yolu geçersiz."
+                          : "Target path is invalid.",
+                    },
+                  ],
+                }),
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            }
+          } else {
+            globalThis.__adminProviderMapperCreateRequests ??= [];
+            globalThis.__adminProviderMapperCreateRequests.push(body);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              ...body,
+              id: requestMethod === "POST" ? "mapper-2" : mapperId,
+              providerAlias: "google",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
           /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers$/.test(
             requestUrl.pathname,
           )
@@ -2887,6 +2941,109 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       new URLSearchParams(mapperSearchRequests[0]).get("size"),
       "20",
     );
+    await identityProviderRow
+      .getByRole("button", { name: "Add mapper", exact: true })
+      .click();
+    const mapperCreateForm = identityProviderRow.locator(
+      'form[data-form="admin-provider-mapper"]',
+    );
+    await mapperCreateForm.locator('[name="name"]').fill("display-name");
+    await mapperCreateForm
+      .locator('[name="sourceClaim"]')
+      .fill("preferred_username");
+    await mapperCreateForm.locator('[name="target"]').fill("displayName");
+    await mapperCreateForm
+      .locator('[name="mapperType"]')
+      .selectOption("user-attribute");
+    await mapperCreateForm.locator('[name="syncMode"]').selectOption("import");
+    await mapperCreateForm.locator('[name="addToIdToken"]').check();
+    const createMapperButton = mapperCreateForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await createMapperButton.click();
+    assert.equal(await createMapperButton.isDisabled(), true);
+    assert.equal(await createMapperButton.locator(".spinner").count(), 1);
+    await window
+      .getByText("Provider mapper created.", { exact: true })
+      .waitFor();
+    const mapperCreateRequests = await application.evaluate(
+      () => globalThis.__adminProviderMapperCreateRequests,
+    );
+    assert.deepEqual(mapperCreateRequests, [
+      {
+        name: "display-name",
+        sourceClaim: "preferred_username",
+        target: "displayName",
+        mapperType: "user-attribute",
+        syncMode: "import",
+        addToIdToken: true,
+        addToAccessToken: false,
+      },
+    ]);
+    const createdMapperRow = identityProviderRow.locator(
+      '[data-provider-mapper-id="mapper-2"]',
+    );
+    await createdMapperRow.waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    const existingMapperRow = identityProviderRow.locator(
+      '[data-provider-mapper-id="mapper-1"]',
+    );
+    await existingMapperRow
+      .getByRole("button", { name: "Eşleyiciyi düzenle", exact: true })
+      .click();
+    const mapperEditForm = identityProviderRow.locator(
+      'form[data-form="admin-provider-mapper"]',
+    );
+    assert.equal(
+      await mapperEditForm.count(),
+      1,
+      await identityProviderRow.innerText(),
+    );
+    const mapperTarget = mapperEditForm.locator('[name="target"]');
+    await mapperTarget.fill("invalid target");
+    const updateMapperButton = mapperEditForm.getByRole("button", {
+      name: "Kaydet",
+      exact: true,
+    });
+    await updateMapperButton.click();
+    assert.equal(await updateMapperButton.isDisabled(), true);
+    assert.equal(await updateMapperButton.locator(".spinner").count(), 1);
+    await mapperEditForm
+      .getByText("Hedef yolu geçersiz.", { exact: true })
+      .waitFor();
+    assert.equal(await mapperTarget.inputValue(), "invalid target");
+    await mapperTarget.fill("profile.email");
+    await updateMapperButton.click();
+    assert.equal(await updateMapperButton.isDisabled(), true);
+    assert.equal(await updateMapperButton.locator(".spinner").count(), 1);
+    await window
+      .getByText("Sağlayıcı eşleyicisi güncellendi.", { exact: true })
+      .waitFor();
+    const mapperUpdateRequests = await application.evaluate(
+      () => globalThis.__adminProviderMapperUpdateRequests,
+    );
+    assert.deepEqual(mapperUpdateRequests, [
+      {
+        name: "email-mapper",
+        sourceClaim: "email",
+        target: "invalid target",
+        mapperType: "user-attribute",
+        syncMode: "import",
+        addToIdToken: true,
+        addToAccessToken: true,
+      },
+      {
+        name: "email-mapper",
+        sourceClaim: "email",
+        target: "profile.email",
+        mapperType: "user-attribute",
+        syncMode: "import",
+        addToIdToken: true,
+        addToAccessToken: true,
+      },
+    ]);
+    await window.getByRole("button", { name: "İngilizce" }).click();
     await mapperRow
       .getByRole("button", { name: "Delete mapper", exact: true })
       .click();

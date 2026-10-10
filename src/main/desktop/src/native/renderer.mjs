@@ -154,6 +154,7 @@ async function request(path, options = {}) {
   }
   const response = await api.api.request({
     console: state.console,
+    locale: state.locale,
     path,
     method: options.method,
     body: options.body,
@@ -570,6 +571,27 @@ function renderIdentityProviderMappers(providerId) {
   if (state.data.identityProviderMappersOpenId !== providerId) return "";
   const mappers = state.data.identityProviderMappers?.[providerId] ?? [];
   if (!Array.isArray(mappers)) return "";
+  const editor = state.data.providerMapperEditor;
+  const mapperId = editor?.providerId === providerId ? editor.mapperId : null;
+  const selectedMapper =
+    mapperId === null ? null : mappers.find((mapper) => mapper.id === mapperId);
+  const draftKey = mapperId ?? "new";
+  const draft = state.data.providerMapperDrafts?.[providerId]?.[draftKey] ?? {};
+  const errorKey = `${providerId}:${draftKey}`;
+  const errors =
+    state.data.providerMapperErrorKey === errorKey
+      ? violations(state.error?.body)
+      : {};
+  const formBusy = state.busy === `provider-mapper-save:${errorKey}`;
+  const mapperEditor =
+    editor?.providerId === providerId
+      ? `<form class="card" data-form="admin-provider-mapper" data-provider-id="${escapeHtml(providerId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(text(mapperId ? "adminEditProviderMapper" : "adminCreateProviderMapper"))}</h3>${field("name", text("adminProviderMapperName"), draft.name ?? selectedMapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("sourceClaim", text("adminProviderMapperSource"), draft.sourceClaim ?? selectedMapper?.sourceClaim ?? "", errors.sourceClaim, "text", 'maxlength="200" required')}${field("target", text("adminProviderMapperTarget"), draft.target ?? selectedMapper?.target ?? "", errors.target, "text", 'maxlength="200" required')}<div class="field"><label for="provider-mapper-type">${escapeHtml(text("adminProviderMapperType"))}</label><select id="provider-mapper-type" name="mapperType"><option value="user-attribute" ${(draft.mapperType ?? selectedMapper?.mapperType ?? "user-attribute") === "user-attribute" ? "selected" : ""}>user-attribute</option><option value="claim" ${(draft.mapperType ?? selectedMapper?.mapperType) === "claim" ? "selected" : ""}>claim</option><option value="role" ${(draft.mapperType ?? selectedMapper?.mapperType) === "role" ? "selected" : ""}>role</option><option value="group" ${(draft.mapperType ?? selectedMapper?.mapperType) === "group" ? "selected" : ""}>group</option></select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div><div class="field"><label for="provider-mapper-sync-mode">${escapeHtml(text("adminProviderMapperSyncMode"))}</label><select id="provider-mapper-sync-mode" name="syncMode"><option value="inherit" ${(draft.syncMode ?? selectedMapper?.syncMode ?? "inherit") === "inherit" ? "selected" : ""}>inherit</option><option value="legacy" ${(draft.syncMode ?? selectedMapper?.syncMode) === "legacy" ? "selected" : ""}>legacy</option><option value="import" ${(draft.syncMode ?? selectedMapper?.syncMode) === "import" ? "selected" : ""}>import</option><option value="read_only" ${(draft.syncMode ?? selectedMapper?.syncMode) === "read_only" ? "selected" : ""}>read_only</option><option value="force" ${(draft.syncMode ?? selectedMapper?.syncMode) === "force" ? "selected" : ""}>force</option></select><div class="field-error">${escapeHtml(errors.syncMode ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="addToIdToken" ${(draft.addToIdToken ?? selectedMapper?.addToIdToken) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${(draft.addToAccessToken ?? selectedMapper?.addToAccessToken) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: formBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-editor-cancel" data-provider="${escapeHtml(providerId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+      : "";
+  const addMapperButton = button(text("adminAddProviderMapper"), {
+    action: "admin-provider-mapper-create",
+    provider: providerId,
+    disabled: state.offline || Boolean(state.busy),
+  });
   return `<section class="card" aria-label="${escapeHtml(text("adminProviderMappers"))}"><div class="list">${
     mappers.length
       ? mappers
@@ -583,12 +605,12 @@ function renderIdentityProviderMappers(providerId) {
               `provider-mapper-delete:${providerId}:${mapper.id}`;
             const controls = confirming
               ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteProviderMapperPrompt"))}</span>${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-confirm", provider: providerId, id: mapper.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-delete-cancel" data-provider="${escapeHtml(providerId)}" data-id="${escapeHtml(mapper.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-              : `<div class="actions">${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-request", provider: providerId, id: mapper.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+              : `<div class="actions">${button(text("adminEditProviderMapper"), { action: "admin-provider-mapper-edit", provider: providerId, id: mapper.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-request", provider: providerId, id: mapper.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
             return `<article class="list-item" data-provider-mapper-id="${escapeHtml(mapper.id)}"><div><strong>${escapeHtml(mapper.name)}</strong><span class="muted">${escapeHtml(`${mapper.sourceClaim} → ${mapper.target} · ${mapper.mapperType}`)}</span></div><span>${escapeHtml(mapper.syncMode)}</span>${controls}</article>`;
           })
           .join("")
       : `<div class="empty" role="status">${escapeHtml(text("adminNoProviderMappers"))}</div>`
-  }</div></section>`;
+  }</div><div class="actions">${addMapperButton}</div>${mapperEditor}</section>`;
 }
 
 function adminIdentityProvidersContent() {
@@ -1286,6 +1308,21 @@ function preserveOfflineDrafts() {
         state.data.adminClientScopeDrafts ??= {};
         state.data.adminClientScopeDrafts[scopeId] = values;
       }
+    } else if (form.dataset.form === "admin-provider-mapper") {
+      const providerId = form.dataset.providerId;
+      const mapperId = form.dataset.mapperId || "new";
+      if (
+        /^[A-Za-z0-9_-]{1,100}$/.test(providerId ?? "") &&
+        (mapperId === "new" || /^[A-Za-z0-9_-]{1,100}$/.test(mapperId))
+      ) {
+        state.data.providerMapperDrafts ??= {};
+        state.data.providerMapperDrafts[providerId] ??= {};
+        state.data.providerMapperDrafts[providerId][mapperId] = {
+          ...values,
+          addToIdToken: form.elements.namedItem("addToIdToken").checked,
+          addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
+        };
+      }
     } else if (form.dataset.form === "admin-localization-message-create") {
       state.data.adminMessageOverrideCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
@@ -1309,6 +1346,98 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-provider-mapper") {
+    const providerId = form.dataset.providerId ?? "";
+    const mapperId = form.dataset.mapperId || null;
+    const providers = state.data.identityProviders?.content ?? [];
+    const provider = providers.find((item) => item.id === providerId);
+    const mappers = state.data.identityProviderMappers?.[providerId] ?? [];
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(providerId) ||
+      !provider ||
+      !Array.isArray(mappers) ||
+      (mapperId !== null &&
+        (!/^[A-Za-z0-9_-]{1,100}$/.test(mapperId) ||
+          !mappers.some((mapper) => mapper.id === mapperId)))
+    )
+      return;
+    if (!form.reportValidity()) return;
+    const body = {
+      name: String(values.name ?? "").trim(),
+      sourceClaim: String(values.sourceClaim ?? "").trim(),
+      target: String(values.target ?? "").trim(),
+      mapperType: String(values.mapperType ?? ""),
+      syncMode: String(values.syncMode ?? ""),
+      addToIdToken: form.elements.namedItem("addToIdToken").checked,
+      addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
+    };
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(body.name) ||
+      !body.sourceClaim ||
+      body.sourceClaim.length > 200 ||
+      !body.target ||
+      body.target.length > 200 ||
+      !["user-attribute", "claim", "role", "group"].includes(body.mapperType) ||
+      !["inherit", "legacy", "import", "read_only", "force"].includes(
+        body.syncMode,
+      )
+    )
+      return;
+    const draftKey = mapperId ?? "new";
+    const errorKey = `${providerId}:${draftKey}`;
+    state.data.providerMapperDrafts ??= {};
+    state.data.providerMapperDrafts[providerId] ??= {};
+    state.data.providerMapperDrafts[providerId][draftKey] = body;
+    state.data.providerMapperErrorKey = errorKey;
+    state.error = null;
+    state.notice = null;
+    state.busy = `provider-mapper-save:${errorKey}`;
+    render();
+    try {
+      const path = `/api/admin/identity-providers/${providerId}/mappers${mapperId ? `/${mapperId}` : ""}`;
+      const saved = await request(path, {
+        method: mapperId ? "PUT" : "POST",
+        body,
+      });
+      const savedMapper = saved ?? {
+        ...body,
+        id: mapperId,
+        providerAlias: provider.alias,
+      };
+      state.data.identityProviderMappers[providerId] = mapperId
+        ? mappers.map((mapper) =>
+            mapper.id === mapperId ? savedMapper : mapper,
+          )
+        : [...mappers, savedMapper];
+      state.data.identityProviders = {
+        ...state.data.identityProviders,
+        content: providers.map((item) =>
+          item.id === providerId
+            ? {
+                ...item,
+                mapperCount: mapperId
+                  ? item.mapperCount
+                  : (Number.isSafeInteger(item.mapperCount)
+                      ? item.mapperCount
+                      : 0) + 1,
+              }
+            : item,
+        ),
+      };
+      delete state.data.providerMapperDrafts[providerId][draftKey];
+      state.data.providerMapperEditor = null;
+      state.data.providerMapperErrorKey = null;
+      state.notice = text(
+        mapperId ? "adminProviderMapperUpdated" : "adminProviderMapperCreated",
+      );
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-group-roles") {
     const id = Number(form.dataset.groupId);
     const groups = state.data.groups?.content ?? [];
@@ -2353,6 +2482,58 @@ async function action(action, element) {
   if (action === "admin-role-delete-cancel") {
     if (state.busy) return;
     state.data.roleDeleteConfirmName = null;
+    render();
+    return;
+  }
+  if (action === "admin-provider-mapper-create") {
+    if (state.busy || state.offline) return;
+    const providerId = element.dataset.provider;
+    if (
+      typeof providerId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(providerId) ||
+      !state.data.identityProviders?.content?.some(
+        (provider) => provider.id === providerId,
+      ) ||
+      !Array.isArray(state.data.identityProviderMappers?.[providerId])
+    )
+      return;
+    state.data.providerMapperEditor = { providerId, mapperId: null };
+    state.data.providerMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-provider-mapper-edit") {
+    if (state.busy || state.offline) return;
+    const providerId = element.dataset.provider;
+    const mapperId = element.dataset.id;
+    const mappers = state.data.identityProviderMappers?.[providerId] ?? [];
+    if (
+      typeof providerId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(providerId) ||
+      typeof mapperId !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(mapperId) ||
+      !Array.isArray(mappers) ||
+      !mappers.some((mapper) => mapper.id === mapperId)
+    )
+      return;
+    state.data.providerMapperEditor = { providerId, mapperId };
+    state.data.providerMapperErrorKey = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-provider-mapper-editor-cancel") {
+    if (state.busy) return;
+    const editor = state.data.providerMapperEditor;
+    const providerId = element.dataset.provider;
+    if (editor?.providerId !== providerId) return;
+    const draftKey = editor.mapperId ?? "new";
+    if (state.data.providerMapperDrafts?.[providerId])
+      delete state.data.providerMapperDrafts[providerId][draftKey];
+    state.data.providerMapperEditor = null;
+    state.data.providerMapperErrorKey = null;
+    state.error = null;
     render();
     return;
   }

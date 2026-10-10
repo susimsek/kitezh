@@ -28,7 +28,10 @@ export type ApiErrorKind =
   | "server"
   | "http";
 
-export function classifyApiError(status: number, cause?: unknown): ApiErrorKind {
+export function classifyApiError(
+  status: number,
+  cause?: unknown,
+): ApiErrorKind {
   if (status === 0) {
     return cause instanceof Error && cause.name === "AbortError"
       ? "timeout"
@@ -75,6 +78,7 @@ export type NativeSessionNamespace = "account" | "admin";
 
 export type NativeApiRequest = {
   console: NativeSessionNamespace;
+  locale?: "en" | "tr";
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   path: string;
   body?: unknown;

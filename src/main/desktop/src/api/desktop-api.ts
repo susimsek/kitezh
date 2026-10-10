@@ -131,6 +131,20 @@ function isAllowedApiPath(
       )
     )
       return true;
+    if (
+      method === "POST" &&
+      /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers$/.test(
+        path,
+      )
+    )
+      return true;
+    if (
+      method === "PUT" &&
+      /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers\/[A-Za-z0-9_-]{1,100}$/.test(
+        path,
+      )
+    )
+      return true;
     const consentRevokeMatch = path.match(
       /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/,
     );
@@ -439,6 +453,7 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
         method,
         headers: {
           Accept: "application/json",
+          "Accept-Language": request.locale === "tr" ? "tr" : "en",
           Authorization: `Bearer ${accessToken}`,
           ...(request.body === undefined
             ? {}

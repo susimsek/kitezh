@@ -2838,6 +2838,7 @@ function registerIpc() {
       throw new Error("Invalid native API request");
     const value = request as Partial<{
       console: ConsoleName;
+      locale: "en" | "tr";
       method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
       path: string;
       body: unknown;
@@ -2853,6 +2854,7 @@ function registerIpc() {
     }
     return desktopApiAdapter.request({
       console: value.console,
+      locale: value.locale === "tr" ? "tr" : "en",
       method: value.method,
       path: value.path,
       body: value.body,
