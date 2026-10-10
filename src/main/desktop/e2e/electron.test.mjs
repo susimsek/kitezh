@@ -581,10 +581,29 @@ test("preserves Account profile drafts offline and completes native social linki
     });
     const save = profileForm.getByRole("button", { name: "Save" });
     assert.equal(await save.isDisabled(), true);
-    assert.match(
-      await window.getByRole("status").textContent(),
-      /Offline mode/,
-    );
+    await window
+      .getByRole("status")
+      .getByText(
+        "Offline mode: safe mutations are disabled until connectivity returns.",
+        { exact: true },
+      )
+      .waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("status")
+      .getByText(
+        "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı.",
+        { exact: true },
+      )
+      .waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window
+      .getByRole("status")
+      .getByText(
+        "Offline mode: safe mutations are disabled until connectivity returns.",
+        { exact: true },
+      )
+      .waitFor();
     assert.equal(
       await profileForm.locator('[name="firstName"]').inputValue(),
       "Grace",

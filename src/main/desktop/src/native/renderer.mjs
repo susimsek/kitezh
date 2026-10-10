@@ -173,34 +173,15 @@ function setTheme(theme) {
 }
 
 function problemMessage(error) {
-  if (error?.kind === "offline")
-    return state.locale === "tr"
-      ? "Çevrimdışısınız. Bağlantıyı kontrol edip tekrar deneyin."
-      : "You are offline. Check your connection and try again.";
-  if (error?.kind === "timeout")
-    return state.locale === "tr"
-      ? "İstek zaman aşımına uğradı. Tekrar deneyin."
-      : "The request timed out. Try again.";
+  if (error?.kind === "offline") return text("apiOffline");
+  if (error?.kind === "timeout") return text("apiTimeout");
   if (error?.kind === "forbidden" && state.console === "admin")
     return text("adminForbidden");
-  if (error?.kind === "forbidden")
-    return state.locale === "tr"
-      ? "Bu işlemi yapma yetkiniz yok."
-      : "You are not allowed to perform this action.";
-  if (error?.kind === "unauthorized")
-    return state.locale === "tr"
-      ? "Oturumunuz sona erdi. Tekrar giriş yapın."
-      : "Your session expired. Sign in again.";
+  if (error?.kind === "forbidden") return text("apiForbidden");
+  if (error?.kind === "unauthorized") return text("apiUnauthorized");
   if (error?.kind === "validation")
-    return (
-      error.body?.detail ??
-      (state.locale === "tr"
-        ? "Alanları kontrol edin."
-        : "Check the fields and try again.")
-    );
-  return state.locale === "tr"
-    ? "İşlem tamamlanamadı. Tekrar deneyin."
-    : "The operation could not be completed. Try again.";
+    return error.body?.detail ?? text("apiValidation");
+  return text("apiFailure");
 }
 
 function setError(error) {
@@ -296,7 +277,7 @@ function shell() {
     state.console === "admin"
       ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}${navButton("localization", text("adminLocalization"))}${navButton("ldap", text("adminLdap"))}${navButton("authentication", text("adminAuthentication"))}`
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
-  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(state.locale === "tr" ? "Çevrimdışı mod: güvenli değişiklikler bağlantı gelene kadar devre dışı." : "Offline mode: safe mutations are disabled until connectivity returns.")}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
+  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(text("offlineNotice"))}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
 }
 
 function navButton(route, label) {
@@ -366,17 +347,11 @@ function routeDescription() {
       dashboard: text("adminOverview"),
     }[state.route];
   return {
-    profile:
-      state.locale === "tr"
-        ? "Profil bilgilerinizi yönetin."
-        : "Manage your profile information.",
+    profile: text("profileDescription"),
     security: text("mfaHelp"),
     sessions: text("sessionsError"),
     applications: text("applicationsError"),
-    settings:
-      state.locale === "tr"
-        ? "Masaüstü tercihlerini yönetin."
-        : "Manage desktop preferences.",
+    settings: text("desktopSettingsDescription"),
   }[state.route];
 }
 
@@ -1136,12 +1111,12 @@ function applicationsContent() {
 }
 
 function settingsContent() {
-  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("appearance"))}</h2><div class="settings-row"><label for="theme">${escapeHtml(text("theme"))}</label><select id="theme"><option value="system">${escapeHtml(text("system"))}</option><option value="light">${escapeHtml(text("light"))}</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>${escapeHtml(text("dark"))}</option></select></div><div class="settings-row"><label for="language">${escapeHtml(text("language"))}</label><select id="language"><option value="en" ${state.locale === "en" ? "selected" : ""}>${escapeHtml(text("english"))}</option><option value="tr" ${state.locale === "tr" ? "selected" : ""}>${escapeHtml(text("turkish"))}</option></select></div></section><section class="card"><h2>${escapeHtml(text("security"))}</h2><p>${escapeHtml(state.locale === "tr" ? "Oturum anahtarları yalnızca masaüstü ana sürecinin güvenli kasasında tutulur." : "Session keys are kept only in the desktop main-process secure vault.")}</p>${button(text("signOut"), { action: "logout", busy: state.busy === "logout" })}</section></div>`;
+  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("appearance"))}</h2><div class="settings-row"><label for="theme">${escapeHtml(text("theme"))}</label><select id="theme"><option value="system">${escapeHtml(text("system"))}</option><option value="light">${escapeHtml(text("light"))}</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>${escapeHtml(text("dark"))}</option></select></div><div class="settings-row"><label for="language">${escapeHtml(text("language"))}</label><select id="language"><option value="en" ${state.locale === "en" ? "selected" : ""}>${escapeHtml(text("english"))}</option><option value="tr" ${state.locale === "tr" ? "selected" : ""}>${escapeHtml(text("turkish"))}</option></select></div></section><section class="card"><h2>${escapeHtml(text("security"))}</h2><p>${escapeHtml(text("secureVaultNote"))}</p>${button(text("signOut"), { action: "logout", busy: state.busy === "logout" })}</section></div>`;
 }
 
 function loginContent() {
   if (!hasConsoleSelection()) {
-    return `<div class="login"><section class="card login-card"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(text("signInNote"))}</p><h1>${escapeHtml(state.locale === "tr" ? "Bir konsol seçin" : "Choose a console")}</h1><p>${escapeHtml(state.locale === "tr" ? "Devam etmek istediğiniz konsolu seçin." : "Select where you want to continue.")}</p><div class="actions">${button(text("adminTitle"), { action: "choose-admin" })}${button(text("accountTitle"), { action: "choose-account" })}</div></section></div>`;
+    return `<div class="login"><section class="card login-card"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(text("signInNote"))}</p><h1>${escapeHtml(text("chooseConsole"))}</h1><p>${escapeHtml(text("chooseConsoleHelp"))}</p><div class="actions">${button(text("adminTitle"), { action: "choose-admin" })}${button(text("accountTitle"), { action: "choose-account" })}</div></section></div>`;
   }
   const title =
     state.console === "admin" ? text("adminTitle") : text("accountTitle");
@@ -1433,10 +1408,7 @@ async function logout() {
   } catch {
     state.session = null;
     state.error = {
-      message:
-        state.locale === "tr"
-          ? "Çıkış yapılamadı."
-          : "Sign out could not be completed.",
+      message: text("signOutError"),
     };
   }
   state.busy = null;
