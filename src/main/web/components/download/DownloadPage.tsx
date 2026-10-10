@@ -108,7 +108,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
         }
         setReleaseLoading(false);
         setReleaseError(true);
-        console.warn("Unable to resolve the latest desktop release", error);
+        console.warn("Unable to resolve the latest desktop release");
       });
   }, []);
 
