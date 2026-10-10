@@ -11,6 +11,10 @@ const desktopDirectory = path.resolve(
 const packageJson = JSON.parse(
   await readFile(path.join(desktopDirectory, "package.json"), "utf8"),
 );
+const pnpmLockfile = await readFile(
+  path.join(desktopDirectory, "pnpm-lock.yaml"),
+  "utf8",
+);
 
 test("desktop release metadata is complete for native packaging", () => {
   assert.equal(packageJson.desktopName, "kitezh");
@@ -47,5 +51,17 @@ test("desktop release metadata is complete for native packaging", () => {
       ({ name, schemes }) =>
         name === "Kitezh OAuth callback" && schemes.includes("kitezh"),
     ),
+  );
+});
+
+test("uses a live shared-package link for clean build ordering", () => {
+  assert.equal(packageJson.dependencies["@kitezh/shared"], "link:../shared");
+  assert.match(
+    pnpmLockfile,
+    /^\s+specifier: link:\.\.\/shared\s*\n\s+version: link:\.\.\/shared$/m,
+  );
+  assert.doesNotMatch(
+    pnpmLockfile,
+    /^\s*resolution: \{directory: \.\.\/shared, type: directory\}$/m,
   );
 });
