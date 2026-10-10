@@ -681,6 +681,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     await application.evaluate(() => {
       globalThis.__packagedRoleMappingStatuses = [];
       globalThis.__packagedScopeMapperStatuses = [];
+      globalThis.__packagedScopeAssignmentStatuses = [];
       globalThis.__packagedPolicyStatuses = [];
       globalThis.__packagedBrandingStatuses = [];
       globalThis.__packagedLocalizationStatuses = [];
@@ -711,6 +712,18 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
             status: response.status,
           });
           if (method !== "GET")
+            await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        if (
+          /^\/api\/admin\/clients\/[^/]+\/scope-assignments$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__packagedScopeAssignmentStatuses.push({
+            method,
+            status: response.status,
+          });
+          if (method === "PUT")
             await new Promise((resolve) => setTimeout(resolve, 300));
         }
         if (
@@ -936,6 +949,100 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
         { method: "DELETE", status: 204 },
       ],
     );
+
+    await mainWindow
+      .getByRole("button", { name: "Clients", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Clients", exact: true })
+      .waitFor();
+    const clientSearch = mainWindow.locator("#admin-client-search");
+    await clientSearch.locator('[name="q"]').fill("demo-client");
+    await clientSearch.locator('button[type="submit"]').click();
+    const demoClient = await mainWindow.evaluate(async () => {
+      const response = await window.desktopApi.api.request({
+        console: "admin",
+        path: "/api/admin/clients?q=demo-client&page=0&size=20&sort=clientId,asc",
+      });
+      return response.status === 200
+        ? response.body.content.find(
+            (client) => client.clientId === "demo-client",
+          )
+        : null;
+    });
+    assert.ok(demoClient);
+    const demoClientRow = mainWindow.locator(
+      `[data-client-id="${demoClient.id}"]`,
+    );
+    await demoClientRow.waitFor();
+    await demoClientRow
+      .getByRole("button", { name: "Manage assigned scopes", exact: true })
+      .click();
+    const assignmentsPanel = demoClientRow.getByRole("region", {
+      name: "Client scope assignments",
+    });
+    await assignmentsPanel.waitFor();
+    const scopeAssignmentForm = assignmentsPanel.locator(
+      'form[data-form="admin-client-scope-assignments"]',
+    );
+    const packagedScopeAssignment = scopeAssignmentForm.locator(
+      `input[name="optionalScopes"][value="${scopeName}"]`,
+    );
+    await packagedScopeAssignment.waitFor();
+    await packagedScopeAssignment.check();
+    await mainWindow.evaluate(() => window.dispatchEvent(new Event("offline")));
+    const saveAssignments = scopeAssignmentForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveAssignments.waitFor({ state: "visible" });
+    assert.equal(await saveAssignments.isDisabled(), true);
+    assert.equal(await packagedScopeAssignment.isChecked(), true);
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__packagedScopeAssignmentStatuses.filter(
+          ({ method }) => method === "PUT",
+        ),
+      ),
+      [],
+    );
+    await mainWindow.evaluate(() => window.dispatchEvent(new Event("online")));
+    await saveAssignments.waitFor({ state: "visible" });
+    assert.equal(await packagedScopeAssignment.isChecked(), true);
+    await saveAssignments.click();
+    assert.equal(await saveAssignments.isDisabled(), true);
+    assert.equal(await saveAssignments.getAttribute("aria-busy"), "true");
+    await saveAssignments.evaluate((button) => button.click());
+    await mainWindow
+      .getByText("Client scope assignments updated.", { exact: true })
+      .waitFor();
+    const savedAssignments = await mainWindow.evaluate(
+      async (clientId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/clients/${encodeURIComponent(clientId)}/scope-assignments`,
+        }),
+      demoClient.id,
+    );
+    assert.equal(savedAssignments.status, 200);
+    assert.ok(savedAssignments.body.optionalScopes.includes(scopeName));
+    await scopeAssignmentForm
+      .locator(`input[name="optionalScopes"][value="${scopeName}"]`)
+      .uncheck();
+    await saveAssignments.click();
+    await mainWindow
+      .getByText("Client scope assignments updated.", { exact: true })
+      .waitFor();
+    const restoredAssignments = await mainWindow.evaluate(
+      async (clientId) =>
+        window.desktopApi.api.request({
+          console: "admin",
+          path: `/api/admin/clients/${encodeURIComponent(clientId)}/scope-assignments`,
+        }),
+      demoClient.id,
+    );
+    assert.equal(restoredAssignments.status, 200);
+    assert.ok(!restoredAssignments.body.optionalScopes.includes(scopeName));
 
     await mainWindow
       .getByRole("button", { name: "Policies", exact: true })

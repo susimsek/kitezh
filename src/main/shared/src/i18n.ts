@@ -301,6 +301,15 @@ export const messages = {
     adminClientScopeDescriptionTooLong:
       "Scope description must be 500 characters or fewer.",
     adminManageClientScopeRoles: "Manage role mappings",
+    adminManageClientScopeAssignments: "Manage assigned scopes",
+    adminClientScopeAssignments: "Client scope assignments",
+    adminClientScopeAssignmentsHelp:
+      "Choose scopes granted by default or available for optional consent.",
+    adminClientScopeDefault: "Default",
+    adminClientScopeOptional: "Optional",
+    adminClientScopeAssignmentRequired:
+      "Assign at least one scope and choose each scope as either default or optional.",
+    adminClientScopeAssignmentsSaved: "Client scope assignments updated.",
     adminClientScopeRoleMappings: "Role mappings for this scope",
     adminClientScopeRoleMappingsSaved: "Client scope role mappings updated.",
     adminApplicationRoles: "Application roles",
@@ -903,6 +912,15 @@ export const messages = {
     adminClientScopeDescriptionTooLong:
       "Kapsam açıklaması en fazla 500 karakter olabilir.",
     adminManageClientScopeRoles: "Rol eşlemelerini yönet",
+    adminManageClientScopeAssignments: "Atanan kapsamları yönet",
+    adminClientScopeAssignments: "İstemci kapsamı atamaları",
+    adminClientScopeAssignmentsHelp:
+      "Varsayılan verilen veya isteğe bağlı izin ekranında sunulan kapsamları seçin.",
+    adminClientScopeDefault: "Varsayılan",
+    adminClientScopeOptional: "İsteğe bağlı",
+    adminClientScopeAssignmentRequired:
+      "En az bir kapsam atayın ve her kapsamı varsayılan ya da isteğe bağlı seçin.",
+    adminClientScopeAssignmentsSaved: "İstemci kapsamı atamaları güncellendi.",
     adminClientScopeRoleMappings: "Bu kapsamın rol eşlemeleri",
     adminClientScopeRoleMappingsSaved:
       "İstemci kapsamı rol eşlemeleri güncellendi.",

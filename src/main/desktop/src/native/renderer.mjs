@@ -88,6 +88,8 @@ const actionIcons = {
   "admin-client-scope-mapper-delete-confirm": "delete",
   "admin-client-delete-request": "delete",
   "admin-client-delete-confirm": "delete",
+  "admin-client-scope-assignments-toggle": "edit",
+  "admin-client-scope-assignments-save": "check",
   "admin-consent-revoke-request": "delete",
   "admin-consent-revoke-confirm": "delete",
   "admin-group-delete-request": "delete",
@@ -1141,6 +1143,36 @@ function adminClientScopeCreateContent() {
   return `<section class="card"><form data-form="admin-client-scope-create" novalidate>${field("name", text("adminClientScopeName"), draft.name ?? "", errors.name, "text", 'maxlength="100" autocomplete="off" required')}${field("displayName", text("adminClientScopeDisplayName"), draft.displayName ?? "", errors.displayName, "text", 'maxlength="200"')}${field("description", text("adminClientScopeDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="muted">${escapeHtml(text("adminClientScopeDefaults"))}</div>${button(text("adminCreateClientScope"), { type: "submit", busy: state.busy === "client-scope-create", disabled: state.offline })}</form></section>`;
 }
 
+function clientScopeAssignmentsPanel(clientId) {
+  if (state.data.clientScopeAssignmentsOpenId !== clientId) return "";
+  const assignments = state.data.clientScopeAssignments?.[clientId];
+  if (!assignments) return "";
+  const draft =
+    state.data.clientScopeAssignmentDrafts?.[clientId] ?? assignments;
+  const defaults = Array.isArray(draft.defaultScopes)
+    ? draft.defaultScopes
+    : [];
+  const optional = Array.isArray(draft.optionalScopes)
+    ? draft.optionalScopes
+    : [];
+  const available = Array.isArray(assignments.availableScopes)
+    ? assignments.availableScopes
+    : [];
+  const localError =
+    state.data.clientScopeAssignmentErrorId === clientId
+      ? text("adminClientScopeAssignmentRequired")
+      : "";
+  const rows = available
+    .map((scope) => {
+      const name = String(scope.name ?? "");
+      if (!name || name.length > 100) return "";
+      const inputId = `client-scope-assignment-${clientId}-${name}`;
+      return `<article class="list-item"><div><strong>${escapeHtml(scope.displayName || name)}</strong><span class="muted">${escapeHtml(scope.description ?? name)}</span></div><label class="settings-row" for="${escapeHtml(`${inputId}-default`)}"><input id="${escapeHtml(`${inputId}-default`)}" type="checkbox" name="defaultScopes" value="${escapeHtml(name)}" ${defaults.includes(name) ? "checked" : ""}/>${escapeHtml(text("adminClientScopeDefault"))}</label><label class="settings-row" for="${escapeHtml(`${inputId}-optional`)}"><input id="${escapeHtml(`${inputId}-optional`)}" type="checkbox" name="optionalScopes" value="${escapeHtml(name)}" ${optional.includes(name) ? "checked" : ""}/>${escapeHtml(text("adminClientScopeOptional"))}</label></article>`;
+    })
+    .join("");
+  return `<section class="card" data-client-scope-assignments-panel="true" data-client-id="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientScopeAssignments"))}"><form data-form="admin-client-scope-assignments" data-client-id="${escapeHtml(clientId)}"><fieldset><legend>${escapeHtml(text("adminClientScopeAssignmentsHelp"))}</legend>${rows || `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}</fieldset><div class="field-error" role="alert">${escapeHtml(localError)}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-scope-assignments-save:${clientId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-assignments-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
+}
+
 function adminClientsContent() {
   const page = state.data.clients ?? { content: [], number: 0, totalPages: 0 };
   const clients = Array.isArray(page.content) ? page.content : [];
@@ -1160,6 +1192,19 @@ function adminClientsContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-client-native-metadata" data-client-id="${escapeHtml(id)}" novalidate>${field("clientName", text("adminClientName"), draft.clientName ?? client.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-metadata-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-metadata-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
+      const assignmentsOpen = state.data.clientScopeAssignmentsOpenId === id;
+      const assignmentsToggle = button(
+        text("adminManageClientScopeAssignments"),
+        {
+          action: "admin-client-scope-assignments-toggle",
+          id,
+          busy: state.busy === `client-scope-assignments-load:${id}`,
+          disabled: state.offline || Boolean(state.busy),
+        },
+      );
+      const assignmentsPanel = assignmentsOpen
+        ? clientScopeAssignmentsPanel(id)
+        : "";
       const protectedClient = PLATFORM_CONSOLE_CLIENT_IDS.has(client.clientId);
       const confirming = state.data.clientDeleteConfirmId === id;
       const deleting = state.busy === `client-delete:${id}`;
@@ -1168,7 +1213,7 @@ function adminClientsContent() {
         : confirming
           ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
           : `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}</div>${editForm}${deleteControls}</article>`;
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${assignmentsToggle}</div>${editForm}${assignmentsPanel}${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -2037,6 +2082,19 @@ function preserveOfflineDrafts() {
         state.data.clientMetadataDrafts ??= {};
         state.data.clientMetadataDrafts[id] = values;
       }
+    } else if (form.dataset.form === "admin-client-scope-assignments") {
+      const id = form.dataset.clientId;
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
+        state.data.clientScopeAssignmentDrafts ??= {};
+        state.data.clientScopeAssignmentDrafts[id] = {
+          defaultScopes: [
+            ...form.querySelectorAll('input[name="defaultScopes"]:checked'),
+          ].map((input) => input.value),
+          optionalScopes: [
+            ...form.querySelectorAll('input[name="optionalScopes"]:checked'),
+          ].map((input) => input.value),
+        };
+      }
     } else if (form.dataset.form === "admin-provider-mapper") {
       const providerId = form.dataset.providerId;
       const mapperId = form.dataset.mapperId || "new";
@@ -2309,6 +2367,74 @@ async function submitForm(form) {
       state.notice = text("adminClientMetadataUpdated");
     } catch {
       /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-client-scope-assignments") {
+    const clientId = form.dataset.clientId ?? "";
+    const clients = state.data.clients?.content ?? [];
+    const assignments = state.data.clientScopeAssignments?.[clientId];
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !clients.some((client) => client.id === clientId) ||
+      !assignments
+    )
+      return;
+    const available = new Set(
+      (assignments.availableScopes ?? []).map((scope) => scope.name),
+    );
+    const body = {
+      defaultScopes: [
+        ...new Set(
+          [...form.querySelectorAll('input[name="defaultScopes"]:checked')]
+            .map((input) => input.value)
+            .filter((name) => available.has(name)),
+        ),
+      ].sort(),
+      optionalScopes: [
+        ...new Set(
+          [...form.querySelectorAll('input[name="optionalScopes"]:checked')]
+            .map((input) => input.value)
+            .filter((name) => available.has(name)),
+        ),
+      ].sort(),
+    };
+    const overlap = body.defaultScopes.some((name) =>
+      body.optionalScopes.includes(name),
+    );
+    if (
+      overlap ||
+      body.defaultScopes.length + body.optionalScopes.length === 0
+    ) {
+      state.data.clientScopeAssignmentErrorId = clientId;
+      render();
+      return;
+    }
+    state.data.clientScopeAssignmentDrafts ??= {};
+    state.data.clientScopeAssignmentDrafts[clientId] = body;
+    state.data.clientScopeAssignmentErrorId = null;
+    state.error = null;
+    state.notice = null;
+    state.busy = `client-scope-assignments-save:${clientId}`;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/scope-assignments`,
+        { method: "PUT", body },
+      );
+      state.data.clientScopeAssignments[clientId] = saved;
+      state.data.clientScopeAssignmentDrafts[clientId] = {
+        defaultScopes: [...(saved.defaultScopes ?? [])],
+        optionalScopes: [...(saved.optionalScopes ?? [])],
+        availableScopes: saved.availableScopes ?? assignments.availableScopes,
+      };
+      state.data.clientScopeAssignmentErrorId = null;
+      state.notice = text("adminClientScopeAssignmentsSaved");
+    } catch {
+      /* request rendered localized authorization, validation, or transport feedback */
     }
     state.busy = null;
     render();
@@ -4886,6 +5012,68 @@ async function action(action, element) {
     render();
     return;
   }
+  if (action === "admin-client-scope-assignments-toggle") {
+    if (state.busy || state.offline) return;
+    const id = element.dataset.id;
+    const client = (state.data.clients?.content ?? []).find(
+      (item) => item.id === id,
+    );
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
+    if (state.data.clientScopeAssignmentsOpenId === id) {
+      state.data.clientScopeAssignmentsOpenId = null;
+      render();
+      return;
+    }
+    const cached = state.data.clientScopeAssignments?.[id];
+    state.data.clientScopeAssignmentsOpenId = id;
+    state.data.clientScopeAssignmentErrorId = null;
+    state.error = null;
+    if (cached) {
+      state.data.clientScopeAssignmentDrafts ??= {};
+      state.data.clientScopeAssignmentDrafts[id] = {
+        defaultScopes: [...(cached.defaultScopes ?? [])],
+        optionalScopes: [...(cached.optionalScopes ?? [])],
+      };
+      render();
+      return;
+    }
+    state.busy = `client-scope-assignments-load:${id}`;
+    render();
+    try {
+      const assignments = await request(
+        `/api/admin/clients/${encodeURIComponent(id)}/scope-assignments`,
+      );
+      state.data.clientScopeAssignments ??= {};
+      state.data.clientScopeAssignments[id] = assignments;
+      state.data.clientScopeAssignmentDrafts ??= {};
+      state.data.clientScopeAssignmentDrafts[id] = {
+        defaultScopes: [...(assignments.defaultScopes ?? [])],
+        optionalScopes: [...(assignments.optionalScopes ?? [])],
+      };
+    } catch {
+      state.data.clientScopeAssignmentsOpenId = null;
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-scope-assignments-cancel") {
+    if (state.busy) return;
+    const id = element.dataset.id;
+    const current = state.data.clientScopeAssignments?.[id];
+    if (!current || state.data.clientScopeAssignmentsOpenId !== id) return;
+    state.data.clientScopeAssignmentDrafts ??= {};
+    state.data.clientScopeAssignmentDrafts[id] = {
+      defaultScopes: [...(current.defaultScopes ?? [])],
+      optionalScopes: [...(current.optionalScopes ?? [])],
+    };
+    state.data.clientScopeAssignmentsOpenId = null;
+    state.data.clientScopeAssignmentErrorId = null;
+    state.error = null;
+    render();
+    return;
+  }
   if (action === "admin-identity-provider-policy-cancel") {
     if (state.busy) return;
     const id = element.dataset.id;
@@ -5809,6 +5997,39 @@ function bind() {
                 .filter((id) => Number.isSafeInteger(id) && id > 0),
             ),
           ],
+        };
+      }),
+    );
+  document
+    .querySelectorAll("[data-client-scope-assignments-panel]")
+    .forEach((panel) =>
+      panel.addEventListener("change", (event) => {
+        const input = event.target;
+        const clientId = panel.dataset.clientId;
+        if (
+          state.busy ||
+          !input.matches(
+            'input[type="checkbox"][name="defaultScopes"], input[type="checkbox"][name="optionalScopes"]',
+          )
+        )
+          return;
+        if (input.checked) {
+          const otherName =
+            input.name === "defaultScopes" ? "optionalScopes" : "defaultScopes";
+          const counterpart = [
+            ...panel.querySelectorAll(`input[name="${otherName}"]`),
+          ].find((item) => item.value === input.value);
+          if (counterpart) counterpart.checked = false;
+        }
+        state.data.clientScopeAssignmentErrorId = null;
+        state.data.clientScopeAssignmentDrafts ??= {};
+        state.data.clientScopeAssignmentDrafts[clientId] = {
+          defaultScopes: [
+            ...panel.querySelectorAll('input[name="defaultScopes"]:checked'),
+          ].map((item) => item.value),
+          optionalScopes: [
+            ...panel.querySelectorAll('input[name="optionalScopes"]:checked'),
+          ].map((item) => item.value),
         };
       }),
     );

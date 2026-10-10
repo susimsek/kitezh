@@ -162,6 +162,34 @@ test("allows only exact client scope protocol mapper routes", async () => {
   }
 });
 
+test("allows only the client scope assignment read and replacement routes", async () => {
+  const { adapter } = harness(
+    async () =>
+      new Response(JSON.stringify({ defaultScopes: ["openid"] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  for (const [method, path] of [
+    ["GET", "/api/admin/clients/client-main/scope-assignments"],
+    ["PUT", "/api/admin/clients/client-main/scope-assignments"],
+  ]) {
+    const response = await adapter.request({ console: "admin", path, method });
+    assert.equal(response.status, 200);
+  }
+  for (const [method, path] of [
+    ["POST", "/api/admin/clients/client-main/scope-assignments"],
+    ["PUT", "/api/admin/clients/client-main/scope-assignments/nested"],
+    ["PUT", "/api/admin/clients/client-main/scope-assignments?q=unbounded"],
+    ["GET", "/api/admin/clients/client-main/scope-assignments?page=1"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method }),
+      /not allowed/,
+    );
+  }
+});
+
 test("limits the Admin namespace to approved settings writes and bounded read contracts", async () => {
   const requestLanguages = [];
   const { adapter } = harness(async (_url, init) => {

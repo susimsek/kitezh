@@ -206,6 +206,13 @@ function isAllowedApiPath(
       )
     )
       return true;
+    if (
+      method === "PUT" &&
+      /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/scope-assignments$/.test(
+        path,
+      )
+    )
+      return true;
     const clientScopeMapperPath = path.match(
       /^\/api\/admin\/client-scopes\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/,
     );
@@ -381,6 +388,10 @@ function isAllowedApiPath(
         Number.isSafeInteger(Number(groupMemberSearchMatch[1])),
       );
       const isClientScopes = url.pathname === "/api/admin/client-scopes";
+      const isClientScopeAssignments =
+        /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/scope-assignments$/.test(
+          url.pathname,
+        );
       const isClientScopeRoleMappings =
         /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}\/role-mappings$/.test(
           url.pathname,
@@ -452,6 +463,7 @@ function isAllowedApiPath(
           isGroups ||
           isGroupMemberSearch ||
           isClientScopes ||
+          isClientScopeAssignments ||
           isClientScopeRoleMappings ||
           isClientScopeMappers ||
           isClientScopeRoleCandidates ||
@@ -467,6 +479,7 @@ function isAllowedApiPath(
           isAuthenticationFlows) &&
         url.origin === "https://desktop.invalid" &&
         !url.hash &&
+        (!isClientScopeAssignments || !url.search) &&
         [...url.searchParams.keys()].every((key) =>
           allowedParameters.has(key),
         ) &&
