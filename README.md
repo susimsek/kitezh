@@ -393,10 +393,14 @@ The packaged app uses the `kitezh://oauth/callback` protocol and stores console 
 the operating system's protected Electron storage. Release signing, macOS notarization, and
 auto-update publishing require platform certificates and are not part of the unsigned local build.
 
-To enable signing for the `desktop-release` GitHub Environment, configure these secrets without
-committing certificate material: `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` for the base64-encoded
-macOS Developer ID `.p12`, `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER` for
-notarization, and `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` for the base64-encoded Windows `.pfx`.
+Signing is controlled by the `MAC_SIGNING_MODE` and `WINDOWS_SIGNING_MODE` variables in the
+`desktop-release` GitHub Environment. Both currently use `unsigned`. To enable macOS signing, set
+`MAC_SIGNING_MODE` to `signed` and configure `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` environment
+secrets for the base64-encoded Developer ID `.p12`. Optional notarization additionally uses
+`APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. To enable Windows signing, set
+`WINDOWS_SIGNING_MODE` to `signed` and configure `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` for the
+base64-encoded Windows `.pfx`. A signed mode fails early when its required certificate secrets are
+missing; do not put signing material in repository-level secrets.
 Linux always validates Debian metadata, publishes `SHA256SUMS`, and creates a Sigstore bundle beside
 each AppImage, Debian, RPM, and Snap package. These keyless signatures are produced by GitHub Actions
 through GitHub OIDC, so no paid certificate or private signing secret is required. Verify a package

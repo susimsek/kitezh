@@ -56,11 +56,13 @@ jobs:
       id-token: write
     environment: desktop-release
     env:
+      MAC_SIGNING_MODE: ${{ vars.MAC_SIGNING_MODE || 'unsigned' }}
       MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK || '' }}
       MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD || '' }}
       APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 || '' }}
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID || '' }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER || '' }}
+      WINDOWS_SIGNING_MODE: ${{ vars.WINDOWS_SIGNING_MODE || 'unsigned' }}
       WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK || '' }}
       WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD || '' }}
       LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY || '' }}
@@ -121,24 +123,53 @@ jobs:
       - name: Prepare platform signing configuration
         shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ matrix.platform }}" == "macos" ]]; then
-            if [[ -n "${MAC_CSC_LINK}" && -n "${MAC_CSC_KEY_PASSWORD}" ]]; then
-              {
-                echo "CSC_LINK=${MAC_CSC_LINK}"
-                echo "CSC_KEY_PASSWORD=${MAC_CSC_KEY_PASSWORD}"
-              } >> "${GITHUB_ENV}"
-            else
-              echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
-            fi
+            case "${MAC_SIGNING_MODE}" in
+              unsigned)
+                echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+                echo "macOS release signing mode is unsigned."
+                ;;
+              signed)
+                for secret_name in MAC_CSC_LINK MAC_CSC_KEY_PASSWORD; do
+                  if [[ -z "${!secret_name}" ]]; then
+                    echo "${secret_name} is required when MAC_SIGNING_MODE=signed." >&2
+                    exit 1
+                  fi
+                done
+                {
+                  echo "CSC_LINK=${MAC_CSC_LINK}"
+                  echo "CSC_KEY_PASSWORD=${MAC_CSC_KEY_PASSWORD}"
+                } >> "${GITHUB_ENV}"
+                ;;
+              *)
+                echo "MAC_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
+                exit 1
+                ;;
+            esac
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
-            if [[ -n "${WIN_CSC_LINK}" && -n "${WIN_CSC_KEY_PASSWORD}" ]]; then
-              {
-                echo "CSC_LINK=${WIN_CSC_LINK}"
-                echo "CSC_KEY_PASSWORD=${WIN_CSC_KEY_PASSWORD}"
-              } >> "${GITHUB_ENV}"
-            else
-              echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
-            fi
+            case "${WINDOWS_SIGNING_MODE}" in
+              unsigned)
+                echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+                echo "Windows release signing mode is unsigned."
+                ;;
+              signed)
+                for secret_name in WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+                  if [[ -z "${!secret_name}" ]]; then
+                    echo "${secret_name} is required when WINDOWS_SIGNING_MODE=signed." >&2
+                    exit 1
+                  fi
+                done
+                {
+                  echo "CSC_LINK=${WIN_CSC_LINK}"
+                  echo "CSC_KEY_PASSWORD=${WIN_CSC_KEY_PASSWORD}"
+                } >> "${GITHUB_ENV}"
+                ;;
+              *)
+                echo "WINDOWS_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
+                exit 1
+                ;;
+            esac
           else
             echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
           fi
@@ -223,13 +254,17 @@ jobs:
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
         run: |
-          if [[ -z "${CSC_LINK:-}" || -z "${CSC_KEY_PASSWORD:-}" || -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
-            echo "macOS signing and notarization secrets are not configured; keeping this package unsigned."
+          if [[ "${MAC_SIGNING_MODE}" == "unsigned" ]]; then
+            echo "macOS release is configured as unsigned."
             exit 0
           fi
           app_path="$(find src/main/desktop/release -type d -name '*.app' -print -quit)"
           test -n "${app_path}"
           codesign --verify --deep --strict --verbose=2 "${app_path}"
+          if [[ -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
+            echo "macOS app is signed; notarization credentials are not configured."
+            exit 0
+          fi
           spctl --assess --type exec --verbose "${app_path}"
           xcrun stapler validate "${app_path}"
 
@@ -237,8 +272,8 @@ jobs:
         if: ${{ matrix.platform == 'windows' }}
         shell: pwsh
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK)) {
-            Write-Host "Windows signing secret is not configured; keeping this package unsigned."
+          if ($env:WINDOWS_SIGNING_MODE -eq "unsigned") {
+            Write-Host "Windows release is configured as unsigned."
             exit 0
           }
           $installers = Get-ChildItem -Path "src/main/desktop/release" -Filter "*.exe"
