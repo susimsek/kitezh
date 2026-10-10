@@ -764,7 +764,16 @@ test("shows an up-to-date result when no update is available", async () => {
       await resultWindow.locator("p").textContent(),
       /There are no new updates available/,
     );
-    await resultWindow.getByRole("button", { name: "Done" }).click();
+    const resultWindowClosed = resultWindow.waitForEvent("close");
+    const doneClick = resultWindow
+      .getByRole("button", { name: "Done" })
+      .click()
+      .catch((error) => {
+        // The dialog closes synchronously on click, which can close the page
+        // before Playwright receives the click acknowledgement.
+        assert.equal(resultWindow.isClosed(), true, error.message);
+      });
+    await Promise.all([resultWindowClosed, doneClick]);
   } finally {
     await application.close();
   }
