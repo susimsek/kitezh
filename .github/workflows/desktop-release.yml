@@ -186,6 +186,22 @@ jobs:
           mkdir -p "${cache_dir}"
           echo "ELECTRON_BUILDER_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
 
+      - name: Cache electron-builder downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/electron-builder
+          key: electron-builder-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/desktop/pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Cache Next.js renderer build output
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: src/main/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.event.workflow_run.head_sha || github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
+
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
         shell: bash

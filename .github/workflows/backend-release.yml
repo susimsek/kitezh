@@ -50,9 +50,6 @@ jobs:
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      - name: Install Maven dependencies
-        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
-
       - name: Install web dependencies
         run: pnpm --dir src/main/web install --frozen-lockfile
 
@@ -115,9 +112,6 @@ jobs:
 
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
-
-      - name: Install Maven dependencies
-        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
       - name: Install web dependencies
         run: pnpm --dir src/main/web install --frozen-lockfile

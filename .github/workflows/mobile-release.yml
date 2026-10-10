@@ -93,7 +93,8 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
-          cache: false
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
           install: false
 
       - name: Set up Java
@@ -101,6 +102,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            src/main/mobile/pnpm-lock.yaml
+            src/main/mobile/package.json
 
       - name: Install mobile dependencies
         working-directory: src/main/mobile
@@ -193,12 +198,21 @@ jobs:
         with:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
-          cache: false
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
           install: false
 
       - name: Install mobile dependencies
         working-directory: src/main/mobile
         run: pnpm install --frozen-lockfile
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoaPods-${{ runner.os }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml') }}
+          restore-keys: |
+            cocoaPods-${{ runner.os }}-
 
       - name: Set mobile release version
         working-directory: src/main/mobile
@@ -218,6 +232,19 @@ jobs:
       - name: Generate native iOS project
         working-directory: src/main/mobile
         run: pnpm exec expo prebuild --clean --platform ios
+
+      - name: Record Xcode version
+        id: xcode-version
+        shell: bash
+        run: echo "version=$(xcodebuild -version | tr '\n' '-' | tr ' ' '-')" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache Xcode build products
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/kitezh-ios-build
+          key: xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile.lock') }}-${{ github.event.workflow_run.head_sha || github.sha }}
+          restore-keys: |
+            xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile.lock') }}-
 
       - name: Resolve iOS signing mode
         id: ios-signing
@@ -337,6 +364,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "${archive_path}" \
+            -derivedDataPath "${RUNNER_TEMP}/kitezh-ios-build" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY='Apple Distribution' \
             DEVELOPMENT_TEAM="${IOS_TEAM_ID}" \

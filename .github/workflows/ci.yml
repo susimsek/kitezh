@@ -72,29 +72,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: "maven"
 
-      - name: Set up Node.js and pnpm
-        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          runtime: node@${{ env.NODE_VERSION }}
-          cache: true
-          cache-dependency-path: src/main/web/pnpm-lock.yaml
-          install: false
-
       - name: Print tool versions
         run: |
           java -version
-          node --version
-          pnpm --version
 
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
-
-      - name: Install Maven dependencies
-        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
-
-      - name: Install web dependencies
-        run: pnpm --dir src/main/web install --frozen-lockfile
 
       - name: Set up Snyk CLI
         if: ${{ env.SNYK_TOKEN != '' }}
@@ -117,23 +100,6 @@ jobs:
       - name: Backend verification
         run: ./mvnw -B -ntp verify -Dskip.frontend=true
 
-      - name: Web type check
-        run: pnpm --dir src/main/web typecheck
-
-      - name: Web lint
-        run: pnpm --dir src/main/web lint
-
-      - name: Web format check
-        run: pnpm --dir src/main/web format:check
-
-      - name: Web build
-        run: pnpm --dir src/main/web build
-
-      - name: Test web client and collect Sonar coverage
-        env:
-          SONAR_COVERAGE_REPORT: "true"
-        run: pnpm --dir src/main/web test:unit:sonar-coverage
-
       - name: Upload backend Sonar inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -147,6 +113,52 @@ jobs:
             target/checkstyle-result.xml
           if-no-files-found: error
           retention-days: 1
+
+  web-quality:
+    name: Web quality and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
+          install: false
+
+      - name: Install web dependencies
+        run: pnpm --dir src/main/web install --frozen-lockfile
+
+      - name: Web type check
+        run: pnpm --dir src/main/web typecheck
+
+      - name: Web lint
+        run: pnpm --dir src/main/web lint
+
+      - name: Web format check
+        run: pnpm --dir src/main/web format:check
+
+      - name: Cache Next.js build output
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: src/main/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
+
+      - name: Web build
+        run: pnpm --dir src/main/web build
+
+      - name: Test web client and collect Sonar coverage
+        env:
+          SONAR_COVERAGE_REPORT: "true"
+        run: pnpm --dir src/main/web test:unit:sonar-coverage
 
       - name: Upload web Sonar coverage
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -256,6 +268,7 @@ jobs:
     name: SonarCloud analysis
     needs:
       - build
+      - web-quality
       - desktop-quality
       - mobile-quality
     runs-on: ubuntu-latest
@@ -361,9 +374,6 @@ jobs:
 
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
-
-      - name: Install Maven dependencies
-        run: ./mvnw -B -ntp -Pprod -Dskip.frontend=true dependency:go-offline
 
       - name: Install web dependencies
         run: pnpm --dir src/main/web install --frozen-lockfile
