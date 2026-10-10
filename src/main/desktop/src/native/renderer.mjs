@@ -570,6 +570,7 @@ function adminAdminLocalizationContent() {
   const drafts = state.data.adminMessageOverrideDrafts ?? {};
   const localizationDraft = state.data.adminLocalizationDraft ?? settings;
   const errors = violations(state.error?.body);
+  const messageErrorTarget = state.data.adminMessageOverrideErrorTarget;
   const row = (label, value) =>
     `<div class="list-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value ?? text("adminNotConfigured"))}</span></div>`;
   const list = (values) => (Array.isArray(values) ? values.join(", ") : null);
@@ -579,21 +580,34 @@ function adminAdminLocalizationContent() {
   const supportedLocales = Array.isArray(localizationDraft.supportedLocales)
     ? localizationDraft.supportedLocales
     : [];
+  const availableBundles = [
+    ...new Set([
+      ...(Array.isArray(settings.availableBundles)
+        ? settings.availableBundles
+        : []),
+      ...overrides.map((item) => item.bundle).filter(Boolean),
+    ]),
+  ];
   const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${localizationDraft.defaultLocale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => `<label class="settings-row"><input type="checkbox" name="supportedLocales" value="${escapeHtml(locale)}" ${supportedLocales.includes(locale) ? "checked" : ""}/>${escapeHtml(locale)}</label>`).join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings", disabled: state.offline })}</div></form>`;
   const overrideField = (item, name, label, value, error) => {
     const id = `override-${item.id}-${name}`;
     return `<div class="field"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" name="${name}" value="${escapeHtml(value ?? "")}" aria-invalid="${Boolean(error)}" required maxlength="${name === "messageValue" ? 4000 : name === "locale" ? 10 : name === "bundle" ? 50 : 255}"/><div class="field-error" id="${id}-error">${escapeHtml(error ?? "")}</div></div>`;
   };
+  const createDraft = state.data.adminMessageOverrideCreateDraft ?? {};
+  const createErrors = messageErrorTarget === "create" ? errors : {};
+  const createForm = `<form data-form="admin-localization-message-create" novalidate><div class="field"><label for="new-override-locale">${escapeHtml(text("adminMessageLocale"))}</label><select id="new-override-locale" name="locale" required>${supportedLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${createDraft.locale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(createErrors.locale ?? "")}</div></div><div class="field"><label for="new-override-bundle">${escapeHtml(text("adminMessageBundle"))}</label><select id="new-override-bundle" name="bundle" required>${availableBundles.map((bundle) => `<option value="${escapeHtml(bundle)}" ${createDraft.bundle === bundle ? "selected" : ""}>${escapeHtml(bundle)}</option>`).join("")}</select><div class="field-error">${escapeHtml(createErrors.bundle ?? "")}</div></div>${field("messageKey", text("adminMessageKey"), createDraft.messageKey ?? "", createErrors.messageKey, "text", 'maxlength="255" pattern="[A-Za-z0-9_.-]+" required')}<div class="field"><label for="new-override-value">${escapeHtml(text("adminMessageValue"))}</label><textarea id="new-override-value" name="messageValue" required maxlength="4000">${escapeHtml(createDraft.messageValue ?? "")}</textarea><div class="field-error">${escapeHtml(createErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("adminCreateMessageOverride"), { type: "submit", busy: state.busy === "admin-message-create", disabled: state.offline })}</div></form>`;
   return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLocalizationSettings"))}"><h2>${escapeHtml(text("adminLocalizationSettings"))}</h2><div class="list">${row(text("adminLocalizationEnabled"), settings.internationalizationEnabled === true ? text("adminEnabled") : settings.internationalizationEnabled === false ? text("adminDisabled") : undefined)}${row(text("adminDefaultLocale"), settings.defaultLocale)}${row(text("adminSupportedLocales"), list(settings.supportedLocales))}${row(text("adminAvailableLocales"), list(settings.availableLocales))}${row(text("adminAvailableBundles"), list(settings.availableBundles))}</div></section><section class="card" aria-label="${escapeHtml(text("adminMessageOverrides"))}"><h2>${escapeHtml(text("adminMessageOverrides"))}</h2>${
     overrides.length
       ? `<div class="list">${overrides
           .map((item) => {
             const values = drafts[item.id] ?? item;
-            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, errors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, errors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, errors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(errors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(errors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form></article>`;
+            const itemErrors =
+              messageErrorTarget === `update:${item.id}` ? errors : {};
+            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, itemErrors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, itemErrors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, itemErrors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(itemErrors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(itemErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form></article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`
-  }${localizationSettingsForm}</section></div>`;
+  }${createForm}${localizationSettingsForm}</section></div>`;
 }
 
 function adminAdminLdapContent() {
@@ -1034,6 +1048,8 @@ function preserveOfflineDrafts() {
         state.data.adminClientScopeDrafts ??= {};
         state.data.adminClientScopeDrafts[scopeId] = values;
       }
+    } else if (form.dataset.form === "admin-localization-message-create") {
+      state.data.adminMessageOverrideCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
       state.data.adminGroupCreateDraft = values;
     } else if (form.dataset.form === "admin-client-scope-create") {
@@ -1045,6 +1061,44 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-localization-message-create") {
+    if (!form.reportValidity()) return;
+    const body = {
+      locale: String(values.locale ?? "").trim(),
+      bundle: String(values.bundle ?? "").trim(),
+      messageKey: String(values.messageKey ?? "").trim(),
+      messageValue: String(values.messageValue ?? "").trim(),
+    };
+    if (
+      !/^[A-Za-z]{2,10}$/.test(body.locale) ||
+      !/^[A-Za-z0-9_-]{1,50}$/.test(body.bundle) ||
+      !/^[A-Za-z0-9_.-]{1,255}$/.test(body.messageKey) ||
+      !body.messageValue ||
+      body.messageValue.length > 4000
+    )
+      return;
+    state.data.adminMessageOverrideCreateDraft = body;
+    state.data.adminMessageOverrideErrorTarget = "create";
+    state.busy = "admin-message-create";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request("/api/admin/settings/localization/messages", {
+        method: "POST",
+        body,
+      });
+      await loadRoute({ keepContent: true });
+      state.data.adminMessageOverrideCreateDraft = null;
+      state.data.adminMessageOverrideErrorTarget = null;
+      state.notice = text("adminMessageOverrideCreated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-client-scope-edit") {
     const scopeId = form.dataset.scopeId ?? "";
     const scopeName = form.dataset.scopeName ?? "";
@@ -1317,10 +1371,14 @@ async function submitForm(form) {
     state.notice = null;
     render();
     try {
-      state.data.adminLocalization = await request(
+      const savedLocalization = await request(
         "/api/admin/settings/localization",
         { method: "PUT", body },
       );
+      state.data.adminLocalization = {
+        ...state.data.adminLocalization,
+        ...savedLocalization,
+      };
       state.data.adminLocalizationDraft = null;
       state.notice = text("adminLocalizationSaved");
     } catch {
@@ -1341,6 +1399,7 @@ async function submitForm(form) {
     };
     state.data.adminMessageOverrideDrafts ??= {};
     state.data.adminMessageOverrideDrafts[id] = { id, ...body };
+    state.data.adminMessageOverrideErrorTarget = `update:${id}`;
     state.busy = `admin-message-${id}`;
     state.error = null;
     state.notice = null;
@@ -1356,6 +1415,7 @@ async function submitForm(form) {
         content: page.content.map((item) => (item.id === id ? updated : item)),
       };
       delete state.data.adminMessageOverrideDrafts[id];
+      state.data.adminMessageOverrideErrorTarget = null;
       state.notice = text("adminMessageOverrideSaved");
     } catch {
       /* request rendered localized server validation or transport feedback */

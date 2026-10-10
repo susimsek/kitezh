@@ -74,6 +74,11 @@ function isAllowedApiPath(
       /^\/api\/admin\/settings\/localization\/messages\/([1-9]\d*)$/,
     );
     if (
+      method === "POST" &&
+      path === "/api/admin/settings/localization/messages"
+    )
+      return true;
+    if (
       method === "PUT" &&
       localizationMessageMatch &&
       Number.isSafeInteger(Number(localizationMessageMatch[1]))

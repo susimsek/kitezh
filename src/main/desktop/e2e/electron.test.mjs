@@ -1419,6 +1419,37 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           });
         }
         if (
+          requestUrl.pathname === "/api/admin/settings/localization/messages" &&
+          requestMethod === "POST"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__localizationMessageCreates ??= [];
+          globalThis.__localizationMessageCreates.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.messageKey === "invalid.key")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the localization fields.",
+                violations: [
+                  {
+                    field: "messageKey",
+                    message: "Choose another message key.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          globalThis.__createdLocalizationMessages ??= [];
+          globalThis.__createdLocalizationMessages.push({ id: 2, ...body });
+          return new Response(
+            JSON.stringify(globalThis.__createdLocalizationMessages.at(-1)),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
           requestUrl.pathname === "/api/admin/settings/localization/messages"
         ) {
           globalThis.__localizationMessageRequests ??= [];
@@ -1434,6 +1465,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
                   messageKey: "login.title",
                   messageValue: "<img src=x onerror=alert(1)>",
                 },
+                ...(globalThis.__createdLocalizationMessages ?? []),
               ],
               number: 0,
               totalPages: 1,
@@ -2615,6 +2647,12 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       exact: true,
     });
     await localizationNavigation.click();
+    await window.waitForFunction(() => {
+      const button = [...document.querySelectorAll(".sidebar button")].find(
+        (candidate) => candidate.textContent.includes("Localization"),
+      );
+      return button?.disabled === true;
+    });
     assert.equal(await localizationNavigation.isDisabled(), true);
     assert.equal(await localizationNavigation.locator(".spinner").count(), 1);
     await window
@@ -2671,7 +2709,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .waitFor();
     assert.equal(await window.locator("img[src=x]").count(), 0);
     const overrideForm = window.locator(
-      'form[data-form="admin-localization-message"]',
+      'form[data-form="admin-localization-message"][data-id="1"]',
     );
     const overrideLocale = overrideForm.locator('[name="locale"]');
     const overrideValue = overrideForm.locator('[name="messageValue"]');
@@ -2696,6 +2734,64 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(
       await window.locator("strong").filter({ hasText: "Sign in" }).count(),
       0,
+    );
+    const createOverrideForm = window.locator(
+      'form[data-form="admin-localization-message-create"]',
+    );
+    await createOverrideForm.locator('[name="locale"]').selectOption("tr");
+    await createOverrideForm.locator('[name="bundle"]').selectOption("admin");
+    await createOverrideForm.locator('[name="messageKey"]').fill("invalid.key");
+    await createOverrideForm
+      .locator('[name="messageValue"]')
+      .fill("Yeni <b>mesaj</b>");
+    const createOverrideButton = createOverrideForm.getByRole("button", {
+      name: "Create message override",
+      exact: true,
+    });
+    await createOverrideButton.click();
+    assert.equal(await createOverrideButton.isDisabled(), true);
+    assert.equal(await createOverrideButton.locator(".spinner").count(), 1);
+    await createOverrideForm
+      .getByText("Choose another message key.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await createOverrideForm.locator('[name="messageValue"]').inputValue(),
+      "Yeni <b>mesaj</b>",
+    );
+    await createOverrideForm
+      .locator('[name="messageKey"]')
+      .fill("native.created");
+    await createOverrideButton.click();
+    assert.equal(await createOverrideButton.isDisabled(), true);
+    assert.equal(await createOverrideButton.locator(".spinner").count(), 1);
+    await window
+      .getByText("Message override created.", { exact: true })
+      .waitFor();
+    await window
+      .getByText("tr · admin · native.created", { exact: true })
+      .waitFor();
+    await window.locator("#override-2-messageValue").waitFor();
+    assert.equal(
+      await window.locator("#override-2-messageValue").inputValue(),
+      "Yeni <b>mesaj</b>",
+    );
+    assert.equal(await window.locator("b").count(), 0);
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__localizationMessageCreates),
+      [
+        {
+          locale: "tr",
+          bundle: "admin",
+          messageKey: "invalid.key",
+          messageValue: "Yeni <b>mesaj</b>",
+        },
+        {
+          locale: "tr",
+          bundle: "admin",
+          messageKey: "native.created",
+          messageValue: "Yeni <b>mesaj</b>",
+        },
+      ],
     );
     await window.getByRole("button", { name: "Turkish" }).click();
     await window

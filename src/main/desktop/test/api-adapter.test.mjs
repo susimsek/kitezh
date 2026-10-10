@@ -169,6 +169,18 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(updatedClientScope.status, 200);
+  const createdMessageOverride = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/localization/messages",
+    method: "POST",
+    body: {
+      locale: "tr",
+      bundle: "admin",
+      messageKey: "native.created",
+      messageValue: "Native override",
+    },
+  });
+  assert.equal(createdMessageOverride.status, 200);
   const roles = await adapter.request({
     console: "admin",
     path: "/api/admin/roles?q=USER&page=0&size=20&sort=name,asc",
@@ -423,7 +435,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/settings/localization/messages",
+      path: "/api/admin/settings/localization/messages/1",
       method: "POST",
     }),
     /not allowed/,

@@ -148,6 +148,8 @@ export const messages = {
     adminMessageKey: "Message key",
     adminMessageValue: "Message value",
     adminMessageOverrideSaved: "Message override saved.",
+    adminMessageOverrideCreated: "Message override created.",
+    adminCreateMessageOverride: "Create message override",
     adminNoMessageOverrides: "No message overrides found.",
     adminLdap: "LDAP federation",
     adminLdapDescription:
@@ -548,6 +550,8 @@ export const messages = {
     adminMessageKey: "Mesaj anahtarı",
     adminMessageValue: "Mesaj değeri",
     adminMessageOverrideSaved: "İleti geçersiz kılması kaydedildi.",
+    adminMessageOverrideCreated: "İleti geçersiz kılması oluşturuldu.",
+    adminCreateMessageOverride: "İleti geçersiz kılması oluştur",
     adminNoMessageOverrides: "İleti geçersiz kılması bulunamadı.",
     adminLdap: "LDAP federasyonu",
     adminLdapDescription: "Dizin federasyonu durumunu ve eşitlemeyi inceleyin.",
