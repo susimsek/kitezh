@@ -455,7 +455,23 @@ function adminGroupsContent() {
         Number(state.data.groupMembersOpenId) === Number(group.id)
           ? renderGroupMembers(group.id, memberState)
           : "";
-      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${controls}</div>${memberPanel}</article>`;
+      const roleDraft = state.data.groupRoleDrafts?.[group.id] ?? {};
+      const roleErrors =
+        Number(state.data.groupRoleErrorId) === Number(group.id)
+          ? violations(state.error?.body)
+          : {};
+      const roleCatalog = Array.isArray(state.data.userEditRoles)
+        ? state.data.userEditRoles
+        : [];
+      const selectedRoles = Array.isArray(roleDraft.roles)
+        ? roleDraft.roles
+        : (group.roles ?? []);
+      const editingRoles =
+        Number(state.data.groupRolesOpenId) === Number(group.id);
+      const roleForm = editingRoles
+        ? `<form class="card" data-form="admin-group-roles" data-group-id="${escapeHtml(group.id)}"><fieldset class="field"><legend>${escapeHtml(text("adminEditGroupRoles"))}</legend>${roleCatalog.length ? roleCatalog.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(roleErrors.roles ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-roles-update:${group.id}`, disabled: state.offline || Boolean(state.busy) || roleCatalog.length === 0 })}<button class="secondary-button" type="button" data-action="admin-group-roles-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        : "";
+      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === `group-role-catalog:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${controls}</div>${roleForm}${memberPanel}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -1227,6 +1243,16 @@ function preserveOfflineDrafts() {
       state.data.adminMessageOverrideCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
       state.data.adminGroupCreateDraft = values;
+    } else if (form.dataset.form === "admin-group-roles") {
+      const id = Number(form.dataset.groupId);
+      if (Number.isSafeInteger(id) && id > 0) {
+        state.data.groupRoleDrafts ??= {};
+        state.data.groupRoleDrafts[id] = {
+          roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+            (input) => input.value,
+          ),
+        };
+      }
     } else if (form.dataset.form === "admin-client-scope-create") {
       state.data.adminClientScopeCreateDraft = values;
     }
@@ -1236,6 +1262,41 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-group-roles") {
+    const id = Number(form.dataset.groupId);
+    const groups = state.data.groups?.content ?? [];
+    if (
+      !Number.isSafeInteger(id) ||
+      id < 1 ||
+      !groups.some((group) => Number(group.id) === id)
+    )
+      return;
+    const body = {
+      roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
+        (input) => input.value,
+      ),
+    };
+    state.data.groupRoleDrafts ??= {};
+    state.data.groupRoleDrafts[id] = body;
+    state.data.groupRoleErrorId = id;
+    state.error = null;
+    state.notice = null;
+    state.busy = `group-roles-update:${id}`;
+    render();
+    try {
+      await request(`/api/admin/groups/${id}/roles`, { method: "PUT", body });
+      delete state.data.groupRoleDrafts[id];
+      state.data.groupRoleErrorId = null;
+      state.data.groupRolesOpenId = null;
+      await loadRoute({ keepContent: true });
+      state.notice = text("adminGroupRolesUpdated");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-user-edit") {
     const id = Number(form.dataset.userId);
     const users = state.data.users?.content ?? [];
@@ -2041,6 +2102,51 @@ async function action(action, element) {
   if (action === "admin-group-delete-cancel") {
     if (state.busy) return;
     state.data.groupDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (action === "admin-group-roles-toggle") {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const group = (state.data.groups?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !group) return;
+    if (Number(state.data.groupRolesOpenId) === id) {
+      state.data.groupRolesOpenId = null;
+      render();
+      return;
+    }
+    if (!Array.isArray(state.data.userEditRoles)) {
+      state.busy = `group-role-catalog:${id}`;
+      state.error = null;
+      render();
+      try {
+        const page = await request(
+          "/api/admin/roles?page=0&size=100&sort=name,asc",
+        );
+        state.data.userEditRoles = Array.isArray(page?.content)
+          ? page.content
+          : [];
+      } catch {
+        state.busy = null;
+        render();
+        return;
+      }
+      state.busy = null;
+    }
+    state.data.groupRolesOpenId = id;
+    state.data.groupRoleErrorId = null;
+    render();
+    return;
+  }
+  if (action === "admin-group-roles-cancel") {
+    if (state.busy) return;
+    const id = Number(element.dataset.id);
+    if (!Number.isSafeInteger(id) || id < 1) return;
+    if (state.data.groupRoleDrafts) delete state.data.groupRoleDrafts[id];
+    state.data.groupRolesOpenId = null;
+    state.data.groupRoleErrorId = null;
     render();
     return;
   }

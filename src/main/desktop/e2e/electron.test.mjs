@@ -768,6 +768,10 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               ? [
                   { name: "ROLE_USER", description: "Standard user role" },
                   { name: "ROLE_ADMIN", description: "Administrator role" },
+                  {
+                    name: "ROLE_USER_VIEWER",
+                    description: "User viewer role",
+                  },
                 ]
               : [{ name, description: "Scoped authorization role" }];
           if (!query && page === 0)
@@ -784,6 +788,25 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               totalElements: 2,
               size: 20,
             }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        if (
+          /^\/api\/admin\/groups\/[1-9]\d*\/roles$/.test(requestUrl.pathname) &&
+          requestMethod === "PUT"
+        ) {
+          const groupId = Number(requestUrl.pathname.split("/")[4]);
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminGroupRoleRequests ??= [];
+          globalThis.__adminGroupRoleRequests.push({ id: groupId, body });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__groupRoleUpdates ??= {};
+          globalThis.__groupRoleUpdates[groupId] = body.roles;
+          return new Response(
+            JSON.stringify({ id: groupId, roles: body.roles }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
@@ -931,6 +954,13 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           ];
           if (!query && page === 0)
             content.push(...(globalThis.__createdGroups ?? []));
+          for (const group of content) {
+            const updatedRoles = globalThis.__groupRoleUpdates?.[group.id];
+            if (updatedRoles) {
+              group.roles = updatedRoles;
+              group.effectiveRoles = updatedRoles;
+            }
+          }
           return new Response(
             JSON.stringify({
               content,
@@ -2407,6 +2437,27 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Search groups" }).waitFor();
     const createdGroupRow = window.locator('[data-group-id="99"]');
+    await createdGroupRow
+      .getByRole("button", { name: "Edit group roles", exact: true })
+      .click();
+    const groupRolesForm = createdGroupRow.locator(
+      'form[data-form="admin-group-roles"]',
+    );
+    await groupRolesForm
+      .locator('[name="roles"][value="ROLE_USER_VIEWER"]')
+      .check();
+    const saveGroupRoles = groupRolesForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveGroupRoles.click();
+    assert.equal(await saveGroupRoles.isDisabled(), true);
+    assert.equal(await saveGroupRoles.locator(".spinner").count(), 1);
+    await window.getByText("Group roles updated.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminGroupRoleRequests),
+      [{ id: 99, body: { roles: ["ROLE_USER_VIEWER"] } }],
+    );
     await createdGroupRow
       .getByRole("button", { name: "Manage members", exact: true })
       .click();

@@ -181,6 +181,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdGroup.status, 200);
+  const updatedGroupRoles = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/roles",
+    method: "PUT",
+    body: { roles: ["ROLE_USER_VIEWER"] },
+  });
+  assert.equal(updatedGroupRoles.status, 200);
   const groupMembers = await adapter.request({
     console: "admin",
     path: "/api/admin/groups/12/users?q=alice&page=0&size=10&sort=username,asc",
@@ -562,6 +569,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/groups/9007199254740992/users/2",
       method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/groups/2/roles/nested",
+      method: "PUT",
     }),
     /not allowed/,
   );
