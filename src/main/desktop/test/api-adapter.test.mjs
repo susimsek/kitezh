@@ -200,6 +200,12 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     method: "DELETE",
   });
   assert.equal(deletedClientScope.status, 200);
+  const revokedOfflineSession = await adapter.request({
+    console: "admin",
+    path: "/api/admin/offline-sessions/offline-auth-opaque-id",
+    method: "DELETE",
+  });
+  assert.equal(revokedOfflineSession.status, 200);
   const createdMessageOverride = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/localization/messages",
@@ -505,6 +511,14 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/client-scopes/scope-native-observer/mappers/1",
+      method: "DELETE",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/offline-sessions/offline-auth-opaque-id/mappers/1",
       method: "DELETE",
     }),
     /not allowed/,

@@ -1088,6 +1088,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (
+          /^\/api\/admin\/offline-sessions\/[A-Za-z0-9_-]{1,100}$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "DELETE"
+        ) {
+          const sessionId = requestUrl.pathname.split("/").at(-1);
+          globalThis.__adminOfflineSessionDeleteRequests ??= [];
+          globalThis.__adminOfflineSessionDeleteRequests.push(sessionId);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
         if (requestUrl.pathname === "/api/admin/offline-sessions") {
           globalThis.__adminOfflineSessionRequests ??= [];
           globalThis.__adminOfflineSessionRequests.push(requestUrl.search);
@@ -2577,6 +2589,48 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(await nextOfflineSessionPage.isDisabled(), true);
     assert.equal(await nextOfflineSessionPage.locator(".spinner").count(), 1);
     await window.getByText("bob", { exact: true }).waitFor();
+    const offlineSessionRow = window
+      .locator(".list-item")
+      .filter({ hasText: "bob" });
+    assert.equal(await window.getByText("offline-auth-opaque-id").count(), 0);
+    await offlineSessionRow
+      .getByRole("button", { name: "Revoke offline session", exact: true })
+      .click();
+    await offlineSessionRow
+      .getByText(
+        "Revoke this offline session? Its refresh token will stop working.",
+        { exact: true },
+      )
+      .waitFor();
+    await offlineSessionRow
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminOfflineSessionDeleteRequests ?? [],
+      ),
+      [],
+    );
+    await offlineSessionRow
+      .getByRole("button", { name: "Revoke offline session", exact: true })
+      .click();
+    const confirmOfflineRevoke = offlineSessionRow.getByRole("button", {
+      name: "Revoke offline session",
+      exact: true,
+    });
+    await confirmOfflineRevoke.click();
+    assert.equal(await confirmOfflineRevoke.isDisabled(), true);
+    assert.equal(await confirmOfflineRevoke.locator(".spinner").count(), 1);
+    await window
+      .getByText("Offline session revoked.", { exact: true })
+      .waitFor();
+    assert.equal(await offlineSessionRow.count(), 0);
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminOfflineSessionDeleteRequests,
+      ),
+      ["offline-auth-opaque-id"],
+    );
     const offlineSessionRequests = await application.evaluate(
       () => globalThis.__adminOfflineSessionRequests,
     );

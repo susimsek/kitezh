@@ -38,7 +38,7 @@ const escapeHtml = (value) =>
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const button = (label, options = {}) =>
-  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${(options.icon ?? (label === text("save") ? "check" : null)) && icons[options.icon ?? "check"] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon ?? "check"].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${(options.icon ?? (label === text("save") ? "check" : null)) && icons[options.icon ?? "check"] ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icons[options.icon ?? "check"].unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
 const field = (
   name,
   label,
@@ -522,7 +522,17 @@ function adminAdminOfflineSessionsContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminOfflineSessions"))}">${sessions.length ? `<div class="list">${sessions.map((session) => `<article class="list-item"><div><strong>${escapeHtml(session.clientName || session.clientId)}</strong><span class="muted">${escapeHtml(session.username)}</span></div></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("offlineSessionsEmpty"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminOfflineSessions"))} pagination"><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const rows = sessions
+    .map((session, index) => {
+      const confirming = state.data.offlineSessionDeleteConfirmIndex === index;
+      const busy = state.busy === `admin-offline-session-delete:${index}`;
+      const controls = confirming
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminOfflineSessionRevokePrompt"))}</span>${button(text("adminRevokeOfflineSession"), { action: "admin-offline-session-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-offline-session-revoke-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        : `<div class="actions">${button(text("adminRevokeOfflineSession"), { action: "admin-offline-session-revoke-request", index, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item"><div><strong>${escapeHtml(session.clientName || session.clientId)}</strong><span class="muted">${escapeHtml(session.username)}</span></div>${controls}</article>`;
+    })
+    .join("");
+  return `<section class="card" aria-label="${escapeHtml(text("adminOfflineSessions"))}">${sessions.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("offlineSessionsEmpty"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminOfflineSessions"))} pagination"><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminEventsContent() {
@@ -1906,6 +1916,55 @@ async function action(action, element) {
   if (action === "admin-client-scope-delete-cancel") {
     if (state.busy) return;
     state.data.clientScopeDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-offline-session-revoke-request" ||
+    action === "admin-offline-session-revoke-confirm"
+  ) {
+    if (state.busy || state.offline) return;
+    const index = Number(element.dataset.index);
+    const sessions = state.data.adminOfflineSessions?.content ?? [];
+    const session = sessions[index];
+    if (
+      !Number.isSafeInteger(index) ||
+      index < 0 ||
+      !session ||
+      typeof session.id !== "string" ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(session.id)
+    )
+      return;
+    if (action === "admin-offline-session-revoke-request") {
+      state.data.offlineSessionDeleteConfirmIndex = index;
+      render();
+      return;
+    }
+    if (state.data.offlineSessionDeleteConfirmIndex !== index) return;
+    state.busy = `admin-offline-session-delete:${index}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/admin/offline-sessions/${session.id}`, {
+        method: "DELETE",
+      });
+      state.data.adminOfflineSessions = {
+        ...state.data.adminOfflineSessions,
+        content: sessions.filter((_, itemIndex) => itemIndex !== index),
+      };
+      state.data.offlineSessionDeleteConfirmIndex = null;
+      state.notice = text("adminOfflineSessionRevoked");
+    } catch {
+      /* request rendered localized validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-offline-session-revoke-cancel") {
+    if (state.busy) return;
+    state.data.offlineSessionDeleteConfirmIndex = null;
     render();
     return;
   }

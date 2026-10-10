@@ -48,6 +48,10 @@ export const messages = {
     adminIdentityProviders: "Identity providers",
     adminSessions: "Sessions",
     adminOfflineSessions: "Offline sessions",
+    adminRevokeOfflineSession: "Revoke offline session",
+    adminOfflineSessionRevokePrompt:
+      "Revoke this offline session? Its refresh token will stop working.",
+    adminOfflineSessionRevoked: "Offline session revoked.",
     adminEvents: "Events",
     adminSearchEvents: "Search events",
     adminNoEvents: "No events found.",
@@ -472,6 +476,10 @@ export const messages = {
     adminIdentityProviders: "Kimlik sağlayıcıları",
     adminSessions: "Oturumlar",
     adminOfflineSessions: "Çevrimdışı oturumlar",
+    adminRevokeOfflineSession: "Çevrimdışı oturumu iptal et",
+    adminOfflineSessionRevokePrompt:
+      "Bu çevrimdışı oturum iptal edilsin mi? Yenileme belirteci artık çalışmaz.",
+    adminOfflineSessionRevoked: "Çevrimdışı oturum iptal edildi.",
     adminEvents: "Olaylar",
     adminSearchEvents: "Olay ara",
     adminNoEvents: "Olay bulunamadı.",
