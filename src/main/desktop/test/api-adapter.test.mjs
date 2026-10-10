@@ -165,6 +165,18 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     body: { password: "test-password-not-a-secret", temporary: true },
   });
   assert.equal(resetUserPassword.status, 200);
+  const userProfileAttributes = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/profile-attributes",
+  });
+  assert.equal(userProfileAttributes.status, 200);
+  const updatedUserProfileAttributes = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2/profile-attributes",
+    method: "PUT",
+    body: { attributes: { department: ["IT"] } },
+  });
+  assert.equal(updatedUserProfileAttributes.status, 200);
   const userPasskeys = await adapter.request({
     console: "admin",
     path: "/api/admin/users/2/webauthn/credentials?page=0&size=100",
@@ -706,6 +718,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/users/2/webauthn/credentials?page=0&size=101",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/profile-attributes?include=all",
     }),
     /not allowed/,
   );

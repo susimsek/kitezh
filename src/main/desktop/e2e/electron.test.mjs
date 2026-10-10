@@ -914,6 +914,120 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           return new Response(null, { status: 204 });
         }
         if (
+          /^\/api\/admin\/users\/[1-9]\d*\/profile-attributes$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "GET"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          globalThis.__adminProfileAttributeReads ??= [];
+          globalThis.__adminProfileAttributeReads.push(id);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              definitions: [
+                {
+                  name: "department",
+                  displayName: "Department",
+                  type: "STRING",
+                  required: true,
+                  multivalued: false,
+                  minLength: 3,
+                  maxLength: 40,
+                  enabled: true,
+                  builtIn: false,
+                },
+                {
+                  name: "skills",
+                  displayName: "Skills",
+                  type: "STRING",
+                  required: false,
+                  multivalued: true,
+                  maxLength: 40,
+                  enabled: true,
+                  builtIn: false,
+                },
+                {
+                  name: "firstName",
+                  displayName: "Built-in first name",
+                  type: "STRING",
+                  required: false,
+                  multivalued: false,
+                  enabled: true,
+                  builtIn: true,
+                },
+              ],
+              attributes: { department: ["Research"], skills: ["java"] },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/users\/[1-9]\d*\/profile-attributes$/.test(
+            requestUrl.pathname,
+          ) &&
+          requestMethod === "PUT"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-2));
+          const body = JSON.parse(init?.body ?? "{}");
+          const attributes = body.attributes ?? {};
+          globalThis.__adminProfileAttributeWrites ??= [];
+          globalThis.__adminProfileAttributeWrites.push({
+            id,
+            names: Object.keys(attributes).sort(),
+            departmentCount: attributes.department?.length ?? 0,
+            departmentLength: attributes.department?.[0]?.length ?? 0,
+            skillsCount: attributes.skills?.length ?? 0,
+            skillsLength: attributes.skills?.join("").length ?? 0,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (attributes.department?.[0] === "Rejected Department")
+            return new Response(
+              JSON.stringify({
+                detail: "Correct the profile attributes.",
+                violations: [
+                  {
+                    field: "attributes.department",
+                    message: "Choose another department.",
+                  },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          return new Response(
+            JSON.stringify({
+              definitions: [
+                {
+                  name: "department",
+                  displayName: "Department",
+                  type: "STRING",
+                  required: true,
+                  multivalued: false,
+                  minLength: 3,
+                  maxLength: 40,
+                  enabled: true,
+                  builtIn: false,
+                },
+                {
+                  name: "skills",
+                  displayName: "Skills",
+                  type: "STRING",
+                  required: false,
+                  multivalued: true,
+                  maxLength: 40,
+                  enabled: true,
+                  builtIn: false,
+                },
+              ],
+              attributes,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
           /^\/api\/admin\/users\/[1-9]\d*\/webauthn\/credentials$/.test(
             requestUrl.pathname,
           ) &&
@@ -2884,6 +2998,98 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(userUpdateRequests[1].body.firstName, "Alice Updated");
     assert.deepEqual(userUpdateRequests[1].body.roles, ["ROLE_USER"]);
     assert.equal(Object.hasOwn(userUpdateRequests[1].body, "password"), false);
+    const manageProfileAttributes = aliceRow.getByRole("button", {
+      name: "Profile attributes",
+      exact: true,
+    });
+    await manageProfileAttributes.click();
+    assert.equal(await manageProfileAttributes.isDisabled(), true);
+    assert.equal(await manageProfileAttributes.locator(".spinner").count(), 1);
+    const profileAttributesPanel = aliceRow.getByRole("region", {
+      name: "Profile attributes",
+    });
+    const departmentInput = profileAttributesPanel.locator(
+      '[name="attribute-department"]',
+    );
+    const skillsInput = profileAttributesPanel.locator(
+      '[name="attribute-skills"]',
+    );
+    await departmentInput.waitFor();
+    assert.equal(await departmentInput.inputValue(), "Research");
+    assert.equal(await skillsInput.inputValue(), "java");
+    assert.equal(
+      await profileAttributesPanel.getByText("Built-in first name").count(),
+      0,
+    );
+    await departmentInput.fill("Rejected Department");
+    const saveProfileAttributes = profileAttributesPanel.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveProfileAttributes.click();
+    assert.equal(await saveProfileAttributes.isDisabled(), true);
+    assert.equal(await saveProfileAttributes.locator(".spinner").count(), 1);
+    await profileAttributesPanel
+      .getByText("Choose another department.", { exact: true })
+      .waitFor();
+    assert.equal(await departmentInput.inputValue(), "Rejected Department");
+    await departmentInput.fill("Engineering");
+    await skillsInput.fill("typescript\nsecurity");
+    await saveProfileAttributes.click();
+    assert.equal(await saveProfileAttributes.isDisabled(), true);
+    assert.equal(await saveProfileAttributes.locator(".spinner").count(), 1);
+    await window
+      .getByText("Profile attributes updated.", { exact: true })
+      .waitFor();
+    const profileAttributeWrites = await application.evaluate(
+      () => globalThis.__adminProfileAttributeWrites,
+    );
+    assert.deepEqual(
+      profileAttributeWrites.map(
+        ({
+          id,
+          names,
+          departmentCount,
+          departmentLength,
+          skillsCount,
+          skillsLength,
+        }) => ({
+          id,
+          names,
+          departmentCount,
+          departmentLength,
+          skillsCount,
+          skillsLength,
+        }),
+      ),
+      [
+        {
+          id: 2,
+          names: ["department", "skills"],
+          departmentCount: 1,
+          departmentLength: "Rejected Department".length,
+          skillsCount: 1,
+          skillsLength: 4,
+        },
+        {
+          id: 2,
+          names: ["department", "skills"],
+          departmentCount: 1,
+          departmentLength: "Engineering".length,
+          skillsCount: 2,
+          skillsLength: 18,
+        },
+      ],
+    );
+    assert.equal(
+      profileAttributeWrites.some((entry) =>
+        Object.hasOwn(entry, "attributes"),
+      ),
+      false,
+    );
+    await profileAttributesPanel
+      .locator('button[data-action="admin-user-profile-attributes-close"]')
+      .click();
     await aliceRow
       .getByRole("button", { name: "Reset password", exact: true })
       .click();

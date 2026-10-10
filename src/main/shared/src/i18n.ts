@@ -393,6 +393,10 @@ export const messages = {
     adminDeletePasskeyPrompt:
       "Delete this passkey? The user will no longer be able to sign in with it.",
     adminPasskeyDeleted: "Passkey deleted.",
+    adminProfileAttributes: "Profile attributes",
+    adminProfileAttributesUpdated: "Profile attributes updated.",
+    adminNoProfileAttributes: "No configurable profile attributes are enabled.",
+    adminProfileAttributesHelp: "Enter one value per line for multiple values.",
     adminDeleteUser: "Delete user",
     adminDeleteUserPrompt:
       "Delete this user? Their sessions and authorizations will be revoked.",
@@ -943,6 +947,11 @@ export const messages = {
     adminDeletePasskeyPrompt:
       "Bu geçiş anahtarı silinsin mi? Kullanıcı artık bu anahtarla giriş yapamaz.",
     adminPasskeyDeleted: "Geçiş anahtarı silindi.",
+    adminProfileAttributes: "Profil özellikleri",
+    adminProfileAttributesUpdated: "Profil özellikleri güncellendi.",
+    adminNoProfileAttributes: "Yapılandırılmış profil özelliği etkin değil.",
+    adminProfileAttributesHelp:
+      "Birden çok değer için her satıra bir değer girin.",
     adminDeleteUser: "Kullanıcıyı sil",
     adminDeleteUserPrompt:
       "Bu kullanıcı silinsin mi? Oturumları ve yetkilendirmeleri iptal edilir.",

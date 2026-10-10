@@ -55,6 +55,15 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userUpdateMatch[1]))
     )
       return true;
+    const userProfileAttributesMatch = path.match(
+      /^\/api\/admin\/users\/([1-9]\d*)\/profile-attributes$/,
+    );
+    if (
+      userProfileAttributesMatch &&
+      Number.isSafeInteger(Number(userProfileAttributesMatch[1])) &&
+      ["GET", "PUT"].includes(method)
+    )
+      return true;
     const userEnabledMatch = path.match(
       /^\/api\/admin\/users\/([1-9]\d*)\/enabled$/,
     );

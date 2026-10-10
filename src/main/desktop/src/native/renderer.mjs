@@ -484,6 +484,14 @@ function adminUsersContent() {
         busy: passkeysLoading,
         disabled: state.offline || Boolean(state.busy),
       });
+      const profileAttributesLoading =
+        state.busy === `user-profile-attributes-load:${user.id}`;
+      const profileAttributesControl = button(text("adminProfileAttributes"), {
+        action: "admin-user-profile-attributes-toggle",
+        id: user.id,
+        busy: profileAttributesLoading,
+        disabled: state.offline || Boolean(state.busy),
+      });
       const editing = Number(state.data.userEditOpenId) === Number(user.id);
       const selectedRoles = Array.isArray(editDraft.roles)
         ? editDraft.roles
@@ -492,10 +500,68 @@ function adminUsersContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${profileAttributesControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function adminUserProfileAttributesContent(userId) {
+  const profile = state.data.adminUserProfileAttributes?.[userId];
+  if (!profile) return "";
+  const definitions = (profile.definitions ?? []).filter(
+    (definition) => definition.enabled && !definition.builtIn,
+  );
+  const drafts = state.data.adminProfileAttributeDrafts?.[userId] ?? {};
+  const errors =
+    Number(state.data.adminProfileAttributesErrorId) === Number(userId)
+      ? violations(state.error?.body)
+      : {};
+  const fields = definitions
+    .map((definition) => {
+      const name = String(definition.name ?? "");
+      if (!/^[A-Za-z][A-Za-z0-9_.-]{0,99}$/.test(name)) return "";
+      const values = Array.isArray(drafts[name])
+        ? drafts[name]
+        : (profile.attributes?.[name] ?? []);
+      const value = values.join("\n");
+      const error = errors[`attributes.${name}`] ?? errors[name] ?? "";
+      const label = escapeHtml(definition.displayName || name);
+      const id = `admin-profile-attribute-${escapeHtml(userId)}-${escapeHtml(name)}`;
+      const common = `id="${id}" name="attribute-${escapeHtml(name)}" data-profile-attribute="${escapeHtml(name)}" data-multivalued="${Boolean(definition.multivalued)}" aria-invalid="${Boolean(error)}" ${definition.required ? "required" : ""}`;
+      let input;
+      if (definition.multivalued) {
+        input = `<textarea ${common} rows="3">${escapeHtml(value)}</textarea>`;
+      } else if (definition.type === "BOOLEAN") {
+        input = `<select ${common}><option value=""></option><option value="true" ${value === "true" ? "selected" : ""}>true</option><option value="false" ${value === "false" ? "selected" : ""}>false</option></select>`;
+      } else {
+        const type =
+          definition.type === "EMAIL"
+            ? "email"
+            : definition.type === "INTEGER"
+              ? "number"
+              : "text";
+        const constraints = [
+          definition.minLength != null
+            ? `minlength="${Number(definition.minLength)}"`
+            : "",
+          definition.maxLength != null
+            ? `maxlength="${Number(definition.maxLength)}"`
+            : "",
+          definition.type === "INTEGER" ? 'step="1"' : "",
+          definition.pattern
+            ? `pattern="${escapeHtml(definition.pattern)}"`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        input = `<input ${common} type="${type}" value="${escapeHtml(values[0] ?? "")}" ${constraints}/>`;
+      }
+      return `<div class="field"><label for="${id}">${label}</label>${input}<div class="field-error">${escapeHtml(error)}</div></div>`;
+    })
+    .join("");
+  const saveBusy = state.busy === `user-profile-attributes-save:${userId}`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><form data-form="admin-user-profile-attributes" data-user-id="${escapeHtml(userId)}" novalidate><div class="form-grid">${fields || `<div class="empty" role="status">${escapeHtml(text("adminNoProfileAttributes"))}</div>`}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: saveBusy, disabled: state.offline || definitions.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-profile-attributes-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
 }
 
 function adminUserPasskeysContent(userId) {
@@ -1546,6 +1612,24 @@ function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+function profileAttributeValues(form) {
+  return Object.fromEntries(
+    [...form.querySelectorAll("[data-profile-attribute]")].map((input) => {
+      const value = String(input.value ?? "");
+      const values =
+        input.dataset.multivalued === "true"
+          ? value
+              .split(/\r?\n/)
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : value.trim()
+            ? [value.trim()]
+            : [];
+      return [input.dataset.profileAttribute, values];
+    }),
+  );
+}
+
 function preserveOfflineDrafts() {
   for (const form of app.querySelectorAll("form[data-form]")) {
     const values = formValues(form);
@@ -1637,6 +1721,13 @@ function preserveOfflineDrafts() {
             (input) => input.value,
           ),
         };
+      }
+    } else if (form.dataset.form === "admin-user-profile-attributes") {
+      const id = Number(form.dataset.userId);
+      if (Number.isSafeInteger(id) && id > 0) {
+        state.data.adminProfileAttributeDrafts ??= {};
+        state.data.adminProfileAttributeDrafts[id] =
+          profileAttributeValues(form);
       }
     } else if (form.dataset.form === "admin-user-passkey-rename") {
       const userId = Number(form.dataset.userId);
@@ -1744,6 +1835,41 @@ async function submitForm(form) {
       state.notice = text("adminPasswordReset");
     } catch {
       /* Keep the form open without retaining the submitted password. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-user-profile-attributes") {
+    const userId = Number(form.dataset.userId);
+    const profile = state.data.adminUserProfileAttributes?.[userId];
+    if (
+      state.offline ||
+      !Number.isSafeInteger(userId) ||
+      userId < 1 ||
+      !profile ||
+      !form.reportValidity()
+    )
+      return;
+    const attributes = profileAttributeValues(form);
+    state.data.adminProfileAttributeDrafts ??= {};
+    state.data.adminProfileAttributeDrafts[userId] = attributes;
+    state.data.adminProfileAttributesErrorId = userId;
+    state.error = null;
+    state.notice = null;
+    state.busy = `user-profile-attributes-save:${userId}`;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/users/${userId}/profile-attributes`,
+        { method: "PUT", body: { attributes } },
+      );
+      state.data.adminUserProfileAttributes[userId] = saved;
+      delete state.data.adminProfileAttributeDrafts[userId];
+      state.data.adminProfileAttributesErrorId = null;
+      state.notice = text("adminProfileAttributesUpdated");
+    } catch {
+      /* Keep profile values available for validation or retry recovery. */
     }
     state.busy = null;
     render();
@@ -2900,6 +3026,45 @@ async function action(action, element) {
   if (action === "admin-offline-access-revoke-cancel") {
     if (state.busy) return;
     state.data.offlineAccessRevokeConfirm = false;
+    render();
+    return;
+  }
+  if (
+    action === "admin-user-profile-attributes-toggle" ||
+    action === "admin-user-profile-attributes-close"
+  ) {
+    if (state.busy || state.offline) return;
+    const id = Number(element.dataset.id);
+    const user = (state.data.users?.content ?? []).find(
+      (candidate) => Number(candidate.id) === id,
+    );
+    if (!Number.isSafeInteger(id) || id < 1 || !user) return;
+    if (
+      action === "admin-user-profile-attributes-close" ||
+      Number(state.data.userProfileAttributesOpenId) === id
+    ) {
+      delete state.data.adminUserProfileAttributes?.[id];
+      delete state.data.adminProfileAttributeDrafts?.[id];
+      state.data.userProfileAttributesOpenId = null;
+      state.data.adminProfileAttributesErrorId = null;
+      render();
+      return;
+    }
+    state.busy = `user-profile-attributes-load:${id}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const profile = await request(
+        `/api/admin/users/${id}/profile-attributes`,
+      );
+      state.data.adminUserProfileAttributes ??= {};
+      state.data.adminUserProfileAttributes[id] = profile;
+      state.data.userProfileAttributesOpenId = id;
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
     render();
     return;
   }
