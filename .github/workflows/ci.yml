@@ -199,7 +199,7 @@ jobs:
         run: pnpm run build:web
 
   desktop:
-    name: Desktop package (${{ matrix.platform }})
+    name: Desktop E2E (${{ matrix.platform }})
     needs: build
     strategy:
       fail-fast: false
@@ -262,38 +262,6 @@ jobs:
           path: ${{ runner.temp }}/desktop-e2e/*.png
           if-no-files-found: ignore
           retention-days: 7
-
-      - name: Prepare electron-builder cache
-        shell: bash
-        run: |
-          set -euo pipefail
-          cache_dir="${RUNNER_TEMP}/electron-builder"
-          mkdir -p "${cache_dir}"
-          echo "ELECTRON_BUILDER_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
-
-      - name: Build desktop package
-        working-directory: src/main/desktop
-        run: pnpm package
-
-      - name: Smoke-test packaged desktop app
-        shell: bash
-        working-directory: src/main/desktop
-        run: |
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            xvfb-run -a pnpm run smoke:package
-          else
-            pnpm run smoke:package
-          fi
-
-      - name: Collect distributable desktop assets
-        run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${{ runner.temp }}/desktop-release-assets"
-
-      - name: Upload desktop package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: desktop-${{ matrix.platform }}-${{ github.sha }}
-          path: ${{ runner.temp }}/desktop-release-assets/*
-          if-no-files-found: error
 
   native-image:
     name: Native image verification (${{ matrix.architecture }})
