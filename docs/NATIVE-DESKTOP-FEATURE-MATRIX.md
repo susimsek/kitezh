@@ -42,8 +42,9 @@ uses typed, capability-scoped API calls.
 - Windows authenticated Admin E2E covers native client-name editing with validation recovery, draft retention, inline spinner, duplicate prevention, and a `clientName`-only payload; HTTP integration verifies credential and OAuth policy fields stay outside the native metadata contract.
 - Web desktop-release failures now log a fixed message without raw exception content; `components/download/DownloadPage.test.tsx` verifies sensitive rejected details are not emitted.
 - Backend mail and API failure logging omits recipient addresses, raw exception messages, and stack traces; focused `MailServiceTest` and `ApiExceptionHandlerTest` assertions verify the emitted log events.
-- `pnpm --dir src/main/desktop run test:unit`: 25/25 passed, including diagnostics redaction and EN/TR catalog parity.
+- `pnpm --dir src/main/desktop run test:unit`: 27/27 passed, including diagnostics byte/line retention and native-renderer EN/TR key coverage.
 - `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 13/13 passed, including email settings, shared icon semantics, exact external navigation/callback rejection, diagnostics copy busy-state, and forced-colors system token checks.
+- Latest targeted Windows Electron E2E runs passed: diagnostics retention/privacy 1/1 and authenticated Admin localization/role/provider workflows 1/1 (325 seconds).
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.
 - `git diff --check` passed for the committed slices.
 
