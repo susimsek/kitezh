@@ -17,6 +17,7 @@ import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderNativePolicyRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperRequestDTO;
 import io.github.susimsek.kitezh.repository.SamlProviderConfigRepository;
@@ -164,6 +165,37 @@ class AdminIdentityProviderServiceTest {
         assertThat(mapper.getProviderAlias()).isEqualTo("acme");
         verify(auditEventService)
                 .record(eq("identity-provider.created"), eq("identity-provider"), anyString());
+    }
+
+    @Test
+    void updatesNativeSafePolicyWithoutChangingProviderCredentialsOrEndpoints() {
+        SocialProviderEntity existing = provider();
+        when(providerRepository.findById("provider-1")).thenReturn(Optional.of(existing));
+        when(providerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminIdentityProviderNativePolicyRequestDTO request =
+                new AdminIdentityProviderNativePolicyRequestDTO(
+                        "Acme Enterprise",
+                        false,
+                        true,
+                        true,
+                        false,
+                        true,
+                        7,
+                        "when-linked",
+                        "read_only");
+
+        var policy = service.updateNativePolicy("provider-1", request);
+
+        assertThat(policy.displayName()).isEqualTo("Acme Enterprise");
+        assertThat(policy.enabled()).isFalse();
+        assertThat(policy.syncMode()).isEqualTo("read_only");
+        assertThat(existing.getClientId()).isEqualTo("client");
+        assertThat(existing.getClientSecretEncrypted()).isEqualTo("encrypted");
+        assertThat(existing.getAuthorizationUri()).isEqualTo("https://acme.example/authorize");
+        assertThat(existing.getTokenUri()).isEqualTo("https://acme.example/token");
+        verify(settingsService).refreshClientRegistrations();
+        verify(auditEventService)
+                .record("identity-provider.updated", "identity-provider", "provider-1");
     }
 
     @Test

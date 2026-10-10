@@ -184,6 +184,28 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     },
   });
   assert.equal(createdGroup.status, 200);
+  const providerPolicy = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-12/native-policy",
+  });
+  assert.equal(providerPolicy.status, 200);
+  const updatedProviderPolicy = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-12/native-policy",
+    method: "PUT",
+    body: {
+      displayName: "Acme SSO",
+      enabled: true,
+      hideOnLogin: false,
+      accountLinkingOnly: false,
+      trustEmail: false,
+      mfaRequired: true,
+      guiOrder: 1,
+      showInAccountConsole: "always",
+      syncMode: "import",
+    },
+  });
+  assert.equal(updatedProviderPolicy.status, 200);
   const renamedGroup = await adapter.request({
     console: "admin",
     path: "/api/admin/groups/12/name",

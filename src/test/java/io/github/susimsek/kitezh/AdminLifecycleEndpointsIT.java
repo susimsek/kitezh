@@ -211,6 +211,41 @@ class AdminLifecycleEndpointsIT {
                         .getContentAsString();
         String providerId = JSON.readTree(providerResponse).get("id").asString();
         try {
+            mockMvc.perform(
+                            get("/api/admin/identity-providers/{id}/native-policy", providerId)
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC"))
+                    .andExpect(jsonPath("$.clientId").doesNotExist())
+                    .andExpect(jsonPath("$.authorizationUri").doesNotExist());
+            mockMvc.perform(
+                            put("/api/admin/identity-providers/{id}/native-policy", providerId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"displayName\":\"IT OIDC Updated\","
+                                                + "\"enabled\":false,\"hideOnLogin\":true,"
+                                                + "\"accountLinkingOnly\":true,\"trustEmail\":false,"
+                                                + "\"mfaRequired\":true,\"guiOrder\":7,"
+                                                + "\"showInAccountConsole\":\"when-linked\","
+                                                + "\"syncMode\":\"read_only\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC Updated"))
+                    .andExpect(jsonPath("$.syncMode").value("read_only"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").doesNotExist());
+            mockMvc.perform(
+                            put("/api/admin/identity-providers/{id}/native-policy", providerId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"displayName\":\"invalid\",\"guiOrder\":-1}"))
+                    .andExpect(status().isBadRequest());
+            mockMvc.perform(get("/api/admin/identity-providers/{id}", providerId).with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clientId").value("it-client"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").value(true))
+                    .andExpect(
+                            jsonPath("$.authorizationUri")
+                                    .value("https://idp.example.test/authorize"));
             String mapperResponse =
                     mockMvc.perform(
                                     post("/api/admin/identity-providers/{id}/mappers", providerId)

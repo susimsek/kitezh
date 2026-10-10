@@ -131,6 +131,13 @@ function isAllowedApiPath(
     )
       return true;
     if (
+      method === "PUT" &&
+      /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/native-policy$/.test(
+        path,
+      )
+    )
+      return true;
+    if (
       method === "DELETE" &&
       /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/mappers\/[A-Za-z0-9_-]{1,100}$/.test(
         path,
@@ -237,6 +244,14 @@ function isAllowedApiPath(
       return true;
     try {
       const url = new URL(path, "https://desktop.invalid");
+      if (
+        /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/native-policy$/.test(
+          url.pathname,
+        )
+      )
+        return (
+          url.origin === "https://desktop.invalid" && !url.search && !url.hash
+        );
       const isUsers = url.pathname === "/api/admin/users";
       const isRoles = url.pathname === "/api/admin/roles";
       const isGroups = url.pathname === "/api/admin/groups";

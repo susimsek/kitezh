@@ -691,11 +691,24 @@ function adminIdentityProvidersContent() {
       ? `<div class="list">${providers
           .map((provider) => {
             const id = String(provider.id ?? "");
+            const policy = state.data.identityProviderPolicies?.[id];
+            const editingPolicy =
+              state.data.identityProviderPolicyOpenId === id;
+            const policyDraft =
+              state.data.identityProviderPolicyDrafts?.[id] ?? policy ?? {};
+            const policyErrors =
+              state.data.identityProviderPolicyErrorId === id
+                ? violations(state.error?.body)
+                : {};
             const confirming =
               state.data.identityProviderDeleteConfirmId === id;
             const controls = confirming
               ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteIdentityProviderPrompt"))}</span>${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-confirm", id, danger: true, busy: state.busy === `identity-provider-delete:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
               : `<div class="actions">${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+            const policyForm =
+              editingPolicy && policy
+                ? `<form class="card" data-form="admin-identity-provider-policy" data-provider-id="${escapeHtml(id)}"><div class="field"><label for="provider-policy-name-${escapeHtml(id)}">${escapeHtml(text("adminProviderDisplayName"))}</label><input id="provider-policy-name-${escapeHtml(id)}" name="displayName" type="text" value="${escapeHtml(policyDraft.displayName ?? policy.displayName)}" maxlength="100" required/><div class="field-error">${escapeHtml(policyErrors.displayName ?? "")}</div></div><label class="settings-row"><span>${escapeHtml(text("adminProviderEnabled"))}</span><input name="enabled" type="checkbox" ${(policyDraft.enabled ?? policy.enabled) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderHideOnLogin"))}</span><input name="hideOnLogin" type="checkbox" ${(policyDraft.hideOnLogin ?? policy.hideOnLogin) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderLinkingOnly"))}</span><input name="accountLinkingOnly" type="checkbox" ${(policyDraft.accountLinkingOnly ?? policy.accountLinkingOnly) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderTrustEmail"))}</span><input name="trustEmail" type="checkbox" ${(policyDraft.trustEmail ?? policy.trustEmail) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderRequireMfa"))}</span><input name="mfaRequired" type="checkbox" ${(policyDraft.mfaRequired ?? policy.mfaRequired) ? "checked" : ""}/></label><div class="field"><label for="provider-policy-order-${escapeHtml(id)}">${escapeHtml(text("adminProviderOrder"))}</label><input id="provider-policy-order-${escapeHtml(id)}" name="guiOrder" type="number" min="0" max="2147483647" value="${escapeHtml(policyDraft.guiOrder ?? policy.guiOrder)}" required/><div class="field-error">${escapeHtml(policyErrors.guiOrder ?? "")}</div></div><div class="field"><label for="provider-policy-visibility-${escapeHtml(id)}">${escapeHtml(text("adminProviderAccountVisibility"))}</label><select id="provider-policy-visibility-${escapeHtml(id)}" name="showInAccountConsole"><option value="always" ${(policyDraft.showInAccountConsole ?? policy.showInAccountConsole) === "always" ? "selected" : ""}>${escapeHtml(text("adminProviderAlways"))}</option><option value="when-linked" ${(policyDraft.showInAccountConsole ?? policy.showInAccountConsole) === "when-linked" ? "selected" : ""}>${escapeHtml(text("adminProviderWhenLinked"))}</option><option value="never" ${(policyDraft.showInAccountConsole ?? policy.showInAccountConsole) === "never" ? "selected" : ""}>${escapeHtml(text("adminProviderNever"))}</option></select><div class="field-error">${escapeHtml(policyErrors.showInAccountConsole ?? "")}</div></div><div class="field"><label for="provider-policy-sync-${escapeHtml(id)}">${escapeHtml(text("adminProviderSyncMode"))}</label><select id="provider-policy-sync-${escapeHtml(id)}" name="syncMode"><option value="legacy" ${(policyDraft.syncMode ?? policy.syncMode) === "legacy" ? "selected" : ""}>legacy</option><option value="import" ${(policyDraft.syncMode ?? policy.syncMode) === "import" ? "selected" : ""}>import</option><option value="read_only" ${(policyDraft.syncMode ?? policy.syncMode) === "read_only" ? "selected" : ""}>read_only</option><option value="force" ${(policyDraft.syncMode ?? policy.syncMode) === "force" ? "selected" : ""}>force</option></select><div class="field-error">${escapeHtml(policyErrors.syncMode ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `identity-provider-policy-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-policy-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+                : "";
             const mapperBusy = state.busy === `provider-mappers:${id}`;
             const mapperButton = button(text("adminManageProviderMappers"), {
               action: "admin-provider-mappers-toggle",
@@ -704,7 +717,7 @@ function adminIdentityProvidersContent() {
               disabled: state.offline || Boolean(state.busy),
             });
             const mapperPanel = renderIdentityProviderMappers(id);
-            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${mapperButton}${controls}</div>${mapperPanel}</article>`;
+            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditProviderPolicy"), { action: "admin-identity-provider-policy-toggle", id, busy: state.busy === `identity-provider-policy-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${mapperButton}${controls}</div>${policyForm}${mapperPanel}</article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoIdentityProviders"))}</div>`
@@ -1426,6 +1439,65 @@ function preserveOfflineDrafts() {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-identity-provider-policy") {
+    const id = form.dataset.providerId ?? "";
+    const providers = state.data.identityProviders?.content ?? [];
+    const provider = providers.find((item) => item.id === id);
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !provider ||
+      !state.data.identityProviderPolicies?.[id] ||
+      !form.reportValidity()
+    )
+      return;
+    const body = {
+      displayName: String(values.displayName ?? "").trim(),
+      enabled: form.elements.namedItem("enabled").checked,
+      hideOnLogin: form.elements.namedItem("hideOnLogin").checked,
+      accountLinkingOnly: form.elements.namedItem("accountLinkingOnly").checked,
+      trustEmail: form.elements.namedItem("trustEmail").checked,
+      mfaRequired: form.elements.namedItem("mfaRequired").checked,
+      guiOrder: Number(values.guiOrder),
+      showInAccountConsole: String(values.showInAccountConsole ?? ""),
+      syncMode: String(values.syncMode ?? ""),
+    };
+    state.data.identityProviderPolicyDrafts ??= {};
+    state.data.identityProviderPolicyDrafts[id] = body;
+    state.data.identityProviderPolicyErrorId = id;
+    state.error = null;
+    state.notice = null;
+    state.busy = `identity-provider-policy-save:${id}`;
+    render();
+    try {
+      const saved = await request(
+        `/api/admin/identity-providers/${id}/native-policy`,
+        { method: "PUT", body },
+      );
+      state.data.identityProviderPolicies[id] = saved;
+      state.data.identityProviders = {
+        ...state.data.identityProviders,
+        content: providers.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                displayName: saved.displayName,
+                enabled: saved.enabled,
+              }
+            : item,
+        ),
+      };
+      delete state.data.identityProviderPolicyDrafts[id];
+      state.data.identityProviderPolicyErrorId = null;
+      state.data.identityProviderPolicyOpenId = null;
+      state.notice = text("adminIdentityProviderPolicyUpdated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-provider-mapper") {
     const providerId = form.dataset.providerId ?? "";
     const mapperId = form.dataset.mapperId || null;
@@ -2868,6 +2940,50 @@ async function action(action, element) {
     )
       return;
     state.data.providerMapperDeleteConfirm = null;
+    render();
+    return;
+  }
+  if (action === "admin-identity-provider-policy-toggle") {
+    if (state.busy || state.offline) return;
+    const id = element.dataset.id;
+    const provider = (state.data.identityProviders?.content ?? []).find(
+      (item) => item.id === id,
+    );
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !provider) return;
+    if (state.data.identityProviderPolicyOpenId === id) {
+      state.data.identityProviderPolicyOpenId = null;
+      delete state.data.identityProviderPolicyDrafts?.[id];
+      state.data.identityProviderPolicyErrorId = null;
+      render();
+      return;
+    }
+    state.busy = `identity-provider-policy-load:${id}`;
+    state.error = null;
+    render();
+    try {
+      const policy = await request(
+        `/api/admin/identity-providers/${id}/native-policy`,
+      );
+      state.data.identityProviderPolicies ??= {};
+      state.data.identityProviderPolicies[id] = policy;
+      state.data.identityProviderPolicyOpenId = id;
+      state.data.identityProviderPolicyDrafts ??= {};
+      state.data.identityProviderPolicyDrafts[id] = policy;
+      state.data.identityProviderPolicyErrorId = null;
+    } catch {
+      /* request rendered localized transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-identity-provider-policy-cancel") {
+    if (state.busy) return;
+    const id = element.dataset.id;
+    if (state.data.identityProviderPolicyOpenId !== id) return;
+    state.data.identityProviderPolicyOpenId = null;
+    delete state.data.identityProviderPolicyDrafts?.[id];
+    state.data.identityProviderPolicyErrorId = null;
     render();
     return;
   }

@@ -1250,6 +1250,65 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/native-policy$/.test(
+            requestUrl.pathname,
+          )
+        ) {
+          globalThis.__adminProviderPolicy ??= {
+            id: "provider-1",
+            displayName: "Google",
+            enabled: true,
+            hideOnLogin: false,
+            accountLinkingOnly: false,
+            trustEmail: true,
+            mfaRequired: false,
+            guiOrder: 1,
+            showInAccountConsole: "always",
+            syncMode: "import",
+          };
+          if (requestMethod === "GET")
+            return new Response(
+              JSON.stringify(globalThis.__adminProviderPolicy),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__adminProviderPolicyRequests ??= [];
+            globalThis.__adminProviderPolicyRequests.push(body);
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            if (body.displayName === "Rejected policy")
+              return new Response(
+                JSON.stringify({
+                  detail: "Correct the provider policy.",
+                  violations: [
+                    {
+                      field: "displayName",
+                      message: "Choose another provider name.",
+                    },
+                  ],
+                }),
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            globalThis.__adminProviderPolicy = {
+              ...globalThis.__adminProviderPolicy,
+              ...body,
+            };
+            return new Response(
+              JSON.stringify(globalThis.__adminProviderPolicy),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+        }
+        if (
           /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}$/.test(
             requestUrl.pathname,
           ) &&
@@ -3125,6 +3184,77 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     const identityProviderRow = window.locator(
       '[data-identity-provider-id="provider-1"]',
     );
+    await identityProviderRow
+      .getByRole("button", { name: "Edit provider policy", exact: true })
+      .click();
+    const providerPolicyForm = identityProviderRow.locator(
+      'form[data-form="admin-identity-provider-policy"]',
+    );
+    await providerPolicyForm.waitFor();
+    await providerPolicyForm
+      .locator('[name="displayName"]')
+      .fill("Rejected policy");
+    await providerPolicyForm.locator('[name="mfaRequired"]').check();
+    await providerPolicyForm
+      .locator('[name="syncMode"]')
+      .selectOption("read_only");
+    const saveProviderPolicy = providerPolicyForm.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveProviderPolicy.click();
+    assert.equal(await saveProviderPolicy.isDisabled(), true);
+    assert.equal(await saveProviderPolicy.locator(".spinner").count(), 1);
+    await window
+      .getByText("Choose another provider name.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await providerPolicyForm.locator('[name="displayName"]').inputValue(),
+      "Rejected policy",
+    );
+    await providerPolicyForm
+      .locator('[name="displayName"]')
+      .fill("Google Workspace");
+    await saveProviderPolicy.click();
+    assert.equal(await saveProviderPolicy.isDisabled(), true);
+    assert.equal(await saveProviderPolicy.locator(".spinner").count(), 1);
+    await window
+      .getByText("Provider policy updated.", { exact: true })
+      .waitFor();
+    const policyRequests = await application.evaluate(
+      () => globalThis.__adminProviderPolicyRequests,
+    );
+    assert.deepEqual(policyRequests, [
+      {
+        displayName: "Rejected policy",
+        enabled: true,
+        hideOnLogin: false,
+        accountLinkingOnly: false,
+        trustEmail: true,
+        mfaRequired: true,
+        guiOrder: 1,
+        showInAccountConsole: "always",
+        syncMode: "read_only",
+      },
+      {
+        displayName: "Google Workspace",
+        enabled: true,
+        hideOnLogin: false,
+        accountLinkingOnly: false,
+        trustEmail: true,
+        mfaRequired: true,
+        guiOrder: 1,
+        showInAccountConsole: "always",
+        syncMode: "read_only",
+      },
+    ]);
+    for (const unsafeField of [
+      "clientSecret",
+      "clientId",
+      "authorizationUri",
+      "samlIdpCertificate",
+    ])
+      assert.equal(Object.hasOwn(policyRequests[1], unsafeField), false);
     const manageMappers = identityProviderRow.getByRole("button", {
       name: "Manage mappers",
       exact: true,
