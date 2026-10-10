@@ -13,7 +13,10 @@ export const colors = {
     primaryPressed: "#0f5fd2",
     onPrimary: "#ffffff",
     danger: "#c93636",
+    onDanger: "#ffffff",
     success: "#1a8f5b",
+    warning: "#c68b22",
+    focus: "#1677ff",
   },
   dark: {
     background: "#111418",
@@ -26,7 +29,10 @@ export const colors = {
     primaryPressed: "#7badff",
     onPrimary: "#08152a",
     danger: "#ff8585",
+    onDanger: "#111418",
     success: "#65d49b",
+    warning: "#e0ac52",
+    focus: "#7badff",
   },
 } as const;
 

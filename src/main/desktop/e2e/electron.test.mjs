@@ -2519,6 +2519,17 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("radio", { name: "Dark" }).click();
+    await mainWindow.waitForFunction(
+      () => document.documentElement.dataset.theme === "dark",
+    );
+    assert.equal(
+      await mainWindow.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--background")
+          .trim(),
+      ),
+      "#111418",
+    );
     await settingsWindow.getByRole("button", { name: "General" }).click();
     await settingsWindow.locator("#desktop-language").selectOption("tr");
     await mainWindow
@@ -2572,13 +2583,13 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       await availableWindow.evaluate(
         () => getComputedStyle(document.body).backgroundColor,
       ),
-      "rgb(32, 33, 36)",
+      "rgb(17, 20, 24)",
     );
     await mainWindow.evaluate(async () => window.desktopApi.theme.set("light"));
     await availableWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
-        "rgb(248, 249, 250)",
+        "rgb(247, 249, 252)",
     );
     await mainWindow.evaluate(async () =>
       window.desktopApi.theme.set("system"),
@@ -2587,7 +2598,7 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       () => document.documentElement.dataset.theme,
     );
     const systemDialogBackground =
-      systemTheme === "dark" ? "rgb(32, 33, 36)" : "rgb(248, 249, 250)";
+      systemTheme === "dark" ? "rgb(17, 20, 24)" : "rgb(247, 249, 252)";
     await availableWindow.waitForFunction(
       (background) =>
         getComputedStyle(document.body).backgroundColor === background,

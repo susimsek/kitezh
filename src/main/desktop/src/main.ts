@@ -92,7 +92,9 @@ function isTurkishDesktop() {
 }
 
 function desktopBackgroundColor() {
-  return nativeTheme.shouldUseDarkColors ? "#202124" : "#f8f9fa";
+  return nativeTheme.shouldUseDarkColors
+    ? colors.dark.background
+    : colors.light.background;
 }
 
 function desktopThemePath() {
@@ -135,29 +137,19 @@ function applyDesktopTheme(value: unknown) {
 
 function updateOpenWindowTheme(window: BrowserWindow) {
   const dark = nativeTheme.shouldUseDarkColors;
+  const palette = dark ? colors.dark : colors.light;
   window.webContents.send("desktop:theme-changed", dark ? "dark" : "light");
   void window.webContents
     .executeJavaScript(
       `(() => {
-        const values = ${JSON.stringify(
-          dark
-            ? {
-                background: "#202124",
-                foreground: "#f1f3f4",
-                secondary: "#d4d8da",
-                button: "#343d42",
-                buttonHover: "#414c52",
-                border: "#3a4246",
-              }
-            : {
-                background: "#f8f9fa",
-                foreground: "#202124",
-                secondary: "#5f6368",
-                button: "#e8eaed",
-                buttonHover: "#dfe1e5",
-                border: "#dadce0",
-              },
-        )};
+        const values = ${JSON.stringify({
+          background: palette.background,
+          foreground: palette.text,
+          secondary: palette.textMuted,
+          button: palette.surfaceMuted,
+          buttonHover: palette.border,
+          border: palette.border,
+        })};
         const root = document.documentElement;
         root.style.colorScheme = ${JSON.stringify(dark ? "dark" : "light")};
         root.style.setProperty("--dialog-background", values.background);
@@ -221,14 +213,15 @@ async function applyDesktopLanguage(value: unknown) {
 
 function nativeDialogThemeCss() {
   const dark = nativeTheme.shouldUseDarkColors;
+  const palette = dark ? colors.dark : colors.light;
   return `:root {
         color-scheme: ${dark ? "dark" : "light"};
-        --dialog-background: ${dark ? "#202124" : "#f8f9fa"};
-        --dialog-foreground: ${dark ? "#f1f3f4" : "#202124"};
-        --dialog-secondary: ${dark ? "#d4d8da" : "#5f6368"};
-        --dialog-button: ${dark ? "#343d42" : "#e8eaed"};
-        --dialog-button-hover: ${dark ? "#414c52" : "#dfe1e5"};
-        --dialog-border: ${dark ? "#3a4246" : "#dadce0"};
+        --dialog-background: ${palette.background};
+        --dialog-foreground: ${palette.text};
+        --dialog-secondary: ${palette.textMuted};
+        --dialog-button: ${palette.surfaceMuted};
+        --dialog-button-hover: ${palette.border};
+        --dialog-border: ${palette.border};
       }`;
 }
 
