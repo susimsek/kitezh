@@ -312,7 +312,9 @@ token response/error conversion, disposable unreadable login-failure attributes
 (security-context corruption still fails closed), and Windows protocol registration
 using the actual application path rather than Playwright's `--inspect=0` argument.
 The native sign-in spinner remains pending until callback/error/timeout and rejects
-duplicate requests. See `src/main/desktop/e2e/README.md` for the live test procedure.
+duplicate requests; timeout now cancels the matching main-process transaction so a
+retry starts with a fresh PKCE state. See `src/main/desktop/e2e/README.md` for the
+live test procedure.
 The broader P0 checklist stays `[~]`: this evidence does not complete native Admin,
 all Account mutations, real-provider packaged E2E, or macOS/Linux release validation.
 
@@ -329,6 +331,11 @@ Windows callback, protected APIs, and restart persistence. The Admin loop regres
 uses synthetic tokens; it is not proof of a fresh Google-to-Admin login. The user
 subsequently confirmed that the opening-loop defect is fixed; fresh Google-to-Admin
 authorization remains separate from that lifecycle acceptance.
+
+Latest Windows verification (2026-10-10): desktop unit tests 28/28, full Electron
+E2E 14/14, and rebuilt packaged authenticated PKCE smoke 1/1 passed. The packaged
+smoke covers Account API access, session persistence after restart, and logout;
+the package remains unsigned and does not establish macOS/Linux release evidence.
 
 Google logout regression verified on Windows (2026-10-09): the unsupported global
 `https://accounts.google.com/Logout?continue=...` fallback and its `continue`

@@ -42,8 +42,8 @@ uses typed, capability-scoped API calls.
 - Windows authenticated Admin E2E covers native client-name editing with validation recovery, draft retention, inline spinner, duplicate prevention, and a `clientName`-only payload; HTTP integration verifies credential and OAuth policy fields stay outside the native metadata contract.
 - Web desktop-release failures now log a fixed message without raw exception content; `components/download/DownloadPage.test.tsx` verifies sensitive rejected details are not emitted.
 - Backend mail and API failure logging omits recipient addresses, raw exception messages, and stack traces; focused `MailServiceTest` and `ApiExceptionHandlerTest` assertions verify the emitted log events.
-- `pnpm --dir src/main/desktop run test:unit`: 27/27 passed, including diagnostics byte/line retention and native-renderer EN/TR key coverage.
-- `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 13/13 passed, including email settings, shared icon semantics, exact external navigation/callback rejection, diagnostics copy busy-state, and forced-colors system token checks.
+- `pnpm --dir src/main/desktop run test:unit`: 28/28 passed, including renderer session IPC boundary, diagnostics byte/line retention, and native-renderer EN/TR key coverage.
+- `pnpm --dir src/main/desktop run test:e2e`: Windows Electron suite, 14/14 passed, including email settings, shared icon semantics, exact external navigation/callback rejection, diagnostics copy busy-state, forced-colors system token checks, native window privileges, and PKCE timeout recovery.
 - Latest targeted Windows Electron E2E runs passed: diagnostics retention/privacy 1/1 and authenticated Admin localization/role/provider workflows 1/1 (325 seconds).
 - Windows Account Electron E2E verifies social-link start sends only state and PKCE challenge, opens the exact registered provider authorization path, completes the callback with the native verifier, refreshes linked status, and blocks duplicate starts; packaged social-link smoke remains open.
 - After correcting the provider dataset binding, the targeted Windows Account social-link E2E passed 1/1; it fails if the provider value is not forwarded to the main-process start contract.
@@ -51,6 +51,7 @@ uses typed, capability-scoped API calls.
 - Windows native renderer-privilege E2E passed 1/1 across chooser, login, About, Settings, companion, and update windows; each active window reports context isolation and sandbox enabled with Node integration disabled.
 - Windows sign-in E2E verifies renderer-supplied OAuth URL/state/PKCE verifier transactions are rejected and do not replace the main-process-generated authorization URL.
 - Windows sign-in E2E shortens the authorization timer, verifies timeout cancels the pending transaction, and confirms retry creates a fresh PKCE state before callback handling.
+- Rebuilt Windows `win-unpacked` authenticated PKCE smoke passed 1/1 against the local seeded server, covering Account API, restart persistence, and logout with the current renderer privilege and auth transaction changes.
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.
 - `git diff --check` passed for the committed slices.
 
