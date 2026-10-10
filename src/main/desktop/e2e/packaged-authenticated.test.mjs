@@ -480,6 +480,22 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     );
     assert.equal(accountResponse.status, 401);
     assert.equal(accountResponse.kind, "unauthorized");
+
+    await mainWindow
+      .getByRole("button", { name: "Client scopes", exact: true })
+      .click();
+    await mainWindow
+      .getByRole("heading", { name: "Client scopes", exact: true })
+      .waitFor();
+    await mainWindow.getByText("OpenID", { exact: true }).waitFor();
+    const packagedScopes = mainWindow.locator("[data-client-scope-id]");
+    assert.ok((await packagedScopes.count()) > 0);
+    assert.equal(
+      await mainWindow
+        .getByRole("button", { name: "Manage role mappings" })
+        .count(),
+      0,
+    );
   } finally {
     await application.close();
   }
