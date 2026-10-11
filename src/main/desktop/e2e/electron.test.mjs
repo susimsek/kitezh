@@ -4573,6 +4573,47 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         },
       ],
     );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const saveRoleMappingsInEnglish = roleMappingsPanel.getByRole("button", {
+      name: "Save",
+      exact: true,
+    });
+    await saveRoleMappingsInEnglish.waitFor();
+    await saveRoleMappingsInEnglish.click();
+    assert.equal(await saveRoleMappingsInEnglish.isDisabled(), true);
+    assert.equal(
+      await saveRoleMappingsInEnglish.locator(".spinner").count(),
+      1,
+    );
+    await saveRoleMappingsInEnglish.evaluate((button) =>
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    await window
+      .getByText("Client scope role mappings updated.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__clientScopeRoleMappingRequests,
+      ),
+      [
+        {
+          id: "scope-native-observer",
+          body: {
+            applicationRoles: ["ROLE_SCOPE_READER", "ROLE_USER"],
+            clientRoleIds: [11, 21],
+          },
+        },
+        {
+          id: "scope-native-observer",
+          body: {
+            applicationRoles: ["ROLE_SCOPE_READER", "ROLE_USER"],
+            clientRoleIds: [11, 21],
+          },
+        },
+      ],
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await roleMappingsPanel.getByRole("button", { name: "Kaydet" }).waitFor();
     const roleCandidateRequests = await application.evaluate(
       () => globalThis.__clientScopeRoleCandidateRequests,
     );
