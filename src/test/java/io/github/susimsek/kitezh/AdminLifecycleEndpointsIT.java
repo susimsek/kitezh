@@ -340,6 +340,54 @@ class AdminLifecycleEndpointsIT {
                     .andExpect(
                             jsonPath("$.authorizationUri")
                                     .value("https://idp.example.test/authorize"));
+            String updateBody =
+                    JSON.writeValueAsString(
+                            new AdminIdentityProviderRequestDTO(
+                                    id,
+                                    "oidc",
+                                    "IT OIDC Updated",
+                                    id,
+                                    "generic",
+                                    false,
+                                    false,
+                                    true,
+                                    "it-client",
+                                    "",
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    "sub",
+                                    false,
+                                    false,
+                                    99,
+                                    "always",
+                                    "import",
+                                    "https://idp.example.test/authorize-updated",
+                                    "https://idp.example.test/token",
+                                    null,
+                                    null,
+                                    null,
+                                    "client_secret_basic",
+                                    "openid,profile",
+                                    "sub"));
+            mockMvc.perform(
+                            put("/api/admin/identity-providers/{id}", providerId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(updateBody))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC Updated"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").value(true))
+                    .andExpect(jsonPath("$.clientSecret").doesNotExist())
+                    .andExpect(
+                            jsonPath("$.authorizationUri")
+                                    .value("https://idp.example.test/authorize-updated"));
+            mockMvc.perform(get("/api/admin/identity-providers/{id}", providerId).with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC Updated"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").value(true))
+                    .andExpect(jsonPath("$.clientSecret").doesNotExist());
             String mapperResponse =
                     mockMvc.perform(
                                     post("/api/admin/identity-providers/{id}/mappers", providerId)

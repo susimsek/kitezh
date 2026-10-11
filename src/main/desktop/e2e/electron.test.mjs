@@ -889,6 +889,393 @@ test("preserves Account profile drafts offline and completes native social linki
   }
 });
 
+test("creates and updates native OIDC providers without retaining client secrets", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__adminAccessFlags = {
+        isAdmin: true,
+        queryUsers: true,
+        viewUsers: true,
+        manageUsers: true,
+        viewRoles: true,
+        manageRoles: true,
+        queryGroups: true,
+        viewGroups: true,
+        manageGroups: true,
+        queryClients: true,
+        viewClients: true,
+        manageClients: true,
+        viewSessions: true,
+        manageSessions: true,
+        viewConsents: true,
+        manageConsents: true,
+        viewEvents: true,
+        manageEvents: true,
+        viewKeys: true,
+        manageKeys: true,
+      };
+      globalThis.__authorizationOpens = 0;
+      shell.openExternal = async (url) => {
+        globalThis.__authorizationOpens += 1;
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.__oidcProvider = {
+        id: "provider-1",
+        providerType: "oidc",
+        registrationId: "google",
+        displayName: "Google",
+        alias: "google",
+        iconKey: "generic",
+        shortStateParameter: false,
+        caseSensitiveUsername: false,
+        enabled: true,
+        configured: true,
+        clientId: "google-client",
+        clientSecretConfigured: true,
+        hideOnLogin: false,
+        accountLinkingOnly: false,
+        trustEmail: true,
+        mfaRequired: false,
+        requiredClaims: "sub",
+        storeTokens: false,
+        storedTokensReadable: false,
+        guiOrder: 1,
+        showInAccountConsole: "always",
+        syncMode: "import",
+        authorizationUri: "https://accounts.example/authorize",
+        tokenUri: "https://accounts.example/token",
+        userInfoUri: "https://accounts.example/userinfo",
+        jwkSetUri: "https://accounts.example/jwks",
+        issuerUri: "https://accounts.example",
+        clientAuthenticationMethod: "client_secret_basic",
+        scopes: "openid profile email",
+        userNameAttribute: "sub",
+        mapperCount: 0,
+      };
+      globalThis.__oidcRequestSummaries = [];
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const requestMethod = String(init?.method ?? "GET").toUpperCase();
+        if (requestUrl.pathname === "/oauth2/token")
+          return new Response(
+            JSON.stringify({
+              access_token: "test-admin-access-token",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return new Response(
+            JSON.stringify({ access: globalThis.__adminAccessFlags }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/dashboard")
+          return new Response(
+            JSON.stringify({ clients: 1, users: 1, sessions: 0, consents: 0 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/identity-providers") {
+          if (requestMethod === "GET")
+            return new Response(
+              JSON.stringify({
+                content: [globalThis.__oidcProvider],
+                number: 0,
+                totalPages: 1,
+                totalElements: 1,
+                size: 20,
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__oidcRequestSummaries.push({
+            method: requestMethod,
+            registrationId: body.registrationId,
+            alias: body.alias,
+            authorizationUri: body.authorizationUri,
+            clientAuthenticationMethod: body.clientAuthenticationMethod,
+            secretProvided: Boolean(body.clientSecret),
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (body.alias === "rejected-oidc")
+            return new Response(
+              JSON.stringify({
+                detail: "Choose another provider alias.",
+                violations: [
+                  { field: "alias", message: "Choose another provider alias." },
+                ],
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/problem+json" },
+              },
+            );
+          const saved = {
+            ...globalThis.__oidcProvider,
+            ...body,
+            id: "provider-new",
+            clientSecretConfigured: true,
+            configured: true,
+          };
+          delete saved.clientSecret;
+          globalThis.__oidcProvider = saved;
+          return new Response(JSON.stringify(saved), {
+            status: requestMethod === "POST" ? 201 : 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (
+          requestUrl.pathname ===
+          `/api/admin/identity-providers/${globalThis.__oidcProvider.id}`
+        ) {
+          if (requestMethod === "GET")
+            return new Response(JSON.stringify(globalThis.__oidcProvider), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__oidcRequestSummaries.push({
+              method: requestMethod,
+              registrationId: body.registrationId,
+              alias: body.alias,
+              authorizationUri: body.authorizationUri,
+              clientAuthenticationMethod: body.clientAuthenticationMethod,
+              secretProvided: Boolean(body.clientSecret),
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            const saved = {
+              ...globalThis.__oidcProvider,
+              ...body,
+              clientSecretConfigured: true,
+              configured: true,
+            };
+            delete saved.clientSecret;
+            globalThis.__oidcProvider = saved;
+            return new Response(JSON.stringify(saved), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+        }
+        throw new Error("Unexpected OIDC provider E2E API request");
+      };
+    });
+    const window = await nativeMainWindow(application);
+    let chooser;
+    for (let attempt = 0; attempt < 100 && !chooser; attempt += 1) {
+      chooser = application
+        .windows()
+        .find((page) => page.url() === "app://renderer/desktop-login");
+      if (!chooser) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(chooser, "Visible native login chooser must exist");
+    await chooser
+      .getByRole("button", { name: "Sign in to Admin Console", exact: true })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in", exact: true })
+      .waitFor();
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=oidc-provider-e2e-code`,
+      );
+    });
+    await window
+      .getByRole("heading", { name: "Dashboard", exact: true })
+      .waitFor();
+    const providersNavigation = window.getByRole("button", {
+      name: "Identity providers",
+      exact: true,
+    });
+    if ((await providersNavigation.count()) === 0)
+      assert.fail(
+        `Admin navigation was not rendered: ${await window.locator("body").innerText()}`,
+      );
+    await providersNavigation.click();
+    await window.getByText("Google", { exact: true }).waitFor();
+    assert.equal(
+      await window
+        .locator('[data-identity-provider-id="provider-1"]')
+        .getByRole("button", { name: "Edit connection", exact: true })
+        .count(),
+      1,
+    );
+
+    await window.getByRole("button", { name: "Add OIDC provider" }).click();
+    const createForm = window.locator(
+      'form[data-form="admin-identity-provider-connection"]',
+    );
+    await createForm.waitFor();
+    await createForm.locator('[name="registrationId"]').fill("native-oidc");
+    await createForm.locator('[name="displayName"]').fill("Native OIDC");
+    await createForm.locator('[name="alias"]').fill("native-oidc");
+    await createForm.locator('[name="clientId"]').fill("native-client");
+    await createForm
+      .locator('[name="clientSecret"]')
+      .fill("OIDC_SECRET_MUST_NOT_PERSIST");
+    await createForm
+      .locator('[name="authorizationUri"]')
+      .fill("https://issuer.example/authorize");
+    await createForm
+      .locator('[name="tokenUri"]')
+      .fill("https://issuer.example/token");
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    const createButton = createForm.getByRole("button", {
+      name: "Add OIDC provider",
+      exact: true,
+    });
+    assert.equal(await createButton.isDisabled(), true);
+    assert.equal(
+      await createForm.locator('[name="clientSecret"]').inputValue(),
+      "",
+    );
+    assert.equal(
+      await createForm.locator('[name="registrationId"]').inputValue(),
+      "native-oidc",
+    );
+    await createForm.dispatchEvent("submit");
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__oidcRequestSummaries),
+      [],
+    );
+
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await createForm
+      .locator('[name="clientSecret"]')
+      .fill("OIDC_SECRET_MUST_NOT_PERSIST");
+    await createForm
+      .locator('[name="authorizationUri"]')
+      .fill("http://untrusted.example/authorize");
+    await createButton.click();
+    await createForm
+      .getByText("Enter absolute URIs without fragments.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__oidcRequestSummaries),
+      [],
+    );
+    await createForm
+      .locator('[name="clientSecret"]')
+      .fill("OIDC_SECRET_MUST_NOT_PERSIST");
+    await createForm
+      .locator('[name="authorizationUri"]')
+      .fill("https://issuer.example/authorize");
+    await createForm.locator('[name="alias"]').fill("rejected-oidc");
+    await createButton.click();
+    assert.equal(await createButton.isDisabled(), true);
+    assert.equal(await createButton.locator(".spinner").count(), 1);
+    await createForm
+      .getByText("Choose another provider alias.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await createForm.locator('[name="clientSecret"]').inputValue(),
+      "",
+    );
+    assert.equal(
+      await createForm.locator('[name="displayName"]').inputValue(),
+      "Native OIDC",
+    );
+
+    await createForm.locator('[name="alias"]').fill("native-oidc");
+    await createForm
+      .locator('[name="clientSecret"]')
+      .fill("OIDC_SECRET_MUST_NOT_PERSIST");
+    await createButton.click();
+    assert.equal(await createButton.isDisabled(), true);
+    assert.equal(await createButton.locator(".spinner").count(), 1);
+    await createForm.dispatchEvent("submit");
+    await window.getByText("OIDC provider created.", { exact: true }).waitFor();
+    const requestSummaries = await application.evaluate(
+      () => globalThis.__oidcRequestSummaries,
+    );
+    assert.deepEqual(requestSummaries, [
+      {
+        method: "POST",
+        registrationId: "native-oidc",
+        alias: "rejected-oidc",
+        authorizationUri: "https://issuer.example/authorize",
+        clientAuthenticationMethod: "client_secret_basic",
+        secretProvided: true,
+      },
+      {
+        method: "POST",
+        registrationId: "native-oidc",
+        alias: "native-oidc",
+        authorizationUri: "https://issuer.example/authorize",
+        clientAuthenticationMethod: "client_secret_basic",
+        secretProvided: true,
+      },
+    ]);
+
+    await window.getByRole("button", { name: "Turkish", exact: true }).click();
+    const createdProvider = window.locator(
+      '[data-identity-provider-id="provider-new"]',
+    );
+    await createdProvider
+      .getByRole("button", { name: "Bağlantıyı düzenle", exact: true })
+      .click();
+    const editForm = createdProvider.locator(
+      'form[data-form="admin-identity-provider-connection"]',
+    );
+    await editForm.waitFor();
+    assert.equal(
+      await editForm.locator('[name="clientSecret"]').inputValue(),
+      "",
+    );
+    await editForm
+      .locator('[name="authorizationUri"]')
+      .fill("https://issuer.example/v2/authorize");
+    const saveButton = editForm.locator('button[type="submit"]');
+    assert.equal(await saveButton.count(), 1, await editForm.innerText());
+    assert.match(await saveButton.innerText(), /Kaydet/);
+    await saveButton.click();
+    await window
+      .getByText("Sağlayıcı bağlantısı güncellendi.", { exact: true })
+      .waitFor();
+    const finalRequests = await application.evaluate(
+      () => globalThis.__oidcRequestSummaries,
+    );
+    assert.equal(finalRequests.at(-1).method, "PUT");
+    assert.equal(
+      finalRequests.at(-1).authorizationUri,
+      "https://issuer.example/v2/authorize",
+    );
+    assert.equal(finalRequests.at(-1).secretProvided, false);
+    assert.equal(
+      await window.evaluate(() =>
+        JSON.stringify([localStorage, sessionStorage]).includes(
+          "OIDC_SECRET_MUST_NOT_PERSIST",
+        ),
+      ),
+      false,
+    );
+    assert.equal(
+      JSON.stringify(finalRequests).includes("OIDC_SECRET_MUST_NOT_PERSIST"),
+      false,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("native login chooser stays alive and authenticated Admin does not reopen the browser", async () => {
   const application = await launchDesktop();
   try {

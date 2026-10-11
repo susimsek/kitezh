@@ -260,6 +260,13 @@ function isAllowedApiPath(
     )
       return true;
     if (
+      (method === "GET" || method === "PUT") &&
+      /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    )
+      return true;
+    if (method === "POST" && path === "/api/admin/identity-providers")
+      return true;
+    if (
       method === "PUT" &&
       /^\/api\/admin\/identity-providers\/[A-Za-z0-9_-]{1,100}\/native-policy$/.test(
         path,

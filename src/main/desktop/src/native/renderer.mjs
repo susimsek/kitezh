@@ -69,6 +69,8 @@ const actionIcons = {
   "admin-group-member-remove-confirm": "delete",
   "admin-group-members-toggle": "edit",
   "admin-provider-mappers-toggle": "edit",
+  "admin-identity-provider-config-edit": "edit",
+  "admin-oidc-provider-create": "add",
   "admin-message-delete-request": "delete",
   "admin-message-delete-confirm": "delete",
   "admin-provider-mapper-create": "add",
@@ -1725,7 +1727,11 @@ function adminIdentityProvidersContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${
+  const createForm =
+    state.data.identityProviderConfigurationOpenId === "new"
+      ? identityProviderConfigurationForm("new")
+      : "";
+  return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminIdentityProviders"))}</h2>${button(text("adminAddOidcProvider"), { action: "admin-oidc-provider-create", icon: "add", busy: state.busy === "identity-provider-create", disabled: state.offline || Boolean(state.busy) })}</div>${createForm}<form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${
     providers.length
       ? `<div class="list">${providers
           .map((provider) => {
@@ -1741,6 +1747,11 @@ function adminIdentityProvidersContent() {
                 : {};
             const confirming =
               state.data.identityProviderDeleteConfirmId === id;
+            const editingConnection =
+              state.data.identityProviderConfigurationOpenId === id;
+            const connectionForm = editingConnection
+              ? identityProviderConfigurationForm(id)
+              : "";
             const controls = confirming
               ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteIdentityProviderPrompt"))}</span>${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-confirm", id, danger: true, busy: state.busy === `identity-provider-delete:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
               : `<div class="actions">${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
@@ -1756,11 +1767,150 @@ function adminIdentityProvidersContent() {
               disabled: state.offline || Boolean(state.busy),
             });
             const mapperPanel = renderIdentityProviderMappers(id);
-            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditProviderPolicy"), { action: "admin-identity-provider-policy-toggle", id, busy: state.busy === `identity-provider-policy-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${mapperButton}${controls}</div>${policyForm}${mapperPanel}</article>`;
+            const connectionButton =
+              provider.providerType !== "oidc"
+                ? ""
+                : button(text("adminEditProviderConnection"), {
+                    action: "admin-identity-provider-config-edit",
+                    id,
+                    busy: state.busy === `identity-provider-config-load:${id}`,
+                    disabled: state.offline || Boolean(state.busy),
+                  });
+            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditProviderPolicy"), { action: "admin-identity-provider-policy-toggle", id, busy: state.busy === `identity-provider-policy-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${connectionButton}${mapperButton}${controls}</div>${connectionForm}${policyForm}${mapperPanel}</article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoIdentityProviders"))}</div>`
   }<div class="actions" aria-label="${escapeHtml(text("adminIdentityProviders"))} pagination"><button class="secondary-button" type="button" data-identity-provider-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-identity-provider-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+const PROVIDER_CONNECTION_FIELDS = [
+  "registrationId",
+  "displayName",
+  "alias",
+  "iconKey",
+  "clientId",
+  "authorizationUri",
+  "tokenUri",
+  "userInfoUri",
+  "jwkSetUri",
+  "issuerUri",
+  "clientAuthenticationMethod",
+  "scopes",
+  "userNameAttribute",
+];
+
+function defaultIdentityProviderConfiguration() {
+  return {
+    providerType: "oidc",
+    registrationId: "",
+    displayName: "",
+    alias: "",
+    iconKey: "generic",
+    clientId: "",
+    authorizationUri: "",
+    tokenUri: "",
+    userInfoUri: "",
+    jwkSetUri: "",
+    issuerUri: "",
+    clientAuthenticationMethod: "client_secret_basic",
+    scopes: "openid profile email",
+    userNameAttribute: "sub",
+    enabled: true,
+    shortStateParameter: false,
+    caseSensitiveUsername: false,
+    hideOnLogin: false,
+    accountLinkingOnly: false,
+    trustEmail: false,
+    mfaRequired: false,
+    requiredClaims: "sub",
+    storeTokens: false,
+    storedTokensReadable: false,
+    guiOrder: 0,
+    showInAccountConsole: "always",
+    syncMode: "import",
+  };
+}
+
+function identityProviderConfigurationDraft(provider) {
+  const defaults = defaultIdentityProviderConfiguration();
+  return Object.fromEntries(
+    PROVIDER_CONNECTION_FIELDS.map((key) => [
+      key,
+      provider?.[key] ?? defaults[key] ?? "",
+    ]),
+  );
+}
+
+function safeIdentityProviderConfiguration(provider) {
+  const safe = {
+    id: provider?.id,
+    providerType: provider?.providerType,
+    clientSecretConfigured: Boolean(provider?.clientSecretConfigured),
+  };
+  const defaults = defaultIdentityProviderConfiguration();
+  for (const key of Object.keys(defaults))
+    safe[key] = provider?.[key] ?? defaults[key];
+  return safe;
+}
+
+function identityProviderConfigurationFormDraft(form) {
+  const draft = formValues(form);
+  delete draft.clientSecret;
+  return Object.fromEntries(
+    PROVIDER_CONNECTION_FIELDS.map((key) => [key, draft[key] ?? ""]),
+  );
+}
+
+function isSafeProviderEndpointUri(value) {
+  try {
+    const uri = new URL(value);
+    return (
+      !uri.hash &&
+      !uri.username &&
+      !uri.password &&
+      (uri.protocol === "https:" ||
+        (uri.protocol === "http:" &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(uri.hostname)))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function identityProviderConfigurationForm(id) {
+  const creating = id === "new";
+  const key = creating ? "new" : id;
+  const draft = state.data.identityProviderConfigurationDrafts?.[key] ?? {};
+  const baseline = state.data.identityProviderConfigurationBaselines?.[key];
+  const errors =
+    state.data.identityProviderConfigurationErrorId === key
+      ? violations(state.error?.body)
+      : {};
+  const busy = state.busy === `identity-provider-config-save:${key}`;
+  const value = (name) => draft[name] ?? "";
+  const required = (name) =>
+    `<div class="field-error">${escapeHtml(errors[name] ?? "")}</div>`;
+  const textField = (name, label, type = "text", attributes = "") =>
+    `<div class="field"><label for="provider-config-${key}-${name}">${escapeHtml(text(label))}</label><input id="provider-config-${key}-${name}" name="${name}" type="${type}" value="${type === "password" ? "" : escapeHtml(value(name))}" ${attributes}/>${required(name)}</div>`;
+  const secretHint = creating
+    ? text("adminProviderSecretRequired")
+    : baseline?.clientSecretConfigured
+      ? text("adminProviderSecretConfigured")
+      : text("adminProviderSecretRequired");
+  const authenticationMethod = value("clientAuthenticationMethod");
+  const authenticationMethods = ["client_secret_basic", "client_secret_post"];
+  const selectedLegacyMethod = authenticationMethods.includes(
+    authenticationMethod,
+  )
+    ? ""
+    : `<option value="${escapeHtml(authenticationMethod)}" selected>${escapeHtml(authenticationMethod)}</option>`;
+  const authenticationMethodField = `<div class="field"><label for="provider-config-${key}-clientAuthenticationMethod">${escapeHtml(text("adminProviderClientAuthenticationMethod"))}</label><select id="provider-config-${key}-clientAuthenticationMethod" name="clientAuthenticationMethod" required>${selectedLegacyMethod}${authenticationMethods
+    .map(
+      (method) =>
+        `<option value="${method}" ${authenticationMethod === method ? "selected" : ""}>${method}</option>`,
+    )
+    .join("")}</select>${required("clientAuthenticationMethod")}</div>`;
+  return `<form class="card" data-form="admin-identity-provider-connection" data-provider-id="${creating ? "" : escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminProviderConnectionTitle"))}</h3>${textField("registrationId", "adminProviderRegistrationId", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("displayName", "adminProviderDisplayName", "text", 'maxlength="100" required')}${textField("alias", "adminProviderAlias", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("iconKey", "adminProviderIconKey", "text", 'maxlength="40" pattern="[a-z][a-z0-9_-]{0,39}" required')}${textField("clientId", "adminProviderClientId", "text", 'maxlength="500" required')}${textField("clientSecret", "adminProviderClientSecret", "password", `maxlength="1000" autocomplete="new-password" ${creating || !baseline?.clientSecretConfigured ? "required" : ""}`)}<div class="muted">${escapeHtml(secretHint)} ${escapeHtml(text("adminProviderConnectionSecretHint"))}</div>${textField("authorizationUri", "adminProviderAuthorizationUri", "url", 'maxlength="1000" required')}${textField("tokenUri", "adminProviderTokenUri", "url", 'maxlength="1000" required')}${textField("userInfoUri", "adminProviderUserInfoUri", "url", 'maxlength="1000"')}${textField("jwkSetUri", "adminProviderJwkSetUri", "url", 'maxlength="1000"')}${textField("issuerUri", "adminProviderIssuerUri", "url", 'maxlength="1000"')}${authenticationMethodField}${textField("scopes", "adminProviderScopes", "text", 'maxlength="1000" required')}${textField("userNameAttribute", "adminProviderUserNameAttribute", "text", 'maxlength="100" required')}<div class="actions">${button(text(creating ? "adminAddOidcProvider" : "save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy), icon: creating ? "add" : "check" })}<button class="secondary-button" type="button" data-action="admin-identity-provider-config-cancel" data-provider-id="${escapeHtml(key)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
 }
 
 function adminAdminSessionsContent() {
@@ -2565,6 +2715,11 @@ function preserveOfflineDrafts() {
         state.data.clientConfigurationDrafts[id] =
           clientConfigurationFormDraft(form);
       }
+    } else if (form.dataset.form === "admin-identity-provider-connection") {
+      const key = form.dataset.providerId || "new";
+      state.data.identityProviderConfigurationDrafts ??= {};
+      state.data.identityProviderConfigurationDrafts[key] =
+        identityProviderConfigurationFormDraft(form);
     } else if (form.dataset.form === "admin-client-native-metadata") {
       const id = form.dataset.clientId;
       if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
@@ -2699,6 +2854,160 @@ function groupPermissionAssignmentsFromForm(form) {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-identity-provider-connection") {
+    const providerId = form.dataset.providerId ?? "";
+    const creating = providerId.length === 0;
+    const key = creating ? "new" : providerId;
+    const providers = state.data.identityProviders?.content ?? [];
+    const provider = creating
+      ? null
+      : providers.find((item) => item.id === providerId);
+    const baseline = state.data.identityProviderConfigurationBaselines?.[key];
+    if (
+      state.offline ||
+      !adminRouteAllowed("identity-providers") ||
+      (creating && state.data.identityProviderConfigurationOpenId !== "new") ||
+      (!creating &&
+        (!/^[A-Za-z0-9_-]{1,100}$/.test(providerId) ||
+          !provider ||
+          provider.providerType !== "oidc" ||
+          baseline?.id !== providerId ||
+          baseline?.providerType !== "oidc"))
+    )
+      return;
+
+    const draft = identityProviderConfigurationFormDraft(form);
+    const secret = String(values.clientSecret ?? "");
+    const localErrors = {};
+    if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.registrationId))
+      localErrors.registrationId = text("adminRequired");
+    if (!draft.displayName.trim())
+      localErrors.displayName = text("adminRequired");
+    if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.alias))
+      localErrors.alias = text("adminRequired");
+    if (!/^[a-z][a-z0-9_-]{0,39}$/.test(draft.iconKey))
+      localErrors.iconKey = text("adminRequired");
+    if (!draft.clientId.trim()) localErrors.clientId = text("adminRequired");
+    if ((creating || !baseline?.clientSecretConfigured) && !secret.trim())
+      localErrors.clientSecret = text("adminProviderSecretRequired");
+    for (const name of [
+      "authorizationUri",
+      "tokenUri",
+      "userInfoUri",
+      "jwkSetUri",
+      "issuerUri",
+    ]) {
+      const required = name === "authorizationUri" || name === "tokenUri";
+      if (
+        (required && !draft[name].trim()) ||
+        (draft[name].trim() && !isSafeProviderEndpointUri(draft[name].trim()))
+      )
+        localErrors[name] = text("adminInvalidUri");
+    }
+    if (!draft.clientAuthenticationMethod.trim())
+      localErrors.clientAuthenticationMethod = text("adminRequired");
+    if (!draft.scopes.trim()) localErrors.scopes = text("adminRequired");
+    if (!draft.userNameAttribute.trim())
+      localErrors.userNameAttribute = text("adminRequired");
+    if (Object.keys(localErrors).length) {
+      state.data.identityProviderConfigurationDrafts ??= {};
+      state.data.identityProviderConfigurationDrafts[key] = draft;
+      state.data.identityProviderConfigurationErrorId = key;
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: Object.values(localErrors)[0],
+          violations: Object.entries(localErrors).map(
+            ([fieldName, message]) => ({
+              field: fieldName,
+              message,
+            }),
+          ),
+        },
+      };
+      render();
+      return;
+    }
+    if (!form.reportValidity()) return;
+
+    const current = creating
+      ? defaultIdentityProviderConfiguration()
+      : baseline;
+    const body = {
+      registrationId: draft.registrationId.trim(),
+      providerType: creating ? "oidc" : current.providerType,
+      displayName: draft.displayName.trim(),
+      alias: draft.alias.trim(),
+      iconKey: draft.iconKey.trim(),
+      shortStateParameter: Boolean(current.shortStateParameter),
+      caseSensitiveUsername: Boolean(current.caseSensitiveUsername),
+      enabled: Boolean(current.enabled),
+      clientId: draft.clientId.trim(),
+      clientSecret: secret,
+      hideOnLogin: Boolean(current.hideOnLogin),
+      accountLinkingOnly: Boolean(current.accountLinkingOnly),
+      trustEmail: Boolean(current.trustEmail),
+      mfaRequired: Boolean(current.mfaRequired),
+      requiredClaims: current.requiredClaims || "sub",
+      storeTokens: Boolean(current.storeTokens),
+      storedTokensReadable: Boolean(current.storedTokensReadable),
+      guiOrder: Number(current.guiOrder ?? 0),
+      showInAccountConsole: current.showInAccountConsole || "always",
+      syncMode: current.syncMode || "import",
+      authorizationUri: draft.authorizationUri.trim(),
+      tokenUri: draft.tokenUri.trim(),
+      userInfoUri: draft.userInfoUri.trim() || null,
+      jwkSetUri: draft.jwkSetUri.trim() || null,
+      issuerUri: draft.issuerUri.trim() || null,
+      clientAuthenticationMethod: draft.clientAuthenticationMethod,
+      scopes: draft.scopes.trim(),
+      userNameAttribute: draft.userNameAttribute.trim(),
+    };
+    state.data.identityProviderConfigurationDrafts ??= {};
+    state.data.identityProviderConfigurationDrafts[key] = draft;
+    state.data.identityProviderConfigurationErrorId = key;
+    state.error = null;
+    state.notice = null;
+    state.busy = `identity-provider-config-save:${key}`;
+    render();
+    try {
+      const saved = await request(
+        creating
+          ? "/api/admin/identity-providers"
+          : `/api/admin/identity-providers/${encodeURIComponent(providerId)}`,
+        { method: creating ? "POST" : "PUT", body },
+      );
+      const safeSaved = safeIdentityProviderConfiguration(saved);
+      if (creating) {
+        state.data.identityProviderQuery = "";
+        state.data.identityProviderPage = 0;
+        state.data.identityProviders = {
+          ...state.data.identityProviders,
+          content: [safeSaved, ...providers],
+          totalElements:
+            Number(state.data.identityProviders?.totalElements ?? 0) + 1,
+        };
+        state.notice = text("adminProviderConnectionCreated");
+      } else {
+        state.data.identityProviders = {
+          ...state.data.identityProviders,
+          content: providers.map((item) =>
+            item.id === providerId ? { ...item, ...safeSaved } : item,
+          ),
+        };
+        state.notice = text("adminProviderConnectionUpdated");
+      }
+      state.data.identityProviderConfigurationOpenId = null;
+      delete state.data.identityProviderConfigurationDrafts[key];
+      delete state.data.identityProviderConfigurationBaselines[key];
+      state.data.identityProviderConfigurationErrorId = null;
+    } catch {
+      /* The secret stays out of drafts after validation or transport errors. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-user-password-reset") {
     const id = Number(form.dataset.userId);
     const user = (state.data.users?.content ?? []).find(
@@ -6302,6 +6611,85 @@ async function action(action, element) {
       /* request rendered localized transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-oidc-provider-create") {
+    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
+      return;
+    state.data.identityProviderConfigurationOpenId = "new";
+    state.data.identityProviderConfigurationBaselines ??= {};
+    state.data.identityProviderConfigurationDrafts ??= {};
+    state.data.identityProviderConfigurationBaselines.new =
+      defaultIdentityProviderConfiguration();
+    state.data.identityProviderConfigurationDrafts.new =
+      identityProviderConfigurationDraft(
+        state.data.identityProviderConfigurationBaselines.new,
+      );
+    state.data.identityProviderConfigurationErrorId = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (action === "admin-identity-provider-config-edit") {
+    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
+      return;
+    const id = element.dataset.id ?? "";
+    const provider = (state.data.identityProviders?.content ?? []).find(
+      (item) => item.id === id,
+    );
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !provider ||
+      provider.providerType !== "oidc"
+    )
+      return;
+    if (state.data.identityProviderConfigurationOpenId === id) {
+      state.data.identityProviderConfigurationOpenId = null;
+      delete state.data.identityProviderConfigurationDrafts?.[id];
+      delete state.data.identityProviderConfigurationBaselines?.[id];
+      state.data.identityProviderConfigurationErrorId = null;
+      render();
+      return;
+    }
+    state.busy = `identity-provider-config-load:${id}`;
+    state.error = null;
+    render();
+    try {
+      const response = await request(
+        `/api/admin/identity-providers/${encodeURIComponent(id)}`,
+      );
+      if (
+        response?.id !== id ||
+        response.providerType !== "oidc" ||
+        typeof response.registrationId !== "string" ||
+        typeof response.clientId !== "string"
+      )
+        throw new Error("invalid_identity_provider_connection_response");
+      const baseline = safeIdentityProviderConfiguration(response);
+      state.data.identityProviderConfigurationBaselines ??= {};
+      state.data.identityProviderConfigurationDrafts ??= {};
+      state.data.identityProviderConfigurationBaselines[id] = baseline;
+      state.data.identityProviderConfigurationDrafts[id] =
+        identityProviderConfigurationDraft(baseline);
+      state.data.identityProviderConfigurationOpenId = id;
+      state.data.identityProviderConfigurationErrorId = null;
+    } catch {
+      /* The API adapter supplies localized authorization and transport feedback. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-identity-provider-config-cancel") {
+    if (state.busy) return;
+    const key = element.dataset.providerId || "new";
+    if (state.data.identityProviderConfigurationOpenId !== key) return;
+    state.data.identityProviderConfigurationOpenId = null;
+    delete state.data.identityProviderConfigurationDrafts?.[key];
+    delete state.data.identityProviderConfigurationBaselines?.[key];
+    state.data.identityProviderConfigurationErrorId = null;
+    state.error = null;
     render();
     return;
   }

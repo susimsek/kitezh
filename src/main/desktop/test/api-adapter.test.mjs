@@ -428,6 +428,25 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/identity-providers/provider-12/native-policy",
   });
   assert.equal(providerPolicy.status, 200);
+  const providerDetails = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-12",
+  });
+  assert.equal(providerDetails.status, 200);
+  const createdProvider = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers",
+    method: "POST",
+    body: { providerType: "oidc", clientSecret: "transient-test-secret" },
+  });
+  assert.equal(createdProvider.status, 200);
+  const updatedProvider = await adapter.request({
+    console: "admin",
+    path: "/api/admin/identity-providers/provider-12",
+    method: "PUT",
+    body: { providerType: "oidc", clientSecret: "" },
+  });
+  assert.equal(updatedProvider.status, 200);
   const updatedProviderPolicy = await adapter.request({
     console: "admin",
     path: "/api/admin/identity-providers/provider-12/native-policy",
@@ -671,6 +690,32 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     {
       path: "/api/admin/clients/client-1/native-metadata/secret",
       method: "PUT",
+    },
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", ...request }),
+      /not allowed/,
+    );
+  }
+  for (const request of [
+    {
+      path: "/api/admin/identity-providers/provider-12?includeSecrets=true",
+    },
+    {
+      path: "/api/admin/identity-providers/provider-12/nested",
+      method: "GET",
+    },
+    {
+      path: "/api/admin/identity-providers/provider-12?includeSecrets=true",
+      method: "PUT",
+    },
+    {
+      path: "/api/admin/identity-providers?replace=true",
+      method: "POST",
+    },
+    {
+      path: "/api/admin/identity-providers/provider-12",
+      method: "PATCH",
     },
   ]) {
     await assert.rejects(
