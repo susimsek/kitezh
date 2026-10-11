@@ -6499,11 +6499,14 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       globalThis.__denyClientRead = false;
       globalThis.fetch = async (url) => {
         const requestUrl = new URL(String(url));
-        if (requestUrl.pathname === "/api/admin/whoami")
+        if (requestUrl.pathname === "/api/admin/whoami") {
+          if (globalThis.__delayWhoAmI)
+            await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
             JSON.stringify({ access: globalThis.__adminAccessFlags }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        }
         if (requestUrl.pathname === "/api/admin/clients") {
           if (globalThis.__denyClientRead)
             return new Response("{}", { status: 403 });
@@ -6561,6 +6564,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .getByRole("heading", { name: "Kontrol paneli", exact: true })
       .waitFor();
     await application.evaluate(() => {
+      globalThis.__delayWhoAmI = true;
       globalThis.__adminAccessFlags = {
         isAdmin: false,
         queryUsers: false,
@@ -6585,9 +6589,14 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       };
     });
     await window.reload();
+    await window.getByRole("status").waitFor();
+    assert.equal(await window.locator('[data-route="dashboard"]').count(), 0);
     await window
       .getByRole("heading", { name: "İstemciler", exact: true })
       .waitFor();
+    await application.evaluate(() => {
+      globalThis.__delayWhoAmI = false;
+    });
     assert.equal(await window.locator('[data-route="dashboard"]').count(), 0);
     assert.equal(await window.locator('[data-route="clients"]').count(), 1);
     await application.evaluate(() => {

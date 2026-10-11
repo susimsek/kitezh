@@ -6985,7 +6985,7 @@ async function hydrate() {
   } catch {
     state.session = null;
   }
-  state.loading = false;
+  state.loading = Boolean(state.session && state.console === "admin");
   render();
   if (state.session) {
     if (state.console === "admin") {
@@ -6998,6 +6998,7 @@ async function hydrate() {
         state.error = null;
       } catch (error) {
         state.route = "dashboard";
+        state.loading = false;
         if (!error?.kind) state.error = { kind: "forbidden" };
         render();
         return;
