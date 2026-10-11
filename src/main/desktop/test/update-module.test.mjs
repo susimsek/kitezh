@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import Module from "node:module";
-import test from "node:test";
+import test, { after } from "node:test";
 
 const originalLoad = Module._load;
+const originalAppImage = process.env.APPIMAGE;
+if (process.platform === "linux" && !process.env.APPIMAGE) {
+  process.env.APPIMAGE = "/tmp/kitezh-test.AppImage";
+}
+after(() => {
+  if (originalAppImage === undefined) delete process.env.APPIMAGE;
+  else process.env.APPIMAGE = originalAppImage;
+});
+
 const updateHandlers = new Map();
 const publishedStatuses = [];
 const runtime = {

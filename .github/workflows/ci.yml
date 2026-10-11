@@ -190,6 +190,12 @@ jobs:
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
 
+      - name: Install web dependencies for desktop renderer
+        run: pnpm --dir src/main/web install --frozen-lockfile
+
+      - name: Build desktop E2E renderer
+        run: pnpm --dir src/main/desktop build:renderer
+
       - name: Test desktop shell and collect Sonar coverage
         run: xvfb-run -a pnpm --dir src/main/desktop test:sonar-coverage
 
