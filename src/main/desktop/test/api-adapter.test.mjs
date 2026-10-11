@@ -357,6 +357,82 @@ test("allows bounded client-role CRUD routes only", async () => {
   }
 });
 
+test("allows only bounded client-role composite routes", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, init) => {
+    requests.push({ url: String(url), method: init.method });
+    return new Response(
+      JSON.stringify({ compositeRoles: [], compositeRealmRoles: [] }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  });
+  for (const [method, path] of [
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-composites?q=invoice&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-realm-composites?q=ROLE&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/composites/43?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "DELETE",
+      "/api/admin/clients/billing-api/roles/42/composites/43?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "DELETE",
+      "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER?page=0&size=20&sort=username,asc",
+    ],
+  ]) {
+    const response = await adapter.request({ console: "admin", path, method });
+    assert.equal(response.status, 200);
+  }
+  assert.equal(requests.length, 6);
+  for (const [method, path] of [
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-composites?q=x&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-realm-composites?q=ROLE&page=0&size=100&sort=name,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-composites?q=invoice&page=0&size=10&sort=name,asc&extra=1",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/composites/43/nested?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "DELETE",
+      "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_user?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER?page=0&size=20&sort=username,asc&page=0",
+    ],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method }),
+      /not allowed/,
+    );
+  }
+  assert.equal(requests.length, 6);
+});
+
 test("allows only the client scope assignment read and replacement routes", async () => {
   const { adapter } = harness(
     async () =>
@@ -1503,10 +1579,6 @@ test("limits the Admin namespace to approved settings writes and bounded read co
       console: "admin",
       path: "/api/admin/sessions?status=all",
     }),
-    /not allowed/,
-  );
-  await assert.rejects(
-    adapter.request({ console: "admin", path: "/api/admin/roles/ROLE_USER" }),
     /not allowed/,
   );
   await assert.rejects(

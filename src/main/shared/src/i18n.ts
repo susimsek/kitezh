@@ -528,6 +528,17 @@ export const messages = {
     adminRoleCompositeClientEmpty: "No included client roles.",
     adminRoleCompositeClientAdded: "Included client role added.",
     adminRoleCompositeClientRemoved: "Included client role removed.",
+    adminClientRoleComposites: "Manage included roles",
+    adminClientRoleCompositeRealmTitle: "Included realm roles",
+    adminClientRoleCompositeClientTitle: "Included client roles",
+    adminClientRoleCompositeSearchRealm: "Search available realm roles",
+    adminClientRoleCompositeSearchClient: "Search available client roles",
+    adminClientRoleCompositeEmptyRealm: "No included realm roles.",
+    adminClientRoleCompositeEmptyClient: "No included client roles.",
+    adminClientRoleCompositeSessionImpact:
+      "Changing included roles changes effective permissions and signs out all users. Continue?",
+    adminClientRoleCompositeSessionEnded:
+      "Role hierarchy updated. All desktop sessions were signed out; sign in again.",
     adminRoleUpdated: "Role description updated.",
     adminRoleName: "Role name",
     adminRoleDescription: "Description",
@@ -1360,6 +1371,18 @@ export const messages = {
     adminRoleCompositeClientEmpty: "İçerilen istemci rolü yok.",
     adminRoleCompositeClientAdded: "İçerilen istemci rolü eklendi.",
     adminRoleCompositeClientRemoved: "İçerilen istemci rolü kaldırıldı.",
+    adminClientRoleComposites: "İçerilen rolleri yönet",
+    adminClientRoleCompositeRealmTitle: "İçerilen alan rolleri",
+    adminClientRoleCompositeClientTitle: "İçerilen istemci rolleri",
+    adminClientRoleCompositeSearchRealm: "Kullanılabilir alan rollerini ara",
+    adminClientRoleCompositeSearchClient:
+      "Kullanılabilir istemci rollerini ara",
+    adminClientRoleCompositeEmptyRealm: "İçerilen alan rolü yok.",
+    adminClientRoleCompositeEmptyClient: "İçerilen istemci rolü yok.",
+    adminClientRoleCompositeSessionImpact:
+      "İçerilen rolleri değiştirmek etkin izinleri değiştirir ve tüm kullanıcıların oturumunu kapatır. Devam edilsin mi?",
+    adminClientRoleCompositeSessionEnded:
+      "Rol hiyerarşisi güncellendi. Tüm masaüstü oturumları kapatıldı; yeniden giriş yapın.",
     adminRoleUpdated: "Rol açıklaması güncellendi.",
     adminRoleName: "Rol adı",
     adminRoleDescription: "Açıklama",

@@ -107,6 +107,12 @@ const actionIcons = {
   "admin-client-role-assignment-add": "add",
   "admin-client-role-assignment-remove-request": "delete",
   "admin-client-role-assignment-remove-confirm": "delete",
+  "admin-client-role-composites-toggle": "edit",
+  "admin-client-role-composite-search": "search",
+  "admin-client-role-composite-add-request": "add",
+  "admin-client-role-composite-add-confirm": "add",
+  "admin-client-role-composite-remove-request": "delete",
+  "admin-client-role-composite-remove-confirm": "delete",
   "admin-client-role-edit": "edit",
   "admin-client-role-delete-request": "delete",
   "admin-client-role-delete-confirm": "delete",
@@ -1792,6 +1798,256 @@ function clientRoleAssignmentPanel(clientId, roleId, roleName) {
   return `<section class="card" data-client-role-assignments="${escapeHtml(key)}" aria-label="${escapeHtml(text("adminManageClientRoleAssignments"))}"><h4>${escapeHtml(roleName)}</h4><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedUsers"))}</legend>${memberRows(users, "user") || `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions"><input name="user-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchUsers"))}" value="${escapeHtml(assignment.userQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "user", busy: userSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="user" role="alert">${escapeHtml(assignment.userSearchError ? text(assignment.userSearchError) : "")}</div>${candidateRows(userCandidates, "user")}</fieldset><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedGroups"))}</legend>${memberRows(groups, "group") || `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions"><input name="group-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchGroups"))}" value="${escapeHtml(assignment.groupQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "group", busy: groupSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="group" role="alert">${escapeHtml(assignment.groupSearchError ? text(assignment.groupSearchError) : "")}</div>${candidateRows(groupCandidates, "group")}</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-assignments-close" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
 }
 
+function clientRoleCompositePanel(clientId, roleId, roleName) {
+  const key = clientId + ":" + roleId;
+  const composition = state.data.clientRoleCompositions?.[key] ?? {};
+  const clientRoles = Array.isArray(composition.clientRoles)
+    ? composition.clientRoles.filter(
+        (role) =>
+          Number.isSafeInteger(Number(role?.id)) &&
+          Number(role.id) > 0 &&
+          /^[A-Za-z0-9_-]{1,100}$/.test(role?.clientId ?? "") &&
+          typeof role?.name === "string",
+      )
+    : [];
+  const realmRoles = Array.isArray(composition.realmRoles)
+    ? composition.realmRoles.filter((role) =>
+        /^ROLE_[A-Z0-9_]{1,45}$/.test(role?.name ?? ""),
+      )
+    : [];
+  const clientCandidates = Array.isArray(composition.clientCandidates)
+    ? composition.clientCandidates.filter(
+        (role) =>
+          Number.isSafeInteger(Number(role?.id)) &&
+          Number(role.id) > 0 &&
+          /^[A-Za-z0-9_-]{1,100}$/.test(role?.clientId ?? "") &&
+          typeof role?.name === "string",
+      )
+    : [];
+  const realmCandidates = Array.isArray(composition.realmCandidates)
+    ? composition.realmCandidates.filter((role) =>
+        /^ROLE_[A-Z0-9_]{1,45}$/.test(role?.name ?? ""),
+      )
+    : [];
+  const rows = (roles, kind) =>
+    roles.length
+      ? roles
+          .map((role) => {
+            const memberId = kind === "realm" ? role.name : String(role.id);
+            const confirming =
+              composition.confirm?.kind === kind &&
+              composition.confirm.id === memberId;
+            const removeMessageKey =
+              kind === "realm"
+                ? "adminRoleCompositeRemove"
+                : "adminRoleCompositeClientRemove";
+            const label =
+              kind === "realm" ? role.name : role.clientId + " / " + role.name;
+            const controls = confirming
+              ? '<div class="actions"><span role="status">' +
+                escapeHtml(text("adminClientRoleCompositeSessionImpact")) +
+                "</span>" +
+                button(text(removeMessageKey), {
+                  action: "admin-client-role-composite-remove-confirm",
+                  id: clientId,
+                  clientRoleId: roleId,
+                  memberId,
+                  memberKind: kind,
+                  danger: true,
+                  busy:
+                    state.busy ===
+                    "client-role-composite-remove:" +
+                      clientId +
+                      ":" +
+                      roleId +
+                      ":" +
+                      kind +
+                      ":" +
+                      memberId,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                '<button class="secondary-button" type="button" data-action="admin-client-role-composite-cancel" data-id="' +
+                escapeHtml(clientId) +
+                '" data-client-role-id="' +
+                escapeHtml(roleId) +
+                '" data-member-id="' +
+                escapeHtml(memberId) +
+                '" data-member-kind="' +
+                kind +
+                '" ' +
+                (state.busy ? "disabled" : "") +
+                ">" +
+                escapeHtml(text("cancel")) +
+                "</button></div>"
+              : '<div class="actions">' +
+                button(text(removeMessageKey), {
+                  action: "admin-client-role-composite-remove-request",
+                  id: clientId,
+                  clientRoleId: roleId,
+                  memberId,
+                  memberKind: kind,
+                  danger: true,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                "</div>";
+            return (
+              '<article class="list-item"><strong>' +
+              escapeHtml(label) +
+              "</strong>" +
+              controls +
+              "</article>"
+            );
+          })
+          .join("")
+      : '<div class="empty" role="status">' +
+        escapeHtml(
+          text(
+            kind === "realm"
+              ? "adminClientRoleCompositeEmptyRealm"
+              : "adminClientRoleCompositeEmptyClient",
+          ),
+        ) +
+        "</div>";
+  const candidates = (available, assigned, kind) =>
+    available
+      .filter(
+        (role) =>
+          !assigned.some((current) =>
+            kind === "realm"
+              ? current.name === role.name
+              : Number(current.id) === Number(role.id),
+          ),
+      )
+      .map((role) => {
+        const memberId = kind === "realm" ? role.name : String(role.id);
+        const confirming =
+          composition.confirm?.kind === kind &&
+          composition.confirm.id === memberId &&
+          composition.confirm.adding;
+        const actionName = confirming
+          ? "admin-client-role-composite-add-confirm"
+          : "admin-client-role-composite-add-request";
+        const label = text(
+          kind === "realm"
+            ? "adminRoleCompositeAdd"
+            : "adminRoleCompositeClientAdd",
+        );
+        const control = confirming
+          ? '<div class="actions"><span role="status">' +
+            escapeHtml(text("adminClientRoleCompositeSessionImpact")) +
+            "</span>" +
+            button(label, {
+              action: actionName,
+              id: clientId,
+              clientRoleId: roleId,
+              memberId,
+              memberKind: kind,
+              busy:
+                state.busy ===
+                "client-role-composite-add:" +
+                  clientId +
+                  ":" +
+                  roleId +
+                  ":" +
+                  kind +
+                  ":" +
+                  memberId,
+              disabled: state.offline || Boolean(state.busy),
+            }) +
+            '<button class="secondary-button" type="button" data-action="admin-client-role-composite-cancel" data-id="' +
+            escapeHtml(clientId) +
+            '" data-client-role-id="' +
+            escapeHtml(roleId) +
+            '" data-member-id="' +
+            escapeHtml(memberId) +
+            '" data-member-kind="' +
+            kind +
+            '" ' +
+            (state.busy ? "disabled" : "") +
+            ">" +
+            escapeHtml(text("cancel")) +
+            "</button></div>"
+          : button(label, {
+              action: actionName,
+              id: clientId,
+              clientRoleId: roleId,
+              memberId,
+              memberKind: kind,
+              disabled: state.offline || Boolean(state.busy),
+            });
+        return (
+          '<article class="list-item"><strong>' +
+          escapeHtml(
+            kind === "realm" ? role.name : role.clientId + " / " + role.name,
+          ) +
+          "</strong>" +
+          control +
+          "</article>"
+        );
+      })
+      .join("");
+  const queryField = (kind, messageKey) => {
+    const busy =
+      state.busy ===
+      "client-role-composite-search:" + clientId + ":" + roleId + ":" + kind;
+    return (
+      '<div class="actions"><input name="' +
+      kind +
+      '-composite-q" type="search" aria-label="' +
+      escapeHtml(text(messageKey)) +
+      '" value="' +
+      escapeHtml(composition[kind + "Query"] ?? "") +
+      '" minlength="2" maxlength="100"/>' +
+      button(text(messageKey), {
+        action: "admin-client-role-composite-search",
+        id: clientId,
+        clientRoleId: roleId,
+        memberKind: kind,
+        busy,
+        disabled: state.offline || Boolean(state.busy),
+      }) +
+      '</div><div class="field-error" data-composite-search-error="' +
+      kind +
+      '" role="alert">' +
+      escapeHtml(
+        composition[kind + "SearchError"]
+          ? text(composition[kind + "SearchError"])
+          : "",
+      ) +
+      "</div>"
+    );
+  };
+  return (
+    '<section class="card" data-client-role-composites="' +
+    escapeHtml(key) +
+    '" aria-label="' +
+    escapeHtml(text("adminClientRoleComposites")) +
+    '"><h4>' +
+    escapeHtml(roleName) +
+    "</h4><fieldset><legend>" +
+    escapeHtml(text("adminClientRoleCompositeRealmTitle")) +
+    "</legend>" +
+    rows(realmRoles, "realm") +
+    queryField("realm", "adminClientRoleCompositeSearchRealm") +
+    candidates(realmCandidates, realmRoles, "realm") +
+    "</fieldset><fieldset><legend>" +
+    escapeHtml(text("adminClientRoleCompositeClientTitle")) +
+    "</legend>" +
+    rows(clientRoles, "client") +
+    queryField("client", "adminClientRoleCompositeSearchClient") +
+    candidates(clientCandidates, clientRoles, "client") +
+    '</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-composites-close" data-id="' +
+    escapeHtml(clientId) +
+    '" data-client-role-id="' +
+    escapeHtml(roleId) +
+    '" ' +
+    (state.busy ? "disabled" : "") +
+    ">" +
+    escapeHtml(text("cancel")) +
+    "</button></section>"
+  );
+}
+
 function clientRolesPanel(clientId) {
   const panel = state.data.clientRoles?.[clientId] ?? {};
   const page = panel.page ?? { content: [], number: 0, totalPages: 0 };
@@ -1807,6 +2063,7 @@ function clientRolesPanel(clientId) {
       const confirming = panel.deleteConfirmId === roleId;
       const assignmentKey = `${clientId}:${roleId}`;
       const assignment = state.data.clientRoleAssignments?.[assignmentKey];
+      const composition = state.data.clientRoleCompositions?.[assignmentKey];
       const deleting =
         state.busy === `client-role-delete:${clientId}:${roleId}`;
       const editForm = editing
@@ -1829,7 +2086,18 @@ function clientRolesPanel(clientId) {
       const assignmentPanel = assignment?.open
         ? clientRoleAssignmentPanel(clientId, roleId, role.name ?? "")
         : "";
-      return `<article class="list-item" data-client-role-id="${escapeHtml(roleId)}"><div><strong>${escapeHtml(role.name ?? "")}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div><div class="actions">${assignmentToggle}</div>${deleteControls}${editForm}${assignmentPanel}</article>`;
+      const compositionToggle = button(text("adminClientRoleComposites"), {
+        action: "admin-client-role-composites-toggle",
+        id: clientId,
+        clientRoleId: roleId,
+        busy:
+          state.busy === `client-role-composites-load:${clientId}:${roleId}`,
+        disabled: state.offline || Boolean(state.busy),
+      });
+      const compositionPanel = composition?.open
+        ? clientRoleCompositePanel(clientId, roleId, role.name ?? "")
+        : "";
+      return `<article class="list-item" data-client-role-id="${escapeHtml(roleId)}"><div><strong>${escapeHtml(role.name ?? "")}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div><div class="actions">${assignmentToggle}${compositionToggle}</div>${deleteControls}${editForm}${assignmentPanel}${compositionPanel}</article>`;
     })
     .join("");
   const draft = panel.createDraft ?? {};
@@ -3013,6 +3281,15 @@ async function encodeAvatarFile(file) {
 }
 
 function preserveOfflineDrafts() {
+  for (const panel of app.querySelectorAll("[data-client-role-composites]")) {
+    const composition =
+      state.data.clientRoleCompositions?.[panel.dataset.clientRoleComposites];
+    if (!composition?.open) continue;
+    for (const kind of ["realm", "client"]) {
+      const input = panel.querySelector(`input[name="${kind}-composite-q"]`);
+      if (input) composition[kind + "Query"] = input.value;
+    }
+  }
   for (const panel of app.querySelectorAll("[data-client-role-assignments]")) {
     const assignment =
       state.data.clientRoleAssignments?.[panel.dataset.clientRoleAssignments];
@@ -5701,6 +5978,250 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "admin-client-role-composites-toggle") {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true
+    )
+      return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !/^[1-9]\d{0,18}$/.test(roleId) ||
+      !Number.isSafeInteger(Number(roleId))
+    )
+      return;
+    const key = clientId + ":" + roleId;
+    state.data.clientRoleCompositions ??= {};
+    const current = state.data.clientRoleCompositions[key];
+    if (current?.open) {
+      current.open = false;
+      render();
+      return;
+    }
+    const composition = (state.data.clientRoleCompositions[key] = {
+      ...current,
+      open: true,
+      confirm: null,
+      realmCandidates: [],
+      clientCandidates: [],
+    });
+    state.busy = `client-role-composites-load:${clientId}:${roleId}`;
+    state.error = null;
+    render();
+    try {
+      const detail = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}?page=0&size=20&sort=username,asc`,
+      );
+      composition.realmRoles = Array.isArray(detail?.compositeRealmRoles)
+        ? detail.compositeRealmRoles
+        : [];
+      composition.clientRoles = Array.isArray(detail?.compositeRoles)
+        ? detail.compositeRoles
+        : [];
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-role-composites-close") {
+    if (state.busy) return;
+    const key =
+      (element.dataset.id ?? "") + ":" + (element.dataset.clientRoleId ?? "");
+    const composition = state.data.clientRoleCompositions?.[key];
+    if (composition) composition.open = false;
+    render();
+    return;
+  }
+  if (action === "admin-client-role-composite-search") {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true
+    )
+      return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const kind = element.dataset.memberKind;
+    const key = clientId + ":" + roleId;
+    const composition = state.data.clientRoleCompositions?.[key];
+    const query = String(
+      element
+        .closest("[data-client-role-composites]")
+        ?.querySelector(`input[name="${kind}-composite-q"]`)?.value ?? "",
+    ).trim();
+    if (
+      !composition?.open ||
+      !["realm", "client"].includes(kind) ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !/^[1-9]\d{0,18}$/.test(roleId) ||
+      !Number.isSafeInteger(Number(roleId))
+    )
+      return;
+    const errorKey = kind + "SearchError";
+    if (query.length < 2 || query.length > 100) {
+      composition[errorKey] =
+        query.length < 2
+          ? "adminClientRoleSearchMinimum"
+          : "adminClientRoleSearchMaximum";
+      composition[kind + "Query"] = query;
+      render();
+      return;
+    }
+    composition[errorKey] = null;
+    composition[kind + "Query"] = query;
+    composition[kind + "Candidates"] = [];
+    state.busy = `client-role-composite-search:${clientId}:${roleId}:${kind}`;
+    state.error = null;
+    render();
+    try {
+      const suffix =
+        kind === "realm"
+          ? "available-realm-composites"
+          : "available-composites";
+      const page = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}/${suffix}?q=${encodeURIComponent(query)}&page=0&size=10&sort=name,asc`,
+      );
+      const candidates = Array.isArray(page?.content) ? page.content : [];
+      composition[kind + "Candidates"] =
+        kind === "realm"
+          ? candidates.filter((candidate) =>
+              /^ROLE_[A-Z0-9_]{1,45}$/.test(candidate?.name ?? ""),
+            )
+          : candidates.filter(
+              (candidate) =>
+                Number.isSafeInteger(Number(candidate?.id)) &&
+                Number(candidate.id) > 0 &&
+                /^[A-Za-z0-9_-]{1,100}$/.test(candidate?.clientId ?? "") &&
+                typeof candidate?.name === "string",
+            );
+    } catch {
+      /* request rendered localized authorization, validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-role-composite-cancel") {
+    if (state.busy) return;
+    const key =
+      (element.dataset.id ?? "") + ":" + (element.dataset.clientRoleId ?? "");
+    const composition = state.data.clientRoleCompositions?.[key];
+    if (
+      composition?.confirm?.kind === element.dataset.memberKind &&
+      composition.confirm.id === element.dataset.memberId
+    )
+      composition.confirm = null;
+    render();
+    return;
+  }
+  if (
+    [
+      "admin-client-role-composite-add-request",
+      "admin-client-role-composite-add-confirm",
+      "admin-client-role-composite-remove-request",
+      "admin-client-role-composite-remove-confirm",
+    ].includes(action)
+  ) {
+    if (state.busy || state.data.adminAccess?.manageClients !== true) return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const memberId = element.dataset.memberId ?? "";
+    const kind = element.dataset.memberKind;
+    const key = clientId + ":" + roleId;
+    const composition = state.data.clientRoleCompositions?.[key];
+    if (
+      !composition?.open ||
+      !["realm", "client"].includes(kind) ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !/^[1-9]\d{0,18}$/.test(roleId) ||
+      !Number.isSafeInteger(Number(roleId)) ||
+      (kind === "realm"
+        ? !/^ROLE_[A-Z0-9_]{1,45}$/.test(memberId)
+        : !/^[1-9]\d{0,18}$/.test(memberId) ||
+          !Number.isSafeInteger(Number(memberId)))
+    )
+      return;
+    const adding = action.includes("add");
+    const assigned =
+      kind === "realm"
+        ? (composition.realmRoles ?? [])
+        : (composition.clientRoles ?? []);
+    const candidates =
+      kind === "realm"
+        ? (composition.realmCandidates ?? [])
+        : (composition.clientCandidates ?? []);
+    const hasMember = (role) =>
+      kind === "realm" ? role.name === memberId : String(role.id) === memberId;
+    const confirmation = composition.confirm;
+    if (action.endsWith("request")) {
+      if (adding ? !candidates.some(hasMember) : !assigned.some(hasMember))
+        return;
+      composition.confirm = { kind, id: memberId, adding };
+      render();
+      return;
+    }
+    if (
+      !confirmation ||
+      confirmation.kind !== kind ||
+      confirmation.id !== memberId ||
+      confirmation.adding !== adding ||
+      (adding ? !candidates.some(hasMember) : !assigned.some(hasMember)) ||
+      state.offline
+    )
+      return;
+    state.busy = `client-role-composite-${adding ? "add" : "remove"}:${clientId}:${roleId}:${kind}:${memberId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    let changed = false;
+    let timedOut = false;
+    try {
+      const suffix =
+        kind === "realm"
+          ? `realm-composites/${encodeURIComponent(memberId)}`
+          : `composites/${encodeURIComponent(memberId)}`;
+      const detail = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}/${suffix}?page=0&size=20&sort=username,asc`,
+        { method: adding ? "POST" : "DELETE" },
+      );
+      composition.realmRoles = Array.isArray(detail?.compositeRealmRoles)
+        ? detail.compositeRealmRoles
+        : composition.realmRoles;
+      composition.clientRoles = Array.isArray(detail?.compositeRoles)
+        ? detail.compositeRoles
+        : composition.clientRoles;
+      composition.confirm = null;
+      changed = true;
+    } catch {
+      /* request rendered localized authorization, validation or transport feedback */
+      timedOut = state.error?.kind === "timeout";
+    }
+    if (changed || timedOut) {
+      try {
+        await api.auth.clearAllSessions();
+      } catch {
+        /* backend invalidated all users; remove renderer session state regardless */
+      }
+      state.session = null;
+      state.profile = null;
+      state.data = {};
+      state.route = "dashboard";
+      state.error = timedOut
+        ? { kind: "timeout", message: text("apiTimeout") }
+        : null;
+      state.notice = changed
+        ? text("adminClientRoleCompositeSessionEnded")
+        : null;
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "admin-client-role-assignments-toggle") {
     if (
       state.busy ||

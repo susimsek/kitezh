@@ -198,6 +198,34 @@ function isAllowedApiPath(
       )
         return true;
     }
+    const clientRoleCompositeMatch = path.match(
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)\/(composites\/([1-9]\d*)|realm-composites\/(ROLE_[A-Z0-9_]{1,45}))(?:\?|$)/,
+    );
+    if (clientRoleCompositeMatch && ["POST", "DELETE"].includes(method)) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        const [, , parentId, , childId] = clientRoleCompositeMatch;
+        const idsAreSafe = [parentId, childId]
+          .filter(Boolean)
+          .every((value) => Number.isSafeInteger(Number(value)));
+        const keys = [...url.searchParams.keys()];
+        return (
+          idsAreSafe &&
+          url.origin === "https://desktop.invalid" &&
+          url.searchParams.get("page") === "0" &&
+          url.searchParams.get("size") === "20" &&
+          url.searchParams.get("sort") === "username,asc" &&
+          keys.length === 3 &&
+          keys.every((key) => ["page", "size", "sort"].includes(key)) &&
+          [...new Set(keys)].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          !url.hash
+        );
+      } catch {
+        return false;
+      }
+    }
     const clientRoleAssignmentPathMatch = path.match(
       /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)(?:\/(available-users|available-groups|users(?:\/([1-9]\d*))?|groups(?:\/([1-9]\d*))?))?(?:\?|$)/,
     );
@@ -542,6 +570,9 @@ function isAllowedApiPath(
       const roleClientCompositeCandidatesMatch = url.pathname.match(
         /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-client-composites$/,
       );
+      const clientRoleCompositeCandidatesMatch = url.pathname.match(
+        /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/roles\/([1-9]\d*)\/available-(?:composites|realm-composites)$/,
+      );
       const isRoleDetail = Boolean(roleDetailMatch);
       const isRoleCompositeCandidates = Boolean(
         roleCompositeCandidatesMatch || roleClientCompositeCandidatesMatch,
@@ -646,6 +677,7 @@ function isAllowedApiPath(
         (isUsers ||
           isRoles ||
           isRoleCompositeCandidates ||
+          Boolean(clientRoleCompositeCandidatesMatch) ||
           isGroups ||
           isGroupMemberSearch ||
           isClientScopes ||
@@ -674,6 +706,15 @@ function isAllowedApiPath(
         (!isAuthenticationFlows || !url.searchParams.has("q")) &&
         (!isRoleCompositeCandidates ||
           (url.searchParams.get("page") === "0" &&
+            url.searchParams.get("size") === "10" &&
+            url.searchParams.get("sort") === "name,asc" &&
+            (url.searchParams.get("q")?.length ?? 0) >= 2 &&
+            (url.searchParams.get("q")?.length ?? 0) <= 100)) &&
+        (!clientRoleCompositeCandidatesMatch ||
+          (Number.isSafeInteger(
+            Number(clientRoleCompositeCandidatesMatch[1]),
+          ) &&
+            url.searchParams.get("page") === "0" &&
             url.searchParams.get("size") === "10" &&
             url.searchParams.get("sort") === "name,asc" &&
             (url.searchParams.get("q")?.length ?? 0) >= 2 &&

@@ -8845,6 +8845,441 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
   }
 });
 
+test("manages client-role composites with Windows session invalidation recovery", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__adminAccessFlags = {
+        isAdmin: false,
+        queryUsers: false,
+        viewUsers: false,
+        manageUsers: false,
+        viewRoles: false,
+        manageRoles: false,
+        queryGroups: false,
+        viewGroups: false,
+        manageGroups: false,
+        queryClients: true,
+        viewClients: true,
+        manageClients: true,
+        viewSessions: false,
+        manageSessions: false,
+        viewConsents: false,
+        manageConsents: false,
+        viewEvents: false,
+        manageEvents: false,
+        viewKeys: false,
+        manageKeys: false,
+      };
+      globalThis.__clientRoleCompositeState = {
+        clientRoles: [],
+        realmRoles: [],
+      };
+      globalThis.__clientRoleCompositeRequests = [];
+      globalThis.__timeoutNextCompositeMutation = false;
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        const json = (body, status = 200) =>
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          });
+        if (requestUrl.pathname === "/oauth2/token")
+          return json({
+            access_token: "composite-admin-test-token",
+            expires_in: 3600,
+          });
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return json({ access: globalThis.__adminAccessFlags });
+        if (requestUrl.pathname === "/api/admin/clients" && method === "GET")
+          return json({
+            content: [
+              {
+                id: "client-row-1",
+                clientId: "billing-api",
+                clientName: "Billing API",
+                scopes: ["openid"],
+                requireProofKey: false,
+              },
+            ],
+            number: 0,
+            totalPages: 1,
+            totalElements: 1,
+            size: 20,
+          });
+        if (
+          requestUrl.pathname === "/api/admin/clients/billing-api/roles" &&
+          method === "GET"
+        )
+          return json({
+            content: [
+              {
+                id: 42,
+                clientId: "billing-api",
+                name: "invoice.parent",
+                description: "Parent",
+              },
+            ],
+            number: 0,
+            totalPages: 1,
+            totalElements: 1,
+            size: 20,
+          });
+        if (
+          requestUrl.pathname === "/api/admin/clients/billing-api/roles/42" &&
+          method === "GET"
+        )
+          return json({
+            users: { content: [] },
+            groups: { content: [] },
+            compositeRoles: globalThis.__clientRoleCompositeState.clientRoles,
+            compositeRealmRoles:
+              globalThis.__clientRoleCompositeState.realmRoles,
+          });
+        if (
+          /^\/api\/admin\/clients\/billing-api\/roles\/42\/available-(composites|realm-composites)$/.test(
+            requestUrl.pathname,
+          ) &&
+          method === "GET"
+        ) {
+          const realm = requestUrl.pathname.endsWith(
+            "available-realm-composites",
+          );
+          const content = realm
+            ? [{ name: "ROLE_USER", description: "User" }]
+            : [
+                {
+                  id: 43,
+                  clientId: "admin-console",
+                  name: "view.users",
+                  description: "View users",
+                },
+              ];
+          return json({ content, number: 0, totalPages: 1, size: 10 });
+        }
+        const compositeMatch = requestUrl.pathname.match(
+          /^\/api\/admin\/clients\/billing-api\/roles\/42\/(composites\/[1-9]\d*|realm-composites\/ROLE_[A-Z0-9_]{1,45})$/,
+        );
+        if (compositeMatch && ["POST", "DELETE"].includes(method)) {
+          globalThis.__clientRoleCompositeRequests.push({
+            method,
+            path: requestUrl.pathname,
+            query: requestUrl.search,
+          });
+          if (globalThis.__timeoutNextCompositeMutation) {
+            globalThis.__timeoutNextCompositeMutation = false;
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            throw new DOMException("Aborted", "AbortError");
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          const isRealmComposite =
+            compositeMatch[1].startsWith("realm-composites/");
+          const child = isRealmComposite
+            ? {
+                name: compositeMatch[1].slice("realm-composites/".length),
+                description: "User",
+              }
+            : {
+                id: Number(compositeMatch[1].split("/").at(-1)),
+                clientId: "admin-console",
+                name: "view.users",
+                description: "View users",
+              };
+          const stateKey = isRealmComposite ? "realmRoles" : "clientRoles";
+          globalThis.__clientRoleCompositeState[stateKey] =
+            method === "POST" ? [child] : [];
+          return json({
+            users: { content: [] },
+            groups: { content: [] },
+            compositeRoles: globalThis.__clientRoleCompositeState.clientRoles,
+            compositeRealmRoles:
+              globalThis.__clientRoleCompositeState.realmRoles,
+          });
+        }
+        throw new Error(`Unexpected Admin API request: ${requestUrl.pathname}`);
+      };
+    });
+    const window = await nativeMainWindow(application);
+    const signIn = async () => {
+      const chooseAdmin = window.locator('[data-action="choose-admin"]');
+      if (await chooseAdmin.count()) await chooseAdmin.click();
+      const signInButton = window.getByRole("button", {
+        name: /Sign in|Giriş yap/,
+      });
+      if (!(await signInButton.isDisabled())) await signInButton.click();
+      await signInButton.locator(".spinner").waitFor();
+      const authorizationUrl = await application.evaluate(
+        () => globalThis.__pendingAuthorizationUrl,
+      );
+      await application.evaluate(({ app }, pendingUrl) => {
+        const state = new URL(pendingUrl).searchParams.get("state");
+        app.emit(
+          "open-url",
+          { preventDefault() {} },
+          `kitezh://oauth/callback?state=${state}&code=client-role-composite-test-code`,
+        );
+      }, authorizationUrl);
+      await window
+        .getByRole("heading", { name: /Clients|İstemciler/, exact: true })
+        .waitFor();
+    };
+    await window.getByRole("heading", { name: "Choose a console" }).waitFor();
+    await signIn();
+    const clientRow = window.locator('[data-client-id="client-row-1"]');
+    await clientRow
+      .locator('[data-action="admin-client-roles-toggle"]')
+      .click();
+    const rolesPanel = window.locator(
+      '[data-client-roles-panel="billing-api"]',
+    );
+    await rolesPanel
+      .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
+      .waitFor();
+    await rolesPanel
+      .getByRole("button", { name: "Manage included roles" })
+      .click();
+    const composites = rolesPanel.locator(
+      '[data-client-role-composites="billing-api:42"]',
+    );
+    const clientSearch = composites.getByRole("searchbox", {
+      name: "Search available client roles",
+    });
+    await clientSearch.fill("x");
+    await composites
+      .getByRole("button", { name: "Search available client roles" })
+      .click();
+    await composites
+      .locator('[data-composite-search-error="client"]')
+      .getByText("Enter at least 2 characters to search.")
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__clientRoleCompositeRequests.length,
+      ),
+      0,
+    );
+    await clientSearch.fill("view");
+    await composites
+      .getByRole("button", { name: "Search available client roles" })
+      .click();
+    await composites
+      .getByText("admin-console / view.users", { exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    assert.equal(
+      await composites
+        .getByRole("searchbox", {
+          name: "Kullanılabilir istemci rollerini ara",
+        })
+        .inputValue(),
+      "view",
+    );
+    const realmSearch = composites.getByRole("searchbox", {
+      name: "Kullanılabilir alan rollerini ara",
+    });
+    await realmSearch.fill("ROLE");
+    await composites
+      .getByRole("button", { name: "Kullanılabilir alan rollerini ara" })
+      .click();
+    await composites.getByText("ROLE_USER", { exact: true }).waitFor();
+    await composites.getByRole("button", { name: "Rol ekle" }).click();
+    await composites
+      .getByText(
+        "İçerilen rolleri değiştirmek etkin izinleri değiştirir ve tüm kullanıcıların oturumunu kapatır. Devam edilsin mi?",
+        { exact: true },
+      )
+      .waitFor();
+    const addRealm = composites.getByRole("button", { name: "Rol ekle" });
+    await addRealm.click();
+    assert.equal(await addRealm.isDisabled(), true);
+    assert.equal(await addRealm.locator(".spinner").count(), 1);
+    await addRealm.dispatchEvent("click");
+    await window
+      .getByText(
+        "Rol hiyerarşisi güncellendi. Tüm masaüstü oturumları kapatıldı; yeniden giriş yapın.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.equal(
+      await window.getByRole("button", { name: "Giriş yap" }).count(),
+      1,
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__clientRoleCompositeRequests,
+      ),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER",
+          query: "?page=0&size=20&sort=username,asc",
+        },
+      ],
+    );
+    await signIn();
+    await window
+      .locator('[data-client-id="client-row-1"]')
+      .locator('[data-action="admin-client-roles-toggle"]')
+      .click();
+    await rolesPanel
+      .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
+      .waitFor();
+    await rolesPanel
+      .getByRole("button", { name: "İçerilen rolleri yönet" })
+      .click();
+    const reopenedPanel = rolesPanel.locator(
+      '[data-client-role-composites="billing-api:42"]',
+    );
+    await reopenedPanel.getByRole("button", { name: "Rolü kaldır" }).click();
+    await reopenedPanel
+      .getByText(
+        "İçerilen rolleri değiştirmek etkin izinleri değiştirir ve tüm kullanıcıların oturumunu kapatır. Devam edilsin mi?",
+        { exact: true },
+      )
+      .waitFor();
+    const removeRealm = reopenedPanel.getByRole("button", {
+      name: "Rolü kaldır",
+    });
+    await removeRealm.click();
+    await removeRealm.locator(".spinner").waitFor();
+    await window
+      .getByText(
+        "Rol hiyerarşisi güncellendi. Tüm masaüstü oturumları kapatıldı; yeniden giriş yapın.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__clientRoleCompositeRequests.map(({ method, path }) => ({
+          method,
+          path,
+        })),
+      ),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER",
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER",
+        },
+      ],
+    );
+    await signIn();
+    await window
+      .locator('[data-client-id="client-row-1"]')
+      .locator('[data-action="admin-client-roles-toggle"]')
+      .click();
+    await rolesPanel
+      .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
+      .waitFor();
+    await rolesPanel
+      .getByRole("button", { name: "İçerilen rolleri yönet" })
+      .click();
+    const clientCompositePanel = rolesPanel.locator(
+      '[data-client-role-composites="billing-api:42"]',
+    );
+    await clientCompositePanel
+      .getByRole("searchbox", { name: "Kullanılabilir istemci rollerini ara" })
+      .fill("view");
+    await clientCompositePanel
+      .getByRole("button", { name: "Kullanılabilir istemci rollerini ara" })
+      .click();
+    await clientCompositePanel
+      .getByText("admin-console / view.users", { exact: true })
+      .waitFor();
+    await clientCompositePanel
+      .getByRole("button", { name: "İstemci rolü ekle" })
+      .click();
+    await clientCompositePanel
+      .getByText(
+        "İçerilen rolleri değiştirmek etkin izinleri değiştirir ve tüm kullanıcıların oturumunu kapatır. Devam edilsin mi?",
+        { exact: true },
+      )
+      .waitFor();
+    const addClientRole = clientCompositePanel.getByRole("button", {
+      name: "İstemci rolü ekle",
+    });
+    await addClientRole.click();
+    await addClientRole.locator(".spinner").waitFor();
+    await window
+      .getByText(
+        "Rol hiyerarşisi güncellendi. Tüm masaüstü oturumları kapatıldı; yeniden giriş yapın.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() =>
+        globalThis.__clientRoleCompositeRequests.map(({ method, path }) => ({
+          method,
+          path,
+        })),
+      ),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER",
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/clients/billing-api/roles/42/realm-composites/ROLE_USER",
+        },
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles/42/composites/43",
+        },
+      ],
+    );
+    await signIn();
+    await window
+      .locator('[data-client-id="client-row-1"]')
+      .locator('[data-action="admin-client-roles-toggle"]')
+      .click();
+    await rolesPanel
+      .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
+      .waitFor();
+    await rolesPanel
+      .getByRole("button", { name: "İçerilen rolleri yönet" })
+      .click();
+    const timeoutPanel = rolesPanel.locator(
+      '[data-client-role-composites="billing-api:42"]',
+    );
+    await timeoutPanel
+      .getByRole("button", { name: "İstemci rolünü kaldır" })
+      .click();
+    await timeoutPanel
+      .getByText(
+        "İçerilen rolleri değiştirmek etkin izinleri değiştirir ve tüm kullanıcıların oturumunu kapatır. Devam edilsin mi?",
+        { exact: true },
+      )
+      .waitFor();
+    const timeoutRemove = timeoutPanel.getByRole("button", {
+      name: "İstemci rolünü kaldır",
+    });
+    await application.evaluate(
+      () => (globalThis.__timeoutNextCompositeMutation = true),
+    );
+    await timeoutRemove.click();
+    await timeoutRemove.locator(".spinner").waitFor();
+    await window
+      .getByText("İstek zaman aşımına uğradı. Tekrar deneyin.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(
+      await window.getByRole("button", { name: "Giriş yap" }).count(),
+      1,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("opens settings in a separate window without requiring login", async () => {
   const application = await launchDesktop();
   try {
