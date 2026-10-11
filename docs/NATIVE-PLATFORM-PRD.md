@@ -295,14 +295,14 @@ cross-platform, signing, and other explicitly listed evidence is complete.
   rebuilt package verifies PKCE, real Account API access, refresh retry, restart persistence, and
   logout. Social transaction and mutation endpoints in the source UI test use safe test stubs;
   live-provider and macOS/Linux packaged proof remain open.
-- [~] Windows partial — Desktop P1 Admin screens: the rebuilt Windows package passes authenticated
-  Admin dashboard and session-isolation plus native role/client-scope mapping and settings writes
-  with persisted API read-back. The package now renders and verifies Web-parity dashboard panels
-  for readiness health, active signing-key metadata, and recent events; the main-process adapter
-  allows only the exact read-only readiness route. Windows source Electron E2E covers localized
-  validation, CRUD, permissions, and confirmation flows (Admin flow test 1/1); Desktop unit tests
-  pass 49/49. The full Admin route/mutation parity inventory is still open, so this broad P1 item
-  remains partial.
+- [x] Windows — Desktop P1 Admin screens: Windows source Electron E2E passes (1/1) across the
+  native Admin screens, localized validation, CRUD, permissions, and confirmation flows; packaged
+  Windows authenticated Admin E2E passes (1/1) for isolated session behavior, dashboard panels,
+  role/client-scope mapping, and settings writes with persisted API read-back. Dashboard parity
+  verifies readiness health, active signing-key metadata, and recent events; the main-process
+  adapter allows only the exact read-only readiness route. Desktop unit tests pass 49/49. Overall
+  cross-platform status remains `[~]` pending macOS/Linux packaged evidence and signed Windows
+  release verification.
 
 - [~] Desktop P0 native console shell: `app://renderer/native` owns the console chooser and authenticated Account shell; the default packaged route no longer loads the Web console. Windows packaged E2E completes Account PKCE login, a protected Account API request, session restart, and logout, plus Admin PKCE login and dashboard access while proving the Account namespace remains unauthenticated (2 packaged tests). Evidence: `src/main/desktop/src/native/native.html`, `src/main/desktop/src/native/renderer.mjs`, `test/native-boundary.test.mjs`, and `e2e/packaged-authenticated.test.mjs`. macOS/Linux evidence and signed Windows release verification remain open.
 - [~] Desktop P0 API/session adapter: protected Account requests run through the main-process typed adapter with separate Admin/Account vault records, one refresh retry, timeout/offline/401/403/validation mapping, and atomic refresh replacement. Evidence: `src/main/desktop/src/api/desktop-api.ts` and `test/api-adapter.test.mjs`.

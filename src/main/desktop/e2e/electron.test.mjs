@@ -4703,6 +4703,12 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       buffer: onePixelPng(),
     });
     await uploadAvatar.click();
+    await window.waitForFunction(() => {
+      const upload = document.querySelector(
+        'button[data-action="admin-user-avatar-upload"]',
+      );
+      return upload?.disabled && upload.querySelector(".spinner");
+    });
     assert.equal(await uploadAvatar.isDisabled(), true);
     assert.equal(await uploadAvatar.locator(".spinner").count(), 1);
     await window.waitForFunction(() => {
