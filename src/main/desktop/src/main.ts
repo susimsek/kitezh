@@ -22,14 +22,14 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { ThemeMode } from "@kitezh/shared";
 import {
   colors,
   controlSizes,
   radii,
   spacing,
   typography,
-  type ThemeMode,
-} from "@kitezh/shared";
+} from "@kitezh/shared/theme/runtime";
 
 import {
   DESKTOP_PROTOCOL,

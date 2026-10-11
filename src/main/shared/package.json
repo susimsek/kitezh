@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./theme": "./src/theme.ts",
+    "./theme/runtime": "./src/theme-runtime.cjs",
     "./i18n": "./src/i18n.ts",
     "./icons": "./src/icons.ts",
     "./contracts": "./src/contracts.ts",

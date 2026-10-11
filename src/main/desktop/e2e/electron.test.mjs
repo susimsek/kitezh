@@ -927,7 +927,7 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       await availableWindow.evaluate(
         () => getComputedStyle(document.body).backgroundColor,
       ),
-      "rgb(32, 33, 36)",
+      "rgb(33, 37, 41)",
     );
   } finally {
     await application.close();
