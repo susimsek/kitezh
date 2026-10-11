@@ -276,6 +276,34 @@ another owner's work, but a review does not transfer implementation ownership.
 The first Desktop P0 vertical slice is intentionally `[~]` until authenticated native E2E, packaged
 smoke, and cross-platform release evidence are available.
 
+Windows-specific completion is tracked independently below. `[x] Windows` means the listed
+Windows source/package acceptance passed; the existing overall `[~]` status remains until the
+cross-platform, signing, and other explicitly listed evidence is complete.
+
+- [x] Windows — Desktop P0 native console shell: rebuilt unpacked Windows package, authenticated
+  Account/Admin startup, cancel/retry and stale callback recovery; source Electron E2E passed
+  23/23 after the native renderer visual alignment. Remaining: macOS/Linux callbacks and signed
+  release validation.
+- [x] Windows — Desktop P0 API/session adapter: packaged Account API request recovered from one
+  forced 401 through the real local refresh-token endpoint and retried to 200; Account session
+  survived the refresh. Packaged Admin login verified isolated Admin storage and Account API 401.
+  Remaining: signed release and macOS/Linux secure-storage/session evidence.
+- [x] Windows — Desktop P0 Account vertical slice: source Electron E2E verifies profile/offline
+  recovery and social-link callback behavior; a focused native Account E2E passes 1/1 for MFA
+  setup/enable/disable, session sign-out, application/offline-token revocation, social unlink,
+  password update, account deletion, inline progress, duplicate blocking, and busy cleanup. The
+  rebuilt package verifies PKCE, real Account API access, refresh retry, restart persistence, and
+  logout. Social transaction and mutation endpoints in the source UI test use safe test stubs;
+  live-provider and macOS/Linux packaged proof remain open.
+- [~] Windows partial — Desktop P1 Admin screens: the rebuilt Windows package passes authenticated
+  Admin dashboard and session-isolation plus native role/client-scope mapping and settings writes
+  with persisted API read-back. The package now renders and verifies Web-parity dashboard panels
+  for readiness health, active signing-key metadata, and recent events; the main-process adapter
+  allows only the exact read-only readiness route. Windows source Electron E2E covers localized
+  validation, CRUD, permissions, and confirmation flows (Admin flow test 1/1); Desktop unit tests
+  pass 49/49. The full Admin route/mutation parity inventory is still open, so this broad P1 item
+  remains partial.
+
 - [~] Desktop P0 native console shell: `app://renderer/native` owns the console chooser and authenticated Account shell; the default packaged route no longer loads the Web console. Windows packaged E2E completes Account PKCE login, a protected Account API request, session restart, and logout, plus Admin PKCE login and dashboard access while proving the Account namespace remains unauthenticated (2 packaged tests). Evidence: `src/main/desktop/src/native/native.html`, `src/main/desktop/src/native/renderer.mjs`, `test/native-boundary.test.mjs`, and `e2e/packaged-authenticated.test.mjs`. macOS/Linux evidence and signed Windows release verification remain open.
 - [~] Desktop P0 API/session adapter: protected Account requests run through the main-process typed adapter with separate Admin/Account vault records, one refresh retry, timeout/offline/401/403/validation mapping, and atomic refresh replacement. Evidence: `src/main/desktop/src/api/desktop-api.ts` and `test/api-adapter.test.mjs`.
 - [~] Desktop P0 Account vertical slice: profile, password, sessions, offline sessions, applications, MFA, account deletion, settings, and social-link read/unlink are native. Social-provider link start uses a short-lived server transaction, native PKCE verifier, authenticated bearer completion, and a validated `kitezh://social-link/callback`; Windows Electron E2E verifies state/challenge-only start, exact authorization URL, callback verifier completion, and linked-state refresh. Packaged Windows PKCE Account login/API, session restart, logout, and the social-link callback/verifier path pass; the packaged social-link test stubs only start/complete transaction responses, while Windows NSIS, portable, and AppX targets remain unsigned. Live-provider packaged proof, signed Windows release verification, and macOS/Linux package evidence remain open.

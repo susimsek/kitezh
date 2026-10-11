@@ -84,6 +84,36 @@ test("keeps forbidden responses authoritative and rejects unapproved API paths",
   );
 });
 
+test("allows only the read-only readiness probe for the Admin dashboard", async () => {
+  let requestedUrl;
+  const { adapter } = harness(async (url) => {
+    requestedUrl = url;
+    return new Response(JSON.stringify({ status: "UP" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const response = await adapter.request({
+    console: "admin",
+    path: "/actuator/health/readiness",
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { status: "UP" });
+  assert.equal(
+    requestedUrl,
+    "https://kitezh.onrender.com/actuator/health/readiness",
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      method: "POST",
+      path: "/actuator/health/readiness",
+    }),
+    /not allowed/,
+  );
+});
+
 test("uploads only bounded Admin avatar payloads as multipart data", async () => {
   let captured;
   const { adapter } = harness(async (_url, init) => {

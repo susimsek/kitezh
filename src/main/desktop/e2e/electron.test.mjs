@@ -889,6 +889,265 @@ test("preserves Account profile drafts offline and completes native social linki
   }
 });
 
+test("guards native Account security and revocation actions while pending", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__accountMutations = [];
+      globalThis.__accountMfaEnabled = false;
+      globalThis.__accountSocialLinked = true;
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (input, init) => {
+        const requestUrl = new URL(String(input));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        const page = (content) => ({
+          content,
+          number: 0,
+          size: 20,
+          totalElements: content.length,
+          totalPages: 1,
+        });
+        if (requestUrl.pathname === "/oauth2/token")
+          return new Response(
+            JSON.stringify({
+              access_token: "account-test-token",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/profile")
+          return new Response(
+            JSON.stringify({
+              firstName: "Ada",
+              lastName: "Lovelace",
+              email: "ada@example.test",
+              preferredLocale: "en",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/sessions" && method === "GET")
+          return new Response(
+            JSON.stringify(
+              page([
+                {
+                  id: "other-session",
+                  current: false,
+                  createdAt: "2026-10-11T10:00:00Z",
+                },
+              ]),
+            ),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (
+          requestUrl.pathname === "/api/account/applications" &&
+          method === "GET"
+        )
+          return new Response(
+            JSON.stringify(
+              page([
+                {
+                  clientId: "demo-app",
+                  clientName: "Demo app",
+                  scopes: ["openid"],
+                },
+              ]),
+            ),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (
+          requestUrl.pathname === "/api/account/offline-sessions" &&
+          method === "GET"
+        )
+          return new Response(
+            JSON.stringify(
+              page([
+                {
+                  id: "offline-session",
+                  clientId: "demo-app",
+                  clientName: "Demo app",
+                  issuedAt: "2026-10-10T10:00:00Z",
+                },
+              ]),
+            ),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/mfa" && method === "GET")
+          return new Response(
+            JSON.stringify({
+              available: true,
+              enabled: globalThis.__accountMfaEnabled,
+              digits: 6,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/mfa/recovery-codes")
+          return new Response(
+            JSON.stringify({ available: true, remaining: 0 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/account/social-links")
+          return new Response(
+            JSON.stringify([
+              {
+                provider: "github",
+                displayName: "GitHub",
+                linked: globalThis.__accountSocialLinked,
+                configured: true,
+                enabled: true,
+              },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (method !== "GET") {
+          globalThis.__accountMutations.push({
+            method,
+            path: requestUrl.pathname,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          if (requestUrl.pathname === "/api/account/mfa/enable")
+            globalThis.__accountMfaEnabled = true;
+          if (requestUrl.pathname === "/api/account/mfa/disable")
+            globalThis.__accountMfaEnabled = false;
+          if (requestUrl.pathname === "/api/account/social-links/github")
+            globalThis.__accountSocialLinked = false;
+          if (requestUrl.pathname === "/api/account/mfa/setup")
+            return new Response(
+              JSON.stringify({ secret: "test-totp-secret", digits: 6 }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          return new Response(null, { status: 204 });
+        }
+        throw new Error(`Unexpected Account API route: ${requestUrl.pathname}`);
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window
+      .getByRole("button", { name: "Account Console", exact: true })
+      .click();
+    await window.getByRole("button", { name: "Cancel sign-in" }).waitFor();
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=test-account-code`,
+      );
+    });
+    await window
+      .getByRole("heading", { name: "First name & Last name" })
+      .waitFor();
+    window.on("dialog", async (dialog) => {
+      await dialog.accept();
+    });
+    await window.evaluate(() => {
+      globalThis.confirm = () => true;
+    });
+
+    const performSingleMutation = async (button, method, path) => {
+      const startIndex = await application.evaluate(
+        () => globalThis.__accountMutations.length,
+      );
+      await button.click();
+      await button
+        .locator(".spinner")
+        .waitFor({ state: "visible", timeout: 5000 });
+      assert.equal(await button.isDisabled(), true);
+      await button.dispatchEvent("click");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const mutations = await application.evaluate(() =>
+        globalThis.__accountMutations.slice(),
+      );
+      assert.deepEqual(mutations.slice(startIndex), [{ method, path }]);
+      await button.locator(".spinner").waitFor({ state: "detached" });
+    };
+
+    await window.getByRole("button", { name: "Security", exact: true }).click();
+    await window
+      .getByRole("button", { name: "Set up authenticator" })
+      .waitFor();
+    await performSingleMutation(
+      window.getByRole("button", { name: "Set up authenticator" }),
+      "POST",
+      "/api/account/mfa/setup",
+    );
+    await window.locator('[name="mfaCode"]').fill("123456");
+    await performSingleMutation(
+      window.getByRole("button", { name: "Enable two-factor authentication" }),
+      "POST",
+      "/api/account/mfa/enable",
+    );
+    await window
+      .getByRole("button", { name: "Disable two-factor authentication" })
+      .waitFor();
+    await window.locator('[name="mfaCode"]').fill("123456");
+    await performSingleMutation(
+      window.getByRole("button", { name: "Disable two-factor authentication" }),
+      "POST",
+      "/api/account/mfa/disable",
+    );
+    await performSingleMutation(
+      window.getByRole("button", { name: "Remove link" }),
+      "DELETE",
+      "/api/account/social-links/github",
+    );
+    await window.getByRole("button", { name: "Sessions", exact: true }).click();
+    await window.getByText("other-session", { exact: true }).waitFor();
+    await performSingleMutation(
+      window.getByRole("button", { name: "Sign out other sessions" }),
+      "DELETE",
+      "/api/account/sessions/others",
+    );
+
+    await window
+      .getByRole("button", { name: "Applications", exact: true })
+      .click();
+    await window.getByText("Demo app", { exact: true }).first().waitFor();
+    await performSingleMutation(
+      window.getByRole("button", { name: "Revoke access" }),
+      "DELETE",
+      "/api/account/applications/demo-app",
+    );
+    await performSingleMutation(
+      window.getByRole("button", { name: "Revoke token" }),
+      "DELETE",
+      "/api/account/offline-sessions/offline-session",
+    );
+
+    await window.getByRole("button", { name: "Security", exact: true }).click();
+    const passwordForm = window.locator('form[data-form="password"]');
+    await passwordForm
+      .locator('[name="currentPassword"]')
+      .fill("test-current-password");
+    await passwordForm
+      .locator('[name="newPassword"]')
+      .fill("test-new-password-123");
+    await passwordForm
+      .locator('[name="confirmPassword"]')
+      .fill("test-new-password-123");
+    await performSingleMutation(
+      passwordForm.getByRole("button", { name: "Save", exact: true }),
+      "PUT",
+      "/api/account/password",
+    );
+    const deleteForm = window.locator('form[data-form="delete"]');
+    await deleteForm
+      .locator('[name="deletePassword"]')
+      .fill("test-current-password");
+    await performSingleMutation(
+      deleteForm.getByRole("button", { name: "Delete account", exact: true }),
+      "DELETE",
+      "/api/account",
+    );
+    await window.locator(".login-card").waitFor();
+  } finally {
+    await application.close();
+  }
+});
+
 test("creates and updates native OIDC and SAML providers without retaining credentials", async () => {
   const application = await launchDesktop();
   try {
@@ -1024,6 +1283,27 @@ test("creates and updates native OIDC and SAML providers without retaining crede
             JSON.stringify({ clients: 1, users: 1, sessions: 0, consents: 0 }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        if (
+          requestUrl.pathname === "/api/admin/events" &&
+          requestUrl.searchParams.get("size") === "6"
+        )
+          return new Response(
+            JSON.stringify({ content: [], number: 0, totalPages: 0 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/server-info")
+          return new Response(
+            JSON.stringify({
+              issuer: "https://identity.example.test",
+              activeSigningKey: null,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/actuator/health/readiness")
+          return new Response(JSON.stringify({ status: "UP" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         if (requestUrl.pathname === "/api/admin/identity-providers") {
           if (requestMethod === "GET")
             return new Response(
@@ -1672,6 +1952,19 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               headers: { "Content-Type": "application/json" },
             },
           );
+        if (
+          requestUrl.pathname === "/api/admin/events" &&
+          requestUrl.searchParams.get("size") === "6"
+        )
+          return new Response(
+            JSON.stringify({ content: [], number: 0, totalPages: 0 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/actuator/health/readiness")
+          return new Response(JSON.stringify({ status: "UP" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         if (
           /^\/api\/admin\/users\/[1-9]\d*\/enabled$/.test(
             requestUrl.pathname,
@@ -7691,6 +7984,27 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        if (
+          requestUrl.pathname === "/api/admin/events" &&
+          requestUrl.searchParams.get("size") === "6"
+        )
+          return new Response(
+            JSON.stringify({ content: [], number: 0, totalPages: 0 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/server-info")
+          return new Response(
+            JSON.stringify({
+              issuer: "https://identity.example.test",
+              activeSigningKey: null,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/actuator/health/readiness")
+          return new Response(JSON.stringify({ status: "UP" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
         if (requestUrl.pathname !== "/api/admin/dashboard")
           throw new Error("Unexpected Admin API request");
         await new Promise((resolve) => setTimeout(resolve, 100));

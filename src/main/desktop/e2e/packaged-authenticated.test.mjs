@@ -231,6 +231,37 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     assert.equal(profileResponse?.status, 200);
+    await application.evaluate(() => {
+      globalThis.__forcedAccountUnauthorizedResponses = 0;
+      const originalFetch = globalThis.fetch.bind(globalThis);
+      globalThis.fetch = async (input, init) => {
+        const requestUrl = new URL(String(input));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        if (
+          requestUrl.pathname === "/api/account/profile" &&
+          method === "GET" &&
+          globalThis.__forcedAccountUnauthorizedResponses === 0
+        ) {
+          globalThis.__forcedAccountUnauthorizedResponses += 1;
+          return new Response(null, { status: 401 });
+        }
+        return originalFetch(input, init);
+      };
+    });
+    const refreshedProfileResponse = await accountProfile(mainWindow);
+    assert.equal(refreshedProfileResponse.status, 200);
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__forcedAccountUnauthorizedResponses,
+      ),
+      1,
+    );
+    assert.equal(
+      await mainWindow.evaluate(() =>
+        window.desktopApi.auth.hasSession("account"),
+      ),
+      true,
+    );
     assert.equal(
       await mainWindow.url(),
       "app://renderer/native?console=account",
@@ -502,6 +533,27 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     assert.equal(dashboardResponse?.status, 200);
+    await mainWindow.getByText("Server health", { exact: true }).waitFor();
+    await mainWindow.getByText("Active signing key", { exact: true }).waitFor();
+    await mainWindow.getByText("Recent events", { exact: true }).waitFor();
+    assert.equal(await mainWindow.getByText("UP", { exact: true }).count(), 1);
+    const nativeVisualMetrics = await mainWindow.evaluate(() => {
+      const layout = getComputedStyle(document.querySelector(".app"));
+      const card = document.querySelector(".card");
+      const action = document.querySelector(".topbar .primary-button");
+      return {
+        sidebarWidth: layout.gridTemplateColumns.split(" ")[0],
+        bodyFontSize: getComputedStyle(document.body).fontSize,
+        cardRadius: card ? getComputedStyle(card).borderRadius : null,
+        actionHeight: action ? getComputedStyle(action).minHeight : null,
+      };
+    });
+    assert.deepEqual(nativeVisualMetrics, {
+      sidebarWidth: "264px",
+      bodyFontSize: "14px",
+      cardRadius: "12px",
+      actionHeight: "40px",
+    });
     assert.equal(await mainWindow.url(), "app://renderer/native?console=admin");
     assert.equal(
       await mainWindow.evaluate(() =>

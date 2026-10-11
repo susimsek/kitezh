@@ -649,12 +649,30 @@ function adminContent() {
     return adminAdminAuthenticationContent();
   const dashboard = state.data.dashboard ?? {};
   const stats = [
-    ["clients", "adminStatClients"],
-    ["users", "adminStatUsers"],
-    ["sessions", "adminStatSessions"],
-    ["consents", "adminStatConsents"],
+    ["clients", "adminStatClients", "layers", "clients"],
+    ["users", "adminStatUsers", "home", "users"],
+    ["sessions", "adminStatSessions", "gear", "sessions"],
+    ["consents", "adminStatConsents", "shield", "consents"],
   ];
-  return `<section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${stats.map(([key, label]) => `<article class="card stat-card"><h2>${escapeHtml(text(label))}</h2><p class="stat-value">${Number.isSafeInteger(dashboard[key]) && dashboard[key] >= 0 ? dashboard[key] : 0}</p></article>`).join("")}</section>`;
+  const statCards = stats
+    .map(([key, label, iconName, route]) => {
+      const icon = icons[iconName];
+      return `<article class="card stat-card"><div><h2>${escapeHtml(text(label))}</h2><p class="stat-value">${Number.isSafeInteger(dashboard[key]) && dashboard[key] >= 0 ? dashboard[key] : "—"}</p></div><span class="admin-stat-icon" aria-hidden="true">${icon ? escapeHtml(icon.unicode) : ""}</span><div class="stat-action">${navButton(route, text("adminViewAll"))}</div></article>`;
+    })
+    .join("");
+  const health = state.data.adminHealth ?? "DOWN";
+  const server = state.data.adminServerInfo ?? {};
+  const signingKey = server.activeSigningKey;
+  const events = Array.isArray(state.data.adminDashboardEvents)
+    ? state.data.adminDashboardEvents
+    : [];
+  const eventRows = events
+    .map(
+      (event) =>
+        `<div class="dashboard-event"><span class="event-action">${escapeHtml(event.action)}</span><div class="event-summary"><strong>${escapeHtml(event.actor)}</strong><span>${escapeHtml(event.targetType)}</span><small>${escapeHtml(event.targetId)}</small></div><time datetime="${escapeHtml(event.occurredAt)}">${escapeHtml(new Date(event.occurredAt).toLocaleString(state.locale === "tr" ? "tr-TR" : "en-US"))}</time></div>`,
+    )
+    .join("");
+  return `<div class="dashboard-layout"><section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${statCards}</section><section class="dashboard-panels"><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.heartPulse?.unicode ?? "")}</span>${escapeHtml(text("adminServerHealth"))}</h2><div class="health-row"><span class="health-badge ${health === "UP" ? "is-up" : "is-down"}" role="status">${escapeHtml(health)}</span><span>${escapeHtml(text("adminReadinessProbe"))}</span></div><p class="issuer-value">${escapeHtml(server.issuer ?? "—")}</p>${navButton("configuration", text("adminOpenServerInfo"))}</article><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.key?.unicode ?? "")}</span>${escapeHtml(text("adminActiveSigningKey"))}</h2>${signingKey ? `<p class="signing-key-id">${escapeHtml(signingKey.kid)}</p><span class="key-algorithm">${escapeHtml(signingKey.algorithm)}</span>` : '<p class="empty-value">—</p>'}${navButton("keys", text("adminManageKeys"))}</article></section><section class="card dashboard-events"><div class="dashboard-events-heading"><div><h2><span aria-hidden="true">${escapeHtml(icons.clockRotateLeft?.unicode ?? "")}</span>${escapeHtml(text("adminRecentEvents"))}</h2><p>${escapeHtml(text("adminRecentActivity"))}</p></div>${navButton("events", text("adminViewAll"))}</div><div class="dashboard-event-list">${eventRows || `<p class="empty-value">${escapeHtml(text("adminNoRecentEvents"))}</p>`}</div></section></div>`;
 }
 
 function adminUsersContent() {
@@ -2876,7 +2894,7 @@ function securityContent() {
   const mfa = state.data.mfa ?? {};
   const social = state.data.social ?? [];
   const passwordErrors = violations(state.error?.body);
-  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("passwordPolicy"))}</h2><p>${escapeHtml(text("securityTitle"))}</p><form data-form="password" novalidate>${field("currentPassword", text("currentPassword"), "", passwordErrors.currentPassword, "password")}${field("newPassword", text("newPassword"), "", passwordErrors.newPassword, "password")}${field("confirmPassword", text("confirmPassword"), "", passwordErrors.confirmPassword, "password")}<div class="actions">${button(text("save"), { action: "save-password", type: "submit", busy: state.busy === "password", mutation: true })}</div></form></section><section class="card"><h2>${escapeHtml(text("mfaTitle"))}</h2><p>${escapeHtml(text("mfaHelp"))}</p>${mfa.available === false ? `<div class="notice">${escapeHtml(text("mfaUnavailable"))}</div>` : mfa.enabled ? `<div class="notice success">${escapeHtml(text("mfaEnabled"))}</div>${field("mfaCode", text("mfaCode"), "", "", "text", 'inputmode="numeric" maxlength="${mfa.digits ?? 6}"')}${button(text("mfaDisable"), { action: "mfa-disable", busy: state.busy === "mfa", mutation: true })}` : mfa.setup ? `<div class="notice">${escapeHtml(text("mfaSecret"))}: <code>${escapeHtml(mfa.setup.secret ?? "")}</code></div>${field("mfaCode", text("mfaCode"), "", "", "text", 'inputmode="numeric" maxlength="${mfa.setup.digits ?? 6}"')}${button(text("mfaEnable"), { action: "mfa-enable", busy: state.busy === "mfa", mutation: true })}` : button(text("mfaSetup"), { action: "mfa-setup", busy: state.busy === "mfa", mutation: true })}</section><section class="card"><h2>${escapeHtml(text("socialLinksTitle"))}</h2><p>${escapeHtml(text("socialLinksHelp"))}</p><div class="list">${social.length ? social.map((link) => `<div class="list-item"><div><strong>${escapeHtml(link.displayName ?? link.provider)}</strong><span class="muted">${escapeHtml(link.linked ? text("socialConnected") : link.configured && link.enabled ? text("socialNotConnected") : text("socialNotConfigured"))}</span></div>${link.linked ? button(text("socialRemove"), { action: "social-remove", danger: true, mutation: true }) : button(text("socialConnect"), { action: "social-start", busy: state.busy === "social", disabled: !link.configured || !link.enabled, mutation: true, provider: link.provider })}</div>`).join("") : `<div class="empty">${escapeHtml(text("socialLinksEmpty"))}</div>`}</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
+  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("passwordPolicy"))}</h2><p>${escapeHtml(text("securityTitle"))}</p><form data-form="password" novalidate>${field("currentPassword", text("currentPassword"), "", passwordErrors.currentPassword, "password")}${field("newPassword", text("newPassword"), "", passwordErrors.newPassword, "password")}${field("confirmPassword", text("confirmPassword"), "", passwordErrors.confirmPassword, "password")}<div class="actions">${button(text("save"), { action: "save-password", type: "submit", busy: state.busy === "password", mutation: true })}</div></form></section><section class="card"><h2>${escapeHtml(text("mfaTitle"))}</h2><p>${escapeHtml(text("mfaHelp"))}</p>${mfa.available === false ? `<div class="notice">${escapeHtml(text("mfaUnavailable"))}</div>` : mfa.enabled ? `<div class="notice success">${escapeHtml(text("mfaEnabled"))}</div>${field("mfaCode", text("mfaCode"), "", "", "text", 'inputmode="numeric" maxlength="${mfa.digits ?? 6}"')}${button(text("mfaDisable"), { action: "mfa-disable", busy: state.busy === "mfa", mutation: true })}` : mfa.setup ? `<div class="notice">${escapeHtml(text("mfaSecret"))}: <code>${escapeHtml(mfa.setup.secret ?? "")}</code></div>${field("mfaCode", text("mfaCode"), "", "", "text", 'inputmode="numeric" maxlength="${mfa.setup.digits ?? 6}"')}${button(text("mfaEnable"), { action: "mfa-enable", busy: state.busy === "mfa", mutation: true })}` : button(text("mfaSetup"), { action: "mfa-setup", busy: state.busy === "mfa", mutation: true })}</section><section class="card"><h2>${escapeHtml(text("socialLinksTitle"))}</h2><p>${escapeHtml(text("socialLinksHelp"))}</p><div class="list">${social.length ? social.map((link) => `<div class="list-item"><div><strong>${escapeHtml(link.displayName ?? link.provider)}</strong><span class="muted">${escapeHtml(link.linked ? text("socialConnected") : link.configured && link.enabled ? text("socialNotConnected") : text("socialNotConfigured"))}</span></div>${link.linked ? button(text("socialRemove"), { action: "social-remove", danger: true, busy: state.busy === "social", mutation: true }) : button(text("socialConnect"), { action: "social-start", busy: state.busy === "social", disabled: !link.configured || !link.enabled, mutation: true, provider: link.provider })}</div>`).join("") : `<div class="empty">${escapeHtml(text("socialLinksEmpty"))}</div>`}</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
 }
 
 function pageItems(items, emptyText, renderItem) {
@@ -2893,7 +2911,7 @@ function sessionsContent() {
 function applicationsContent() {
   const applications = state.data.applications ?? [];
   const offline = state.data.offlineSessions ?? [];
-  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("applicationsTitle"))}</h2><p>${escapeHtml(text("applicationsError"))}</p>${pageItems(applications, text("applicationsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.clientId)}"><div><strong>${escapeHtml(item.clientName ?? item.clientId)}</strong><span class="muted">${escapeHtml((item.scopes ?? []).join(", "))}</span></div>${button(text("revokeApplication"), { action: "revoke-application", danger: true, mutation: true })}</div>`)}</section><section class="card"><h2>${escapeHtml(text("offlineSessionsTitle"))}</h2><p>${escapeHtml(text("offlineSessionsHelp"))}</p>${pageItems(offline, text("offlineSessionsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.clientName ?? item.clientId)}</strong><span class="muted">${escapeHtml(item.issuedAt ?? "")}</span></div>${button(text("revokeOfflineSession"), { action: "revoke-offline", danger: true, mutation: true })}</div>`)}</section></div>`;
+  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("applicationsTitle"))}</h2><p>${escapeHtml(text("applicationsError"))}</p>${pageItems(applications, text("applicationsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.clientId)}"><div><strong>${escapeHtml(item.clientName ?? item.clientId)}</strong><span class="muted">${escapeHtml((item.scopes ?? []).join(", "))}</span></div>${button(text("revokeApplication"), { action: "revoke-application", danger: true, busy: state.busy === "revoke-application", mutation: true })}</div>`)}</section><section class="card"><h2>${escapeHtml(text("offlineSessionsTitle"))}</h2><p>${escapeHtml(text("offlineSessionsHelp"))}</p>${pageItems(offline, text("offlineSessionsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.clientName ?? item.clientId)}</strong><span class="muted">${escapeHtml(item.issuedAt ?? "")}</span></div>${button(text("revokeOfflineSession"), { action: "revoke-offline", danger: true, busy: state.busy === "revoke-offline", mutation: true })}</div>`)}</section></div>`;
 }
 
 function settingsContent() {
@@ -2944,8 +2962,26 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
   if (!preserveError) state.error = null;
   render();
   try {
-    if (state.console === "admin" && state.route === "dashboard")
-      state.data.dashboard = await request("/api/admin/dashboard");
+    if (state.console === "admin" && state.route === "dashboard") {
+      const [dashboard, events, serverInfo, health] = await Promise.allSettled([
+        request("/api/admin/dashboard"),
+        request("/api/admin/events?size=6&sort=occurredAt,desc"),
+        request("/api/admin/server-info"),
+        request("/actuator/health/readiness"),
+      ]);
+      if (dashboard.status === "rejected") throw dashboard.reason;
+      state.data.dashboard = dashboard.value;
+      state.data.adminDashboardEvents =
+        events.status === "fulfilled" && Array.isArray(events.value?.content)
+          ? events.value.content.slice(0, 6)
+          : [];
+      state.data.adminServerInfo =
+        serverInfo.status === "fulfilled" ? serverInfo.value : null;
+      state.data.adminHealth =
+        health.status === "fulfilled" && health.value?.status === "UP"
+          ? "UP"
+          : "DOWN";
+    }
     if (state.console === "admin" && state.route === "users") {
       const query = new URLSearchParams({
         q: state.data.userQuery ?? "",
@@ -9349,6 +9385,8 @@ async function action(action, element) {
       );
       state.notice = text("signOutSession");
       await loadRoute();
+      state.busy = null;
+      render();
     } catch {
       state.busy = null;
       render();
@@ -9382,6 +9420,8 @@ async function action(action, element) {
           : "revokeOfflineSessionSuccess",
       );
       await loadRoute();
+      state.busy = null;
+      render();
     } catch {
       state.busy = null;
       render();
@@ -9404,6 +9444,8 @@ async function action(action, element) {
       );
       state.notice = text("socialRemoveSuccess");
       await loadRoute();
+      state.busy = null;
+      render();
     } catch {
       state.busy = null;
       render();
@@ -9478,12 +9520,17 @@ function bind() {
   document.querySelectorAll("[data-route]").forEach((element) =>
     element.addEventListener("click", () => {
       if (state.busy || element.disabled) return;
-      if (state.route !== element.dataset.route)
-        state.data.clientCreateSecret = null;
-      state.route = element.dataset.route;
+      const destination = element.dataset.route;
+      if (state.route !== destination) state.data.clientCreateSecret = null;
+      state.route = destination;
       state.notice = null;
       state.busy = `route:${state.route}`;
       void loadRoute().finally(() => {
+        if (
+          state.route !== destination ||
+          state.busy !== `route:${destination}`
+        )
+          return;
         state.busy = null;
         render();
       });

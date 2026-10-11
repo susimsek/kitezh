@@ -520,6 +520,7 @@ function isAllowedApiPath(
       return true;
     if (method !== "GET") return false;
     if (path === "/api/admin/dashboard") return true;
+    if (path === "/actuator/health/readiness") return true;
     if (
       path === "/api/admin/settings/ciba-policy" ||
       path === "/api/admin/settings/offline-access" ||
