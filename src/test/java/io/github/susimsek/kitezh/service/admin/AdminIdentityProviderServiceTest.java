@@ -617,6 +617,37 @@ class AdminIdentityProviderServiceTest {
     }
 
     @Test
+    void preservesEncryptedSamlKeysWhenAnUpdateLeavesPrivateKeyFieldsBlank() {
+        SocialProviderEntity provider = provider();
+        provider.setProviderType("saml");
+        when(providerRepository.findById("provider-1")).thenReturn(Optional.of(provider));
+        SamlProviderConfigEntity existingConfig = new SamlProviderConfigEntity();
+        existingConfig.setProviderId("provider-1");
+        existingConfig.setMetadataUri("https://idp.example/metadata");
+        existingConfig.setAssertingPartyEntityId("https://idp.example/entity");
+        existingConfig.setSingleSignOnServiceUrl("https://idp.example/sso");
+        existingConfig.setIdpCertificate("existing-idp-certificate");
+        existingConfig.setSigningPrivateKeyEncrypted("encrypted-signing-key");
+        existingConfig.setDecryptionPrivateKeyEncrypted("encrypted-decryption-key");
+        when(samlConfigRepository.findById("provider-1")).thenReturn(Optional.of(existingConfig));
+        when(samlConfigRepository.findByProviderId("provider-1"))
+                .thenReturn(Optional.of(existingConfig));
+        when(samlConfigRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminIdentityProviderDTO result =
+                samlService.update("provider-1", samlRequest(null, false, null));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(SamlProviderConfigEntity.class);
+        verify(samlConfigRepository).save(captor.capture());
+        assertThat(captor.getValue().getSigningPrivateKeyEncrypted())
+                .isEqualTo("encrypted-signing-key");
+        assertThat(captor.getValue().getDecryptionPrivateKeyEncrypted())
+                .isEqualTo("encrypted-decryption-key");
+        assertThat(result.samlSigningPrivateKeyConfigured()).isTrue();
+        assertThat(result.samlDecryptionPrivateKeyConfigured()).isTrue();
+    }
+
+    @Test
     void rejectsSamlProviderWithoutMetadataOrManualPartyDetails() {
         when(providerRepository.existsByRegistrationId("acme")).thenReturn(false);
         when(providerRepository.existsByAliasIgnoreCase("acme")).thenReturn(false);

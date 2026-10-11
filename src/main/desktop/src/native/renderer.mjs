@@ -70,7 +70,9 @@ const actionIcons = {
   "admin-group-members-toggle": "edit",
   "admin-provider-mappers-toggle": "edit",
   "admin-identity-provider-config-edit": "edit",
+  "admin-saml-provider-config-edit": "edit",
   "admin-oidc-provider-create": "add",
+  "admin-saml-provider-create": "add",
   "admin-message-delete-request": "delete",
   "admin-message-delete-confirm": "delete",
   "admin-provider-mapper-create": "add",
@@ -1727,11 +1729,14 @@ function adminIdentityProvidersContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
+  const openConfigurationId = state.data.identityProviderConfigurationOpenId;
   const createForm =
-    state.data.identityProviderConfigurationOpenId === "new"
+    openConfigurationId === "new"
       ? identityProviderConfigurationForm("new")
-      : "";
-  return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminIdentityProviders"))}</h2>${button(text("adminAddOidcProvider"), { action: "admin-oidc-provider-create", icon: "add", busy: state.busy === "identity-provider-create", disabled: state.offline || Boolean(state.busy) })}</div>${createForm}<form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${
+      : openConfigurationId === "new-saml"
+        ? samlIdentityProviderConfigurationForm("new-saml")
+        : "";
+  return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminIdentityProviders"))}</h2><div class="actions">${button(text("adminAddOidcProvider"), { action: "admin-oidc-provider-create", icon: "add", busy: state.busy === "identity-provider-create", disabled: state.offline || Boolean(state.busy) })}${button(text("adminAddSamlProvider"), { action: "admin-saml-provider-create", icon: "add", disabled: state.offline || Boolean(state.busy) })}</div></div>${createForm}<form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${
     providers.length
       ? `<div class="list">${providers
           .map((provider) => {
@@ -1750,7 +1755,9 @@ function adminIdentityProvidersContent() {
             const editingConnection =
               state.data.identityProviderConfigurationOpenId === id;
             const connectionForm = editingConnection
-              ? identityProviderConfigurationForm(id)
+              ? provider.providerType === "saml"
+                ? samlIdentityProviderConfigurationForm(id)
+                : identityProviderConfigurationForm(id)
               : "";
             const controls = confirming
               ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteIdentityProviderPrompt"))}</span>${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-confirm", id, danger: true, busy: state.busy === `identity-provider-delete:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
@@ -1767,15 +1774,26 @@ function adminIdentityProvidersContent() {
               disabled: state.offline || Boolean(state.busy),
             });
             const mapperPanel = renderIdentityProviderMappers(id);
-            const connectionButton =
-              provider.providerType !== "oidc"
-                ? ""
-                : button(text("adminEditProviderConnection"), {
-                    action: "admin-identity-provider-config-edit",
+            const connectionButton = !["oidc", "saml"].includes(
+              provider.providerType,
+            )
+              ? ""
+              : button(
+                  text(
+                    provider.providerType === "saml"
+                      ? "adminEditSamlConfiguration"
+                      : "adminEditProviderConnection",
+                  ),
+                  {
+                    action:
+                      provider.providerType === "saml"
+                        ? "admin-saml-provider-config-edit"
+                        : "admin-identity-provider-config-edit",
                     id,
                     busy: state.busy === `identity-provider-config-load:${id}`,
                     disabled: state.offline || Boolean(state.busy),
-                  });
+                  },
+                );
             return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditProviderPolicy"), { action: "admin-identity-provider-policy-toggle", id, busy: state.busy === `identity-provider-policy-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${connectionButton}${mapperButton}${controls}</div>${connectionForm}${policyForm}${mapperPanel}</article>`;
           })
           .join("")}</div>`
@@ -1799,6 +1817,35 @@ const PROVIDER_CONNECTION_FIELDS = [
   "userNameAttribute",
 ];
 
+const SAML_CONNECTION_FIELDS = [
+  "registrationId",
+  "displayName",
+  "alias",
+  "iconKey",
+  "samlMetadataUri",
+  "samlAssertingPartyEntityId",
+  "samlSingleSignOnServiceUrl",
+  "samlSingleLogoutServiceUrl",
+  "samlIdpCertificate",
+  "samlSigningCertificate",
+  "samlServiceProviderEntityId",
+  "samlSignAuthnRequests",
+  "samlWantAssertionsSigned",
+  "samlNameIdFormat",
+  "samlPrincipalAttribute",
+  "samlEmailAttribute",
+  "samlFirstNameAttribute",
+  "samlLastNameAttribute",
+  "samlGroupsAttribute",
+  "samlDecryptionCertificate",
+  "samlSignatureAlgorithm",
+  "samlAuthnRequestBinding",
+  "samlResponseBinding",
+  "samlLogoutBinding",
+  "samlForceAuthentication",
+  "samlPassSubject",
+];
+
 function defaultIdentityProviderConfiguration() {
   return {
     providerType: "oidc",
@@ -1815,6 +1862,30 @@ function defaultIdentityProviderConfiguration() {
     clientAuthenticationMethod: "client_secret_basic",
     scopes: "openid profile email",
     userNameAttribute: "sub",
+    samlMetadataUri: "",
+    samlAssertingPartyEntityId: "",
+    samlSingleSignOnServiceUrl: "",
+    samlSingleLogoutServiceUrl: "",
+    samlIdpCertificate: "",
+    samlSigningPrivateKeyConfigured: false,
+    samlSigningCertificate: "",
+    samlServiceProviderEntityId: "",
+    samlSignAuthnRequests: false,
+    samlWantAssertionsSigned: true,
+    samlNameIdFormat: "",
+    samlPrincipalAttribute: "NameID",
+    samlEmailAttribute: "email",
+    samlFirstNameAttribute: "givenName",
+    samlLastNameAttribute: "sn",
+    samlGroupsAttribute: "groups",
+    samlDecryptionPrivateKeyConfigured: false,
+    samlDecryptionCertificate: "",
+    samlSignatureAlgorithm: "",
+    samlAuthnRequestBinding: "REDIRECT",
+    samlResponseBinding: "POST",
+    samlLogoutBinding: "REDIRECT",
+    samlForceAuthentication: false,
+    samlPassSubject: false,
     enabled: true,
     shortStateParameter: false,
     caseSensitiveUsername: false,
@@ -1833,11 +1904,12 @@ function defaultIdentityProviderConfiguration() {
 
 function identityProviderConfigurationDraft(provider) {
   const defaults = defaultIdentityProviderConfiguration();
+  const fields =
+    provider?.providerType === "saml"
+      ? SAML_CONNECTION_FIELDS
+      : PROVIDER_CONNECTION_FIELDS;
   return Object.fromEntries(
-    PROVIDER_CONNECTION_FIELDS.map((key) => [
-      key,
-      provider?.[key] ?? defaults[key] ?? "",
-    ]),
+    fields.map((key) => [key, provider?.[key] ?? defaults[key] ?? ""]),
   );
 }
 
@@ -1858,6 +1930,22 @@ function identityProviderConfigurationFormDraft(form) {
   delete draft.clientSecret;
   return Object.fromEntries(
     PROVIDER_CONNECTION_FIELDS.map((key) => [key, draft[key] ?? ""]),
+  );
+}
+
+function samlIdentityProviderConfigurationFormDraft(form) {
+  const draft = formValues(form);
+  for (const name of ["samlSigningPrivateKey", "samlDecryptionPrivateKey"])
+    delete draft[name];
+  for (const name of [
+    "samlSignAuthnRequests",
+    "samlWantAssertionsSigned",
+    "samlForceAuthentication",
+    "samlPassSubject",
+  ])
+    draft[name] = form.elements.namedItem(name).checked;
+  return Object.fromEntries(
+    SAML_CONNECTION_FIELDS.map((key) => [key, draft[key] ?? ""]),
   );
 }
 
@@ -1911,6 +1999,32 @@ function identityProviderConfigurationForm(id) {
     )
     .join("")}</select>${required("clientAuthenticationMethod")}</div>`;
   return `<form class="card" data-form="admin-identity-provider-connection" data-provider-id="${creating ? "" : escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminProviderConnectionTitle"))}</h3>${textField("registrationId", "adminProviderRegistrationId", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("displayName", "adminProviderDisplayName", "text", 'maxlength="100" required')}${textField("alias", "adminProviderAlias", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("iconKey", "adminProviderIconKey", "text", 'maxlength="40" pattern="[a-z][a-z0-9_-]{0,39}" required')}${textField("clientId", "adminProviderClientId", "text", 'maxlength="500" required')}${textField("clientSecret", "adminProviderClientSecret", "password", `maxlength="1000" autocomplete="new-password" ${creating || !baseline?.clientSecretConfigured ? "required" : ""}`)}<div class="muted">${escapeHtml(secretHint)} ${escapeHtml(text("adminProviderConnectionSecretHint"))}</div>${textField("authorizationUri", "adminProviderAuthorizationUri", "url", 'maxlength="1000" required')}${textField("tokenUri", "adminProviderTokenUri", "url", 'maxlength="1000" required')}${textField("userInfoUri", "adminProviderUserInfoUri", "url", 'maxlength="1000"')}${textField("jwkSetUri", "adminProviderJwkSetUri", "url", 'maxlength="1000"')}${textField("issuerUri", "adminProviderIssuerUri", "url", 'maxlength="1000"')}${authenticationMethodField}${textField("scopes", "adminProviderScopes", "text", 'maxlength="1000" required')}${textField("userNameAttribute", "adminProviderUserNameAttribute", "text", 'maxlength="100" required')}<div class="actions">${button(text(creating ? "adminAddOidcProvider" : "save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy), icon: creating ? "add" : "check" })}<button class="secondary-button" type="button" data-action="admin-identity-provider-config-cancel" data-provider-id="${escapeHtml(key)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
+}
+
+function samlIdentityProviderConfigurationForm(id) {
+  const creating = id === "new-saml";
+  const key = creating ? "new-saml" : id;
+  const draft = state.data.identityProviderConfigurationDrafts?.[key] ?? {};
+  const baseline = state.data.identityProviderConfigurationBaselines?.[key];
+  const errors =
+    state.data.identityProviderConfigurationErrorId === key
+      ? violations(state.error?.body)
+      : {};
+  const busy = state.busy === `identity-provider-config-save:${key}`;
+  const value = (name) => draft[name] ?? "";
+  const field = (name, label, type = "text", attributes = "") =>
+    `<div class="field"><label for="saml-config-${key}-${name}">${escapeHtml(text(label))}</label>${type === "textarea" ? `<textarea id="saml-config-${key}-${name}" name="${name}" ${attributes}>${escapeHtml(value(name))}</textarea>` : `<input id="saml-config-${key}-${name}" name="${name}" type="${type}" value="${type === "password" ? "" : escapeHtml(value(name))}" ${attributes}/>`}<div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
+  const checkbox = (name, label, defaultValue = false) =>
+    `<label class="settings-row"><span>${escapeHtml(text(label))}</span><input name="${name}" type="checkbox" ${(draft[name] ?? defaultValue) ? "checked" : ""}/></label>`;
+  const select = (name, label, options, defaultValue) =>
+    `<div class="field"><label for="saml-config-${key}-${name}">${escapeHtml(text(label))}</label><select id="saml-config-${key}-${name}" name="${name}">${options.map((option) => `<option value="${option}" ${(value(name) || defaultValue) === option ? "selected" : ""}>${option}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
+  const signingKeyHint = baseline?.samlSigningPrivateKeyConfigured
+    ? text("adminSamlSigningKeyConfigured")
+    : "";
+  const decryptionKeyHint = baseline?.samlDecryptionPrivateKeyConfigured
+    ? text("adminSamlDecryptionKeyConfigured")
+    : "";
+  return `<form class="card" data-form="admin-saml-identity-provider-connection" data-provider-id="${creating ? "" : escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminSamlConfigurationTitle"))}</h3>${field("registrationId", "adminProviderRegistrationId", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${field("displayName", "adminProviderDisplayName", "text", 'maxlength="100" required')}${field("alias", "adminProviderAlias", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${field("iconKey", "adminProviderIconKey", "text", 'maxlength="40" pattern="[a-z][a-z0-9_-]{0,39}" required')}${field("samlMetadataUri", "adminSamlMetadataUri", "url", 'maxlength="2000"')}${field("samlAssertingPartyEntityId", "adminSamlPartyId", "url", 'maxlength="1000"')}${field("samlSingleSignOnServiceUrl", "adminSamlSsoUri", "url", 'maxlength="2000"')}${field("samlSingleLogoutServiceUrl", "adminSamlSloUri", "url", 'maxlength="2000"')}${field("samlIdpCertificate", "adminSamlIdpCertificate", "textarea", 'maxlength="12000" rows="4" spellcheck="false"')}${field("samlServiceProviderEntityId", "adminSamlServiceProviderId", "url", 'maxlength="1000"')}${field("samlSigningCertificate", "adminSamlSigningCertificate", "textarea", 'maxlength="12000" rows="4" spellcheck="false"')}${field("samlSigningPrivateKey", "adminSamlSigningKey", "textarea", 'maxlength="16000" rows="4" autocomplete="off" spellcheck="false" class="secret-pem"')}<div class="muted">${escapeHtml([signingKeyHint, text("adminSamlPrivateKeyHint")].filter(Boolean).join(" "))}</div>${checkbox("samlSignAuthnRequests", "adminSamlSignAuthnRequests")}${checkbox("samlWantAssertionsSigned", "adminSamlSignedAssertions", true)}${field("samlDecryptionCertificate", "adminSamlDecryptionCertificate", "textarea", 'maxlength="12000" rows="4" spellcheck="false"')}${field("samlDecryptionPrivateKey", "adminSamlDecryptionKey", "textarea", 'maxlength="16000" rows="4" autocomplete="off" spellcheck="false" class="secret-pem"')}<div class="muted">${escapeHtml([decryptionKeyHint, text("adminSamlPrivateKeyHint")].filter(Boolean).join(" "))}</div>${field("samlNameIdFormat", "adminSamlNameIdFormat", "text", 'maxlength="200"')}${field("samlPrincipalAttribute", "adminSamlPrincipalAttribute", "text", 'maxlength="200"')}${field("samlEmailAttribute", "adminSamlEmailAttribute", "text", 'maxlength="200"')}${field("samlFirstNameAttribute", "adminSamlFirstNameAttribute", "text", 'maxlength="200"')}${field("samlLastNameAttribute", "adminSamlLastNameAttribute", "text", 'maxlength="200"')}${field("samlGroupsAttribute", "adminSamlGroupsAttribute", "text", 'maxlength="200"')}${field("samlSignatureAlgorithm", "adminSamlSignatureAlgorithm", "url", 'maxlength="500"')}${select("samlAuthnRequestBinding", "adminSamlAuthnBinding", ["POST", "REDIRECT"], "REDIRECT")}${select("samlResponseBinding", "adminSamlResponseBinding", ["POST", "REDIRECT"], "POST")}${select("samlLogoutBinding", "adminSamlLogoutBinding", ["POST", "REDIRECT"], "REDIRECT")}${checkbox("samlForceAuthentication", "adminSamlForceAuthentication")}${checkbox("samlPassSubject", "adminSamlPassSubject")}<div class="actions">${button(text(creating ? "adminAddSamlProvider" : "save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy), icon: creating ? "add" : "check" })}<button class="secondary-button" type="button" data-action="admin-identity-provider-config-cancel" data-provider-id="${escapeHtml(key)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
 }
 
 function adminAdminSessionsContent() {
@@ -2715,11 +2829,20 @@ function preserveOfflineDrafts() {
         state.data.clientConfigurationDrafts[id] =
           clientConfigurationFormDraft(form);
       }
-    } else if (form.dataset.form === "admin-identity-provider-connection") {
-      const key = form.dataset.providerId || "new";
+    } else if (
+      form.dataset.form === "admin-identity-provider-connection" ||
+      form.dataset.form === "admin-saml-identity-provider-connection"
+    ) {
+      const key =
+        form.dataset.providerId ||
+        (form.dataset.form === "admin-saml-identity-provider-connection"
+          ? "new-saml"
+          : "new");
       state.data.identityProviderConfigurationDrafts ??= {};
       state.data.identityProviderConfigurationDrafts[key] =
-        identityProviderConfigurationFormDraft(form);
+        form.dataset.form === "admin-saml-identity-provider-connection"
+          ? samlIdentityProviderConfigurationFormDraft(form)
+          : identityProviderConfigurationFormDraft(form);
     } else if (form.dataset.form === "admin-client-native-metadata") {
       const id = form.dataset.clientId;
       if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
@@ -2854,6 +2977,226 @@ function groupPermissionAssignmentsFromForm(form) {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-saml-identity-provider-connection") {
+    const providerId = form.dataset.providerId ?? "";
+    const creating = providerId.length === 0;
+    const key = creating ? "new-saml" : providerId;
+    const providers = state.data.identityProviders?.content ?? [];
+    const provider = creating
+      ? null
+      : providers.find((item) => item.id === providerId);
+    const baseline = state.data.identityProviderConfigurationBaselines?.[key];
+    if (
+      state.offline ||
+      !adminRouteAllowed("identity-providers") ||
+      (creating &&
+        state.data.identityProviderConfigurationOpenId !== "new-saml") ||
+      (!creating &&
+        (!/^[A-Za-z0-9_-]{1,100}$/.test(providerId) ||
+          !provider ||
+          provider.providerType !== "saml" ||
+          baseline?.id !== providerId ||
+          baseline?.providerType !== "saml"))
+    )
+      return;
+
+    const draft = samlIdentityProviderConfigurationFormDraft(form);
+    const signingKey = String(values.samlSigningPrivateKey ?? "").trim();
+    const decryptionKey = String(values.samlDecryptionPrivateKey ?? "").trim();
+    const localErrors = {};
+    if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.registrationId))
+      localErrors.registrationId = text("adminRequired");
+    if (!draft.displayName.trim())
+      localErrors.displayName = text("adminRequired");
+    if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.alias))
+      localErrors.alias = text("adminRequired");
+    if (!/^[a-z][a-z0-9_-]{0,39}$/.test(draft.iconKey))
+      localErrors.iconKey = text("adminRequired");
+    const metadataUri = draft.samlMetadataUri.trim();
+    const partyId = draft.samlAssertingPartyEntityId.trim();
+    const ssoUri = draft.samlSingleSignOnServiceUrl.trim();
+    const idpCertificate = draft.samlIdpCertificate.trim();
+    const metadataConfigured = Boolean(metadataUri);
+    const manualConfigured = Boolean(partyId && ssoUri && idpCertificate);
+    if (!metadataConfigured && !manualConfigured)
+      localErrors.samlMetadataUri = text("adminSamlSourceRequired");
+    for (const name of [
+      "samlMetadataUri",
+      "samlSingleSignOnServiceUrl",
+      "samlSingleLogoutServiceUrl",
+    ]) {
+      const uri = draft[name].trim();
+      if (uri && !isSafeProviderEndpointUri(uri))
+        localErrors[name] = text("adminInvalidUri");
+    }
+    for (const name of [
+      "samlAssertingPartyEntityId",
+      "samlServiceProviderEntityId",
+      "samlSignatureAlgorithm",
+    ]) {
+      const uri = draft[name].trim();
+      if (uri && !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(uri))
+        localErrors[name] = text("adminInvalidUri");
+    }
+    if (
+      draft.samlSignAuthnRequests &&
+      !signingKey &&
+      !baseline?.samlSigningPrivateKeyConfigured
+    )
+      localErrors.samlSigningPrivateKey = text("adminRequired");
+    if (
+      signingKey &&
+      !/^-----BEGIN PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----$/.test(
+        signingKey,
+      )
+    )
+      localErrors.samlSigningPrivateKey = text("adminRequired");
+    if (
+      decryptionKey &&
+      !/^-----BEGIN PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----$/.test(
+        decryptionKey,
+      )
+    )
+      localErrors.samlDecryptionPrivateKey = text("adminRequired");
+    for (const [name, label] of [
+      ["samlIdpCertificate", "CERTIFICATE"],
+      ["samlSigningCertificate", "CERTIFICATE"],
+      ["samlDecryptionCertificate", "CERTIFICATE"],
+    ]) {
+      const pem = draft[name].trim();
+      if (
+        pem &&
+        !(
+          pem.startsWith(`-----BEGIN ${label}-----`) &&
+          pem.includes("\n") &&
+          pem.endsWith(`-----END ${label}-----`)
+        )
+      )
+        localErrors[name] = text("adminRequired");
+    }
+    if (Object.keys(localErrors).length) {
+      state.data.identityProviderConfigurationDrafts ??= {};
+      state.data.identityProviderConfigurationDrafts[key] = draft;
+      state.data.identityProviderConfigurationErrorId = key;
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: Object.values(localErrors)[0],
+          violations: Object.entries(localErrors).map(
+            ([fieldName, message]) => ({ field: fieldName, message }),
+          ),
+        },
+      };
+      render();
+      return;
+    }
+    if (!form.reportValidity()) return;
+
+    const current = creating
+      ? defaultIdentityProviderConfiguration()
+      : baseline;
+    const body = {
+      registrationId: draft.registrationId.trim(),
+      providerType: "saml",
+      displayName: draft.displayName.trim(),
+      alias: draft.alias.trim(),
+      iconKey: draft.iconKey.trim(),
+      shortStateParameter: Boolean(current.shortStateParameter),
+      caseSensitiveUsername: Boolean(current.caseSensitiveUsername),
+      enabled: Boolean(current.enabled),
+      clientId: null,
+      clientSecret: null,
+      hideOnLogin: Boolean(current.hideOnLogin),
+      accountLinkingOnly: Boolean(current.accountLinkingOnly),
+      trustEmail: Boolean(current.trustEmail),
+      mfaRequired: Boolean(current.mfaRequired),
+      requiredClaims: current.requiredClaims || "sub",
+      storeTokens: false,
+      storedTokensReadable: false,
+      guiOrder: Number(current.guiOrder ?? 0),
+      showInAccountConsole: current.showInAccountConsole || "always",
+      syncMode: current.syncMode || "import",
+      authorizationUri: null,
+      tokenUri: null,
+      userInfoUri: null,
+      jwkSetUri: null,
+      issuerUri: null,
+      clientAuthenticationMethod: "client_secret_basic",
+      scopes: "openid",
+      userNameAttribute: "sub",
+      samlMetadataUri: metadataUri || null,
+      samlAssertingPartyEntityId: partyId || null,
+      samlSingleSignOnServiceUrl: ssoUri || null,
+      samlSingleLogoutServiceUrl:
+        draft.samlSingleLogoutServiceUrl.trim() || null,
+      samlIdpCertificate: idpCertificate || null,
+      samlSigningPrivateKey: signingKey || null,
+      samlSigningCertificate: draft.samlSigningCertificate.trim() || null,
+      samlServiceProviderEntityId:
+        draft.samlServiceProviderEntityId.trim() || null,
+      samlSignAuthnRequests: Boolean(draft.samlSignAuthnRequests),
+      samlWantAssertionsSigned: Boolean(draft.samlWantAssertionsSigned),
+      samlNameIdFormat: draft.samlNameIdFormat.trim() || null,
+      samlPrincipalAttribute: draft.samlPrincipalAttribute.trim() || "NameID",
+      samlEmailAttribute: draft.samlEmailAttribute.trim() || "email",
+      samlFirstNameAttribute:
+        draft.samlFirstNameAttribute.trim() || "givenName",
+      samlLastNameAttribute: draft.samlLastNameAttribute.trim() || "sn",
+      samlGroupsAttribute: draft.samlGroupsAttribute.trim() || "groups",
+      samlDecryptionPrivateKey: decryptionKey || null,
+      samlDecryptionCertificate: draft.samlDecryptionCertificate.trim() || null,
+      samlSignatureAlgorithm: draft.samlSignatureAlgorithm.trim() || null,
+      samlAuthnRequestBinding: draft.samlAuthnRequestBinding,
+      samlResponseBinding: draft.samlResponseBinding,
+      samlLogoutBinding: draft.samlLogoutBinding,
+      samlForceAuthentication: Boolean(draft.samlForceAuthentication),
+      samlPassSubject: Boolean(draft.samlPassSubject),
+    };
+    state.data.identityProviderConfigurationDrafts ??= {};
+    state.data.identityProviderConfigurationDrafts[key] = draft;
+    state.data.identityProviderConfigurationErrorId = key;
+    state.error = null;
+    state.notice = null;
+    state.busy = `identity-provider-config-save:${key}`;
+    render();
+    try {
+      const saved = await request(
+        creating
+          ? "/api/admin/identity-providers"
+          : `/api/admin/identity-providers/${encodeURIComponent(providerId)}`,
+        { method: creating ? "POST" : "PUT", body },
+      );
+      const safeSaved = safeIdentityProviderConfiguration(saved);
+      if (creating) {
+        state.data.identityProviderQuery = "";
+        state.data.identityProviderPage = 0;
+        state.data.identityProviders = {
+          ...state.data.identityProviders,
+          content: [safeSaved, ...providers],
+          totalElements:
+            Number(state.data.identityProviders?.totalElements ?? 0) + 1,
+        };
+        state.notice = text("adminSamlProviderCreated");
+      } else {
+        state.data.identityProviders = {
+          ...state.data.identityProviders,
+          content: providers.map((item) =>
+            item.id === providerId ? { ...item, ...safeSaved } : item,
+          ),
+        };
+        state.notice = text("adminProviderConnectionUpdated");
+      }
+      state.data.identityProviderConfigurationOpenId = null;
+      delete state.data.identityProviderConfigurationDrafts[key];
+      delete state.data.identityProviderConfigurationBaselines[key];
+      state.data.identityProviderConfigurationErrorId = null;
+    } catch {
+      /* Private keys are deliberately excluded from the retained draft. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-identity-provider-connection") {
     const providerId = form.dataset.providerId ?? "";
     const creating = providerId.length === 0;
@@ -6631,17 +6974,40 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-identity-provider-config-edit") {
+  if (action === "admin-saml-provider-create") {
+    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
+      return;
+    const baseline = {
+      ...defaultIdentityProviderConfiguration(),
+      providerType: "saml",
+    };
+    state.data.identityProviderConfigurationOpenId = "new-saml";
+    state.data.identityProviderConfigurationBaselines ??= {};
+    state.data.identityProviderConfigurationDrafts ??= {};
+    state.data.identityProviderConfigurationBaselines["new-saml"] = baseline;
+    state.data.identityProviderConfigurationDrafts["new-saml"] =
+      identityProviderConfigurationDraft(baseline);
+    state.data.identityProviderConfigurationErrorId = null;
+    state.error = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-identity-provider-config-edit" ||
+    action === "admin-saml-provider-config-edit"
+  ) {
     if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
       return;
     const id = element.dataset.id ?? "";
     const provider = (state.data.identityProviders?.content ?? []).find(
       (item) => item.id === id,
     );
+    const expectedProviderType =
+      action === "admin-saml-provider-config-edit" ? "saml" : "oidc";
     if (
       !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
       !provider ||
-      provider.providerType !== "oidc"
+      provider.providerType !== expectedProviderType
     )
       return;
     if (state.data.identityProviderConfigurationOpenId === id) {
@@ -6661,9 +7027,10 @@ async function action(action, element) {
       );
       if (
         response?.id !== id ||
-        response.providerType !== "oidc" ||
+        response.providerType !== expectedProviderType ||
         typeof response.registrationId !== "string" ||
-        typeof response.clientId !== "string"
+        (expectedProviderType === "oidc" &&
+          typeof response.clientId !== "string")
       )
         throw new Error("invalid_identity_provider_connection_response");
       const baseline = safeIdentityProviderConfiguration(response);

@@ -889,7 +889,7 @@ test("preserves Account profile drafts offline and completes native social linki
   }
 });
 
-test("creates and updates native OIDC providers without retaining client secrets", async () => {
+test("creates and updates native OIDC and SAML providers without retaining credentials", async () => {
   const application = await launchDesktop();
   try {
     await application.evaluate(({ shell }) => {
@@ -953,10 +953,59 @@ test("creates and updates native OIDC providers without retaining client secrets
         userNameAttribute: "sub",
         mapperCount: 0,
       };
+      globalThis.__samlProvider = {
+        id: "provider-saml",
+        providerType: "saml",
+        registrationId: "saml-existing",
+        displayName: "Existing SAML",
+        alias: "saml-existing",
+        iconKey: "generic",
+        enabled: true,
+        configured: true,
+        clientSecretConfigured: false,
+        samlMetadataUri: "https://idp.example/metadata",
+        samlAssertingPartyEntityId: "https://idp.example/entity",
+        samlSingleSignOnServiceUrl: "https://idp.example/sso",
+        samlSingleLogoutServiceUrl: "https://idp.example/slo",
+        samlIdpCertificate:
+          "-----BEGIN CERTIFICATE-----\nIDP_CERT\n-----END CERTIFICATE-----",
+        samlSigningPrivateKeyConfigured: true,
+        samlSigningCertificate:
+          "-----BEGIN CERTIFICATE-----\nSP_CERT\n-----END CERTIFICATE-----",
+        samlServiceProviderEntityId: "https://kitezh.example/saml",
+        samlSignAuthnRequests: true,
+        samlWantAssertionsSigned: true,
+        samlNameIdFormat:
+          "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+        samlPrincipalAttribute: "NameID",
+        samlEmailAttribute: "email",
+        samlFirstNameAttribute: "givenName",
+        samlLastNameAttribute: "sn",
+        samlGroupsAttribute: "groups",
+        samlDecryptionPrivateKeyConfigured: true,
+        samlDecryptionCertificate:
+          "-----BEGIN CERTIFICATE-----\nDEC_CERT\n-----END CERTIFICATE-----",
+        samlSignatureAlgorithm:
+          "https://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+        samlAuthnRequestBinding: "REDIRECT",
+        samlResponseBinding: "POST",
+        samlLogoutBinding: "REDIRECT",
+        samlForceAuthentication: false,
+        samlPassSubject: false,
+        mapperCount: 0,
+      };
+      globalThis.__createdSamlProvider = null;
       globalThis.__oidcRequestSummaries = [];
+      globalThis.__samlRequestSummaries = [];
+      globalThis.__providerCalls = [];
       globalThis.fetch = async (url, init) => {
         const requestUrl = new URL(String(url));
         const requestMethod = String(init?.method ?? "GET").toUpperCase();
+        if (requestUrl.pathname.startsWith("/api/admin/identity-providers"))
+          globalThis.__providerCalls.push({
+            method: requestMethod,
+            path: requestUrl.pathname,
+          });
         if (requestUrl.pathname === "/oauth2/token")
           return new Response(
             JSON.stringify({
@@ -979,7 +1028,7 @@ test("creates and updates native OIDC providers without retaining client secrets
           if (requestMethod === "GET")
             return new Response(
               JSON.stringify({
-                content: [globalThis.__oidcProvider],
+                content: [globalThis.__oidcProvider, globalThis.__samlProvider],
                 number: 0,
                 totalPages: 1,
                 totalElements: 1,
@@ -988,6 +1037,38 @@ test("creates and updates native OIDC providers without retaining client secrets
               { status: 200, headers: { "Content-Type": "application/json" } },
             );
           const body = JSON.parse(init?.body ?? "{}");
+          if (body.providerType === "saml") {
+            globalThis.__samlRequestSummaries.push({
+              method: requestMethod,
+              registrationId: body.registrationId,
+              alias: body.alias,
+              metadataUri: body.samlMetadataUri,
+              signAuthnRequests: body.samlSignAuthnRequests,
+              signingKeyProvided: Boolean(body.samlSigningPrivateKey),
+              decryptionKeyProvided: Boolean(body.samlDecryptionPrivateKey),
+              idpCertificate: body.samlIdpCertificate,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            const saved = {
+              ...globalThis.__samlProvider,
+              ...body,
+              id: "provider-saml-new",
+              samlSigningPrivateKeyConfigured: Boolean(
+                body.samlSigningPrivateKey,
+              ),
+              samlDecryptionPrivateKeyConfigured: Boolean(
+                body.samlDecryptionPrivateKey,
+              ),
+              configured: true,
+            };
+            delete saved.samlSigningPrivateKey;
+            delete saved.samlDecryptionPrivateKey;
+            globalThis.__createdSamlProvider = saved;
+            return new Response(JSON.stringify(saved), {
+              status: 201,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
           globalThis.__oidcRequestSummaries.push({
             method: requestMethod,
             registrationId: body.registrationId,
@@ -1052,6 +1133,37 @@ test("creates and updates native OIDC providers without retaining client secrets
             };
             delete saved.clientSecret;
             globalThis.__oidcProvider = saved;
+            return new Response(JSON.stringify(saved), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+        }
+        if (
+          requestUrl.pathname === "/api/admin/identity-providers/provider-saml"
+        ) {
+          if (requestMethod === "GET")
+            return new Response(JSON.stringify(globalThis.__samlProvider), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__samlRequestSummaries.push({
+              method: requestMethod,
+              registrationId: body.registrationId,
+              alias: body.alias,
+              metadataUri: body.samlMetadataUri,
+              signAuthnRequests: body.samlSignAuthnRequests,
+              signingKeyProvided: Boolean(body.samlSigningPrivateKey),
+              decryptionKeyProvided: Boolean(body.samlDecryptionPrivateKey),
+              idpCertificate: body.samlIdpCertificate,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            const saved = { ...globalThis.__samlProvider, ...body };
+            delete saved.samlSigningPrivateKey;
+            delete saved.samlDecryptionPrivateKey;
+            globalThis.__samlProvider = saved;
             return new Response(JSON.stringify(saved), {
               status: 200,
               headers: { "Content-Type": "application/json" },
@@ -1270,6 +1382,223 @@ test("creates and updates native OIDC providers without retaining client secrets
     assert.equal(
       JSON.stringify(finalRequests).includes("OIDC_SECRET_MUST_NOT_PERSIST"),
       false,
+    );
+
+    await window
+      .getByRole("button", { name: "SAML sağlayıcısı ekle", exact: true })
+      .click();
+    const samlCreateForm = window.locator(
+      'form[data-form="admin-saml-identity-provider-connection"]',
+    );
+    await samlCreateForm.waitFor();
+    await samlCreateForm.locator('[name="registrationId"]').fill("native-saml");
+    await samlCreateForm.locator('[name="displayName"]').fill("Native SAML");
+    await samlCreateForm.locator('[name="alias"]').fill("native-saml");
+    await samlCreateForm
+      .locator('[name="samlMetadataUri"]')
+      .fill("http://untrusted.example/metadata");
+    await samlCreateForm
+      .locator('[name="samlSigningCertificate"]')
+      .fill(
+        "-----BEGIN CERTIFICATE-----\nSIGNING_CERT\n-----END CERTIFICATE-----",
+      );
+    await samlCreateForm
+      .locator('[name="samlSigningPrivateKey"]')
+      .fill(
+        "-----BEGIN PRIVATE KEY-----\nSIGNING_KEY_SENTINEL\n-----END PRIVATE KEY-----",
+      );
+    await samlCreateForm.locator('[name="samlSignAuthnRequests"]').check();
+    await samlCreateForm
+      .locator('[name="samlDecryptionCertificate"]')
+      .fill(
+        "-----BEGIN CERTIFICATE-----\nDECRYPTION_CERT\n-----END CERTIFICATE-----",
+      );
+    await samlCreateForm
+      .locator('[name="samlDecryptionPrivateKey"]')
+      .fill(
+        "-----BEGIN PRIVATE KEY-----\nDECRYPTION_KEY_SENTINEL\n-----END PRIVATE KEY-----",
+      );
+    const samlCreateButton = samlCreateForm.getByRole("button", {
+      name: "SAML sağlayıcısı ekle",
+      exact: true,
+    });
+    await samlCreateButton.click();
+    await samlCreateForm
+      .getByText("Parça içermeyen mutlak URI girin.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__samlRequestSummaries),
+      [],
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(
+      await samlCreateForm
+        .locator('[name="samlSigningPrivateKey"]')
+        .inputValue(),
+      "",
+    );
+    assert.equal(
+      await samlCreateForm
+        .locator('[name="samlDecryptionPrivateKey"]')
+        .inputValue(),
+      "",
+    );
+    assert.equal(
+      await samlCreateForm.locator('[name="registrationId"]').inputValue(),
+      "native-saml",
+    );
+    await samlCreateForm.dispatchEvent("submit");
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__samlRequestSummaries),
+      [],
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await samlCreateForm
+      .locator('[name="samlMetadataUri"]')
+      .fill("https://idp.example/metadata");
+    await samlCreateForm
+      .locator('[name="samlSigningPrivateKey"]')
+      .fill(
+        "-----BEGIN PRIVATE KEY-----\nSIGNING_KEY_SENTINEL\n-----END PRIVATE KEY-----",
+      );
+    await samlCreateForm
+      .locator('[name="samlDecryptionPrivateKey"]')
+      .fill(
+        "-----BEGIN PRIVATE KEY-----\nDECRYPTION_KEY_SENTINEL\n-----END PRIVATE KEY-----",
+      );
+    await samlCreateButton.click();
+    assert.equal(
+      await samlCreateButton.isDisabled(),
+      true,
+      await samlCreateForm.innerText(),
+    );
+    assert.equal(await samlCreateButton.locator(".spinner").count(), 1);
+    await samlCreateForm.dispatchEvent("submit");
+    await window
+      .getByText("SAML sağlayıcısı oluşturuldu.", { exact: true })
+      .waitFor();
+    const samlRequests = await application.evaluate(
+      () => globalThis.__samlRequestSummaries,
+    );
+    assert.equal(samlRequests.length, 1);
+    assert.deepEqual(samlRequests[0], {
+      method: "POST",
+      registrationId: "native-saml",
+      alias: "native-saml",
+      metadataUri: "https://idp.example/metadata",
+      signAuthnRequests: true,
+      signingKeyProvided: true,
+      decryptionKeyProvided: true,
+      idpCertificate: null,
+    });
+    assert.equal(
+      JSON.stringify(samlRequests).includes("SIGNING_KEY_SENTINEL"),
+      false,
+    );
+    assert.equal(
+      JSON.stringify(samlRequests).includes("DECRYPTION_KEY_SENTINEL"),
+      false,
+    );
+    assert.equal(
+      await window.evaluate(() =>
+        JSON.stringify([localStorage, sessionStorage]).includes(
+          "SIGNING_KEY_SENTINEL",
+        ),
+      ),
+      false,
+    );
+
+    const existingSaml = window.locator(
+      '[data-identity-provider-id="provider-saml"]',
+    );
+    await existingSaml
+      .getByRole("button", {
+        name: "SAML yapılandırmasını düzenle",
+        exact: true,
+      })
+      .click();
+    const samlEditForm = existingSaml.locator(
+      'form[data-form="admin-saml-identity-provider-connection"]',
+    );
+    await samlEditForm.waitFor();
+    assert.equal(
+      await samlEditForm.locator('[name="samlSigningPrivateKey"]').inputValue(),
+      "",
+    );
+    assert.equal(
+      await samlEditForm
+        .locator('[name="samlDecryptionPrivateKey"]')
+        .inputValue(),
+      "",
+    );
+    assert.match(
+      await samlEditForm.locator('[name="samlIdpCertificate"]').inputValue(),
+      /BEGIN CERTIFICATE/,
+    );
+    await samlEditForm
+      .locator('[name="samlMetadataUri"]')
+      .fill("https://idp.example/v2/metadata");
+    const samlSaveButton = samlEditForm.locator('button[type="submit"]');
+    await samlSaveButton.click();
+    assert.equal(await samlSaveButton.isDisabled(), true);
+    assert.equal(await samlSaveButton.locator(".spinner").count(), 1);
+    await samlEditForm.dispatchEvent("submit");
+    await window
+      .getByText("Sağlayıcı bağlantısı güncellendi.", { exact: true })
+      .waitFor();
+    const editedSamlRequests = await application.evaluate(
+      () => globalThis.__samlRequestSummaries,
+    );
+    assert.deepEqual(editedSamlRequests.at(-1), {
+      method: "PUT",
+      registrationId: "saml-existing",
+      alias: "saml-existing",
+      metadataUri: "https://idp.example/v2/metadata",
+      signAuthnRequests: true,
+      signingKeyProvided: false,
+      decryptionKeyProvided: false,
+      idpCertificate:
+        "-----BEGIN CERTIFICATE-----\nIDP_CERT\n-----END CERTIFICATE-----",
+    });
+    assert.equal(JSON.stringify(editedSamlRequests).includes("IDP_CERT"), true);
+    const providerCalls = await application.evaluate(
+      () => globalThis.__providerCalls,
+    );
+    assert.equal(
+      providerCalls.some(
+        (call) =>
+          call.method === "POST" &&
+          call.path === "/api/admin/identity-providers",
+      ),
+      true,
+    );
+    assert.equal(
+      providerCalls.some(
+        (call) =>
+          call.method === "GET" &&
+          call.path === "/api/admin/identity-providers/provider-saml",
+      ),
+      true,
+    );
+    assert.equal(
+      providerCalls.some(
+        (call) =>
+          call.method === "PUT" &&
+          call.path === "/api/admin/identity-providers/provider-saml",
+      ),
+      true,
     );
   } finally {
     await application.close();
