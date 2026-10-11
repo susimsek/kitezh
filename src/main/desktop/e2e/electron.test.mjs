@@ -353,6 +353,9 @@ test("opens settings in a separate window without requiring login", async () => 
         document.querySelector("#desktop-global-shortcut")?.value ===
         "Alt+Space",
     );
+    await settingsWindow.waitForFunction(
+      () => document.querySelector("#desktop-language")?.value === "system",
+    );
     assert.equal(await showInMenuBar.isChecked(), true);
     assert.equal(
       await settingsWindow.locator("#desktop-language").inputValue(),
