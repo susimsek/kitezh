@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Alert } from "react-native";
 import * as accountApi from "@/api/account-api";
-import AccountScreen from "./account";
-import ApplicationsScreen from "./applications";
+import AccountScreen from "../app/account";
+import ApplicationsScreen from "../app/applications";
 
 jest.mock("@/api/account-api", () => ({
   getAccountProfile: jest.fn(),

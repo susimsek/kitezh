@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Alert } from "react-native";
 import * as adminApi from "@/api/admin-api";
-import AdminScreen from "./admin";
+import AdminScreen from "../app/admin";
 
 jest.mock("@/api/admin-api", () => ({
   getAdminDashboard: jest.fn(),

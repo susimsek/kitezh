@@ -9,7 +9,7 @@ import {
   editorDefaults,
   editorValues,
   toAdminRequest,
-} from "./admin-editor.ts";
+} from "../app/admin-editor.ts";
 
 test("provides resource-specific defaults for mobile administration editors", () => {
   assert.deepEqual(editorDefaults("users"), {

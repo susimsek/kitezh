@@ -8,12 +8,12 @@ import {
 import { Alert } from "react-native";
 import * as accountApi from "@/api/account-api";
 import * as publicApi from "@/api/public-api";
-import MfaScreen from "./mfa";
-import RegisterScreen from "./register";
-import ResetPasswordScreen from "./reset-password";
-import SecurityScreen from "./security";
-import SocialLinksScreen from "./social-links";
-import ForgotPasswordScreen from "./forgot-password";
+import MfaScreen from "../app/mfa";
+import RegisterScreen from "../app/register";
+import ResetPasswordScreen from "../app/reset-password";
+import SecurityScreen from "../app/security";
+import SocialLinksScreen from "../app/social-links";
+import ForgotPasswordScreen from "../app/forgot-password";
 import {
   AccountAuthCallbackScreen,
   AdminAuthCallbackScreen,

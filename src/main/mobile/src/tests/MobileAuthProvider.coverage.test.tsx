@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import * as storage from "./storage";
-import { MobileAuthProvider, useMobileAuth } from "./MobileAuthProvider";
+import * as storage from "../auth/storage";
+import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
 
 jest.mock("expo-auth-session", () => {
   const request = {
@@ -44,7 +44,7 @@ jest.mock("@/config", () => ({
 jest.mock("@/i18n/LocaleProvider", () => ({
   useLocale: () => ({ resolvedLocale: "en" }),
 }));
-jest.mock("./storage", () => ({
+jest.mock("../auth/storage", () => ({
   clearSession: jest.fn(),
   readSession: jest.fn(),
   writeSession: jest.fn(),
