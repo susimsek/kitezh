@@ -36,6 +36,7 @@ function runSigningCheck(platform, variables = {}) {
       APPLE_API_ISSUER: "",
       WIN_CSC_LINK: "",
       WIN_CSC_KEY_PASSWORD: "",
+      LINUX_GPG_PRIVATE_KEY: "",
       ...variables,
     },
   });
@@ -78,6 +79,7 @@ test("release signing check requires the platform-specific trust material", () =
   assert.match(macos.stderr, /APPLE_API_KEY_BASE64/);
   assert.notEqual(linux.status, 0);
   assert.match(linux.stderr, /ACTIONS_ID_TOKEN_REQUEST_TOKEN/);
+  assert.match(linux.stderr, /LINUX_GPG_PRIVATE_KEY/);
 });
 
 test("release signing check accepts complete Apple and Linux identities", () => {
@@ -93,6 +95,7 @@ test("release signing check accepts complete Apple and Linux identities", () => 
     UPDATE_MANIFEST_SIGNING_KEY: "manifest-private-test-value",
     ACTIONS_ID_TOKEN_REQUEST_URL: "https://actions.invalid/token",
     ACTIONS_ID_TOKEN_REQUEST_TOKEN: "oidc-test-value",
+    LINUX_GPG_PRIVATE_KEY: "gpg-private-test-value",
   });
 
   assert.equal(macos.status, 0, macos.stderr);
@@ -106,10 +109,33 @@ test("desktop release workflow checks signing credentials before packaging", () 
     "node scripts/require-release-signing.mjs",
   );
   const packageBuild = releaseWorkflow.indexOf("- name: Build desktop package");
+  const jobEnvironment = releaseWorkflow.match(
+    /^    env:\r?\n([\s\S]*?)^\r?\n    steps:/m,
+  )?.[1];
+  const dependencyInstall = releaseWorkflow.indexOf(
+    "- name: Install web dependencies",
+  );
 
   assert.notEqual(signingGate, -1);
+  assert.ok(signingGate < dependencyInstall);
   assert.ok(signingGate < packageBuild);
+  assert.ok(jobEnvironment);
+  assert.match(jobEnvironment, /DESKTOP_RELEASE_PLATFORM/);
+  assert.doesNotMatch(jobEnvironment, /secrets\./);
+  assert.match(
+    releaseWorkflow,
+    /MAC_CSC_LINK: \$\{\{ matrix\.platform == 'macos' && secrets\.MAC_CSC_LINK/,
+  );
+  assert.match(
+    releaseWorkflow,
+    /WIN_CSC_LINK: \$\{\{ matrix\.platform == 'windows' && secrets\.WIN_CSC_LINK/,
+  );
+  assert.match(
+    releaseWorkflow,
+    /LINUX_GPG_PRIVATE_KEY: \$\{\{ matrix\.platform == 'linux' && secrets\.LINUX_GPG_PRIVATE_KEY/,
+  );
   assert.doesNotMatch(releaseWorkflow, /keeping this package unsigned/);
   assert.match(releaseWorkflow, /config\.mac\.notarize=true/);
   assert.match(releaseWorkflow, /Verify Windows Authenticode signature/);
+  assert.match(releaseWorkflow, /LINUX_GPG_PRIVATE_KEY/);
 });

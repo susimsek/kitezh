@@ -3,6 +3,7 @@ const requirementsByPlatform = {
     "UPDATE_MANIFEST_SIGNING_KEY",
     "ACTIONS_ID_TOKEN_REQUEST_URL",
     "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+    "LINUX_GPG_PRIVATE_KEY",
   ],
   macos: [
     "UPDATE_MANIFEST_SIGNING_KEY",
