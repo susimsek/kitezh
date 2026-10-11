@@ -82,6 +82,7 @@ uses typed, capability-scoped API calls.
 - `package-metadata.test.mjs` now checks AppX identity/publisher, Windows targets, icon and packaged file globs, ASAR enablement, output directory, protocol registration, and platform artifact naming.
 - Prettier check on changed TypeScript, JavaScript, and shared localization sources passed.
 - `git diff --check` passed for the committed slices.
+- Native client-role assignments use bounded available-user/group search and exact user/group assignment routes. The Windows Electron E2E verifies offline disablement, English/Turkish short-query field validation with no request, search feedback, add/remove confirmation, inline progress, duplicate blocking, and safe request instrumentation containing identifiers only; the adapter unit test accepts the bounded contracts and rejects malformed variants.
 
 The Native Admin surface is intentionally not marked fully complete while management
 parity and packaged cross-platform smoke evidence remain open. Missing backend or

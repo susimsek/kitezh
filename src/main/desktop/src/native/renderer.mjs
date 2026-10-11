@@ -103,6 +103,10 @@ const actionIcons = {
   "admin-client-mapper-delete-request": "delete",
   "admin-client-mapper-delete-confirm": "delete",
   "admin-client-roles-toggle": "edit",
+  "admin-client-role-assignments-toggle": "edit",
+  "admin-client-role-assignment-add": "add",
+  "admin-client-role-assignment-remove-request": "delete",
+  "admin-client-role-assignment-remove-confirm": "delete",
   "admin-client-role-edit": "edit",
   "admin-client-role-delete-request": "delete",
   "admin-client-role-delete-confirm": "delete",
@@ -156,7 +160,7 @@ const button = (label, options = {}) => {
     actionIcons[options.action] ??
     (label === text("save") ? "check" : null);
   const icon = iconName ? icons[iconName] : null;
-  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.child != null ? `data-child="${escapeHtml(options.child)}"` : ""} ${options.clientRoleId != null ? `data-client-role-id="${escapeHtml(options.clientRoleId)}"` : ""} ${options.mapper != null ? `data-mapper="${escapeHtml(options.mapper)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.child != null ? `data-child="${escapeHtml(options.child)}"` : ""} ${options.clientRoleId != null ? `data-client-role-id="${escapeHtml(options.clientRoleId)}"` : ""} ${options.memberId != null ? `data-member-id="${escapeHtml(options.memberId)}"` : ""} ${options.memberKind != null ? `data-member-kind="${escapeHtml(options.memberKind)}"` : ""} ${options.mapper != null ? `data-mapper="${escapeHtml(options.mapper)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
 };
 const field = (
   name,
@@ -1710,6 +1714,84 @@ function clientScopeAssignmentsPanel(clientId) {
   return `<section class="card" data-client-scope-assignments-panel="true" data-client-id="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientScopeAssignments"))}"><form data-form="admin-client-scope-assignments" data-client-id="${escapeHtml(clientId)}"><fieldset><legend>${escapeHtml(text("adminClientScopeAssignmentsHelp"))}</legend>${rows || `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}</fieldset><div class="field-error" role="alert">${escapeHtml(localError)}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-scope-assignments-save:${clientId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-assignments-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
 }
 
+function clientRoleAssignmentPanel(clientId, roleId, roleName) {
+  const key = `${clientId}:${roleId}`;
+  const assignment = state.data.clientRoleAssignments?.[key] ?? {};
+  const users = Array.isArray(assignment.users) ? assignment.users : [];
+  const groups = Array.isArray(assignment.groups) ? assignment.groups : [];
+  const userCandidates = Array.isArray(assignment.userCandidates)
+    ? assignment.userCandidates
+    : [];
+  const groupCandidates = Array.isArray(assignment.groupCandidates)
+    ? assignment.groupCandidates
+    : [];
+  const memberRows = (members, kind) =>
+    members
+      .filter(
+        (member) =>
+          Number.isSafeInteger(Number(member?.id)) &&
+          Number(member.id) > 0 &&
+          typeof (kind === "user" ? member.username : member.name) === "string",
+      )
+      .map((member) => {
+        const memberId = String(member.id);
+        const confirming =
+          assignment.removeConfirm?.kind === kind &&
+          assignment.removeConfirm.id === memberId;
+        const removeLabel = text(
+          kind === "user"
+            ? "adminClientRoleRemoveUser"
+            : "adminClientRoleRemoveGroup",
+        );
+        const confirmLabel = text(
+          kind === "user"
+            ? "adminClientRoleRemoveUserConfirm"
+            : "adminClientRoleRemoveGroupConfirm",
+        );
+        const busy =
+          state.busy ===
+          `client-role-assignment-remove:${clientId}:${roleId}:${kind}:${memberId}`;
+        const actions = confirming
+          ? `<div class="actions"><span role="status">${escapeHtml(confirmLabel)}</span>${button(removeLabel, { action: "admin-client-role-assignment-remove-confirm", id: clientId, clientRoleId: roleId, memberId, memberKind: kind, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-assignment-remove-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" data-member-id="${escapeHtml(memberId)}" data-member-kind="${kind}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+          : `<div class="actions">${button(removeLabel, { action: "admin-client-role-assignment-remove-request", id: clientId, clientRoleId: roleId, memberId, memberKind: kind, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        return `<article class="list-item"><strong>${escapeHtml(kind === "user" ? member.username : member.path || member.name)}</strong>${actions}</article>`;
+      })
+      .join("");
+  const candidateRows = (candidates, kind) =>
+    candidates
+      .filter(
+        (candidate) =>
+          !(kind === "user" ? users : groups).some(
+            (assigned) => Number(assigned.id) === Number(candidate.id),
+          ),
+      )
+      .filter(
+        (candidate) =>
+          Number.isSafeInteger(Number(candidate?.id)) &&
+          Number(candidate.id) > 0 &&
+          typeof (kind === "user" ? candidate.username : candidate.name) ===
+            "string",
+      )
+      .map((candidate) => {
+        const memberId = String(candidate.id);
+        const label = text(
+          kind === "user"
+            ? "adminClientRoleAssignUser"
+            : "adminClientRoleAssignGroup",
+        );
+        const busy =
+          state.busy ===
+          `client-role-assignment-add:${clientId}:${roleId}:${kind}:${memberId}`;
+        return `<article class="list-item"><strong>${escapeHtml(kind === "user" ? candidate.username : candidate.path || candidate.name)}</strong>${button(label, { action: "admin-client-role-assignment-add", id: clientId, clientRoleId: roleId, memberId, memberKind: kind, busy, disabled: state.offline || Boolean(state.busy) })}</article>`;
+      })
+      .join("");
+  const userSearching =
+    state.busy === `client-role-assignment-search:${clientId}:${roleId}:user`;
+  const groupSearching =
+    state.busy === `client-role-assignment-search:${clientId}:${roleId}:group`;
+  return `<section class="card" data-client-role-assignments="${escapeHtml(key)}" aria-label="${escapeHtml(text("adminManageClientRoleAssignments"))}"><h4>${escapeHtml(roleName)}</h4><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedUsers"))}</legend>${memberRows(users, "user") || `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions"><input name="user-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchUsers"))}" value="${escapeHtml(assignment.userQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "user", busy: userSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="user" role="alert">${escapeHtml(assignment.userSearchError ?? "")}</div>${candidateRows(userCandidates, "user")}</fieldset><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedGroups"))}</legend>${memberRows(groups, "group") || `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions"><input name="group-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchGroups"))}" value="${escapeHtml(assignment.groupQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "group", busy: groupSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="group" role="alert">${escapeHtml(assignment.groupSearchError ?? "")}</div>${candidateRows(groupCandidates, "group")}</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-assignments-close" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
+}
+
 function clientRolesPanel(clientId) {
   const panel = state.data.clientRoles?.[clientId] ?? {};
   const page = panel.page ?? { content: [], number: 0, totalPages: 0 };
@@ -1723,6 +1805,8 @@ function clientRolesPanel(clientId) {
         panel.errorRoleId === roleId ? violations(state.error?.body) : {};
       const editing = editingId === roleId;
       const confirming = panel.deleteConfirmId === roleId;
+      const assignmentKey = `${clientId}:${roleId}`;
+      const assignment = state.data.clientRoleAssignments?.[assignmentKey];
       const deleting =
         state.busy === `client-role-delete:${clientId}:${roleId}`;
       const editForm = editing
@@ -1731,7 +1815,21 @@ function clientRolesPanel(clientId) {
       const deleteControls = confirming
         ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientRolePrompt"))}</span>${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-confirm", id: clientId, clientRoleId: roleId, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-delete-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminEditClientRole"), { action: "admin-client-role-edit", id: clientId, clientRoleId: roleId, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-request", id: clientId, clientRoleId: roleId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-role-id="${escapeHtml(roleId)}"><div><strong>${escapeHtml(role.name ?? "")}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div>${deleteControls}${editForm}</article>`;
+      const assignmentToggle = button(
+        text("adminManageClientRoleAssignments"),
+        {
+          action: "admin-client-role-assignments-toggle",
+          id: clientId,
+          clientRoleId: roleId,
+          busy:
+            state.busy === `client-role-assignment-load:${clientId}:${roleId}`,
+          disabled: state.offline || Boolean(state.busy),
+        },
+      );
+      const assignmentPanel = assignment?.open
+        ? clientRoleAssignmentPanel(clientId, roleId, role.name ?? "")
+        : "";
+      return `<article class="list-item" data-client-role-id="${escapeHtml(roleId)}"><div><strong>${escapeHtml(role.name ?? "")}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div><div class="actions">${assignmentToggle}</div>${deleteControls}${editForm}${assignmentPanel}</article>`;
     })
     .join("");
   const draft = panel.createDraft ?? {};
@@ -1776,6 +1874,47 @@ async function loadClientRoles(clientId, page, query, busyKey) {
     );
   } catch {
     /* request rendered localized authorization, validation or transport feedback */
+  }
+  state.busy = null;
+  render();
+}
+
+async function loadClientRoleAssignmentDetail(
+  clientId,
+  roleId,
+  busyKey,
+  existing = {},
+) {
+  if (
+    !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+    !/^[1-9]\d{0,18}$/.test(roleId) ||
+    !Number.isSafeInteger(Number(roleId)) ||
+    state.busy ||
+    state.offline ||
+    state.data.adminAccess?.manageClients !== true
+  )
+    return;
+  const key = `${clientId}:${roleId}`;
+  state.data.clientRoleAssignments ??= {};
+  const assignment = (state.data.clientRoleAssignments[key] = {
+    ...existing,
+    open: true,
+  });
+  state.busy = busyKey;
+  state.error = null;
+  render();
+  try {
+    const detail = await request(
+      `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}?page=0&size=20&sort=username,asc`,
+    );
+    assignment.users = Array.isArray(detail?.users?.content)
+      ? detail.users.content
+      : [];
+    assignment.groups = Array.isArray(detail?.groups?.content)
+      ? detail.groups.content
+      : [];
+  } catch {
+    /* request rendered localized authorization or transport feedback */
   }
   state.busy = null;
   render();
@@ -5553,6 +5692,199 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "admin-client-role-assignments-toggle") {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true
+    )
+      return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const key = `${clientId}:${roleId}`;
+    const current = state.data.clientRoleAssignments?.[key];
+    if (current?.open) {
+      current.open = false;
+      render();
+      return;
+    }
+    await loadClientRoleAssignmentDetail(
+      clientId,
+      roleId,
+      `client-role-assignment-load:${clientId}:${roleId}`,
+      current ?? {},
+    );
+    return;
+  }
+  if (action === "admin-client-role-assignments-close") {
+    if (state.busy) return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const assignment =
+      state.data.clientRoleAssignments?.[`${clientId}:${roleId}`];
+    if (assignment) assignment.open = false;
+    render();
+    return;
+  }
+  if (action === "admin-client-role-assignment-search") {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true
+    )
+      return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const kind = element.dataset.memberKind;
+    const key = `${clientId}:${roleId}`;
+    const assignment = state.data.clientRoleAssignments?.[key];
+    const query = String(
+      element
+        .closest("[data-client-role-assignments]")
+        ?.querySelector(`input[name="${kind}-q"]`)?.value ?? "",
+    ).trim();
+    if (
+      !assignment?.open ||
+      !["user", "group"].includes(kind) ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !/^[1-9]\d{0,18}$/.test(roleId) ||
+      !Number.isSafeInteger(Number(roleId))
+    )
+      return;
+    const searchErrorKey =
+      kind === "user" ? "userSearchError" : "groupSearchError";
+    if (query.length < 2 || query.length > 100) {
+      assignment[searchErrorKey] = text(
+        query.length < 2
+          ? "adminClientRoleSearchMinimum"
+          : "adminClientRoleSearchMaximum",
+      );
+      render();
+      return;
+    }
+    assignment[searchErrorKey] = null;
+    const candidateKey = kind === "user" ? "userCandidates" : "groupCandidates";
+    const queryKey = kind === "user" ? "userQuery" : "groupQuery";
+    assignment[candidateKey] = [];
+    assignment[queryKey] = query;
+    state.busy = `client-role-assignment-search:${clientId}:${roleId}:${kind}`;
+    state.error = null;
+    render();
+    try {
+      const endpoint = kind === "user" ? "available-users" : "available-groups";
+      const sort = kind === "user" ? "username,asc" : "name,asc";
+      const page = await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}/${endpoint}?q=${encodeURIComponent(query)}&page=0&size=10&sort=${sort}`,
+      );
+      assignment[candidateKey] = Array.isArray(page?.content)
+        ? page.content
+        : [];
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-client-role-assignment-add" ||
+    action === "admin-client-role-assignment-remove-request" ||
+    action === "admin-client-role-assignment-remove-confirm" ||
+    action === "admin-client-role-assignment-remove-cancel"
+  ) {
+    if (state.busy || state.data.adminAccess?.manageClients !== true) return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const memberId = element.dataset.memberId ?? "";
+    const kind = element.dataset.memberKind;
+    const key = `${clientId}:${roleId}`;
+    const assignment = state.data.clientRoleAssignments?.[key];
+    if (
+      !assignment?.open ||
+      !["user", "group"].includes(kind) ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !/^[1-9]\d{0,18}$/.test(roleId) ||
+      !Number.isSafeInteger(Number(roleId)) ||
+      !/^[1-9]\d{0,18}$/.test(memberId) ||
+      !Number.isSafeInteger(Number(memberId))
+    )
+      return;
+    const memberKey = kind === "user" ? "users" : "groups";
+    const candidateKey = kind === "user" ? "userCandidates" : "groupCandidates";
+    const assigned = assignment[memberKey] ?? [];
+    const removeConfirm = assignment.removeConfirm;
+    if (action === "admin-client-role-assignment-remove-cancel") {
+      if (removeConfirm?.kind === kind && removeConfirm.id === memberId) {
+        assignment.removeConfirm = null;
+        render();
+      }
+      return;
+    }
+    if (state.offline) return;
+    if (action === "admin-client-role-assignment-remove-request") {
+      if (!assigned.some((member) => String(member.id) === memberId)) return;
+      assignment.removeConfirm = { kind, id: memberId };
+      render();
+      return;
+    }
+    const adding = action === "admin-client-role-assignment-add";
+    if (adding) {
+      if (
+        !assignment[candidateKey]?.some(
+          (candidate) => String(candidate.id) === memberId,
+        )
+      )
+        return;
+    } else if (
+      removeConfirm?.kind !== kind ||
+      removeConfirm.id !== memberId ||
+      !assigned.some((member) => String(member.id) === memberId)
+    ) {
+      return;
+    }
+    const assignmentPath =
+      kind === "user"
+        ? `/users${adding ? "" : `/${encodeURIComponent(memberId)}`}`
+        : `/groups/${encodeURIComponent(memberId)}`;
+    const path = `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}${assignmentPath}?page=0&size=20&sort=username,asc`;
+    const busyKey = `client-role-assignment-${adding ? "add" : "remove"}:${clientId}:${roleId}:${kind}:${memberId}`;
+    state.busy = busyKey;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const detail = await request(path, {
+        method: adding ? "POST" : "DELETE",
+        ...(adding && kind === "user"
+          ? { body: { userId: Number(memberId) } }
+          : {}),
+      });
+      assignment.users = Array.isArray(detail?.users?.content)
+        ? detail.users.content
+        : assignment.users;
+      assignment.groups = Array.isArray(detail?.groups?.content)
+        ? detail.groups.content
+        : assignment.groups;
+      assignment[candidateKey] = (assignment[candidateKey] ?? []).filter(
+        (candidate) => String(candidate.id) !== memberId,
+      );
+      assignment.removeConfirm = null;
+      state.notice = text(
+        kind === "user"
+          ? adding
+            ? "adminClientRoleUserAssigned"
+            : "adminClientRoleUserRemoved"
+          : adding
+            ? "adminClientRoleGroupAssigned"
+            : "adminClientRoleGroupRemoved",
+      );
+    } catch {
+      /* request rendered localized authorization, validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "admin-client-roles-toggle") {
     const clientId = element.dataset.id ?? "";
     if (

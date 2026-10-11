@@ -287,6 +287,35 @@ test("allows bounded client-role CRUD routes only", async () => {
       { name: "invoice.view" },
     ],
     ["DELETE", "/api/admin/clients/billing-api/roles/42"],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-users?q=ad&page=0&size=10&sort=username,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-groups?q=fi&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/users?page=0&size=20&sort=username,asc",
+      { userId: 7 },
+    ],
+    [
+      "DELETE",
+      "/api/admin/clients/billing-api/roles/42/users/7?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/groups/8?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "DELETE",
+      "/api/admin/clients/billing-api/roles/42/groups/8?page=0&size=20&sort=username,asc",
+    ],
   ]) {
     const response = await adapter.request({
       console: "admin",
@@ -296,13 +325,30 @@ test("allows bounded client-role CRUD routes only", async () => {
     });
     assert.equal(response.status, 200);
   }
-  assert.equal(requests.length, 4);
+  assert.equal(requests.length, 11);
   for (const [method, path] of [
     ["GET", "/api/admin/clients/billing-api/roles?size=1000"],
     ["GET", "/api/admin/clients/billing-api/roles/nested"],
     ["POST", "/api/admin/clients/billing-api/roles/42"],
     ["PUT", "/api/admin/clients/billing-api/roles/0"],
     ["DELETE", "/api/admin/clients/billing-api/roles/42/nested"],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-users?q=a&page=0&size=10&sort=username,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles/42/available-groups?q=fi&page=0&size=10&sort=name,desc",
+    ],
+    [
+      "POST",
+      "/api/admin/clients/billing-api/roles/42/users?page=0&size=20&sort=username,asc&extra=1",
+    ],
+    [
+      "DELETE",
+      "/api/admin/clients/billing-api/roles/42/groups/0?page=0&size=20&sort=username,asc",
+    ],
+    ["POST", "/api/admin/clients/billing-api/roles/42/groups/8"],
   ]) {
     await assert.rejects(
       adapter.request({ console: "admin", path, method }),

@@ -198,6 +198,60 @@ function isAllowedApiPath(
       )
         return true;
     }
+    const clientRoleAssignmentPathMatch = path.match(
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)(?:\/(available-users|available-groups|users(?:\/([1-9]\d*))?|groups(?:\/([1-9]\d*))?))?(?:\?|$)/,
+    );
+    if (clientRoleAssignmentPathMatch) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        const suffix = clientRoleAssignmentPathMatch[3] ?? "";
+        const userId = clientRoleAssignmentPathMatch[4];
+        const groupId = clientRoleAssignmentPathMatch[5];
+        const safeIds = [clientRoleAssignmentPathMatch[2], userId, groupId]
+          .filter(Boolean)
+          .every((value) => Number.isSafeInteger(Number(value)));
+        if (!safeIds || url.origin !== "https://desktop.invalid" || url.hash)
+          return false;
+        const params = url.searchParams;
+        const keys = [...params.keys()];
+        if (
+          [...new Set(keys)].some((key) => params.getAll(key).length !== 1) ||
+          keys.some((key) => !["q", "page", "size", "sort"].includes(key))
+        )
+          return false;
+        if (suffix === "available-users" || suffix === "available-groups") {
+          return (
+            method === "GET" &&
+            params.get("page") === "0" &&
+            params.get("size") === "10" &&
+            params.get("sort") ===
+              (suffix === "available-users" ? "username,asc" : "name,asc") &&
+            (params.get("q")?.length ?? 0) >= 2 &&
+            (params.get("q")?.length ?? 0) <= 100
+          );
+        }
+        const hasBoundedDetailPage =
+          params.get("page") === "0" &&
+          params.get("size") === "20" &&
+          params.get("sort") === "username,asc" &&
+          keys.length === 3;
+        if (suffix === "")
+          return (
+            method === "GET" && (keys.length === 0 || hasBoundedDetailPage)
+          );
+        if (suffix === "users" && method === "POST")
+          return hasBoundedDetailPage;
+        if (suffix.startsWith("groups/") && method === "POST")
+          return hasBoundedDetailPage;
+        if (suffix.startsWith("users/") && method === "DELETE")
+          return hasBoundedDetailPage;
+        if (suffix.startsWith("groups/") && method === "DELETE")
+          return hasBoundedDetailPage;
+        return false;
+      } catch {
+        return false;
+      }
+    }
     const roleClientCompositeMatch = path.match(
       /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/client-composites\/([1-9]\d*)(?:\?|$)/,
     );

@@ -8326,6 +8326,10 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
       };
       globalThis.__clientRoleItems = [];
       globalThis.__clientRoleRequests = [];
+      globalThis.__clientRoleAssignedUsers = [];
+      globalThis.__clientRoleAssignedGroups = [];
+      globalThis.__clientRoleAssignmentRequests = [];
+      globalThis.__clientRoleCandidateSearches = [];
       shell.openExternal = async (url) => {
         globalThis.__pendingAuthorizationUrl = url;
       };
@@ -8376,6 +8380,74 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
               totalPages: 1,
               totalElements: globalThis.__clientRoleItems.length,
               size: 20,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          requestUrl.pathname === "/api/admin/clients/billing-api/roles/42" &&
+          method === "GET"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          return new Response(
+            JSON.stringify({
+              users: { content: globalThis.__clientRoleAssignedUsers },
+              groups: { content: globalThis.__clientRoleAssignedGroups },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/clients\/billing-api\/roles\/42\/available-(users|groups)$/.test(
+            requestUrl.pathname,
+          ) &&
+          method === "GET"
+        ) {
+          globalThis.__clientRoleCandidateSearches.push({
+            method,
+            path: requestUrl.pathname,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          const users = requestUrl.pathname.endsWith("available-users");
+          const content = users
+            ? [{ id: 5, username: "qa-user", enabled: true }]
+            : [{ id: 8, name: "finance", path: "Finance / finance" }];
+          return new Response(
+            JSON.stringify({ content, number: 0, totalPages: 1, size: 10 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const assignmentPath = requestUrl.pathname.match(
+          /^\/api\/admin\/clients\/billing-api\/roles\/42\/(users(?:\/[1-9]\d*)?|groups\/[1-9]\d*)$/,
+        );
+        if (assignmentPath && ["POST", "DELETE"].includes(method)) {
+          const userAssignment = assignmentPath[1].startsWith("users");
+          const memberId = userAssignment
+            ? method === "POST"
+              ? Number(JSON.parse(String(init.body)).userId)
+              : Number(assignmentPath[1].split("/").at(-1))
+            : Number(assignmentPath[1].split("/").at(-1));
+          globalThis.__clientRoleAssignmentRequests.push({
+            method,
+            path: requestUrl.pathname,
+            memberId,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          if (userAssignment) {
+            globalThis.__clientRoleAssignedUsers =
+              method === "POST"
+                ? [{ id: 5, username: "qa-user", enabled: true }]
+                : [];
+          } else {
+            globalThis.__clientRoleAssignedGroups =
+              method === "POST"
+                ? [{ id: 8, name: "finance", path: "Finance / finance" }]
+                : [];
+          }
+          return new Response(
+            JSON.stringify({
+              users: { content: globalThis.__clientRoleAssignedUsers },
+              groups: { content: globalThis.__clientRoleAssignedGroups },
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
@@ -8504,6 +8576,205 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
     await window
       .getByText("İstemci rolü güncellendi.", { exact: true })
       .waitFor();
+    const assignmentToggle = rolesPanel.getByRole("button", {
+      name: "Rol atamalarını yönet",
+    });
+    await assignmentToggle.click();
+    await assignmentToggle.locator(".spinner").waitFor();
+    await assignmentToggle.locator(".spinner").waitFor({ state: "detached" });
+    const assignmentPanel = rolesPanel.locator(
+      '[data-client-role-assignments="billing-api:42"]',
+    );
+    const userSearch = assignmentPanel.getByRole("searchbox", {
+      name: "Kullanılabilir kullanıcıları ara",
+    });
+    const userSearchButton = assignmentPanel
+      .getByRole("button", {
+        name: "Ara",
+      })
+      .nth(0);
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(await userSearchButton.isDisabled(), true);
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await userSearch.fill("q");
+    await userSearchButton.click();
+    await assignmentPanel
+      .locator('[data-assignment-search-error="user"]')
+      .filter({ hasText: "Arama için en az 2 karakter girin." })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__clientRoleCandidateSearches.length,
+      ),
+      0,
+    );
+    await userSearch.evaluate((input) => {
+      input.value = "q".repeat(101);
+    });
+    await userSearchButton.click();
+    await assignmentPanel
+      .locator('[data-assignment-search-error="user"]')
+      .filter({ hasText: "Arama metni en fazla 100 karakter olabilir." })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__clientRoleCandidateSearches.length,
+      ),
+      0,
+    );
+    await userSearch.fill("qa");
+    await userSearchButton.click();
+    await userSearchButton.locator(".spinner").waitFor();
+    await assignmentPanel.getByText("qa-user", { exact: true }).waitFor();
+    const assignUser = assignmentPanel.getByRole("button", {
+      name: "Kullanıcıyı ata",
+    });
+    await assignUser.click();
+    await assignUser.locator(".spinner").waitFor();
+    await assignUser.dispatchEvent("click");
+    await window.getByText("Kullanıcı role atandı.", { exact: true }).waitFor();
+    await assignmentPanel
+      .getByRole("button", { name: "Kullanıcıyı kaldır" })
+      .click();
+    await assignmentPanel
+      .getByText("Bu kullanıcı rolden kaldırılsın mı?", { exact: true })
+      .waitFor();
+    await assignmentPanel
+      .locator('[data-action="admin-client-role-assignment-remove-cancel"]')
+      .click();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__clientRoleAssignmentRequests.length,
+      ),
+      1,
+    );
+    await assignmentPanel
+      .getByRole("button", { name: "Kullanıcıyı kaldır" })
+      .click();
+    const removeUser = assignmentPanel.getByRole("button", {
+      name: "Kullanıcıyı kaldır",
+    });
+    await removeUser.click();
+    await removeUser.locator(".spinner").waitFor();
+    await window
+      .getByText("Kullanıcı rolden kaldırıldı.", { exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const groupSearch = assignmentPanel.getByRole("searchbox", {
+      name: "Search available groups",
+    });
+    const groupSearchButton = assignmentPanel
+      .getByRole("button", {
+        name: "Search",
+      })
+      .nth(1);
+    await groupSearch.fill("f");
+    await groupSearchButton.click();
+    await assignmentPanel
+      .locator('[data-assignment-search-error="group"]')
+      .filter({ hasText: "Enter at least 2 characters to search." })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__clientRoleCandidateSearches.length,
+      ),
+      1,
+    );
+    await groupSearch.evaluate((input) => {
+      input.value = "f".repeat(101);
+    });
+    await groupSearchButton.click();
+    await assignmentPanel
+      .locator('[data-assignment-search-error="group"]')
+      .filter({ hasText: "Search text must be 100 characters or fewer." })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__clientRoleCandidateSearches.length,
+      ),
+      1,
+    );
+    await groupSearch.fill("fi");
+    await groupSearchButton.click();
+    await groupSearchButton.locator(".spinner").waitFor();
+    await assignmentPanel
+      .getByText("Finance / finance", { exact: true })
+      .waitFor();
+    const assignGroup = assignmentPanel.getByRole("button", {
+      name: "Assign group",
+    });
+    await assignGroup.click();
+    await assignGroup.locator(".spinner").waitFor();
+    await window
+      .getByText("Group assigned to the role.", { exact: true })
+      .waitFor();
+    await assignmentPanel.getByRole("button", { name: "Remove group" }).click();
+    await assignmentPanel
+      .getByText("Remove this group from the role?", { exact: true })
+      .waitFor();
+    const removeGroup = assignmentPanel.getByRole("button", {
+      name: "Remove group",
+    });
+    await removeGroup.click();
+    await removeGroup.locator(".spinner").waitFor();
+    await window
+      .getByText("Group removed from the role.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__clientRoleAssignmentRequests,
+      ),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles/42/users",
+          memberId: 5,
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/clients/billing-api/roles/42/users/5",
+          memberId: 5,
+        },
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles/42/groups/8",
+          memberId: 8,
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/clients/billing-api/roles/42/groups/8",
+          memberId: 8,
+        },
+      ],
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__clientRoleCandidateSearches,
+      ),
+      [
+        {
+          method: "GET",
+          path: "/api/admin/clients/billing-api/roles/42/available-users",
+        },
+        {
+          method: "GET",
+          path: "/api/admin/clients/billing-api/roles/42/available-groups",
+        },
+      ],
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
     await rolesPanel
       .getByRole("button", { name: "İstemci rolünü sil" })
       .click();
