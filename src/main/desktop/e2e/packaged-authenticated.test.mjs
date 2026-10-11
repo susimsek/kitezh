@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -50,6 +51,73 @@ async function callbackUrlFromBrowser(application) {
   throw new Error("Packaged OAuth callback was not received");
 }
 
+function dispatchWindowsProtocolUrl(url) {
+  execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "$url=[Console]::In.ReadToEnd(); Start-Process -FilePath $url",
+    ],
+    { encoding: "utf8", input: url, windowsHide: true, timeout: 10_000 },
+  );
+}
+
+function snapshotWindowsProtocolRegistration(backupPath) {
+  const key = "HKCU\\Software\\Classes\\kitezh";
+  try {
+    execFileSync("reg.exe", ["query", key], {
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: "ignore",
+    });
+  } catch (error) {
+    if (error.status !== 1) throw error;
+    return { key, existed: false, backupPath };
+  }
+  execFileSync("reg.exe", ["export", key, backupPath, "/y"], {
+    encoding: "utf8",
+    windowsHide: true,
+    stdio: "ignore",
+  });
+  return { key, existed: true, backupPath };
+}
+
+function pointWindowsProtocolRegistrationAtProfile(profileDirectory) {
+  const key = "HKCU\\Software\\Classes\\kitezh\\shell\\open\\command";
+  const command = `"${packagedExecutable}" --user-data-dir="${profileDirectory}" "%1"`;
+  execFileSync(
+    "reg.exe",
+    ["add", key, "/ve", "/t", "REG_SZ", "/d", command, "/f"],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: "ignore",
+    },
+  );
+}
+
+function restoreWindowsProtocolRegistration(snapshot) {
+  if (snapshot.existed) {
+    execFileSync("reg.exe", ["import", snapshot.backupPath], {
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: "ignore",
+    });
+    return;
+  }
+  try {
+    execFileSync("reg.exe", ["delete", snapshot.key, "/f"], {
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: "ignore",
+    });
+  } catch {
+    // The protocol key is already absent, which is the expected prior state.
+  }
+}
+
 async function accountProfile(mainWindow) {
   return mainWindow.evaluate(() =>
     window.desktopApi.api.request({
@@ -68,6 +136,12 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
     "en",
   );
   await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
+  let protocolRegistration;
+  if (process.platform === "win32") {
+    protocolRegistration = snapshotWindowsProtocolRegistration(
+      path.join(userDataDirectory, "protocol-registration.reg"),
+    );
+  }
 
   const launchPackaged = () =>
     electron.launch({
@@ -80,9 +154,13 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
         DESKTOP_AUTO_UPDATE: "false",
       },
     });
-  let application = await launchPackaged();
+  let application;
 
   try {
+    application = await launchPackaged();
+    if (protocolRegistration) {
+      pointWindowsProtocolRegistrationAtProfile(userDataDirectory);
+    }
     await application.evaluate(({ shell }) => {
       globalThis.__socialLinkStartRequests = [];
       globalThis.__socialLinkCompletions = [];
@@ -206,8 +284,6 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
       if (!loginWindow) throw new Error("Packaged login window was not found");
       const captureCallback = (event, url) => {
         if (!url.startsWith("kitezh://oauth/callback")) return;
-        // This harness injects delivery below; do not also launch a second,
-        // default-profile process through the operating-system handler.
         event.preventDefault();
         globalThis.__e2eCallbackUrl = url;
       };
@@ -220,9 +296,13 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
     await browserWindow.getByRole("button", { name: /Sign in|Giriş/i }).click();
 
     const callbackUrl = await callbackUrlFromBrowser(application);
-    await application.evaluate(({ app }, url) => {
-      app.emit("open-url", { preventDefault() {} }, url);
-    }, callbackUrl);
+    if (process.platform === "win32") {
+      dispatchWindowsProtocolUrl(callbackUrl);
+    } else {
+      await application.evaluate(({ app }, url) => {
+        app.emit("open-url", { preventDefault() {} }, url);
+      }, callbackUrl);
+    }
 
     let profileResponse;
     for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -449,7 +529,17 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
       false,
     );
   } finally {
-    await application.close();
+    try {
+      await application?.close();
+    } finally {
+      try {
+        if (protocolRegistration) {
+          restoreWindowsProtocolRegistration(protocolRegistration);
+        }
+      } finally {
+        await rm(userDataDirectory, { recursive: true, force: true });
+      }
+    }
   }
 });
 
