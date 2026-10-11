@@ -163,6 +163,23 @@ export const messages = {
     adminClientScopeMapperUpdated: "Client scope protocol mapper updated.",
     adminClientScopeMapperDeleted: "Client scope protocol mapper deleted.",
     adminManageClientMappers: "Manage protocol mappers",
+    adminManageClientRoles: "Manage client roles",
+    adminClientRolesTitle: "Client roles",
+    adminClientRoleName: "Role name",
+    adminClientRoleDescription: "Role description",
+    adminCreateClientRole: "Create client role",
+    adminEditClientRole: "Edit client role",
+    adminDeleteClientRole: "Delete client role",
+    adminDeleteClientRolePrompt:
+      "Delete this client role? Assigned roles cannot be deleted.",
+    adminClientRoleCrudEmpty: "No client roles found.",
+    adminClientRoleCreated: "Client role created.",
+    adminClientRoleUpdated: "Client role updated.",
+    adminClientRoleDeleted: "Client role deleted.",
+    adminClientRoleNameInvalid:
+      "Enter a valid role name using letters, numbers, dot, underscore, colon, or hyphen.",
+    adminClientRoleDescriptionInvalid:
+      "Role description must be 500 characters or fewer.",
     adminClientMappers: "Client protocol mappers",
     adminNoClientMappers: "No protocol mappers are configured for this client.",
     adminAddClientMapper: "Add protocol mapper",
@@ -951,6 +968,23 @@ export const messages = {
     adminClientScopeMapperDeleted:
       "İstemci kapsamı protokol eşleyicisi silindi.",
     adminManageClientMappers: "Protokol eşleyicilerini yönet",
+    adminManageClientRoles: "İstemci rollerini yönet",
+    adminClientRolesTitle: "İstemci rolleri",
+    adminClientRoleName: "Rol adı",
+    adminClientRoleDescription: "Rol açıklaması",
+    adminCreateClientRole: "İstemci rolü oluştur",
+    adminEditClientRole: "İstemci rolünü düzenle",
+    adminDeleteClientRole: "İstemci rolünü sil",
+    adminDeleteClientRolePrompt:
+      "Bu istemci rolü silinsin mi? Atanmış roller silinemez.",
+    adminClientRoleCrudEmpty: "İstemci rolü bulunamadı.",
+    adminClientRoleCreated: "İstemci rolü oluşturuldu.",
+    adminClientRoleUpdated: "İstemci rolü güncellendi.",
+    adminClientRoleDeleted: "İstemci rolü silindi.",
+    adminClientRoleNameInvalid:
+      "Harf, rakam, nokta, alt çizgi, iki nokta veya tire kullanarak geçerli bir rol adı girin.",
+    adminClientRoleDescriptionInvalid:
+      "Rol açıklaması en fazla 500 karakter olabilir.",
     adminClientMappers: "İstemci protokol eşleyicileri",
     adminNoClientMappers:
       "Bu istemci için protokol eşleyicisi yapılandırılmamış.",

@@ -8298,6 +8298,271 @@ test("manages native realm-role composites through bounded Admin contracts", asy
   }
 });
 
+test("manages client-scoped roles with authorized bounded CRUD", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__adminAccessFlags = {
+        isAdmin: false,
+        queryUsers: false,
+        viewUsers: false,
+        manageUsers: false,
+        viewRoles: false,
+        manageRoles: false,
+        queryGroups: false,
+        viewGroups: false,
+        manageGroups: false,
+        queryClients: true,
+        viewClients: true,
+        manageClients: true,
+        viewSessions: false,
+        manageSessions: false,
+        viewConsents: false,
+        manageConsents: false,
+        viewEvents: false,
+        manageEvents: false,
+        viewKeys: false,
+        manageKeys: false,
+      };
+      globalThis.__clientRoleItems = [];
+      globalThis.__clientRoleRequests = [];
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        if (requestUrl.pathname === "/oauth2/token")
+          return new Response(
+            JSON.stringify({
+              access_token: "client-role-admin-test-token",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return new Response(
+            JSON.stringify({ access: globalThis.__adminAccessFlags }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/clients" && method === "GET")
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "client-row-1",
+                  clientId: "billing-api",
+                  clientName: "Billing API",
+                  scopes: ["openid"],
+                  requireProofKey: false,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (
+          requestUrl.pathname === "/api/admin/clients/billing-api/roles" &&
+          method === "GET"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          return new Response(
+            JSON.stringify({
+              content: globalThis.__clientRoleItems,
+              number: 0,
+              totalPages: 1,
+              totalElements: globalThis.__clientRoleItems.length,
+              size: 20,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const rolePath = requestUrl.pathname.match(
+          /^\/api\/admin\/clients\/billing-api\/roles(?:\/([1-9]\d*))?$/,
+        );
+        if (rolePath && ["POST", "PUT", "DELETE"].includes(method)) {
+          globalThis.__clientRoleRequests.push({
+            method,
+            path: requestUrl.pathname,
+            query: requestUrl.search,
+            body: init?.body ? JSON.parse(String(init.body)) : undefined,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          if (method === "POST") {
+            const role = {
+              id: 42,
+              clientId: "billing-api",
+              ...JSON.parse(String(init.body)),
+            };
+            globalThis.__clientRoleItems = [role];
+            return new Response(JSON.stringify(role), {
+              status: 201,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (method === "PUT") {
+            const role = {
+              id: 42,
+              clientId: "billing-api",
+              ...JSON.parse(String(init.body)),
+            };
+            globalThis.__clientRoleItems = [role];
+            return new Response(JSON.stringify(role), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          globalThis.__clientRoleItems = [];
+          return new Response(null, { status: 204 });
+        }
+        throw new Error(`Unexpected Admin API request: ${requestUrl.pathname}`);
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window.getByRole("heading", { name: "Choose a console" }).waitFor();
+    await window
+      .getByRole("button", { name: "Administration Console" })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in" })
+      .locator(".spinner")
+      .waitFor();
+    const authorizationUrl = await application.evaluate(
+      () => globalThis.__pendingAuthorizationUrl,
+    );
+    await application.evaluate(({ app }, pendingUrl) => {
+      const state = new URL(pendingUrl).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=client-role-test-code`,
+      );
+    }, authorizationUrl);
+    await window
+      .getByRole("heading", { name: "Clients", exact: true })
+      .waitFor();
+    const clientRow = window.locator('[data-client-id="client-row-1"]');
+    const manageRoles = clientRow.getByRole("button", {
+      name: "Manage client roles",
+    });
+    await manageRoles.click();
+    await manageRoles.locator(".spinner").waitFor();
+    assert.equal(await manageRoles.isDisabled(), true);
+    const rolesPanel = window.locator(
+      '[data-client-roles-panel="billing-api"]',
+    );
+    await rolesPanel.getByRole("heading", { name: "Client roles" }).waitFor();
+    await rolesPanel
+      .getByText("No client roles found.", { exact: true })
+      .waitFor();
+    const roleName = rolesPanel.getByRole("textbox", { name: "Role name" });
+    await roleName.fill("invalid name");
+    await rolesPanel
+      .getByRole("textbox", { name: "Role description" })
+      .fill("Read invoices");
+    const create = rolesPanel.getByRole("button", {
+      name: "Create client role",
+      exact: true,
+    });
+    await create.click();
+    await rolesPanel
+      .locator('[data-form="admin-client-role-create"] .field-error')
+      .filter({
+        hasText:
+          "Enter a valid role name using letters, numbers, dot, underscore, colon, or hyphen.",
+      })
+      .waitFor();
+    assert.equal(
+      await application.evaluate(() => globalThis.__clientRoleRequests.length),
+      0,
+    );
+    await roleName.fill("invoice.read");
+    await create.click();
+    assert.equal(await create.isDisabled(), true);
+    assert.equal(await create.locator(".spinner").count(), 1);
+    await create.dispatchEvent("click");
+    await window.getByText("Client role created.", { exact: true }).waitFor();
+    assert.equal(await rolesPanel.getByText("invoice.read").count(), 1);
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await rolesPanel
+      .getByRole("button", { name: "İstemci rolünü düzenle" })
+      .click();
+    const updateForm = rolesPanel.locator(
+      '[data-form="admin-client-role-update"]',
+    );
+    await updateForm
+      .getByRole("textbox", { name: "Rol adı" })
+      .fill("invoice.view");
+    const update = updateForm.getByRole("button", { name: "Kaydet" });
+    await update.click();
+    assert.equal(await update.isDisabled(), true);
+    assert.equal(await update.locator(".spinner").count(), 1);
+    await update.dispatchEvent("click");
+    await window
+      .getByText("İstemci rolü güncellendi.", { exact: true })
+      .waitFor();
+    await rolesPanel
+      .getByRole("button", { name: "İstemci rolünü sil" })
+      .click();
+    await rolesPanel
+      .getByText("Bu istemci rolü silinsin mi? Atanmış roller silinemez.", {
+        exact: true,
+      })
+      .waitFor();
+    await rolesPanel
+      .locator('[data-action="admin-client-role-delete-cancel"]')
+      .click();
+    assert.equal(
+      await application.evaluate(() => globalThis.__clientRoleRequests.length),
+      2,
+    );
+    const remove = rolesPanel.getByRole("button", {
+      name: "İstemci rolünü sil",
+    });
+    await remove.click();
+    const confirmRemove = rolesPanel.getByRole("button", {
+      name: "İstemci rolünü sil",
+    });
+    await confirmRemove.click();
+    assert.equal(await confirmRemove.isDisabled(), true);
+    assert.equal(await confirmRemove.locator(".spinner").count(), 1);
+    await confirmRemove.dispatchEvent("click");
+    await window.getByText("İstemci rolü silindi.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__clientRoleItems),
+      [],
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__clientRoleRequests),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/clients/billing-api/roles",
+          query: "",
+          body: { name: "invoice.read", description: "Read invoices" },
+        },
+        {
+          method: "PUT",
+          path: "/api/admin/clients/billing-api/roles/42",
+          query: "",
+          body: { name: "invoice.view", description: "Read invoices" },
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/clients/billing-api/roles/42",
+          query: "",
+          body: undefined,
+        },
+      ],
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("opens settings in a separate window without requiring login", async () => {
   const application = await launchDesktop();
   try {

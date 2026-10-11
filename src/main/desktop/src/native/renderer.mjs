@@ -102,6 +102,10 @@ const actionIcons = {
   "admin-client-mapper-edit": "edit",
   "admin-client-mapper-delete-request": "delete",
   "admin-client-mapper-delete-confirm": "delete",
+  "admin-client-roles-toggle": "edit",
+  "admin-client-role-edit": "edit",
+  "admin-client-role-delete-request": "delete",
+  "admin-client-role-delete-confirm": "delete",
   "admin-consent-revoke-request": "delete",
   "admin-consent-revoke-confirm": "delete",
   "admin-group-delete-request": "delete",
@@ -1706,6 +1710,77 @@ function clientScopeAssignmentsPanel(clientId) {
   return `<section class="card" data-client-scope-assignments-panel="true" data-client-id="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientScopeAssignments"))}"><form data-form="admin-client-scope-assignments" data-client-id="${escapeHtml(clientId)}"><fieldset><legend>${escapeHtml(text("adminClientScopeAssignmentsHelp"))}</legend>${rows || `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}</fieldset><div class="field-error" role="alert">${escapeHtml(localError)}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-scope-assignments-save:${clientId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-assignments-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
 }
 
+function clientRolesPanel(clientId) {
+  const panel = state.data.clientRoles?.[clientId] ?? {};
+  const page = panel.page ?? { content: [], number: 0, totalPages: 0 };
+  const roles = Array.isArray(page.content) ? page.content : [];
+  const editingId = panel.editingId;
+  const rows = roles
+    .map((role) => {
+      const roleId = String(role.id ?? "");
+      const draft = panel.drafts?.[roleId] ?? {};
+      const errors =
+        panel.errorRoleId === roleId ? violations(state.error?.body) : {};
+      const editing = editingId === roleId;
+      const confirming = panel.deleteConfirmId === roleId;
+      const deleting =
+        state.busy === `client-role-delete:${clientId}:${roleId}`;
+      const editForm = editing
+        ? `<form class="card" data-form="admin-client-role-update" data-client-id="${escapeHtml(clientId)}" data-role-id="${escapeHtml(roleId)}" novalidate>${field("name", text("adminClientRoleName"), draft.name ?? role.name ?? "", errors.name, "text", 'maxlength="100" pattern="[A-Za-z0-9._:-]+" required')}${field("description", text("adminClientRoleDescription"), draft.description ?? role.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-role-update:${clientId}:${roleId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-edit-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        : "";
+      const deleteControls = confirming
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientRolePrompt"))}</span>${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-confirm", id: clientId, clientRoleId: roleId, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-delete-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        : `<div class="actions">${button(text("adminEditClientRole"), { action: "admin-client-role-edit", id: clientId, clientRoleId: roleId, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-request", id: clientId, clientRoleId: roleId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+      return `<article class="list-item" data-client-role-id="${escapeHtml(roleId)}"><div><strong>${escapeHtml(role.name ?? "")}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div>${deleteControls}${editForm}</article>`;
+    })
+    .join("");
+  const draft = panel.createDraft ?? {};
+  const errors =
+    panel.errorRoleId === "new" ? violations(state.error?.body) : {};
+  const createForm = `<form class="card" data-form="admin-client-role-create" data-client-id="${escapeHtml(clientId)}" novalidate><h3>${escapeHtml(text("adminCreateClientRole"))}</h3>${field("name", text("adminClientRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="100" pattern="[A-Za-z0-9._:-]+" required')}${field("description", text("adminClientRoleDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="actions">${button(text("adminCreateClientRole"), { type: "submit", busy: state.busy === `client-role-create:${clientId}`, disabled: state.offline || Boolean(state.busy) })}</div></form>`;
+  const currentPage = Number.isSafeInteger(page.number) ? page.number : 0;
+  const totalPages = Number.isSafeInteger(page.totalPages)
+    ? page.totalPages
+    : 0;
+  return `<section class="card" data-client-roles-panel="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientRolesTitle"))}"><h3>${escapeHtml(text("adminClientRolesTitle"))}</h3><form class="actions" data-form="admin-client-role-search" data-client-id="${escapeHtml(clientId)}" role="search"><input name="q" type="search" aria-label="${escapeHtml(text("adminClientRoleName"))}" value="${escapeHtml(panel.query ?? "")}" maxlength="100"/><button class="secondary-button" type="submit" ${state.busy === `client-role-search:${clientId}` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-role-search:${clientId}`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${roles.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminClientRoleCrudEmpty"))}</div>`}<div class="actions"><button class="secondary-button" type="button" data-client-role-page="${escapeHtml(clientId)}" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-role-page:${clientId}`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages ? currentPage + 1 : 0} / ${totalPages}</span><button class="secondary-button" type="button" data-client-role-page="${escapeHtml(clientId)}" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === `client-role-page:${clientId}`)}${escapeHtml(text("adminNext"))}</button></div>${createForm}</section>`;
+}
+
+async function loadClientRoles(clientId, page, query, busyKey) {
+  if (
+    !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+    !Number.isSafeInteger(page) ||
+    page < 0 ||
+    page > 1_000_000 ||
+    query.length > 100 ||
+    state.busy ||
+    state.offline ||
+    state.data.adminAccess?.manageClients !== true
+  )
+    return;
+  state.data.clientRoles ??= {};
+  const panel = (state.data.clientRoles[clientId] ??= { open: true });
+  panel.open = true;
+  panel.query = query;
+  state.busy = busyKey;
+  state.error = null;
+  render();
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      page: String(page),
+      size: "20",
+      sort: "name,asc",
+    });
+    panel.page = await request(
+      `/api/admin/clients/${encodeURIComponent(clientId)}/roles?${params.toString()}`,
+    );
+  } catch {
+    /* request rendered localized authorization, validation or transport feedback */
+  }
+  state.busy = null;
+  render();
+}
+
 function adminClientsContent() {
   const page = state.data.clients ?? { content: [], number: 0, totalPages: 0 };
   const clients = Array.isArray(page.content) ? page.content : [];
@@ -1751,6 +1826,19 @@ function adminClientsContent() {
       });
       const mappersPanel = mappersOpen ? clientMappersPanel(id) : "";
       const protectedClient = PLATFORM_CONSOLE_CLIENT_IDS.has(client.clientId);
+      const clientRolesOpen = state.data.clientRoles?.[client.clientId]?.open;
+      const clientRolesToggle =
+        state.data.adminAccess?.manageClients === true
+          ? button(text("adminManageClientRoles"), {
+              action: "admin-client-roles-toggle",
+              id: client.clientId,
+              busy: state.busy === `client-roles-load:${client.clientId}`,
+              disabled: state.offline || Boolean(state.busy) || protectedClient,
+            })
+          : "";
+      const clientRolesContent = clientRolesOpen
+        ? clientRolesPanel(client.clientId)
+        : "";
       const confirming = state.data.clientDeleteConfirmId === id;
       const deleting = state.busy === `client-delete:${id}`;
       const deleteControls = protectedClient
@@ -1758,7 +1846,7 @@ function adminClientsContent() {
         : confirming
           ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
           : `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientConfiguration"), { action: "admin-client-configuration-edit", id, busy: state.busy === `client-configuration-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${assignmentsToggle}${mappersToggle}</div>${configurationForm}${editForm}${assignmentsPanel}${mappersPanel}${deleteControls}</article>`;
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientConfiguration"), { action: "admin-client-configuration-edit", id, busy: state.busy === `client-configuration-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${assignmentsToggle}${mappersToggle}${clientRolesToggle}</div>${configurationForm}${editForm}${assignmentsPanel}${mappersPanel}${clientRolesContent}${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -2916,6 +3004,22 @@ function preserveOfflineDrafts() {
         state.data.adminRoleDrafts ??= {};
         state.data.adminRoleDrafts[roleName] = values;
       }
+    } else if (
+      ["admin-client-role-create", "admin-client-role-update"].includes(
+        form.dataset.form,
+      )
+    ) {
+      const clientId = form.dataset.clientId;
+      const roleId = form.dataset.roleId ?? "new";
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "")) {
+        state.data.clientRoles ??= {};
+        const panel = (state.data.clientRoles[clientId] ??= {});
+        if (roleId === "new") panel.createDraft = values;
+        else if (/^[1-9]\d{0,18}$/.test(roleId)) {
+          panel.drafts ??= {};
+          panel.drafts[roleId] = values;
+        }
+      }
     } else if (form.dataset.form === "admin-client-scope-edit") {
       const scopeId = form.dataset.scopeId;
       if (/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "")) {
@@ -3077,6 +3181,100 @@ function groupPermissionAssignmentsFromForm(form) {
 async function submitForm(form) {
   if (state.busy) return;
   const values = formValues(form);
+  if (form.dataset.form === "admin-client-role-search") {
+    const clientId = form.dataset.clientId ?? "";
+    const query = String(values.q ?? "").trim();
+    await loadClientRoles(clientId, 0, query, `client-role-search:${clientId}`);
+    return;
+  }
+  if (
+    ["admin-client-role-create", "admin-client-role-update"].includes(
+      form.dataset.form,
+    )
+  ) {
+    const clientId = form.dataset.clientId ?? "";
+    const roleId = form.dataset.roleId ?? "";
+    const creating = form.dataset.form === "admin-client-role-create";
+    const panel = state.data.clientRoles?.[clientId];
+    if (
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !panel?.open ||
+      (!creating && !/^[1-9]\d{0,18}$/.test(roleId)) ||
+      (creating && roleId !== "")
+    )
+      return;
+    const body = {
+      name: String(values.name ?? "").trim(),
+      description: String(values.description ?? "").trim() || null,
+    };
+    const localErrors = {};
+    if (!body.name) localErrors.name = text("adminRequired");
+    else if (body.name.length > 100 || !/^[A-Za-z0-9._:-]+$/.test(body.name))
+      localErrors.name = text("adminClientRoleNameInvalid");
+    if ((body.description?.length ?? 0) > 500)
+      localErrors.description = text("adminClientRoleDescriptionInvalid");
+    if (Object.keys(localErrors).length > 0) {
+      if (creating)
+        panel.createDraft = { ...body, description: body.description ?? "" };
+      else {
+        panel.drafts ??= {};
+        panel.drafts[roleId] = { ...body, description: body.description ?? "" };
+      }
+      panel.errorRoleId = creating ? "new" : roleId;
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: Object.values(localErrors)[0],
+          violations: Object.entries(localErrors).map(([field, message]) => ({
+            field,
+            message,
+          })),
+        },
+      };
+      render();
+      return;
+    }
+    panel.errorRoleId = creating ? "new" : roleId;
+    state.error = null;
+    state.notice = null;
+    state.busy = creating
+      ? `client-role-create:${clientId}`
+      : `client-role-update:${clientId}:${roleId}`;
+    render();
+    try {
+      const path = `/api/admin/clients/${encodeURIComponent(clientId)}/roles${creating ? "" : `/${encodeURIComponent(roleId)}`}`;
+      const result = await request(path, {
+        method: creating ? "POST" : "PUT",
+        body,
+      });
+      if (creating) {
+        panel.page = {
+          ...(panel.page ?? { number: 0, totalPages: 0 }),
+          content: [result, ...(panel.page?.content ?? [])].slice(0, 20),
+        };
+        panel.createDraft = {};
+        state.notice = text("adminClientRoleCreated");
+      } else {
+        panel.page = {
+          ...panel.page,
+          content: (panel.page?.content ?? []).map((role) =>
+            String(role.id) === roleId ? result : role,
+          ),
+        };
+        delete panel.drafts?.[roleId];
+        panel.editingId = null;
+        state.notice = text("adminClientRoleUpdated");
+      }
+      panel.errorRoleId = null;
+    } catch {
+      /* request rendered localized authorization, validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-saml-identity-provider-connection") {
     const providerId = form.dataset.providerId ?? "";
     const creating = providerId.length === 0;
@@ -5355,6 +5553,116 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "admin-client-roles-toggle") {
+    const clientId = element.dataset.id ?? "";
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !state.data.clients?.content?.some(
+        (client) => client.clientId === clientId,
+      ) ||
+      PLATFORM_CONSOLE_CLIENT_IDS.has(clientId)
+    )
+      return;
+    state.data.clientRoles ??= {};
+    const panel = (state.data.clientRoles[clientId] ??= { open: false });
+    if (panel.open) {
+      panel.open = false;
+      render();
+      return;
+    }
+    await loadClientRoles(
+      clientId,
+      0,
+      panel.query ?? "",
+      `client-roles-load:${clientId}`,
+    );
+    return;
+  }
+  if (
+    action === "admin-client-role-edit" ||
+    action === "admin-client-role-edit-cancel" ||
+    action === "admin-client-role-delete-request" ||
+    action === "admin-client-role-delete-cancel" ||
+    action === "admin-client-role-delete-confirm"
+  ) {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageClients !== true
+    )
+      return;
+    const clientId = element.dataset.id ?? "";
+    const roleId = element.dataset.clientRoleId ?? "";
+    const panel = state.data.clientRoles?.[clientId];
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+      !/^[1-9]\d{0,18}$/.test(roleId) ||
+      !Number.isSafeInteger(Number(roleId)) ||
+      !panel?.open ||
+      !panel.page?.content?.some((role) => String(role.id) === roleId)
+    )
+      return;
+    if (action === "admin-client-role-edit") {
+      const role = panel.page.content.find(
+        (item) => String(item.id) === roleId,
+      );
+      panel.editingId = roleId;
+      panel.drafts ??= {};
+      panel.drafts[roleId] = {
+        name: role.name ?? "",
+        description: role.description ?? "",
+      };
+      panel.errorRoleId = null;
+      state.error = null;
+      render();
+      return;
+    }
+    if (action === "admin-client-role-edit-cancel") {
+      panel.editingId = null;
+      delete panel.drafts?.[roleId];
+      panel.errorRoleId = null;
+      state.error = null;
+      render();
+      return;
+    }
+    if (action === "admin-client-role-delete-request") {
+      panel.deleteConfirmId = roleId;
+      render();
+      return;
+    }
+    if (action === "admin-client-role-delete-cancel") {
+      panel.deleteConfirmId = null;
+      render();
+      return;
+    }
+    if (panel.deleteConfirmId !== roleId) return;
+    state.busy = `client-role-delete:${clientId}:${roleId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(
+        `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}`,
+        { method: "DELETE" },
+      );
+      panel.page = {
+        ...panel.page,
+        content: panel.page.content.filter(
+          (role) => String(role.id) !== roleId,
+        ),
+      };
+      panel.deleteConfirmId = null;
+      state.notice = text("adminClientRoleDeleted");
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "admin-role-composite-search") {
     if (
       state.busy ||
@@ -8495,6 +8803,22 @@ function bind() {
         state.busy = null;
         render();
       });
+    }),
+  );
+  document.querySelectorAll("[data-client-role-page]").forEach((element) =>
+    element.addEventListener("click", () => {
+      if (state.busy || element.disabled) return;
+      const clientId = element.dataset.clientRolePage ?? "";
+      const nextPage = Number(element.dataset.page);
+      const panel = state.data.clientRoles?.[clientId];
+      if (!panel?.open || !Number.isSafeInteger(nextPage) || nextPage < 0)
+        return;
+      void loadClientRoles(
+        clientId,
+        nextPage,
+        panel.query ?? "",
+        `client-role-page:${clientId}`,
+      );
     }),
   );
   document

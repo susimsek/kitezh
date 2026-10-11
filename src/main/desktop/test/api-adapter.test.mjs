@@ -266,6 +266,51 @@ test("allows bounded native realm-role composite reads and mutations only", asyn
   }
 });
 
+test("allows bounded client-role CRUD routes only", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, init) => {
+    requests.push({ url: String(url), method: init.method });
+    return new Response(JSON.stringify({ id: 42, name: "invoice.read" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  for (const [method, path, body] of [
+    [
+      "GET",
+      "/api/admin/clients/billing-api/roles?q=invoice&page=0&size=20&sort=name,asc",
+    ],
+    ["POST", "/api/admin/clients/billing-api/roles", { name: "invoice.read" }],
+    [
+      "PUT",
+      "/api/admin/clients/billing-api/roles/42",
+      { name: "invoice.view" },
+    ],
+    ["DELETE", "/api/admin/clients/billing-api/roles/42"],
+  ]) {
+    const response = await adapter.request({
+      console: "admin",
+      path,
+      method,
+      ...(body ? { body } : {}),
+    });
+    assert.equal(response.status, 200);
+  }
+  assert.equal(requests.length, 4);
+  for (const [method, path] of [
+    ["GET", "/api/admin/clients/billing-api/roles?size=1000"],
+    ["GET", "/api/admin/clients/billing-api/roles/nested"],
+    ["POST", "/api/admin/clients/billing-api/roles/42"],
+    ["PUT", "/api/admin/clients/billing-api/roles/0"],
+    ["DELETE", "/api/admin/clients/billing-api/roles/42/nested"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method }),
+      /not allowed/,
+    );
+  }
+});
+
 test("allows only the client scope assignment read and replacement routes", async () => {
   const { adapter } = harness(
     async () =>

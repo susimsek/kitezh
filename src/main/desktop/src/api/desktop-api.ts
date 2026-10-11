@@ -185,6 +185,19 @@ function isAllowedApiPath(
       /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
     )
       return true;
+    const clientRoleMutationMatch = path.match(
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles(?:\/([1-9]\d*))?$/,
+    );
+    if (clientRoleMutationMatch) {
+      if (method === "POST" && clientRoleMutationMatch[2] === undefined)
+        return true;
+      if (
+        ["PUT", "DELETE"].includes(method) &&
+        clientRoleMutationMatch[2] !== undefined &&
+        Number.isSafeInteger(Number(clientRoleMutationMatch[2]))
+      )
+        return true;
+    }
     const roleClientCompositeMatch = path.match(
       /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/client-composites\/([1-9]\d*)(?:\?|$)/,
     );
@@ -509,6 +522,10 @@ function isAllowedApiPath(
           url.pathname,
         );
       const isClients = url.pathname === "/api/admin/clients";
+      const clientRoleListMatch = url.pathname.match(
+        /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles$/,
+      );
+      const isClientRoleList = Boolean(clientRoleListMatch);
       const isIdentityProviders =
         url.pathname === "/api/admin/identity-providers";
       const providerMappersMatch = url.pathname.match(
@@ -545,30 +562,32 @@ function isAllowedApiPath(
         ? ["username,asc", "username,desc"]
         : isClients
           ? ["clientId,asc", "clientId,desc"]
-          : isIdentityProviders
-            ? ["guiOrder,asc", "guiOrder,desc"]
-            : isSessions
-              ? ["lastAccessTime,asc", "lastAccessTime,desc"]
-              : isConsents
-                ? ["id.principalName,asc", "id.principalName,desc"]
-                : isOfflineSessions
-                  ? ["refreshTokenIssuedAt,asc", "refreshTokenIssuedAt,desc"]
-                  : isEvents
-                    ? ["occurredAt,asc", "occurredAt,desc"]
-                    : isKeys
-                      ? ["createdAt,asc", "createdAt,desc"]
-                      : isLocalizationMessages
-                        ? [
-                            "locale,asc",
-                            "locale,desc",
-                            "messageKey,asc",
-                            "messageKey,desc",
-                          ]
-                        : isAuthenticationFlows
-                          ? ["name,asc", "name,desc"]
-                          : isGroupMemberSearch
-                            ? ["username,asc", "username,desc"]
-                            : ["name,asc", "name,desc"];
+          : isClientRoleList
+            ? ["name,asc", "name,desc"]
+            : isIdentityProviders
+              ? ["guiOrder,asc", "guiOrder,desc"]
+              : isSessions
+                ? ["lastAccessTime,asc", "lastAccessTime,desc"]
+                : isConsents
+                  ? ["id.principalName,asc", "id.principalName,desc"]
+                  : isOfflineSessions
+                    ? ["refreshTokenIssuedAt,asc", "refreshTokenIssuedAt,desc"]
+                    : isEvents
+                      ? ["occurredAt,asc", "occurredAt,desc"]
+                      : isKeys
+                        ? ["createdAt,asc", "createdAt,desc"]
+                        : isLocalizationMessages
+                          ? [
+                              "locale,asc",
+                              "locale,desc",
+                              "messageKey,asc",
+                              "messageKey,desc",
+                            ]
+                          : isAuthenticationFlows
+                            ? ["name,asc", "name,desc"]
+                            : isGroupMemberSearch
+                              ? ["username,asc", "username,desc"]
+                              : ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
@@ -582,6 +601,7 @@ function isAllowedApiPath(
           isClientScopeMappers ||
           isClientScopeRoleCandidates ||
           isClients ||
+          isClientRoleList ||
           isIdentityProviders ||
           isProviderMappers ||
           isSessions ||
