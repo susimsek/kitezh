@@ -461,9 +461,9 @@ jobs:
             fi
             if [[ -z "${allowed_assets["${asset_name}"]+present}" ]]; then
               echo "Removing stale release asset: ${asset_name}"
-              gh api --repo "${GH_REPO}" --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
+              gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
             fi
-          done < <(gh api --repo "${GH_REPO}" "repos/${GH_REPO}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
+          done < <(gh api "repos/${GH_REPO}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
 
           for asset in "${assets[@]}"; do
             uploaded=false
