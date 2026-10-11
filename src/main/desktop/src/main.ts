@@ -1327,8 +1327,14 @@ async function showSettingsWindow() {
     settingsWindow.focus();
     return;
   }
+  const settingsParent =
+    desktopLoginWindow?.isVisible() === true
+      ? desktopLoginWindow
+      : mainWindow?.isVisible() === true
+        ? mainWindow
+        : undefined;
   settingsWindow = new BrowserWindow({
-    parent: mainWindow ?? undefined,
+    parent: settingsParent,
     modal: false,
     width: 1100,
     height: 640,
@@ -1356,6 +1362,9 @@ async function showSettingsWindow() {
   const createdSettingsWindow = settingsWindow;
   createdSettingsWindow.on("closed", () => {
     if (settingsWindow === createdSettingsWindow) settingsWindow = null;
+    setTimeout(() => {
+      focusVisibleConsoleWindow();
+    }, 0);
   });
   await createdSettingsWindow.loadURL(
     `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-settings`,
@@ -1500,6 +1509,15 @@ function focusMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+function focusVisibleConsoleWindow() {
+  const window =
+    desktopLoginWindow?.isVisible() === true ? desktopLoginWindow : mainWindow;
+  if (!window || window.isDestroyed() || !window.isVisible()) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
 }
 
 async function desktopCompanionHtml() {

@@ -9887,6 +9887,34 @@ test("opens settings in a separate window without requiring login", async () => 
         .count(),
       1,
     );
+    const settingsClosed = settingsWindow.waitForEvent("close");
+    await closeNativeSettings(application);
+    await settingsClosed;
+    let consoleWindowFocused = false;
+    for (let attempt = 0; attempt < 20 && !consoleWindowFocused; attempt += 1) {
+      consoleWindowFocused = await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((window) => {
+            const route = new URL(window.webContents.getURL()).pathname;
+            return (
+              window.isVisible() &&
+              (route === "/native" || route === "/desktop-login")
+            );
+          })
+          ?.isFocused(),
+      );
+      if (!consoleWindowFocused)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const windowFocusState = await application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((window) => ({
+        route: new URL(window.webContents.getURL()).pathname,
+        visible: window.isVisible(),
+        focused: window.isFocused(),
+        minimized: window.isMinimized(),
+      })),
+    );
+    assert.equal(consoleWindowFocused, true, JSON.stringify(windowFocusState));
   } finally {
     await application.close();
   }
