@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import { messages, resolveLocale } from "@kitezh/shared/i18n";
 import { colors, resolveTheme } from "../../shared/src/theme.ts";
@@ -107,6 +110,35 @@ test("mobile issuer overrides are limited to the development loopback server", (
     () => resolveAuthorizationServerIssuer("http://localhost:9090/path", true),
     /authorization_server_issuer_invalid/,
   );
+});
+
+test("production config fails closed when an unapproved issuer is configured", () => {
+  const mobileRoot = fileURLToPath(new URL("..", import.meta.url));
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--input-type=module",
+      "-e",
+      "await import('./src/config.ts')",
+    ],
+    {
+      cwd: path.resolve(mobileRoot),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER: "https://unapproved.example",
+        NODE_ENV: "production",
+      },
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /authorization_server_issuer_override_not_allowed/,
+  );
+  assert.doesNotMatch(result.stderr, /unapproved\.example/);
 });
 
 test("shared API errors preserve native status semantics without transport details", () => {
