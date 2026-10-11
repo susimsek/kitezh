@@ -428,3 +428,15 @@ jobs:
 
       - name: Compress native executable
         run: upx --lzma --best target/native-executable
+
+      - name: Upload native executable for release publishing
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-native-${{ matrix.architecture }}
+          path: |
+            target/native-executable
+            target/classes/**
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

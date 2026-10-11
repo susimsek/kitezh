@@ -1424,7 +1424,7 @@ terraform -chdir=terraform destroy -auto-approve
 
 ## Continuous Integration
 
-Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.github/workflows/backend-release.yml`
+Validation pipeline: `.github/workflows/ci.yml`; versioned release publishing: `.github/workflows/publish-release.yml`
 
 - Docker Compose, Helm, and Terraform definitions are validated on every branch.
 - `./mvnw verify` for backend tests + quality gates
