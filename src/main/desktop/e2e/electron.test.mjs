@@ -3096,22 +3096,6 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       "6",
       "8",
     ]);
-    await window.emulateMedia({ forcedColors: "active" });
-    assert.deepEqual(
-      await window.evaluate(() => ({
-        background: getComputedStyle(document.documentElement)
-          .getPropertyValue("--background")
-          .trim(),
-        primary: getComputedStyle(document.documentElement)
-          .getPropertyValue("--primary")
-          .trim(),
-        text: getComputedStyle(document.documentElement)
-          .getPropertyValue("--text")
-          .trim(),
-      })),
-      { background: "Canvas", primary: "Highlight", text: "CanvasText" },
-    );
-    await window.emulateMedia({ forcedColors: "none" });
     const signOut = window.getByRole("button", {
       name: "Sign out",
       exact: true,
@@ -3146,6 +3130,36 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     });
     await usersButton.waitFor();
     await window.getByText("admin@example.test").waitFor();
+    await window.emulateMedia({ forcedColors: "active" });
+    assert.deepEqual(
+      await window.evaluate(() => ({
+        background: getComputedStyle(document.documentElement)
+          .getPropertyValue("--background")
+          .trim(),
+        primary: getComputedStyle(document.documentElement)
+          .getPropertyValue("--primary")
+          .trim(),
+        text: getComputedStyle(document.documentElement)
+          .getPropertyValue("--text")
+          .trim(),
+        buttonBorderStyle: getComputedStyle(
+          document.querySelector(".primary-button"),
+        ).borderTopStyle,
+        buttonHasVisibleBorder:
+          Number.parseFloat(
+            getComputedStyle(document.querySelector(".primary-button"))
+              .borderTopWidth,
+          ) > 0,
+      })),
+      {
+        background: "Canvas",
+        primary: "Highlight",
+        text: "CanvasText",
+        buttonBorderStyle: "solid",
+        buttonHasVisibleBorder: true,
+      },
+    );
+    await window.emulateMedia({ forcedColors: "none" });
     const userQuery = window.getByRole("searchbox", { name: "Search users" });
     await userQuery.fill("alice");
     await usersButton.click();
