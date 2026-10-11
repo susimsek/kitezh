@@ -13,12 +13,12 @@ import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
-import { radii, spacing } from "@/theme/tokens";
+import { controlSizes, radii, spacing } from "@/theme/tokens";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 
 export default function HomeScreen() {
-  const { dictionary, locale, setLocale } = useLocale();
-  const { mode, palette, setMode } = useTheme();
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
   const { status } = useMobileAuth();
 
   useEffect(() => {
@@ -60,34 +60,6 @@ export default function HomeScreen() {
           </Text>
           <AppIcon name="arrowRight" size={16} color={palette.onPrimary} />
         </Pressable>
-        <View style={styles.preferences}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dictionary.language}
-            onPress={() => setLocale(locale === "tr" ? "en" : "tr")}
-            style={[styles.preference, { borderColor: palette.border }]}
-          >
-            <AppIcon name="globe" size={14} color={palette.textMuted} />
-            <Text style={{ color: palette.text }}>
-              {locale === "tr" ? "TR" : "EN"}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dictionary.theme}
-            onPress={() => setMode(mode === "dark" ? "light" : "dark")}
-            style={[styles.preference, { borderColor: palette.border }]}
-          >
-            <AppIcon
-              name={mode === "dark" ? "sun" : "moon"}
-              size={14}
-              color={palette.textMuted}
-            />
-            <Text style={{ color: palette.text }}>
-              {mode === "dark" ? dictionary.light : dictionary.dark}
-            </Text>
-          </Pressable>
-        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={dictionary.settings}
@@ -127,18 +99,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.lg,
-    minHeight: 52,
+    minHeight: controlSizes.mobile,
     paddingHorizontal: spacing.xl,
-  },
-  preferences: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
-  preference: {
-    alignItems: "center",
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing.xs,
-    minHeight: 40,
-    paddingHorizontal: spacing.md,
   },
   settings: {
     alignItems: "center",

@@ -171,6 +171,44 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Verify light and dark themes, keyboard focus, narrow windows, long localized text, offline/error banners, disabled/loading states, and screen-reader labels.
 - Do not expose sensitive authentication details in visible error messages or client-side telemetry.
 
+### Operating-system conventions
+
+- Keep one Kitezh visual identity across operating systems through the shared semantic palette,
+  spacing, type roles, and icon meanings. Let each OS supply its familiar window chrome, input
+  behavior, keyboard conventions, and accessibility behavior; do not make every platform look like
+  a web page in a native window.
+- Use the system font stack for native windows (`-apple-system` on macOS, `Segoe UI` on Windows,
+  and the system sans-serif fallback on Linux). Keep shared type roles and readable line lengths,
+  but do not bundle a web font just to make native windows look identical across operating systems.
+- **macOS:** respect the native title bar and traffic-light controls; support standard menu roles
+  and Command-key shortcuts; keep dialogs focused and sized to their content; preserve Escape,
+  Return, and system window-close behavior. Use native window placement and remember only valid
+  display bounds. Follow Apple window, keyboard, and accessibility guidance
+  ([windows](https://developer.apple.com/design/human-interface-guidelines/windows),
+  [keyboards](https://developer.apple.com/design/human-interface-guidelines/keyboards/),
+  [accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)).
+- **Windows:** retain familiar title-bar and system-menu behavior; use Ctrl-key shortcuts and
+  standard Enter/Escape dialog actions; keep all controls keyboard reachable with a visible focus
+  indicator; support Windows high-contrast/forced-colors mode and text scaling. Do not replace
+  system window controls with custom chrome unless the feature has a tested accessibility path.
+- **Linux:** work with window-manager sizing, moving, focus, and close behavior; avoid assumptions
+  about a specific desktop environment or display scale; keep menus and dialogs usable with the
+  keyboard and system theme. Treat missing optional desktop integration as a supported state.
+- Keep the app's explicit light/dark/system preference separate from the OS theme source. In
+  `system` mode follow OS appearance changes immediately; in explicit modes keep every native
+  window, dialog, and renderer surface on the selected palette. Never leave a native dialog on a
+  stale hard-coded dark or light palette.
+- Use shared semantic color roles for background, surface, text, muted text, border, primary,
+  destructive, and success states. Pair color with text/icon/state, preserve contrast, and use the
+  same action hierarchy across sign-in, settings, updates, errors, and confirmations.
+- Native windows must reflow at narrow widths and high display scaling. Keep primary actions visible
+  or reachable by scrolling, allow localized labels to wrap, and avoid horizontal scrolling for
+  ordinary forms and settings.
+- Before changing a native window, check macOS, Windows, and Linux-specific behavior where the
+  affected feature exists, plus light/dark/system, English/Turkish, keyboard-only navigation,
+  high contrast, reduced motion, long text, and loading/error states. E2E runs must stay in the
+  background and must not focus or raise test windows.
+
 ## Common Mistakes to Avoid
 
 - Loading the web application from a remote URL inside the Electron window.

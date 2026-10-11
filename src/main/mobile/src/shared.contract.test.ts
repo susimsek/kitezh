@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { messages, resolveLocale } from "../../shared/src/i18n.ts";
-import { colors, resolveTheme } from "../../shared/src/theme.ts";
+import {
+  colors,
+  controlSizes,
+  resolveTheme,
+} from "../../shared/src/theme.ts";
 import { getMobileConsoleConfig } from "./config.ts";
 import { sessionStorageKey } from "./auth/session-keys.ts";
 import {
@@ -35,8 +39,15 @@ test("system locale resolves to the device language when supported", () => {
 test("theme resolver returns semantic palettes for every mode", () => {
   assert.equal(resolveTheme("dark", "light"), "dark");
   assert.equal(resolveTheme("system", "dark"), "dark");
-  assert.ok(colors.light.primary);
-  assert.ok(colors.dark.primary);
+  for (const palette of [colors.light, colors.dark]) {
+    assert.ok(palette.background);
+    assert.ok(palette.surface);
+    assert.ok(palette.surfaceHover);
+    assert.ok(palette.text);
+    assert.ok(palette.primary);
+  }
+  assert.ok(controlSizes.mobile >= 48);
+  assert.ok(controlSizes.mobileIconTarget >= 44);
   assert.equal(messages.tr.signIn, "Giriş yap");
 });
 

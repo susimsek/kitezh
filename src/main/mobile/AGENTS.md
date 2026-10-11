@@ -105,6 +105,48 @@ Electron-specific implementation details do not apply directly to React Native.
   overlap, large text, focus/pressed/disabled states, and VoiceOver/TalkBack labels. Record or update
   a native E2E assertion when the screen behavior or layout constraint changes.
 
+### iOS, iPadOS, and Android conventions
+
+- Keep the Kitezh brand and shared semantic tokens consistent with Web and Desktop, while using
+  native navigation, controls, and system behavior on each platform. Shared tokens define meaning;
+  platform components decide how that meaning is presented.
+- Prefer the iOS system font and Android's Roboto/system font defaults. Use a custom family only for
+  a deliberate brand role; keep body text and controls in the OS-native family so Dynamic Type and
+  Android font scaling remain predictable.
+- **iOS:** use a predictable native back/navigation pattern and respect the system status bar,
+  home indicator, safe areas, keyboard dismissal, and edge gestures. Use bottom tabs only for the
+  app's persistent top-level destinations; use a native-feeling selected state and do not place the
+  tab bar in a floating rounded card. Present short focused tasks as sheets and destructive
+  confirmation with a native alert. Support Dynamic Type and VoiceOver without clipping or
+  truncating labels. Follow Apple's guidance for
+  [tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars),
+  [accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility),
+  and [keyboards](https://developer.apple.com/design/human-interface-guidelines/keyboards/).
+- **iPadOS:** do not stretch a phone form across the full display. Use a readable maximum content
+  width; use a sidebar or split layout only when it improves navigation between persistent sections.
+  Keep touch targets and safe-area behavior correct in portrait, landscape, and multitasking sizes.
+- **Android:** follow Material 3 interaction conventions for controls, selection, navigation, and
+  confirmation while retaining Kitezh's token values. Respect system Back and predictive Back,
+  edge-to-edge insets, status/navigation bars, keyboard IME resizing, font scaling, and TalkBack.
+  Use a bottom navigation bar on compact widths and a navigation rail only when the available
+  width makes it useful. A visible app-bar back action on a nested screen must mirror Android
+  system Back and predictive Back behavior. Follow the
+  [Material 3 guidance](https://m3.material.io/).
+- Use platform-aware back affordances, pressed feedback, and navigation semantics. A screen must
+  not depend on a gesture alone: provide an accessible visible alternative where the OS pattern
+  requires one. Respect reduced motion and do not encode selected, error, or success state by color
+  alone.
+- Treat accessibility text scaling as a layout input. Let headings, tab labels, form errors, and
+  buttons wrap; allow scrolling instead of truncating or shrinking text. Keep interactive targets
+  at least 44 points on iOS and 48 dp on Android, including icon-only actions.
+- For tablet layouts, use a maximum readable content width and responsive columns rather than
+  stretching cards and fields. For phones, keep the primary task visible without introducing
+  horizontal scrolling.
+- Before accepting a native UI change, validate the relevant iOS and Android behavior separately:
+  safe areas/insets, system Back, keyboard/IME, status/navigation bars, light/dark/system theme,
+  English/Turkish, compact and large text, touch targets, and VoiceOver/TalkBack. A shared Maestro
+  flow may verify common behavior, but platform-specific behavior needs an assertion on each OS.
+
 ## Authentication and security
 
 - Use Authorization Code + PKCE (S256) for mobile. The mobile OAuth client is public and must not

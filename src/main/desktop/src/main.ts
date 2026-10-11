@@ -22,7 +22,14 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { ThemeMode } from "@kitezh/shared";
+import {
+  colors,
+  controlSizes,
+  radii,
+  spacing,
+  typography,
+  type ThemeMode,
+} from "@kitezh/shared";
 
 import {
   DESKTOP_PROTOCOL,
@@ -108,7 +115,7 @@ function isTurkishDesktop() {
 }
 
 function desktopBackgroundColor() {
-  return nativeTheme.shouldUseDarkColors ? "#202124" : "#f8f9fa";
+  return colors[nativeTheme.shouldUseDarkColors ? "dark" : "light"].background;
 }
 
 function applyDesktopTheme(value: unknown) {
@@ -181,18 +188,31 @@ async function applyDesktopLanguage(value: unknown) {
 
 function nativeDialogThemeCss() {
   const dark = nativeTheme.shouldUseDarkColors;
+  const palette = colors[dark ? "dark" : "light"];
   return `:root {
         color-scheme: ${dark ? "dark" : "light"};
-        --dialog-background: ${dark ? "#202124" : "#f8f9fa"};
-        --dialog-foreground: ${dark ? "#f1f3f4" : "#202124"};
-        --dialog-secondary: ${dark ? "#d4d8da" : "#5f6368"};
-        --dialog-button: ${dark ? "#343d42" : "#e8eaed"};
-        --dialog-button-hover: ${dark ? "#414c52" : "#dfe1e5"};
-        --dialog-border: ${dark ? "#3a4246" : "#dadce0"};
-        --dialog-surface: ${dark ? "#25282b" : "#ffffff"};
+        --dialog-background: ${palette.background};
+        --dialog-foreground: ${palette.text};
+        --dialog-secondary: ${palette.textMuted};
+        --dialog-button: ${palette.surfaceMuted};
+        --dialog-button-hover: ${palette.surfaceHover};
+        --dialog-border: ${palette.border};
+        --dialog-surface: ${palette.surface};
+        --dialog-primary: ${palette.primary};
+        --dialog-primary-hover: ${palette.primaryPressed};
+        --dialog-on-primary: ${palette.onPrimary};
+        --dialog-danger: ${palette.danger};
+        --dialog-control-compact: ${controlSizes.desktopCompact}px;
+        --dialog-control-default: ${controlSizes.desktopDefault}px;
+        --dialog-page-title: ${typography.pageTitle}px;
+        --dialog-space-sm: ${spacing.sm}px;
+        --dialog-space-md: ${spacing.md}px;
+        --dialog-space-lg: ${spacing.lg}px;
+        --dialog-radius-sm: ${radii.sm}px;
+        --dialog-radius-md: ${radii.md}px;
       }
       :where(button, input, select, textarea, a, [tabindex]):focus-visible {
-        outline: 2px solid #1683ff;
+        outline: 2px solid var(--dialog-primary);
         outline-offset: 2px;
       }
       @media (forced-colors: active) {
@@ -412,16 +432,16 @@ async function desktopLoginHtml() {
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; max-width: 560px; padding: 42px 36px 34px; text-align: center; }
       img { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 22px; }
-      .eyebrow { color: #1683ff; font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-      h1 { margin: 12px 0 8px; font-size: 30px; line-height: 1.15; font-weight: 750; }
+      .eyebrow { color: var(--dialog-primary); font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 12px 0 8px; font-size: var(--dialog-page-title); line-height: 1.15; font-weight: 750; }
       .description { margin: 0 0 26px; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
       .option { margin-top: 14px; }
-      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: #1683ff; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
-      button:hover { background: #0b72e4; }
+      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+      button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: wait; opacity: .7; }
       .option p { margin: 8px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.35; }
       .hint { margin: 28px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.45; }
-      .error { display: none; margin: 18px 0 0; padding: 11px 14px; border: 1px solid #d93025; border-radius: 8px; color: #d93025; font-size: 13px; line-height: 1.4; }
+      .error { display: none; margin: 18px 0 0; padding: 11px 14px; border: 1px solid var(--dialog-danger); border-radius: 8px; color: var(--dialog-danger); font-size: 13px; line-height: 1.4; }
       .error.visible { display: block; }
       .status { display: none; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 14px; }
       .status.visible { display: block; }
@@ -611,28 +631,28 @@ async function desktopSettingsHtml() {
       .search-box svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--dialog-secondary); pointer-events: none; }
       nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: 42px; margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: 10px; background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
       nav input[type="search"]::placeholder { color: var(--dialog-secondary); opacity: .8; }
-      nav button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 42px; margin: 3px 0; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dialog-secondary); text-align: left; font: inherit; font-size: 14px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+      nav button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: var(--dialog-control-default); margin: 3px 0; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dialog-secondary); text-align: left; font: inherit; font-size: 14px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
       nav button svg { flex: 0 0 17px; width: 17px; height: 17px; }
       nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       nav button:hover { background: var(--dialog-button-hover); color: var(--dialog-foreground); }
       nav button[aria-selected="true"] { background: var(--dialog-button); color: var(--dialog-foreground); font-weight: 600; }
-      nav button[aria-selected="true"] svg { color: #1683ff; }
+      nav button[aria-selected="true"] svg { color: var(--dialog-primary); }
       .no-results { margin: 10px 8px; color: var(--dialog-secondary); font-size: 14px; }
       main { min-width: 0; overflow-y: auto; padding: 32px clamp(24px, 4vw, 52px) 28px; }
       section[hidden] { display: none; }
       h2 { margin: 0 0 8px; font-size: 25px; }
       .intro { max-width: 58rem; margin: 0 0 24px; color: var(--dialog-secondary); line-height: 1.5; }
-      .card { border: 1px solid var(--dialog-border); border-radius: 14px; padding: 8px 18px; background: var(--dialog-surface); }
+      .card { border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-md); padding: 8px 18px; background: var(--dialog-surface); }
       .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 50px; padding: 7px 0; border-bottom: 1px solid var(--dialog-border); }
       .setting-row:last-child { border-bottom: 0; }
       .setting-row span { font-size: 15px; }
-      select, input[type="text"] { min-height: 38px; padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: 8px; background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; }
-      input[type="checkbox"] { width: 18px; height: 18px; accent-color: #1683ff; }
+      select, input[type="text"] { min-height: var(--dialog-control-compact); padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; }
+      input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--dialog-primary); }
       .theme-options { display: flex; gap: 8px; }
       .theme-options label { display: flex; align-items: center; gap: 6px; }
       .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
-      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 9px; background: #1683ff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
-      button.action:hover { background: #0b72e4; }
+      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 9px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
+      button.action:hover { background: var(--dialog-primary-hover); }
       button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
       button:disabled { cursor: wait; opacity: .65; }
       .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
@@ -1356,14 +1376,14 @@ async function desktopCompanionHtml() {
       main { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
       section { width: min(100%, 390px); text-align: center; }
       img { width: 76px; height: 76px; border-radius: 18px; margin-bottom: 1.25rem; }
-      .eyebrow { color: #1677ff; font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
+      .eyebrow { color: var(--dialog-primary); font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
       h1 { font-size: 1.65rem; margin: .6rem 0 .45rem; }
       p { color: var(--dialog-secondary); font-size: .98rem; margin: 0 0 1.5rem; }
       .actions { display: grid; gap: .75rem; }
-      button { align-items: center; background: #1677ff; border: 0; border-radius: 10px; color: white; cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
-      button:hover { background: #0f5fd2; }
+      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: 10px; color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
+      button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: default; opacity: .65; }
-      .spinner { animation: spin 800ms linear infinite; border: 2px solid rgba(255,255,255,.45); border-radius: 50%; border-top-color: white; height: 16px; width: 16px; }
+      .spinner { animation: spin 800ms linear infinite; border: 2px solid color-mix(in srgb, var(--dialog-on-primary) 45%, transparent); border-radius: 50%; border-top-color: var(--dialog-on-primary); height: 16px; width: 16px; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
@@ -1749,7 +1769,7 @@ async function showUpdateCheckWindow() {
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
       .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: var(--dialog-border); }
-      .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: #1683ff; transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
+      .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: var(--dialog-primary); transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
       @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
       button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
       button:hover { background: var(--dialog-button-hover); }
@@ -1933,7 +1953,7 @@ async function showUpdateConfirmation() {
       p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: var(--dialog-secondary); }
       footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
       button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button.primary { background: #1683ff; }
+      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
       button:hover { filter: brightness(1.12); }
     </style>
   </head>
@@ -2051,10 +2071,10 @@ async function showUpdateDialog(version: string, force = false) {
       h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
       p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: var(--dialog-secondary); }
       label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: var(--dialog-foreground); }
-      input { width: 25px; height: 25px; accent-color: #1683ff; }
+      input { width: 25px; height: 25px; accent-color: var(--dialog-primary); }
       footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
       button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
-      button.primary { background: #1683ff; }
+      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
       button:hover { filter: brightness(1.12); }
     </style>
   </head>
