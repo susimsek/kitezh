@@ -350,6 +350,9 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
     );
     const packagedDiagnosticText = packagedDiagnostics.events.join("\n");
     assert.equal(packagedDiagnostics.packaged, true);
+    if (process.platform === "win32") {
+      assert.equal(packagedDiagnostics.secureStorage, "available");
+    }
     assert.match(packagedDiagnosticText, /unhandled-rejection/);
     assert.match(packagedDiagnosticText, /uncaught-exception/);
     assert.doesNotMatch(
@@ -408,6 +411,14 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
     await application.close();
     application = await launchPackaged();
     const restartedWindow = await nativeMainWindow(application);
+    if (process.platform === "win32") {
+      assert.equal(
+        await restartedWindow.evaluate(
+          async () => (await window.desktopApi.diagnostics.get()).secureStorage,
+        ),
+        "available",
+      );
+    }
     await restartedWindow
       .getByRole("heading", { name: "Account Console" })
       .waitFor();
