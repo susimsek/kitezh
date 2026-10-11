@@ -10529,6 +10529,59 @@ test("localizes and themes the update dialog with desktop preferences", async ()
         getComputedStyle(document.body).backgroundColor === background,
       systemDialogBackground,
     );
+    const liveSettingsWindowPromise = application.waitForEvent("window");
+    await clickApplicationMenuItem(application, "Ayarlar…");
+    const liveSettingsWindow = await liveSettingsWindowPromise;
+    await liveSettingsWindow
+      .getByRole("heading", { name: "Ayarlar" })
+      .waitFor();
+    // Exercise Electron's native theme update while the saved preference stays
+    // on "system"; this is the event path used when Windows changes its theme.
+    await application.evaluate(({ nativeTheme }) => {
+      nativeTheme.themeSource = "dark";
+    });
+    await mainWindow.waitForFunction(
+      () => document.documentElement.dataset.theme === "dark",
+    );
+    await availableWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+    );
+    await companionWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+    );
+    await liveSettingsWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+    );
+    await application.evaluate(({ nativeTheme }) => {
+      nativeTheme.themeSource = "light";
+    });
+    await mainWindow.waitForFunction(
+      () => document.documentElement.dataset.theme === "light",
+    );
+    await availableWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor ===
+        "rgb(247, 249, 252)",
+    );
+    await companionWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor ===
+        "rgb(247, 249, 252)",
+    );
+    await liveSettingsWindow.waitForFunction(
+      () =>
+        getComputedStyle(document.body).backgroundColor ===
+        "rgb(247, 249, 252)",
+    );
+    const liveSettingsClosed = liveSettingsWindow.waitForEvent("close");
+    await closeNativeSettings(application);
+    await liveSettingsClosed;
+    await application.evaluate(({ nativeTheme }) => {
+      nativeTheme.themeSource = "system";
+    });
   } finally {
     await application.close();
   }
