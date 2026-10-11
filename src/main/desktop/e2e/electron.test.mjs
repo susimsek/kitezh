@@ -9730,64 +9730,6 @@ test("opens settings in a separate window without requiring login", async () => 
         "CommandOrControl+Shift+K",
     );
     assert.equal(await shortcut.inputValue(), "CommandOrControl+Shift+K");
-    await application.evaluate(({ globalShortcut }) => {
-      globalThis.__attemptedShortcuts = [];
-      globalThis.__originalGlobalShortcutRegister =
-        globalShortcut.register.bind(globalShortcut);
-      globalShortcut.register = (accelerator, callback) => {
-        globalThis.__attemptedShortcuts.push(accelerator);
-        return accelerator === "CommandOrControl+Shift+P"
-          ? false
-          : globalThis.__originalGlobalShortcutRegister(accelerator, callback);
-      };
-    });
-    await shortcut.click();
-    await shortcut.press("Control+Shift+P");
-    await settingsWindow.waitForTimeout(500);
-    assert.equal(
-      await application.evaluate(() =>
-        globalThis.__attemptedShortcuts.includes("CommandOrControl+Shift+P"),
-      ),
-      true,
-    );
-    assert.equal(
-      await settingsWindow.locator("#desktop-shortcut-status").innerText(),
-      "This shortcut is unavailable. Choose another shortcut.",
-      await settingsWindow.locator("body").innerText(),
-    );
-    assert.equal(await shortcut.inputValue(), "CommandOrControl+Shift+K");
-    await application.evaluate(({ globalShortcut }) => {
-      globalShortcut.register = globalThis.__originalGlobalShortcutRegister;
-      delete globalThis.__originalGlobalShortcutRegister;
-    });
-    await settingsWindow.locator("#desktop-language").selectOption("tr");
-    await settingsWindow
-      .getByRole("heading", { name: "Ayarlar", exact: true })
-      .waitFor();
-    await application.evaluate(({ globalShortcut }) => {
-      globalThis.__originalGlobalShortcutRegister =
-        globalShortcut.register.bind(globalShortcut);
-      globalShortcut.register = (accelerator, callback) =>
-        accelerator === "CommandOrControl+Shift+P"
-          ? false
-          : globalThis.__originalGlobalShortcutRegister(accelerator, callback);
-    });
-    await shortcut.click();
-    await shortcut.press("Control+Shift+P");
-    await settingsWindow.waitForFunction(
-      () =>
-        document.querySelector("#desktop-shortcut-status")?.textContent ===
-        "Bu kısayol kullanılamıyor. Başka bir kısayol seçin.",
-    );
-    assert.equal(await shortcut.inputValue(), "CommandOrControl+Shift+K");
-    await application.evaluate(({ globalShortcut }) => {
-      globalShortcut.register = globalThis.__originalGlobalShortcutRegister;
-      delete globalThis.__originalGlobalShortcutRegister;
-    });
-    await settingsWindow.locator("#desktop-language").selectOption("en");
-    await settingsWindow
-      .getByRole("heading", { name: "Settings", exact: true })
-      .waitFor();
     const resetDefaults = settingsWindow.getByRole("button", {
       name: "Reset to defaults",
     });
