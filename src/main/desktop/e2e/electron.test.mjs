@@ -893,6 +893,28 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
   try {
     await application.evaluate(({ shell }) => {
       globalThis.__authorizationOpens = 0;
+      globalThis.__adminAccessFlags = {
+        isAdmin: true,
+        queryUsers: true,
+        viewUsers: true,
+        manageUsers: true,
+        viewRoles: true,
+        manageRoles: true,
+        queryGroups: true,
+        viewGroups: true,
+        manageGroups: true,
+        queryClients: true,
+        viewClients: true,
+        manageClients: true,
+        viewSessions: true,
+        manageSessions: true,
+        viewConsents: true,
+        manageConsents: true,
+        viewEvents: true,
+        manageEvents: true,
+        viewKeys: true,
+        manageKeys: true,
+      };
       shell.openExternal = async (url) => {
         globalThis.__authorizationOpens += 1;
         globalThis.__pendingAuthorizationUrl = url;
@@ -919,6 +941,11 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
               status: 200,
               headers: { "Content-Type": "application/json" },
             },
+          );
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return new Response(
+            JSON.stringify({ access: globalThis.__adminAccessFlags }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
           );
         if (requestUrl.pathname === "/api/admin/dashboard")
           return new Response(
@@ -6469,8 +6496,24 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
+      globalThis.__denyClientRead = false;
       globalThis.fetch = async (url) => {
-        if (new URL(String(url)).pathname !== "/api/admin/dashboard")
+        const requestUrl = new URL(String(url));
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return new Response(
+            JSON.stringify({ access: globalThis.__adminAccessFlags }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/clients") {
+          if (globalThis.__denyClientRead)
+            return new Response("{}", { status: 403 });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({ content: [], number: 0, totalPages: 0 }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (requestUrl.pathname !== "/api/admin/dashboard")
           throw new Error("Unexpected Admin API request");
         await new Promise((resolve) => setTimeout(resolve, 100));
         return new Response("{}", { status: 403 });
@@ -6483,18 +6526,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         "You do not have permission to use the administration console.",
       )
       .waitFor();
-    const retry = forbidden.getByRole("button", { name: "Retry" });
-    await retry.click();
-    assert.equal(await retry.isDisabled(), true);
-    assert.equal(await retry.locator(".spinner").count(), 1);
+    await forbidden
+      .getByRole("button", { name: "Return to an authorized page" })
+      .waitFor();
+    assert.equal(
+      await forbidden.getByRole("button", { name: "Retry" }).count(),
+      0,
+    );
     await forbidden
       .getByText(
         "You do not have permission to use the administration console.",
       )
       .waitFor();
-    await window.waitForFunction(
-      () => !document.querySelector('[data-action="retry"]')?.disabled,
-    );
     await window.getByRole("button", { name: "Turkish" }).click();
     await window.getByRole("button", { name: "İngilizce" }).waitFor();
     assert.match(
@@ -6516,6 +6559,63 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.reload();
     await window
       .getByRole("heading", { name: "Kontrol paneli", exact: true })
+      .waitFor();
+    await application.evaluate(() => {
+      globalThis.__adminAccessFlags = {
+        isAdmin: false,
+        queryUsers: false,
+        viewUsers: false,
+        manageUsers: false,
+        viewRoles: false,
+        manageRoles: false,
+        queryGroups: false,
+        viewGroups: false,
+        manageGroups: false,
+        queryClients: false,
+        viewClients: true,
+        manageClients: false,
+        viewSessions: false,
+        manageSessions: false,
+        viewConsents: false,
+        manageConsents: false,
+        viewEvents: false,
+        manageEvents: false,
+        viewKeys: false,
+        manageKeys: false,
+      };
+    });
+    await window.reload();
+    await window
+      .getByRole("heading", { name: "İstemciler", exact: true })
+      .waitFor();
+    assert.equal(await window.locator('[data-route="dashboard"]').count(), 0);
+    assert.equal(await window.locator('[data-route="clients"]').count(), 1);
+    await application.evaluate(() => {
+      globalThis.__denyClientRead = true;
+    });
+    await window.locator('[data-route="clients"]').click();
+    const limitedForbidden = window.getByRole("alert");
+    await limitedForbidden
+      .getByText("Yönetim konsolunu kullanma yetkiniz yok.")
+      .waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await limitedForbidden
+      .getByText(
+        "You do not have permission to use the administration console.",
+      )
+      .waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await application.evaluate(() => {
+      globalThis.__denyClientRead = false;
+    });
+    const returnToAuthorized = window.getByRole("button", {
+      name: "Yetkili olduğunuz sayfaya dönün",
+    });
+    await returnToAuthorized.click();
+    assert.equal(await returnToAuthorized.isDisabled(), true);
+    assert.equal(await returnToAuthorized.locator(".spinner").count(), 1);
+    await window
+      .getByRole("heading", { name: "İstemciler", exact: true })
       .waitFor();
     await window.waitForTimeout(500);
     assert.equal(

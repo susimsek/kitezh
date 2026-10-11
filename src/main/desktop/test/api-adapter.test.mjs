@@ -242,6 +242,24 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   });
   assert.equal(response.status, 200);
   assert.equal(requestLanguages[0], "tr");
+  assert.equal(
+    (
+      await adapter.request({
+        console: "admin",
+        path: "/api/admin/whoami",
+      })
+    ).status,
+    200,
+  );
+  for (const path of [
+    "/api/admin/whoami?expand=authorities",
+    "/api/admin/whoami/",
+    "/api/admin/whoami#fragment",
+  ])
+    await assert.rejects(
+      adapter.request({ console: "admin", path }),
+      /not allowed/,
+    );
   await assert.rejects(
     adapter.request({ console: "account", path: "/api/admin/dashboard" }),
     /not allowed/,

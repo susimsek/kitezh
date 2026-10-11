@@ -265,8 +265,10 @@ test("native Admin selection does not call Account APIs", async () => {
     /if \(state\.console === "admin"\) return adminContent\(\)/,
   );
   assert.match(source, /\/api\/admin\/dashboard/);
+  assert.match(source, /\/api\/admin\/whoami/);
+  assert.match(source, /firstAuthorizedAdminRoute\(\)/);
   assert.match(
     source,
-    /state\.route = state\.console === "admin" \? "dashboard" : "profile"/,
+    /filter\(\(\[, , allowed\]\) => allowed\(state\.data\.adminAccess\)\)/,
   );
 });

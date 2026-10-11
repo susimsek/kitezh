@@ -273,6 +273,7 @@ export const messages = {
     adminLoadError: "We could not load the administration console.",
     adminForbidden:
       "You do not have permission to use the administration console.",
+    adminForbiddenReturn: "Return to an authorized page",
     apiOffline: "You are offline. Check your connection and try again.",
     apiTimeout: "The request timed out. Try again.",
     apiForbidden: "You are not allowed to perform this action.",
@@ -917,6 +918,7 @@ export const messages = {
     adminSignInNote: "Varsayılan tarayıcınızda güvenli şekilde devam edin.",
     adminLoadError: "Yönetim konsolu yüklenemedi.",
     adminForbidden: "Yönetim konsolunu kullanma yetkiniz yok.",
+    adminForbiddenReturn: "Yetkili olduğunuz sayfaya dönün",
     apiOffline: "Çevrimdışısınız. Bağlantıyı kontrol edip tekrar deneyin.",
     apiTimeout: "İstek zaman aşımına uğradı. Tekrar deneyin.",
     apiForbidden: "Bu işlemi yapma yetkiniz yok.",

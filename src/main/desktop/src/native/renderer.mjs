@@ -230,6 +230,109 @@ function problemMessage(error) {
   return text("apiFailure");
 }
 
+const adminNavigation = [
+  ["dashboard", "adminDashboard", (access) => access?.isAdmin === true],
+  [
+    "users",
+    "adminUsers",
+    (access) => access?.queryUsers === true || access?.viewUsers === true,
+  ],
+  ["roles", "adminRoles", (access) => access?.viewRoles === true],
+  [
+    "groups",
+    "adminGroups",
+    (access) => access?.queryGroups === true || access?.viewGroups === true,
+  ],
+  [
+    "clients",
+    "adminClients",
+    (access) => access?.queryClients === true || access?.viewClients === true,
+  ],
+  [
+    "client-scopes",
+    "adminClientScopes",
+    (access) => access?.queryClients === true || access?.viewClients === true,
+  ],
+  [
+    "identity-providers",
+    "adminIdentityProviders",
+    (access) => access?.isAdmin === true,
+  ],
+  ["sessions", "adminSessions", (access) => access?.viewSessions === true],
+  ["consents", "adminConsents", (access) => access?.viewConsents === true],
+  [
+    "offline-sessions",
+    "adminOfflineSessions",
+    (access) => access?.viewSessions === true,
+  ],
+  ["events", "adminEvents", (access) => access?.viewEvents === true],
+  ["keys", "adminKeys", (access) => access?.viewKeys === true],
+  ["policies", "adminPolicies", (access) => access?.isAdmin === true],
+  ["configuration", "adminConfiguration", (access) => access?.isAdmin === true],
+  ["login-email", "adminLoginEmail", (access) => access?.isAdmin === true],
+  ["localization", "adminLocalization", (access) => access?.isAdmin === true],
+  ["ldap", "adminLdap", (access) => access?.isAdmin === true],
+  [
+    "authentication",
+    "adminAuthentication",
+    (access) => access?.isAdmin === true,
+  ],
+];
+const ADMIN_ACCESS_KEYS = [
+  "isAdmin",
+  "queryUsers",
+  "viewUsers",
+  "manageUsers",
+  "viewRoles",
+  "manageRoles",
+  "queryGroups",
+  "viewGroups",
+  "manageGroups",
+  "queryClients",
+  "viewClients",
+  "manageClients",
+  "viewSessions",
+  "manageSessions",
+  "viewConsents",
+  "manageConsents",
+  "viewEvents",
+  "manageEvents",
+  "viewKeys",
+  "manageKeys",
+];
+
+function normalizeAdminAccess(value) {
+  if (!value || typeof value !== "object") return null;
+  const access = {};
+  for (const key of ADMIN_ACCESS_KEYS) {
+    if (typeof value[key] !== "boolean") return null;
+    access[key] = value[key];
+  }
+  return access;
+}
+
+function adminRouteAllowed(route) {
+  const access = state.data.adminAccess;
+  if (!access) return false;
+  const routeAccess = adminNavigation.find(
+    ([candidate]) => candidate === route,
+  );
+  if (routeAccess) return routeAccess[2](access);
+  if (["user-create"].includes(route)) return access.manageUsers;
+  if (["role-create"].includes(route)) return access.manageRoles;
+  if (["group-create"].includes(route)) return access.manageGroups;
+  if (["client-scope-create"].includes(route)) return access.manageClients;
+  return false;
+}
+
+function firstAuthorizedAdminRoute() {
+  return (
+    adminNavigation.find(([, , allowed]) =>
+      allowed(state.data.adminAccess),
+    )?.[0] ?? null
+  );
+}
+
 function setError(error) {
   state.error = {
     message: problemMessage(error),
@@ -364,9 +467,32 @@ function violations(body) {
 function shell() {
   const navigation =
     state.console === "admin"
-      ? `${navButton("dashboard", text("adminDashboard"))}${navButton("users", text("adminUsers"))}${navButton("roles", text("adminRoles"))}${navButton("groups", text("adminGroups"))}${navButton("client-scopes", text("adminClientScopes"))}${navButton("clients", text("adminClients"))}${navButton("identity-providers", text("adminIdentityProviders"))}${navButton("sessions", text("adminSessions"))}${navButton("consents", text("adminConsents"))}${navButton("offline-sessions", text("adminOfflineSessions"))}${navButton("events", text("adminEvents"))}${navButton("keys", text("adminKeys"))}${navButton("policies", text("adminPolicies"))}${navButton("configuration", text("adminConfiguration"))}${navButton("login-email", text("adminLoginEmail"))}${navButton("localization", text("adminLocalization"))}${navButton("ldap", text("adminLdap"))}${navButton("authentication", text("adminAuthentication"))}`
+      ? adminNavigation
+          .filter(([, , allowed]) => allowed(state.data.adminAccess))
+          .map(([route, messageKey]) => navButton(route, text(messageKey)))
+          .join("")
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
-  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(text("offlineNotice"))}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${state.error.kind === "unauthorized" ? button(text("signIn"), { action: "sign-in" }) : button(state.console === "admin" ? text("adminRetry") : text("sessionsRetry"), { action: "retry", busy: state.busy === "retry" })}</div>` : ""}${content()}</div></main></div>`;
+  const authorizedRoute =
+    state.error?.kind === "forbidden" && state.console === "admin"
+      ? firstAuthorizedAdminRoute()
+      : null;
+  const errorAction =
+    state.error?.kind === "unauthorized"
+      ? button(text("signIn"), { action: "sign-in" })
+      : authorizedRoute
+        ? button(text("adminForbiddenReturn"), {
+            action: "admin-return-authorized",
+            busy: state.busy === "admin-return-authorized",
+          })
+        : state.error?.kind === "forbidden" && state.console === "admin"
+          ? ""
+          : button(
+              state.console === "admin"
+                ? text("adminRetry")
+                : text("sessionsRetry"),
+              { action: "retry", busy: state.busy === "retry" },
+            );
+  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(text("offlineNotice"))}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${errorAction}</div>` : ""}${content()}</div></main></div>`;
 }
 
 function navButton(route, label) {
@@ -445,6 +571,8 @@ function routeDescription() {
 }
 
 function content() {
+  if (state.console === "admin" && state.error?.kind === "forbidden")
+    return `<section class="card" role="status">${escapeHtml(problemMessage(state.error))}</section>`;
   if (state.loading)
     return (
       '<div class="loading" role="status"><span class="spinner"></span>' +
@@ -1804,6 +1932,12 @@ async function loadProfile() {
 }
 
 async function loadRoute({ preserveError = false, keepContent = false } = {}) {
+  if (state.console === "admin" && !adminRouteAllowed(state.route)) {
+    state.loading = false;
+    state.error = { kind: "forbidden" };
+    render();
+    return;
+  }
   state.loading = !keepContent;
   if (!preserveError) state.error = null;
   render();
@@ -6113,6 +6247,7 @@ async function action(action, element) {
       "switch-account",
       "toggle-locale",
       "retry",
+      "admin-return-authorized",
     ].includes(action)
   ) {
     if (action === "logout") return logout();
@@ -6122,6 +6257,7 @@ async function action(action, element) {
       state.console = state.console === "admin" ? "account" : "admin";
       state.route = state.console === "admin" ? "dashboard" : "profile";
       state.session = null;
+      state.data = {};
       state.error = null;
       render();
       return signIn();
@@ -6147,6 +6283,22 @@ async function action(action, element) {
       await loadRoute({ preserveError: true });
       state.busy = null;
       render();
+      return;
+    }
+    if (action === "admin-return-authorized") {
+      if (state.busy) return;
+      const route = firstAuthorizedAdminRoute();
+      if (!route) {
+        state.error = { kind: "forbidden" };
+        render();
+        return;
+      }
+      state.route = route;
+      state.busy = "admin-return-authorized";
+      void loadRoute({ preserveError: true }).finally(() => {
+        state.busy = null;
+        render();
+      });
       return;
     }
   }
@@ -6836,7 +6988,23 @@ async function hydrate() {
   state.loading = false;
   render();
   if (state.session) {
-    state.route = state.console === "admin" ? "dashboard" : "profile";
+    if (state.console === "admin") {
+      state.data.adminAccess = null;
+      try {
+        const identity = await request("/api/admin/whoami");
+        state.data.adminAccess = normalizeAdminAccess(identity?.access);
+        if (!state.data.adminAccess) throw { kind: "forbidden" };
+        state.route = firstAuthorizedAdminRoute() ?? "dashboard";
+        state.error = null;
+      } catch (error) {
+        state.route = "dashboard";
+        if (!error?.kind) state.error = { kind: "forbidden" };
+        render();
+        return;
+      }
+    } else {
+      state.route = "profile";
+    }
     void loadRoute();
   } else if (hasConsoleSelection()) void signIn();
 }
