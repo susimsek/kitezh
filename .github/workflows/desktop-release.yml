@@ -191,20 +191,20 @@ jobs:
           version="$(node -p "require('./src/main/desktop/package.json').devDependencies.electron")"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
-      - name: Prepare Electron runtime cache
+      - name: Prepare Electron runtime download cache
         shell: bash
         run: |
           set -euo pipefail
           cache_dir="${RUNNER_TEMP}/electron"
           mkdir -p "${cache_dir}"
-          echo "electron_config_cache=${cache_dir}" >> "${GITHUB_ENV}"
+          echo "ELECTRON_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
 
       - name: Cache Electron runtime download
         id: electron-runtime-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}/electron
-          key: electron-runtime-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron-runtime.outputs.version }}
+          key: electron-runtime-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron-runtime.outputs.version }}
 
       - name: Install desktop dependencies
         working-directory: src/main/desktop
