@@ -1392,6 +1392,20 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           globalThis.__adminUserRequests ??= [];
           globalThis.__adminUserRequests.push(requestUrl.search);
           await new Promise((resolve) => setTimeout(resolve, 350));
+          if (Number(requestUrl.searchParams.get("size")) === 100)
+            return new Response(
+              JSON.stringify({
+                content: [
+                  { id: 1, username: "admin" },
+                  { id: 2, username: "user" },
+                ],
+                number: 0,
+                totalPages: 1,
+                totalElements: 2,
+                size: 100,
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
           const page = Number(requestUrl.searchParams.get("page") ?? 0);
           const query = requestUrl.searchParams.get("q") ?? "";
           const username = query
@@ -1697,6 +1711,42 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             globalThis.__createdGroups ?? []
           ).filter((group) => group.id !== id);
           return new Response(null, { status: 204 });
+        }
+        const groupPermissionsMatch = requestUrl.pathname.match(
+          /^\/api\/admin\/groups\/([1-9]\d*)\/permissions$/,
+        );
+        if (groupPermissionsMatch) {
+          const groupId = Number(groupPermissionsMatch[1]);
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            globalThis.__adminGroupPermissionRequests ??= [];
+            globalThis.__adminGroupPermissionRequests.push({
+              id: groupId,
+              body,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            const usernames = { 1: "admin", 2: "user" };
+            globalThis.__groupPermissions ??= {};
+            globalThis.__groupPermissions[groupId] = body.permissions.map(
+              ({ userId, permission }) => ({
+                userId,
+                username: usernames[userId] ?? `user-${userId}`,
+                permission,
+              }),
+            );
+            return new Response(
+              JSON.stringify(globalThis.__groupPermissions[groupId]),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          return new Response(
+            JSON.stringify(
+              globalThis.__groupPermissions?.[groupId] ?? [
+                { userId: 2, username: "user", permission: "VIEW" },
+              ],
+            ),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
         }
         if (requestUrl.pathname === "/api/admin/groups") {
           if (requestMethod === "POST") {
@@ -4295,6 +4345,120 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           parentId: 1,
           attributes: {},
           defaultGroup: false,
+        },
+      ],
+    );
+    const groupPermissionsToggle = parentGroupRow.getByRole("button", {
+      name: "Manage permissions",
+      exact: true,
+    });
+    await groupPermissionsToggle.click();
+    assert.equal(await groupPermissionsToggle.isDisabled(), true);
+    assert.equal(await groupPermissionsToggle.locator(".spinner").count(), 1);
+    const groupPermissionsForm = parentGroupRow.locator(
+      'form[data-form="admin-group-permissions"]',
+    );
+    await groupPermissionsForm
+      .getByRole("heading", { name: "Group permissions", exact: true })
+      .waitFor();
+    await groupPermissionsForm
+      .locator('[data-group-permission-index="0"] [name="permission"]')
+      .selectOption("MANAGE_MEMBERS");
+    await groupPermissionsForm.locator('[name="newUserId"]').selectOption("1");
+    await groupPermissionsForm
+      .locator('[name="newPermission"]')
+      .selectOption("MANAGE_GROUP");
+    await groupPermissionsForm
+      .getByRole("button", { name: "Add permission", exact: true })
+      .click();
+    assert.equal(
+      await groupPermissionsForm
+        .locator("[data-group-permission-index]")
+        .count(),
+      2,
+    );
+    await window.getByRole("button", { name: "Turkish", exact: true }).click();
+    await groupPermissionsForm
+      .getByRole("heading", { name: "Grup izinleri", exact: true })
+      .waitFor();
+    assert.equal(
+      await groupPermissionsForm
+        .locator('[data-group-permission-index="0"] [name="permission"]')
+        .inputValue(),
+      "MANAGE_MEMBERS",
+    );
+    const saveGroupPermissions = groupPermissionsForm.getByRole("button", {
+      name: "Kaydet",
+      exact: true,
+    });
+    await saveGroupPermissions.click();
+    assert.equal(await saveGroupPermissions.isDisabled(), true);
+    assert.equal(await saveGroupPermissions.locator(".spinner").count(), 1);
+    await window
+      .getByText("Grup izinleri güncellendi.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminGroupPermissionRequests,
+      ),
+      [
+        {
+          id: 1,
+          body: {
+            permissions: [
+              { userId: 2, permission: "MANAGE_MEMBERS" },
+              { userId: 1, permission: "MANAGE_GROUP" },
+            ],
+          },
+        },
+      ],
+    );
+    await window
+      .getByRole("button", { name: "İngilizce", exact: true })
+      .click();
+    await window.getByRole("button", { name: "Search groups" }).waitFor();
+    await groupPermissionsForm
+      .locator('[data-group-permission-index="1"]')
+      .getByRole("button", { name: "Remove permission", exact: true })
+      .click();
+    assert.equal(
+      await groupPermissionsForm
+        .locator("[data-group-permission-index]")
+        .count(),
+      1,
+    );
+    const saveGroupPermissionsEnglish = groupPermissionsForm.getByRole(
+      "button",
+      { name: "Save", exact: true },
+    );
+    await saveGroupPermissionsEnglish.click();
+    assert.equal(await saveGroupPermissionsEnglish.isDisabled(), true);
+    assert.equal(
+      await saveGroupPermissionsEnglish.locator(".spinner").count(),
+      1,
+    );
+    await window
+      .getByText("Group permissions updated.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminGroupPermissionRequests,
+      ),
+      [
+        {
+          id: 1,
+          body: {
+            permissions: [
+              { userId: 2, permission: "MANAGE_MEMBERS" },
+              { userId: 1, permission: "MANAGE_GROUP" },
+            ],
+          },
+        },
+        {
+          id: 1,
+          body: {
+            permissions: [{ userId: 2, permission: "MANAGE_MEMBERS" }],
+          },
         },
       ],
     );

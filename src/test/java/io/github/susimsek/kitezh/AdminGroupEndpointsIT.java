@@ -78,6 +78,15 @@ class AdminGroupEndpointsIT {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].username").value("user"));
 
+            mockMvc.perform(
+                            put("/api/admin/groups/{id}/permissions", groupId)
+                                    .with(user())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"permissions\":[{\"userId\":2,"
+                                                    + "\"permission\":\"MANAGE_MEMBERS\"}]}"))
+                    .andExpect(status().isForbidden());
+
             mockMvc.perform(get("/api/admin/groups").param("q", name).with(user()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].name").value(name));

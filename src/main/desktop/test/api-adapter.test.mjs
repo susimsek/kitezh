@@ -470,6 +470,34 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     method: "DELETE",
   });
   assert.equal(deletedGroup.status, 200);
+  const groupPermissions = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/permissions",
+  });
+  assert.equal(groupPermissions.status, 200);
+  const updatedGroupPermissions = await adapter.request({
+    console: "admin",
+    path: "/api/admin/groups/12/permissions",
+    method: "PUT",
+    body: { permissions: [{ userId: 7, permission: "MANAGE_MEMBERS" }] },
+  });
+  assert.equal(updatedGroupPermissions.status, 200);
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/groups/12/permissions?admin=true",
+      method: "PUT",
+    }),
+    /Native API path is not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/groups/12/permissions/extra",
+      method: "PUT",
+    }),
+    /Native API path is not allowed/,
+  );
   const createdClientScope = await adapter.request({
     console: "admin",
     path: "/api/admin/client-scopes",

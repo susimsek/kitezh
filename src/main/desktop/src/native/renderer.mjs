@@ -63,6 +63,8 @@ const spin = (busy) =>
 const actionIcons = {
   "admin-group-member-add": "add",
   "admin-group-child-create-toggle": "add",
+  "admin-group-permission-add": "add",
+  "admin-group-permission-remove": "delete",
   "admin-group-member-remove-request": "delete",
   "admin-group-member-remove-confirm": "delete",
   "admin-group-members-toggle": "edit",
@@ -134,6 +136,12 @@ const actionIcons = {
   "sign-in": "arrowRight",
   "social-remove": "delete",
 };
+const GROUP_PERMISSION_VALUES = [
+  "VIEW",
+  "MANAGE_MEMBERS",
+  "MANAGE_ROLES",
+  "MANAGE_GROUP",
+];
 const button = (label, options = {}) => {
   const iconName =
     options.icon ??
@@ -282,6 +290,49 @@ async function loadGroupMembership(groupId) {
     members,
     available,
     removeConfirmId: current.removeConfirmId ?? null,
+  };
+}
+
+async function loadGroupPermissions(groupId) {
+  const query = new URLSearchParams({
+    page: "0",
+    size: "100",
+    sort: "username,asc",
+  });
+  const [permissionResult, usersResult] = await Promise.allSettled([
+    request(`/api/admin/groups/${groupId}/permissions`),
+    request(`/api/admin/users?${query.toString()}`),
+  ]);
+  if (permissionResult.status === "rejected") throw permissionResult.reason;
+  const assignments =
+    permissionResult.status === "fulfilled" &&
+    Array.isArray(permissionResult.value)
+      ? permissionResult.value
+      : [];
+  const candidatesById = new Map(
+    (usersResult.status === "fulfilled" &&
+    Array.isArray(usersResult.value?.content)
+      ? usersResult.value.content
+      : []
+    ).map((user) => [Number(user.id), user]),
+  );
+  assignments.forEach((assignment) => {
+    if (!candidatesById.has(Number(assignment.userId)))
+      candidatesById.set(Number(assignment.userId), {
+        id: assignment.userId,
+        username: assignment.username,
+      });
+  });
+  const candidates = [...candidatesById.values()];
+  state.data.groupPermissions ??= {};
+  state.data.groupPermissions[groupId] = {
+    saved: assignments,
+    draft: assignments.map(({ userId, username, permission }) => ({
+      userId,
+      username,
+      permission,
+    })),
+    candidates,
   };
 }
 
@@ -918,13 +969,18 @@ function adminGroupsContent() {
       const childCreateForm = childCreateOpen
         ? renderGroupChildCreateForm(group)
         : "";
+      const groupPermissionsOpen =
+        Number(state.data.groupPermissionsOpenId) === Number(group.id);
+      const groupPermissionsPanel = groupPermissionsOpen
+        ? renderGroupPermissions(group.id)
+        : "";
       const nameForm = editingName
         ? `<form class="card" data-form="admin-group-rename" data-group-id="${escapeHtml(group.id)}"><div class="field"><label for="group-name-${escapeHtml(group.id)}">${escapeHtml(text("adminGroupName"))}</label><input id="group-name-${escapeHtml(group.id)}" name="name" type="text" value="${escapeHtml(nameDraft.name ?? group.name ?? "")}" maxlength="100" required/><div class="field-error">${escapeHtml(nameErrors.name ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-name-update:${group.id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-name-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const roleForm = editingRoles
         ? `<form class="card" data-form="admin-group-roles" data-group-id="${escapeHtml(group.id)}"><fieldset class="field"><legend>${escapeHtml(text("adminEditGroupRoles"))}</legend>${roleCatalog.length ? roleCatalog.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(roleErrors.roles ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-roles-update:${group.id}`, disabled: state.offline || Boolean(state.busy) || roleCatalog.length === 0 })}<button class="secondary-button" type="button" data-action="admin-group-roles-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminCreateChildGroup"), { action: "admin-group-child-create-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupName"), { action: "admin-group-name-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === `group-role-catalog:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${controls}</div>${childCreateForm}${nameForm}${roleForm}${memberPanel}</article>`;
+      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminCreateChildGroup"), { action: "admin-group-child-create-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupName"), { action: "admin-group-name-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === `group-role-catalog:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${button(text("adminManageGroupPermissions"), { action: "admin-group-permissions-toggle", id: group.id, busy: state.busy === `group-permissions:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${controls}</div>${childCreateForm}${groupPermissionsPanel}${nameForm}${roleForm}${memberPanel}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -940,6 +996,40 @@ function renderGroupChildCreateForm(group) {
   const busy = state.busy === `group-child-create:${parentId}`;
   const fieldId = `group-child-name-${parentId}`;
   return `<form class="card" data-form="admin-group-child-create" data-parent-id="${parentId}" novalidate><h3>${escapeHtml(text("adminCreateChildGroup"))}: ${escapeHtml(group.path || group.name)}</h3><div class="field"><label for="${fieldId}">${escapeHtml(text("adminGroupName"))}</label><input id="${fieldId}" name="name" type="text" value="${escapeHtml(draft.name ?? "")}" aria-invalid="${Boolean(errors.name)}" maxlength="100" autocomplete="off" required/><div class="field-error">${escapeHtml(errors.name ?? "")}</div></div><div class="actions">${button(text("adminCreateChildGroup"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-child-create-cancel" data-id="${parentId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
+}
+
+function renderGroupPermissions(groupId) {
+  const permissionState = state.data.groupPermissions?.[groupId];
+  if (!permissionState)
+    return `<div class="notice" role="status">${escapeHtml(text("adminGroupPermissions"))}…</div>`;
+  const draft = Array.isArray(permissionState.draft)
+    ? permissionState.draft
+    : [];
+  const users = Array.isArray(permissionState.candidates)
+    ? permissionState.candidates
+    : [];
+  const permissionOptions = GROUP_PERMISSION_VALUES;
+  const rows = draft.length
+    ? draft
+        .map(
+          (assignment, index) =>
+            `<div class="list-item" data-group-permission-index="${index}"><div><strong>${escapeHtml(assignment.username)}</strong><select name="permission" aria-label="${escapeHtml(text("adminGroupPermission"))} ${escapeHtml(assignment.username)}">${permissionOptions.map((permission) => `<option value="${permission}" ${assignment.permission === permission ? "selected" : ""}>${permission}</option>`).join("")}</select></div>${button(text("adminRemoveGroupPermission"), { action: "admin-group-permission-remove", id: index, provider: groupId, danger: true, disabled: Boolean(state.busy) })}</div>`,
+        )
+        .join("")
+    : `<div class="empty" role="status">${escapeHtml(text("adminNoGroupPermissions"))}</div>`;
+  const availableUsers = users
+    .filter(
+      (user) =>
+        Number.isSafeInteger(Number(user.id)) &&
+        Number(user.id) > 0 &&
+        typeof user.username === "string",
+    )
+    .map(
+      (user) =>
+        `<option value="${escapeHtml(user.id)}">${escapeHtml(user.username)}</option>`,
+    )
+    .join("");
+  return `<form class="card" data-form="admin-group-permissions" data-group-id="${escapeHtml(groupId)}"><h3>${escapeHtml(text("adminGroupPermissions"))}</h3><div class="list">${rows}</div><div class="field"><label for="group-permission-user-${escapeHtml(groupId)}">${escapeHtml(text("adminUsers"))}</label><select id="group-permission-user-${escapeHtml(groupId)}" name="newUserId">${availableUsers}</select></div><div class="field"><label for="group-permission-kind-${escapeHtml(groupId)}">${escapeHtml(text("adminGroupPermission"))}</label><select id="group-permission-kind-${escapeHtml(groupId)}" name="newPermission">${permissionOptions.map((permission) => `<option value="${permission}">${permission}</option>`).join("")}</select></div><div class="actions">${button(text("adminAddGroupPermission"), { action: "admin-group-permission-add", id: groupId, disabled: state.offline || Boolean(state.busy) || draft.length >= 200 || users.length === 0 })}${button(text("save"), { type: "submit", busy: state.busy === `group-permissions-save:${groupId}`, disabled: state.offline || Boolean(state.busy) })}</div></form>`;
 }
 
 function renderGroupMembers(groupId, memberState) {
@@ -2241,6 +2331,16 @@ function preserveOfflineDrafts() {
         state.data.groupChildCreateDrafts ??= {};
         state.data.groupChildCreateDrafts[parentId] = values;
       }
+    } else if (form.dataset.form === "admin-group-permissions") {
+      const groupId = Number(form.dataset.groupId);
+      const permissionState = state.data.groupPermissions?.[groupId];
+      if (Number.isSafeInteger(groupId) && permissionState) {
+        if (state.data.skipGroupPermissionDraftPreservation) {
+          state.data.skipGroupPermissionDraftPreservation = false;
+        } else {
+          permissionState.draft = groupPermissionAssignmentsFromForm(form);
+        }
+      }
     } else if (form.dataset.form === "admin-group-roles") {
       const id = Number(form.dataset.groupId);
       if (Number.isSafeInteger(id) && id > 0) {
@@ -2261,6 +2361,24 @@ function preserveOfflineDrafts() {
       state.data.adminClientScopeCreateDraft = values;
     }
   }
+}
+
+function groupPermissionAssignmentsFromForm(form) {
+  const groupId = Number(form.dataset.groupId);
+  const permissionState = state.data.groupPermissions?.[groupId];
+  const previous = Array.isArray(permissionState?.draft)
+    ? permissionState.draft
+    : [];
+  return [...form.querySelectorAll("[data-group-permission-index]")]
+    .map((row) => {
+      const index = Number(row.dataset.groupPermissionIndex);
+      const assignment = previous[index];
+      const permission = row.querySelector('[name="permission"]')?.value;
+      if (!assignment || !GROUP_PERMISSION_VALUES.includes(permission))
+        return null;
+      return { ...assignment, permission };
+    })
+    .filter(Boolean);
 }
 
 async function submitForm(form) {
@@ -3256,6 +3374,69 @@ async function submitForm(form) {
       state.notice = text("adminGroupCreated");
     } catch {
       /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-group-permissions") {
+    const groupId = Number(form.dataset.groupId);
+    const group = (state.data.groups?.content ?? []).find(
+      (candidate) => Number(candidate.id) === groupId,
+    );
+    const permissionState = state.data.groupPermissions?.[groupId];
+    const assignments = permissionState?.draft ?? [];
+    if (
+      !Number.isSafeInteger(groupId) ||
+      groupId < 1 ||
+      !group ||
+      !permissionState ||
+      assignments.length > 200
+    )
+      return;
+    const unique = new Set();
+    const permissions = [];
+    for (const assignment of assignments) {
+      const userId = Number(assignment.userId);
+      const permission = String(assignment.permission ?? "");
+      const user = permissionState.candidates.find(
+        (candidate) => Number(candidate.id) === userId,
+      );
+      const key = `${userId}:${permission}`;
+      if (
+        !Number.isSafeInteger(userId) ||
+        userId < 1 ||
+        !user ||
+        !GROUP_PERMISSION_VALUES.includes(permission) ||
+        unique.has(key)
+      )
+        return;
+      unique.add(key);
+      permissions.push({ userId, permission });
+    }
+    state.busy = `group-permissions-save:${groupId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const updated = await request(
+        `/api/admin/groups/${groupId}/permissions`,
+        {
+          method: "PUT",
+          body: { permissions },
+        },
+      );
+      permissionState.saved = Array.isArray(updated) ? updated : [];
+      permissionState.draft = permissionState.saved.map(
+        ({ userId, username, permission }) => ({
+          userId,
+          username,
+          permission,
+        }),
+      );
+      state.notice = text("adminGroupPermissionsUpdated");
+    } catch {
+      /* request rendered localized server validation or authorization feedback */
     }
     state.busy = null;
     render();
@@ -4984,6 +5165,83 @@ async function action(action, element) {
     render();
     return;
   }
+  if (action === "admin-group-permissions-toggle") {
+    if (state.busy || state.offline) return;
+    const groupId = Number(element.dataset.id);
+    const visible = (state.data.groups?.content ?? []).some(
+      (group) => Number(group.id) === groupId,
+    );
+    if (!Number.isSafeInteger(groupId) || groupId < 1 || !visible) return;
+    if (Number(state.data.groupPermissionsOpenId) === groupId) {
+      state.data.groupPermissionsOpenId = null;
+      render();
+      return;
+    }
+    state.data.groupPermissionsOpenId = groupId;
+    state.busy = `group-permissions:${groupId}`;
+    state.error = null;
+    render();
+    try {
+      await loadGroupPermissions(groupId);
+    } catch {
+      /* request rendered localized transport or authorization feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-group-permission-add") {
+    if (state.busy || state.offline) return;
+    const groupId = Number(element.dataset.id);
+    const permissionState = state.data.groupPermissions?.[groupId];
+    const form = element.closest('form[data-form="admin-group-permissions"]');
+    const userId = Number(form?.elements.namedItem("newUserId")?.value);
+    const permission = String(
+      form?.elements.namedItem("newPermission")?.value ?? "",
+    );
+    const user = permissionState?.candidates?.find(
+      (candidate) => Number(candidate.id) === userId,
+    );
+    const draft = permissionState?.draft;
+    if (
+      !Number.isSafeInteger(groupId) ||
+      groupId < 1 ||
+      !permissionState ||
+      !user ||
+      !GROUP_PERMISSION_VALUES.includes(permission) ||
+      !Array.isArray(draft) ||
+      draft.length >= 200 ||
+      draft.some(
+        (assignment) =>
+          Number(assignment.userId) === userId &&
+          assignment.permission === permission,
+      )
+    )
+      return;
+    draft.push({ userId, username: user.username, permission });
+    state.data.skipGroupPermissionDraftPreservation = true;
+    render();
+    return;
+  }
+  if (action === "admin-group-permission-remove") {
+    if (state.busy) return;
+    const groupId = Number(element.dataset.provider);
+    const index = Number(element.dataset.id);
+    const draft = state.data.groupPermissions?.[groupId]?.draft;
+    if (
+      !Number.isSafeInteger(groupId) ||
+      groupId < 1 ||
+      !Number.isSafeInteger(index) ||
+      index < 0 ||
+      !Array.isArray(draft) ||
+      index >= draft.length
+    )
+      return;
+    draft.splice(index, 1);
+    state.data.skipGroupPermissionDraftPreservation = true;
+    render();
+    return;
+  }
   if (action === "admin-group-child-create-cancel") {
     if (state.busy) return;
     const parentId = Number(element.dataset.id);
@@ -6480,6 +6738,17 @@ function bind() {
       void submitForm(form);
     }),
   );
+  document
+    .querySelectorAll('form[data-form="admin-group-permissions"]')
+    .forEach((form) =>
+      form.addEventListener("change", () => {
+        if (state.busy) return;
+        const groupId = Number(form.dataset.groupId);
+        const permissionState = state.data.groupPermissions?.[groupId];
+        if (permissionState)
+          permissionState.draft = groupPermissionAssignmentsFromForm(form);
+      }),
+    );
   document
     .querySelectorAll("[data-client-scope-role-mappings-panel]")
     .forEach((panel) =>

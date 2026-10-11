@@ -162,6 +162,15 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/groups") return true;
+    const groupPermissionsMatch = path.match(
+      /^\/api\/admin\/groups\/([1-9]\d*)\/permissions$/,
+    );
+    if (
+      groupPermissionsMatch &&
+      Number.isSafeInteger(Number(groupPermissionsMatch[1])) &&
+      ["GET", "PUT"].includes(method)
+    )
+      return true;
     if (
       method === "PUT" &&
       /^\/api\/admin\/groups\/[1-9]\d*\/name$/.test(path) &&
