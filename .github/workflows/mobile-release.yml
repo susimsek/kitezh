@@ -154,12 +154,36 @@ jobs:
           keystore_path="${RUNNER_TEMP}/kitezh-release.keystore"
           printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
           ./gradlew --no-daemon --stacktrace assembleRelease \
+            "-PreactNativeArchitectures=arm64-v8a" \
+            "-Pandroid.enableMinifyInReleaseBuilds=true" \
+            "-Pandroid.enableShrinkResourcesInReleaseBuilds=true" \
+            "-Pandroid.enableBundleCompression=true" \
+            "-Pexpo.useLegacyPackaging=true" \
             "-Pandroid.injected.signing.store.file=${keystore_path}" \
             "-Pandroid.injected.signing.store.password=${KEYSTORE_PASSWORD}" \
             "-Pandroid.injected.signing.key.alias=${KEY_ALIAS}" \
             "-Pandroid.injected.signing.key.password=${KEY_PASSWORD}"
+          apk_path="app/build/outputs/apk/release/app-release.apk"
+          test -s "${apk_path}"
+          if unzip -Z1 "${apk_path}" | grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/'; then
+            echo "The release APK contains unsupported non-ARM64 native libraries." >&2
+            exit 1
+          fi
+          if ! unzip -Z1 "${apk_path}" | grep -q '^lib/arm64-v8a/'; then
+            echo "The release APK does not contain ARM64 native libraries." >&2
+            exit 1
+          fi
+          apk_size_bytes="$(stat -c '%s' "${apk_path}")"
+          apk_size_mib="$(node -e 'process.stdout.write((Number(process.argv[1]) / 1048576).toFixed(2))' "${apk_size_bytes}")"
+          {
+            echo '### Android release package size'
+            echo "- ABI: arm64-v8a"
+            echo "- APK: ${apk_size_bytes} bytes (${apk_size_mib} MiB)"
+            echo '- R8 minification and resource shrinking: enabled'
+            echo '- Hermes bundle and native libraries: compressed'
+          } >> "${GITHUB_STEP_SUMMARY}"
           mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
-          cp app/build/outputs/apk/release/app-release.apk \
+          cp "${apk_path}" \
             "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-android.apk"
 
       - name: Upload Android package
