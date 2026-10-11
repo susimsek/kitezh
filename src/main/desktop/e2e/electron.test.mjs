@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { createRequire } from "node:module";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import test from "node:test";
@@ -7310,6 +7311,93 @@ test("rejects an unsigned update manifest in the Windows main process", async ()
     );
   } finally {
     await application.close();
+  }
+});
+
+test("does not check a Windows update when the signed manifest was altered", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+  });
+  const manifest = Buffer.from(
+    "version: 0.1.4\nreleaseDate: '2026-10-11T08:00:00.000Z'\nfiles:\n  - url: kitezh-0.1.4-win-x64-setup.exe\n    sha512: signed-checksum\n    size: 128\n",
+  );
+  const signature = sign(null, manifest, privateKey).toString("base64");
+  const alteredManifest = manifest
+    .toString("utf8")
+    .replace("version: 0.1.4", "version: 0.1.5");
+  const appPath = await mkdtemp(
+    path.join(os.tmpdir(), "kitezh-desktop-update-integrity-e2e-"),
+  );
+  const assetsPath = path.join(appPath, "assets");
+  await mkdir(assetsPath, { recursive: true });
+  await writeFile(
+    path.join(assetsPath, "update-manifest-public-key.pem"),
+    publicKey.export({ type: "spki", format: "pem" }),
+  );
+
+  const application = await launchDesktop({ autoUpdate: "true" });
+  try {
+    const window = await nativeMainWindow(application);
+    await window.getByRole("heading", { name: "Choose a console" }).waitFor();
+    await application.evaluate(
+      ({ app, net }, fixture) => {
+        Object.defineProperty(app, "isPackaged", {
+          configurable: true,
+          value: true,
+        });
+        Object.defineProperty(app, "getAppPath", {
+          configurable: true,
+          value: () => fixture.appPath,
+        });
+        globalThis.__updateManifestRequests = [];
+        net.fetch = async (url) => {
+          const requestUrl = String(url);
+          globalThis.__updateManifestRequests.push(requestUrl);
+          if (requestUrl.endsWith(".sig"))
+            return new Response(fixture.signature, { status: 200 });
+          return new Response(fixture.manifest, { status: 200 });
+        };
+      },
+      {
+        appPath,
+        manifest: alteredManifest,
+        signature,
+      },
+    );
+
+    const statusPromise = window.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const statuses = [];
+          let remove;
+          remove = window.desktopApi.updates.onStatus((status) => {
+            statuses.push(status);
+            if (status?.state !== "error") return;
+            remove?.();
+            resolve({ status, observedStates: statuses });
+          });
+        }),
+    );
+    await window.evaluate(() => window.desktopApi.updates.check());
+    const result = await statusPromise;
+    assert.deepEqual(result.status, {
+      state: "error",
+      message: "Desktop update could not be checked.",
+    });
+    assert.equal(
+      result.observedStates.some((status) => status?.state === "available"),
+      false,
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__updateManifestRequests),
+      [
+        "https://github.com/susimsek/kitezh/releases/latest/download/latest.yml",
+        "https://github.com/susimsek/kitezh/releases/latest/download/latest.yml.sig",
+      ],
+    );
+  } finally {
+    await application.close();
+    await rm(appPath, { recursive: true, force: true });
   }
 });
 
