@@ -14,6 +14,7 @@ spring:
       enabled: false
   application:
     name: kitezh
+    version: '@project.version@'
   web:
     locale: en
   servlet:

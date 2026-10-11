@@ -48,6 +48,7 @@
 			<jib-native-image-extension-maven.version>0.1.0</jib-native-image-extension-maven.version>
 			<jib-maven-plugin.image>eclipse-temurin:25-jre-alpine</jib-maven-plugin.image>
 		<jib-maven-plugin.architecture>arm64</jib-maven-plugin.architecture>
+			<application.version>${project.version}</application.version>
 
 		<frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
 		<node.version>v24.18.0</node.version>
@@ -194,12 +195,14 @@
 				<filtering>true</filtering>
 				<includes>
 					<include>config/**/*.yml</include>
+					<include>banner.txt</include>
 				</includes>
 			</resource>
 			<resource>
 				<directory>${basedir}/src/main/resources/</directory>
 				<excludes>
 					<exclude>config/**/*.yml</exclude>
+					<exclude>banner.txt</exclude>
 				</excludes>
 			</resource>
 
@@ -210,6 +213,16 @@
 			</resource>
 		</resources>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<configuration>
+					<delimiters>
+						<delimiter>@</delimiter>
+					</delimiters>
+					<useDefaultDelimiters>false</useDefaultDelimiters>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>com.github.eirslett</groupId>
 				<artifactId>frontend-maven-plugin</artifactId>
@@ -516,6 +529,9 @@
 					</to>
 					<container>
 						<mainClass>${start-class}</mainClass>
+						<environment>
+							<SPRING_APPLICATION_VERSION>${application.version}</SPRING_APPLICATION_VERSION>
+						</environment>
 						<ports>
 							<port>9090</port>
 						</ports>
