@@ -34,8 +34,9 @@ The native app consumes platform-neutral theme, locale, and icon contracts from
 `src/main/shared`. React Native components remain native and do not import Bootstrap, Electron,
 or browser storage code.
 
-Set `EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER` to use another issuer during development. The
-default is `https://kitezh.onrender.com`. The authorization server must contain the public
+Set `EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER=http://localhost:9090` to use the local issuer in a
+development build. Other issuer overrides are rejected, and release builds use the fixed
+`https://kitezh.onrender.com` issuer. The authorization server must contain the public
 `mobile-account-console` client with the `kitezh://oauth/callback` and `kitezh://logout/callback`
 redirect URIs for Account. The native Admin client is deliberately separate:
 `mobile-admin-console` uses the `admin-api` scope, the `kitezh://admin/oauth/callback` and

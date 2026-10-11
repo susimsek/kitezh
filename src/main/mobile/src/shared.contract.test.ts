@@ -3,7 +3,11 @@ import test from "node:test";
 
 import { messages, resolveLocale } from "@kitezh/shared/i18n";
 import { colors, resolveTheme } from "../../shared/src/theme.ts";
-import { getMobileConsoleConfig } from "./config.ts";
+import {
+  DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+  getMobileConsoleConfig,
+  resolveAuthorizationServerIssuer,
+} from "./config.ts";
 import { sessionStorageKey } from "./auth/session-keys.ts";
 import {
   DEFAULT_NOTICE_DURATION_MS,
@@ -73,6 +77,36 @@ test("mobile console contracts isolate account and admin sessions", () => {
   assert.deepEqual(admin.scopes, ["openid", "profile", "email", "admin-api"]);
   assert.equal(admin.redirectUri, "kitezh://admin/oauth/callback");
   assert.notEqual(sessionStorageKey("account"), sessionStorageKey("admin"));
+});
+
+test("mobile issuer overrides are limited to the development loopback server", () => {
+  assert.equal(
+    resolveAuthorizationServerIssuer(undefined, false),
+    DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+  );
+  assert.equal(
+    resolveAuthorizationServerIssuer("http://localhost:9090/", true),
+    "http://localhost:9090",
+  );
+  assert.equal(
+    resolveAuthorizationServerIssuer(
+      DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+      false,
+    ),
+    DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("https://unapproved.example", false),
+    /authorization_server_issuer_override_not_allowed/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("https://unapproved.example", true),
+    /authorization_server_issuer_invalid/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("http://localhost:9090/path", true),
+    /authorization_server_issuer_invalid/,
+  );
 });
 
 test("shared API errors preserve native status semantics without transport details", () => {
