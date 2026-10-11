@@ -268,6 +268,11 @@ function isAllowedApiPath(
       return true;
     if (
       method === "PUT" &&
+      /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    )
+      return true;
+    if (
+      method === "PUT" &&
       /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/native-metadata$/.test(
         path,
       )
@@ -390,6 +395,10 @@ function isAllowedApiPath(
           url.pathname,
         )
       )
+        return (
+          url.origin === "https://desktop.invalid" && !url.search && !url.hash
+        );
+      if (/^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}$/.test(url.pathname))
         return (
           url.origin === "https://desktop.invalid" && !url.search && !url.hash
         );

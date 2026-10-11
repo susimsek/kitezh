@@ -623,6 +623,107 @@ class AdminClientServiceTest {
     }
 
     @Test
+    void preservesConfiguredCibaNotificationTokenWhenUpdateLeavesItBlank() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        String configuredToken = "sensitive-ciba-token";
+        RegisteredClient existing =
+                RegisteredClient.from(registeredClient("client-id", "advanced-client"))
+                        .clientSecret("encoded-secret")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.CIBA_DELIVERY_MODE,
+                                                        "ping",
+                                                        ClientSecuritySettings
+                                                                .CIBA_NOTIFICATION_ENDPOINT,
+                                                        "https://example.test/ciba",
+                                                        ClientSecuritySettings
+                                                                .CIBA_CLIENT_NOTIFICATION_TOKEN,
+                                                        configuredToken))
+                                        .build())
+                        .build();
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(existing);
+
+        service()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials", AuthorizationGrantTypes.CIBA),
+                                "ping",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false));
+
+        Object savedToken =
+                savedClient
+                        .get()
+                        .getClientSettings()
+                        .getSetting(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+        assertThat(savedToken).isInstanceOf(String.class);
+        assertThat(configuredToken.equals(savedToken)).isTrue();
+    }
+
+    @Test
+    void replacesConfiguredCibaNotificationTokenWithoutExposingIt() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        String configuredToken = "sensitive-ciba-token";
+        String replacementToken = "replacement-ciba-token";
+        RegisteredClient existing =
+                RegisteredClient.from(registeredClient("client-id", "advanced-client"))
+                        .clientSecret("encoded-secret")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.CIBA_DELIVERY_MODE,
+                                                        "ping",
+                                                        ClientSecuritySettings
+                                                                .CIBA_NOTIFICATION_ENDPOINT,
+                                                        "https://example.test/ciba",
+                                                        ClientSecuritySettings
+                                                                .CIBA_CLIENT_NOTIFICATION_TOKEN,
+                                                        configuredToken))
+                                        .build())
+                        .build();
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(existing);
+
+        service()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials", AuthorizationGrantTypes.CIBA),
+                                "ping",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false,
+                                "https://example.test/ciba",
+                                replacementToken));
+
+        Object savedToken =
+                savedClient
+                        .get()
+                        .getClientSettings()
+                        .getSetting(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+        assertThat(savedToken).isInstanceOf(String.class);
+        assertThat(replacementToken.equals(savedToken)).isTrue();
+    }
+
+    @Test
     void rejectsRenamingClientToAnExistingClientId() {
         RegisteredClientEntity entity = new RegisteredClientEntity();
         RegisteredClient existing = registeredClient("client-id", "service-client");
@@ -1654,6 +1755,57 @@ class AdminClientServiceTest {
             Duration gracePeriod,
             boolean serviceAccountEnabled,
             String cibaNotificationEndpoint) {
+        return advancedRequest(
+                clientId,
+                methods,
+                grants,
+                cibaMode,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod,
+                serviceAccountEnabled,
+                cibaNotificationEndpoint,
+                null);
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled,
+            String cibaNotificationEndpoint,
+            String cibaClientNotificationToken) {
+        return advancedRequest(
+                "advanced-client",
+                methods,
+                grants,
+                cibaMode,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod,
+                serviceAccountEnabled,
+                cibaNotificationEndpoint,
+                cibaClientNotificationToken);
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            String clientId,
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled,
+            String cibaNotificationEndpoint,
+            String cibaClientNotificationToken) {
         return new AdminClientRequestDTO(
                 clientId,
                 "Advanced client",
@@ -1670,7 +1822,7 @@ class AdminClientServiceTest {
                 Set.of("RS256"),
                 cibaMode,
                 cibaNotificationEndpoint,
-                null,
+                cibaClientNotificationToken,
                 Duration.ofMinutes(5),
                 Duration.ofMinutes(5),
                 Duration.ofHours(1),

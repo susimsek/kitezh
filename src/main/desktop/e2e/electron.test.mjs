@@ -2168,6 +2168,100 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             },
           );
         }
+        if (requestUrl.pathname === "/api/admin/clients/client-1") {
+          globalThis.__adminClientConfigurationReadRequests ??= [];
+          if (requestMethod === "GET") {
+            globalThis.__adminClientConfigurationReadRequests.push(true);
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            globalThis.__adminClientConfiguration ??= {
+              id: "client-1",
+              clientId: "demo-client",
+              clientName: "Admin Console",
+              clientIdIssuedAt: "2026-01-01T00:00:00Z",
+              clientSecretExpiresAt: null,
+              clientAuthenticationMethods: ["none"],
+              authorizationGrantTypes: [
+                "authorization_code",
+                "refresh_token",
+                "urn:openid:params:grant-type:ciba",
+              ],
+              redirectUris: ["https://client.example/callback"],
+              postLogoutRedirectUris: [],
+              scopes: ["openid", "profile"],
+              requireAuthorizationConsent: false,
+              requireProofKey: true,
+              requireDpop: false,
+              requireDpopJkt: false,
+              dpopRefreshTokenOnly: false,
+              dpopSigningAlgorithms: ["RS256"],
+              cibaDeliveryMode: "ping",
+              cibaNotificationEndpoint: "https://client.example/ciba",
+              cibaClientNotificationTokenConfigured: true,
+              authorizationCodeTimeToLive: "PT5M",
+              accessTokenTimeToLive: "PT5M",
+              refreshTokenTimeToLive: "PT1H",
+              serviceAccountEnabled: false,
+              serviceAccountUsername: "private-service-account-name",
+              enabled: true,
+              rootUrl: "https://client.example",
+              homeUrl: "https://client.example/home",
+              webOrigins: ["https://client.example"],
+              adminUrl: "https://client.example/admin",
+              frontChannelLogout: false,
+              backchannelLogout: false,
+              jwkSetUrl: null,
+              tokenEndpointAuthenticationSigningAlgorithm: null,
+              x509CertificateSubjectDN: null,
+              offlineSessionIdle: null,
+              offlineSessionMax: null,
+              tokenExchangeDownscopeOnly: false,
+              tokenExchangeAllowDelegation: false,
+              tokenExchangeAllowedAudiences: [],
+            };
+            return new Response(
+              JSON.stringify(globalThis.__adminClientConfiguration),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          if (requestMethod === "PUT") {
+            const body = JSON.parse(init?.body ?? "{}");
+            const { cibaClientNotificationToken, ...safeBody } = body;
+            globalThis.__adminClientConfigurationRequests ??= [];
+            globalThis.__adminClientConfigurationRequests.push({
+              body: safeBody,
+              cibaTokenProvided: Boolean(cibaClientNotificationToken),
+            });
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            if (body.clientName === "Rejected policy")
+              return new Response(
+                JSON.stringify({
+                  detail: "Correct the client configuration.",
+                  violations: [
+                    {
+                      field: "clientName",
+                      message: "Choose another client name.",
+                    },
+                  ],
+                }),
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/problem+json" },
+                },
+              );
+            globalThis.__adminClientConfiguration = {
+              ...globalThis.__adminClientConfiguration,
+              ...safeBody,
+              cibaClientNotificationTokenConfigured:
+                Boolean(cibaClientNotificationToken) ||
+                globalThis.__adminClientConfiguration
+                  .cibaClientNotificationTokenConfigured,
+            };
+            return new Response(
+              JSON.stringify(globalThis.__adminClientConfiguration),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+        }
         if (
           /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/native-metadata$/.test(
             requestUrl.pathname,
@@ -5148,6 +5242,165 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     assert.equal(new URLSearchParams(clientRequests[1]).get("q"), "admin");
     const clientRow = window.locator('[data-client-id="client-1"]');
+    const editClientConfiguration = clientRow.getByRole("button", {
+      name: "Edit client configuration",
+      exact: true,
+    });
+    await editClientConfiguration.click();
+    assert.equal(await editClientConfiguration.isDisabled(), true);
+    assert.equal(await editClientConfiguration.locator(".spinner").count(), 1);
+    await editClientConfiguration.dispatchEvent("click");
+    const clientConfigurationForm = clientRow.locator(
+      'form[data-form="admin-client-configuration"]',
+    );
+    await clientConfigurationForm.waitFor();
+    assert.equal(
+      await window
+        .getByText("private-service-account-name", { exact: true })
+        .count(),
+      0,
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientConfigurationReadRequests,
+      ),
+      [true],
+    );
+    const clientConfigurationSave = clientConfigurationForm.getByRole(
+      "button",
+      { name: "Save", exact: true },
+    );
+    const configRedirectUris = clientConfigurationForm.locator(
+      '[name="redirectUris"]',
+    );
+    await clientConfigurationForm
+      .locator('[name="rootUrl"]')
+      .fill("https://offline.example");
+    await clientConfigurationForm
+      .locator('[name="cibaClientNotificationToken"]')
+      .fill("SENSITIVE_NATIVE_CIBA_TOKEN");
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(await clientConfigurationSave.isDisabled(), true);
+    assert.equal(
+      await clientConfigurationForm.locator('[name="rootUrl"]').inputValue(),
+      "https://offline.example",
+    );
+    assert.equal(
+      await clientConfigurationForm
+        .locator('[name="cibaClientNotificationToken"]')
+        .inputValue(),
+      "",
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientConfigurationRequests ?? [],
+      ),
+      [],
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await clientConfigurationSave.waitFor({ state: "visible" });
+    assert.equal(await clientConfigurationSave.isEnabled(), true);
+    await configRedirectUris.fill("not an absolute URI");
+    await clientConfigurationSave.click();
+    await clientConfigurationForm
+      .getByText("Enter absolute URIs without fragments.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientConfigurationRequests ?? [],
+      ),
+      [],
+    );
+    await configRedirectUris.fill("https://updated.example/callback");
+    await clientConfigurationForm
+      .locator('[name="clientName"]')
+      .fill("Rejected policy");
+    await clientConfigurationForm
+      .locator('[name="cibaClientNotificationToken"]')
+      .fill("SENSITIVE_NATIVE_CIBA_TOKEN");
+    await clientConfigurationSave.click();
+    assert.equal(await clientConfigurationSave.isDisabled(), true);
+    assert.equal(await clientConfigurationSave.locator(".spinner").count(), 1);
+    await clientConfigurationForm
+      .getByText("Choose another client name.", { exact: true })
+      .waitFor();
+    assert.equal(
+      await clientConfigurationForm.locator('[name="clientName"]').inputValue(),
+      "Rejected policy",
+    );
+    assert.equal(
+      await clientConfigurationForm
+        .locator('[name="cibaClientNotificationToken"]')
+        .inputValue(),
+      "",
+    );
+    await clientConfigurationForm
+      .locator('[name="clientName"]')
+      .fill("Native Config Client");
+    await clientConfigurationForm
+      .locator('[name="cibaClientNotificationToken"]')
+      .fill("SENSITIVE_NATIVE_CIBA_TOKEN");
+    await clientConfigurationSave.click();
+    assert.equal(await clientConfigurationSave.isDisabled(), true);
+    assert.equal(await clientConfigurationSave.locator(".spinner").count(), 1);
+    await window
+      .getByText("Client configuration updated.", { exact: true })
+      .waitFor();
+    const clientConfigurationRequests = await application.evaluate(
+      () => globalThis.__adminClientConfigurationRequests,
+    );
+    assert.equal(clientConfigurationRequests.length, 2);
+    assert.deepEqual(
+      clientConfigurationRequests[1].body.clientAuthenticationMethods,
+      ["none"],
+    );
+    assert.deepEqual(
+      clientConfigurationRequests[1].body.authorizationGrantTypes,
+      [
+        "authorization_code",
+        "refresh_token",
+        "urn:openid:params:grant-type:ciba",
+      ],
+    );
+    assert.deepEqual(clientConfigurationRequests[1].body.redirectUris, [
+      "https://updated.example/callback",
+    ]);
+    assert.equal(clientConfigurationRequests[1].body.requireProofKey, true);
+    assert.equal(
+      clientConfigurationRequests[1].body.rootUrl,
+      "https://offline.example",
+    );
+    assert.equal(clientConfigurationRequests[1].cibaTokenProvided, true);
+    assert.equal(
+      JSON.stringify(clientConfigurationRequests).includes(
+        "SENSITIVE_NATIVE_CIBA_TOKEN",
+      ),
+      false,
+    );
+    assert.equal(
+      await window.evaluate(() =>
+        JSON.stringify([localStorage, sessionStorage]).includes(
+          "SENSITIVE_NATIVE_CIBA_TOKEN",
+        ),
+      ),
+      false,
+    );
+    assert.equal(
+      await window.locator('[name="cibaClientNotificationToken"]').count(),
+      0,
+    );
     await clientRow
       .getByRole("button", { name: "Edit client name", exact: true })
       .click();

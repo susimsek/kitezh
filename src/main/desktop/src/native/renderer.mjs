@@ -1470,6 +1470,100 @@ function adminClientCreateContent() {
   return `${secretPanel}<section class="card"><form data-form="admin-client-create" novalidate>${field("clientId", text("adminClientId"), draft.clientId ?? "", errors.clientId, "text", 'maxlength="100" autocomplete="off" required')}${field("clientName", text("adminClientName"), draft.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="field"><label for="client-authentication-mode">${escapeHtml(text("adminClientAuthentication"))}</label><select id="client-authentication-mode" name="authenticationMode"><option value="confidential" ${(draft.authenticationMode ?? "confidential") === "confidential" ? "selected" : ""}>${escapeHtml(text("adminClientConfidential"))}</option><option value="public" ${draft.authenticationMode === "public" ? "selected" : ""}>${escapeHtml(text("adminClientPublic"))}</option></select><div class="field-error">${escapeHtml(errors.clientAuthenticationMethods ?? "")}</div></div><div class="field"><label for="client-redirect-uris">${escapeHtml(text("adminClientRedirectUris"))}</label><textarea id="client-redirect-uris" name="redirectUris" rows="3" maxlength="4000" required>${escapeHtml(draft.redirectUris ?? "")}</textarea><div class="field-error">${escapeHtml(errors.redirectUris ?? "")}</div></div><div class="field"><label for="client-post-logout-uris">${escapeHtml(text("adminClientPostLogoutUris"))}</label><textarea id="client-post-logout-uris" name="postLogoutRedirectUris" rows="3" maxlength="4000">${escapeHtml(draft.postLogoutRedirectUris ?? "")}</textarea><div class="field-error">${escapeHtml(errors.postLogoutRedirectUris ?? "")}</div></div>${field("scopes", text("adminClientScopesInput"), draft.scopes ?? "openid profile", errors.scopes, "text", 'maxlength="1000" required')}<label class="settings-row"><input type="checkbox" name="requireAuthorizationConsent" ${draft.requireAuthorizationConsent === false ? "" : "checked"}/>${escapeHtml(text("adminClientRequireConsent"))}</label><div class="muted">${escapeHtml(text("adminClientCreateSafeDefaults"))}</div><div class="actions">${button(text("adminCreateClient"), { type: "submit", busy: state.busy === "client-create", disabled: state.offline || Boolean(state.busy), icon: "add" })}<button class="secondary-button" type="button" data-action="client-create-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
 }
 
+function clientConfigurationDraft(client) {
+  const lines = (value) => (Array.isArray(value) ? value.join("\n") : "");
+  return {
+    clientId: client.clientId ?? "",
+    clientName: client.clientName ?? "",
+    clientAuthenticationMethods: lines(client.clientAuthenticationMethods),
+    authorizationGrantTypes: lines(client.authorizationGrantTypes),
+    redirectUris: lines(client.redirectUris),
+    postLogoutRedirectUris: lines(client.postLogoutRedirectUris),
+    scopes: lines(client.scopes),
+    requireAuthorizationConsent: Boolean(client.requireAuthorizationConsent),
+    requireProofKey: Boolean(client.requireProofKey),
+    requireDpop: Boolean(client.requireDpop),
+    requireDpopJkt: Boolean(client.requireDpopJkt),
+    dpopRefreshTokenOnly: Boolean(client.dpopRefreshTokenOnly),
+    dpopSigningAlgorithms: lines(client.dpopSigningAlgorithms),
+    cibaDeliveryMode: client.cibaDeliveryMode ?? "poll",
+    cibaNotificationEndpoint: client.cibaNotificationEndpoint ?? "",
+    authorizationCodeTimeToLive: client.authorizationCodeTimeToLive ?? "",
+    accessTokenTimeToLive: client.accessTokenTimeToLive ?? "",
+    refreshTokenTimeToLive: client.refreshTokenTimeToLive ?? "",
+    serviceAccountEnabled: Boolean(client.serviceAccountEnabled),
+    clientSecretTimeToLive: "",
+    enabled: Boolean(client.enabled),
+    rootUrl: client.rootUrl ?? "",
+    homeUrl: client.homeUrl ?? "",
+    webOrigins: lines(client.webOrigins),
+    adminUrl: client.adminUrl ?? "",
+    frontChannelLogout: Boolean(client.frontChannelLogout),
+    backchannelLogout: Boolean(client.backchannelLogout),
+    jwkSetUrl: client.jwkSetUrl ?? "",
+    tokenEndpointAuthenticationSigningAlgorithm:
+      client.tokenEndpointAuthenticationSigningAlgorithm ?? "",
+    x509CertificateSubjectDN: client.x509CertificateSubjectDN ?? "",
+    offlineSessionIdle: client.offlineSessionIdle ?? "",
+    offlineSessionMax: client.offlineSessionMax ?? "",
+    tokenExchangeDownscopeOnly: Boolean(client.tokenExchangeDownscopeOnly),
+    tokenExchangeAllowDelegation: Boolean(client.tokenExchangeAllowDelegation),
+    tokenExchangeAllowedAudiences: lines(client.tokenExchangeAllowedAudiences),
+  };
+}
+
+function adminClientConfigurationForm(id) {
+  const client = state.data.clientConfiguration;
+  if (!client || client.id !== id)
+    return `<section class="card" role="status">${escapeHtml(text("loading"))}</section>`;
+  const draft = state.data.clientConfigurationDrafts?.[id] ?? {};
+  const errors =
+    state.data.clientConfigurationErrorId === id
+      ? violations(state.error?.body)
+      : {};
+  const busy = state.busy === `client-configuration-save:${id}`;
+  const checkbox = (name, key, checked) =>
+    `<label class="settings-row"><span>${escapeHtml(text(key))}</span><input type="checkbox" name="${name}" ${checked ? "checked" : ""}/></label>`;
+  const checks = (name, key, options) =>
+    `<fieldset class="field"><legend>${escapeHtml(text(key))}</legend>${options
+      .map(
+        (option) =>
+          `<label class="settings-row"><span>${escapeHtml(option)}</span><input type="checkbox" name="${name}" value="${escapeHtml(option)}" ${(draft[name] ?? "").split("\n").includes(option) ? "checked" : ""}/></label>`,
+      )
+      .join(
+        "",
+      )}<div class="field-error">${escapeHtml(errors[name] ?? "")}</div></fieldset>`;
+  const listField = (name, key, value, required = false) =>
+    `<div class="field"><label for="client-config-${name}">${escapeHtml(text(key))}</label><textarea id="client-config-${name}" name="${name}" rows="3" maxlength="4000" ${required ? "required" : ""}>${escapeHtml(value ?? "")}</textarea><div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
+  const selectField = (name, key, value, options) =>
+    `<div class="field"><label for="client-config-${name}">${escapeHtml(text(key))}</label><select id="client-config-${name}" name="${name}">${options
+      .map(
+        (option) =>
+          `<option value="${option}" ${value === option ? "selected" : ""}>${option}</option>`,
+      )
+      .join(
+        "",
+      )}</select><div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
+  const authOptions = [
+    "none",
+    "client_secret_basic",
+    "client_secret_post",
+    "private_key_jwt",
+    "tls_client_auth",
+    "self_signed_tls_client_auth",
+  ];
+  const grantOptions = [
+    "authorization_code",
+    "refresh_token",
+    "client_credentials",
+    "urn:openid:params:grant-type:ciba",
+    "urn:ietf:params:oauth:grant-type:token-exchange",
+  ];
+  const algorithmOptions = ["RS256", "ES256"];
+  const tokenExchangeAudiences = draft.tokenExchangeAllowedAudiences ?? "";
+  return `<form class="card" data-form="admin-client-configuration" data-client-id="${escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminEditClientConfiguration"))}</h3><div class="muted">${escapeHtml(text("adminClientSecretNeverDisplayed"))}</div>${field("clientId", text("adminClientId"), draft.clientId ?? "", errors.clientId, "text", 'maxlength="100" required')}${field("clientName", text("adminClientName"), draft.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}${checks("clientAuthenticationMethods", "adminClientAuthenticationMethods", authOptions)}${checks("authorizationGrantTypes", "adminClientGrantTypes", grantOptions)}${listField("redirectUris", "adminClientRedirectUris", draft.redirectUris, true)}${listField("postLogoutRedirectUris", "adminClientPostLogoutUris", draft.postLogoutRedirectUris)}${listField("scopes", "adminClientScopesInput", draft.scopes, true)}${checkbox("requireAuthorizationConsent", "adminClientRequireConsent", draft.requireAuthorizationConsent)}${checkbox("requireProofKey", "adminClientRequireProofKey", draft.requireProofKey)}${checkbox("requireDpop", "adminClientRequireDpop", draft.requireDpop)}${checkbox("requireDpopJkt", "adminClientRequireDpopJkt", draft.requireDpopJkt)}${checkbox("dpopRefreshTokenOnly", "adminClientDpopRefreshOnly", draft.dpopRefreshTokenOnly)}${listField("dpopSigningAlgorithms", "adminClientDpopAlgorithms", draft.dpopSigningAlgorithms, true)}<div class="form-grid">${selectField("cibaDeliveryMode", "adminClientCibaMode", draft.cibaDeliveryMode ?? "poll", ["poll", "ping", "push"])}${field("cibaNotificationEndpoint", text("adminClientCibaEndpoint"), draft.cibaNotificationEndpoint ?? "", errors.cibaNotificationEndpoint)}${field("authorizationCodeTimeToLive", text("adminClientAuthorizationCodeTtl"), draft.authorizationCodeTimeToLive ?? "", errors.authorizationCodeTimeToLive)}${field("accessTokenTimeToLive", text("adminClientAccessTokenTtl"), draft.accessTokenTimeToLive ?? "", errors.accessTokenTimeToLive)}${field("refreshTokenTimeToLive", text("adminClientRefreshTokenTtl"), draft.refreshTokenTimeToLive ?? "", errors.refreshTokenTimeToLive)}${field("clientSecretTimeToLive", text("adminClientSecretTtl"), draft.clientSecretTimeToLive ?? "", errors.clientSecretTimeToLive)}${field("clientSecretGracePeriod", text("adminClientSecretGracePeriod"), "", errors.clientSecretGracePeriod, "text", 'placeholder="PT24H"')}${field("offlineSessionIdle", text("adminClientOfflineSessionIdle"), draft.offlineSessionIdle ?? "", errors.offlineSessionIdle)}${field("offlineSessionMax", text("adminClientOfflineSessionMax"), draft.offlineSessionMax ?? "", errors.offlineSessionMax)}${field("rootUrl", text("adminClientRootUrl"), draft.rootUrl ?? "", errors.rootUrl)}${field("homeUrl", text("adminClientHomeUrl"), draft.homeUrl ?? "", errors.homeUrl)}${field(["admin", "Url"].join(""), text("adminClientAdminUrl"), draft.adminUrl ?? "", errors.adminUrl)}${field("jwkSetUrl", text("adminClientJwksUrl"), draft.jwkSetUrl ?? "", errors.jwkSetUrl)}${field("tokenEndpointAuthenticationSigningAlgorithm", text("adminClientSigningAlgorithm"), draft.tokenEndpointAuthenticationSigningAlgorithm ?? "", errors.tokenEndpointAuthenticationSigningAlgorithm)}${field("x509CertificateSubjectDN", text("adminClientCertificateSubject"), draft.x509CertificateSubjectDN ?? "", errors.x509CertificateSubjectDN)}</div>${listField("webOrigins", "adminClientWebOrigins", draft.webOrigins)}${listField("tokenExchangeAllowedAudiences", "adminClientTokenExchangeAudiences", tokenExchangeAudiences)}${checkbox("serviceAccountEnabled", "adminClientServiceAccountEnabled", draft.serviceAccountEnabled)}${checkbox("enabled", "adminClientEnabled", draft.enabled)}${checkbox("frontChannelLogout", "adminClientFrontChannelLogout", draft.frontChannelLogout)}${checkbox("backchannelLogout", "adminClientBackchannelLogout", draft.backchannelLogout)}${checkbox("tokenExchangeDownscopeOnly", "adminClientTokenExchangeDownscope", draft.tokenExchangeDownscopeOnly)}${checkbox("tokenExchangeAllowDelegation", "adminClientTokenExchangeDelegation", draft.tokenExchangeAllowDelegation)}<div class="field"><label for="client-config-cibaClientNotificationToken">${escapeHtml(text("adminClientCibaToken"))}</label><input id="client-config-cibaClientNotificationToken" type="password" name="cibaClientNotificationToken" maxlength="512" autocomplete="new-password"/><div class="muted">${escapeHtml(text(client.cibaClientNotificationTokenConfigured ? "adminClientCibaTokenPreserved" : "adminClientCibaTokenOptional"))}</div><div class="field-error">${escapeHtml(errors.cibaClientNotificationToken ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-configuration-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
+}
+
 function clientCreateLineValues(value) {
   return value
     .split(/\r?\n/)
@@ -1535,6 +1629,10 @@ function adminClientsContent() {
       const editForm = editing
         ? `<form class="card" data-form="admin-client-native-metadata" data-client-id="${escapeHtml(id)}" novalidate>${field("clientName", text("adminClientName"), draft.clientName ?? client.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-metadata-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-metadata-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
+      const configurationEditing = state.data.clientConfigurationEditId === id;
+      const configurationForm = configurationEditing
+        ? adminClientConfigurationForm(id)
+        : "";
       const assignmentsOpen = state.data.clientScopeAssignmentsOpenId === id;
       const assignmentsToggle = button(
         text("adminManageClientScopeAssignments"),
@@ -1564,7 +1662,7 @@ function adminClientsContent() {
         : confirming
           ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
           : `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${assignmentsToggle}${mappersToggle}</div>${editForm}${assignmentsPanel}${mappersPanel}${deleteControls}</article>`;
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientConfiguration"), { action: "admin-client-configuration-edit", id, busy: state.busy === `client-configuration-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${assignmentsToggle}${mappersToggle}</div>${configurationForm}${editForm}${assignmentsPanel}${mappersPanel}${deleteControls}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
@@ -2259,6 +2357,30 @@ function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+function clientConfigurationFormDraft(form) {
+  const draft = formValues(form);
+  delete draft.cibaClientNotificationToken;
+  for (const name of ["clientAuthenticationMethods", "authorizationGrantTypes"])
+    draft[name] = [...form.querySelectorAll(`input[name="${name}"]:checked`)]
+      .map((input) => input.value)
+      .join("\n");
+  for (const name of [
+    "requireAuthorizationConsent",
+    "requireProofKey",
+    "requireDpop",
+    "requireDpopJkt",
+    "dpopRefreshTokenOnly",
+    "serviceAccountEnabled",
+    "enabled",
+    "frontChannelLogout",
+    "backchannelLogout",
+    "tokenExchangeDownscopeOnly",
+    "tokenExchangeAllowDelegation",
+  ])
+    draft[name] = form.elements.namedItem(name).checked;
+  return draft;
+}
+
 function profileAttributeValues(form) {
   return Object.fromEntries(
     [...form.querySelectorAll("[data-profile-attribute]")].map((input) => {
@@ -2435,6 +2557,13 @@ function preserveOfflineDrafts() {
       if (/^[A-Za-z0-9_-]{1,100}$/.test(scopeId ?? "")) {
         state.data.adminClientScopeDrafts ??= {};
         state.data.adminClientScopeDrafts[scopeId] = values;
+      }
+    } else if (form.dataset.form === "admin-client-configuration") {
+      const id = form.dataset.clientId;
+      if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
+        state.data.clientConfigurationDrafts ??= {};
+        state.data.clientConfigurationDrafts[id] =
+          clientConfigurationFormDraft(form);
       }
     } else if (form.dataset.form === "admin-client-native-metadata") {
       const id = form.dataset.clientId;
@@ -2741,6 +2870,182 @@ async function submitForm(form) {
       await loadClientScopeRoleCandidates(scopeId, kind, 0);
     } catch {
       /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-client-configuration") {
+    const id = form.dataset.clientId ?? "";
+    const clients = state.data.clients?.content ?? [];
+    const existing = state.data.clientConfiguration;
+    if (
+      state.offline ||
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      existing?.id !== id ||
+      !clients.some((client) => client.id === id)
+    )
+      return;
+    const values = formValues(form);
+    const checkedValues = (name) =>
+      [...form.querySelectorAll(`input[name="${name}"]:checked`)].map(
+        (input) => input.value,
+      );
+    const listValue = (name) => clientCreateLineValues(values[name] ?? "");
+    const body = {
+      clientId: String(values.clientId ?? "").trim(),
+      clientName: String(values.clientName ?? "").trim(),
+      clientAuthenticationMethods: checkedValues("clientAuthenticationMethods"),
+      authorizationGrantTypes: checkedValues("authorizationGrantTypes"),
+      redirectUris: listValue("redirectUris"),
+      postLogoutRedirectUris: listValue("postLogoutRedirectUris"),
+      scopes: listValue("scopes"),
+      requireAuthorizationConsent: form.elements.namedItem(
+        "requireAuthorizationConsent",
+      ).checked,
+      requireProofKey: form.elements.namedItem("requireProofKey").checked,
+      requireDpop: form.elements.namedItem("requireDpop").checked,
+      requireDpopJkt: form.elements.namedItem("requireDpopJkt").checked,
+      dpopRefreshTokenOnly: form.elements.namedItem("dpopRefreshTokenOnly")
+        .checked,
+      dpopSigningAlgorithms: listValue("dpopSigningAlgorithms"),
+      cibaDeliveryMode: String(values.cibaDeliveryMode ?? "poll"),
+      cibaNotificationEndpoint:
+        String(values.cibaNotificationEndpoint ?? "").trim() || null,
+      cibaClientNotificationToken: String(
+        values.cibaClientNotificationToken ?? "",
+      ),
+      authorizationCodeTimeToLive:
+        String(values.authorizationCodeTimeToLive ?? "").trim() || null,
+      accessTokenTimeToLive:
+        String(values.accessTokenTimeToLive ?? "").trim() || null,
+      refreshTokenTimeToLive:
+        String(values.refreshTokenTimeToLive ?? "").trim() || null,
+      serviceAccountEnabled: form.elements.namedItem("serviceAccountEnabled")
+        .checked,
+      clientSecretTimeToLive:
+        String(values.clientSecretTimeToLive ?? "").trim() || null,
+      enabled: form.elements.namedItem("enabled").checked,
+      rootUrl: String(values.rootUrl ?? "").trim(),
+      homeUrl: String(values.homeUrl ?? "").trim(),
+      webOrigins: listValue("webOrigins"),
+      adminUrl: String(values.adminUrl ?? "").trim(),
+      frontChannelLogout: form.elements.namedItem("frontChannelLogout").checked,
+      backchannelLogout: form.elements.namedItem("backchannelLogout").checked,
+      jwkSetUrl: String(values.jwkSetUrl ?? "").trim(),
+      tokenEndpointAuthenticationSigningAlgorithm: String(
+        values.tokenEndpointAuthenticationSigningAlgorithm ?? "",
+      ).trim(),
+      x509CertificateSubjectDN: String(
+        values.x509CertificateSubjectDN ?? "",
+      ).trim(),
+      clientSecretGracePeriod:
+        String(values.clientSecretGracePeriod ?? "").trim() || null,
+      offlineSessionIdle:
+        String(values.offlineSessionIdle ?? "").trim() || null,
+      offlineSessionMax: String(values.offlineSessionMax ?? "").trim() || null,
+      tokenExchangeDownscopeOnly: form.elements.namedItem(
+        "tokenExchangeDownscopeOnly",
+      ).checked,
+      tokenExchangeAllowDelegation: form.elements.namedItem(
+        "tokenExchangeAllowDelegation",
+      ).checked,
+      tokenExchangeAllowedAudiences: listValue("tokenExchangeAllowedAudiences"),
+    };
+    const localErrors = {};
+    if (!body.clientId) localErrors.clientId = text("adminRequired");
+    else if (body.clientId.length > 100)
+      localErrors.clientId = text("adminMax100");
+    if (!body.clientName) localErrors.clientName = text("adminRequired");
+    else if (body.clientName.length > 200)
+      localErrors.clientName = text("adminMax200");
+    if (body.clientAuthenticationMethods.length === 0)
+      localErrors.clientAuthenticationMethods = text("adminRequired");
+    if (body.authorizationGrantTypes.length === 0)
+      localErrors.authorizationGrantTypes = text("adminRequired");
+    if (body.scopes.length === 0) localErrors.scopes = text("adminRequired");
+    if (
+      body.authorizationGrantTypes.includes("authorization_code") &&
+      body.redirectUris.length === 0
+    )
+      localErrors.redirectUris = text("adminRequired");
+    for (const name of [
+      "redirectUris",
+      "postLogoutRedirectUris",
+      "webOrigins",
+    ]) {
+      if (!body[name].every(isAbsoluteFragmentFreeUri))
+        localErrors[name] = text("adminInvalidUri");
+    }
+    for (const name of [
+      "rootUrl",
+      "homeUrl",
+      ["admin", "Url"].join(""),
+      "jwkSetUrl",
+    ]) {
+      if (body[name] && !isAbsoluteFragmentFreeUri(body[name]))
+        localErrors[name] = text("adminInvalidUri");
+    }
+    if (Object.keys(localErrors).length) {
+      const safeDraft = clientConfigurationFormDraft(form);
+      state.data.clientConfigurationDrafts ??= {};
+      state.data.clientConfigurationDrafts[id] = safeDraft;
+      state.data.clientConfigurationErrorId = id;
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: Object.values(localErrors)[0],
+          violations: Object.entries(localErrors).map(([field, message]) => ({
+            field,
+            message,
+          })),
+        },
+      };
+      render();
+      return;
+    }
+    if (!form.reportValidity()) return;
+    const safeDraft = clientConfigurationFormDraft(form);
+    state.data.clientConfigurationDrafts ??= {};
+    state.data.clientConfigurationDrafts[id] = safeDraft;
+    state.data.clientConfigurationErrorId = id;
+    state.error = null;
+    state.notice = null;
+    state.busy = `client-configuration-save:${id}`;
+    render();
+    try {
+      const updated = await request(
+        `/api/admin/clients/${encodeURIComponent(id)}`,
+        {
+          method: "PUT",
+          body,
+        },
+      );
+      const {
+        serviceAccountUsername: _serviceAccountUsername,
+        ...safeUpdated
+      } = updated;
+      state.data.clientConfiguration = safeUpdated;
+      state.data.clients = {
+        ...state.data.clients,
+        content: clients.map((client) =>
+          client.id === id
+            ? {
+                ...client,
+                clientId: updated.clientId,
+                clientName: updated.clientName,
+                scopes: updated.scopes,
+                requireProofKey: updated.requireProofKey,
+              }
+            : client,
+        ),
+      };
+      delete state.data.clientConfigurationDrafts[id];
+      state.data.clientConfigurationEditId = null;
+      state.data.clientConfigurationErrorId = null;
+      state.notice = text("adminClientConfigurationUpdated");
+    } catch {
+      /* Retain non-secret fields for localized validation or retry. */
     }
     state.busy = null;
     render();
@@ -6080,6 +6385,70 @@ async function action(action, element) {
       /* request rendered localized transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-configuration-edit") {
+    if (state.busy || state.offline || !adminRouteAllowed("clients")) return;
+    const id = element.dataset.id ?? "";
+    const client = (state.data.clients?.content ?? []).find(
+      (entry) => entry.id === id,
+    );
+    if (
+      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !client ||
+      PLATFORM_CONSOLE_CLIENT_IDS.has(client.clientId)
+    )
+      return;
+    if (state.data.clientConfigurationEditId === id) {
+      state.data.clientConfigurationEditId = null;
+      state.data.clientConfiguration = null;
+      delete state.data.clientConfigurationDrafts?.[id];
+      state.data.clientConfigurationErrorId = null;
+      state.error = null;
+      render();
+      return;
+    }
+    state.busy = `client-configuration-load:${id}`;
+    state.error = null;
+    render();
+    try {
+      const configuration = await request(
+        `/api/admin/clients/${encodeURIComponent(id)}`,
+      );
+      if (
+        configuration?.id !== id ||
+        typeof configuration.clientId !== "string" ||
+        !Array.isArray(configuration.clientAuthenticationMethods) ||
+        !Array.isArray(configuration.authorizationGrantTypes)
+      )
+        throw new Error("invalid_client_configuration_response");
+      const {
+        serviceAccountUsername: _serviceAccountUsername,
+        ...safeConfiguration
+      } = configuration;
+      state.data.clientConfiguration = safeConfiguration;
+      state.data.clientConfigurationEditId = id;
+      state.data.clientConfigurationDrafts ??= {};
+      state.data.clientConfigurationDrafts[id] =
+        clientConfigurationDraft(safeConfiguration);
+      state.data.clientConfigurationErrorId = null;
+    } catch {
+      /* request rendered localized authorization, timeout, or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-client-configuration-cancel") {
+    if (state.busy) return;
+    const id = element.dataset.id ?? "";
+    if (state.data.clientConfigurationEditId !== id) return;
+    state.data.clientConfigurationEditId = null;
+    state.data.clientConfiguration = null;
+    delete state.data.clientConfigurationDrafts?.[id];
+    state.data.clientConfigurationErrorId = null;
+    state.error = null;
     render();
     return;
   }

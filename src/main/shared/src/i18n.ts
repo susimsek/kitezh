@@ -297,6 +297,49 @@ export const messages = {
     adminEditClientMetadata: "Edit client name",
     adminClientName: "Client name",
     adminCreateClient: "Create client",
+    adminEditClientConfiguration: "Edit client configuration",
+    adminClientSecretNeverDisplayed:
+      "Client secrets are never returned by this screen. Leave secret fields blank to keep their current values.",
+    adminClientAuthenticationMethods: "Client authentication methods",
+    adminClientGrantTypes: "OAuth grant types",
+    adminClientRequireProofKey: "Require PKCE",
+    adminClientRequireDpop: "Require DPoP proofs",
+    adminClientRequireDpopJkt: "Require DPoP key thumbprint",
+    adminClientDpopRefreshOnly: "Use unbound DPoP for refresh tokens",
+    adminClientDpopAlgorithms: "DPoP signing algorithms (one per line)",
+    adminClientCibaMode: "CIBA delivery mode",
+    adminClientCibaEndpoint: "CIBA notification endpoint",
+    adminClientCibaToken: "Replace CIBA notification token (optional)",
+    adminClientCibaTokenPreserved:
+      "A token is configured. Leave this field blank to keep it.",
+    adminClientCibaTokenOptional:
+      "This value is sent only with the save request and is never retained in the form.",
+    adminClientAuthorizationCodeTtl: "Authorization code lifetime (ISO-8601)",
+    adminClientAccessTokenTtl: "Access token lifetime (ISO-8601)",
+    adminClientRefreshTokenTtl: "Refresh token lifetime (ISO-8601)",
+    adminClientSecretTtl: "Client secret lifetime (optional ISO-8601)",
+    adminClientSecretGracePeriod:
+      "Client secret grace period (optional ISO-8601)",
+    adminClientOfflineSessionIdle:
+      "Offline session idle lifetime (optional ISO-8601)",
+    adminClientOfflineSessionMax:
+      "Offline session maximum lifetime (optional ISO-8601)",
+    adminClientRootUrl: "Root URL",
+    adminClientHomeUrl: "Home URL",
+    adminClientWebOrigins: "Web origins (one per line)",
+    adminClientAdminUrl: "Admin URL",
+    adminClientFrontChannelLogout: "Enable front-channel logout",
+    adminClientBackchannelLogout: "Enable back-channel logout",
+    adminClientJwksUrl: "JWKS URL",
+    adminClientSigningAlgorithm: "Token endpoint signing algorithm",
+    adminClientCertificateSubject: "TLS certificate subject DN",
+    adminClientTokenExchangeDownscope: "Require token-exchange downscoping",
+    adminClientTokenExchangeDelegation: "Allow token-exchange delegation",
+    adminClientTokenExchangeAudiences:
+      "Allowed token-exchange audiences (one per line)",
+    adminClientServiceAccountEnabled: "Enable service account",
+    adminClientEnabled: "Client enabled",
+    adminClientConfigurationUpdated: "Client configuration updated.",
     adminCreateClientDescription:
       "Register an OAuth client with PKCE and review its secret once.",
     adminClientId: "Client ID",
@@ -963,6 +1006,53 @@ export const messages = {
     adminEditClientMetadata: "İstemci adını düzenle",
     adminClientName: "İstemci adı",
     adminCreateClient: "İstemci oluştur",
+    adminEditClientConfiguration: "İstemci yapılandırmasını düzenle",
+    adminClientSecretNeverDisplayed:
+      "İstemci sırları bu ekranda hiçbir zaman döndürülmez. Mevcut sırları korumak için sır alanlarını boş bırakın.",
+    adminClientAuthenticationMethods: "İstemci kimlik doğrulama yöntemleri",
+    adminClientGrantTypes: "OAuth yetki türleri",
+    adminClientRequireProofKey: "PKCE zorunlu olsun",
+    adminClientRequireDpop: "DPoP kanıtı zorunlu olsun",
+    adminClientRequireDpopJkt: "DPoP anahtar parmak izi zorunlu olsun",
+    adminClientDpopRefreshOnly:
+      "Yenileme belirteçlerinde anahtara bağlanmamış DPoP kullan",
+    adminClientDpopAlgorithms:
+      "DPoP imzalama algoritmaları (her satıra bir tane)",
+    adminClientCibaMode: "CIBA teslimat modu",
+    adminClientCibaEndpoint: "CIBA bildirim uç noktası",
+    adminClientCibaToken: "CIBA bildirim belirtecini değiştir (isteğe bağlı)",
+    adminClientCibaTokenPreserved:
+      "Bir belirteç yapılandırılmış. Korumak için bu alanı boş bırakın.",
+    adminClientCibaTokenOptional:
+      "Bu değer yalnızca kaydetme isteğiyle gönderilir ve formda tutulmaz.",
+    adminClientAuthorizationCodeTtl: "Yetkilendirme kodu ömrü (ISO-8601)",
+    adminClientAccessTokenTtl: "Erişim belirteci ömrü (ISO-8601)",
+    adminClientRefreshTokenTtl: "Yenileme belirteci ömrü (ISO-8601)",
+    adminClientSecretTtl: "İstemci sırrı ömrü (isteğe bağlı ISO-8601)",
+    adminClientSecretGracePeriod:
+      "İstemci sırrı geçiş süresi (isteğe bağlı ISO-8601)",
+    adminClientOfflineSessionIdle:
+      "Çevrimdışı oturum boşta kalma süresi (isteğe bağlı ISO-8601)",
+    adminClientOfflineSessionMax:
+      "Çevrimdışı oturum en uzun süre (isteğe bağlı ISO-8601)",
+    adminClientRootUrl: "Kök URL",
+    adminClientHomeUrl: "Ana sayfa URL'si",
+    adminClientWebOrigins: "Web kaynakları (her satıra bir tane)",
+    adminClientAdminUrl: "Yönetim URL'si",
+    adminClientFrontChannelLogout: "Ön kanal oturum kapatmayı etkinleştir",
+    adminClientBackchannelLogout: "Arka kanal oturum kapatmayı etkinleştir",
+    adminClientJwksUrl: "JWKS URL'si",
+    adminClientSigningAlgorithm: "Belirteç uç noktası imzalama algoritması",
+    adminClientCertificateSubject: "TLS sertifika konu DN'si",
+    adminClientTokenExchangeDownscope:
+      "Belirteç değişiminde kapsam daraltmayı zorunlu kıl",
+    adminClientTokenExchangeDelegation:
+      "Belirteç değişiminde yetki devrine izin ver",
+    adminClientTokenExchangeAudiences:
+      "İzin verilen belirteç değişim hedefleri (her satıra bir tane)",
+    adminClientServiceAccountEnabled: "Hizmet hesabını etkinleştir",
+    adminClientEnabled: "İstemci etkin",
+    adminClientConfigurationUpdated: "İstemci yapılandırması güncellendi.",
     adminCreateClientDescription:
       "PKCE ile bir OAuth istemcisi kaydedin ve sırrını bir kez görüntüleyin.",
     adminClientId: "İstemci kimliği",

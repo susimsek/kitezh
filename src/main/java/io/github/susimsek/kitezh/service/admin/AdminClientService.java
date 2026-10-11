@@ -604,7 +604,7 @@ public class AdminClientService {
         applyOptionalUrls(values, request, existing);
         applyOptionalLogoutSettings(values, request);
         applyOptionalAuthenticationSettings(values, request, existing);
-        applyCibaSettings(values, request);
+        applyCibaSettings(values, request, existing);
         applyTokenExchangeSettings(values, request);
     }
 
@@ -678,7 +678,7 @@ public class AdminClientService {
     }
 
     private static void applyCibaSettings(
-            Map<String, Object> values, AdminClientRequestDTO request) {
+            Map<String, Object> values, AdminClientRequestDTO request, RegisteredClient existing) {
         String cibaDeliveryMode = resolveCibaDeliveryMode(request);
         values.put(ClientSecuritySettings.CIBA_DELIVERY_MODE, cibaDeliveryMode);
         if (ClientSecuritySettings.CIBA_POLL.equals(cibaDeliveryMode)) {
@@ -688,7 +688,14 @@ public class AdminClientService {
             values.put(
                     ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
                     request.cibaNotificationEndpoint());
-            values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+            if (request.cibaClientNotificationToken() != null
+                    && !request.cibaClientNotificationToken().isBlank()) {
+                values.put(
+                        ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN,
+                        request.cibaClientNotificationToken());
+            } else if (existing == null) {
+                values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+            }
         }
     }
 
