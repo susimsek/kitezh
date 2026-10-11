@@ -36,6 +36,7 @@
     "package": "pnpm run build && electron-builder --publish never"
   },
   "devDependencies": {
+    "@types/js-yaml": "4.0.9",
     "@types/node": "24.10.1",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
@@ -114,6 +115,7 @@
   },
   "dependencies": {
     "@kitezh/shared": "link:../shared",
-    "electron-updater": "6.8.9"
+    "electron-updater": "6.8.9",
+    "js-yaml": "4.1.0"
   }
 }
