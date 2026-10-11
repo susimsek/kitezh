@@ -296,6 +296,27 @@ export const messages = {
     adminNoClients: "No clients found.",
     adminEditClientMetadata: "Edit client name",
     adminClientName: "Client name",
+    adminCreateClient: "Create client",
+    adminCreateClientDescription:
+      "Register an OAuth client with PKCE and review its secret once.",
+    adminClientId: "Client ID",
+    adminClientAuthentication: "Client authentication",
+    adminClientConfidential: "Confidential (client secret)",
+    adminClientPublic: "Public (PKCE)",
+    adminClientRedirectUris: "Redirect URIs (one per line)",
+    adminClientPostLogoutUris: "Post-logout redirect URIs (one per line)",
+    adminClientScopesInput: "Scopes (space separated)",
+    adminClientRequireConsent: "Require authorization consent",
+    adminClientCreateSafeDefaults:
+      "Authorization code and refresh token grants use PKCE. Service accounts and DPoP are disabled.",
+    adminClientCreated: "Client created.",
+    adminClientSecretOneTime: "Client secret (shown once)",
+    adminClientSecretOneTimeHelp:
+      "Copy this secret to your secure password manager now. It is held only in this window and is cleared when you continue.",
+    adminClientSecretDone: "I saved the secret",
+    adminMax100: "Use no more than 100 characters.",
+    adminMax200: "Use no more than 200 characters.",
+    adminInvalidUri: "Enter absolute URIs without fragments.",
     adminClientMetadataUpdated: "Client name updated.",
     adminDeleteClient: "Delete client",
     adminDeleteClientPrompt:
@@ -941,6 +962,28 @@ export const messages = {
     adminNoClients: "İstemci bulunamadı.",
     adminEditClientMetadata: "İstemci adını düzenle",
     adminClientName: "İstemci adı",
+    adminCreateClient: "İstemci oluştur",
+    adminCreateClientDescription:
+      "PKCE ile bir OAuth istemcisi kaydedin ve sırrını bir kez görüntüleyin.",
+    adminClientId: "İstemci kimliği",
+    adminClientAuthentication: "İstemci kimlik doğrulaması",
+    adminClientConfidential: "Gizli (istemci sırrı)",
+    adminClientPublic: "Herkese açık (PKCE)",
+    adminClientRedirectUris: "Yönlendirme URI'leri (her satıra bir tane)",
+    adminClientPostLogoutUris:
+      "Oturum kapatma sonrası yönlendirme URI'leri (her satıra bir tane)",
+    adminClientScopesInput: "Kapsamlar (boşlukla ayırın)",
+    adminClientRequireConsent: "Yetkilendirme onayı iste",
+    adminClientCreateSafeDefaults:
+      "Yetkilendirme kodu ve yenileme belirteci akışları PKCE kullanır. Hizmet hesapları ve DPoP kapalıdır.",
+    adminClientCreated: "İstemci oluşturuldu.",
+    adminClientSecretOneTime: "İstemci sırrı (bir kez gösterilir)",
+    adminClientSecretOneTimeHelp:
+      "Bu sırrı şimdi güvenli parola yöneticinize kaydedin. Yalnızca bu pencerede tutulur ve devam ettiğinizde silinir.",
+    adminClientSecretDone: "Sırrı kaydettim",
+    adminMax100: "En fazla 100 karakter kullanın.",
+    adminMax200: "En fazla 200 karakter kullanın.",
+    adminInvalidUri: "Parça içermeyen mutlak URI girin.",
     adminClientMetadataUpdated: "İstemci adı güncellendi.",
     adminDeleteClient: "İstemciyi sil",
     adminDeleteClientPrompt:

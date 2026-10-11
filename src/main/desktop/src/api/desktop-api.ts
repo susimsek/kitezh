@@ -205,6 +205,7 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/client-scopes") return true;
+    if (method === "POST" && path === "/api/admin/clients") return true;
     if (
       method === "DELETE" &&
       /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(path)

@@ -173,6 +173,9 @@ const pageHeader = (title, description) => {
     state.route === "client-scopes" ||
     (state.route === "client-scope-create" &&
       state.busy === "client-scope-create-route");
+  const createClient =
+    (state.route === "clients" && adminRouteAllowed("client-create")) ||
+    (state.route === "client-create" && state.busy === "client-create-route");
   const createAction =
     state.console === "admin" && createUser
       ? button(text("adminCreateUser"), {
@@ -200,16 +203,25 @@ const pageHeader = (title, description) => {
               disabled: state.offline || Boolean(state.busy),
               icon: "add",
             })
-          : state.console === "admin" && createClientScope
-            ? button(text("adminCreateClientScope"), {
-                action: "create-client-scope",
+          : state.console === "admin" && createClient
+            ? button(text("adminCreateClient"), {
+                action: "create-client",
                 busy:
-                  state.busy === "client-scope-create-route" ||
-                  state.busy === "route:client-scopes",
+                  state.busy === "client-create-route" ||
+                  state.busy === "route:clients",
                 disabled: state.offline || Boolean(state.busy),
                 icon: "add",
               })
-            : "";
+            : state.console === "admin" && createClientScope
+              ? button(text("adminCreateClientScope"), {
+                  action: "create-client-scope",
+                  busy:
+                    state.busy === "client-scope-create-route" ||
+                    state.busy === "route:client-scopes",
+                  disabled: state.offline || Boolean(state.busy),
+                  icon: "add",
+                })
+              : "";
   return `<div class="topbar"><div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><div class="actions">${createAction}${button(text("signOut"), { action: "logout", busy: state.busy === "logout", icon: "logout" })}</div></div>`;
 };
 
@@ -322,6 +334,7 @@ function adminRouteAllowed(route) {
   if (["role-create"].includes(route)) return access.manageRoles;
   if (["group-create"].includes(route)) return access.manageGroups;
   if (["client-scope-create"].includes(route)) return access.manageClients;
+  if (["client-create"].includes(route)) return access.manageClients;
   return false;
 }
 
@@ -511,6 +524,7 @@ function routeTitle() {
       "group-create": text("adminCreateGroup"),
       "client-scopes": text("adminClientScopes"),
       "client-scope-create": text("adminCreateClientScope"),
+      "client-create": text("adminCreateClient"),
       clients: text("adminClients"),
       "identity-providers": text("adminIdentityProviders"),
       sessions: text("adminSessions"),
@@ -546,6 +560,7 @@ function routeDescription() {
       "group-create": text("adminCreateGroupDescription"),
       "client-scopes": text("adminSearchClientScopes"),
       "client-scope-create": text("adminCreateClientScopeDescription"),
+      "client-create": text("adminCreateClientDescription"),
       clients: text("adminSearchClients"),
       "identity-providers": text("adminSearchIdentityProviders"),
       sessions: text("adminSearchSessions"),
@@ -597,6 +612,7 @@ function adminContent() {
   if (state.route === "client-scopes") return adminClientScopesContent();
   if (state.route === "client-scope-create")
     return adminClientScopeCreateContent();
+  if (state.route === "client-create") return adminClientCreateContent();
   if (state.route === "clients") return adminClientsContent();
   if (state.route === "identity-providers")
     return adminIdentityProvidersContent();
@@ -1439,6 +1455,35 @@ function adminClientScopeCreateContent() {
   const draft = state.data.adminClientScopeCreateDraft ?? {};
   const errors = violations(state.error?.body);
   return `<section class="card"><form data-form="admin-client-scope-create" novalidate>${field("name", text("adminClientScopeName"), draft.name ?? "", errors.name, "text", 'maxlength="100" autocomplete="off" required')}${field("displayName", text("adminClientScopeDisplayName"), draft.displayName ?? "", errors.displayName, "text", 'maxlength="200"')}${field("description", text("adminClientScopeDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="muted">${escapeHtml(text("adminClientScopeDefaults"))}</div>${button(text("adminCreateClientScope"), { type: "submit", busy: state.busy === "client-scope-create", disabled: state.offline })}</form></section>`;
+}
+
+function adminClientCreateContent() {
+  const draft = state.data.adminClientCreateDraft ?? {};
+  const errors = state.data.adminClientCreateError
+    ? violations(state.error?.body)
+    : {};
+  const secret = state.data.clientCreateSecret;
+  const secretPanel = secret
+    ? `<section class="card notice warning" aria-label="${escapeHtml(text("adminClientSecretOneTime"))}"><h2>${escapeHtml(text("adminClientSecretOneTime"))}</h2><p>${escapeHtml(text("adminClientSecretOneTimeHelp"))}</p><code data-one-time-client-secret="true">${escapeHtml(secret)}</code>${button(text("adminClientSecretDone"), { action: "client-create-secret-dismiss" })}</section>`
+    : "";
+  if (secret) return secretPanel;
+  return `${secretPanel}<section class="card"><form data-form="admin-client-create" novalidate>${field("clientId", text("adminClientId"), draft.clientId ?? "", errors.clientId, "text", 'maxlength="100" autocomplete="off" required')}${field("clientName", text("adminClientName"), draft.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="field"><label for="client-authentication-mode">${escapeHtml(text("adminClientAuthentication"))}</label><select id="client-authentication-mode" name="authenticationMode"><option value="confidential" ${(draft.authenticationMode ?? "confidential") === "confidential" ? "selected" : ""}>${escapeHtml(text("adminClientConfidential"))}</option><option value="public" ${draft.authenticationMode === "public" ? "selected" : ""}>${escapeHtml(text("adminClientPublic"))}</option></select><div class="field-error">${escapeHtml(errors.clientAuthenticationMethods ?? "")}</div></div><div class="field"><label for="client-redirect-uris">${escapeHtml(text("adminClientRedirectUris"))}</label><textarea id="client-redirect-uris" name="redirectUris" rows="3" maxlength="4000" required>${escapeHtml(draft.redirectUris ?? "")}</textarea><div class="field-error">${escapeHtml(errors.redirectUris ?? "")}</div></div><div class="field"><label for="client-post-logout-uris">${escapeHtml(text("adminClientPostLogoutUris"))}</label><textarea id="client-post-logout-uris" name="postLogoutRedirectUris" rows="3" maxlength="4000">${escapeHtml(draft.postLogoutRedirectUris ?? "")}</textarea><div class="field-error">${escapeHtml(errors.postLogoutRedirectUris ?? "")}</div></div>${field("scopes", text("adminClientScopesInput"), draft.scopes ?? "openid profile", errors.scopes, "text", 'maxlength="1000" required')}<label class="settings-row"><input type="checkbox" name="requireAuthorizationConsent" ${draft.requireAuthorizationConsent === false ? "" : "checked"}/>${escapeHtml(text("adminClientRequireConsent"))}</label><div class="muted">${escapeHtml(text("adminClientCreateSafeDefaults"))}</div><div class="actions">${button(text("adminCreateClient"), { type: "submit", busy: state.busy === "client-create", disabled: state.offline || Boolean(state.busy), icon: "add" })}<button class="secondary-button" type="button" data-action="client-create-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
+}
+
+function clientCreateLineValues(value) {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isAbsoluteFragmentFreeUri(value) {
+  try {
+    const uri = new URL(value);
+    return Boolean(uri.protocol) && !uri.hash;
+  } catch {
+    return false;
+  }
 }
 
 function clientScopeAssignmentsPanel(clientId) {
@@ -2493,6 +2538,13 @@ function preserveOfflineDrafts() {
       }
     } else if (form.dataset.form === "admin-client-scope-create") {
       state.data.adminClientScopeCreateDraft = values;
+    } else if (form.dataset.form === "admin-client-create") {
+      state.data.adminClientCreateDraft = {
+        ...values,
+        requireAuthorizationConsent: form.elements.namedItem(
+          "requireAuthorizationConsent",
+        ).checked,
+      };
     }
   }
 }
@@ -3624,6 +3676,135 @@ async function submitForm(form) {
       state.notice = text("adminChildGroupCreated");
     } catch {
       /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-client-create") {
+    const bodyDraft = {
+      clientId: String(values.clientId ?? "").trim(),
+      clientName: String(values.clientName ?? "").trim(),
+      authenticationMode:
+        values.authenticationMode === "public" ? "public" : "confidential",
+      redirectUris: String(values.redirectUris ?? ""),
+      postLogoutRedirectUris: String(values.postLogoutRedirectUris ?? ""),
+      scopes: String(values.scopes ?? "").trim(),
+      requireAuthorizationConsent: form.elements.namedItem(
+        "requireAuthorizationConsent",
+      ).checked,
+    };
+    state.data.adminClientCreateDraft = bodyDraft;
+    const redirectUris = clientCreateLineValues(bodyDraft.redirectUris);
+    const postLogoutRedirectUris = clientCreateLineValues(
+      bodyDraft.postLogoutRedirectUris,
+    );
+    const localErrors = {};
+    if (!bodyDraft.clientId) localErrors.clientId = text("adminRequired");
+    if (bodyDraft.clientId.length > 100)
+      localErrors.clientId = text("adminMax100");
+    if (!bodyDraft.clientName) localErrors.clientName = text("adminRequired");
+    if (bodyDraft.clientName.length > 200)
+      localErrors.clientName = text("adminMax200");
+    if (redirectUris.length === 0)
+      localErrors.redirectUris = text("adminRequired");
+    else if (!redirectUris.every(isAbsoluteFragmentFreeUri))
+      localErrors.redirectUris = text("adminInvalidUri");
+    if (!postLogoutRedirectUris.every(isAbsoluteFragmentFreeUri))
+      localErrors.postLogoutRedirectUris = text("adminInvalidUri");
+    if (!bodyDraft.scopes || bodyDraft.scopes.length > 1000)
+      localErrors.scopes = text("adminRequired");
+    if (Object.keys(localErrors).length) {
+      state.data.adminClientCreateError = true;
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: Object.values(localErrors)[0],
+          violations: Object.entries(localErrors).map(([field, message]) => ({
+            field,
+            message,
+          })),
+        },
+      };
+      render();
+      return;
+    }
+    if (state.offline || !form.reportValidity()) return;
+    const confidential = bodyDraft.authenticationMode === "confidential";
+    const body = {
+      clientId: bodyDraft.clientId,
+      clientName: bodyDraft.clientName,
+      clientAuthenticationMethods: [
+        confidential ? "client_secret_basic" : "none",
+      ],
+      authorizationGrantTypes: ["authorization_code", "refresh_token"],
+      redirectUris,
+      postLogoutRedirectUris,
+      scopes: bodyDraft.scopes.split(/\s+/).filter(Boolean),
+      requireAuthorizationConsent: bodyDraft.requireAuthorizationConsent,
+      requireProofKey: true,
+      requireDpop: false,
+      requireDpopJkt: false,
+      dpopRefreshTokenOnly: false,
+      dpopSigningAlgorithms: ["RS256", "ES256"],
+      cibaDeliveryMode: "poll",
+      authorizationCodeTimeToLive: "PT5M",
+      accessTokenTimeToLive: "PT5M",
+      refreshTokenTimeToLive: "PT1H",
+      serviceAccountEnabled: false,
+      clientSecretTimeToLive: confidential ? "P90D" : null,
+      enabled: true,
+      frontChannelLogout: false,
+      backchannelLogout: false,
+      tokenEndpointAuthenticationSigningAlgorithm: "RS256",
+      clientSecretGracePeriod: "PT24H",
+      tokenExchangeDownscopeOnly: false,
+      tokenExchangeAllowDelegation: false,
+      tokenExchangeAllowedAudiences: [],
+    };
+    state.data.adminClientCreateError = true;
+    state.error = null;
+    state.notice = null;
+    state.busy = "client-create";
+    render();
+    try {
+      const created = await request("/api/admin/clients", {
+        method: "POST",
+        body,
+      });
+      const client = created?.client;
+      if (!client || typeof client.id !== "string")
+        throw new Error("invalid_client_create_response");
+      state.data.clients = {
+        ...(state.data.clients ?? { content: [], number: 0, totalPages: 0 }),
+        content: [
+          {
+            id: client.id,
+            clientId: client.clientId,
+            clientName: client.clientName,
+            scopes: Array.isArray(client.scopes) ? client.scopes : body.scopes,
+            requireProofKey: true,
+          },
+          ...(state.data.clients?.content ?? []).filter(
+            (entry) => entry.id !== client.id,
+          ),
+        ],
+      };
+      state.data.clientCreateSecret =
+        confidential && typeof created.clientSecret === "string"
+          ? created.clientSecret
+          : null;
+      state.data.adminClientCreateDraft = null;
+      state.data.adminClientCreateError = false;
+      state.data.clientQuery = "";
+      state.data.clientPage = 0;
+      if (!state.data.clientCreateSecret) {
+        state.route = "clients";
+        state.notice = text("adminClientCreated");
+      }
+    } catch {
+      /* Keep only the non-secret form draft for localized validation or retry. */
+      if (!state.error) state.error = { kind: "failure" };
     }
     state.busy = null;
     render();
@@ -6358,6 +6539,39 @@ async function action(action, element) {
     render();
     return;
   }
+  if (action === "create-client") {
+    if (state.busy || state.offline || !adminRouteAllowed("client-create"))
+      return;
+    state.busy = "client-create-route";
+    state.route = "client-create";
+    state.data.adminClientCreateDraft = null;
+    state.data.adminClientCreateError = false;
+    state.data.clientCreateSecret = null;
+    state.error = null;
+    state.notice = null;
+    await loadRoute();
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "client-create-cancel") {
+    if (state.busy) return;
+    state.route = "clients";
+    state.data.adminClientCreateDraft = null;
+    state.data.adminClientCreateError = false;
+    state.error = null;
+    state.notice = null;
+    render();
+    return;
+  }
+  if (action === "client-create-secret-dismiss") {
+    if (state.busy) return;
+    state.data.clientCreateSecret = null;
+    state.route = "clients";
+    state.notice = null;
+    render();
+    return;
+  }
   if (action === "mfa-setup") {
     state.busy = "mfa";
     render();
@@ -6535,6 +6749,8 @@ function bind() {
   document.querySelectorAll("[data-route]").forEach((element) =>
     element.addEventListener("click", () => {
       if (state.busy || element.disabled) return;
+      if (state.route !== element.dataset.route)
+        state.data.clientCreateSecret = null;
       state.route = element.dataset.route;
       state.notice = null;
       state.busy = `route:${state.route}`;

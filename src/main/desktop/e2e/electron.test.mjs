@@ -2110,6 +2110,33 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(null, { status: 204 });
         }
+        if (
+          requestMethod === "POST" &&
+          requestUrl.pathname === "/api/admin/clients"
+        ) {
+          const body = JSON.parse(init?.body ?? "{}");
+          globalThis.__adminClientCreateRequests ??= [];
+          globalThis.__adminClientCreateRequests.push(body);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              client: {
+                id: "client-native-created",
+                clientId: body.clientId,
+                clientName: body.clientName,
+                scopes: body.scopes,
+                requireProofKey: body.requireProofKey,
+              },
+              clientSecret: body.clientAuthenticationMethods.includes("none")
+                ? null
+                : "ONE_TIME_CLIENT_SECRET_SENTINEL",
+            }),
+            {
+              status: 201,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         if (requestUrl.pathname === "/api/admin/clients") {
           globalThis.__adminClientRequests ??= [];
           globalThis.__adminClientRequests.push(requestUrl.search);
@@ -4998,6 +5025,107 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(await clientsNavigation.isDisabled(), true);
     assert.equal(await clientsNavigation.locator(".spinner").count(), 1);
     await window.getByText("Account Console").waitFor();
+    await window
+      .getByRole("button", { name: "Create client", exact: true })
+      .click();
+    const createClientForm = window.locator(
+      'form[data-form="admin-client-create"]',
+    );
+    await createClientForm.waitFor();
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    const offlineCreateClient = createClientForm.getByRole("button", {
+      name: "Create client",
+      exact: true,
+    });
+    assert.equal(await offlineCreateClient.isDisabled(), true);
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientCreateRequests ?? [],
+      ),
+      [],
+    );
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await createClientForm
+      .locator('[name="clientId"]')
+      .fill("native-e2e-client");
+    await createClientForm
+      .locator('[name="clientName"]')
+      .fill("Native E2E Client");
+    await createClientForm
+      .locator('[name="redirectUris"]')
+      .fill("not an absolute URI");
+    await createClientForm
+      .getByRole("button", { name: "Create client", exact: true })
+      .click();
+    await window
+      .getByText("Enter absolute URIs without fragments.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminClientCreateRequests ?? [],
+      ),
+      [],
+    );
+    const redirectUris = createClientForm.locator('[name="redirectUris"]');
+    await redirectUris.fill("https://native-client.example/callback");
+    const createClient = createClientForm.getByRole("button", {
+      name: "Create client",
+      exact: true,
+    });
+    await createClient.click();
+    assert.equal(await createClient.isDisabled(), true);
+    assert.equal(await createClient.locator(".spinner").count(), 1);
+    await createClient.dispatchEvent("click");
+    await window
+      .getByRole("heading", { name: "Client secret (shown once)" })
+      .waitFor();
+    assert.equal(
+      await window.locator('[data-one-time-client-secret="true"]').innerText(),
+      "ONE_TIME_CLIENT_SECRET_SENTINEL",
+    );
+    const clientCreateRequests = await application.evaluate(
+      () => globalThis.__adminClientCreateRequests,
+    );
+    assert.equal(clientCreateRequests.length, 1);
+    assert.deepEqual(clientCreateRequests[0].clientAuthenticationMethods, [
+      "client_secret_basic",
+    ]);
+    assert.deepEqual(clientCreateRequests[0].authorizationGrantTypes, [
+      "authorization_code",
+      "refresh_token",
+    ]);
+    assert.deepEqual(clientCreateRequests[0].redirectUris, [
+      "https://native-client.example/callback",
+    ]);
+    assert.equal(clientCreateRequests[0].requireProofKey, true);
+    assert.equal("clientSecret" in clientCreateRequests[0], false);
+    assert.equal(
+      await window.evaluate(() =>
+        JSON.stringify([localStorage, sessionStorage]).includes(
+          "ONE_TIME_CLIENT_SECRET_SENTINEL",
+        ),
+      ),
+      false,
+    );
+    await window
+      .getByRole("button", { name: "I saved the secret", exact: true })
+      .click();
+    assert.equal(
+      await window.locator('[data-one-time-client-secret="true"]').count(),
+      0,
+    );
     const platformClientRow = window.locator('[data-client-id="client-1"]');
     assert.equal(
       await platformClientRow
@@ -5086,6 +5214,40 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       await application.evaluate(() => globalThis.__adminClientDeleteRequests),
       ["/api/admin/clients/client-1"],
     );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("button", { name: "İstemci oluştur", exact: true })
+      .click();
+    const publicClientForm = window.locator(
+      'form[data-form="admin-client-create"]',
+    );
+    await publicClientForm.waitFor();
+    await publicClientForm
+      .locator('[name="clientId"]')
+      .fill("native-e2e-public-client");
+    await publicClientForm
+      .locator('[name="clientName"]')
+      .fill("Native E2E Public Client");
+    await publicClientForm
+      .locator('[name="authenticationMode"]')
+      .selectOption("public");
+    await publicClientForm
+      .locator('[name="redirectUris"]')
+      .fill("https://native-public.example/callback");
+    await publicClientForm
+      .getByRole("button", { name: "İstemci oluştur", exact: true })
+      .click();
+    await window.getByText("İstemci oluşturuldu.", { exact: true }).waitFor();
+    assert.equal(
+      await window.locator('[data-one-time-client-secret="true"]').count(),
+      0,
+    );
+    const publicCreateRequest = await application.evaluate(
+      () => globalThis.__adminClientCreateRequests[1],
+    );
+    assert.deepEqual(publicCreateRequest.clientAuthenticationMethods, ["none"]);
+    assert.equal(publicCreateRequest.requireProofKey, true);
+    await window.getByRole("button", { name: "İngilizce" }).click();
     const identityProvidersNavigation = window.getByRole("button", {
       name: "Identity providers",
       exact: true,

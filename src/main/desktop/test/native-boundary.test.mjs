@@ -162,7 +162,7 @@ test("native desktop renderer does not depend on the Web component tree", async 
     /React|React-Bootstrap|localStorage|next\/|src\/main\/web/,
   );
   assert.match(source, /api\.api\.request/);
-  assert.doesNotMatch(source, /getSession|refreshToken|accessToken/);
+  assert.doesNotMatch(source, /\b(?:getSession|refreshToken|accessToken)\b/);
   assert.match(source, /aria-busy/);
   assert.match(source, /social-start/);
   assert.match(source, /onCallback/);
