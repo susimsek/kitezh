@@ -185,6 +185,29 @@ function isAllowedApiPath(
       /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
     )
       return true;
+    const roleClientCompositeMatch = path.match(
+      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/client-composites\/([1-9]\d*)(?:\?|$)/,
+    );
+    if (roleClientCompositeMatch && ["POST", "DELETE"].includes(method)) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        return (
+          url.origin === "https://desktop.invalid" &&
+          url.searchParams.get("page") === "0" &&
+          url.searchParams.get("size") === "20" &&
+          url.searchParams.get("sort") === "username,asc" &&
+          [...url.searchParams.keys()].every((key) =>
+            ["page", "size", "sort"].includes(key),
+          ) &&
+          [...new Set(url.searchParams.keys())].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          !url.hash
+        );
+      } catch {
+        return false;
+      }
+    }
     if (method === "POST" && path === "/api/admin/groups") return true;
     const groupPermissionsMatch = path.match(
       /^\/api\/admin\/groups\/([1-9]\d*)\/permissions$/,
@@ -449,8 +472,13 @@ function isAllowedApiPath(
       const roleCompositeCandidatesMatch = url.pathname.match(
         /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-composites$/,
       );
+      const roleClientCompositeCandidatesMatch = url.pathname.match(
+        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-client-composites$/,
+      );
       const isRoleDetail = Boolean(roleDetailMatch);
-      const isRoleCompositeCandidates = Boolean(roleCompositeCandidatesMatch);
+      const isRoleCompositeCandidates = Boolean(
+        roleCompositeCandidatesMatch || roleClientCompositeCandidatesMatch,
+      );
       const isGroups = url.pathname === "/api/admin/groups";
       const groupMemberSearchMatch = url.pathname.match(
         /^\/api\/admin\/groups\/([1-9]\d*)\/(?:users|available-users)$/,

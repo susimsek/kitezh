@@ -7923,8 +7923,11 @@ test("manages native realm-role composites through bounded Admin contracts", asy
         manageKeys: false,
       };
       globalThis.__compositeRoleNames = [];
+      globalThis.__compositeClientRoles = [];
       globalThis.__compositeRoleRequests = [];
       globalThis.__compositeRoleSearchRequests = [];
+      globalThis.__compositeClientRoleRequests = [];
+      globalThis.__compositeClientRoleSearchRequests = [];
       shell.openExternal = async (url) => {
         globalThis.__pendingAuthorizationUrl = url;
       };
@@ -7961,7 +7964,10 @@ test("manages native realm-role composites through bounded Admin contracts", asy
         ) {
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
-            JSON.stringify({ compositeRoles: globalThis.__compositeRoleNames }),
+            JSON.stringify({
+              compositeRoles: globalThis.__compositeRoleNames,
+              compositeClientRoles: globalThis.__compositeClientRoles,
+            }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
@@ -7975,6 +7981,32 @@ test("manages native realm-role composites through bounded Admin contracts", asy
             JSON.stringify({
               content: [
                 { name: "ROLE_VIEWER", description: "Read-only access" },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 10,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          requestUrl.pathname ===
+          "/api/admin/roles/ROLE_ADMIN/available-client-composites"
+        ) {
+          globalThis.__compositeClientRoleSearchRequests.push(
+            requestUrl.search,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: 42,
+                  clientId: "billing-api",
+                  name: "invoice.read",
+                  description: "Read invoices",
+                },
               ],
               number: 0,
               totalPages: 1,
@@ -8001,6 +8033,37 @@ test("manages native realm-role composites through bounded Admin contracts", asy
             method === "POST" ? ["ROLE_VIEWER"] : [];
           return new Response(
             JSON.stringify({ compositeRoles: globalThis.__compositeRoleNames }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/roles\/ROLE_ADMIN\/client-composites\/42$/.test(
+            requestUrl.pathname,
+          ) &&
+          ["POST", "DELETE"].includes(method)
+        ) {
+          globalThis.__compositeClientRoleRequests.push({
+            method,
+            path: requestUrl.pathname,
+            query: requestUrl.search,
+            body: init?.body,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__compositeClientRoles =
+            method === "POST"
+              ? [
+                  {
+                    id: 42,
+                    clientId: "billing-api",
+                    name: "invoice.read",
+                    description: "Read invoices",
+                  },
+                ]
+              : [];
+          return new Response(
+            JSON.stringify({
+              compositeClientRoles: globalThis.__compositeClientRoles,
+            }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
@@ -8138,6 +8201,93 @@ test("manages native realm-role composites through bounded Admin contracts", asy
         {
           method: "DELETE",
           path: "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER",
+          query: "?page=0&size=20&sort=username,asc",
+          body: undefined,
+        },
+      ],
+    );
+    const clientRoleSearch = composition.getByRole("searchbox", {
+      name: "Search available client roles",
+    });
+    const clientRoleSearchButton = composition.getByRole("button", {
+      name: "Search available client roles",
+    });
+    await clientRoleSearch.fill("invoice");
+    await clientRoleSearchButton.click();
+    assert.equal(await clientRoleSearchButton.isDisabled(), true);
+    assert.equal(await clientRoleSearchButton.locator(".spinner").count(), 1);
+    await clientRoleSearchButton.dispatchEvent("click");
+    await composition
+      .getByText("billing-api / invoice.read", { exact: true })
+      .waitFor();
+    const addClientRole = composition.getByRole("button", {
+      name: "Add client role",
+      exact: true,
+    });
+    await addClientRole.click();
+    assert.equal(await addClientRole.isDisabled(), true);
+    assert.equal(await addClientRole.locator(".spinner").count(), 1);
+    await addClientRole.dispatchEvent("click");
+    await window
+      .getByText("Included client role added.", { exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await composition
+      .getByRole("button", { name: "İstemci rolünü kaldır", exact: true })
+      .click();
+    await composition
+      .getByText("Bu içerilen istemci rolü kaldırılsın mı?", { exact: true })
+      .waitFor();
+    await composition
+      .locator('[data-action="admin-role-client-composite-remove-cancel"]')
+      .click();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__compositeClientRoleRequests.length,
+      ),
+      1,
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const removeClientRole = composition.getByRole("button", {
+      name: "Remove client role",
+      exact: true,
+    });
+    await removeClientRole.click();
+    const confirmRemoveClientRole = composition.getByRole("button", {
+      name: "Remove client role",
+      exact: true,
+    });
+    await confirmRemoveClientRole.click();
+    assert.equal(await confirmRemoveClientRole.isDisabled(), true);
+    assert.equal(await confirmRemoveClientRole.locator(".spinner").count(), 1);
+    await confirmRemoveClientRole.dispatchEvent("click");
+    await window
+      .getByText("Included client role removed.", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__compositeClientRoles),
+      [],
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__compositeClientRoleSearchRequests,
+      ),
+      ["?q=invoice&page=0&size=10&sort=name,asc"],
+    );
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__compositeClientRoleRequests,
+      ),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/roles/ROLE_ADMIN/client-composites/42",
+          query: "?page=0&size=20&sort=username,asc",
+          body: undefined,
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/roles/ROLE_ADMIN/client-composites/42",
           query: "?page=0&size=20&sort=username,asc",
           body: undefined,
         },

@@ -152,7 +152,7 @@ const button = (label, options = {}) => {
     actionIcons[options.action] ??
     (label === text("save") ? "check" : null);
   const icon = iconName ? icons[iconName] : null;
-  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.child != null ? `data-child="${escapeHtml(options.child)}"` : ""} ${options.mapper != null ? `data-mapper="${escapeHtml(options.mapper)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.child != null ? `data-child="${escapeHtml(options.child)}"` : ""} ${options.clientRoleId != null ? `data-client-role-id="${escapeHtml(options.clientRoleId)}"` : ""} ${options.mapper != null ? `data-mapper="${escapeHtml(options.mapper)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
 };
 const field = (
   name,
@@ -1089,6 +1089,24 @@ function adminRoleCompositionPanel(roleName, composition) {
         /^ROLE_[A-Z0-9_]{1,45}$/.test(role?.name),
       )
     : [];
+  const clientRoles = Array.isArray(composition.compositeClientRoles)
+    ? composition.compositeClientRoles.filter(
+        (role) =>
+          Number.isSafeInteger(Number(role?.id)) &&
+          Number(role.id) > 0 &&
+          /^[A-Za-z0-9_-]{1,100}$/.test(role?.clientId ?? "") &&
+          typeof role?.name === "string",
+      )
+    : [];
+  const clientCandidates = Array.isArray(composition.clientCandidates)
+    ? composition.clientCandidates.filter(
+        (role) =>
+          Number.isSafeInteger(Number(role?.id)) &&
+          Number(role.id) > 0 &&
+          /^[A-Za-z0-9_-]{1,100}$/.test(role?.clientId ?? "") &&
+          typeof role?.name === "string",
+      )
+    : [];
   const rows = roleNames.length
     ? roleNames
         .map((name) => {
@@ -1109,9 +1127,35 @@ function adminRoleCompositionPanel(roleName, composition) {
         `<article class="list-item"><div><strong>${escapeHtml(candidate.name)}</strong><span class="muted">${escapeHtml(candidate.description ?? "")}</span></div>${button(text("adminRoleCompositeAdd"), { action: "admin-role-composite-add", id: roleName, child: candidate.name, busy: state.busy === `role-composite-add:${roleName}:${candidate.name}`, disabled: state.offline || Boolean(state.busy) })}</article>`,
     )
     .join("");
+  const clientRoleRows = clientRoles.length
+    ? clientRoles
+        .map((role) => {
+          const roleId = String(role.id);
+          const confirming = composition.removeClientConfirmId === roleId;
+          const busy =
+            state.busy === `role-client-composite-remove:${roleName}:${roleId}`;
+          const controls = confirming
+            ? `<div class="actions"><span role="status">${escapeHtml(text("adminRoleCompositeClientRemoveConfirm"))}</span>${button(text("adminRoleCompositeClientRemove"), { action: "admin-role-client-composite-remove-confirm", id: roleName, clientRoleId: roleId, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-client-composite-remove-cancel" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+            : `<div class="actions">${button(text("adminRoleCompositeClientRemove"), { action: "admin-role-client-composite-remove-request", id: roleName, clientRoleId: roleId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          return `<article class="list-item"><div><strong>${escapeHtml(role.clientId)} / ${escapeHtml(role.name)}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div>${controls}</article>`;
+        })
+        .join("")
+    : `<div class="empty" role="status">${escapeHtml(text("adminRoleCompositeClientEmpty"))}</div>`;
+  const clientCandidateRows = clientCandidates
+    .filter(
+      (candidate) =>
+        !clientRoles.some((role) => Number(role.id) === Number(candidate.id)),
+    )
+    .map(
+      (candidate) =>
+        `<article class="list-item"><div><strong>${escapeHtml(candidate.clientId)} / ${escapeHtml(candidate.name)}</strong><span class="muted">${escapeHtml(candidate.description ?? "")}</span></div>${button(text("adminRoleCompositeClientAdd"), { action: "admin-role-client-composite-add", id: roleName, clientRoleId: candidate.id, busy: state.busy === `role-client-composite-add:${roleName}:${candidate.id}`, disabled: state.offline || Boolean(state.busy) })}</article>`,
+    )
+    .join("");
   const loading = state.busy === `role-compositions:${roleName}`;
   const searching = state.busy === `role-composite-search:${roleName}`;
-  return `<section class="card" data-role-composition="${escapeHtml(roleName)}" aria-label="${escapeHtml(text("adminRoleCompositesTitle"))}"><h3>${escapeHtml(text("adminRoleCompositesTitle"))}</h3><p class="muted">${escapeHtml(text("adminRoleCompositesHelp"))}</p>${loading ? `<div role="status">${escapeHtml(text("loading"))}</div>` : rows}<div class="actions"><input name="q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeSearch"))}" value="${escapeHtml(composition.query ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeSearch"), { action: "admin-role-composite-search", id: roleName, busy: searching, disabled: state.offline || Boolean(state.busy) })}</div>${candidateRows}<button class="secondary-button" type="button" data-action="admin-role-compositions-close" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
+  const clientSearching =
+    state.busy === `role-client-composite-search:${roleName}`;
+  return `<section class="card" data-role-composition="${escapeHtml(roleName)}" aria-label="${escapeHtml(text("adminRoleCompositesTitle"))}"><h3>${escapeHtml(text("adminRoleCompositesTitle"))}</h3><p class="muted">${escapeHtml(text("adminRoleCompositesHelp"))}</p>${loading ? `<div role="status">${escapeHtml(text("loading"))}</div>` : rows}<div class="actions"><input name="q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeSearch"))}" value="${escapeHtml(composition.query ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeSearch"), { action: "admin-role-composite-search", id: roleName, busy: searching, disabled: state.offline || Boolean(state.busy) })}</div>${candidateRows}<h3>${escapeHtml(text("adminRoleCompositeClientTitle"))}</h3>${loading ? `<div role="status">${escapeHtml(text("loading"))}</div>` : clientRoleRows}<div class="actions"><input name="client-q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeClientSearch"))}" value="${escapeHtml(composition.clientQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeClientSearch"), { action: "admin-role-client-composite-search", id: roleName, busy: clientSearching, disabled: state.offline || Boolean(state.busy) })}</div>${clientCandidateRows}<button class="secondary-button" type="button" data-action="admin-role-compositions-close" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
 }
 
 function adminRoleCreateContent() {
@@ -5355,6 +5399,52 @@ async function action(action, element) {
     render();
     return;
   }
+  if (action === "admin-role-client-composite-search") {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageRoles !== true
+    )
+      return;
+    const roleName = element.dataset.id ?? "";
+    const composition = state.data.adminRoleCompositions?.[roleName];
+    const query = String(
+      element
+        .closest("[data-role-composition]")
+        ?.querySelector('input[name="client-q"]')?.value ?? "",
+    ).trim();
+    if (
+      !/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName) ||
+      !composition?.open ||
+      query.length < 2 ||
+      query.length > 100
+    )
+      return;
+    composition.clientQuery = query;
+    composition.clientCandidates = [];
+    state.busy = `role-client-composite-search:${roleName}`;
+    state.error = null;
+    render();
+    try {
+      const page = await request(
+        `/api/admin/roles/${encodeURIComponent(roleName)}/available-client-composites?q=${encodeURIComponent(query)}&page=0&size=10&sort=name,asc`,
+      );
+      composition.clientCandidates = (
+        Array.isArray(page?.content) ? page.content : []
+      ).filter(
+        (candidate) =>
+          Number.isSafeInteger(Number(candidate?.id)) &&
+          Number(candidate.id) > 0 &&
+          /^[A-Za-z0-9_-]{1,100}$/.test(candidate?.clientId ?? "") &&
+          typeof candidate?.name === "string",
+      );
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (
     action === "admin-role-compositions-toggle" ||
     action === "admin-role-compositions-close"
@@ -5397,6 +5487,9 @@ async function action(action, element) {
         ...state.data.adminRoleCompositions[roleName],
         compositeRoles: Array.isArray(detail?.compositeRoles)
           ? detail.compositeRoles
+          : [],
+        compositeClientRoles: Array.isArray(detail?.compositeClientRoles)
+          ? detail.compositeClientRoles
           : [],
       };
     } catch {
@@ -5472,6 +5565,87 @@ async function action(action, element) {
     if (!/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName)) return;
     const composition = state.data.adminRoleCompositions?.[roleName];
     if (composition) composition.removeConfirmName = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-role-client-composite-add" ||
+    action === "admin-role-client-composite-remove-request" ||
+    action === "admin-role-client-composite-remove-confirm"
+  ) {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageRoles !== true
+    )
+      return;
+    const roleName = element.dataset.id ?? "";
+    const childRoleId = element.dataset.clientRoleId ?? "";
+    const composition = state.data.adminRoleCompositions?.[roleName];
+    if (
+      !/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName) ||
+      !/^[1-9]\d{0,18}$/.test(childRoleId) ||
+      !Number.isSafeInteger(Number(childRoleId)) ||
+      !composition?.open
+    )
+      return;
+    if (action === "admin-role-client-composite-remove-request") {
+      if (
+        !composition.compositeClientRoles?.some(
+          (role) => String(role?.id) === childRoleId,
+        )
+      )
+        return;
+      composition.removeClientConfirmId = childRoleId;
+      render();
+      return;
+    }
+    if (action === "admin-role-client-composite-remove-confirm") {
+      if (composition.removeClientConfirmId !== childRoleId) return;
+    } else if (
+      !composition.clientCandidates?.some(
+        (role) => String(role?.id) === childRoleId,
+      )
+    ) {
+      return;
+    }
+    const adding = action === "admin-role-client-composite-add";
+    state.busy = `role-client-composite-${adding ? "add" : "remove"}:${roleName}:${childRoleId}`;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      const detail = await request(
+        `/api/admin/roles/${encodeURIComponent(roleName)}/client-composites/${encodeURIComponent(childRoleId)}?page=0&size=20&sort=username,asc`,
+        { method: adding ? "POST" : "DELETE" },
+      );
+      composition.compositeClientRoles = Array.isArray(
+        detail?.compositeClientRoles,
+      )
+        ? detail.compositeClientRoles
+        : (composition.compositeClientRoles ?? []);
+      composition.clientCandidates = (
+        composition.clientCandidates ?? []
+      ).filter((candidate) => String(candidate.id) !== childRoleId);
+      composition.removeClientConfirmId = null;
+      state.notice = text(
+        adding
+          ? "adminRoleCompositeClientAdded"
+          : "adminRoleCompositeClientRemoved",
+      );
+    } catch {
+      /* request rendered localized authorization, validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-role-client-composite-remove-cancel") {
+    if (state.busy) return;
+    const roleName = element.dataset.id ?? "";
+    if (!/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName)) return;
+    const composition = state.data.adminRoleCompositions?.[roleName];
+    if (composition) composition.removeClientConfirmId = null;
     render();
     return;
   }

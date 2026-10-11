@@ -208,6 +208,10 @@ test("allows bounded native realm-role composite reads and mutations only", asyn
       "/api/admin/roles/ROLE_ADMIN/available-composites?q=VIEW&page=0&size=10&sort=name,asc",
     ],
     [
+      "GET",
+      "/api/admin/roles/ROLE_ADMIN/available-client-composites?q=VIEW&page=0&size=10&sort=name,asc",
+    ],
+    [
       "POST",
       "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER?page=0&size=20&sort=username,asc",
     ],
@@ -215,16 +219,28 @@ test("allows bounded native realm-role composite reads and mutations only", asyn
       "DELETE",
       "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER?page=0&size=20&sort=username,asc",
     ],
+    [
+      "POST",
+      "/api/admin/roles/ROLE_ADMIN/client-composites/42?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "DELETE",
+      "/api/admin/roles/ROLE_ADMIN/client-composites/42?page=0&size=20&sort=username,asc",
+    ],
   ]) {
     const response = await adapter.request({ console: "admin", path, method });
     assert.equal(response.status, 200);
   }
-  assert.equal(requests.length, 4);
+  assert.equal(requests.length, 7);
   for (const [method, path] of [
     ["GET", "/api/admin/roles/ROLE_ADMIN?size=100"],
     [
       "GET",
       "/api/admin/roles/ROLE_ADMIN/available-composites?q=V&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "GET",
+      "/api/admin/roles/ROLE_ADMIN/available-client-composites?q=V&page=0&size=10&sort=name,asc",
     ],
     [
       "POST",
@@ -233,6 +249,14 @@ test("allows bounded native realm-role composite reads and mutations only", asyn
     [
       "DELETE",
       "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER/nested?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/roles/ROLE_ADMIN/client-composites/42?page=0&size=20&sort=username,asc&extra=true",
+    ],
+    [
+      "DELETE",
+      "/api/admin/roles/ROLE_ADMIN/client-composites/42/nested?page=0&size=20&sort=username,asc",
     ],
   ]) {
     await assert.rejects(
