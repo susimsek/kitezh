@@ -1,6 +1,7 @@
 import { library } from "@fortawesome/fontawesome-svg-core";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
+  faAndroid,
   faApple,
   faGithub,
   faGoogle,
@@ -49,7 +50,6 @@ import {
   faPen,
   faPlus,
   faPrint,
-  faRobot,
   faRightFromBracket,
   faRightToBracket,
   faRotate,
@@ -189,7 +189,7 @@ export const actionIcons: Record<ActionIconName, IconDefinition> = {
 
 export const icons: Record<IconName, IconDefinition> = {
   addressCard: faAddressCard,
-  android: faRobot,
+  android: faAndroid,
   apple: faApple,
   anglesLeft: faAnglesLeft,
   anglesRight: faAnglesRight,
@@ -233,7 +233,7 @@ export const loadIcons = () => {
   if (loaded) return;
 
   library.add(
-    faRobot,
+    faAndroid,
     faApple,
     faAnglesLeft,
     faAnglesRight,
