@@ -125,6 +125,7 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
   `-setup` suffix only for installer artifacts. The product name shown inside the application may
   remain title-cased independently of the downloadable filename.
 - Preserve the current platform targets: separate macOS x64 and ARM64 DMG/ZIP packages, Linux x64 AppImage/deb/rpm/snap plus ARM64 AppImage/deb, and Windows NSIS/portable/AppX unless a release decision changes them.
+- In the desktop release workflow, build the static renderer once and pass it to every platform package job as a short-lived artifact. Package jobs must build only the Electron main/preload code and must not rebuild the renderer.
 - Build each platform in its supported CI environment; do not claim that a local package is signed or notarized.
 - Upload installers as CI artifacts before publishing them. Do not place generated installers or blockmaps in source control.
 - Publish only distributable installers (`.dmg`, `.zip`, `.AppImage`, `.deb`, `.rpm`, `.snap`, `.appx`, and `.exe`),

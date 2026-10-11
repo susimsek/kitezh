@@ -60,9 +60,68 @@ jobs:
             echo "current_release=true"
           } >> "${GITHUB_OUTPUT}"
 
+  renderer:
+    name: Build desktop renderer
+    needs: resolve-release
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
+          install: false
+
+      - name: Install renderer dependencies
+        working-directory: src/main/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Next.js renderer build output
+        id: next-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: src/main/web/.next/cache
+          key: next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
+
+      - name: Report renderer cache status
+        env:
+          NEXT_CACHE_HIT: ${{ steps.next-cache.outputs.cache-hit }}
+        run: |
+          node -e "const fs = require('node:fs'); const status = process.env.NEXT_CACHE_HIT === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Desktop renderer cache status\\n- Next.js build cache: ' + status + '\\n');"
+
+      - name: Build desktop renderer
+        working-directory: src/main/desktop
+        run: pnpm run build:renderer
+
+      - name: Verify desktop renderer output
+        run: test -s src/main/desktop/renderer/index.html
+
+      - name: Upload shared desktop renderer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-renderer-${{ needs.resolve-release.outputs.release_tag }}
+          path: src/main/desktop/renderer/
+          if-no-files-found: error
+          retention-days: 1
+
   package:
     name: Package desktop (${{ matrix.platform }}-${{ matrix.architecture }})
-    needs: resolve-release
+    needs:
+      - resolve-release
+      - renderer
     if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
     outputs:
       release_tag: ${{ needs.resolve-release.outputs.release_tag }}
@@ -122,18 +181,21 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: |
-            src/main/web/pnpm-lock.yaml
-            src/main/desktop/pnpm-lock.yaml
+          cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
-
-      - name: Install web dependencies
-        working-directory: src/main/web
-        run: pnpm install --frozen-lockfile
 
       - name: Install desktop dependencies
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
+
+      - name: Download shared desktop renderer
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-renderer-${{ needs.resolve-release.outputs.release_tag }}
+          path: src/main/desktop/renderer
+
+      - name: Verify shared desktop renderer
+        run: test -s src/main/desktop/renderer/index.html
 
       - name: Prepare platform signing configuration
         shell: bash
@@ -210,21 +272,11 @@ jobs:
           restore-keys: |
             electron-builder-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Cache Next.js renderer build output
-        id: next-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: src/main/web/.next/cache
-          key: next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-${{ runner.os }}-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
-
       - name: Report build cache status
         env:
           ELECTRON_BUILDER_CACHE_HIT: ${{ steps.electron-builder-cache.outputs.cache-hit }}
-          NEXT_CACHE_HIT: ${{ steps.next-cache.outputs.cache-hit }}
         run: |
-          node -e "const fs = require('node:fs'); const status = value => value === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; const summary = ['### Build cache status', '- Electron Builder downloads: ' + status(process.env.ELECTRON_BUILDER_CACHE_HIT), '- Next.js build cache: ' + status(process.env.NEXT_CACHE_HIT)].join('\n') + '\n'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);"
+          node -e "const fs = require('node:fs'); const status = process.env.ELECTRON_BUILDER_CACHE_HIT === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Build cache status\n- Electron Builder downloads: ' + status + '\n');"
 
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
@@ -242,8 +294,8 @@ jobs:
         shell: bash
         working-directory: src/main/desktop
         run: |
+          pnpm run build:main
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            pnpm run build
             if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
               pnpm exec electron-builder --publish never --linux AppImage deb
             else
@@ -253,11 +305,10 @@ jobs:
           fi
 
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            pnpm package
+            pnpm exec electron-builder --publish never
             exit 0
           fi
 
-          pnpm run build
           if [[ -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY:-}" && -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER:-}" ]]; then
             pnpm exec electron-builder --publish never --mac --x64 --arm64 --config.mac.notarize=true
           else
