@@ -1789,7 +1789,7 @@ function clientRoleAssignmentPanel(clientId, roleId, roleName) {
     state.busy === `client-role-assignment-search:${clientId}:${roleId}:user`;
   const groupSearching =
     state.busy === `client-role-assignment-search:${clientId}:${roleId}:group`;
-  return `<section class="card" data-client-role-assignments="${escapeHtml(key)}" aria-label="${escapeHtml(text("adminManageClientRoleAssignments"))}"><h4>${escapeHtml(roleName)}</h4><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedUsers"))}</legend>${memberRows(users, "user") || `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions"><input name="user-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchUsers"))}" value="${escapeHtml(assignment.userQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "user", busy: userSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="user" role="alert">${escapeHtml(assignment.userSearchError ?? "")}</div>${candidateRows(userCandidates, "user")}</fieldset><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedGroups"))}</legend>${memberRows(groups, "group") || `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions"><input name="group-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchGroups"))}" value="${escapeHtml(assignment.groupQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "group", busy: groupSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="group" role="alert">${escapeHtml(assignment.groupSearchError ?? "")}</div>${candidateRows(groupCandidates, "group")}</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-assignments-close" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
+  return `<section class="card" data-client-role-assignments="${escapeHtml(key)}" aria-label="${escapeHtml(text("adminManageClientRoleAssignments"))}"><h4>${escapeHtml(roleName)}</h4><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedUsers"))}</legend>${memberRows(users, "user") || `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions"><input name="user-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchUsers"))}" value="${escapeHtml(assignment.userQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "user", busy: userSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="user" role="alert">${escapeHtml(assignment.userSearchError ? text(assignment.userSearchError) : "")}</div>${candidateRows(userCandidates, "user")}</fieldset><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedGroups"))}</legend>${memberRows(groups, "group") || `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions"><input name="group-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchGroups"))}" value="${escapeHtml(assignment.groupQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "group", busy: groupSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="group" role="alert">${escapeHtml(assignment.groupSearchError ? text(assignment.groupSearchError) : "")}</div>${candidateRows(groupCandidates, "group")}</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-assignments-close" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
 }
 
 function clientRolesPanel(clientId) {
@@ -3013,6 +3013,15 @@ async function encodeAvatarFile(file) {
 }
 
 function preserveOfflineDrafts() {
+  for (const panel of app.querySelectorAll("[data-client-role-assignments]")) {
+    const assignment =
+      state.data.clientRoleAssignments?.[panel.dataset.clientRoleAssignments];
+    if (!assignment?.open) continue;
+    for (const kind of ["user", "group"]) {
+      const input = panel.querySelector(`input[name="${kind}-q"]`);
+      if (input) assignment[`${kind}Query`] = input.value;
+    }
+  }
   for (const form of app.querySelectorAll("form[data-form]")) {
     const values = formValues(form);
     if (form.dataset.form === "profile") {
@@ -5754,11 +5763,10 @@ async function action(action, element) {
     const searchErrorKey =
       kind === "user" ? "userSearchError" : "groupSearchError";
     if (query.length < 2 || query.length > 100) {
-      assignment[searchErrorKey] = text(
+      assignment[searchErrorKey] =
         query.length < 2
           ? "adminClientRoleSearchMinimum"
-          : "adminClientRoleSearchMaximum",
-      );
+          : "adminClientRoleSearchMaximum";
       render();
       return;
     }

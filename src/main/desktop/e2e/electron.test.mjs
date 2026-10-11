@@ -8581,13 +8581,15 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
     });
     await assignmentToggle.click();
     await assignmentToggle.locator(".spinner").waitFor();
-    await assignmentToggle.locator(".spinner").waitFor({ state: "detached" });
     const assignmentPanel = rolesPanel.locator(
       '[data-client-role-assignments="billing-api:42"]',
     );
     const userSearch = assignmentPanel.getByRole("searchbox", {
       name: "Kullanılabilir kullanıcıları ara",
     });
+    await userSearch.fill("qa-draft");
+    await assignmentToggle.locator(".spinner").waitFor({ state: "detached" });
+    assert.equal(await userSearch.inputValue(), "qa-draft");
     const userSearchButton = assignmentPanel
       .getByRole("button", {
         name: "Ara",
@@ -8601,6 +8603,7 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
       window.dispatchEvent(new Event("offline"));
     });
     assert.equal(await userSearchButton.isDisabled(), true);
+    assert.equal(await userSearch.inputValue(), "qa-draft");
     await window.evaluate(() => {
       Object.defineProperty(navigator, "onLine", {
         configurable: true,
@@ -8614,6 +8617,14 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
       .locator('[data-assignment-search-error="user"]')
       .filter({ hasText: "Arama için en az 2 karakter girin." })
       .waitFor();
+    assert.equal(await userSearch.inputValue(), "q");
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await assignmentPanel
+      .locator('[data-assignment-search-error="user"]')
+      .filter({ hasText: "Enter at least 2 characters to search." })
+      .waitFor();
+    await window.getByRole("button", { name: "Turkish" }).click();
+    assert.equal(await userSearch.inputValue(), "q");
     assert.equal(
       await application.evaluate(
         () => globalThis.__clientRoleCandidateSearches.length,
