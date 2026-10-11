@@ -62,6 +62,7 @@ const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const actionIcons = {
   "admin-group-member-add": "add",
+  "admin-group-child-create-toggle": "add",
   "admin-group-member-remove-request": "delete",
   "admin-group-member-remove-confirm": "delete",
   "admin-group-members-toggle": "edit",
@@ -912,16 +913,33 @@ function adminGroupsContent() {
         Number(state.data.groupNameErrorId) === Number(group.id)
           ? violations(state.error?.body)
           : {};
+      const childCreateOpen =
+        Number(state.data.groupChildCreateOpenId) === Number(group.id);
+      const childCreateForm = childCreateOpen
+        ? renderGroupChildCreateForm(group)
+        : "";
       const nameForm = editingName
         ? `<form class="card" data-form="admin-group-rename" data-group-id="${escapeHtml(group.id)}"><div class="field"><label for="group-name-${escapeHtml(group.id)}">${escapeHtml(text("adminGroupName"))}</label><input id="group-name-${escapeHtml(group.id)}" name="name" type="text" value="${escapeHtml(nameDraft.name ?? group.name ?? "")}" maxlength="100" required/><div class="field-error">${escapeHtml(nameErrors.name ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-name-update:${group.id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-name-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const roleForm = editingRoles
         ? `<form class="card" data-form="admin-group-roles" data-group-id="${escapeHtml(group.id)}"><fieldset class="field"><legend>${escapeHtml(text("adminEditGroupRoles"))}</legend>${roleCatalog.length ? roleCatalog.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(roleErrors.roles ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-roles-update:${group.id}`, disabled: state.offline || Boolean(state.busy) || roleCatalog.length === 0 })}<button class="secondary-button" type="button" data-action="admin-group-roles-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminEditGroupName"), { action: "admin-group-name-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === `group-role-catalog:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${controls}</div>${nameForm}${roleForm}${memberPanel}</article>`;
+      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminCreateChildGroup"), { action: "admin-group-child-create-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupName"), { action: "admin-group-name-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === `group-role-catalog:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${controls}</div>${childCreateForm}${nameForm}${roleForm}${memberPanel}</article>`;
     })
     .join("");
   return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+}
+
+function renderGroupChildCreateForm(group) {
+  const parentId = Number(group.id);
+  const draft = state.data.groupChildCreateDrafts?.[parentId] ?? {};
+  const errors =
+    Number(state.data.groupChildCreateErrorId) === parentId
+      ? violations(state.error?.body)
+      : {};
+  const busy = state.busy === `group-child-create:${parentId}`;
+  const fieldId = `group-child-name-${parentId}`;
+  return `<form class="card" data-form="admin-group-child-create" data-parent-id="${parentId}" novalidate><h3>${escapeHtml(text("adminCreateChildGroup"))}: ${escapeHtml(group.path || group.name)}</h3><div class="field"><label for="${fieldId}">${escapeHtml(text("adminGroupName"))}</label><input id="${fieldId}" name="name" type="text" value="${escapeHtml(draft.name ?? "")}" aria-invalid="${Boolean(errors.name)}" maxlength="100" autocomplete="off" required/><div class="field-error">${escapeHtml(errors.name ?? "")}</div></div><div class="actions">${button(text("adminCreateChildGroup"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-child-create-cancel" data-id="${parentId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
 }
 
 function renderGroupMembers(groupId, memberState) {
@@ -2217,6 +2235,12 @@ function preserveOfflineDrafts() {
       state.data.adminMessageOverrideCreateDraft = values;
     } else if (form.dataset.form === "admin-group-create") {
       state.data.adminGroupCreateDraft = values;
+    } else if (form.dataset.form === "admin-group-child-create") {
+      const parentId = Number(form.dataset.parentId);
+      if (Number.isSafeInteger(parentId) && parentId > 0) {
+        state.data.groupChildCreateDrafts ??= {};
+        state.data.groupChildCreateDrafts[parentId] = values;
+      }
     } else if (form.dataset.form === "admin-group-roles") {
       const id = Number(form.dataset.groupId);
       if (Number.isSafeInteger(id) && id > 0) {
@@ -3230,6 +3254,59 @@ async function submitForm(form) {
       state.route = "groups";
       await loadRoute();
       state.notice = text("adminGroupCreated");
+    } catch {
+      /* request rendered localized server validation or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-group-child-create") {
+    const parentId = Number(form.dataset.parentId);
+    const parent = (state.data.groups?.content ?? []).find(
+      (group) => Number(group.id) === parentId,
+    );
+    const name = String(values.name ?? "").trim();
+    if (!Number.isSafeInteger(parentId) || parentId < 1 || !parent) return;
+    if (!name) {
+      state.data.groupChildCreateErrorId = parentId;
+      state.data.groupChildCreateDrafts ??= {};
+      state.data.groupChildCreateDrafts[parentId] = { name };
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: text("adminGroupNameRequired"),
+          violations: [
+            { field: "name", message: text("adminGroupNameRequired") },
+          ],
+        },
+      };
+      render();
+      return;
+    }
+    if (!form.reportValidity()) return;
+    const body = {
+      name,
+      parentId,
+      attributes: {},
+      defaultGroup: false,
+    };
+    state.data.groupChildCreateErrorId = parentId;
+    state.data.groupChildCreateDrafts ??= {};
+    state.data.groupChildCreateDrafts[parentId] = { name };
+    state.error = null;
+    state.notice = null;
+    state.busy = `group-child-create:${parentId}`;
+    render();
+    try {
+      await request("/api/admin/groups", { method: "POST", body });
+      delete state.data.groupChildCreateDrafts[parentId];
+      state.data.groupChildCreateOpenId = null;
+      state.data.groupChildCreateErrorId = null;
+      state.data.groupQuery = "";
+      state.data.groupPage = 0;
+      await loadRoute();
+      state.notice = text("adminChildGroupCreated");
     } catch {
       /* request rendered localized server validation or transport feedback */
     }
@@ -4883,6 +4960,37 @@ async function action(action, element) {
   if (action === "admin-group-delete-cancel") {
     if (state.busy) return;
     state.data.groupDeleteConfirmId = null;
+    render();
+    return;
+  }
+  if (action === "admin-group-child-create-toggle") {
+    if (state.busy || state.offline) return;
+    const parentId = Number(element.dataset.id);
+    const parent = (state.data.groups?.content ?? []).find(
+      (group) => Number(group.id) === parentId,
+    );
+    if (!Number.isSafeInteger(parentId) || parentId < 1 || !parent) return;
+    if (Number(state.data.groupChildCreateOpenId) === parentId) {
+      state.data.groupChildCreateOpenId = null;
+      state.data.groupChildCreateErrorId = null;
+      delete state.data.groupChildCreateDrafts?.[parentId];
+    } else {
+      state.data.groupChildCreateOpenId = parentId;
+      state.data.groupChildCreateErrorId = null;
+      state.data.groupChildCreateDrafts ??= {};
+      state.data.groupChildCreateDrafts[parentId] ??= { name: "" };
+      state.error = null;
+    }
+    render();
+    return;
+  }
+  if (action === "admin-group-child-create-cancel") {
+    if (state.busy) return;
+    const parentId = Number(element.dataset.id);
+    if (!Number.isSafeInteger(parentId) || parentId < 1) return;
+    state.data.groupChildCreateOpenId = null;
+    state.data.groupChildCreateErrorId = null;
+    delete state.data.groupChildCreateDrafts?.[parentId];
     render();
     return;
   }

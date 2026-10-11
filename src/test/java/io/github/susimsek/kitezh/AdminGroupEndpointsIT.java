@@ -94,6 +94,69 @@ class AdminGroupEndpointsIT {
     }
 
     @Test
+    void adminCanCreateChildGroupWithExistingParent() throws Exception {
+        String parentName = "it-parent-group-" + UUID.randomUUID();
+        String childName = "it-child-group-" + UUID.randomUUID();
+        Long parentId = null;
+        Long childId = null;
+        try {
+            String parentResponse =
+                    mockMvc.perform(
+                                    post("/api/admin/groups")
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    objectMapper.writeValueAsString(
+                                                            java.util.Map.of(
+                                                                    "name",
+                                                                    parentName,
+                                                                    "attributes",
+                                                                    java.util.Map.of(),
+                                                                    "defaultGroup",
+                                                                    false))))
+                            .andExpect(status().isCreated())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            parentId = objectMapper.readTree(parentResponse).get("id").asLong();
+
+            String childResponse =
+                    mockMvc.perform(
+                                    post("/api/admin/groups")
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    objectMapper.writeValueAsString(
+                                                            java.util.Map.of(
+                                                                    "name",
+                                                                    childName,
+                                                                    "parentId",
+                                                                    parentId,
+                                                                    "attributes",
+                                                                    java.util.Map.of(),
+                                                                    "defaultGroup",
+                                                                    false))))
+                            .andExpect(status().isCreated())
+                            .andExpect(jsonPath("$.name").value(childName))
+                            .andExpect(jsonPath("$.parentId").value(parentId))
+                            .andExpect(jsonPath("$.path").value(parentName + " / " + childName))
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            childId = objectMapper.readTree(childResponse).get("id").asLong();
+        } finally {
+            if (childId != null) {
+                mockMvc.perform(delete("/api/admin/groups/{id}", childId).with(admin()))
+                        .andExpect(status().isNoContent());
+            }
+            if (parentId != null) {
+                mockMvc.perform(delete("/api/admin/groups/{id}", parentId).with(admin()))
+                        .andExpect(status().isNoContent());
+            }
+        }
+    }
+
+    @Test
     void adminCanRenameMapRolesAndManageGroupMembership() throws Exception {
         String name = "it-membership-group-" + UUID.randomUUID();
         Long groupId = null;

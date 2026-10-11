@@ -364,6 +364,8 @@ export const messages = {
     adminCreateGroup: "Create group",
     adminCreateGroupDescription: "Create a root group for user organization.",
     adminGroupCreated: "Group created.",
+    adminCreateChildGroup: "Create child group",
+    adminChildGroupCreated: "Child group created.",
     adminDeleteGroup: "Delete group",
     adminDeleteGroupPrompt:
       "Delete this group? Its members will be removed and their access revoked. Groups with child groups cannot be deleted.",
@@ -1001,6 +1003,8 @@ export const messages = {
     adminCreateGroup: "Grup oluştur",
     adminCreateGroupDescription: "Kullanıcı düzeni için kök grup oluşturun.",
     adminGroupCreated: "Grup oluşturuldu.",
+    adminCreateChildGroup: "Alt grup oluştur",
+    adminChildGroupCreated: "Alt grup oluşturuldu.",
     adminDeleteGroup: "Grubu sil",
     adminDeleteGroupPrompt:
       "Bu grup silinsin mi? Üyeleri gruptan çıkarılır ve erişimleri iptal edilir. Alt grubu olan gruplar silinemez.",

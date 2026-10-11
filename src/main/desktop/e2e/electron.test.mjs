@@ -1721,10 +1721,20 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
                 },
               );
             globalThis.__createdGroups ??= [];
+            const groupId = body.parentId ? 100 : 99;
+            const parent = body.parentId
+              ? globalThis.__createdGroups.find(
+                  (group) => group.id === body.parentId,
+                )
+              : null;
+            const parentPath =
+              parent?.path ??
+              (body.parentId === 1 ? "Organization / finance" : "Organization");
             globalThis.__createdGroups.push({
-              id: 99,
+              id: groupId,
               name: body.name,
-              path: `Organization / ${body.name}`,
+              parentId: body.parentId ?? null,
+              path: `${parentPath} / ${body.name}`,
               roles: [],
               effectiveRoles: [],
               userCount: 0,
@@ -4236,6 +4246,58 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     await window.getByRole("button", { name: "İngilizce" }).click();
     await window.getByRole("button", { name: "Search groups" }).waitFor();
+    const parentGroupRow = window.locator('[data-group-id="1"]');
+    await parentGroupRow
+      .getByRole("button", { name: "Create child group", exact: true })
+      .click();
+    const childGroupForm = parentGroupRow.locator(
+      'form[data-form="admin-group-child-create"]',
+    );
+    await childGroupForm.locator('[name="name"]').fill("regional");
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await childGroupForm
+      .getByRole("heading", { name: /Alt grup oluştur/ })
+      .waitFor();
+    assert.equal(
+      await childGroupForm.locator('[name="name"]').inputValue(),
+      "regional",
+    );
+    const createChildGroup = childGroupForm.getByRole("button", {
+      name: "Alt grup oluştur",
+      exact: true,
+    });
+    await createChildGroup.click();
+    assert.equal(await createChildGroup.isDisabled(), true);
+    assert.equal(await createChildGroup.locator(".spinner").count(), 1);
+    await window.getByText("Alt grup oluşturuldu.", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.getByRole("button", { name: "Search groups" }).waitFor();
+    await window
+      .getByText("Organization / finance / regional", { exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__adminGroupCreateRequests),
+      [
+        {
+          name: "finance",
+          parentId: null,
+          attributes: {},
+          defaultGroup: false,
+        },
+        {
+          name: "native-operators",
+          parentId: null,
+          attributes: {},
+          defaultGroup: false,
+        },
+        {
+          name: "regional",
+          parentId: 1,
+          attributes: {},
+          defaultGroup: false,
+        },
+      ],
+    );
     const createdGroupRow = window.locator('[data-group-id="99"]');
     await createdGroupRow
       .getByRole("button", { name: "Edit group name", exact: true })
