@@ -224,19 +224,7 @@ jobs:
           ELECTRON_BUILDER_CACHE_HIT: ${{ steps.electron-builder-cache.outputs.cache-hit }}
           NEXT_CACHE_HIT: ${{ steps.next-cache.outputs.cache-hit }}
         run: |
-          {
-            echo '### Build cache status'
-            if [[ "${ELECTRON_BUILDER_CACHE_HIT}" == "true" ]]; then
-              echo '- Electron Builder downloads: exact cache hit'
-            else
-              echo '- Electron Builder downloads: no exact hit (restore-key match or cache miss)'
-            fi
-            if [[ "${NEXT_CACHE_HIT}" == "true" ]]; then
-              echo '- Next.js build cache: exact cache hit'
-            else
-              echo '- Next.js build cache: no exact hit (restore-key match or cache miss)'
-            fi
-          } >> "${GITHUB_STEP_SUMMARY}"
+          node -e "const fs = require('node:fs'); const status = value => value === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; const summary = ['### Build cache status', '- Electron Builder downloads: ' + status(process.env.ELECTRON_BUILDER_CACHE_HIT), '- Next.js build cache: ' + status(process.env.NEXT_CACHE_HIT)].join('\n') + '\n'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);"
 
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
