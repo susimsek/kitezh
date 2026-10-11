@@ -55,6 +55,8 @@ describe("DownloadPage", () => {
       releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v1.0.0",
       assets: {
         windows: "https://example.test/kitezh-win-x64-setup.exe",
+        macArm64: "https://example.test/kitezh-0.1.0-macos-arm64.dmg",
+        macX64: "https://example.test/kitezh-0.1.0-macos-x64.dmg",
         android: "https://example.test/kitezh-android.apk",
         ios: "https://example.test/kitezh-ios.ipa",
       },
@@ -65,6 +67,12 @@ describe("DownloadPage", () => {
     expect(
       await screen.findByRole("button", { name: dictionary.download.windows.assets.installer }),
     ).toHaveAttribute("href", "https://example.test/kitezh-win-x64-setup.exe");
+    expect(
+      screen.getByRole("button", { name: dictionary.download.macos.assets.appleSilicon }),
+    ).toHaveAttribute("href", "https://example.test/kitezh-0.1.0-macos-arm64.dmg");
+    expect(
+      screen.getByRole("button", { name: dictionary.download.macos.assets.intel }),
+    ).toHaveAttribute("href", "https://example.test/kitezh-0.1.0-macos-x64.dmg");
     expect(screen.getByRole("button", { name: dictionary.download.android.asset })).toHaveAttribute(
       "href",
       "https://example.test/kitezh-android.apk",

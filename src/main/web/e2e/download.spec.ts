@@ -22,7 +22,7 @@ test.describe("download page", () => {
               "linux-amd64.snap",
               "linux-arm64.AppImage",
               "linux-arm64.deb",
-              "macos-universal.dmg",
+              "macos-arm64.dmg",
               "macos-x64.dmg",
               "android.apk",
               "ios-unsigned.ipa",
@@ -42,6 +42,14 @@ test.describe("download page", () => {
     await expect(page.getByRole("heading", { name: "Windows" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Linux" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "macOS" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apple Silicon" })).toHaveAttribute(
+      "href",
+      "https://github.com/susimsek/kitezh/releases/download/v0.1.0/kitezh-0.1.0-macos-arm64.dmg",
+    );
+    await expect(page.getByRole("button", { name: "Intel" })).toHaveAttribute(
+      "href",
+      "https://github.com/susimsek/kitezh/releases/download/v0.1.0/kitezh-0.1.0-macos-x64.dmg",
+    );
     await expect(page.getByRole("heading", { name: "Android" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "iPhone and iPad" })).toBeVisible();
 

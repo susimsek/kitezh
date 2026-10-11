@@ -53,7 +53,7 @@ const platformAssets = {
     },
   },
   macos: {
-    universal: /-macos-universal\.dmg$/,
+    appleSilicon: /-macos-arm64\.dmg$/,
     intel: /-macos-x64\.dmg$/,
   },
   android: /-android\.apk$/,
@@ -177,7 +177,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
         {
           label: copy.macos.architecture,
           assets: [
-            asset(platformAssets.macos.universal, copy.macos.assets.universal),
+            asset(platformAssets.macos.appleSilicon, copy.macos.assets.appleSilicon),
             asset(platformAssets.macos.intel, copy.macos.assets.intel),
           ],
         },

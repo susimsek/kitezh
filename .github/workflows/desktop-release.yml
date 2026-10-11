@@ -80,7 +80,7 @@ jobs:
             deb_architecture: arm64
             runner: ubuntu-24.04-arm
           - platform: macos
-            architecture: universal
+            architecture: x64-arm64
             runner: macos-latest
           - platform: windows
             architecture: x64
@@ -259,11 +259,21 @@ jobs:
 
           pnpm run build
           if [[ -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY:-}" && -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER:-}" ]]; then
-            pnpm exec electron-builder --publish never --mac --x64 --config.mac.notarize=true
-            pnpm exec electron-builder --publish never --mac --universal --config.mac.notarize=true
+            pnpm exec electron-builder --publish never --mac --x64 --arm64 --config.mac.notarize=true
           else
-            pnpm exec electron-builder --publish never --mac --x64
-            pnpm exec electron-builder --publish never --mac --universal
+            pnpm exec electron-builder --publish never --mac --x64 --arm64
+          fi
+          release_version="${{ needs.resolve-release.outputs.release_tag }}"
+          release_version="${release_version#v}"
+          for architecture in x64 arm64; do
+            for extension in dmg zip; do
+              package="release/kitezh-${release_version}-macos-${architecture}.${extension}"
+              test -s "${package}"
+            done
+          done
+          if find release -maxdepth 1 -type f -name '*macos-universal*' -print -quit | grep -q .; then
+            echo "A universal macOS package was produced unexpectedly." >&2
+            exit 1
           fi
 
       - name: Smoke-test packaged desktop app
@@ -284,15 +294,19 @@ jobs:
             echo "macOS release is configured as unsigned."
             exit 0
           fi
-          app_path="$(find src/main/desktop/release -type d -name '*.app' -print -quit)"
-          test -n "${app_path}"
-          codesign --verify --deep --strict --verbose=2 "${app_path}"
+          mapfile -t app_paths < <(find src/main/desktop/release -type d -name '*.app' -print)
+          test "${#app_paths[@]}" -eq 2
+          for app_path in "${app_paths[@]}"; do
+            codesign --verify --deep --strict --verbose=2 "${app_path}"
+            if [[ -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
+              continue
+            fi
+            spctl --assess --type exec --verbose "${app_path}"
+            xcrun stapler validate "${app_path}"
+          done
           if [[ -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
             echo "macOS app is signed; notarization credentials are not configured."
-            exit 0
           fi
-          spctl --assess --type exec --verbose "${app_path}"
-          xcrun stapler validate "${app_path}"
 
       - name: Verify Windows Authenticode signature
         if: ${{ matrix.platform == 'windows' }}

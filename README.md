@@ -383,7 +383,7 @@ To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
 After the backend release succeeds, desktop and mobile packaging run independently from the same
 tag. The backend prepares a shared draft release record; each platform uploads and replaces only
 its own assets, then makes the release public when its packages are ready.
-Each release includes macOS x64 and universal DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
+Each release includes separate macOS Apple Silicon and Intel DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
 and Snap packages, Linux ARM64 AppImage and Debian packages, Windows NSIS, portable EXE, and AppX
 packages, plus an SPDX JSON software bill of materials.
 The public download page keeps a stable layout and reads the latest release through the

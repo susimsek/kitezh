@@ -32,7 +32,7 @@ class DesktopReleaseServiceTest {
                                     {"name": "kitezh-0.1.0-win-x64-setup.exe"},
                                     {"name": "kitezh-0.1.0-linux-x86_64.AppImage"},
                                     {"name": "kitezh-0.1.0-linux-arm64.deb"},
-                                    {"name": "kitezh-0.1.0-macos-universal.dmg"},
+                                    {"name": "kitezh-0.1.0-macos-arm64.dmg"},
                                     {"name": "kitezh-0.1.0-android.apk"},
                                     {"name": "kitezh-0.1.0-ios.ipa"},
                                     {"name": "kitezh-0.1.0-ios-unsigned.ipa"},
@@ -66,9 +66,9 @@ class DesktopReleaseServiceTest {
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
                                 + "kitezh-0.1.0-linux-arm64.deb")
                 .containsEntry(
-                        "macosUniversal",
+                        "macosAppleSilicon",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
-                                + "kitezh-0.1.0-macos-universal.dmg")
+                                + "kitezh-0.1.0-macos-arm64.dmg")
                 .containsEntry(
                         "androidApk",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
