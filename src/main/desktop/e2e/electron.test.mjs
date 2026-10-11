@@ -3240,6 +3240,18 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
+          requestUrl.pathname === "/api/admin/sessions/revoke-all" &&
+          requestMethod === "POST"
+        ) {
+          globalThis.__adminSessionRevokeAllRequests ??= [];
+          globalThis.__adminSessionRevokeAllRequests.push({
+            method: requestMethod,
+            body: init?.body,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (
           /^\/api\/admin\/sessions\/[A-Za-z0-9_-]{1,100}$/.test(
             requestUrl.pathname,
           ) &&
@@ -7629,8 +7641,9 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByRole("button", { name: "Dashboard" }).click();
     await application.evaluate(() => {
       globalThis.__denyClientRead = false;
-      globalThis.fetch = async (url) => {
+      globalThis.fetch = async (url, init) => {
         const requestUrl = new URL(String(url));
+        const requestMethod = String(init?.method ?? "GET").toUpperCase();
         if (requestUrl.pathname === "/api/admin/whoami") {
           if (globalThis.__delayWhoAmI)
             await new Promise((resolve) => setTimeout(resolve, 350));
@@ -7648,6 +7661,36 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
+        if (
+          requestUrl.pathname === "/api/admin/sessions/revoke-all" &&
+          requestMethod === "POST"
+        ) {
+          globalThis.__adminSessionRevokeAllRequests ??= [];
+          globalThis.__adminSessionRevokeAllRequests.push({
+            method: requestMethod,
+            body: init?.body,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(null, { status: 204 });
+        }
+        if (requestUrl.pathname === "/api/admin/sessions")
+          return new Response(
+            JSON.stringify({
+              content: [
+                {
+                  id: "session-secret-should-not-render",
+                  username: "admin",
+                  authorizationCount: 1,
+                  active: true,
+                },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
         if (requestUrl.pathname !== "/api/admin/dashboard")
           throw new Error("Unexpected Admin API request");
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -7762,6 +7805,91 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     assert.equal(
       await application.evaluate(() => globalThis.__authorizationOpens),
       1,
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    await window.getByRole("button", { name: "Turkish" }).waitFor();
+    await application.evaluate(() => {
+      for (const key of Object.keys(globalThis.__adminAccessFlags))
+        globalThis.__adminAccessFlags[key] = false;
+      globalThis.__adminAccessFlags.viewSessions = true;
+    });
+    await window.reload();
+    await window
+      .getByRole("heading", { name: "Sessions", exact: true })
+      .waitFor();
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Sign out all sessions", exact: true })
+        .count(),
+      0,
+    );
+    await application.evaluate(() => {
+      globalThis.__adminAccessFlags.manageSessions = true;
+    });
+    await window.reload();
+    await window
+      .getByRole("heading", { name: "Sessions", exact: true })
+      .waitFor();
+    const revokeAllSessionsButton = window.getByRole("button", {
+      name: "Sign out all sessions",
+      exact: true,
+    });
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(await revokeAllSessionsButton.isDisabled(), true);
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await revokeAllSessionsButton.click();
+    await window
+      .getByText(
+        "Sign out every active session, including this Admin session? You will need to sign in again.",
+        { exact: true },
+      )
+      .waitFor();
+    await window.getByRole("button", { name: "Cancel", exact: true }).click();
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminSessionRevokeAllRequests ?? [],
+      ),
+      [],
+    );
+    await window
+      .getByRole("button", { name: "Sign out all sessions", exact: true })
+      .click();
+    const confirmAdminSessionsRevokeAll = window.getByRole("button", {
+      name: "Sign out all sessions",
+      exact: true,
+    });
+    await confirmAdminSessionsRevokeAll.click();
+    assert.equal(await confirmAdminSessionsRevokeAll.isDisabled(), true);
+    assert.equal(
+      await confirmAdminSessionsRevokeAll.locator(".spinner").count(),
+      1,
+    );
+    await confirmAdminSessionsRevokeAll.dispatchEvent("click");
+    await window
+      .getByRole("button", { name: "Sign in", exact: true })
+      .waitFor();
+    assert.equal(await window.getByText("admin", { exact: true }).count(), 0);
+    assert.deepEqual(
+      await application.evaluate(
+        () => globalThis.__adminSessionRevokeAllRequests,
+      ),
+      [{ method: "POST", body: undefined }],
+    );
+    assert.equal(
+      await window.evaluate(() => window.desktopApi.auth.hasSession("admin")),
+      false,
     );
   } finally {
     await application.close();

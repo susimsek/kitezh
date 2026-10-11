@@ -2038,6 +2038,9 @@ function adminAdminSessionsContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
+  const canRevokeAll = state.data.adminAccess?.manageSessions === true;
+  const revokeAllConfirming = state.data.adminSessionRevokeAllConfirm === true;
+  const revokeAllBusy = state.busy === "admin-session-revoke-all";
   const rows = sessions
     .map((session, index) => {
       const confirming = state.data.adminSessionDeleteConfirmId === session.id;
@@ -2048,7 +2051,12 @@ function adminAdminSessionsContent() {
       return `<article class="list-item"><div><strong>${escapeHtml(session.username)}</strong><span class="muted">${Number.isSafeInteger(session.authorizationCount) ? session.authorizationCount : 0} ${escapeHtml(text("adminAuthorizations"))}</span></div><span>${escapeHtml(session.active ? text("adminActive") : text("adminExpired"))}</span>${controls}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminSessions"))}"><form id="admin-session-search" class="actions" role="search"><input id="admin-session-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchSessions"))}" value="${escapeHtml(state.data.adminSessionQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchSessions"))}" maxlength="200"/><select id="admin-session-status" name="status" aria-label="${escapeHtml(text("adminSessions"))}"><option value="active" ${state.data.adminSessionStatus !== "expired" ? "selected" : ""}>${escapeHtml(text("adminActive"))}</option><option value="expired" ${state.data.adminSessionStatus === "expired" ? "selected" : ""}>${escapeHtml(text("adminExpired"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-sessions-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-sessions-search")}${escapeHtml(text("adminSearchSessions"))}</button></form>${sessions.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoSessions"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminSessions"))} pagination"><button class="secondary-button" type="button" data-admin-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  const revokeAllControls = !canRevokeAll
+    ? ""
+    : revokeAllConfirming
+      ? `<div class="actions"><span role="status">${escapeHtml(text("adminSessionRevokeAllConfirm"))}</span>${button(text("adminSessionRevokeAll"), { action: "admin-session-revoke-all-confirm", danger: true, busy: revokeAllBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-session-revoke-all-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+      : `<div class="actions">${button(text("adminSessionRevokeAll"), { action: "admin-session-revoke-all-request", danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminSessions"))}"><form id="admin-session-search" class="actions" role="search"><input id="admin-session-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchSessions"))}" value="${escapeHtml(state.data.adminSessionQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchSessions"))}" maxlength="200"/><select id="admin-session-status" name="status" aria-label="${escapeHtml(text("adminSessions"))}"><option value="active" ${state.data.adminSessionStatus !== "expired" ? "selected" : ""}>${escapeHtml(text("adminActive"))}</option><option value="expired" ${state.data.adminSessionStatus === "expired" ? "selected" : ""}>${escapeHtml(text("adminExpired"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-sessions-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-sessions-search")}${escapeHtml(text("adminSearchSessions"))}</button></form>${sessions.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoSessions"))}</div>`}${revokeAllControls}<div class="actions" aria-label="${escapeHtml(text("adminSessions"))} pagination"><button class="secondary-button" type="button" data-admin-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminConsentsContent() {
@@ -7473,6 +7481,48 @@ async function action(action, element) {
       /* request rendered localized authorization or transport feedback */
     }
     state.busy = null;
+    render();
+    return;
+  }
+  if (
+    action === "admin-session-revoke-all-request" ||
+    action === "admin-session-revoke-all-confirm"
+  ) {
+    if (
+      state.busy ||
+      state.offline ||
+      state.data.adminAccess?.manageSessions !== true
+    )
+      return;
+    if (action === "admin-session-revoke-all-request") {
+      state.data.adminSessionRevokeAllConfirm = true;
+      state.error = null;
+      render();
+      return;
+    }
+    if (!state.data.adminSessionRevokeAllConfirm) return;
+    state.busy = "admin-session-revoke-all";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request("/api/admin/sessions/revoke-all", { method: "POST" });
+      await api.auth.clearSession("admin");
+      state.session = null;
+      state.profile = null;
+      state.data = {};
+      state.route = "dashboard";
+      state.notice = null;
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-session-revoke-all-cancel") {
+    if (state.busy) return;
+    state.data.adminSessionRevokeAllConfirm = false;
     render();
     return;
   }

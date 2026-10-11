@@ -162,6 +162,36 @@ test("allows only exact client scope protocol mapper routes", async () => {
   }
 });
 
+test("allows only the exact authenticated Admin revoke-all sessions route", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, init) => {
+    requests.push({ url: String(url), method: init.method, body: init.body });
+    return new Response(null, { status: 204 });
+  });
+  const response = await adapter.request({
+    console: "admin",
+    path: "/api/admin/sessions/revoke-all",
+    method: "POST",
+  });
+  assert.equal(response.status, 204);
+  assert.deepEqual(requests, [
+    {
+      url: "https://kitezh.onrender.com/api/admin/sessions/revoke-all",
+      method: "POST",
+      body: undefined,
+    },
+  ]);
+  for (const path of [
+    "/api/admin/sessions/revoke-all?all=true",
+    "/api/admin/sessions/revoke-all/nested",
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method: "POST" }),
+      /not allowed/,
+    );
+  }
+});
+
 test("allows only the client scope assignment read and replacement routes", async () => {
   const { adapter } = harness(
     async () =>

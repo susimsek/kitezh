@@ -348,7 +348,8 @@ function isAllowedApiPath(
       return true;
     if (
       method === "POST" &&
-      path === "/api/admin/settings/offline-access/revoke-all"
+      (path === "/api/admin/settings/offline-access/revoke-all" ||
+        path === "/api/admin/sessions/revoke-all")
     )
       return true;
     const localizationMessageMatch = path.match(

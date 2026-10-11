@@ -536,6 +536,9 @@ export const messages = {
     adminSessionDelete: "Sign out session",
     adminSessionDeleteConfirm: "Sign out this session for the user?",
     adminSessionDeleted: "Session signed out.",
+    adminSessionRevokeAll: "Sign out all sessions",
+    adminSessionRevokeAllConfirm:
+      "Sign out every active session, including this Admin session? You will need to sign in again.",
     adminSessionActionError: "The session action could not be completed.",
     adminAuthorizations: "authorizations",
     adminSearchConsents: "Search consents",
@@ -1311,6 +1314,9 @@ export const messages = {
     adminSessionDelete: "Oturumu kapat",
     adminSessionDeleteConfirm: "Bu kullanıcının oturumu kapatılsın mı?",
     adminSessionDeleted: "Oturum kapatıldı.",
+    adminSessionRevokeAll: "Tüm oturumları kapat",
+    adminSessionRevokeAllConfirm:
+      "Bu yönetici oturumu dahil tüm etkin oturumlar kapatılsın mı? Yeniden giriş yapmanız gerekecek.",
     adminSessionActionError: "Oturum işlemi tamamlanamadı.",
     adminAuthorizations: "yetkilendirme",
     adminSearchConsents: "Rıza ara",
