@@ -7896,6 +7896,258 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
   }
 });
 
+test("manages native realm-role composites through bounded Admin contracts", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__adminAccessFlags = {
+        isAdmin: false,
+        queryUsers: false,
+        viewUsers: false,
+        manageUsers: false,
+        viewRoles: true,
+        manageRoles: true,
+        queryGroups: false,
+        viewGroups: false,
+        manageGroups: false,
+        queryClients: false,
+        viewClients: false,
+        manageClients: false,
+        viewSessions: false,
+        manageSessions: false,
+        viewConsents: false,
+        manageConsents: false,
+        viewEvents: false,
+        manageEvents: false,
+        viewKeys: false,
+        manageKeys: false,
+      };
+      globalThis.__compositeRoleNames = [];
+      globalThis.__compositeRoleRequests = [];
+      globalThis.__compositeRoleSearchRequests = [];
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        if (requestUrl.pathname === "/oauth2/token")
+          return new Response(
+            JSON.stringify({
+              access_token: "admin-composite-test-token",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return new Response(
+            JSON.stringify({ access: globalThis.__adminAccessFlags }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (requestUrl.pathname === "/api/admin/roles" && method === "GET")
+          return new Response(
+            JSON.stringify({
+              content: [{ name: "ROLE_ADMIN", description: "Admin" }],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 20,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        if (
+          requestUrl.pathname === "/api/admin/roles/ROLE_ADMIN" &&
+          method === "GET"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({ compositeRoles: globalThis.__compositeRoleNames }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          requestUrl.pathname ===
+          "/api/admin/roles/ROLE_ADMIN/available-composites"
+        ) {
+          globalThis.__compositeRoleSearchRequests.push(requestUrl.search);
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return new Response(
+            JSON.stringify({
+              content: [
+                { name: "ROLE_VIEWER", description: "Read-only access" },
+              ],
+              number: 0,
+              totalPages: 1,
+              totalElements: 1,
+              size: 10,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/roles\/ROLE_ADMIN\/composites\/ROLE_VIEWER$/.test(
+            requestUrl.pathname,
+          ) &&
+          ["POST", "DELETE"].includes(method)
+        ) {
+          globalThis.__compositeRoleRequests.push({
+            method,
+            path: requestUrl.pathname,
+            query: requestUrl.search,
+            body: init?.body,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          globalThis.__compositeRoleNames =
+            method === "POST" ? ["ROLE_VIEWER"] : [];
+          return new Response(
+            JSON.stringify({ compositeRoles: globalThis.__compositeRoleNames }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        throw new Error(`Unexpected Admin API request: ${requestUrl.pathname}`);
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window.getByRole("heading", { name: "Choose a console" }).waitFor();
+    await window
+      .getByRole("button", { name: "Administration Console" })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in" })
+      .locator(".spinner")
+      .waitFor();
+    const authorizationUrl = await application.evaluate(
+      () => globalThis.__pendingAuthorizationUrl,
+    );
+    await application.evaluate(({ app }, pendingUrl) => {
+      const state = new URL(pendingUrl).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=role-composite-test-code`,
+      );
+    }, authorizationUrl);
+    await window.getByRole("heading", { name: "Roles", exact: true }).waitFor();
+    const roleRow = window.locator('[data-role-name="ROLE_ADMIN"]');
+    const manageComposites = roleRow.getByRole("button", {
+      name: "Manage composite roles",
+    });
+    await manageComposites.click();
+    assert.equal(await manageComposites.isDisabled(), true);
+    assert.equal(await manageComposites.locator(".spinner").count(), 1);
+    const composition = roleRow.locator('[data-role-composition="ROLE_ADMIN"]');
+    await composition
+      .getByRole("heading", { name: "Included roles" })
+      .waitFor();
+    await composition
+      .getByText("No included roles.", { exact: true })
+      .waitFor();
+    const search = composition.getByRole("searchbox", {
+      name: "Search available roles",
+    });
+    const searchButton = composition.getByRole("button", {
+      name: "Search available roles",
+    });
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: false,
+      });
+      window.dispatchEvent(new Event("offline"));
+    });
+    assert.equal(await searchButton.isDisabled(), true);
+    await window.evaluate(() => {
+      Object.defineProperty(navigator, "onLine", {
+        configurable: true,
+        value: true,
+      });
+      window.dispatchEvent(new Event("online"));
+    });
+    await search.fill("VIEW");
+    await searchButton.click();
+    assert.equal(
+      await searchButton.isDisabled(),
+      true,
+      JSON.stringify(
+        await application.evaluate(
+          () => globalThis.__compositeRoleSearchRequests,
+        ),
+      ),
+    );
+    assert.equal(await searchButton.locator(".spinner").count(), 1);
+    await searchButton.dispatchEvent("click");
+    await composition.getByText("ROLE_VIEWER", { exact: true }).waitFor();
+    const addRole = composition.getByRole("button", {
+      name: "Add role",
+      exact: true,
+    });
+    await addRole.click();
+    assert.equal(await addRole.isDisabled(), true);
+    assert.equal(await addRole.locator(".spinner").count(), 1);
+    await addRole.dispatchEvent("click");
+    await window.getByText("Included role added.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__compositeRoleNames),
+      ["ROLE_VIEWER"],
+    );
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByText("Bileşik rolleri yönet", { exact: true }).waitFor();
+    await composition
+      .getByRole("button", { name: "Rolü kaldır", exact: true })
+      .click();
+    await composition
+      .getByText("Bu içerilen rol kaldırılsın mı?", { exact: true })
+      .waitFor();
+    await composition
+      .locator('[data-action="admin-role-composite-remove-cancel"]')
+      .click();
+    assert.equal(
+      await application.evaluate(
+        () => globalThis.__compositeRoleRequests.length,
+      ),
+      1,
+    );
+    await window.getByRole("button", { name: "İngilizce" }).click();
+    const removeRole = composition.getByRole("button", {
+      name: "Remove role",
+      exact: true,
+    });
+    await removeRole.click();
+    const confirmRemove = composition.getByRole("button", {
+      name: "Remove role",
+      exact: true,
+    });
+    await confirmRemove.click();
+    assert.equal(await confirmRemove.isDisabled(), true);
+    assert.equal(await confirmRemove.locator(".spinner").count(), 1);
+    await confirmRemove.dispatchEvent("click");
+    await window.getByText("Included role removed.", { exact: true }).waitFor();
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__compositeRoleNames),
+      [],
+    );
+    assert.deepEqual(
+      await application.evaluate(() => globalThis.__compositeRoleRequests),
+      [
+        {
+          method: "POST",
+          path: "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER",
+          query: "?page=0&size=20&sort=username,asc",
+          body: undefined,
+        },
+        {
+          method: "DELETE",
+          path: "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER",
+          query: "?page=0&size=20&sort=username,asc",
+          body: undefined,
+        },
+      ],
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("opens settings in a separate window without requiring login", async () => {
   const application = await launchDesktop();
   try {

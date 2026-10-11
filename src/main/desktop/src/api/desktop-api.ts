@@ -152,6 +152,29 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/roles") return true;
+    const roleCompositeMutationMatch = path.match(
+      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/composites\/(ROLE_[A-Z0-9_]{1,45})(?:\?|$)/,
+    );
+    if (roleCompositeMutationMatch && ["POST", "DELETE"].includes(method)) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        return (
+          url.origin === "https://desktop.invalid" &&
+          url.searchParams.get("page") === "0" &&
+          url.searchParams.get("size") === "20" &&
+          url.searchParams.get("sort") === "username,asc" &&
+          [...url.searchParams.keys()].every((key) =>
+            ["page", "size", "sort"].includes(key),
+          ) &&
+          [...new Set(url.searchParams.keys())].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          !url.hash
+        );
+      } catch {
+        return false;
+      }
+    }
     if (
       method === "PUT" &&
       /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
@@ -420,6 +443,14 @@ function isAllowedApiPath(
         );
       const isUsers = url.pathname === "/api/admin/users";
       const isRoles = url.pathname === "/api/admin/roles";
+      const roleDetailMatch = url.pathname.match(
+        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})$/,
+      );
+      const roleCompositeCandidatesMatch = url.pathname.match(
+        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-composites$/,
+      );
+      const isRoleDetail = Boolean(roleDetailMatch);
+      const isRoleCompositeCandidates = Boolean(roleCompositeCandidatesMatch);
       const isGroups = url.pathname === "/api/admin/groups";
       const groupMemberSearchMatch = url.pathname.match(
         /^\/api\/admin\/groups\/([1-9]\d*)\/(?:users|available-users)$/,
@@ -465,6 +496,14 @@ function isAllowedApiPath(
         url.pathname === "/api/admin/settings/localization/messages";
       const isAuthenticationFlows =
         url.pathname === "/api/admin/authentication/flows";
+      if (
+        isRoleDetail &&
+        method === "GET" &&
+        url.origin === "https://desktop.invalid" &&
+        !url.search &&
+        !url.hash
+      )
+        return true;
       const allowedParameters = new Set([
         "q",
         "page",
@@ -505,6 +544,7 @@ function isAllowedApiPath(
       return (
         (isUsers ||
           isRoles ||
+          isRoleCompositeCandidates ||
           isGroups ||
           isGroupMemberSearch ||
           isClientScopes ||
@@ -530,6 +570,12 @@ function isAllowedApiPath(
           allowedParameters.has(key),
         ) &&
         (!isAuthenticationFlows || !url.searchParams.has("q")) &&
+        (!isRoleCompositeCandidates ||
+          (url.searchParams.get("page") === "0" &&
+            url.searchParams.get("size") === "10" &&
+            url.searchParams.get("sort") === "name,asc" &&
+            (url.searchParams.get("q")?.length ?? 0) >= 2 &&
+            (url.searchParams.get("q")?.length ?? 0) <= 100)) &&
         [...allowedParameters].every(
           (key) => url.searchParams.getAll(key).length <= 1,
         ) &&

@@ -192,6 +192,56 @@ test("allows only the exact authenticated Admin revoke-all sessions route", asyn
   }
 });
 
+test("allows bounded native realm-role composite reads and mutations only", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, init) => {
+    requests.push({ url: String(url), method: init.method });
+    return new Response(JSON.stringify({ compositeRoles: ["ROLE_VIEWER"] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  for (const [method, path] of [
+    ["GET", "/api/admin/roles/ROLE_ADMIN"],
+    [
+      "GET",
+      "/api/admin/roles/ROLE_ADMIN/available-composites?q=VIEW&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER?page=0&size=20&sort=username,asc",
+    ],
+    [
+      "DELETE",
+      "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER?page=0&size=20&sort=username,asc",
+    ],
+  ]) {
+    const response = await adapter.request({ console: "admin", path, method });
+    assert.equal(response.status, 200);
+  }
+  assert.equal(requests.length, 4);
+  for (const [method, path] of [
+    ["GET", "/api/admin/roles/ROLE_ADMIN?size=100"],
+    [
+      "GET",
+      "/api/admin/roles/ROLE_ADMIN/available-composites?q=V&page=0&size=10&sort=name,asc",
+    ],
+    [
+      "POST",
+      "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER?page=0&size=20&sort=username,asc&extra=true",
+    ],
+    [
+      "DELETE",
+      "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER/nested?page=0&size=20&sort=username,asc",
+    ],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path, method }),
+      /not allowed/,
+    );
+  }
+});
+
 test("allows only the client scope assignment read and replacement routes", async () => {
   const { adapter } = harness(
     async () =>
