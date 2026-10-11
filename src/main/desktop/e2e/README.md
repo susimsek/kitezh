@@ -1,5 +1,22 @@
 # Desktop authentication E2E
 
+## Windows system-theme event
+
+The opt-in `electron.test.mjs` case changes the current user's Windows app/system
+theme values while native windows are open, then restores the original values in
+its cleanup path. Run it only on Windows from the repository root:
+
+```powershell
+pnpm --dir src/main/desktop run build
+$env:DESKTOP_WINDOWS_OS_THEME_E2E = 'true'
+node --test --test-name-pattern="propagates actual Windows system-theme changes to open native windows" src/main/desktop/e2e/electron.test.mjs
+Remove-Item Env:DESKTOP_WINDOWS_OS_THEME_E2E
+```
+
+The test verifies the chooser, Settings, update dialog, and Quick Access companion
+follow both dark and light system changes. The original registry values are
+restored even when an assertion fails.
+
 ## Real Google / Windows protocol callback
 
 The live test is opt-in and uses the local backend on `http://localhost:9090`.

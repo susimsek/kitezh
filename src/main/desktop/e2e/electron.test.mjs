@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { createRequire } from "node:module";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -19,6 +20,51 @@ const electronExecutable = require("electron");
 const packageVersion = JSON.parse(
   await readFile(path.join(desktopDirectory, "package.json"), "utf8"),
 ).version;
+
+function readWindowsAppearance() {
+  const output = execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "$key='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize'; $value=Get-ItemProperty -LiteralPath $key; [pscustomobject]@{apps=$value.AppsUseLightTheme; system=$value.SystemUsesLightTheme} | ConvertTo-Json -Compress",
+    ],
+    { encoding: "utf8", windowsHide: true, timeout: 10_000 },
+  );
+  const appearance = JSON.parse(output);
+  for (const value of [appearance.apps, appearance.system]) {
+    if (value !== 0 && value !== 1) {
+      throw new Error(
+        "Windows appearance settings must be readable as 0 or 1.",
+      );
+    }
+  }
+  return appearance;
+}
+
+function setWindowsAppearance(appsValue, systemValue = appsValue) {
+  for (const value of [appsValue, systemValue]) {
+    if (value !== 0 && value !== 1) {
+      throw new Error("Windows appearance test values must be 0 or 1.");
+    }
+  }
+  const script = `
+    $key='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize'
+    New-ItemProperty -LiteralPath $key -Name AppsUseLightTheme -PropertyType DWord -Value ${appsValue} -Force | Out-Null
+    New-ItemProperty -LiteralPath $key -Name SystemUsesLightTheme -PropertyType DWord -Value ${systemValue} -Force | Out-Null
+    if (-not ('KitezhThemeBroadcast' -as [type])) {
+      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class KitezhThemeBroadcast { [DllImport("user32.dll", CharSet=CharSet.Auto, SetLastError=true)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wParam, string lParam, uint flags, uint timeout, out UIntPtr result); }'
+    }
+    $result=[UIntPtr]::Zero
+    [KitezhThemeBroadcast]::SendMessageTimeout([IntPtr]0xffff, 0x001a, [UIntPtr]::Zero, 'ImmersiveColorSet', 2, 5000, [ref]$result) | Out-Null
+  `;
+  execFileSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", script],
+    { encoding: "utf8", windowsHide: true, timeout: 10_000 },
+  );
+}
 
 function pngChunk(type, data) {
   const name = Buffer.from(type);
@@ -10586,3 +10632,70 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await application.close();
   }
 });
+
+test(
+  "propagates actual Windows system-theme changes to open native windows",
+  {
+    skip:
+      process.platform !== "win32" ||
+      process.env.DESKTOP_WINDOWS_OS_THEME_E2E !== "true",
+    timeout: 60_000,
+  },
+  async () => {
+    const originalAppearance = readWindowsAppearance();
+    const application = await launchDesktop({
+      updatePreviewState: "available",
+    });
+    try {
+      const mainWindow = await nativeMainWindow(application);
+      await mainWindow.evaluate(async () => {
+        await window.desktopApi.theme.set("system");
+        await window.desktopApi.language.set("en");
+      });
+      const settingsWindowPromise = application.waitForEvent("window");
+      await clickApplicationMenuItem(application, "Settings…");
+      const settingsWindow = await settingsWindowPromise;
+      await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+      const companionWindowPromise = application.waitForEvent("window");
+      await clickViewMenuItem(application, "Quick Access…");
+      const companionWindow = await companionWindowPromise;
+      await companionWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+      await clickApplicationMenuItem(application, "Check for Updates…");
+      const updateWindow = await windowWithHeading(
+        application,
+        "A new version of Kitezh is available!",
+      );
+
+      for (const [mode, theme] of [
+        [0, "dark"],
+        [1, "light"],
+      ]) {
+        setWindowsAppearance(mode);
+        const background =
+          theme === "dark" ? "rgb(17, 20, 24)" : "rgb(247, 249, 252)";
+        await mainWindow.waitForFunction(
+          (expectedTheme) =>
+            document.documentElement.dataset.theme === expectedTheme,
+          theme,
+        );
+        for (const window of [settingsWindow, updateWindow, companionWindow]) {
+          await window.waitForFunction(
+            (expectedBackground) =>
+              getComputedStyle(document.body).backgroundColor ===
+              expectedBackground,
+            background,
+          );
+        }
+      }
+    } finally {
+      try {
+        setWindowsAppearance(
+          originalAppearance.apps,
+          originalAppearance.system,
+        );
+      } finally {
+        await application.close();
+      }
+    }
+  },
+);
