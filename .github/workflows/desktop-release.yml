@@ -184,6 +184,28 @@ jobs:
           cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
 
+      - name: Resolve Electron runtime version
+        id: electron-runtime
+        shell: bash
+        run: |
+          version="$(node -p "require('./src/main/desktop/package.json').devDependencies.electron")"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare Electron runtime cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          cache_dir="${RUNNER_TEMP}/electron"
+          mkdir -p "${cache_dir}"
+          echo "electron_config_cache=${cache_dir}" >> "${GITHUB_ENV}"
+
+      - name: Cache Electron runtime download
+        id: electron-runtime-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/electron
+          key: electron-runtime-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron-runtime.outputs.version }}
+
       - name: Install desktop dependencies
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
@@ -273,10 +295,23 @@ jobs:
             electron-builder-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Report build cache status
+        shell: bash
         env:
+          ELECTRON_RUNTIME_CACHE_HIT: ${{ steps.electron-runtime-cache.outputs.cache-hit }}
           ELECTRON_BUILDER_CACHE_HIT: ${{ steps.electron-builder-cache.outputs.cache-hit }}
         run: |
-          node -e "const fs = require('node:fs'); const status = process.env.ELECTRON_BUILDER_CACHE_HIT === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Build cache status\n- Electron Builder downloads: ' + status + '\n');"
+          cache_status() {
+            if [[ "$1" == "true" ]]; then
+              echo 'exact cache hit'
+            else
+              echo 'no exact hit (cache miss)'
+            fi
+          }
+          {
+            echo '### Desktop build cache status'
+            echo "- Electron runtime download: $(cache_status "${ELECTRON_RUNTIME_CACHE_HIT}")"
+            echo "- Electron Builder tools: $(cache_status "${ELECTRON_BUILDER_CACHE_HIT}")"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}

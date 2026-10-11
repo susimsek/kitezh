@@ -153,7 +153,7 @@ jobs:
           set -euo pipefail
           keystore_path="${RUNNER_TEMP}/kitezh-release.keystore"
           printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
-          ./gradlew --no-daemon --stacktrace assembleRelease \
+          ./gradlew --no-daemon --stacktrace --build-cache --console=plain assembleRelease \
             "-PreactNativeArchitectures=arm64-v8a" \
             "-Pandroid.enableMinifyInReleaseBuilds=true" \
             "-Pandroid.enableShrinkResourcesInReleaseBuilds=true" \
@@ -228,15 +228,6 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm install --frozen-lockfile
 
-      - name: Cache CocoaPods downloads
-        id: cocoapods-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/Library/Caches/CocoaPods
-          key: cocoaPods-${{ runner.os }}-${{ hashFiles('src/main/mobile/ios/Podfile.lock') }}
-          restore-keys: |
-            cocoaPods-${{ runner.os }}-
-
       - name: Set mobile release version
         working-directory: src/main/mobile
         env:
@@ -254,7 +245,20 @@ jobs:
 
       - name: Generate native iOS project
         working-directory: src/main/mobile
-        run: pnpm exec expo prebuild --clean --platform ios
+        run: pnpm exec expo prebuild --clean --platform ios --no-install
+
+      - name: Cache CocoaPods downloads
+        id: cocoapods-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoaPods-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile', 'src/main/mobile/ios/Podfile.properties.json') }}
+          restore-keys: |
+            cocoaPods-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install iOS dependencies
+        working-directory: src/main/mobile/ios
+        run: pod install
 
       - name: Record Xcode version
         id: xcode-version
@@ -266,9 +270,9 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}/kitezh-ios-build
-          key: xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile.lock') }}-${{ github.sha }}
+          key: xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile', 'src/main/mobile/ios/Podfile.lock') }}-${{ github.sha }}
           restore-keys: |
-            xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile.lock') }}-
+            xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile', 'src/main/mobile/ios/Podfile.lock') }}-
 
       - name: Report iOS build cache status
         env:
