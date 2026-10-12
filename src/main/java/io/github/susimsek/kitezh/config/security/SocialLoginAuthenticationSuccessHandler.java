@@ -116,23 +116,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
                 throw new IllegalStateException("Social login requires an OAuth2 authentication");
             }
             jakarta.servlet.http.HttpSession session = request.getSession(false);
-            Object desktopPending =
-                    session == null
-                            ? null
-                            : session.getAttribute(
-                                    DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
-            if (desktopPending instanceof String token
-                    && desktopSocialLinkTransactionService != null) {
-                DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion completion =
-                        desktopSocialLinkTransactionService.completeFromBrowser(
-                                token,
-                                oauth2Authentication.getAuthorizedClientRegistrationId(),
-                                oauth2Authentication);
-                session.removeAttribute(
-                        DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
-                response.sendRedirect(
-                        desktopSocialLinkTransactionService.callbackUrl(
-                                completion.state(), completion.code(), null));
+            if (completeDesktopLink(request, response, session, oauth2Authentication)) {
                 return;
             }
             OAuth2AuthorizedClient authorizedClient =
@@ -211,6 +195,30 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
                                     .AuthenticationServiceException(
                                     "Social login could not be completed", exception));
         }
+    }
+
+    private boolean completeDesktopLink(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            jakarta.servlet.http.HttpSession session,
+            OAuth2AuthenticationToken authentication)
+            throws IOException {
+        if (session == null || desktopSocialLinkTransactionService == null) {
+            return false;
+        }
+        Object pending =
+                session.getAttribute(DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+        if (!(pending instanceof String token)) {
+            return false;
+        }
+        DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion completion =
+                desktopSocialLinkTransactionService.completeFromBrowser(
+                        token, authentication.getAuthorizedClientRegistrationId(), authentication);
+        session.removeAttribute(DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+        response.sendRedirect(
+                desktopSocialLinkTransactionService.callbackUrl(
+                        completion.state(), completion.code(), null));
+        return true;
     }
 
     private void completeResponse(

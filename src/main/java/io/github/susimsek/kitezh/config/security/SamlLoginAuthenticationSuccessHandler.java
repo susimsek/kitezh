@@ -88,24 +88,7 @@ public final class SamlLoginAuthenticationSuccessHandler implements Authenticati
                         "SAML login requires a SAML authentication");
             }
             String registrationId = registrationId(request);
-            Object desktopPending =
-                    request.getSession(false) == null
-                            ? null
-                            : request.getSession(false)
-                                    .getAttribute(
-                                            DesktopSocialLinkTransactionService
-                                                    .PENDING_SESSION_ATTRIBUTE);
-            if (desktopPending instanceof String token
-                    && desktopSocialLinkTransactionService != null) {
-                DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion completion =
-                        desktopSocialLinkTransactionService.completeFromBrowser(
-                                token, registrationId, samlAuthentication);
-                request.getSession(false)
-                        .removeAttribute(
-                                DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
-                response.sendRedirect(
-                        desktopSocialLinkTransactionService.callbackUrl(
-                                completion.state(), completion.code(), null));
+            if (completeDesktopLink(request, response, registrationId, samlAuthentication)) {
                 return;
             }
             Object linkTarget =
@@ -161,6 +144,31 @@ public final class SamlLoginAuthenticationSuccessHandler implements Authenticati
                             : new AuthenticationServiceException(
                                     "SAML login could not be completed", exception));
         }
+    }
+
+    private boolean completeDesktopLink(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            String registrationId,
+            Saml2Authentication authentication)
+            throws IOException {
+        var session = request.getSession(false);
+        if (session == null || desktopSocialLinkTransactionService == null) {
+            return false;
+        }
+        Object pending =
+                session.getAttribute(DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+        if (!(pending instanceof String token)) {
+            return false;
+        }
+        DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion completion =
+                desktopSocialLinkTransactionService.completeFromBrowser(
+                        token, registrationId, authentication);
+        session.removeAttribute(DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+        response.sendRedirect(
+                desktopSocialLinkTransactionService.callbackUrl(
+                        completion.state(), completion.code(), null));
+        return true;
     }
 
     private Authentication establishLocalSession(

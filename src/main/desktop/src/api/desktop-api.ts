@@ -98,8 +98,8 @@ function isAllowedApiPath(
     if (method === "GET" && path === "/api/admin/profile-attributes")
       return true;
     if (method === "POST" && path === "/api/admin/users") return true;
-    const userAvatarMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/avatar$/,
+    const userAvatarMatch = /^\/api\/admin\/users\/([1-9]\d*)\/avatar$/.exec(
+      path,
     );
     if (
       userAvatarMatch &&
@@ -108,24 +108,23 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/users/bulk") return true;
-    const userUpdateMatch = path.match(/^\/api\/admin\/users\/([1-9]\d*)$/);
+    const userUpdateMatch = /^\/api\/admin\/users\/([1-9]\d*)$/.exec(path);
     if (
       method === "PUT" &&
       userUpdateMatch &&
       Number.isSafeInteger(Number(userUpdateMatch[1]))
     )
       return true;
-    const userProfileAttributesMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/profile-attributes$/,
-    );
+    const userProfileAttributesMatch =
+      /^\/api\/admin\/users\/([1-9]\d*)\/profile-attributes$/.exec(path);
     if (
       userProfileAttributesMatch &&
       Number.isSafeInteger(Number(userProfileAttributesMatch[1])) &&
       ["GET", "PUT"].includes(method)
     )
       return true;
-    const userEnabledMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/enabled$/,
+    const userEnabledMatch = /^\/api\/admin\/users\/([1-9]\d*)\/enabled$/.exec(
+      path,
     );
     if (
       method === "PUT" &&
@@ -133,17 +132,18 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userEnabledMatch[1]))
     )
       return true;
-    const userActionEmailMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/execute-actions-email\?lifespan=(1800|3600|43200|86400)$/,
-    );
+    const userActionEmailMatch =
+      /^\/api\/admin\/users\/([1-9]\d*)\/execute-actions-email\?lifespan=(1800|3600|43200|86400)$/.exec(
+        path,
+      );
     if (
       method === "PUT" &&
       userActionEmailMatch &&
       Number.isSafeInteger(Number(userActionEmailMatch[1]))
     )
       return true;
-    const userTotpResetMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/totp$/,
+    const userTotpResetMatch = /^\/api\/admin\/users\/([1-9]\d*)\/totp$/.exec(
+      path,
     );
     if (
       method === "DELETE" &&
@@ -151,8 +151,8 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userTotpResetMatch[1]))
     )
       return true;
-    const userUnlockMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/unlock$/,
+    const userUnlockMatch = /^\/api\/admin\/users\/([1-9]\d*)\/unlock$/.exec(
+      path,
     );
     if (
       method === "POST" &&
@@ -160,18 +160,18 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(userUnlockMatch[1]))
     )
       return true;
-    const userPasswordResetMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/password$/,
-    );
+    const userPasswordResetMatch =
+      /^\/api\/admin\/users\/([1-9]\d*)\/password$/.exec(path);
     if (
       method === "PUT" &&
       userPasswordResetMatch &&
       Number.isSafeInteger(Number(userPasswordResetMatch[1]))
     )
       return true;
-    const userPasskeyListMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/webauthn\/credentials(?:\?page=(0|[1-9]\d*)&size=(\d+))?$/,
-    );
+    const userPasskeyListMatch =
+      /^\/api\/admin\/users\/([1-9]\d*)\/webauthn\/credentials(?:\?page=(0|[1-9]\d*)&size=(\d+))?$/.exec(
+        path,
+      );
     if (
       method === "GET" &&
       userPasskeyListMatch &&
@@ -182,9 +182,10 @@ function isAllowedApiPath(
           Number(userPasskeyListMatch[3]) <= 100))
     )
       return true;
-    const userPasskeyMatch = path.match(
-      /^\/api\/admin\/users\/([1-9]\d*)\/webauthn\/credentials\/([A-Za-z0-9_-]{1,300})$/,
-    );
+    const userPasskeyMatch =
+      /^\/api\/admin\/users\/([1-9]\d*)\/webauthn\/credentials\/([A-Za-z0-9_-]{1,300})$/.exec(
+        path,
+      );
     if (
       userPasskeyMatch &&
       Number.isSafeInteger(Number(userPasskeyMatch[1])) &&
@@ -198,9 +199,10 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/roles") return true;
-    const roleCompositeMutationMatch = path.match(
-      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/composites\/(ROLE_[A-Z0-9_]{1,45})(?:\?|$)/,
-    );
+    const roleCompositeMutationMatch =
+      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/composites\/(ROLE_[A-Z0-9_]{1,45})(?:\?|$)/.exec(
+        path,
+      );
     if (roleCompositeMutationMatch && ["POST", "DELETE"].includes(method)) {
       try {
         const url = new URL(path, "https://desktop.invalid");
@@ -231,9 +233,10 @@ function isAllowedApiPath(
       /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(path)
     )
       return true;
-    const clientRoleMutationMatch = path.match(
-      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles(?:\/([1-9]\d*))?$/,
-    );
+    const clientRoleMutationMatch =
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles(?:\/([1-9]\d*))?$/.exec(
+        path,
+      );
     if (clientRoleMutationMatch) {
       if (method === "POST" && clientRoleMutationMatch[2] === undefined)
         return true;
@@ -244,9 +247,10 @@ function isAllowedApiPath(
       )
         return true;
     }
-    const clientRoleCompositeMatch = path.match(
-      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)\/(composites\/([1-9]\d*)|realm-composites\/(ROLE_[A-Z0-9_]{1,45}))(?:\?|$)/,
-    );
+    const clientRoleCompositeMatch =
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)\/(composites\/([1-9]\d*)|realm-composites\/(ROLE_[A-Z0-9_]{1,45}))(?:\?|$)/.exec(
+        path,
+      );
     if (clientRoleCompositeMatch && ["POST", "DELETE"].includes(method)) {
       try {
         const url = new URL(path, "https://desktop.invalid");
@@ -272,9 +276,10 @@ function isAllowedApiPath(
         return false;
       }
     }
-    const clientRoleAssignmentPathMatch = path.match(
-      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)(?:\/(available-users|available-groups|users(?:\/([1-9]\d*))?|groups(?:\/([1-9]\d*))?))?(?:\?|$)/,
-    );
+    const clientRoleAssignmentPathMatch =
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles\/([1-9]\d*)(?:\/(available-users|available-groups|users(?:\/([1-9]\d*))?|groups(?:\/([1-9]\d*))?))?(?:\?|$)/.exec(
+        path,
+      );
     if (clientRoleAssignmentPathMatch) {
       try {
         const url = new URL(path, "https://desktop.invalid");
@@ -326,9 +331,10 @@ function isAllowedApiPath(
         return false;
       }
     }
-    const roleClientCompositeMatch = path.match(
-      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/client-composites\/([1-9]\d*)(?:\?|$)/,
-    );
+    const roleClientCompositeMatch =
+      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/client-composites\/([1-9]\d*)(?:\?|$)/.exec(
+        path,
+      );
     if (roleClientCompositeMatch && ["POST", "DELETE"].includes(method)) {
       try {
         const url = new URL(path, "https://desktop.invalid");
@@ -350,9 +356,8 @@ function isAllowedApiPath(
       }
     }
     if (method === "POST" && path === "/api/admin/groups") return true;
-    const groupPermissionsMatch = path.match(
-      /^\/api\/admin\/groups\/([1-9]\d*)\/permissions$/,
-    );
+    const groupPermissionsMatch =
+      /^\/api\/admin\/groups\/([1-9]\d*)\/permissions$/.exec(path);
     if (
       groupPermissionsMatch &&
       Number.isSafeInteger(Number(groupPermissionsMatch[1])) &&
@@ -377,9 +382,8 @@ function isAllowedApiPath(
       Number.isSafeInteger(Number(path.split("/").at(-1)))
     )
       return true;
-    const groupMembershipMatch = path.match(
-      /^\/api\/admin\/groups\/([1-9]\d*)\/users(?:\/([1-9]\d*))?$/,
-    );
+    const groupMembershipMatch =
+      /^\/api\/admin\/groups\/([1-9]\d*)\/users(?:\/([1-9]\d*))?$/.exec(path);
     if (
       groupMembershipMatch &&
       groupMembershipMatch
@@ -412,9 +416,10 @@ function isAllowedApiPath(
       )
     )
       return true;
-    const clientMapperPath = path.match(
-      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/,
-    );
+    const clientMapperPath =
+      /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/.exec(
+        path,
+      );
     if (
       clientMapperPath &&
       (method === "POST" || method === "PUT" || method === "DELETE") &&
@@ -424,9 +429,10 @@ function isAllowedApiPath(
           Number.isSafeInteger(Number(clientMapperPath[2])))
     )
       return true;
-    const clientScopeMapperPath = path.match(
-      /^\/api\/admin\/client-scopes\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/,
-    );
+    const clientScopeMapperPath =
+      /^\/api\/admin\/client-scopes\/([A-Za-z0-9_-]{1,100})\/mappers(?:\/([1-9]\d*))?$/.exec(
+        path,
+      );
     if (
       clientScopeMapperPath &&
       (method === "POST" || method === "PUT" || method === "DELETE") &&
@@ -498,9 +504,10 @@ function isAllowedApiPath(
       )
     )
       return true;
-    const consentRevokeMatch = path.match(
-      /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/,
-    );
+    const consentRevokeMatch =
+      /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/.exec(
+        path,
+      );
     if (method === "DELETE" && consentRevokeMatch) {
       try {
         const clientId = decodeURIComponent(consentRevokeMatch[1]);
@@ -539,9 +546,8 @@ function isAllowedApiPath(
         path === "/api/admin/sessions/revoke-all")
     )
       return true;
-    const localizationMessageMatch = path.match(
-      /^\/api\/admin\/settings\/localization\/messages\/([1-9]\d*)$/,
-    );
+    const localizationMessageMatch =
+      /^\/api\/admin\/settings\/localization\/messages\/([1-9]\d*)$/.exec(path);
     if (
       method === "POST" &&
       path === "/api/admin/settings/localization/messages"
@@ -608,26 +614,29 @@ function isAllowedApiPath(
         );
       const isUsers = url.pathname === "/api/admin/users";
       const isRoles = url.pathname === "/api/admin/roles";
-      const roleDetailMatch = url.pathname.match(
-        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})$/,
-      );
-      const roleCompositeCandidatesMatch = url.pathname.match(
-        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-composites$/,
-      );
-      const roleClientCompositeCandidatesMatch = url.pathname.match(
-        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-client-composites$/,
-      );
-      const clientRoleCompositeCandidatesMatch = url.pathname.match(
-        /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/roles\/([1-9]\d*)\/available-(?:composites|realm-composites)$/,
-      );
+      const roleDetailMatch =
+        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})$/.exec(url.pathname);
+      const roleCompositeCandidatesMatch =
+        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-composites$/.exec(
+          url.pathname,
+        );
+      const roleClientCompositeCandidatesMatch =
+        /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/available-client-composites$/.exec(
+          url.pathname,
+        );
+      const clientRoleCompositeCandidatesMatch =
+        /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/roles\/([1-9]\d*)\/available-(?:composites|realm-composites)$/.exec(
+          url.pathname,
+        );
       const isRoleDetail = Boolean(roleDetailMatch);
       const isRoleCompositeCandidates = Boolean(
         roleCompositeCandidatesMatch || roleClientCompositeCandidatesMatch,
       );
       const isGroups = url.pathname === "/api/admin/groups";
-      const groupMemberSearchMatch = url.pathname.match(
-        /^\/api\/admin\/groups\/([1-9]\d*)\/(?:users|available-users)$/,
-      );
+      const groupMemberSearchMatch =
+        /^\/api\/admin\/groups\/([1-9]\d*)\/(?:users|available-users)$/.exec(
+          url.pathname,
+        );
       const isGroupMemberSearch = Boolean(
         groupMemberSearchMatch &&
         Number.isSafeInteger(Number(groupMemberSearchMatch[1])),
@@ -654,15 +663,17 @@ function isAllowedApiPath(
           url.pathname,
         );
       const isClients = url.pathname === "/api/admin/clients";
-      const clientRoleListMatch = url.pathname.match(
-        /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles$/,
-      );
+      const clientRoleListMatch =
+        /^\/api\/admin\/clients\/([A-Za-z0-9_-]{1,100})\/roles$/.exec(
+          url.pathname,
+        );
       const isClientRoleList = Boolean(clientRoleListMatch);
       const isIdentityProviders =
         url.pathname === "/api/admin/identity-providers";
-      const providerMappersMatch = url.pathname.match(
-        /^\/api\/admin\/identity-providers\/([A-Za-z0-9_-]{1,100})\/mappers$/,
-      );
+      const providerMappersMatch =
+        /^\/api\/admin\/identity-providers\/([A-Za-z0-9_-]{1,100})\/mappers$/.exec(
+          url.pathname,
+        );
       const isProviderMappers = Boolean(providerMappersMatch);
       const isSessions = url.pathname === "/api/admin/sessions";
       const isConsents = url.pathname === "/api/admin/consents";
@@ -690,36 +701,77 @@ function isAllowedApiPath(
         ...(isSessions ? ["status"] : []),
         ...(isKeys ? ["active"] : []),
       ]);
-      const sortFields = isUsers
-        ? ["username,asc", "username,desc"]
-        : isClients
-          ? ["clientId,asc", "clientId,desc"]
-          : isClientRoleList
-            ? ["name,asc", "name,desc"]
-            : isIdentityProviders
-              ? ["guiOrder,asc", "guiOrder,desc"]
-              : isSessions
-                ? ["lastAccessTime,asc", "lastAccessTime,desc"]
-                : isConsents
-                  ? ["id.principalName,asc", "id.principalName,desc"]
-                  : isOfflineSessions
-                    ? ["refreshTokenIssuedAt,asc", "refreshTokenIssuedAt,desc"]
-                    : isEvents
-                      ? ["occurredAt,asc", "occurredAt,desc"]
-                      : isKeys
-                        ? ["createdAt,asc", "createdAt,desc"]
-                        : isLocalizationMessages
-                          ? [
-                              "locale,asc",
-                              "locale,desc",
-                              "messageKey,asc",
-                              "messageKey,desc",
-                            ]
-                          : isAuthenticationFlows
-                            ? ["name,asc", "name,desc"]
-                            : isGroupMemberSearch
-                              ? ["username,asc", "username,desc"]
-                              : ["name,asc", "name,desc"];
+      const sortConfigurations = [
+        {
+          matches: isUsers,
+          fields: ["username,asc", "username,desc"],
+          defaultSort: "username,asc",
+        },
+        {
+          matches: isClients,
+          fields: ["clientId,asc", "clientId,desc"],
+          defaultSort: "clientId,asc",
+        },
+        {
+          matches: isClientRoleList,
+          fields: ["name,asc", "name,desc"],
+          defaultSort: "name,asc",
+        },
+        {
+          matches: isIdentityProviders,
+          fields: ["guiOrder,asc", "guiOrder,desc"],
+          defaultSort: "guiOrder,desc",
+        },
+        {
+          matches: isSessions,
+          fields: ["lastAccessTime,asc", "lastAccessTime,desc"],
+          defaultSort: "lastAccessTime,desc",
+        },
+        {
+          matches: isConsents,
+          fields: ["id.principalName,asc", "id.principalName,desc"],
+          defaultSort: "id.principalName,asc",
+        },
+        {
+          matches: isOfflineSessions,
+          fields: ["refreshTokenIssuedAt,asc", "refreshTokenIssuedAt,desc"],
+          defaultSort: "refreshTokenIssuedAt,desc",
+        },
+        {
+          matches: isEvents,
+          fields: ["occurredAt,asc", "occurredAt,desc"],
+          defaultSort: "occurredAt,desc",
+        },
+        {
+          matches: isKeys,
+          fields: ["createdAt,asc", "createdAt,desc"],
+          defaultSort: "createdAt,desc",
+        },
+        {
+          matches: isLocalizationMessages,
+          fields: [
+            "locale,asc",
+            "locale,desc",
+            "messageKey,asc",
+            "messageKey,desc",
+          ],
+          defaultSort: "name,asc",
+        },
+        {
+          matches: isAuthenticationFlows,
+          fields: ["name,asc", "name,desc"],
+          defaultSort: "name,asc",
+        },
+        {
+          matches: isGroupMemberSearch,
+          fields: ["username,asc", "username,desc"],
+          defaultSort: "name,asc",
+        },
+      ];
+      const sortConfiguration = sortConfigurations.find(
+        ({ matches }) => matches,
+      );
+      const sortFields = sortConfiguration?.fields ?? ["name,asc", "name,desc"];
       return (
         (isUsers ||
           isRoles ||
@@ -782,23 +834,8 @@ function isAllowedApiPath(
         /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&
         sortFields.includes(
           url.searchParams.get("sort") ??
-            (isUsers
-              ? "username,asc"
-              : isClients
-                ? "clientId,asc"
-                : isIdentityProviders
-                  ? "guiOrder,asc"
-                  : isSessions
-                    ? "lastAccessTime,desc"
-                    : isConsents
-                      ? "id.principalName,asc"
-                      : isOfflineSessions
-                        ? "refreshTokenIssuedAt,desc"
-                        : isEvents
-                          ? "occurredAt,desc"
-                          : isKeys
-                            ? "createdAt,desc"
-                            : "name,asc"),
+            sortConfiguration?.defaultSort ??
+            "name,asc",
         ) &&
         ["active", "expired"].includes(
           url.searchParams.get("status") ?? "active",
@@ -935,11 +972,12 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
     const avatarUpload =
       method === "PUT" &&
       /^\/api\/admin\/users\/[1-9]\d*\/avatar$/.test(request.path);
-    const body = avatarUpload
-      ? avatarFormData(request.body)
-      : request.body === undefined
-        ? undefined
-        : JSON.stringify(request.body);
+    let body: FormData | string | undefined;
+    if (avatarUpload) {
+      body = avatarFormData(request.body);
+    } else if (request.body !== undefined) {
+      body = JSON.stringify(request.body);
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {

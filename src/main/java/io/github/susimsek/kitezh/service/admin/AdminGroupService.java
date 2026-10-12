@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminGroupService {
 
     private static final String GROUP_TARGET = "group";
+    private static final String GROUP_DUPLICATE_NAME_MESSAGE = "Group name is already registered";
 
     private final GroupRepository groupRepository;
     private final AuthorityRepository authorityRepository;
@@ -122,7 +123,7 @@ public class AdminGroupService {
         String name = normalizeName(request.name());
         if (groupRepository.existsByName(name)) {
             throw ApiException.conflict(
-                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, "Group name is already registered");
+                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, GROUP_DUPLICATE_NAME_MESSAGE);
         }
         GroupEntity group =
                 adminGroupMapper.toEntity(request, resolveParent(request.parentId(), null));
@@ -152,7 +153,7 @@ public class AdminGroupService {
         String name = normalizeName(request.name());
         if (!group.getName().equals(name) && groupRepository.existsByName(name)) {
             throw ApiException.conflict(
-                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, "Group name is already registered");
+                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, GROUP_DUPLICATE_NAME_MESSAGE);
         }
         adminGroupMapper.update(request, group);
         group.setParent(resolveParent(request.parentId(), group));
@@ -172,7 +173,7 @@ public class AdminGroupService {
         String name = normalizeName(request.name());
         if (!group.getName().equals(name) && groupRepository.existsByName(name)) {
             throw ApiException.conflict(
-                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, "Group name is already registered");
+                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, GROUP_DUPLICATE_NAME_MESSAGE);
         }
         group.setName(name);
         invalidateUsersInGroupTree(group);

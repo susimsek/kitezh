@@ -57,7 +57,7 @@ public class AdminClientService {
     private static final String ADMIN_CONSOLE_CLIENT_ID = "admin-console";
     private static final Set<String> PLATFORM_CONSOLE_CLIENT_IDS =
             Set.of(
-                    "admin-console",
+                    ADMIN_CONSOLE_CLIENT_ID,
                     "account-console",
                     "desktop-admin-console",
                     "desktop-account-console",
