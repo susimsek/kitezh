@@ -61,8 +61,7 @@ export function createOAuthTransactionStorage(store: TransactionStore) {
       const transaction = envelope.transaction;
       if (
         envelope.schemaVersion !== TRANSACTION_SCHEMA_VERSION ||
-        !transaction ||
-        transaction.clientId !== expected.clientId ||
+        transaction?.clientId !== expected.clientId ||
         transaction.redirectUri !== expected.redirectUri ||
         typeof transaction.state !== "string" ||
         transaction.state.length === 0 ||

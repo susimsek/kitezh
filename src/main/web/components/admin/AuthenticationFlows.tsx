@@ -126,48 +126,48 @@ const emptyExecution: ExecutionValues = {
 };
 
 type FlowFormProps = {
-  copy: AuthenticationCopy;
-  form: UseFormReturn<FlowValues>;
-  onCancel?: () => void;
-  onSubmit: SubmitHandler<FlowValues>;
-  submitLabel: string;
-  submitting: boolean;
-  topLevel?: boolean;
-  metadataLocked?: boolean;
+  readonly copy: AuthenticationCopy;
+  readonly form: UseFormReturn<FlowValues>;
+  readonly onCancel?: () => void;
+  readonly onSubmit: SubmitHandler<FlowValues>;
+  readonly submitLabel: string;
+  readonly submitting: boolean;
+  readonly topLevel?: boolean;
+  readonly metadataLocked?: boolean;
 };
 
 type ExecutionFormProps = {
-  copy: AuthenticationCopy;
-  form: UseFormReturn<ExecutionValues>;
-  onCancel: () => void;
-  onSubmit: SubmitHandler<ExecutionValues>;
-  providers: string[];
-  submitLabel: string;
-  submitting: boolean;
-  metadataLocked?: boolean;
+  readonly copy: AuthenticationCopy;
+  readonly form: UseFormReturn<ExecutionValues>;
+  readonly onCancel: () => void;
+  readonly onSubmit: SubmitHandler<ExecutionValues>;
+  readonly providers: string[];
+  readonly submitLabel: string;
+  readonly submitting: boolean;
+  readonly metadataLocked?: boolean;
 };
 
 type NodeRowProps = {
-  label: string;
-  secondary: string;
-  requirement: Requirement | null;
-  onOpen: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  onDelete?: () => void;
-  copy: AuthenticationCopy;
-  disabled: boolean;
-  movingNodeKey: string | null;
-  nodeKey: string;
-  opening: boolean;
+  readonly label: string;
+  readonly secondary: string;
+  readonly requirement: Requirement | null;
+  readonly onOpen: () => void;
+  readonly onMoveUp: () => void;
+  readonly onMoveDown: () => void;
+  readonly onDelete?: () => void;
+  readonly copy: AuthenticationCopy;
+  readonly disabled: boolean;
+  readonly movingNodeKey: string | null;
+  readonly nodeKey: string;
+  readonly opening: boolean;
 };
 
 type BindingsCardProps = {
-  bindings: Binding[];
-  flows: Flow[];
-  copy: AuthenticationCopy;
-  saving: boolean;
-  onSave: (bindingType: BindingType, flowId: number | null) => void;
+  readonly bindings: Binding[];
+  readonly flows: Flow[];
+  readonly copy: AuthenticationCopy;
+  readonly saving: boolean;
+  readonly onSave: (bindingType: BindingType, flowId: number | null) => void;
 };
 
 type BindingRowProps = Omit<BindingsCardProps, "bindings"> & { binding: Binding };
@@ -681,127 +681,150 @@ export default function AuthenticationFlows() {
       )}
       {activeDetailTab !== "flow-list" && (
         <div className="mt-4">
-          {!selectedFlow ? (
-            <Card className="admin-panel-card">
-              <Card.Body className="text-body-secondary">{copy.selectFlow}</Card.Body>
-            </Card>
-          ) : detailLoading && !detail ? (
-            <DetailLoadingState />
-          ) : detail ? (
-            <div className="d-grid gap-4">
-              <Card className="admin-panel-card">
-                <Card.Body>
-                  <div className="admin-detail-heading">
-                    <div>
-                      <Card.Title>{copy.flowGraph}</Card.Title>
-                      <Card.Text className="text-body-secondary mb-0">
-                        {detail.flow.alias}
-                      </Card.Text>
+          {(() => {
+            if (!selectedFlow) {
+              return (
+                <Card className="admin-panel-card">
+                  <Card.Body className="text-body-secondary">{copy.selectFlow}</Card.Body>
+                </Card>
+              );
+            } else {
+              if (detailLoading && !detail) {
+                return <DetailLoadingState />;
+              } else {
+                if (detail) {
+                  return (
+                    <div className="d-grid gap-4">
+                      <Card className="admin-panel-card">
+                        <Card.Body>
+                          <div className="admin-detail-heading">
+                            <div>
+                              <Card.Title>{copy.flowGraph}</Card.Title>
+                              <Card.Text className="text-body-secondary mb-0">
+                                {detail.flow.alias}
+                              </Card.Text>
+                            </div>
+                            {!detail.flow.builtIn && (
+                              <Button
+                                variant="danger"
+                                onClick={() => setDeletingFlowId(detail.flow.id)}
+                              >
+                                <ActionIcon action="delete" />
+                                {copy.deleteFlow}
+                              </Button>
+                            )}
+                          </div>
+                          {activeDetailTab === "settings" && (
+                            <FlowForm
+                              copy={copy}
+                              form={flowEditForm}
+                              onSubmit={saveFlow}
+                              submitLabel={copy.saveFlow}
+                              submitting={saving}
+                              topLevel={detail.flow.topLevel}
+                              metadataLocked={detail.flow.builtIn}
+                            />
+                          )}
+                          {activeDetailTab === "graph" && (
+                            <>
+                              <div className="admin-detail-heading mt-4">
+                                <div>
+                                  <h3 className="h6 mb-1">{copy.flowGraph}</h3>
+                                  <p className="text-body-secondary mb-0">{detail.nodes.length}</p>
+                                </div>
+                                {!detail.flow.builtIn && (
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => setCreatingSubFlow((current) => !current)}
+                                  >
+                                    <ActionIcon action="add" />
+                                    {copy.createSubFlow}
+                                  </Button>
+                                )}
+                              </div>
+                              {creatingSubFlow && !detail.flow.builtIn && (
+                                <FlowForm
+                                  copy={copy}
+                                  form={subFlowForm}
+                                  onCancel={() => setCreatingSubFlow(false)}
+                                  onSubmit={createSubFlow}
+                                  submitLabel={copy.createSubFlow}
+                                  submitting={saving}
+                                />
+                              )}
+                              <div className="d-grid gap-2 mt-3">
+                                {detail.nodes.map(renderNode)}
+                              </div>
+                            </>
+                          )}
+                          {activeDetailTab === "executions" && (
+                            <>
+                              <div className="admin-detail-heading mt-4">
+                                <div>
+                                  <h3 className="h6 mb-1">{copy.executions}</h3>
+                                  <p className="text-body-secondary mb-0">
+                                    {detail.executions.length}
+                                  </p>
+                                </div>
+                                {!detail.flow.builtIn && (
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => setCreatingExecution((current) => !current)}
+                                  >
+                                    <ActionIcon action="add" />
+                                    {copy.addExecution}
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="d-grid gap-2 mt-3">
+                                {detail.nodes
+                                  .filter((node) => node.nodeType === "EXECUTION")
+                                  .map(renderNode)}
+                              </div>
+                              {(creatingExecution || editingExecutionId !== null) && (
+                                <ExecutionForm
+                                  copy={copy}
+                                  form={executionForm}
+                                  onCancel={() => {
+                                    setCreatingExecution(false);
+                                    setEditingExecutionId(null);
+                                  }}
+                                  onSubmit={
+                                    editingExecutionId === null ? createExecution : saveExecution
+                                  }
+                                  providers={providers}
+                                  submitLabel={
+                                    editingExecutionId === null
+                                      ? copy.addExecution
+                                      : copy.saveExecution
+                                  }
+                                  submitting={saving}
+                                  metadataLocked={detail.flow.builtIn}
+                                />
+                              )}
+                            </>
+                          )}
+                          {activeDetailTab === "bindings" && (
+                            <BindingsCard
+                              bindings={bindings}
+                              flows={flows}
+                              copy={copy}
+                              saving={saving}
+                              onSave={saveBinding}
+                            />
+                          )}
+                        </Card.Body>
+                      </Card>
                     </div>
-                    {!detail.flow.builtIn && (
-                      <Button variant="danger" onClick={() => setDeletingFlowId(detail.flow.id)}>
-                        <ActionIcon action="delete" />
-                        {copy.deleteFlow}
-                      </Button>
-                    )}
-                  </div>
-                  {activeDetailTab === "settings" && (
-                    <FlowForm
-                      copy={copy}
-                      form={flowEditForm}
-                      onSubmit={saveFlow}
-                      submitLabel={copy.saveFlow}
-                      submitting={saving}
-                      topLevel={detail.flow.topLevel}
-                      metadataLocked={detail.flow.builtIn}
-                    />
-                  )}
-                  {activeDetailTab === "graph" && (
-                    <>
-                      <div className="admin-detail-heading mt-4">
-                        <div>
-                          <h3 className="h6 mb-1">{copy.flowGraph}</h3>
-                          <p className="text-body-secondary mb-0">{detail.nodes.length}</p>
-                        </div>
-                        {!detail.flow.builtIn && (
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => setCreatingSubFlow((current) => !current)}
-                          >
-                            <ActionIcon action="add" />
-                            {copy.createSubFlow}
-                          </Button>
-                        )}
-                      </div>
-                      {creatingSubFlow && !detail.flow.builtIn && (
-                        <FlowForm
-                          copy={copy}
-                          form={subFlowForm}
-                          onCancel={() => setCreatingSubFlow(false)}
-                          onSubmit={createSubFlow}
-                          submitLabel={copy.createSubFlow}
-                          submitting={saving}
-                        />
-                      )}
-                      <div className="d-grid gap-2 mt-3">{detail.nodes.map(renderNode)}</div>
-                    </>
-                  )}
-                  {activeDetailTab === "executions" && (
-                    <>
-                      <div className="admin-detail-heading mt-4">
-                        <div>
-                          <h3 className="h6 mb-1">{copy.executions}</h3>
-                          <p className="text-body-secondary mb-0">{detail.executions.length}</p>
-                        </div>
-                        {!detail.flow.builtIn && (
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => setCreatingExecution((current) => !current)}
-                          >
-                            <ActionIcon action="add" />
-                            {copy.addExecution}
-                          </Button>
-                        )}
-                      </div>
-                      <div className="d-grid gap-2 mt-3">
-                        {detail.nodes
-                          .filter((node) => node.nodeType === "EXECUTION")
-                          .map(renderNode)}
-                      </div>
-                      {(creatingExecution || editingExecutionId !== null) && (
-                        <ExecutionForm
-                          copy={copy}
-                          form={executionForm}
-                          onCancel={() => {
-                            setCreatingExecution(false);
-                            setEditingExecutionId(null);
-                          }}
-                          onSubmit={editingExecutionId === null ? createExecution : saveExecution}
-                          providers={providers}
-                          submitLabel={
-                            editingExecutionId === null ? copy.addExecution : copy.saveExecution
-                          }
-                          submitting={saving}
-                          metadataLocked={detail.flow.builtIn}
-                        />
-                      )}
-                    </>
-                  )}
-                  {activeDetailTab === "bindings" && (
-                    <BindingsCard
-                      bindings={bindings}
-                      flows={flows}
-                      copy={copy}
-                      saving={saving}
-                      onSave={saveBinding}
-                    />
-                  )}
-                </Card.Body>
-              </Card>
-            </div>
-          ) : null}
+                  );
+                } else {
+                  return null;
+                }
+              }
+            }
+          })()}
         </div>
       )}
       <ConfirmModal
@@ -884,13 +907,21 @@ function FlowForm({
               <Form.Select disabled={metadataLocked} {...register("requirement")}>
                 {requirements.map((value) => (
                   <option key={value} value={value}>
-                    {value === "REQUIRED"
-                      ? copy.required
-                      : value === "ALTERNATIVE"
-                        ? copy.alternative
-                        : value === "DISABLED"
-                          ? copy.disabled
-                          : copy.conditional}
+                    {(() => {
+                      if (value === "REQUIRED") {
+                        return copy.required;
+                      } else {
+                        if (value === "ALTERNATIVE") {
+                          return copy.alternative;
+                        } else {
+                          if (value === "DISABLED") {
+                            return copy.disabled;
+                          } else {
+                            return copy.conditional;
+                          }
+                        }
+                      }
+                    })()}
                   </option>
                 ))}
               </Form.Select>
@@ -998,11 +1029,17 @@ function ExecutionForm({
             <Form.Select {...register("requirement")}>
               {executionRequirements.map((value) => (
                 <option key={value} value={value}>
-                  {value === "REQUIRED"
-                    ? copy.required
-                    : value === "ALTERNATIVE"
-                      ? copy.alternative
-                      : copy.disabled}
+                  {(() => {
+                    if (value === "REQUIRED") {
+                      return copy.required;
+                    } else {
+                      if (value === "ALTERNATIVE") {
+                        return copy.alternative;
+                      } else {
+                        return copy.disabled;
+                      }
+                    }
+                  })()}
                 </option>
               ))}
             </Form.Select>
@@ -1093,13 +1130,17 @@ function NodeRow({
       </button>
       <div className="d-flex align-items-center gap-2">
         <Badge
-          bg={
-            requirement === "DISABLED"
-              ? "secondary"
-              : requirement === "CONDITIONAL"
-                ? "warning"
-                : "primary"
-          }
+          bg={(() => {
+            if (requirement === "DISABLED") {
+              return "secondary";
+            } else {
+              if (requirement === "CONDITIONAL") {
+                return "warning";
+              } else {
+                return "primary";
+              }
+            }
+          })()}
         >
           {requirement}
         </Badge>

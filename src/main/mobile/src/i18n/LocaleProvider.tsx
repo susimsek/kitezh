@@ -25,7 +25,9 @@ type LocaleContextValue = {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
+export function LocaleProvider({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const [locale, setLocaleState] = useState<Locale>("system");
   const [ready, setReady] = useState(false);
   const [systemLocale, setSystemLocale] = useState(initialSystemLocale);

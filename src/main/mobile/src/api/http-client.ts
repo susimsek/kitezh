@@ -54,10 +54,16 @@ export function readMobileResponseData(value: unknown) {
   return readApiResponseData(value);
 }
 
-export function getMobileTransportCause(error: unknown, timedOut: boolean) {
-  return timedOut
-    ? Object.assign(new Error("Native API request timed out"), {
-        name: "TimeoutError",
-      })
-    : getApiTransportCause(error);
+export function getMobileTransportCause(error: unknown) {
+  if (error instanceof Error && error.name === "TimeoutError") return error;
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT")
+  ) {
+    return Object.assign(new Error("Native API request timed out"), {
+      name: "TimeoutError",
+    });
+  }
+  return getApiTransportCause(error);
 }

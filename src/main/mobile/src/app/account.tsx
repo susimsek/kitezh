@@ -25,6 +25,7 @@ import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
 import { problemFieldErrors } from "../../../shared/src/api.ts";
+import { isValidEmail } from "@/validation/email";
 
 type ProfileField = "firstName" | "lastName" | "email";
 
@@ -87,7 +88,7 @@ export default function AccountScreen() {
   const saveProfile = useCallback(async () => {
     if (!session || !profile || profileSaveInFlight.current) return;
     const trimmedEmail = email.trim();
-    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
       setEmailError(dictionary.invalidEmail);
       return;
     }

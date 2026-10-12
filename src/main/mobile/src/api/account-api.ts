@@ -173,13 +173,12 @@ async function requestAccount<T>(
     }
     if (response.status === 204) return undefined as T;
     return readMobileResponseData(response.data) as T;
-  } catch (cause) {
-    if (cause instanceof AccountApiError) throw cause;
-    throw new AccountApiError(
-      0,
-      message,
-      getMobileTransportCause(cause, requestSignal.timedOut()),
-    );
+  } catch (error) {
+    if (error instanceof AccountApiError) throw error;
+    const cause = requestSignal.signal.aborted
+      ? requestSignal.signal.reason
+      : error;
+    throw new AccountApiError(0, message, getMobileTransportCause(cause));
   } finally {
     requestSignal.dispose();
   }

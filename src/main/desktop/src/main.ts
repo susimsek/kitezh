@@ -154,12 +154,17 @@ nativeTheme.on("updated", () => {
 
 async function applyDesktopLanguage(value: unknown) {
   desktopLanguageMode = value === "tr" || value === "en" ? value : "system";
-  desktopLanguage =
-    desktopLanguageMode === "system"
-      ? app.getLocale().toLowerCase().startsWith("tr")
-        ? "tr"
-        : "en"
-      : desktopLanguageMode;
+  desktopLanguage = (() => {
+    if (desktopLanguageMode === "system") {
+      if (app.getLocale().toLowerCase().startsWith("tr")) {
+        return "tr";
+      } else {
+        return "en";
+      }
+    } else {
+      return desktopLanguageMode;
+    }
+  })();
   await writeDesktopLanguage(desktopLanguage);
   await writeDesktopLanguageMode(desktopLanguageMode);
   if (aboutWindow && !aboutWindow.isDestroyed()) {
@@ -331,6 +336,15 @@ function diagnosticsLogPath() {
   return path.join(app.getPath("userData"), DIAGNOSTICS_LOG_FILE);
 }
 
+async function updateLogoutMenuVisibility() {
+  try {
+    const vault = await readVault();
+    setLogoutMenuVisible(Boolean(vault.admin || vault.account));
+  } catch {
+    setLogoutMenuVisible(false);
+  }
+}
+
 async function appendDiagnosticEvent(
   name: string,
   details?: Record<string, unknown>,
@@ -340,7 +354,10 @@ async function appendDiagnosticEvent(
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [key, redactDiagnosticText(String(value))]),
   );
-  const line = `${new Date().toISOString()} ${name}${Object.keys(safeDetails).length ? ` ${JSON.stringify(safeDetails)}` : ""}\n`;
+  const detailText = Object.keys(safeDetails).length
+    ? ` ${JSON.stringify(safeDetails)}`
+    : "";
+  const line = `${new Date().toISOString()} ${name}${detailText}\n`;
   try {
     const current = await readFile(diagnosticsLogPath(), "utf8").catch(
       () => "",
@@ -378,12 +395,9 @@ function rendererFile(requestUrl: string) {
     return null;
   const pathname = decodeURIComponent(url.pathname);
   const root = rendererRoot();
-  const relative =
-    pathname === "/"
-      ? "/index.html"
-      : pathname.endsWith("/")
-        ? `${pathname}index.html`
-        : pathname;
+  let relative = pathname;
+  if (pathname === "/") relative = "/index.html";
+  else if (pathname.endsWith("/")) relative = `${pathname}index.html`;
   const file = path.resolve(root, `.${relative}`);
   if (file !== root && !file.startsWith(`${root}${path.sep}`)) return null;
   if (existsSync(file) && statSync(file).isFile()) return file;
@@ -501,7 +515,7 @@ async function desktopLoginHtml() {
 </html>`;
 }
 
-async function desktopSettingsHtml() {
+function desktopSettingsHtml() {
   const isTurkish = isTurkishDesktop();
   const labels = isTurkish
     ? {
@@ -762,7 +776,7 @@ async function desktopSettingsHtml() {
 </html>`;
 }
 
-async function registerRendererProtocol() {
+function registerRendererProtocol() {
   protocol.handle(RENDERER_PROTOCOL, async (request) => {
     const requestPath = new URL(request.url).pathname;
     if (requestPath === "/desktop-login" || requestPath === "/desktop-login/") {
@@ -774,7 +788,7 @@ async function registerRendererProtocol() {
       requestPath === "/desktop-settings" ||
       requestPath === "/desktop-settings/"
     ) {
-      return new Response(await desktopSettingsHtml(), {
+      return new Response(desktopSettingsHtml(), {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
     }
@@ -1590,7 +1604,7 @@ function isValidGlobalShortcut(accelerator: string) {
   return (
     GLOBAL_SHORTCUT_SPECIAL_KEYS.has(key) ||
     /^[A-Z0-9]$/.test(key) ||
-    /^F(?:[1-9]|1[0-9]|2[0-4])$/.test(key)
+    /^F(?:[1-9]|1\d|2[0-4])$/.test(key)
   );
 }
 
@@ -1901,8 +1915,6 @@ async function showUpdateConfirmation() {
     focusWindow(updateConfirmationWindow);
     return false;
   }
-  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
-  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   const isTurkish = isTurkishDesktop();
   const title = isTurkish
     ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`
@@ -2338,7 +2350,8 @@ function registerIpc() {
     assertTrustedSender(event);
     if (typeof value !== "string" || !isAllowedExternalUrl(value))
       throw new Error("External URL is not allowed");
-    await shell.openExternal(value);
+    const externalUrl = new URL(value);
+    await shell.openExternal(externalUrl.toString());
   });
   ipcMain.handle("desktop:app-version", (event) => {
     assertTrustedSender(event);
@@ -2379,11 +2392,11 @@ function registerIpc() {
     assertTrustedSender(event);
     await applyDesktopLanguage(value);
   });
-  ipcMain.handle("desktop:language-get", async (event) => {
+  ipcMain.handle("desktop:language-get", (event) => {
     assertTrustedSender(event);
     return desktopLanguage;
   });
-  ipcMain.handle("desktop:language-mode-get", async (event) => {
+  ipcMain.handle("desktop:language-mode-get", (event) => {
     assertTrustedSender(event);
     return desktopLanguageMode;
   });
@@ -2545,11 +2558,20 @@ function registerIpc() {
       ) {
         throw new Error("Authorization URL is not allowed");
       }
-      if (new URL(value.authorizationUrl).origin !== getApiBaseUrl()) {
+      const requestedAuthorizationUrl = new URL(value.authorizationUrl);
+      if (
+        requestedAuthorizationUrl.origin !== getApiBaseUrl() ||
+        requestedAuthorizationUrl.pathname !== "/oauth2/authorize"
+      ) {
         throw new Error(
           "Authorization URL must use the configured authorization server",
         );
       }
+      const trustedAuthorizationUrl = new URL(
+        "/oauth2/authorize",
+        getApiBaseUrl(),
+      );
+      trustedAuthorizationUrl.search = requestedAuthorizationUrl.search;
       if (
         typeof value.state !== "string" ||
         value.state.length < 16 ||
@@ -2578,7 +2600,7 @@ function registerIpc() {
       });
       try {
         await persistPendingAuthorizations();
-        await shell.openExternal(value.authorizationUrl);
+        await shell.openExternal(trustedAuthorizationUrl.toString());
       } catch (error) {
         pendingAuthorizations.delete(value.console);
         await persistPendingAuthorizations();
@@ -2720,13 +2742,9 @@ if (!hasLock) {
     setDockVisibility(desktopPreferences.showInDock);
     const updatePreferences = await readUpdatePreferences();
     setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
-    void readVault()
-      .then((vault) =>
-        setLogoutMenuVisible(Boolean(vault.admin || vault.account)),
-      )
-      .catch(() => setLogoutMenuVisible(false));
+    void updateLogoutMenuVisibility();
     enforceContentSecurityPolicy();
-    await registerRendererProtocol();
+    registerRendererProtocol();
     void createWindow();
     if (backgroundE2e && process.platform === "darwin") app.hide();
     configureAutoUpdater(async (status: DesktopUpdateStatus) => {

@@ -71,46 +71,71 @@ export default function VerifyEmailScreen() {
         <Text style={[styles.help, { color: palette.textMuted }]}>
           {dictionary.verifyEmailHelp}
         </Text>
-        {pending || !attempted ? (
-          <ActivityIndicator
-            accessibilityLabel={dictionary.loading}
-            color={palette.primary}
-            style={styles.status}
-          />
-        ) : completed ? (
-          <View style={[styles.message, { borderColor: palette.success }]}>
-            <Text style={{ color: palette.success }}>
-              {dictionary.verifyEmailSuccess}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.replace("/sign-in")}
-              style={styles.action}
-            >
-              <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                {dictionary.signIn}
-              </Text>
-            </Pressable>
-          </View>
-        ) : failed ? (
-          <View style={[styles.message, { borderColor: palette.danger }]}>
-            <Text style={{ color: palette.danger }}>
-              {dictionary.verifyEmailError}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: pending }}
-              disabled={pending}
-              onPress={() => void submit()}
-              style={[styles.action, { flexDirection: "row", gap: spacing.xs }]}
-            >
-              {pending ? <ActivityIndicator color={palette.primary} /> : null}
-              <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                {dictionary.sessionsRetry}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
+        {(() => {
+          if (pending || !attempted) {
+            return (
+              <ActivityIndicator
+                accessibilityLabel={dictionary.loading}
+                color={palette.primary}
+                style={styles.status}
+              />
+            );
+          } else {
+            if (completed) {
+              return (
+                <View
+                  style={[styles.message, { borderColor: palette.success }]}
+                >
+                  <Text style={{ color: palette.success }}>
+                    {dictionary.verifyEmailSuccess}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.replace("/sign-in")}
+                    style={styles.action}
+                  >
+                    <Text style={{ color: palette.primary, fontWeight: "700" }}>
+                      {dictionary.signIn}
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            } else {
+              if (failed) {
+                return (
+                  <View
+                    style={[styles.message, { borderColor: palette.danger }]}
+                  >
+                    <Text style={{ color: palette.danger }}>
+                      {dictionary.verifyEmailError}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: pending }}
+                      disabled={pending}
+                      onPress={() => void submit()}
+                      style={[
+                        styles.action,
+                        { flexDirection: "row", gap: spacing.xs },
+                      ]}
+                    >
+                      {pending ? (
+                        <ActivityIndicator color={palette.primary} />
+                      ) : null}
+                      <Text
+                        style={{ color: palette.primary, fontWeight: "700" }}
+                      >
+                        {dictionary.sessionsRetry}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              } else {
+                return null;
+              }
+            }
+          }
+        })()}
       </ScrollView>
     </SafeAreaView>
   );

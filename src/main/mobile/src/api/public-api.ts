@@ -1,4 +1,3 @@
-import type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
 import {
   classifyApiError,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
@@ -44,7 +43,7 @@ type RequestOptions = {
 };
 
 export type CaptchaSettings = { enabled: boolean };
-export type { SocialProviderAvailability };
+export type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
 
 const publicClient = createMobileApiClient(DEFAULT_NATIVE_API_TIMEOUT_MS);
 
@@ -82,7 +81,7 @@ async function post<T>(
     throw new PublicApiError(
       0,
       "Network request failed",
-      getMobileTransportCause(cause, isTimeout(cause)),
+      getMobileTransportCause(cause),
     );
   }
 }
@@ -120,19 +119,9 @@ export async function getCaptchaSettings(
     throw new PublicApiError(
       0,
       "Registration CAPTCHA settings unavailable",
-      getMobileTransportCause(cause, isTimeout(cause)),
+      getMobileTransportCause(cause),
     );
   }
-}
-
-function isTimeout(cause: unknown) {
-  if (!cause || typeof cause !== "object") return false;
-  const error = cause as { code?: unknown; name?: unknown };
-  return (
-    error.name === "TimeoutError" ||
-    error.code === "ECONNABORTED" ||
-    error.code === "ETIMEDOUT"
-  );
 }
 
 export function registerAccount(

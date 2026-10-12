@@ -62,7 +62,6 @@ export function readRetryAfterHeader(headers: unknown): string | undefined {
 
 export type NativeRequestSignal = {
   signal: AbortSignal;
-  timedOut: () => boolean;
   dispose: () => void;
 };
 
@@ -71,10 +70,12 @@ export function createNativeRequestSignal(
   parentSignal?: AbortSignal,
 ): NativeRequestSignal {
   const controller = new AbortController();
-  let didTimeout = false;
+  const timeoutError = Object.assign(
+    new Error("Native API request timed out"),
+    { name: "TimeoutError" },
+  );
   const timeout = setTimeout(() => {
-    didTimeout = true;
-    controller.abort();
+    controller.abort(timeoutError);
   }, timeoutMs);
   const abortFromParent = () => controller.abort();
 
@@ -86,7 +87,6 @@ export function createNativeRequestSignal(
 
   return {
     signal: controller.signal,
-    timedOut: () => didTimeout,
     dispose: () => {
       clearTimeout(timeout);
       parentSignal?.removeEventListener("abort", abortFromParent);

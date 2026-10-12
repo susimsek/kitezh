@@ -55,7 +55,7 @@ export default function MfaScreen() {
         const currentSession = retry
           ? await refreshSession(true)
           : await refreshSession();
-        if (!currentSession) throw new Error();
+        if (!currentSession) throw new Error("No active session");
         const options = {
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
@@ -98,7 +98,7 @@ export default function MfaScreen() {
     setError(false);
     try {
       const currentSession = await refreshSession();
-      if (!currentSession) throw new Error();
+      if (!currentSession) throw new Error("No active session");
       setSetup(
         await startMfaSetup(currentSession.accessToken, {
           refreshAccessToken: async () =>
@@ -117,7 +117,7 @@ export default function MfaScreen() {
     async (action: "enable" | "disable") => {
       const expectedDigits = setup?.digits ?? mfaStatus?.digits ?? 6;
       if (!session || loading || mfaActionInFlight.current) return;
-      if (!new RegExp(`^\\d{${expectedDigits}}$`).test(code)) {
+      if (!new RegExp(String.raw`^\d{${expectedDigits}}$`).test(code)) {
         setCodeError(true);
         return;
       }
@@ -127,7 +127,7 @@ export default function MfaScreen() {
       setCodeError(false);
       try {
         const currentSession = await refreshSession();
-        if (!currentSession) throw new Error();
+        if (!currentSession) throw new Error("No active session");
         await mutateMfa(currentSession.accessToken, action, code, {
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
@@ -169,7 +169,7 @@ export default function MfaScreen() {
     setError(false);
     try {
       const currentSession = await refreshSession();
-      if (!currentSession) throw new Error();
+      if (!currentSession) throw new Error("No active session");
       const generated = await generateRecoveryCodes(
         currentSession.accessToken,
         {
@@ -225,137 +225,186 @@ export default function MfaScreen() {
           </Text>
         </View>
 
-        {loading && !mfaStatus ? (
-          <ActivityIndicator
-            color={palette.primary}
-            accessibilityLabel={dictionary.loading}
-          />
-        ) : error ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void load(true)}
-            style={[styles.error, { borderColor: palette.danger }]}
-          >
-            <Text style={{ color: palette.danger }}>{dictionary.mfaError}</Text>
-            <Text style={{ color: palette.primary }}>
-              {dictionary.sessionsRetry}
-            </Text>
-          </Pressable>
-        ) : !mfaStatus?.available ? (
-          <Text style={[styles.help, { color: palette.textMuted }]}>
-            {dictionary.mfaUnavailable}
-          </Text>
-        ) : (
-          <>
-            <View style={[styles.card, { borderColor: palette.border }]}>
-              <Text style={[styles.cardTitle, { color: palette.text }]}>
-                {mfaStatus.enabled ? dictionary.mfaEnabled : dictionary.mfa}
-              </Text>
-              {mfaStatus.enabled ? (
-                <>
-                  <CodeField
-                    code={code}
-                    error={codeError}
-                    label={dictionary.mfaCode}
-                    onChange={(value) => {
-                      setCode(value.replace(/\D/g, ""));
-                      setCodeError(false);
-                    }}
-                    palette={palette}
-                  />
-                  <ActionButton
-                    label={dictionary.mfaDisable}
-                    loading={loading}
-                    disabled={loading}
-                    onPress={() => void mutate("disable")}
-                    palette={palette}
-                  />
-                </>
-              ) : setup ? (
-                <>
-                  <Image
-                    accessibilityLabel={dictionary.mfaSetup}
-                    source={{ uri: setup.qrCode }}
-                    style={styles.qr}
-                  />
-                  <Text style={[styles.meta, { color: palette.textMuted }]}>
-                    {dictionary.mfaSecret}: {setup.secret}
+        {(() => {
+          if (loading && !mfaStatus) {
+            return (
+              <ActivityIndicator
+                color={palette.primary}
+                accessibilityLabel={dictionary.loading}
+              />
+            );
+          } else {
+            if (error) {
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void load(true)}
+                  style={[styles.error, { borderColor: palette.danger }]}
+                >
+                  <Text style={{ color: palette.danger }}>
+                    {dictionary.mfaError}
                   </Text>
-                  <Text style={[styles.meta, { color: palette.textMuted }]}>
-                    {dictionary.mfaAlgorithm}: {setup.algorithm} ·{" "}
-                    {dictionary.mfaDigits}: {setup.digits} ·{" "}
-                    {dictionary.mfaPeriod}: {setup.periodSeconds}s
+                  <Text style={{ color: palette.primary }}>
+                    {dictionary.sessionsRetry}
                   </Text>
-                  <CodeField
-                    code={code}
-                    error={codeError}
-                    label={dictionary.mfaCode}
-                    onChange={(value) => {
-                      setCode(value.replace(/\D/g, ""));
-                      setCodeError(false);
-                    }}
-                    palette={palette}
-                  />
-                  <ActionButton
-                    label={dictionary.mfaEnable}
-                    loading={loading}
-                    disabled={loading}
-                    onPress={() => void mutate("enable")}
-                    palette={palette}
-                  />
-                </>
-              ) : (
-                <ActionButton
-                  label={dictionary.mfaSetup}
-                  loading={loading}
-                  disabled={loading}
-                  onPress={() => void setupMfa()}
-                  palette={palette}
-                />
-              )}
-            </View>
-
-            {mfaStatus.enabled ? (
-              <View style={[styles.card, { borderColor: palette.border }]}>
-                <Text style={[styles.cardTitle, { color: palette.text }]}>
-                  {dictionary.recoveryCodes}
-                </Text>
-                <Text style={[styles.help, { color: palette.textMuted }]}>
-                  {dictionary.recoveryCodesHelp}
-                </Text>
-                {recoveryRemaining !== null ? (
-                  <Text style={[styles.meta, { color: palette.textMuted }]}>
-                    {dictionary.recoveryCodesRemaining}: {recoveryRemaining}
+                </Pressable>
+              );
+            } else {
+              if (!mfaStatus?.available) {
+                return (
+                  <Text style={[styles.help, { color: palette.textMuted }]}>
+                    {dictionary.mfaUnavailable}
                   </Text>
-                ) : null}
-                {recoveryCodes ? (
-                  <View
-                    style={[
-                      styles.codes,
-                      { backgroundColor: palette.surfaceMuted },
-                    ]}
-                  >
-                    {recoveryCodes.map((recoveryCode) => (
-                      <Text
-                        key={recoveryCode}
-                        style={[styles.code, { color: palette.text }]}
-                      >
-                        {recoveryCode}
+                );
+              } else {
+                return (
+                  <>
+                    <View
+                      style={[styles.card, { borderColor: palette.border }]}
+                    >
+                      <Text style={[styles.cardTitle, { color: palette.text }]}>
+                        {mfaStatus.enabled
+                          ? dictionary.mfaEnabled
+                          : dictionary.mfa}
                       </Text>
-                    ))}
-                  </View>
-                ) : null}
-                <ActionButton
-                  label={dictionary.recoveryCodesGenerate}
-                  loading={recoveryLoading}
-                  disabled={recoveryLoading}
-                  onPress={() => void createRecoveryCodes()}
-                  palette={palette}
-                />
-              </View>
-            ) : null}
-          </>
-        )}
+                      {(() => {
+                        if (mfaStatus.enabled) {
+                          return (
+                            <>
+                              <CodeField
+                                code={code}
+                                error={codeError}
+                                label={dictionary.mfaCode}
+                                onChange={(value) => {
+                                  setCode(value.replace(/\D/g, ""));
+                                  setCodeError(false);
+                                }}
+                                palette={palette}
+                              />
+                              <ActionButton
+                                label={dictionary.mfaDisable}
+                                loading={loading}
+                                disabled={loading}
+                                onPress={() => void mutate("disable")}
+                                palette={palette}
+                              />
+                            </>
+                          );
+                        } else {
+                          if (setup) {
+                            return (
+                              <>
+                                <Image
+                                  accessibilityLabel={dictionary.mfaSetup}
+                                  source={{ uri: setup.qrCode }}
+                                  style={styles.qr}
+                                />
+                                <Text
+                                  style={[
+                                    styles.meta,
+                                    { color: palette.textMuted },
+                                  ]}
+                                >
+                                  {dictionary.mfaSecret}: {setup.secret}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.meta,
+                                    { color: palette.textMuted },
+                                  ]}
+                                >
+                                  {dictionary.mfaAlgorithm}: {setup.algorithm} ·{" "}
+                                  {dictionary.mfaDigits}: {setup.digits} ·{" "}
+                                  {dictionary.mfaPeriod}: {setup.periodSeconds}s
+                                </Text>
+                                <CodeField
+                                  code={code}
+                                  error={codeError}
+                                  label={dictionary.mfaCode}
+                                  onChange={(value) => {
+                                    setCode(value.replace(/\D/g, ""));
+                                    setCodeError(false);
+                                  }}
+                                  palette={palette}
+                                />
+                                <ActionButton
+                                  label={dictionary.mfaEnable}
+                                  loading={loading}
+                                  disabled={loading}
+                                  onPress={() => void mutate("enable")}
+                                  palette={palette}
+                                />
+                              </>
+                            );
+                          } else {
+                            return (
+                              <ActionButton
+                                label={dictionary.mfaSetup}
+                                loading={loading}
+                                disabled={loading}
+                                onPress={() => void setupMfa()}
+                                palette={palette}
+                              />
+                            );
+                          }
+                        }
+                      })()}
+                    </View>
+
+                    {mfaStatus.enabled ? (
+                      <View
+                        style={[styles.card, { borderColor: palette.border }]}
+                      >
+                        <Text
+                          style={[styles.cardTitle, { color: palette.text }]}
+                        >
+                          {dictionary.recoveryCodes}
+                        </Text>
+                        <Text
+                          style={[styles.help, { color: palette.textMuted }]}
+                        >
+                          {dictionary.recoveryCodesHelp}
+                        </Text>
+                        {recoveryRemaining !== null ? (
+                          <Text
+                            style={[styles.meta, { color: palette.textMuted }]}
+                          >
+                            {dictionary.recoveryCodesRemaining}:{" "}
+                            {recoveryRemaining}
+                          </Text>
+                        ) : null}
+                        {recoveryCodes ? (
+                          <View
+                            style={[
+                              styles.codes,
+                              { backgroundColor: palette.surfaceMuted },
+                            ]}
+                          >
+                            {recoveryCodes.map((recoveryCode) => (
+                              <Text
+                                key={recoveryCode}
+                                style={[styles.code, { color: palette.text }]}
+                              >
+                                {recoveryCode}
+                              </Text>
+                            ))}
+                          </View>
+                        ) : null}
+                        <ActionButton
+                          label={dictionary.recoveryCodesGenerate}
+                          loading={recoveryLoading}
+                          disabled={recoveryLoading}
+                          onPress={() => void createRecoveryCodes()}
+                          palette={palette}
+                        />
+                      </View>
+                    ) : null}
+                  </>
+                );
+              }
+            }
+          }
+        })()}
       </MobileFormScrollView>
     </SafeAreaView>
   );
@@ -368,11 +417,11 @@ function CodeField({
   onChange,
   palette,
 }: {
-  code: string;
-  error: boolean;
-  label: string;
-  onChange: (value: string) => void;
-  palette: ReturnType<typeof useTheme>["palette"];
+  readonly code: string;
+  readonly error: boolean;
+  readonly label: string;
+  readonly onChange: (value: string) => void;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
 }) {
   return (
     <View style={styles.field}>
@@ -410,11 +459,11 @@ function ActionButton({
   onPress,
   palette,
 }: {
-  disabled: boolean;
-  label: string;
-  loading: boolean;
-  onPress: () => void;
-  palette: ReturnType<typeof useTheme>["palette"];
+  readonly disabled: boolean;
+  readonly label: string;
+  readonly loading: boolean;
+  readonly onPress: () => void;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
 }) {
   return (
     <Pressable

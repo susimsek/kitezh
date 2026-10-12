@@ -112,12 +112,12 @@ type AuthStatus =
   | "error";
 
 type MobileAuthContextValue = {
-  session: MobileSession | null;
-  status: AuthStatus;
-  error: string | null;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
-  refreshSession: (force?: boolean) => Promise<MobileSession | null>;
+  readonly session: MobileSession | null;
+  readonly status: AuthStatus;
+  readonly error: string | null;
+  readonly signIn: () => Promise<void>;
+  readonly signOut: () => Promise<void>;
+  readonly refreshSession: (force?: boolean) => Promise<MobileSession | null>;
 };
 
 const MobileAuthContext = createContext<MobileAuthContextValue | null>(null);
@@ -188,8 +188,8 @@ export function MobileAuthProvider({
   children,
   consoleName = "account",
 }: {
-  children: React.ReactNode;
-  consoleName?: MobileConsole;
+  readonly children: React.ReactNode;
+  readonly consoleName?: MobileConsole;
 }) {
   const { dictionary, resolvedLocale } = useLocale();
   const consoleConfig = useMemo(
@@ -360,7 +360,7 @@ export function MobileAuthProvider({
     setError(null);
     try {
       if (refreshCoordinator.pending()) {
-        await refreshCoordinator.run(async () => null);
+        await refreshCoordinator.run(() => Promise.resolve(null));
         if (sessionRevision.current !== revision) return;
       }
       const request = new ExpoAuthRequest({
@@ -493,7 +493,7 @@ export function MobileAuthProvider({
       try {
         await clearOAuthTransaction(consoleConfig.namespace);
         if (refreshCoordinator.pending()) {
-          await refreshCoordinator.run(async () => null);
+          await refreshCoordinator.run(() => Promise.resolve(null));
         }
       } finally {
         try {

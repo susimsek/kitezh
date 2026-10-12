@@ -573,13 +573,12 @@ test("admin consents request encodes all filters and stable sort", async () => {
     );
   };
   try {
-    await listAdminConsents(
-      "access-token",
-      "account",
-      "account-console",
-      "ada",
-      "openid",
-    );
+    await listAdminConsents("access-token", {
+      query: "account",
+      clientId: "account-console",
+      username: "ada",
+      scope: "openid",
+    });
     assert.equal(
       request,
       "https://kitezh.onrender.com/api/admin/consents?q=account&clientId=account-console&username=ada&scope=openid&page=0&size=10&sort=id.principalName%2Casc",

@@ -260,7 +260,7 @@ function AdminConsole() {
       setUserActionKey(key);
       try {
         const currentSession = await refreshSession();
-        if (!currentSession) throw new Error();
+        if (!currentSession) throw new Error("No active session");
         await setAdminUserEnabled(
           currentSession.accessToken,
           user.id,
@@ -540,12 +540,7 @@ function AdminConsole() {
         setConsents(
           await listAdminConsents(
             currentSession.accessToken,
-            consentQuery,
-            "",
-            "",
-            "",
-            consentPage,
-            10,
+            { query: consentQuery, page: consentPage, size: 10 },
             {
               refreshAccessToken: async () =>
                 (await refreshSession(true))?.accessToken ?? null,
@@ -717,7 +712,7 @@ function AdminConsole() {
                 setSessionActionKey(adminSession.id);
                 try {
                   const currentSession = await refreshSession();
-                  if (!currentSession) throw new Error();
+                  if (!currentSession) throw new Error("No active session");
                   await deleteAdminSession(
                     currentSession.accessToken,
                     adminSession.id,
@@ -775,7 +770,7 @@ function AdminConsole() {
                 setConsentActionKey(key);
                 try {
                   const currentSession = await refreshSession();
-                  if (!currentSession) throw new Error();
+                  if (!currentSession) throw new Error("No active session");
                   await revokeAdminConsent(
                     currentSession.accessToken,
                     consent.clientId,
@@ -834,7 +829,7 @@ function AdminConsole() {
                 setUserActionKey(key);
                 try {
                   const currentSession = await refreshSession();
-                  if (!currentSession) throw new Error();
+                  if (!currentSession) throw new Error("No active session");
                   await deleteAdminUser(currentSession.accessToken, user.id, {
                     refreshAccessToken: async () =>
                       (await refreshSession(true))?.accessToken ?? null,
@@ -869,9 +864,13 @@ function AdminConsole() {
       const source = item as Record<string, unknown> | undefined;
       const id =
         source?.id ?? (resource === "roles" ? source?.name : undefined);
+      const editorId =
+        typeof id === "string" || typeof id === "number"
+          ? String(id)
+          : undefined;
       setEditor({
         resource,
-        id: id === undefined ? undefined : String(id),
+        id: editorId,
         values: editorValues(resource, item),
       });
     },
@@ -1021,7 +1020,7 @@ function AdminConsole() {
       if (!session || resourceActionKey) return;
       const source = item as Record<string, unknown>;
       const rawId = source.id ?? source.name;
-      if (rawId === undefined) return;
+      if (typeof rawId !== "string" && typeof rawId !== "number") return;
       const id = String(rawId);
       Alert.alert(dictionary.adminDelete, dictionary.adminDeleteConfirm, [
         { text: dictionary.cancel, style: "cancel" },
@@ -1210,6 +1209,21 @@ function AdminConsole() {
     );
   }
 
+  const sectionTitleByKey: Record<AdminSection, string> = {
+    dashboard: dictionary.adminDashboard,
+    users: dictionary.adminUsers,
+    clients: dictionary.adminClients,
+    scopes: dictionary.adminClientScopes,
+    roles: dictionary.adminRoles,
+    groups: dictionary.adminGroups,
+    "identity-providers": dictionary.adminIdentityProviders,
+    sessions: dictionary.adminSessions,
+    consents: dictionary.adminConsents,
+    keys: dictionary.adminKeys,
+    events: dictionary.adminEvents,
+    settings: dictionary.adminSettings,
+  };
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
@@ -1241,243 +1255,299 @@ function AdminConsole() {
         <View style={styles.body}>
           <ScrollView contentContainerStyle={styles.content}>
             <Text style={[styles.title, { color: palette.text }]}>
-              {section === "dashboard"
-                ? dictionary.adminDashboard
-                : section === "users"
-                  ? dictionary.adminUsers
-                  : section === "clients"
-                    ? dictionary.adminClients
-                    : section === "scopes"
-                      ? dictionary.adminClientScopes
-                      : section === "roles"
-                        ? dictionary.adminRoles
-                        : section === "groups"
-                          ? dictionary.adminGroups
-                          : section === "identity-providers"
-                            ? dictionary.adminIdentityProviders
-                            : section === "sessions"
-                              ? dictionary.adminSessions
-                              : section === "consents"
-                                ? dictionary.adminConsents
-                                : section === "keys"
-                                  ? dictionary.adminKeys
-                                  : section === "events"
-                                    ? dictionary.adminEvents
-                                    : dictionary.adminSettings}
+              {sectionTitleByKey[section]}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
-              {section === "dashboard"
-                ? dictionary.adminOverview
-                : dictionary.adminOverview}
+              {dictionary.adminOverview}
             </Text>
-            {editor ? (
-              <AdminResourceEditor
-                key={`${editor.resource}:${editor.id ?? "new"}`}
-                initial={editor}
-                onCancel={() => setEditor(null)}
-                onSave={(values) => void saveEditor(values)}
-                saving={editorSaving}
-              />
-            ) : section === "keys" ? (
-              <KeysContent
-                errorStatus={keysErrorStatus}
-                loading={keysLoading}
-                onNext={() => setKeyPage((page) => page + 1)}
-                onPrevious={() => setKeyPage((page) => Math.max(0, page - 1))}
-                onRetry={() => void loadKeys(true)}
-                onRotate={() => void rotateKey()}
-                page={keys}
-                query={keyQuery}
-                setQuery={(query) => {
-                  setKeyPage(0);
-                  setKeyQuery(query);
-                }}
-                busyKey={keyActionKey}
-              />
-            ) : section === "events" ? (
-              <EventsContent
-                busyKey={eventActionKey}
-                errorStatus={eventsErrorStatus}
-                loading={eventsLoading}
-                onDelete={deleteEvents}
-                onNext={() => setEventPage((page) => page + 1)}
-                onPrevious={() => setEventPage((page) => Math.max(0, page - 1))}
-                onRetry={() => void loadEvents(true)}
-                page={events}
-                query={eventQuery}
-                setQuery={(query) => {
-                  setEventPage(0);
-                  setEventQuery(query);
-                }}
-              />
-            ) : null}
-            {section === "dashboard" ? (
-              <DashboardContent
-                dashboard={dashboard}
-                errorStatus={errorStatus}
-                loading={loading}
-                onRetry={() => void loadDashboard(true)}
-              />
-            ) : section === "users" ? (
-              <UsersContent
-                errorStatus={usersErrorStatus}
-                loading={usersLoading}
-                onNext={() => setUserPage((page) => page + 1)}
-                onPrevious={() => setUserPage((page) => Math.max(0, page - 1))}
-                onRetry={() => void loadUsers(true)}
-                onToggle={updateUserEnabled}
-                onUnlock={unlockUser}
-                onDelete={deleteUser}
-                onCreate={() => openEditor("users")}
-                onEdit={(user) => openEditor("users", user)}
-                page={users}
-                query={userQuery}
-                setQuery={(query) => {
-                  setUserPage(0);
-                  setUserQuery(query);
-                }}
-                busyKey={userActionKey}
-              />
-            ) : section === "clients" ? (
-              <ClientsContent
-                errorStatus={clientsErrorStatus}
-                loading={clientsLoading}
-                onNext={() => setClientPage((page) => page + 1)}
-                onPrevious={() =>
-                  setClientPage((page) => Math.max(0, page - 1))
+            {(() => {
+              if (editor) {
+                return (
+                  <AdminResourceEditor
+                    key={`${editor.resource}:${editor.id ?? "new"}`}
+                    initial={editor}
+                    onCancel={() => setEditor(null)}
+                    onSave={(values) => void saveEditor(values)}
+                    saving={editorSaving}
+                  />
+                );
+              } else {
+                if (section === "keys") {
+                  return (
+                    <KeysContent
+                      errorStatus={keysErrorStatus}
+                      loading={keysLoading}
+                      onNext={() => setKeyPage((page) => page + 1)}
+                      onPrevious={() =>
+                        setKeyPage((page) => Math.max(0, page - 1))
+                      }
+                      onRetry={() => void loadKeys(true)}
+                      onRotate={() => void rotateKey()}
+                      page={keys}
+                      query={keyQuery}
+                      setQuery={(query) => {
+                        setKeyPage(0);
+                        setKeyQuery(query);
+                      }}
+                      busyKey={keyActionKey}
+                    />
+                  );
+                } else {
+                  if (section === "events") {
+                    return (
+                      <EventsContent
+                        busyKey={eventActionKey}
+                        errorStatus={eventsErrorStatus}
+                        loading={eventsLoading}
+                        onDelete={deleteEvents}
+                        onNext={() => setEventPage((page) => page + 1)}
+                        onPrevious={() =>
+                          setEventPage((page) => Math.max(0, page - 1))
+                        }
+                        onRetry={() => void loadEvents(true)}
+                        page={events}
+                        query={eventQuery}
+                        setQuery={(query) => {
+                          setEventPage(0);
+                          setEventQuery(query);
+                        }}
+                      />
+                    );
+                  } else {
+                    return null;
+                  }
                 }
-                onRetry={() => void loadClients(true)}
-                page={clients}
-                query={clientQuery}
-                setQuery={(query) => {
-                  setClientPage(0);
-                  setClientQuery(query);
-                }}
-                onCreate={() => openEditor("clients")}
-                onEdit={(client) => openEditor("clients", client)}
-                onDelete={(client) => deleteResource("clients", client)}
-                busyKey={resourceActionKey}
-              />
-            ) : section === "scopes" ? (
-              <ClientScopesContent
-                errorStatus={scopesErrorStatus}
-                loading={scopesLoading}
-                onNext={() => setScopePage((page) => page + 1)}
-                onPrevious={() => setScopePage((page) => Math.max(0, page - 1))}
-                onRetry={() => void loadScopes(true)}
-                page={scopes}
-                query={scopeQuery}
-                setQuery={(query) => {
-                  setScopePage(0);
-                  setScopeQuery(query);
-                }}
-                onCreate={() => openEditor("scopes")}
-                onEdit={(scope) => openEditor("scopes", scope)}
-                onDelete={(scope) => deleteResource("scopes", scope)}
-                busyKey={resourceActionKey}
-              />
-            ) : section === "roles" ? (
-              <RolesContent
-                errorStatus={rolesErrorStatus}
-                loading={rolesLoading}
-                onNext={() => setRolePage((page) => page + 1)}
-                onPrevious={() => setRolePage((page) => Math.max(0, page - 1))}
-                onRetry={() => void loadRoles(true)}
-                page={roles}
-                query={roleQuery}
-                setQuery={(query) => {
-                  setRolePage(0);
-                  setRoleQuery(query);
-                }}
-                onCreate={() => openEditor("roles")}
-                onEdit={(role) => openEditor("roles", role)}
-                onDelete={(role) => deleteResource("roles", role)}
-                busyKey={resourceActionKey}
-              />
-            ) : section === "groups" ? (
-              <GroupsContent
-                errorStatus={groupsErrorStatus}
-                loading={groupsLoading}
-                onNext={() => setGroupPage((page) => page + 1)}
-                onPrevious={() => setGroupPage((page) => Math.max(0, page - 1))}
-                onRetry={() => void loadGroups(true)}
-                page={groups}
-                query={groupQuery}
-                setQuery={(query) => {
-                  setGroupPage(0);
-                  setGroupQuery(query);
-                }}
-                onCreate={() => openEditor("groups")}
-                onEdit={(group) => openEditor("groups", group)}
-                onDelete={(group) => deleteResource("groups", group)}
-                busyKey={resourceActionKey}
-              />
-            ) : section === "identity-providers" ? (
-              <IdentityProvidersContent
-                errorStatus={identityProvidersErrorStatus}
-                loading={identityProvidersLoading}
-                onNext={() => setIdentityProviderPage((page) => page + 1)}
-                onPrevious={() =>
-                  setIdentityProviderPage((page) => Math.max(0, page - 1))
+              }
+            })()}
+            {(() => {
+              if (section === "dashboard") {
+                return (
+                  <DashboardContent
+                    dashboard={dashboard}
+                    errorStatus={errorStatus}
+                    loading={loading}
+                    onRetry={() => void loadDashboard(true)}
+                  />
+                );
+              } else {
+                if (section === "users") {
+                  return (
+                    <UsersContent
+                      errorStatus={usersErrorStatus}
+                      loading={usersLoading}
+                      onNext={() => setUserPage((page) => page + 1)}
+                      onPrevious={() =>
+                        setUserPage((page) => Math.max(0, page - 1))
+                      }
+                      onRetry={() => void loadUsers(true)}
+                      onToggle={updateUserEnabled}
+                      onUnlock={unlockUser}
+                      onDelete={deleteUser}
+                      onCreate={() => openEditor("users")}
+                      onEdit={(user) => openEditor("users", user)}
+                      page={users}
+                      query={userQuery}
+                      setQuery={(query) => {
+                        setUserPage(0);
+                        setUserQuery(query);
+                      }}
+                      busyKey={userActionKey}
+                    />
+                  );
+                } else {
+                  if (section === "clients") {
+                    return (
+                      <ClientsContent
+                        errorStatus={clientsErrorStatus}
+                        loading={clientsLoading}
+                        onNext={() => setClientPage((page) => page + 1)}
+                        onPrevious={() =>
+                          setClientPage((page) => Math.max(0, page - 1))
+                        }
+                        onRetry={() => void loadClients(true)}
+                        page={clients}
+                        query={clientQuery}
+                        setQuery={(query) => {
+                          setClientPage(0);
+                          setClientQuery(query);
+                        }}
+                        onCreate={() => openEditor("clients")}
+                        onEdit={(client) => openEditor("clients", client)}
+                        onDelete={(client) => deleteResource("clients", client)}
+                        busyKey={resourceActionKey}
+                      />
+                    );
+                  } else {
+                    if (section === "scopes") {
+                      return (
+                        <ClientScopesContent
+                          errorStatus={scopesErrorStatus}
+                          loading={scopesLoading}
+                          onNext={() => setScopePage((page) => page + 1)}
+                          onPrevious={() =>
+                            setScopePage((page) => Math.max(0, page - 1))
+                          }
+                          onRetry={() => void loadScopes(true)}
+                          page={scopes}
+                          query={scopeQuery}
+                          setQuery={(query) => {
+                            setScopePage(0);
+                            setScopeQuery(query);
+                          }}
+                          onCreate={() => openEditor("scopes")}
+                          onEdit={(scope) => openEditor("scopes", scope)}
+                          onDelete={(scope) => deleteResource("scopes", scope)}
+                          busyKey={resourceActionKey}
+                        />
+                      );
+                    } else {
+                      if (section === "roles") {
+                        return (
+                          <RolesContent
+                            errorStatus={rolesErrorStatus}
+                            loading={rolesLoading}
+                            onNext={() => setRolePage((page) => page + 1)}
+                            onPrevious={() =>
+                              setRolePage((page) => Math.max(0, page - 1))
+                            }
+                            onRetry={() => void loadRoles(true)}
+                            page={roles}
+                            query={roleQuery}
+                            setQuery={(query) => {
+                              setRolePage(0);
+                              setRoleQuery(query);
+                            }}
+                            onCreate={() => openEditor("roles")}
+                            onEdit={(role) => openEditor("roles", role)}
+                            onDelete={(role) => deleteResource("roles", role)}
+                            busyKey={resourceActionKey}
+                          />
+                        );
+                      } else {
+                        if (section === "groups") {
+                          return (
+                            <GroupsContent
+                              errorStatus={groupsErrorStatus}
+                              loading={groupsLoading}
+                              onNext={() => setGroupPage((page) => page + 1)}
+                              onPrevious={() =>
+                                setGroupPage((page) => Math.max(0, page - 1))
+                              }
+                              onRetry={() => void loadGroups(true)}
+                              page={groups}
+                              query={groupQuery}
+                              setQuery={(query) => {
+                                setGroupPage(0);
+                                setGroupQuery(query);
+                              }}
+                              onCreate={() => openEditor("groups")}
+                              onEdit={(group) => openEditor("groups", group)}
+                              onDelete={(group) =>
+                                deleteResource("groups", group)
+                              }
+                              busyKey={resourceActionKey}
+                            />
+                          );
+                        } else {
+                          if (section === "identity-providers") {
+                            return (
+                              <IdentityProvidersContent
+                                errorStatus={identityProvidersErrorStatus}
+                                loading={identityProvidersLoading}
+                                onNext={() =>
+                                  setIdentityProviderPage((page) => page + 1)
+                                }
+                                onPrevious={() =>
+                                  setIdentityProviderPage((page) =>
+                                    Math.max(0, page - 1),
+                                  )
+                                }
+                                onRetry={() => void loadIdentityProviders(true)}
+                                page={identityProviders}
+                                query={identityProviderQuery}
+                                setQuery={(query) => {
+                                  setIdentityProviderPage(0);
+                                  setIdentityProviderQuery(query);
+                                }}
+                                onCreate={() =>
+                                  openEditor("identity-providers")
+                                }
+                                onEdit={(provider) =>
+                                  openEditor("identity-providers", provider)
+                                }
+                                onDelete={(provider) =>
+                                  deleteResource("identity-providers", provider)
+                                }
+                                busyKey={resourceActionKey}
+                              />
+                            );
+                          } else {
+                            if (section === "sessions") {
+                              return (
+                                <SessionsContent
+                                  errorStatus={sessionsErrorStatus}
+                                  loading={sessionsLoading}
+                                  onDelete={deleteSession}
+                                  onNext={() =>
+                                    setSessionPage((page) => page + 1)
+                                  }
+                                  onPrevious={() =>
+                                    setSessionPage((page) =>
+                                      Math.max(0, page - 1),
+                                    )
+                                  }
+                                  onRetry={() => void loadSessions(true)}
+                                  onStatusChange={(status) => {
+                                    setSessionPage(0);
+                                    setSessionStatus(status);
+                                  }}
+                                  page={sessions}
+                                  query={sessionQuery}
+                                  setQuery={(query) => {
+                                    setSessionPage(0);
+                                    setSessionQuery(query);
+                                  }}
+                                  status={sessionStatus}
+                                  busyKey={sessionActionKey}
+                                />
+                              );
+                            } else {
+                              if (section === "consents") {
+                                return (
+                                  <ConsentsContent
+                                    busyKey={consentActionKey}
+                                    errorStatus={consentsErrorStatus}
+                                    loading={consentsLoading}
+                                    onNext={() =>
+                                      setConsentPage((page) => page + 1)
+                                    }
+                                    onPrevious={() =>
+                                      setConsentPage((page) =>
+                                        Math.max(0, page - 1),
+                                      )
+                                    }
+                                    onRetry={() => void loadConsents(true)}
+                                    onRevoke={revokeConsent}
+                                    page={consents}
+                                    query={consentQuery}
+                                    setQuery={(query) => {
+                                      setConsentPage(0);
+                                      setConsentQuery(query);
+                                    }}
+                                  />
+                                );
+                              } else {
+                                return null;
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
-                onRetry={() => void loadIdentityProviders(true)}
-                page={identityProviders}
-                query={identityProviderQuery}
-                setQuery={(query) => {
-                  setIdentityProviderPage(0);
-                  setIdentityProviderQuery(query);
-                }}
-                onCreate={() => openEditor("identity-providers")}
-                onEdit={(provider) =>
-                  openEditor("identity-providers", provider)
-                }
-                onDelete={(provider) =>
-                  deleteResource("identity-providers", provider)
-                }
-                busyKey={resourceActionKey}
-              />
-            ) : section === "sessions" ? (
-              <SessionsContent
-                errorStatus={sessionsErrorStatus}
-                loading={sessionsLoading}
-                onDelete={deleteSession}
-                onNext={() => setSessionPage((page) => page + 1)}
-                onPrevious={() =>
-                  setSessionPage((page) => Math.max(0, page - 1))
-                }
-                onRetry={() => void loadSessions(true)}
-                onStatusChange={(status) => {
-                  setSessionPage(0);
-                  setSessionStatus(status);
-                }}
-                page={sessions}
-                query={sessionQuery}
-                setQuery={(query) => {
-                  setSessionPage(0);
-                  setSessionQuery(query);
-                }}
-                status={sessionStatus}
-                busyKey={sessionActionKey}
-              />
-            ) : section === "consents" ? (
-              <ConsentsContent
-                busyKey={consentActionKey}
-                errorStatus={consentsErrorStatus}
-                loading={consentsLoading}
-                onNext={() => setConsentPage((page) => page + 1)}
-                onPrevious={() =>
-                  setConsentPage((page) => Math.max(0, page - 1))
-                }
-                onRetry={() => void loadConsents(true)}
-                onRevoke={revokeConsent}
-                page={consents}
-                query={consentQuery}
-                setQuery={(query) => {
-                  setConsentPage(0);
-                  setConsentQuery(query);
-                }}
-              />
-            ) : null}
+              }
+            })()}
           </ScrollView>
         </View>
         <AdminTabBar active={section} onChange={setSection} />
@@ -1498,16 +1568,16 @@ function KeysContent({
   query,
   setQuery,
 }: {
-  busyKey: string | null;
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  onRotate: () => void;
-  page: AdminPage<AdminKey> | null;
-  query: string;
-  setQuery: (query: string) => void;
+  readonly busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly onRotate: () => void;
+  readonly page: AdminPage<AdminKey> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1532,74 +1602,94 @@ function KeysContent({
         onPress={onRotate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((key) => (
-            <View
-              key={key.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {key.kid}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminLoadError}
                 </Text>
-                <Text
-                  style={{
-                    color: key.active ? palette.success : palette.textMuted,
-                  }}
-                >
-                  {key.active
-                    ? dictionary.adminActive
-                    : dictionary.adminExpired}
-                </Text>
+                <ActionButton
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
+                  palette={palette}
+                  secondary
+                />
               </View>
-              <Text style={{ color: palette.textMuted }}>
-                {key.type} · {key.algorithm} · {key.use}
-              </Text>
-              <Text style={[styles.roles, { color: palette.textMuted }]}>
-                {key.createdAt}
-              </Text>
-            </View>
-          ))}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoKeys}
-        </Text>
-      )}
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((key) => (
+                    <View
+                      key={key.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {key.kid}
+                        </Text>
+                        <Text
+                          style={{
+                            color: key.active
+                              ? palette.success
+                              : palette.textMuted,
+                          }}
+                        >
+                          {key.active
+                            ? dictionary.adminActive
+                            : dictionary.adminExpired}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {key.type} · {key.algorithm} · {key.use}
+                      </Text>
+                      <Text
+                        style={[styles.roles, { color: palette.textMuted }]}
+                      >
+                        {key.createdAt}
+                      </Text>
+                    </View>
+                  ))}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoKeys}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -1616,16 +1706,16 @@ function EventsContent({
   query,
   setQuery,
 }: {
-  busyKey: string | null;
-  errorStatus: number | null;
-  loading: boolean;
-  onDelete: () => void;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  page: AdminPage<AdminEvent> | null;
-  query: string;
-  setQuery: (query: string) => void;
+  readonly busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onDelete: () => void;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly page: AdminPage<AdminEvent> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1651,71 +1741,93 @@ function EventsContent({
         palette={palette}
         secondary
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((event) => (
-            <View
-              key={event.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {event.action}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminLoadError}
                 </Text>
-                <Text style={{ color: palette.textMuted }}>{event.actor}</Text>
+                <ActionButton
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
+                  palette={palette}
+                  secondary
+                />
               </View>
-              <Text style={{ color: palette.textMuted }}>
-                {event.targetType} · {event.targetId}
-              </Text>
-              <Text style={[styles.roles, { color: palette.textMuted }]}>
-                {event.occurredAt}
-              </Text>
-              {event.details ? (
-                <Text style={[styles.roles, { color: palette.textMuted }]}>
-                  {event.details}
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((event) => (
+                    <View
+                      key={event.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {event.action}
+                        </Text>
+                        <Text style={{ color: palette.textMuted }}>
+                          {event.actor}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {event.targetType} · {event.targetId}
+                      </Text>
+                      <Text
+                        style={[styles.roles, { color: palette.textMuted }]}
+                      >
+                        {event.occurredAt}
+                      </Text>
+                      {event.details ? (
+                        <Text
+                          style={[styles.roles, { color: palette.textMuted }]}
+                        >
+                          {event.details}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoEvents}
                 </Text>
-              ) : null}
-            </View>
-          ))}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoEvents}
-        </Text>
-      )}
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -1741,10 +1853,10 @@ function DashboardContent({
   loading,
   onRetry,
 }: {
-  dashboard: AdminDashboard | null;
-  errorStatus: number | null;
-  loading: boolean;
-  onRetry: () => void;
+  readonly dashboard: AdminDashboard | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onRetry: () => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1819,20 +1931,20 @@ function UsersContent({
   onEdit,
   onUnlock,
 }: {
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  onToggle: (user: AdminUser) => void;
-  onDelete: (user: AdminUser) => void;
-  page: AdminPage<AdminUser> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  busyKey: string | null;
-  onCreate: () => void;
-  onEdit: (user: AdminUser) => void;
-  onUnlock: (user: AdminUser) => void;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly onToggle: (user: AdminUser) => void;
+  readonly onDelete: (user: AdminUser) => void;
+  readonly page: AdminPage<AdminUser> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly busyKey: string | null;
+  readonly onCreate: () => void;
+  readonly onEdit: (user: AdminUser) => void;
+  readonly onUnlock: (user: AdminUser) => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -1856,142 +1968,167 @@ function UsersContent({
         onPress={onCreate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminUsersLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((user) => (
-            <View
-              key={user.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {user.username}
-                </Text>
-                <Text
-                  style={{
-                    color: user.enabled ? palette.success : palette.danger,
-                  }}
-                >
-                  {user.enabled
-                    ? dictionary.adminUserEnabled
-                    : dictionary.adminUserDisabled}
-                </Text>
-              </View>
-              <Text style={{ color: palette.textMuted }}>
-                {user.email ??
-                  ([user.firstName, user.lastName].filter(Boolean).join(" ") ||
-                    "—")}
-              </Text>
-              {user.locked ? (
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
                 <Text style={{ color: palette.danger }}>
-                  {dictionary.adminUserLocked}
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminUsersLoadError}
                 </Text>
-              ) : null}
-              {user.effectiveRoles.length > 0 ? (
-                <Text style={[styles.roles, { color: palette.textMuted }]}>
-                  {user.effectiveRoles.join(", ")}
-                </Text>
-              ) : null}
-              <View style={styles.userActions}>
                 <ActionButton
-                  label={dictionary.adminEdit}
-                  busy={false}
-                  disabled={busyKey !== null}
-                  onPress={() => onEdit(user)}
-                  palette={palette}
-                  secondary
-                />
-                {user.locked ? (
-                  <ActionButton
-                    label={dictionary.adminUserUnlock}
-                    busy={busyKey === `unlock:${user.id}`}
-                    disabled={
-                      busyKey !== null && busyKey !== `unlock:${user.id}`
-                    }
-                    onPress={() => onUnlock(user)}
-                    palette={palette}
-                    secondary
-                  />
-                ) : null}
-                <ActionButton
-                  label={
-                    user.enabled
-                      ? dictionary.adminUserDisable
-                      : dictionary.adminUserEnable
-                  }
-                  busy={busyKey === `enabled:${user.id}`}
-                  disabled={
-                    busyKey !== null && busyKey !== `enabled:${user.id}`
-                  }
-                  onPress={() => onToggle(user)}
-                  palette={palette}
-                  secondary
-                />
-                <ActionButton
-                  label={dictionary.adminUserDelete}
-                  busy={busyKey === `delete:${user.id}`}
-                  disabled={busyKey !== null && busyKey !== `delete:${user.id}`}
-                  onPress={() => onDelete(user)}
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
                   palette={palette}
                   secondary
                 />
               </View>
-            </View>
-          ))}
-          <View style={styles.pagination}>
-            <ActionButton
-              label={dictionary.adminPrevious}
-              busy={loading}
-              disabled={page.number === 0}
-              onPress={onPrevious}
-              palette={palette}
-              secondary
-            />
-            <Text style={{ color: palette.textMuted }}>
-              {dictionary.adminPage} {page.number + 1} /{" "}
-              {Math.max(page.totalPages, 1)}
-            </Text>
-            <ActionButton
-              label={dictionary.adminNext}
-              busy={loading}
-              disabled={page.number + 1 >= page.totalPages}
-              onPress={onNext}
-              palette={palette}
-              secondary
-            />
-          </View>
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoUsers}
-        </Text>
-      )}
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((user) => (
+                    <View
+                      key={user.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {user.username}
+                        </Text>
+                        <Text
+                          style={{
+                            color: user.enabled
+                              ? palette.success
+                              : palette.danger,
+                          }}
+                        >
+                          {user.enabled
+                            ? dictionary.adminUserEnabled
+                            : dictionary.adminUserDisabled}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {user.email ??
+                          ([user.firstName, user.lastName]
+                            .filter(Boolean)
+                            .join(" ") ||
+                            "—")}
+                      </Text>
+                      {user.locked ? (
+                        <Text style={{ color: palette.danger }}>
+                          {dictionary.adminUserLocked}
+                        </Text>
+                      ) : null}
+                      {user.effectiveRoles.length > 0 ? (
+                        <Text
+                          style={[styles.roles, { color: palette.textMuted }]}
+                        >
+                          {user.effectiveRoles.join(", ")}
+                        </Text>
+                      ) : null}
+                      <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminEdit}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onEdit(user)}
+                          palette={palette}
+                          secondary
+                        />
+                        {user.locked ? (
+                          <ActionButton
+                            label={dictionary.adminUserUnlock}
+                            busy={busyKey === `unlock:${user.id}`}
+                            disabled={
+                              busyKey !== null &&
+                              busyKey !== `unlock:${user.id}`
+                            }
+                            onPress={() => onUnlock(user)}
+                            palette={palette}
+                            secondary
+                          />
+                        ) : null}
+                        <ActionButton
+                          label={
+                            user.enabled
+                              ? dictionary.adminUserDisable
+                              : dictionary.adminUserEnable
+                          }
+                          busy={busyKey === `enabled:${user.id}`}
+                          disabled={
+                            busyKey !== null && busyKey !== `enabled:${user.id}`
+                          }
+                          onPress={() => onToggle(user)}
+                          palette={palette}
+                          secondary
+                        />
+                        <ActionButton
+                          label={dictionary.adminUserDelete}
+                          busy={busyKey === `delete:${user.id}`}
+                          disabled={
+                            busyKey !== null && busyKey !== `delete:${user.id}`
+                          }
+                          onPress={() => onDelete(user)}
+                          palette={palette}
+                          secondary
+                        />
+                      </View>
+                    </View>
+                  ))}
+                  <View style={styles.pagination}>
+                    <ActionButton
+                      label={dictionary.adminPrevious}
+                      busy={loading}
+                      disabled={page.number === 0}
+                      onPress={onPrevious}
+                      palette={palette}
+                      secondary
+                    />
+                    <Text style={{ color: palette.textMuted }}>
+                      {dictionary.adminPage} {page.number + 1} /{" "}
+                      {Math.max(page.totalPages, 1)}
+                    </Text>
+                    <ActionButton
+                      label={dictionary.adminNext}
+                      busy={loading}
+                      disabled={page.number + 1 >= page.totalPages}
+                      onPress={onNext}
+                      palette={palette}
+                      secondary
+                    />
+                  </View>
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoUsers}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2010,18 +2147,18 @@ function ClientsContent({
   onDelete,
   busyKey,
 }: {
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  page: AdminPage<AdminClient> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  onCreate: () => void;
-  onEdit: (client: AdminClient) => void;
-  onDelete: (client: AdminClient) => void;
-  busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly page: AdminPage<AdminClient> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly onCreate: () => void;
+  readonly onEdit: (client: AdminClient) => void;
+  readonly onDelete: (client: AdminClient) => void;
+  readonly busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2045,109 +2182,130 @@ function ClientsContent({
         onPress={onCreate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminClientsLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((client) => (
-            <View
-              key={client.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {client.clientName}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminClientsLoadError}
                 </Text>
-                <Text
-                  style={{
-                    color: client.enabled ? palette.success : palette.danger,
-                  }}
-                >
-                  {client.enabled
-                    ? dictionary.adminUserEnabled
-                    : dictionary.adminUserDisabled}
-                </Text>
-              </View>
-              <Text style={{ color: palette.textMuted }}>
-                {client.clientId}
-              </Text>
-              <Text style={[styles.roles, { color: palette.textMuted }]}>
-                {client.scopes.join(", ") || "—"}
-              </Text>
-              <View style={styles.userActions}>
                 <ActionButton
-                  label={dictionary.adminEdit}
-                  busy={false}
-                  disabled={busyKey !== null}
-                  onPress={() => onEdit(client)}
-                  palette={palette}
-                  secondary
-                />
-                <ActionButton
-                  label={dictionary.adminDelete}
-                  busy={busyKey === `clients:${client.id}`}
-                  disabled={
-                    busyKey !== null && busyKey !== `clients:${client.id}`
-                  }
-                  onPress={() => onDelete(client)}
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
                   palette={palette}
                   secondary
                 />
               </View>
-            </View>
-          ))}
-          <View style={styles.pagination}>
-            <ActionButton
-              label={dictionary.adminPrevious}
-              busy={loading}
-              disabled={page.number === 0}
-              onPress={onPrevious}
-              palette={palette}
-              secondary
-            />
-            <Text style={{ color: palette.textMuted }}>
-              {dictionary.adminPage} {page.number + 1} /{" "}
-              {Math.max(page.totalPages, 1)}
-            </Text>
-            <ActionButton
-              label={dictionary.adminNext}
-              busy={loading}
-              disabled={page.number + 1 >= page.totalPages}
-              onPress={onNext}
-              palette={palette}
-              secondary
-            />
-          </View>
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoClients}
-        </Text>
-      )}
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((client) => (
+                    <View
+                      key={client.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {client.clientName}
+                        </Text>
+                        <Text
+                          style={{
+                            color: client.enabled
+                              ? palette.success
+                              : palette.danger,
+                          }}
+                        >
+                          {client.enabled
+                            ? dictionary.adminUserEnabled
+                            : dictionary.adminUserDisabled}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {client.clientId}
+                      </Text>
+                      <Text
+                        style={[styles.roles, { color: palette.textMuted }]}
+                      >
+                        {client.scopes.join(", ") || "—"}
+                      </Text>
+                      <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminEdit}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onEdit(client)}
+                          palette={palette}
+                          secondary
+                        />
+                        <ActionButton
+                          label={dictionary.adminDelete}
+                          busy={busyKey === `clients:${client.id}`}
+                          disabled={
+                            busyKey !== null &&
+                            busyKey !== `clients:${client.id}`
+                          }
+                          onPress={() => onDelete(client)}
+                          palette={palette}
+                          secondary
+                        />
+                      </View>
+                    </View>
+                  ))}
+                  <View style={styles.pagination}>
+                    <ActionButton
+                      label={dictionary.adminPrevious}
+                      busy={loading}
+                      disabled={page.number === 0}
+                      onPress={onPrevious}
+                      palette={palette}
+                      secondary
+                    />
+                    <Text style={{ color: palette.textMuted }}>
+                      {dictionary.adminPage} {page.number + 1} /{" "}
+                      {Math.max(page.totalPages, 1)}
+                    </Text>
+                    <ActionButton
+                      label={dictionary.adminNext}
+                      busy={loading}
+                      disabled={page.number + 1 >= page.totalPages}
+                      onPress={onNext}
+                      palette={palette}
+                      secondary
+                    />
+                  </View>
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoClients}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2166,18 +2324,18 @@ function ClientScopesContent({
   onDelete,
   busyKey,
 }: {
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  page: AdminPage<AdminClientScope> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  onCreate: () => void;
-  onEdit: (scope: AdminClientScope) => void;
-  onDelete: (scope: AdminClientScope) => void;
-  busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly page: AdminPage<AdminClientScope> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly onCreate: () => void;
+  readonly onEdit: (scope: AdminClientScope) => void;
+  readonly onDelete: (scope: AdminClientScope) => void;
+  readonly busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2201,119 +2359,140 @@ function ClientScopesContent({
         onPress={onCreate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminClientScopesLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((scope) => (
-            <View
-              key={scope.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {scope.name}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminClientScopesLoadError}
                 </Text>
-                <Text
-                  style={{
-                    color: scope.builtIn ? palette.textMuted : palette.primary,
-                  }}
-                >
-                  {scope.builtIn
-                    ? dictionary.adminBuiltIn
-                    : dictionary.adminCustom}
-                </Text>
+                <ActionButton
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
+                  palette={palette}
+                  secondary
+                />
               </View>
-              {scope.displayName ? (
-                <Text style={{ color: palette.textMuted }}>
-                  {scope.displayName}
-                </Text>
-              ) : null}
-              {scope.description ? (
-                <Text style={{ color: palette.textMuted }}>
-                  {scope.description}
-                </Text>
-              ) : null}
-              <Text style={[styles.roles, { color: palette.textMuted }]}>
-                {scope.includeInTokenScope ? "token_scope" : "—"}
-                {scope.displayOnConsentScreen ? " · consent" : ""}
-              </Text>
-              {!scope.builtIn ? (
-                <View style={styles.userActions}>
-                  <ActionButton
-                    label={dictionary.adminEdit}
-                    busy={false}
-                    disabled={busyKey !== null}
-                    onPress={() => onEdit(scope)}
-                    palette={palette}
-                    secondary
-                  />
-                  <ActionButton
-                    label={dictionary.adminDelete}
-                    busy={busyKey === `scopes:${scope.id}`}
-                    disabled={
-                      busyKey !== null && busyKey !== `scopes:${scope.id}`
-                    }
-                    onPress={() => onDelete(scope)}
-                    palette={palette}
-                    secondary
-                  />
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((scope) => (
+                    <View
+                      key={scope.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {scope.name}
+                        </Text>
+                        <Text
+                          style={{
+                            color: scope.builtIn
+                              ? palette.textMuted
+                              : palette.primary,
+                          }}
+                        >
+                          {scope.builtIn
+                            ? dictionary.adminBuiltIn
+                            : dictionary.adminCustom}
+                        </Text>
+                      </View>
+                      {scope.displayName ? (
+                        <Text style={{ color: palette.textMuted }}>
+                          {scope.displayName}
+                        </Text>
+                      ) : null}
+                      {scope.description ? (
+                        <Text style={{ color: palette.textMuted }}>
+                          {scope.description}
+                        </Text>
+                      ) : null}
+                      <Text
+                        style={[styles.roles, { color: palette.textMuted }]}
+                      >
+                        {scope.includeInTokenScope ? "token_scope" : "—"}
+                        {scope.displayOnConsentScreen ? " · consent" : ""}
+                      </Text>
+                      {!scope.builtIn ? (
+                        <View style={styles.userActions}>
+                          <ActionButton
+                            label={dictionary.adminEdit}
+                            busy={false}
+                            disabled={busyKey !== null}
+                            onPress={() => onEdit(scope)}
+                            palette={palette}
+                            secondary
+                          />
+                          <ActionButton
+                            label={dictionary.adminDelete}
+                            busy={busyKey === `scopes:${scope.id}`}
+                            disabled={
+                              busyKey !== null &&
+                              busyKey !== `scopes:${scope.id}`
+                            }
+                            onPress={() => onDelete(scope)}
+                            palette={palette}
+                            secondary
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  ))}
+                  <View style={styles.pagination}>
+                    <ActionButton
+                      label={dictionary.adminPrevious}
+                      busy={loading}
+                      disabled={page.number === 0}
+                      onPress={onPrevious}
+                      palette={palette}
+                      secondary
+                    />
+                    <Text style={{ color: palette.textMuted }}>
+                      {dictionary.adminPage} {page.number + 1} /{" "}
+                      {Math.max(page.totalPages, 1)}
+                    </Text>
+                    <ActionButton
+                      label={dictionary.adminNext}
+                      busy={loading}
+                      disabled={page.number + 1 >= page.totalPages}
+                      onPress={onNext}
+                      palette={palette}
+                      secondary
+                    />
+                  </View>
                 </View>
-              ) : null}
-            </View>
-          ))}
-          <View style={styles.pagination}>
-            <ActionButton
-              label={dictionary.adminPrevious}
-              busy={loading}
-              disabled={page.number === 0}
-              onPress={onPrevious}
-              palette={palette}
-              secondary
-            />
-            <Text style={{ color: palette.textMuted }}>
-              {dictionary.adminPage} {page.number + 1} /{" "}
-              {Math.max(page.totalPages, 1)}
-            </Text>
-            <ActionButton
-              label={dictionary.adminNext}
-              busy={loading}
-              disabled={page.number + 1 >= page.totalPages}
-              onPress={onNext}
-              palette={palette}
-              secondary
-            />
-          </View>
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoClientScopes}
-        </Text>
-      )}
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoClientScopes}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2332,18 +2511,18 @@ function RolesContent({
   onDelete,
   busyKey,
 }: {
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  page: AdminPage<AdminRole> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  onCreate: () => void;
-  onEdit: (role: AdminRole) => void;
-  onDelete: (role: AdminRole) => void;
-  busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly page: AdminPage<AdminRole> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly onCreate: () => void;
+  readonly onEdit: (role: AdminRole) => void;
+  readonly onDelete: (role: AdminRole) => void;
+  readonly busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2367,82 +2546,96 @@ function RolesContent({
         onPress={onCreate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminRolesLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((role) => (
-            <View
-              key={role.name}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <Text style={[styles.userName, { color: palette.text }]}>
-                {role.name}
-              </Text>
-              {role.description ? (
-                <Text style={{ color: palette.textMuted }}>
-                  {role.description}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminRolesLoadError}
                 </Text>
-              ) : null}
-              <View style={styles.userActions}>
                 <ActionButton
-                  label={dictionary.adminEdit}
-                  busy={false}
-                  disabled={busyKey !== null}
-                  onPress={() => onEdit(role)}
-                  palette={palette}
-                  secondary
-                />
-                <ActionButton
-                  label={dictionary.adminDelete}
-                  busy={busyKey === `roles:${role.name}`}
-                  disabled={
-                    busyKey !== null && busyKey !== `roles:${role.name}`
-                  }
-                  onPress={() => onDelete(role)}
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
                   palette={palette}
                   secondary
                 />
               </View>
-            </View>
-          ))}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoRoles}
-        </Text>
-      )}
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((role) => (
+                    <View
+                      key={role.name}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.userName, { color: palette.text }]}>
+                        {role.name}
+                      </Text>
+                      {role.description ? (
+                        <Text style={{ color: palette.textMuted }}>
+                          {role.description}
+                        </Text>
+                      ) : null}
+                      <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminEdit}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onEdit(role)}
+                          palette={palette}
+                          secondary
+                        />
+                        <ActionButton
+                          label={dictionary.adminDelete}
+                          busy={busyKey === `roles:${role.name}`}
+                          disabled={
+                            busyKey !== null && busyKey !== `roles:${role.name}`
+                          }
+                          onPress={() => onDelete(role)}
+                          palette={palette}
+                          secondary
+                        />
+                      </View>
+                    </View>
+                  ))}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoRoles}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2461,18 +2654,18 @@ function GroupsContent({
   onDelete,
   busyKey,
 }: {
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  page: AdminPage<AdminGroup> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  onCreate: () => void;
-  onEdit: (group: AdminGroup) => void;
-  onDelete: (group: AdminGroup) => void;
-  busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly page: AdminPage<AdminGroup> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly onCreate: () => void;
+  readonly onEdit: (group: AdminGroup) => void;
+  readonly onDelete: (group: AdminGroup) => void;
+  readonly busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2496,88 +2689,108 @@ function GroupsContent({
         onPress={onCreate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminGroupsLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((group) => (
-            <View
-              key={group.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {group.name}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminGroupsLoadError}
                 </Text>
+                <ActionButton
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
+                  palette={palette}
+                  secondary
+                />
+              </View>
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((group) => (
+                    <View
+                      key={group.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {group.name}
+                        </Text>
+                        <Text style={{ color: palette.textMuted }}>
+                          {group.userCount}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {group.path}
+                      </Text>
+                      {group.effectiveRoles.length > 0 ? (
+                        <Text
+                          style={[styles.roles, { color: palette.textMuted }]}
+                        >
+                          {group.effectiveRoles.join(", ")}
+                        </Text>
+                      ) : null}
+                      <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminEdit}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onEdit(group)}
+                          palette={palette}
+                          secondary
+                        />
+                        <ActionButton
+                          label={dictionary.adminDelete}
+                          busy={busyKey === `groups:${group.id}`}
+                          disabled={
+                            busyKey !== null && busyKey !== `groups:${group.id}`
+                          }
+                          onPress={() => onDelete(group)}
+                          palette={palette}
+                          secondary
+                        />
+                      </View>
+                    </View>
+                  ))}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
                 <Text style={{ color: palette.textMuted }}>
-                  {group.userCount}
+                  {dictionary.adminNoGroups}
                 </Text>
-              </View>
-              <Text style={{ color: palette.textMuted }}>{group.path}</Text>
-              {group.effectiveRoles.length > 0 ? (
-                <Text style={[styles.roles, { color: palette.textMuted }]}>
-                  {group.effectiveRoles.join(", ")}
-                </Text>
-              ) : null}
-              <View style={styles.userActions}>
-                <ActionButton
-                  label={dictionary.adminEdit}
-                  busy={false}
-                  disabled={busyKey !== null}
-                  onPress={() => onEdit(group)}
-                  palette={palette}
-                  secondary
-                />
-                <ActionButton
-                  label={dictionary.adminDelete}
-                  busy={busyKey === `groups:${group.id}`}
-                  disabled={
-                    busyKey !== null && busyKey !== `groups:${group.id}`
-                  }
-                  onPress={() => onDelete(group)}
-                  palette={palette}
-                  secondary
-                />
-              </View>
-            </View>
-          ))}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoGroups}
-        </Text>
-      )}
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2596,18 +2809,18 @@ function IdentityProvidersContent({
   onDelete,
   busyKey,
 }: {
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  page: AdminPage<AdminIdentityProvider> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  onCreate: () => void;
-  onEdit: (provider: AdminIdentityProvider) => void;
-  onDelete: (provider: AdminIdentityProvider) => void;
-  busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly page: AdminPage<AdminIdentityProvider> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly onCreate: () => void;
+  readonly onEdit: (provider: AdminIdentityProvider) => void;
+  readonly onDelete: (provider: AdminIdentityProvider) => void;
+  readonly busyKey: string | null;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2631,99 +2844,121 @@ function IdentityProvidersContent({
         onPress={onCreate}
         palette={palette}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminIdentityProvidersLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((provider) => (
-            <View
-              key={provider.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {provider.displayName || provider.alias}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminIdentityProvidersLoadError}
                 </Text>
-                <Text
-                  style={{
-                    color: provider.enabled ? palette.success : palette.danger,
-                  }}
-                >
-                  {provider.enabled
-                    ? dictionary.adminUserEnabled
-                    : dictionary.adminUserDisabled}
-                </Text>
-              </View>
-              <Text style={{ color: palette.textMuted }}>
-                {provider.providerType} · {provider.registrationId}
-              </Text>
-              <Text style={[styles.roles, { color: palette.textMuted }]}>
-                {provider.configured
-                  ? dictionary.adminConfigured
-                  : dictionary.adminUnconfigured}
-                {provider.hideOnLogin ? ` · ${dictionary.adminHidden}` : ""}
-                {` · ${provider.mapperCount} mappers`}
-              </Text>
-              <View style={styles.userActions}>
                 <ActionButton
-                  label={dictionary.adminEdit}
-                  busy={false}
-                  disabled={busyKey !== null}
-                  onPress={() => onEdit(provider)}
-                  palette={palette}
-                  secondary
-                />
-                <ActionButton
-                  label={dictionary.adminDelete}
-                  busy={busyKey === `identity-providers:${provider.id}`}
-                  disabled={
-                    busyKey !== null &&
-                    busyKey !== `identity-providers:${provider.id}`
-                  }
-                  onPress={() => onDelete(provider)}
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
                   palette={palette}
                   secondary
                 />
               </View>
-            </View>
-          ))}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoIdentityProviders}
-        </Text>
-      )}
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((provider) => (
+                    <View
+                      key={provider.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {provider.displayName || provider.alias}
+                        </Text>
+                        <Text
+                          style={{
+                            color: provider.enabled
+                              ? palette.success
+                              : palette.danger,
+                          }}
+                        >
+                          {provider.enabled
+                            ? dictionary.adminUserEnabled
+                            : dictionary.adminUserDisabled}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {provider.providerType} · {provider.registrationId}
+                      </Text>
+                      <Text
+                        style={[styles.roles, { color: palette.textMuted }]}
+                      >
+                        {provider.configured
+                          ? dictionary.adminConfigured
+                          : dictionary.adminUnconfigured}
+                        {provider.hideOnLogin
+                          ? ` · ${dictionary.adminHidden}`
+                          : ""}
+                        {` · ${provider.mapperCount} mappers`}
+                      </Text>
+                      <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminEdit}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onEdit(provider)}
+                          palette={palette}
+                          secondary
+                        />
+                        <ActionButton
+                          label={dictionary.adminDelete}
+                          busy={busyKey === `identity-providers:${provider.id}`}
+                          disabled={
+                            busyKey !== null &&
+                            busyKey !== `identity-providers:${provider.id}`
+                          }
+                          onPress={() => onDelete(provider)}
+                          palette={palette}
+                          secondary
+                        />
+                      </View>
+                    </View>
+                  ))}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoIdentityProviders}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2740,16 +2975,16 @@ function ConsentsContent({
   query,
   setQuery,
 }: {
-  busyKey: string | null;
-  errorStatus: number | null;
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  onRevoke: (consent: AdminConsent) => void;
-  page: AdminPage<AdminConsent> | null;
-  query: string;
-  setQuery: (query: string) => void;
+  readonly busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly onRevoke: (consent: AdminConsent) => void;
+  readonly page: AdminPage<AdminConsent> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2767,76 +3002,94 @@ function ConsentsContent({
         ]}
         value={query}
       />
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminConsentsLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((consent) => {
-            const key = `${consent.clientId}:${consent.principalName}`;
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
             return (
-              <View
-                key={key}
-                style={[
-                  styles.userCard,
-                  {
-                    backgroundColor: palette.surface,
-                    borderColor: palette.border,
-                  },
-                ]}
-              >
-                <View style={styles.userCardHeader}>
-                  <Text style={[styles.userName, { color: palette.text }]}>
-                    {consent.clientName}
-                  </Text>
-                  <Text style={{ color: palette.textMuted }}>
-                    {consent.principalName}
-                  </Text>
-                </View>
-                <Text style={[styles.roles, { color: palette.textMuted }]}>
-                  {consent.authorities.join(", ") || "—"}
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminConsentsLoadError}
                 </Text>
                 <ActionButton
-                  label={dictionary.adminConsentRevoke}
-                  busy={busyKey === key}
-                  disabled={busyKey !== null && busyKey !== key}
-                  onPress={() => onRevoke(consent)}
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
                   palette={palette}
                   secondary
                 />
               </View>
             );
-          })}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoConsents}
-        </Text>
-      )}
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((consent) => {
+                    const key = `${consent.clientId}:${consent.principalName}`;
+                    return (
+                      <View
+                        key={key}
+                        style={[
+                          styles.userCard,
+                          {
+                            backgroundColor: palette.surface,
+                            borderColor: palette.border,
+                          },
+                        ]}
+                      >
+                        <View style={styles.userCardHeader}>
+                          <Text
+                            style={[styles.userName, { color: palette.text }]}
+                          >
+                            {consent.clientName}
+                          </Text>
+                          <Text style={{ color: palette.textMuted }}>
+                            {consent.principalName}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[styles.roles, { color: palette.textMuted }]}
+                        >
+                          {consent.authorities.join(", ") || "—"}
+                        </Text>
+                        <ActionButton
+                          label={dictionary.adminConsentRevoke}
+                          busy={busyKey === key}
+                          disabled={busyKey !== null && busyKey !== key}
+                          onPress={() => onRevoke(consent)}
+                          palette={palette}
+                          secondary
+                        />
+                      </View>
+                    );
+                  })}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoConsents}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2855,18 +3108,18 @@ function SessionsContent({
   setQuery,
   status,
 }: {
-  busyKey: string | null;
-  errorStatus: number | null;
-  loading: boolean;
-  onDelete: (session: AdminSession) => void;
-  onNext: () => void;
-  onPrevious: () => void;
-  onRetry: () => void;
-  onStatusChange: (status: "active" | "expired") => void;
-  page: AdminPage<AdminSession> | null;
-  query: string;
-  setQuery: (query: string) => void;
-  status: "active" | "expired";
+  readonly busyKey: string | null;
+  readonly errorStatus: number | null;
+  readonly loading: boolean;
+  readonly onDelete: (session: AdminSession) => void;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly onRetry: () => void;
+  readonly onStatusChange: (status: "active" | "expired") => void;
+  readonly page: AdminPage<AdminSession> | null;
+  readonly query: string;
+  readonly setQuery: (query: string) => void;
+  readonly status: "active" | "expired";
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
@@ -2902,87 +3155,107 @@ function SessionsContent({
           secondary={status !== "expired"}
         />
       </View>
-      {loading && !page ? (
-        <ActivityIndicator
-          accessibilityLabel={dictionary.loading}
-          color={palette.primary}
-        />
-      ) : errorStatus !== null && !page ? (
-        <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-          <Text style={{ color: palette.danger }}>
-            {errorStatus === 403
-              ? dictionary.adminForbidden
-              : dictionary.adminSessionsLoadError}
-          </Text>
-          <ActionButton
-            label={dictionary.adminRetry}
-            busy={loading}
-            onPress={onRetry}
-            palette={palette}
-            secondary
-          />
-        </View>
-      ) : page && page.content.length > 0 ? (
-        <View style={styles.userList}>
-          {page.content.map((adminSession) => (
-            <View
-              key={adminSession.id}
-              style={[
-                styles.userCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={styles.userCardHeader}>
-                <Text style={[styles.userName, { color: palette.text }]}>
-                  {adminSession.username}
+      {(() => {
+        if (loading && !page) {
+          return (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          );
+        } else {
+          if (errorStatus !== null && !page) {
+            return (
+              <View style={[styles.errorCard, { borderColor: palette.danger }]}>
+                <Text style={{ color: palette.danger }}>
+                  {errorStatus === 403
+                    ? dictionary.adminForbidden
+                    : dictionary.adminSessionsLoadError}
                 </Text>
-                <Text
-                  style={{
-                    color: adminSession.active
-                      ? palette.success
-                      : palette.textMuted,
-                  }}
-                >
-                  {adminSession.active
-                    ? dictionary.adminActive
-                    : dictionary.adminExpired}
-                </Text>
-              </View>
-              <Text style={{ color: palette.textMuted }}>
-                {adminSession.authorizationCount}{" "}
-                {dictionary.adminAuthorizations}
-              </Text>
-              <Text style={[styles.roles, { color: palette.textMuted }]}>
-                {adminSession.lastAccessedAt}
-              </Text>
-              {adminSession.active ? (
                 <ActionButton
-                  label={dictionary.adminSessionDelete}
-                  busy={busyKey === adminSession.id}
-                  disabled={busyKey !== null && busyKey !== adminSession.id}
-                  onPress={() => onDelete(adminSession)}
+                  label={dictionary.adminRetry}
+                  busy={loading}
+                  onPress={onRetry}
                   palette={palette}
                   secondary
                 />
-              ) : null}
-            </View>
-          ))}
-          <Pagination
-            loading={loading}
-            onNext={onNext}
-            onPrevious={onPrevious}
-            page={page}
-            palette={palette}
-          />
-        </View>
-      ) : (
-        <Text style={{ color: palette.textMuted }}>
-          {dictionary.adminNoSessions}
-        </Text>
-      )}
+              </View>
+            );
+          } else {
+            if (page && page.content.length > 0) {
+              return (
+                <View style={styles.userList}>
+                  {page.content.map((adminSession) => (
+                    <View
+                      key={adminSession.id}
+                      style={[
+                        styles.userCard,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.userCardHeader}>
+                        <Text
+                          style={[styles.userName, { color: palette.text }]}
+                        >
+                          {adminSession.username}
+                        </Text>
+                        <Text
+                          style={{
+                            color: adminSession.active
+                              ? palette.success
+                              : palette.textMuted,
+                          }}
+                        >
+                          {adminSession.active
+                            ? dictionary.adminActive
+                            : dictionary.adminExpired}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.textMuted }}>
+                        {adminSession.authorizationCount}{" "}
+                        {dictionary.adminAuthorizations}
+                      </Text>
+                      <Text
+                        style={[styles.roles, { color: palette.textMuted }]}
+                      >
+                        {adminSession.lastAccessedAt}
+                      </Text>
+                      {adminSession.active ? (
+                        <ActionButton
+                          label={dictionary.adminSessionDelete}
+                          busy={busyKey === adminSession.id}
+                          disabled={
+                            busyKey !== null && busyKey !== adminSession.id
+                          }
+                          onPress={() => onDelete(adminSession)}
+                          palette={palette}
+                          secondary
+                        />
+                      ) : null}
+                    </View>
+                  ))}
+                  <Pagination
+                    loading={loading}
+                    onNext={onNext}
+                    onPrevious={onPrevious}
+                    page={page}
+                    palette={palette}
+                  />
+                </View>
+              );
+            } else {
+              return (
+                <Text style={{ color: palette.textMuted }}>
+                  {dictionary.adminNoSessions}
+                </Text>
+              );
+            }
+          }
+        }
+      })()}
     </View>
   );
 }
@@ -2994,11 +3267,11 @@ function Pagination<T>({
   page,
   palette,
 }: {
-  loading: boolean;
-  onNext: () => void;
-  onPrevious: () => void;
-  page: AdminPage<T>;
-  palette: ReturnType<typeof useTheme>["palette"];
+  readonly loading: boolean;
+  readonly onNext: () => void;
+  readonly onPrevious: () => void;
+  readonly page: AdminPage<T>;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
 }) {
   const { dictionary } = useLocale();
   return (
@@ -3035,12 +3308,12 @@ function ActionButton({
   palette,
   secondary = false,
 }: {
-  label: string;
-  busy: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-  palette: ReturnType<typeof useTheme>["palette"];
-  secondary?: boolean;
+  readonly label: string;
+  readonly busy: boolean;
+  readonly disabled?: boolean;
+  readonly onPress: () => void;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
+  readonly secondary?: boolean;
 }) {
   return (
     <Pressable
@@ -3078,8 +3351,8 @@ function AdminTabBar({
   active,
   onChange,
 }: {
-  active: AdminSection;
-  onChange: (section: AdminSection) => void;
+  readonly active: AdminSection;
+  readonly onChange: (section: AdminSection) => void;
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();

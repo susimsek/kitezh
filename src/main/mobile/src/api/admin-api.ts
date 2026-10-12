@@ -322,12 +322,15 @@ async function requestAdmin<T>(
     }
     if (response.status === 204) return undefined as T;
     return readMobileResponseData(response.data) as T;
-  } catch (cause) {
-    if (cause instanceof AdminApiError) throw cause;
+  } catch (error) {
+    if (error instanceof AdminApiError) throw error;
+    const cause = requestSignal.signal.aborted
+      ? requestSignal.signal.reason
+      : error;
     throw new AdminApiError(
       0,
       "Administration request failed",
-      getMobileTransportCause(cause, requestSignal.timedOut()),
+      getMobileTransportCause(cause),
     );
   } finally {
     requestSignal.dispose();
@@ -502,23 +505,27 @@ export function deleteAdminSession(
   );
 }
 
+export type AdminConsentQuery = Readonly<{
+  query?: string;
+  clientId?: string;
+  username?: string;
+  scope?: string;
+  page?: number;
+  size?: number;
+}>;
+
 export function listAdminConsents(
   accessToken: string,
-  query = "",
-  clientId = "",
-  username = "",
-  scope = "",
-  page = 0,
-  size = 10,
+  filters: AdminConsentQuery = {},
   options: RequestOptions = {},
 ) {
   const params = new URLSearchParams({
-    q: query,
-    clientId,
-    username,
-    scope,
-    page: String(page),
-    size: String(size),
+    q: filters.query ?? "",
+    clientId: filters.clientId ?? "",
+    username: filters.username ?? "",
+    scope: filters.scope ?? "",
+    page: String(filters.page ?? 0),
+    size: String(filters.size ?? 10),
     sort: "id.principalName,asc",
   });
   return requestAdmin<AdminPage<AdminConsent>>(

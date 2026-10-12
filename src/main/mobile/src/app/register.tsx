@@ -20,6 +20,7 @@ import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
 import { problemFieldErrors } from "../../../shared/src/api.ts";
+import { isValidEmail } from "@/validation/email";
 
 export default function RegisterScreen() {
   const { dictionary, resolvedLocale } = useLocale();
@@ -56,7 +57,7 @@ export default function RegisterScreen() {
       return;
     }
     if (
-      !/^\S+@\S+\.\S+$/.test(email.trim()) ||
+      !isValidEmail(email.trim()) ||
       password.length < 12 ||
       password !== confirmPassword
     ) {
@@ -124,152 +125,182 @@ export default function RegisterScreen() {
         <Text style={[styles.help, { color: palette.textMuted }]}>
           {dictionary.registrationHelp}
         </Text>
-        {success ? (
-          <View style={[styles.message, { borderColor: palette.primary }]}>
-            <Text style={{ color: palette.primary }}>
-              {dictionary.registrationSuccess}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.replace("/sign-in")}
-              style={styles.link}
-            >
-              <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                {dictionary.signIn}
-              </Text>
-            </Pressable>
-          </View>
-        ) : captchaEnabled === null ? (
-          <ActivityIndicator
-            color={palette.primary}
-            accessibilityLabel={dictionary.loading}
-            style={styles.loading}
-          />
-        ) : captchaEnabled ? (
-          <View style={[styles.message, { borderColor: palette.border }]}>
-            <Text style={{ color: palette.text }}>
-              {dictionary.registrationCaptcha}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: browserPending }}
-              disabled={browserPending}
-              onPress={() => void openBrowserRegistration()}
-              style={[styles.link, { opacity: browserPending ? 0.65 : 1 }]}
-            >
-              {browserPending ? (
-                <ActivityIndicator color={palette.primary} size="small" />
-              ) : null}
-              <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                {dictionary.continueInBrowser}
-              </Text>
-            </Pressable>
-            {browserError ? (
-              <Text style={[styles.error, { color: palette.danger }]}>
-                {dictionary.browserError}
-              </Text>
-            ) : null}
-          </View>
-        ) : (
-          <View style={styles.form}>
-            <Field
-              label={dictionary.username}
-              value={username}
-              onChangeText={(value) => {
-                setUsername(value);
-                setFieldErrors((current) =>
-                  omitFieldError(current, "username"),
+        {(() => {
+          if (success) {
+            return (
+              <View style={[styles.message, { borderColor: palette.primary }]}>
+                <Text style={{ color: palette.primary }}>
+                  {dictionary.registrationSuccess}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.replace("/sign-in")}
+                  style={styles.link}
+                >
+                  <Text style={{ color: palette.primary, fontWeight: "700" }}>
+                    {dictionary.signIn}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          } else {
+            if (captchaEnabled === null) {
+              return (
+                <ActivityIndicator
+                  color={palette.primary}
+                  accessibilityLabel={dictionary.loading}
+                  style={styles.loading}
+                />
+              );
+            } else {
+              if (captchaEnabled) {
+                return (
+                  <View
+                    style={[styles.message, { borderColor: palette.border }]}
+                  >
+                    <Text style={{ color: palette.text }}>
+                      {dictionary.registrationCaptcha}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: browserPending }}
+                      disabled={browserPending}
+                      onPress={() => void openBrowserRegistration()}
+                      style={[
+                        styles.link,
+                        { opacity: browserPending ? 0.65 : 1 },
+                      ]}
+                    >
+                      {browserPending ? (
+                        <ActivityIndicator
+                          color={palette.primary}
+                          size="small"
+                        />
+                      ) : null}
+                      <Text
+                        style={{ color: palette.primary, fontWeight: "700" }}
+                      >
+                        {dictionary.continueInBrowser}
+                      </Text>
+                    </Pressable>
+                    {browserError ? (
+                      <Text style={[styles.error, { color: palette.danger }]}>
+                        {dictionary.browserError}
+                      </Text>
+                    ) : null}
+                  </View>
                 );
-              }}
-              error={fieldErrors.username}
-              palette={palette}
-            />
-            <Field
-              label={dictionary.firstName}
-              value={firstName}
-              onChangeText={(value) => {
-                setFirstName(value);
-                setFieldErrors((current) =>
-                  omitFieldError(current, "firstName"),
+              } else {
+                return (
+                  <View style={styles.form}>
+                    <Field
+                      label={dictionary.username}
+                      value={username}
+                      onChangeText={(value) => {
+                        setUsername(value);
+                        setFieldErrors((current) =>
+                          omitFieldError(current, "username"),
+                        );
+                      }}
+                      error={fieldErrors.username}
+                      palette={palette}
+                    />
+                    <Field
+                      label={dictionary.firstName}
+                      value={firstName}
+                      onChangeText={(value) => {
+                        setFirstName(value);
+                        setFieldErrors((current) =>
+                          omitFieldError(current, "firstName"),
+                        );
+                      }}
+                      error={fieldErrors.firstName}
+                      palette={palette}
+                    />
+                    <Field
+                      label={dictionary.lastName}
+                      value={lastName}
+                      onChangeText={(value) => {
+                        setLastName(value);
+                        setFieldErrors((current) =>
+                          omitFieldError(current, "lastName"),
+                        );
+                      }}
+                      error={fieldErrors.lastName}
+                      palette={palette}
+                    />
+                    <Field
+                      label={dictionary.email}
+                      value={email}
+                      onChangeText={(value) => {
+                        setEmail(value);
+                        setFieldErrors((current) =>
+                          omitFieldError(current, "email"),
+                        );
+                      }}
+                      error={fieldErrors.email}
+                      keyboardType="email-address"
+                      palette={palette}
+                    />
+                    <Field
+                      label={dictionary.newPassword}
+                      value={password}
+                      onChangeText={(value) => {
+                        setPassword(value);
+                        setFieldErrors((current) =>
+                          omitFieldError(current, "password"),
+                        );
+                      }}
+                      error={fieldErrors.password}
+                      secureTextEntry
+                      palette={palette}
+                    />
+                    <Field
+                      label={dictionary.confirmPassword}
+                      value={confirmPassword}
+                      onChangeText={(value) => {
+                        setConfirmPassword(value);
+                        setFieldErrors((current) =>
+                          omitFieldError(current, "confirmPassword"),
+                        );
+                      }}
+                      error={fieldErrors.confirmPassword}
+                      secureTextEntry
+                      palette={palette}
+                    />
+                    {error ? (
+                      <Text style={[styles.error, { color: palette.danger }]}>
+                        {error}
+                      </Text>
+                    ) : null}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: pending }}
+                      disabled={pending}
+                      onPress={() => void submit()}
+                      style={[
+                        styles.action,
+                        {
+                          backgroundColor: palette.primary,
+                          opacity: pending ? 0.65 : 1,
+                        },
+                      ]}
+                    >
+                      {pending ? (
+                        <ActivityIndicator color={palette.onPrimary} />
+                      ) : null}
+                      <Text
+                        style={{ color: palette.onPrimary, fontWeight: "700" }}
+                      >
+                        {dictionary.createAccount}
+                      </Text>
+                    </Pressable>
+                  </View>
                 );
-              }}
-              error={fieldErrors.firstName}
-              palette={palette}
-            />
-            <Field
-              label={dictionary.lastName}
-              value={lastName}
-              onChangeText={(value) => {
-                setLastName(value);
-                setFieldErrors((current) =>
-                  omitFieldError(current, "lastName"),
-                );
-              }}
-              error={fieldErrors.lastName}
-              palette={palette}
-            />
-            <Field
-              label={dictionary.email}
-              value={email}
-              onChangeText={(value) => {
-                setEmail(value);
-                setFieldErrors((current) => omitFieldError(current, "email"));
-              }}
-              error={fieldErrors.email}
-              keyboardType="email-address"
-              palette={palette}
-            />
-            <Field
-              label={dictionary.newPassword}
-              value={password}
-              onChangeText={(value) => {
-                setPassword(value);
-                setFieldErrors((current) =>
-                  omitFieldError(current, "password"),
-                );
-              }}
-              error={fieldErrors.password}
-              secureTextEntry
-              palette={palette}
-            />
-            <Field
-              label={dictionary.confirmPassword}
-              value={confirmPassword}
-              onChangeText={(value) => {
-                setConfirmPassword(value);
-                setFieldErrors((current) =>
-                  omitFieldError(current, "confirmPassword"),
-                );
-              }}
-              error={fieldErrors.confirmPassword}
-              secureTextEntry
-              palette={palette}
-            />
-            {error ? (
-              <Text style={[styles.error, { color: palette.danger }]}>
-                {error}
-              </Text>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: pending }}
-              disabled={pending}
-              onPress={() => void submit()}
-              style={[
-                styles.action,
-                {
-                  backgroundColor: palette.primary,
-                  opacity: pending ? 0.65 : 1,
-                },
-              ]}
-            >
-              {pending ? <ActivityIndicator color={palette.onPrimary} /> : null}
-              <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
-                {dictionary.createAccount}
-              </Text>
-            </Pressable>
-          </View>
-        )}
+              }
+            }
+          }
+        })()}
       </MobileFormScrollView>
     </SafeAreaView>
   );
@@ -284,13 +315,13 @@ function Field({
   secureTextEntry = false,
   keyboardType = "default",
 }: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  error?: string;
-  palette: ReturnType<typeof useTheme>["palette"];
-  secureTextEntry?: boolean;
-  keyboardType?: "default" | "email-address";
+  readonly label: string;
+  readonly value: string;
+  readonly onChangeText: (value: string) => void;
+  readonly error?: string;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
+  readonly secureTextEntry?: boolean;
+  readonly keyboardType?: "default" | "email-address";
 }) {
   return (
     <View>

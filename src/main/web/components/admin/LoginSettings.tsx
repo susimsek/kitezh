@@ -232,8 +232,8 @@ export default function LoginSettingsPage({
   embedded = false,
   focusSection,
 }: {
-  embedded?: boolean;
-  focusSection?: LoginSettingsSection;
+  readonly embedded?: boolean;
+  readonly focusSection?: LoginSettingsSection;
 }) {
   const dictionary = useDictionary();
   const copy = dictionary.admin.loginSettings;
@@ -585,7 +585,9 @@ export default function LoginSettingsPage({
       <Card className="admin-panel-card">
         <Card.Body>
           {!loaded ? (
-            <div role="status">{copy.loading}</div>
+            <output aria-live="polite" className="d-block">
+              {copy.loading}
+            </output>
           ) : (
             <Form noValidate onSubmit={submit}>
               <section hidden={activeSection !== "login"}>
@@ -1419,10 +1421,10 @@ function NumberField({
   error,
   registration,
 }: {
-  id: string;
-  label: string;
-  error?: string;
-  registration: UseFormRegisterReturn;
+  readonly id: string;
+  readonly label: string;
+  readonly error?: string;
+  readonly registration: UseFormRegisterReturn;
 }) {
   return (
     <Form.Group controlId={id}>
@@ -1441,12 +1443,12 @@ function WebAuthnPolicyFields({
   errors,
   labels,
 }: {
-  title: string;
-  help: string;
-  prefix: "webauthnPolicy" | "webauthnPasswordlessPolicy";
-  register: UseFormRegister<Settings>;
-  errors: FieldErrors<Settings>;
-  labels: {
+  readonly title: string;
+  readonly help: string;
+  readonly prefix: "webauthnPolicy" | "webauthnPasswordlessPolicy";
+  readonly register: UseFormRegister<Settings>;
+  readonly errors: FieldErrors<Settings>;
+  readonly labels: {
     rpName: string;
     rpId: string;
     signatureAlgorithms: string;
@@ -1569,7 +1571,13 @@ function WebAuthnPolicyFields({
   );
 }
 
-function SaveButton({ copy, isSubmitting }: { copy: string; isSubmitting: boolean }) {
+function SaveButton({
+  copy,
+  isSubmitting,
+}: {
+  readonly copy: string;
+  readonly isSubmitting: boolean;
+}) {
   return (
     <div className="admin-form-actions mt-4">
       <Button disabled={isSubmitting} type="submit">
