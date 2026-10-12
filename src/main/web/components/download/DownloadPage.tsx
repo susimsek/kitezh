@@ -232,13 +232,10 @@ export function DownloadPage({ dictionary }: Readonly<{ dictionary: Dictionary }
         </Stack>
 
         {releaseLoading && (
-          <div
-            className="download-release-loading d-flex flex-column align-items-center justify-content-center gap-3 py-5"
-            role="status"
-          >
+          <output className="download-release-loading d-flex flex-column align-items-center justify-content-center gap-3 py-5">
             <Spinner animation="border" aria-hidden="true" />
             <span>{copy.loading}</span>
-          </div>
+          </output>
         )}
         {!releaseLoading && releaseError && (
           <Alert variant="danger" className="download-release-error text-center mx-auto">

@@ -110,6 +110,7 @@ function AccountLayout() {
 }
 
 function AccountImpersonationReset({ children }: Readonly<{ children: React.ReactNode }>) {
+  const dictionary = useDictionary();
   const searchParams = useSearchParams();
   const impersonated = searchParams.get("impersonated") === "1";
   const router = useRouter();
@@ -124,7 +125,10 @@ function AccountImpersonationReset({ children }: Readonly<{ children: React.Reac
   if (impersonated)
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary">
-        <div className="spinner-border text-primary" role="status" />
+        <output
+          aria-label={dictionary.account.common.loading}
+          className="spinner-border text-primary"
+        />
       </div>
     );
   return children;

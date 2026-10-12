@@ -19,6 +19,7 @@ import { authorizationServerIssuer } from "@/config";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
+import { isValidEmailAddress } from "@/utils/email";
 
 export default function RegisterScreen() {
   const { dictionary, resolvedLocale } = useLocale();
@@ -54,7 +55,7 @@ export default function RegisterScreen() {
       return;
     }
     if (
-      !/^\S+@\S+\.\S+$/.test(email.trim()) ||
+      !isValidEmailAddress(email.trim()) ||
       password.length < 12 ||
       password !== confirmPassword
     ) {

@@ -30,6 +30,7 @@ import {
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
 import { createSingleFlight } from "../../shared/src/session.ts";
+import { isValidEmailAddress } from "./utils/email.ts";
 
 test("client metadata follows the Kitezh app header contract", () => {
   assert.deepEqual(
@@ -45,6 +46,15 @@ test("client metadata follows the Kitezh app header contract", () => {
       OS: "ios",
     },
   );
+});
+
+test("email shape validation rejects ambiguous and malformed addresses", () => {
+  assert.equal(isValidEmailAddress("person@example.com"), true);
+  assert.equal(isValidEmailAddress("person+tag@example.co.uk"), true);
+  assert.equal(isValidEmailAddress("person@@example.com"), false);
+  assert.equal(isValidEmailAddress("person@.example.com"), false);
+  assert.equal(isValidEmailAddress("person@example."), false);
+  assert.equal(isValidEmailAddress("person name@example.com"), false);
 });
 
 test("system locale resolves to the device language when supported", () => {

@@ -23,6 +23,7 @@ import {
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
+import { isValidEmailAddress } from "@/utils/email";
 
 export default function AccountScreen() {
   const { dictionary } = useLocale();
@@ -76,7 +77,7 @@ export default function AccountScreen() {
   const saveProfile = useCallback(async () => {
     if (!session || !profile) return;
     const trimmedEmail = email.trim();
-    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !isValidEmailAddress(trimmedEmail)) {
       setEmailError(dictionary.invalidEmail);
       return;
     }
