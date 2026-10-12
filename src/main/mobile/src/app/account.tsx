@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { BrandMark } from "@/components/BrandMark";
 import { AccountTabBar } from "@/components/AccountTabBar";
 import { useLocale } from "@/i18n/LocaleProvider";
 import {
@@ -156,12 +157,10 @@ export default function AccountScreen() {
     >
       <View style={styles.screen}>
         <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
         >
-        <View style={[styles.logo, { backgroundColor: palette.primary }]}>
-          <AppIcon name="shield" size={38} color={palette.onPrimary} />
-        </View>
+        <BrandMark size={82} />
         <Text style={[styles.title, { color: palette.text }]}>
           {dictionary.accountTitle}
         </Text>
@@ -390,16 +389,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: {
     alignItems: "center",
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     padding: spacing.xl,
-  },
-  logo: {
-    alignItems: "center",
-    borderRadius: radii.lg,
-    height: 82,
-    justifyContent: "center",
-    width: 82,
   },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   message: { fontSize: 16, marginTop: spacing.sm },

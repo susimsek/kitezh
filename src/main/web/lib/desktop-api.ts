@@ -7,6 +7,8 @@ import type {
 export type DesktopConfig = {
   apiBaseUrl: string;
   protocol: string;
+  appVersion: string;
+  os: string;
 };
 
 export type DesktopConsole = ConsoleName;
@@ -56,6 +58,8 @@ export type DesktopApi = {
   isDesktop: true;
   apiBaseUrl: string;
   protocol: string;
+  appVersion: string;
+  os: string;
   auth: {
     startLogin: (request: {
       console: DesktopConsole;

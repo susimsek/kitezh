@@ -107,6 +107,9 @@ public record ApplicationProperties(
 
     public record Cache(@DefaultValue Caffeine caffeine) {
 
+        @ConstructorBinding
+        public Cache {}
+
         public Cache() {
             this(new Caffeine());
         }
@@ -118,6 +121,11 @@ public record ApplicationProperties(
             @DefaultValue("1000") long maximumSize,
             Map<String, CacheOverride> overrides) {
 
+        @ConstructorBinding
+        public Caffeine {
+            overrides = overrides == null ? Map.of() : overrides;
+        }
+
         public Caffeine() {
             this(Duration.ofHours(1), 500, 1000, Map.of());
         }
@@ -127,6 +135,9 @@ public record ApplicationProperties(
             @DefaultValue("PT1H") Duration ttl,
             @DefaultValue("500") int initialCapacity,
             @DefaultValue("1000") long maximumSize) {
+
+        @ConstructorBinding
+        public CacheOverride {}
 
         public CacheOverride() {
             this(Duration.ofHours(1), 500, 1000);
@@ -138,6 +149,9 @@ public record ApplicationProperties(
     public record AuthorizationServer(
             @DefaultValue("http://127.0.0.1:9090") String issuer,
             @DefaultValue("P30D") Duration offlineSessionIdle) {
+
+        @ConstructorBinding
+        public AuthorizationServer {}
 
         public AuthorizationServer(String issuer) {
             this(issuer, Duration.ofDays(30));
@@ -157,6 +171,9 @@ public record ApplicationProperties(
             @DefaultValue("REQUIRED") String userVerification,
             @DefaultValue("NONE") String attestation) {
 
+        @ConstructorBinding
+        public WebAuthn {}
+
         public WebAuthn() {
             this("Kitezh", "", "", 300, "REQUIRED", "REQUIRED", "NONE");
         }
@@ -173,6 +190,9 @@ public record ApplicationProperties(
             @DefaultValue("0.7") double scoreThreshold,
             @DefaultValue("false") boolean useRecaptchaNet) {
 
+        @ConstructorBinding
+        public RegistrationCaptcha {}
+
         public RegistrationCaptcha() {
             this("disabled", "", "", "", "", "register", false, 0.7, false);
         }
@@ -180,6 +200,9 @@ public record ApplicationProperties(
 
     public record DPoP(
             @DefaultValue("false") boolean nonceRequired, @DefaultValue("PT5M") Duration nonceTtl) {
+
+        @ConstructorBinding
+        public DPoP {}
 
         public DPoP() {
             this(false, Duration.ofMinutes(5));
@@ -193,6 +216,9 @@ public record ApplicationProperties(
 
     public record Security(
             @DefaultValue PasswordPolicy passwordPolicy, @DefaultValue BruteForce bruteForce) {
+
+        @ConstructorBinding
+        public Security {}
 
         public Security() {
             this(new PasswordPolicy(), new BruteForce());
@@ -213,6 +239,9 @@ public record ApplicationProperties(
             @DefaultValue("90") int expirationDays,
             @DefaultValue("password,123456,12345678,qwerty,qwerty123,admin,letmein")
                     String commonPasswords) {
+
+        @ConstructorBinding
+        public PasswordPolicy {}
 
         public PasswordPolicy() {
             this(
@@ -243,6 +272,9 @@ public record ApplicationProperties(
             @DefaultValue("false") boolean permanentLockout,
             @DefaultValue("30") int ipRequestsPerMinute,
             @DefaultValue("5") int usernameIpRequestsPerMinute) {
+
+        @ConstructorBinding
+        public BruteForce {}
 
         public BruteForce() {
             this(

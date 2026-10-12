@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,8 +31,12 @@ async function sourceFiles(directory) {
     if (entry.name === "node_modules" || entry.name === "dist") continue;
     const filePath = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...(await sourceFiles(filePath)));
-    else if (/\.(?:js|jsx|mjs|ts|tsx|json)$/.test(entry.name))
+    else if (
+      /\.(?:js|jsx|mjs|ts|tsx|json)$/.test(entry.name) &&
+      !entry.name.endsWith(".coverage.test.tsx")
+    ) {
       files.push(filePath);
+    }
   }
   return files;
 }

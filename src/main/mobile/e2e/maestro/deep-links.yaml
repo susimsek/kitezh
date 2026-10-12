@@ -1,0 +1,20 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- openLink:
+    link: "kitezh://verify-email?token=synthetic-invalid-token"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Verify your email|E-postanızı doğrulayın"
+    timeout: 180000
+- openLink:
+    link: "kitezh://reset-password?token=synthetic-invalid-token"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Choose a new password|Yeni parola belirleyin"
+    timeout: 180000
+- assertVisible: "Reset token|Sıfırlama belirteci"

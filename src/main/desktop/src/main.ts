@@ -23,6 +23,12 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { colors, iconMetadata, messages, type ThemeMode } from "@kitezh/shared";
+import {
+  controlSizes,
+  radii,
+  spacing,
+  typography,
+} from "@kitezh/shared/theme/runtime";
 
 import {
   DESKTOP_PROTOCOL,
@@ -40,12 +46,17 @@ import {
   parseSocialLinkCallback,
   sanitizedAuthCallback,
   type DesktopTokens,
+  type DesktopConsoleName,
   type PendingAuthorization as PendingAuthorizationData,
 } from "./security/auth-flow";
 import {
   appendBoundedDiagnosticLine,
   redactDiagnosticText,
 } from "./security/diagnostics";
+import {
+  readPendingAuthorizationStore,
+  writePendingAuthorizationStore,
+} from "./security/auth-transaction-vault";
 import type {
   DesktopSocialLinkCompleteRequest,
   DesktopSocialLinkStartRequest,
@@ -55,6 +66,7 @@ import {
   isTrustedRendererFrame,
   isTrustedRendererUrl,
 } from "./security/origin-policy";
+import { registerGlobalShortcutWithFallback } from "./security/global-shortcut";
 import {
   checkForUpdates,
   configureAutoUpdater,
@@ -73,11 +85,35 @@ const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
 const DESKTOP_LANGUAGE_FILE = "desktop-language.json";
 const DESKTOP_THEME_FILE = "desktop-theme.json";
 const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
+const PENDING_AUTHORIZATIONS_FILE = "desktop-pending-authorizations.bin";
 const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
 let diagnosticsWriteQueue: Promise<void> = Promise.resolve();
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
+const backgroundE2e = process.env.DESKTOP_E2E_BACKGROUND === "true";
+if (
+  process.platform === "linux" &&
+  !app.isPackaged &&
+  backgroundE2e &&
+  process.env.DESKTOP_E2E_TEST_STORAGE === "true"
+) {
+  // CI has no desktop keyring; the E2E profile is disposable and must not use this outside tests.
+  safeStorage.setUsePlainTextEncryption(true);
+}
 app.setName(DESKTOP_APP_NAME);
+
+function desktopOsIdentifier() {
+  return process.platform;
+}
+
+function showWindow(window: BrowserWindow) {
+  if (backgroundE2e) return;
+  window.show();
+}
+
+function focusWindow(window: BrowserWindow) {
+  if (!backgroundE2e) window.focus();
+}
 
 type DesktopTheme = ThemeMode;
 type DesktopLanguage = "en" | "tr";
@@ -224,8 +260,41 @@ function nativeDialogThemeCss() {
         --dialog-foreground: ${palette.text};
         --dialog-secondary: ${palette.textMuted};
         --dialog-button: ${palette.surfaceMuted};
-        --dialog-button-hover: ${palette.border};
+        --dialog-button-hover: ${palette.surfaceHover};
         --dialog-border: ${palette.border};
+        --dialog-surface: ${palette.surface};
+        --dialog-primary: ${palette.primary};
+        --dialog-primary-hover: ${palette.primaryPressed};
+        --dialog-on-primary: ${palette.onPrimary};
+        --dialog-danger: ${palette.danger};
+        --dialog-control-compact: ${controlSizes.desktopCompact}px;
+        --dialog-control-default: ${controlSizes.desktopDefault}px;
+        --dialog-page-title: ${typography.pageTitle}px;
+        --dialog-space-sm: ${spacing.sm}px;
+        --dialog-space-md: ${spacing.md}px;
+        --dialog-space-lg: ${spacing.lg}px;
+        --dialog-radius-sm: ${radii.sm}px;
+        --dialog-radius-md: ${radii.md}px;
+      }
+      :where(button, input, select, textarea, a, [tabindex]):focus-visible {
+        outline: 2px solid var(--dialog-primary);
+        outline-offset: 2px;
+      }
+      @media (forced-colors: active) {
+        :where(button, input, select, textarea, a, [tabindex]):focus-visible {
+          outline-color: Highlight;
+        }
+        :where(button, input, select, textarea) {
+          border-color: ButtonText;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
       }`;
 }
 
@@ -247,6 +316,7 @@ let companionWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let updateCheckWindow: BrowserWindow | null = null;
+let updateCheckWindowReady: Promise<void> | null = null;
 let updateResultWindow: BrowserWindow | null = null;
 let updateAvailableWindow: BrowserWindow | null = null;
 let updateConfirmationWindow: BrowserWindow | null = null;
@@ -258,10 +328,12 @@ let manualUpdateCheckRequested = false;
 let suppressNextUpdateNotification = false;
 let latestUpdateStatus: DesktopUpdateStatus | null = null;
 let logoutMenuItem: MenuItem | null = null;
-type ConsoleName = "admin" | "account";
+type ConsoleName = DesktopConsoleName;
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
 type PendingSocialLink = PendingAuthorizationData & { provider: string };
 const pendingSocialLinks = new Map<string, PendingSocialLink>();
+let pendingAuthorizationWrite: Promise<void> = Promise.resolve();
+let pendingAuthorizationsRestored = false;
 type StoredTokens = DesktopTokens;
 type UpdatePreferences = {
   skippedVersion?: string;
@@ -459,16 +531,16 @@ async function desktopLoginHtml() {
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; max-width: 560px; padding: 42px 36px 34px; text-align: center; }
       img { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 22px; }
-      .eyebrow { color: #1683ff; font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-      h1 { margin: 12px 0 8px; font-size: 30px; line-height: 1.15; font-weight: 750; }
+      .eyebrow { color: var(--dialog-primary); font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 12px 0 8px; font-size: var(--dialog-page-title); line-height: 1.15; font-weight: 750; }
       .description { margin: 0 0 26px; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
       .option { margin-top: 14px; }
-      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: #1683ff; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
-      button:hover { background: #0b72e4; }
+      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+      button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: wait; opacity: .7; }
       .option p { margin: 8px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.35; }
       .hint { margin: 28px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.45; }
-      .error { display: none; margin: 18px 0 0; padding: 11px 14px; border: 1px solid #d93025; border-radius: 8px; color: #d93025; font-size: 13px; line-height: 1.4; }
+      .error { display: none; margin: 18px 0 0; padding: 11px 14px; border: 1px solid var(--dialog-danger); border-radius: 8px; color: var(--dialog-danger); font-size: 13px; line-height: 1.4; }
       .error.visible { display: block; }
       .status { display: none; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 14px; }
       .status.visible { display: block; }
@@ -540,6 +612,16 @@ async function desktopSettingsHtml() {
         system: "Sistem",
         english: "English",
         turkish: "Türkçe",
+        generalDescription:
+          "Başlangıç, dil ve hızlı erişim ayarlarını yönetin.",
+        notificationsDescription:
+          "Kitezh’in masaüstü bildirimlerini gösterip göstermeyeceğini seçin.",
+        appearanceDescription:
+          "Kitezh’in sistem görünümünü nasıl izleyeceğini seçin.",
+        updatesDescription:
+          "Kitezh’in masaüstü güncellemelerini nasıl alacağını seçin.",
+        diagnosticsDescription:
+          "Sorun giderirken güvenli çalışma zamanı bilgilerini inceleyin.",
         theme: "Tema",
         light: "Açık",
         dark: "Koyu",
@@ -576,6 +658,14 @@ async function desktopSettingsHtml() {
         system: "System",
         english: "English",
         turkish: "Türkçe",
+        generalDescription: "Manage startup, language, and quick access.",
+        notificationsDescription:
+          "Choose whether Kitezh can show desktop notifications.",
+        appearanceDescription:
+          "Choose how Kitezh follows your system appearance.",
+        updatesDescription: "Choose how Kitezh receives desktop updates.",
+        diagnosticsDescription:
+          "Review safe runtime information when troubleshooting.",
         theme: "Theme",
         light: "Light",
         dark: "Dark",
@@ -604,9 +694,25 @@ async function desktopSettingsHtml() {
     process.platform === "darwin"
       ? `<label class="setting-row"><span>${labels.showInDock}</span><input id="desktop-show-in-dock" type="checkbox"></label>`
       : "";
+  const navigationIcons = {
+    general:
+      '<circle cx="12" cy="6" r="2"></circle><path d="M4 6h6m4 0h6M4 12h2m4 0h10M4 18h10m4 0h2"></path><circle cx="8" cy="12" r="2"></circle><circle cx="16" cy="18" r="2"></circle>',
+    notifications:
+      '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path>',
+    appearance:
+      '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path>',
+    updates:
+      '<path d="M20 7v5h-5M4 17v-5h5"></path><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"></path>',
+    diagnostics:
+      '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5m0-8h.01"></path>',
+  };
+  const navigationButton = (
+    section: keyof typeof navigationIcons,
+    label: string,
+    selected: boolean,
+  ) =>
+    `<button type="button" data-section="${section}" aria-selected="${selected}" aria-label="${label}"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${navigationIcons[section]}</svg><span>${label}</span></button>`;
   const currentTheme = nativeTheme.themeSource;
-  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
-  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   return `<!doctype html>
 <html lang="${isTurkish ? "tr" : "en"}">
   <head>
@@ -617,54 +723,69 @@ async function desktopSettingsHtml() {
       ${nativeDialogThemeCss()}
       :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      header { display: flex; align-items: center; gap: 14px; padding: 22px 28px 16px; border-bottom: 1px solid var(--dialog-border); }
-      header img { width: 38px; height: 38px; border-radius: 10px; }
-      header h1 { margin: 0; font-size: 24px; line-height: 1.2; }
-      .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 540px; }
-      nav { padding: 18px 14px; border-right: 1px solid var(--dialog-border); }
-      nav input { width: 100%; margin-bottom: 12px; }
-      nav button { display: block; width: 100%; margin: 3px 0; padding: 11px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--dialog-foreground); text-align: left; font: inherit; cursor: pointer; }
-      nav button:hover, nav button[aria-selected="true"] { background: var(--dialog-button); }
-      .no-results { margin: 8px 4px; color: var(--dialog-secondary); font-size: 13px; }
-      main { padding: 30px 36px 28px; max-width: 760px; }
+      body { margin: 0; min-height: 100vh; overflow: hidden; background: var(--dialog-background); color: var(--dialog-foreground); }
+      header { display: flex; align-items: center; min-height: 64px; padding: 16px 24px; border-bottom: 1px solid var(--dialog-border); }
+      header h1 { margin: 0; font-size: 21px; line-height: 1.25; font-weight: 650; letter-spacing: -.02em; }
+      .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); height: calc(100vh - 64px); min-height: 0; }
+      nav { min-height: 0; overflow-y: auto; padding: 20px 12px; border-right: 1px solid var(--dialog-border); }
+      .search-box { position: relative; margin: 0 4px 20px; }
+      .search-box svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--dialog-secondary); pointer-events: none; }
+      nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: 42px; margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: 10px; background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
+      nav input[type="search"]::placeholder { color: var(--dialog-secondary); opacity: .8; }
+      nav button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: var(--dialog-control-default); margin: 3px 0; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dialog-secondary); text-align: left; font: inherit; font-size: 14px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+      nav button svg { flex: 0 0 17px; width: 17px; height: 17px; }
+      nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      nav button:hover { background: var(--dialog-button-hover); color: var(--dialog-foreground); }
+      nav button[aria-selected="true"] { background: var(--dialog-button); color: var(--dialog-foreground); font-weight: 600; }
+      nav button[aria-selected="true"] svg { color: var(--dialog-primary); }
+      .no-results { margin: 10px 8px; color: var(--dialog-secondary); font-size: 14px; }
+      main { min-width: 0; overflow-y: auto; padding: 32px clamp(24px, 4vw, 52px) 28px; }
       section[hidden] { display: none; }
       h2 { margin: 0 0 8px; font-size: 25px; }
-      .intro { margin: 0 0 24px; color: var(--dialog-secondary); line-height: 1.45; }
-      .card { border: 1px solid var(--dialog-border); border-radius: 12px; padding: 18px; }
+      .intro { max-width: 58rem; margin: 0 0 24px; color: var(--dialog-secondary); line-height: 1.5; }
+      .card { border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-md); padding: 8px 18px; background: var(--dialog-surface); }
       .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 50px; padding: 7px 0; border-bottom: 1px solid var(--dialog-border); }
       .setting-row:last-child { border-bottom: 0; }
       .setting-row span { font-size: 15px; }
-      select, input[type="text"] { min-height: 38px; padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: 7px; background: var(--dialog-background); color: var(--dialog-foreground); font: inherit; }
-      input[type="checkbox"] { width: 19px; height: 19px; accent-color: #1683ff; }
+      select, input[type="text"] { min-height: var(--dialog-control-compact); padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; }
+      input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--dialog-primary); }
       .theme-options { display: flex; gap: 8px; }
       .theme-options label { display: flex; align-items: center; gap: 6px; }
       .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
-      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 8px; background: #1683ff; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 9px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
+      button.action:hover { background: var(--dialog-primary-hover); }
       button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
       button:disabled { cursor: wait; opacity: .65; }
       .inline-spinner { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: diagnostics-spin .7s linear infinite; vertical-align: -2px; }
       @keyframes diagnostics-spin { to { transform: rotate(360deg); } }
       .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
       pre { overflow: auto; max-height: 300px; padding: 14px; border-radius: 8px; background: var(--dialog-button); color: var(--dialog-secondary); white-space: pre-wrap; word-break: break-word; }
+      @media (max-width: 760px) {
+        header { padding: 14px 20px; }
+        .layout { grid-template-columns: 1fr; height: calc(100vh - 64px); min-height: 0; }
+        nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--dialog-border); }
+        .search-box { grid-column: 1 / -1; }
+        main { max-width: none; padding: 22px 20px; }
+        .setting-row { flex-wrap: wrap; }
+      }
     </style>
   </head>
   <body>
-    <header><img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo"><h1>${labels.title}</h1></header>
+    <header><h1>${labels.title}</h1></header>
     <div class="layout">
       <nav aria-label="${labels.title}">
-        <input id="desktop-settings-search" type="text" placeholder="${labels.search}" aria-label="${labels.search}">
-        <button type="button" data-section="general" aria-selected="true">${labels.general}</button>
-        <button type="button" data-section="notifications" aria-selected="false">${labels.notifications}</button>
-        <button type="button" data-section="appearance" aria-selected="false">${labels.appearance}</button>
-        <button type="button" data-section="updates" aria-selected="false">${labels.updates}</button>
-        <button type="button" data-section="diagnostics" aria-selected="false">${labels.diagnostics}</button>
+        <div class="search-box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="desktop-settings-search" type="search" placeholder="${labels.search}" aria-label="${labels.search}"></div>
+        ${navigationButton("general", labels.general, true)}
+        ${navigationButton("notifications", labels.notifications, false)}
+        ${navigationButton("appearance", labels.appearance, false)}
+        ${navigationButton("updates", labels.updates, false)}
+        ${navigationButton("diagnostics", labels.diagnostics, false)}
         <div id="desktop-settings-no-results" class="no-results" hidden>${labels.noResults}</div>
       </nav>
       <main aria-label="${labels.title}">
         <section data-panel="general">
           <h2>${labels.general}</h2>
-          <p class="intro">${labels.launchAtLogin}</p>
+          <p class="intro">${labels.generalDescription}</p>
           <div class="card">
             <label class="setting-row"><span>${labels.language}</span><select id="desktop-language"><option value="system">${labels.system}</option><option value="en">${labels.english}</option><option value="tr">${labels.turkish}</option></select></label>
             <label class="setting-row"><span>${labels.launchAtLogin}</span><input id="desktop-launch-at-login" type="checkbox"></label>
@@ -677,12 +798,12 @@ async function desktopSettingsHtml() {
         </section>
         <section data-panel="notifications" hidden>
           <h2>${labels.notifications}</h2>
-          <p class="intro">${labels.notificationsEnabled}</p>
+          <p class="intro">${labels.notificationsDescription}</p>
           <div class="card"><label class="setting-row"><span>${labels.notificationsEnabled}</span><input id="desktop-notifications" type="checkbox"></label></div>
         </section>
         <section data-panel="appearance" hidden>
           <h2>${labels.appearance}</h2>
-          <p class="intro">${labels.theme}</p>
+          <p class="intro">${labels.appearanceDescription}</p>
           <div class="card theme-options">
             <label><input type="radio" name="desktop-theme" value="system">${labels.system}</label>
             <label><input type="radio" name="desktop-theme" value="light">${labels.light}</label>
@@ -691,13 +812,13 @@ async function desktopSettingsHtml() {
         </section>
         <section data-panel="updates" hidden>
           <h2>${labels.updates}</h2>
-          <p class="intro">${labels.automaticDownload}</p>
+          <p class="intro">${labels.updatesDescription}</p>
           <div class="card"><label class="setting-row"><span>${labels.automaticDownload}</span><input id="desktop-automatic-download" type="checkbox"></label></div>
           <div class="actions"><span></span><button id="desktop-check-for-updates" class="action" type="button">${labels.checkForUpdates}</button></div>
         </section>
         <section data-panel="diagnostics" hidden>
           <h2>${labels.diagnostics}</h2>
-          <p class="intro">${labels.diagnosticsHelp}</p>
+          <p class="intro">${labels.diagnosticsDescription}</p>
           <div class="card"><pre id="desktop-diagnostics">${labels.unavailable}</pre><div class="actions"><span></span><button id="desktop-copy-diagnostics" class="action secondary" type="button">${labels.copyDiagnostics}</button></div></div>
         </section>
         <div class="actions"><span id="desktop-status" class="status"></span><button id="desktop-reset" class="action secondary" type="button">${labels.reset}</button></div>
@@ -717,7 +838,7 @@ async function desktopSettingsHtml() {
       const setButtonBusy = (button, busy) => { let spinner = button.querySelector(".inline-spinner"); if (busy) { if (!spinner) { spinner = document.createElement("span"); spinner.className = "inline-spinner"; spinner.setAttribute("aria-hidden", "true"); button.prepend(spinner); } button.disabled = true; button.setAttribute("aria-busy", "true"); } else { spinner?.remove(); button.disabled = false; button.removeAttribute("aria-busy"); } };
       const showSection = (name) => { sections.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.section === name))); panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; }); if (name === "diagnostics") void loadDiagnostics(); };
       sections.forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section)));
-      search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); let visible = 0; sections.forEach((button) => { const matches = !query || button.textContent.toLocaleLowerCase().includes(query); button.hidden = !matches; if (matches) visible += 1; }); noResults.hidden = visible > 0; if (visible === 0) panels.forEach((panel) => { panel.hidden = true; }); });
+      search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); const matchingSections = sections.filter((button) => { const panel = panels.find((candidate) => candidate.dataset.panel === button.dataset.section); const content = (button.textContent + " " + (panel?.textContent ?? "")).toLocaleLowerCase(); const matches = !query || content.includes(query); button.hidden = !matches; return matches; }); noResults.hidden = matchingSections.length > 0; if (matchingSections.length === 0) { panels.forEach((panel) => { panel.hidden = true; }); return; } const activeButton = sections.find((button) => button.getAttribute("aria-selected") === "true"); const next = activeButton && !activeButton.hidden ? activeButton : matchingSections[0]; showSection(next.dataset.section); });
       const setPreferences = async (value) => { setBusy(true); setStatus(labels.saving); try { const next = await api.preferences.set(value); applyPreferences(next); setStatus(labels.saved); shortcutStatus.textContent = ""; } catch (error) { const unavailable = error instanceof Error && error.message === "Global shortcut is unavailable"; setStatus(unavailable ? labels.shortcutUnavailable : labels.unavailable); if (unavailable) shortcutStatus.textContent = labels.shortcutUnavailable; } finally { setBusy(false); } };
       const applyPreferences = (value) => { document.getElementById("desktop-launch-at-login").checked = Boolean(value.launchAtLogin); document.getElementById("desktop-show-in-menu-bar").checked = Boolean(value.showInMenuBar); const dock = document.getElementById("desktop-show-in-dock"); if (dock) dock.checked = Boolean(value.showInDock); document.getElementById("desktop-notifications").checked = Boolean(value.notifications); document.getElementById("desktop-automatic-download").checked = Boolean(value.automaticDownload); document.getElementById("desktop-global-shortcut").value = value.globalShortcut || "Alt+Space"; };
       const loadPreferences = async () => { try { applyPreferences(await api.preferences.get()); const languageMode = await api.language.getMode(); document.getElementById("desktop-language").value = languageMode; document.querySelector("input[name='desktop-theme'][value='${currentTheme}']").checked = true; } catch { setStatus(labels.unavailable); } };
@@ -787,7 +908,7 @@ async function sendDeepLink(value: string) {
   if (parseLogoutCallback(value)) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+      focusWindow(mainWindow);
     }
     return;
   }
@@ -849,6 +970,10 @@ async function sendDeepLink(value: string) {
   }
   const callback = parseAuthCallback(value);
   if (!callback) return;
+  if (!pendingAuthorizationsRestored) {
+    pendingDeepLink = value;
+    return;
+  }
   const pending = [...pendingAuthorizations.entries()].find(([, value]) =>
     isPendingAuthorizationValid(value, callback.state),
   );
@@ -858,6 +983,7 @@ async function sendDeepLink(value: string) {
     return;
   }
   pendingAuthorizations.delete(pending[0]);
+  await persistPendingAuthorizations();
   const sendAuthCallback = (payload: {
     console: ConsoleName;
     url: string;
@@ -893,8 +1019,8 @@ async function sendDeepLink(value: string) {
   });
   closeDesktopLoginWindow();
   if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
+  showWindow(mainWindow);
+  focusWindow(mainWindow);
 }
 
 async function storeAuthorizationCode(
@@ -907,6 +1033,11 @@ async function storeAuthorizationCode(
     getApiBaseUrl(),
     pending,
     code,
+    {
+      appVersion: app.getVersion(),
+      clientPlatform: "desktop",
+      os: desktopOsIdentifier(),
+    },
   );
   const vault = await readVault();
   vault[consoleName] = tokens;
@@ -915,6 +1046,47 @@ async function storeAuthorizationCode(
 
 function storagePath() {
   return path.join(app.getPath("userData"), "desktop-sessions.bin");
+}
+
+function pendingAuthorizationsPath() {
+  return path.join(app.getPath("userData"), PENDING_AUTHORIZATIONS_FILE);
+}
+
+async function persistPendingAuthorizations() {
+  const snapshot = Object.fromEntries(pendingAuthorizations);
+  pendingAuthorizationWrite = pendingAuthorizationWrite
+    .catch(() => undefined)
+    .then(() =>
+      writePendingAuthorizationStore(
+        pendingAuthorizationsPath(),
+        snapshot,
+        safeStorage,
+      ),
+    );
+  await pendingAuthorizationWrite;
+}
+
+async function restorePendingAuthorizations() {
+  const file = pendingAuthorizationsPath();
+  if (existsSync(file)) {
+    if (!safeStorage.isEncryptionAvailable()) {
+      await appendDiagnosticEvent("auth-transaction-storage-unavailable");
+      pendingAuthorizationsRestored = true;
+      return;
+    }
+    try {
+      const restored = await readPendingAuthorizationStore(file, safeStorage);
+      for (const [consoleName, pending] of Object.entries(restored)) {
+        if (pending)
+          pendingAuthorizations.set(consoleName as ConsoleName, pending);
+      }
+      await persistPendingAuthorizations();
+    } catch {
+      await rm(file, { force: true });
+      await appendDiagnosticEvent("auth-transaction-restore-failed");
+    }
+  }
+  pendingAuthorizationsRestored = true;
 }
 
 function windowStatePath() {
@@ -1259,7 +1431,7 @@ async function logoutDesktopSession(consoleName: ConsoleName) {
 
 async function showAboutDialog() {
   if (aboutWindow && !aboutWindow.isDestroyed()) {
-    aboutWindow.focus();
+    focusWindow(aboutWindow);
     return;
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
@@ -1319,12 +1491,12 @@ async function showAboutDialog() {
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
   aboutWindow.center();
-  aboutWindow.show();
+  showWindow(aboutWindow);
 }
 
 async function showSettingsWindow() {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.focus();
+    focusWindow(settingsWindow);
     return;
   }
   const settingsParent =
@@ -1337,9 +1509,9 @@ async function showSettingsWindow() {
     parent: settingsParent,
     modal: false,
     width: 1100,
-    height: 640,
+    height: 720,
     minWidth: 900,
-    minHeight: 560,
+    minHeight: 600,
     title: isTurkishDesktop()
       ? `${DESKTOP_APP_NAME} ayarları`
       : `${DESKTOP_APP_NAME} Settings`,
@@ -1507,8 +1679,8 @@ async function applyLaunchAtLogin(enabled: boolean) {
 function focusMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
+  showWindow(mainWindow);
+  focusWindow(mainWindow);
 }
 
 function focusVisibleConsoleWindow() {
@@ -1553,14 +1725,14 @@ async function desktopCompanionHtml() {
       main { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
       section { width: min(100%, 390px); text-align: center; }
       img { width: 76px; height: 76px; border-radius: 18px; margin-bottom: 1.25rem; }
-      .eyebrow { color: #1677ff; font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
+      .eyebrow { color: var(--dialog-primary); font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
       h1 { font-size: 1.65rem; margin: .6rem 0 .45rem; }
       p { color: var(--dialog-secondary); font-size: .98rem; margin: 0 0 1.5rem; }
       .actions { display: grid; gap: .75rem; }
-      button { align-items: center; background: #1677ff; border: 0; border-radius: 10px; color: white; cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
-      button:hover { background: #0f5fd2; }
+      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: 10px; color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
+      button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: default; opacity: .65; }
-      .spinner { animation: spin 800ms linear infinite; border: 2px solid rgba(255,255,255,.45); border-radius: 50%; border-top-color: white; height: 16px; width: 16px; }
+      .spinner { animation: spin 800ms linear infinite; border: 2px solid color-mix(in srgb, var(--dialog-on-primary) 45%, transparent); border-radius: 50%; border-top-color: var(--dialog-on-primary); height: 16px; width: 16px; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
@@ -1604,8 +1776,8 @@ async function desktopCompanionHtml() {
 
 async function showDesktopLoginWindow() {
   if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
-    desktopLoginWindow.show();
-    desktopLoginWindow.focus();
+    showWindow(desktopLoginWindow);
+    focusWindow(desktopLoginWindow);
     return;
   }
   desktopLoginWindow = new BrowserWindow({
@@ -1649,8 +1821,8 @@ async function showDesktopLoginWindow() {
   );
   if (loginWindow.isDestroyed() || desktopLoginWindow !== loginWindow) return;
   loginWindow.center();
-  loginWindow.show();
-  loginWindow.focus();
+  showWindow(loginWindow);
+  focusWindow(loginWindow);
 }
 
 function closeDesktopLoginWindow() {
@@ -1663,8 +1835,8 @@ function closeDesktopLoginWindow() {
 async function showCompanionWindow() {
   if (companionWindow && !companionWindow.isDestroyed()) {
     if (companionWindow.isMinimized()) companionWindow.restore();
-    companionWindow.show();
-    companionWindow.focus();
+    showWindow(companionWindow);
+    focusWindow(companionWindow);
     return;
   }
   const state = await readCompanionWindowState();
@@ -1716,8 +1888,8 @@ async function showCompanionWindow() {
     `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-companion`,
   );
   if (state?.x === undefined || state.y === undefined) companionWindow.center();
-  companionWindow.show();
-  companionWindow.focus();
+  showWindow(companionWindow);
+  focusWindow(companionWindow);
 }
 
 function closeCompanionWindow() {
@@ -1764,16 +1936,12 @@ function isValidGlobalShortcut(accelerator: string) {
 }
 
 function registerGlobalShortcut(accelerator: string) {
-  globalShortcut.unregisterAll();
-  try {
-    if (globalShortcut.register(accelerator, toggleQuickAccess)) return true;
-  } catch {
-    // Invalid or unavailable accelerators fall back to the default shortcut.
-  }
-  if (!globalShortcut.register(DEFAULT_GLOBAL_SHORTCUT, toggleQuickAccess)) {
-    return false;
-  }
-  return false;
+  return registerGlobalShortcutWithFallback(
+    globalShortcut,
+    accelerator,
+    DEFAULT_GLOBAL_SHORTCUT,
+    toggleQuickAccess,
+  ).registered;
 }
 
 function createTray() {
@@ -1948,7 +2116,7 @@ async function handleAvailableUpdate(version: string) {
 
 async function showUpdateCheckWindow() {
   if (updateCheckWindow && !updateCheckWindow.isDestroyed()) {
-    updateCheckWindow.focus();
+    focusWindow(updateCheckWindow);
     return;
   }
   const isTurkish = isTurkishDesktop();
@@ -1995,7 +2163,7 @@ async function showUpdateCheckWindow() {
       img { width: 104px; height: 104px; border-radius: 22px; }
       h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
       .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: var(--dialog-border); }
-      .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: #1683ff; transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
+      .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: var(--dialog-primary); transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
       @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
       button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
       button:hover { background: var(--dialog-button-hover); }
@@ -2018,7 +2186,7 @@ async function showUpdateCheckWindow() {
   if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow)
     return;
   checkingWindow.center();
-  checkingWindow.show();
+  showWindow(checkingWindow);
 }
 
 function closeUpdateCheckWindow() {
@@ -2030,7 +2198,7 @@ function closeUpdateCheckWindow() {
 
 async function showUpdateNotAvailableWindow() {
   if (updateResultWindow && !updateResultWindow.isDestroyed()) {
-    updateResultWindow.focus();
+    focusWindow(updateResultWindow);
     return;
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
@@ -2097,7 +2265,7 @@ async function showUpdateNotAvailableWindow() {
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
   updateResultWindow.center();
-  updateResultWindow.show();
+  showWindow(updateResultWindow);
 }
 
 async function confirmAndInstallUpdate() {
@@ -2115,7 +2283,7 @@ function requestUpdateCheck() {
 
 async function showUpdateConfirmation() {
   if (updateConfirmationWindow && !updateConfirmationWindow.isDestroyed()) {
-    updateConfirmationWindow.focus();
+    focusWindow(updateConfirmationWindow);
     return false;
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
@@ -2179,7 +2347,7 @@ async function showUpdateConfirmation() {
       p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: var(--dialog-secondary); }
       footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
       button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button.primary { background: #1683ff; }
+      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
       button:hover { filter: brightness(1.12); }
     </style>
   </head>
@@ -2199,7 +2367,7 @@ async function showUpdateConfirmation() {
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
   updateConfirmationWindow.center();
-  updateConfirmationWindow.show();
+  showWindow(updateConfirmationWindow);
   return new Promise<boolean>((resolve) => {
     updateConfirmationResolver = resolve;
   });
@@ -2306,10 +2474,10 @@ async function showUpdateDialog(version: string, force = false) {
       h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
       p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: var(--dialog-secondary); }
       label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: var(--dialog-foreground); }
-      input { width: 25px; height: 25px; accent-color: #1683ff; }
+      input { width: 25px; height: 25px; accent-color: var(--dialog-primary); }
       footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
       button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
-      button.primary { background: #1683ff; }
+      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
       button:hover { filter: brightness(1.12); }
     </style>
   </head>
@@ -2333,7 +2501,8 @@ async function showUpdateDialog(version: string, force = false) {
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
   dialogWindow.center();
-  dialogWindow.show();
+  showWindow(dialogWindow);
+  focusWindow(dialogWindow);
 }
 
 function closeUpdateAvailableWindow(window = updateAvailableWindow) {
@@ -2351,11 +2520,15 @@ function setLogoutMenuVisible(visible: boolean) {
 }
 
 function toggleDeveloperTools() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.webContents.isDevToolsOpened()) {
-    mainWindow.webContents.closeDevTools();
+  const targetWindow =
+    BrowserWindow.getFocusedWindow() ??
+    BrowserWindow.getAllWindows().find((window) => window.isVisible()) ??
+    mainWindow;
+  if (!targetWindow || targetWindow.isDestroyed()) return;
+  if (targetWindow.webContents.isDevToolsOpened()) {
+    targetWindow.webContents.closeDevTools();
   } else {
-    mainWindow.webContents.openDevTools({ mode: "detach" });
+    targetWindow.webContents.openDevTools({ mode: "detach" });
   }
 }
 
@@ -2469,7 +2642,7 @@ async function createWindow() {
     height: state?.height ?? 960,
     minWidth: 960,
     minHeight: 640,
-    show: hasStoredSession,
+    show: hasStoredSession && !backgroundE2e,
     backgroundColor: desktopBackgroundColor(),
     webPreferences: {
       contextIsolation: true,
@@ -2522,7 +2695,9 @@ async function createWindow() {
   });
   if (state?.maximized) mainWindow.maximize();
   if (hasStoredSession) {
-    mainWindow.webContents.once("did-finish-load", () => mainWindow?.show());
+    mainWindow.webContents.once("did-finish-load", () => {
+      if (mainWindow) showWindow(mainWindow);
+    });
   }
   if (!hasStoredSession) void showDesktopLoginWindow().catch(() => undefined);
   if (pendingDeepLink) {
@@ -2544,11 +2719,18 @@ function registerIpc() {
     event.returnValue = {
       apiBaseUrl: getApiBaseUrl(),
       protocol: DESKTOP_PROTOCOL,
+      appVersion: app.getVersion(),
+      os: desktopOsIdentifier(),
     };
   });
   ipcMain.handle("desktop:config", (event) => {
     assertTrustedSender(event);
-    return { apiBaseUrl: getApiBaseUrl(), protocol: DESKTOP_PROTOCOL };
+    return {
+      apiBaseUrl: getApiBaseUrl(),
+      protocol: DESKTOP_PROTOCOL,
+      appVersion: app.getVersion(),
+      os: desktopOsIdentifier(),
+    };
   });
   ipcMain.handle("desktop:open-external", async (event, value: unknown) => {
     assertTrustedSender(event);
@@ -2719,8 +2901,8 @@ function registerIpc() {
     assertTrustedSender(event);
     if (!settingsWindow || settingsWindow.isDestroyed()) return;
     settingsWindow.center();
-    settingsWindow.show();
-    settingsWindow.focus();
+    showWindow(settingsWindow);
+    focusWindow(settingsWindow);
   });
   ipcMain.handle(
     "desktop:companion-open-console",
@@ -2744,8 +2926,8 @@ function registerIpc() {
     await mainWindow.loadURL(
       `${RENDERER_PROTOCOL}://${RENDERER_HOST}/native?console=${value}`,
     );
-    mainWindow.show();
-    mainWindow.focus();
+    showWindow(mainWindow);
+    focusWindow(mainWindow);
     closeDesktopLoginWindow();
   });
   ipcMain.handle(
@@ -2761,18 +2943,24 @@ function registerIpc() {
       const nativeRequest = nativeAuthorizationRequest(request);
       pendingAuthorizations.set(request, nativeRequest.pending);
       try {
+        await persistPendingAuthorizations();
         await shell.openExternal(nativeRequest.authorizationUrl.toString());
       } catch {
         pendingAuthorizations.delete(request);
+        await persistPendingAuthorizations();
         throw new Error("Desktop authorization browser could not be opened");
       }
     },
   );
-  ipcMain.handle("desktop:auth-cancel-login", (event, consoleName: unknown) => {
-    assertTrustedSender(event);
-    assertConsole(consoleName);
-    pendingAuthorizations.delete(consoleName);
-  });
+  ipcMain.handle(
+    "desktop:auth-cancel-login",
+    async (event, consoleName: unknown) => {
+      assertTrustedSender(event);
+      assertConsole(consoleName);
+      pendingAuthorizations.delete(consoleName);
+      await persistPendingAuthorizations();
+    },
+  );
   ipcMain.handle(
     "desktop:auth-has-session",
     async (event, consoleName: unknown) => {
@@ -2914,11 +3102,24 @@ if (!hasLock) {
     }
     installApplicationMenu();
     pendingDeepLink = findDesktopDeepLink();
+    await restorePendingAuthorizations();
     registerDesktopProtocol();
     registerIpc();
     const desktopPreferences = await readDesktopPreferences();
     void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
-    registerGlobalShortcut(desktopPreferences.globalShortcut);
+    const shortcutRegistration = registerGlobalShortcutWithFallback(
+      globalShortcut,
+      desktopPreferences.globalShortcut,
+      DEFAULT_GLOBAL_SHORTCUT,
+      toggleQuickAccess,
+    );
+    if (
+      !shortcutRegistration.registered &&
+      shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
+    ) {
+      desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
+      await writeDesktopPreferences(desktopPreferences);
+    }
     setTrayVisibility(desktopPreferences.showInMenuBar);
     setDockVisibility(desktopPreferences.showInDock);
     const updatePreferences = await readUpdatePreferences();
@@ -2931,13 +3132,23 @@ if (!hasLock) {
     enforceContentSecurityPolicy();
     await registerRendererProtocol();
     void createWindow();
-    configureAutoUpdater((status: DesktopUpdateStatus) => {
+    if (backgroundE2e && process.platform === "darwin") app.hide();
+    configureAutoUpdater(async (status: DesktopUpdateStatus) => {
       void appendDiagnosticEvent(`update-${status.state}`, {
         version: "version" in status ? status.version : undefined,
       });
       if (status.state === "checking") {
-        void showUpdateCheckWindow().catch(() => undefined);
+        if (!updateCheckWindowReady) {
+          updateCheckWindowReady = showUpdateCheckWindow().catch(
+            () => undefined,
+          );
+        }
+        sendUpdateStatus(status);
+        return;
       } else {
+        const checkingWindowReady = updateCheckWindowReady;
+        updateCheckWindowReady = null;
+        await checkingWindowReady?.catch(() => undefined);
         closeUpdateCheckWindow();
       }
       if (status.state === "available") {

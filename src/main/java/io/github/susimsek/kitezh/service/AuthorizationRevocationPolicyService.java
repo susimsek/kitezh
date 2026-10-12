@@ -40,12 +40,16 @@ public class AuthorizationRevocationPolicyService {
 
     @Transactional(readOnly = true)
     public boolean isRevoked(Jwt token) {
-        return isRevoked(
+        return isRevokedAt(
                 token.getSubject(), token.getClaimAsString("client_id"), token.getIssuedAt());
     }
 
     @Transactional(readOnly = true)
     public boolean isRevoked(String username, String clientId, Instant issuedAt) {
+        return isRevokedAt(username, clientId, issuedAt);
+    }
+
+    private boolean isRevokedAt(String username, String clientId, Instant issuedAt) {
         if (issuedAt == null) {
             return false;
         }

@@ -81,6 +81,35 @@ public enum ApiErrorCode {
     GROUP_INVALID_ROLES("group_invalid_roles", "One or more roles are invalid."),
     GROUP_INVALID_ATTRIBUTES("group_invalid_attributes", "Group attributes are invalid."),
     GROUP_INVALID_PERMISSION("group_invalid_permission", "The group permission is invalid."),
+    ORGANIZATION_DUPLICATE_ALIAS(
+            "organization_duplicate_alias", "Organization alias is already registered."),
+    ORGANIZATION_DUPLICATE_DOMAIN(
+            "organization_duplicate_domain", "Organization domain is already registered."),
+    ORGANIZATION_MEMBER_EXISTS(
+            "organization_member_exists", "The user is already an organization member."),
+    ORGANIZATION_INVITATION_USED(
+            "organization_invitation_used", "The organization invitation is no longer available."),
+    ORGANIZATION_INVITATION_EXPIRED(
+            "organization_invitation_expired", "The organization invitation has expired."),
+    ORGANIZATION_INVITATION_EMAIL_MISMATCH(
+            "organization_invitation_email_mismatch",
+            "The invitation email does not match the authenticated user."),
+    ORGANIZATION_INVALID_DOMAIN(
+            "organization_invalid_domain", "Organization domain must be a DNS name."),
+    ORGANIZATION_GROUP_DUPLICATE(
+            "organization_group_duplicate", "Organization group already exists."),
+    ORGANIZATION_GROUP_HAS_CHILDREN(
+            "organization_group_has_children", "Delete child organization groups first."),
+    ORGANIZATION_GROUP_INVALID_PARENT(
+            "organization_group_invalid_parent", "Organization group parent is invalid."),
+    ORGANIZATION_MEMBER_REQUIRED(
+            "organization_member_required", "The user must belong to the organization first."),
+    ORGANIZATION_GROUP_MEMBER_EXISTS(
+            "organization_group_member_exists", "The user is already in the organization group."),
+    ORGANIZATION_CLAIM_DUPLICATE(
+            "organization_claim_duplicate", "Organization claim already exists."),
+    ORGANIZATION_PROVIDER_EXISTS(
+            "organization_provider_exists", "Identity provider is already linked."),
     KEY_ROTATION_FAILED("key_rotation_failed", "The signing key could not be rotated."),
     LAST_ADMIN_PROTECTED("last_admin_protected", "The last administrator must be retained."),
     ROLE_ASSIGNED("role_assigned", "This role is assigned to one or more users."),

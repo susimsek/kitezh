@@ -21,6 +21,7 @@ import type {
 } from "./console-auth-types";
 import { applyConsoleToken, clearConsoleAuth, setConsoleInitialized } from "@/store/auth-slice";
 import { apiUrl, isDesktopRuntime } from "./desktop-api";
+import { getClientMetadataHeaders } from "./client-metadata";
 
 export { CONSOLE_TRANSACTION_KEYS } from "./console-auth-storage";
 export type { ConsoleTokenResponse, JwtPayload } from "./console-auth-types";
@@ -173,7 +174,10 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
             refresh_token: currentRefreshToken,
           }),
           {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: {
+              ...getClientMetadataHeaders(),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
           },
         )
         .then((response) => {
@@ -345,7 +349,10 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
             redirect_uri: transaction.redirectUri,
           }),
           {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: {
+              ...getClientMetadataHeaders(),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
           },
         );
         if (generation !== tokenGeneration.current) {

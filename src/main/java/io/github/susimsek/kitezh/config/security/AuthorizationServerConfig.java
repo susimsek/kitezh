@@ -10,12 +10,14 @@ import io.github.susimsek.kitezh.config.observability.ObservabilityMdcFilter;
 import io.github.susimsek.kitezh.domain.ClientMapperEntity;
 import io.github.susimsek.kitezh.domain.ClientScopeEntity;
 import io.github.susimsek.kitezh.domain.GroupEntity;
+import io.github.susimsek.kitezh.domain.OrganizationClaimEntity;
 import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.ClientMapperRepository;
 import io.github.susimsek.kitezh.repository.ClientScopeMapperRepository;
 import io.github.susimsek.kitezh.repository.ClientScopeRepository;
+import io.github.susimsek.kitezh.repository.OrganizationClaimRepository;
 import io.github.susimsek.kitezh.repository.ServiceAccountRepository;
 import io.github.susimsek.kitezh.repository.SocialIdentityRepository;
 import io.github.susimsek.kitezh.repository.UserAvatarRepository;
@@ -117,7 +119,8 @@ public class AuthorizationServerConfig {
             UserProfileAttributeRepository userProfileAttributeRepository,
             boolean legacyAdminGroups,
             SocialIdentityRepository socialIdentityRepository,
-            ObjectMapper objectMapper) {}
+            ObjectMapper objectMapper,
+            OrganizationClaimRepository organizationClaimRepository) {}
 
     private final ApplicationProperties applicationProperties;
     private final AuthorizationEndpointErrorResponseHandler
@@ -427,7 +430,7 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+    OAuth2TokenCustomizer<JwtEncodingContext> organizationAwareJwtTokenCustomizer(
             UserRepository userRepository,
             UserAvatarRepository userAvatarRepository,
             AuthorizationRepository authorizationRepository,
@@ -437,7 +440,8 @@ public class AuthorizationServerConfig {
             ServiceAccountRepository serviceAccountRepository,
             UserProfileAttributeRepository userProfileAttributeRepository,
             SocialIdentityRepository socialIdentityRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            OrganizationClaimRepository organizationClaimRepository) {
         return jwtTokenCustomizer(
                 new JwtTokenCustomizerDependencies(
                         userRepository,
@@ -450,7 +454,8 @@ public class AuthorizationServerConfig {
                         userProfileAttributeRepository,
                         false,
                         socialIdentityRepository,
-                        objectMapper));
+                        objectMapper,
+                        organizationClaimRepository));
     }
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
@@ -468,6 +473,7 @@ public class AuthorizationServerConfig {
                         null,
                         null,
                         true,
+                        null,
                         null,
                         null));
     }
@@ -491,10 +497,11 @@ public class AuthorizationServerConfig {
                         null,
                         false,
                         socialIdentityRepository,
-                        objectMapper));
+                        objectMapper,
+                        null));
     }
 
-    private OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
             JwtTokenCustomizerDependencies dependencies) {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
@@ -518,7 +525,8 @@ public class AuthorizationServerConfig {
                             adminAccessToken,
                             groupMappers,
                             clientMappers,
-                            dependencies.serviceAccountRepository());
+                            dependencies.serviceAccountRepository(),
+                            dependencies.organizationClaimRepository() != null);
             tokenUser
                     .filter(UserEntity::isServiceAccount)
                     .ifPresent(user -> context.getClaims().subject(user.getUsername()));
@@ -529,6 +537,8 @@ public class AuthorizationServerConfig {
                     dependencies.objectMapper());
             appendUserClaims(
                     context, tokenUser, dependencies.userAvatarRepository(), applicationProperties);
+            appendOrganizationClaims(
+                    context, tokenUser, dependencies.organizationClaimRepository());
             appendNonceClaim(context);
             appendAdminClaims(
                     context, tokenUser, dependencies.legacyAdminGroups(), adminAccessToken);
@@ -659,7 +669,8 @@ public class AuthorizationServerConfig {
             boolean adminAccessToken,
             List<ClientScopeEntity> groupMappers,
             List<TokenMapper> clientMappers,
-            ServiceAccountRepository serviceAccountRepository) {
+            ServiceAccountRepository serviceAccountRepository,
+            boolean organizationClaimsEnabled) {
         if (serviceAccountRepository != null
                 && AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                         context.getAuthorizationGrantType())) {
@@ -681,10 +692,16 @@ public class AuthorizationServerConfig {
                 || !groupMappers.isEmpty()
                 || !clientMappers.isEmpty()
                 || isRoleToken(context)
-                || isUserSocialClaimsToken(context)) {
+                || isUserSocialClaimsToken(context)
+                || (organizationClaimsEnabled && isOrganizationClaimToken(context))) {
             return userRepository.findByUsername(context.getPrincipal().getName());
         }
         return Optional.empty();
+    }
+
+    private static boolean isOrganizationClaimToken(JwtEncodingContext context) {
+        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                || OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue());
     }
 
     private static void appendUserClaims(
@@ -729,6 +746,43 @@ public class AuthorizationServerConfig {
                         }
                     });
         }
+    }
+
+    private static void appendOrganizationClaims(
+            JwtEncodingContext context,
+            Optional<UserEntity> tokenUser,
+            OrganizationClaimRepository claimRepository) {
+        if (claimRepository == null || tokenUser.isEmpty()) {
+            return;
+        }
+        boolean accessToken = OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType());
+        boolean idToken = OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue());
+        if (!accessToken && !idToken) {
+            return;
+        }
+        List<OrganizationClaimEntity> claims =
+                claimRepository.findEnabledClaimsForUser(tokenUser.get().getId());
+        Map<String, List<String>> values = new java.util.LinkedHashMap<>();
+        claims.stream()
+                .filter(
+                        claim ->
+                                (accessToken
+                                                && (claim.isAddToAccessToken()
+                                                        || claim.isAddToUserInfo()))
+                                        || (idToken && claim.isAddToIdToken()))
+                .forEach(
+                        claim ->
+                                values.computeIfAbsent(
+                                                claim.getClaimName(), ignored -> new ArrayList<>())
+                                        .add(claim.getClaimValue()));
+        values.forEach(
+                (name, claimValues) ->
+                        context.getClaims()
+                                .claim(
+                                        name,
+                                        claimValues.size() == 1
+                                                ? claimValues.getFirst()
+                                                : claimValues));
     }
 
     private static void appendNonceClaim(JwtEncodingContext context) {

@@ -51,7 +51,7 @@ test("keeps Linux system packages outside the in-app update path", () => {
   );
 });
 
-test("restores a backed-up installation and removes the recovery marker", async () => {
+test("restores a backed-up installation and preserves the recovery marker for startup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "kitezh-rollback-"));
   const targetPath = path.join(root, "current");
   const backupPath = path.join(root, "backup");
@@ -81,6 +81,36 @@ test("restores a backed-up installation and removes the recovery marker", async 
     await readFile(path.join(targetPath, "old-version.txt"), "utf8"),
     "old",
   );
-  await assert.rejects(readFile(recoveryPath));
+  assert.equal(await readFile(recoveryPath, "utf8"), "pending");
+  await assert.rejects(readFile(backupPath));
+});
+
+test("restores an AppImage file backup and preserves the recovery marker for startup", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "kitezh-appimage-rollback-"),
+  );
+  const targetPath = path.join(root, "kitezh.AppImage");
+  const backupPath = path.join(root, "kitezh.AppImage.backup");
+  const recoveryPath = path.join(root, "recovery.json");
+  await writeFile(targetPath, "failed-update");
+  await writeFile(backupPath, "previous-working-version");
+  await writeFile(recoveryPath, "pending");
+
+  await restoreInstallation(
+    {
+      backupPath,
+      targetPath,
+      targetType: "file",
+      executablePath: targetPath,
+      version: "0.2.0",
+      previousVersion: "0.1.0",
+      startedAt: Date.now(),
+    },
+    recoveryPath,
+    false,
+  );
+
+  assert.equal(await readFile(targetPath, "utf8"), "previous-working-version");
+  assert.equal(await readFile(recoveryPath, "utf8"), "pending");
   await assert.rejects(readFile(backupPath));
 });

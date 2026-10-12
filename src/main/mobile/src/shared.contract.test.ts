@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { messages, resolveLocale } from "@kitezh/shared/i18n";
-import { colors, resolveTheme } from "../../shared/src/theme.ts";
+import { createClientMetadataHeaders } from "@kitezh/shared/client-metadata";
+import { colors, controlSizes, resolveTheme } from "../../shared/src/theme.ts";
 import {
   DEFAULT_AUTHORIZATION_SERVER_ISSUER,
   getMobileConsoleConfig,
@@ -25,9 +26,26 @@ import { classifyApiError, parseProblemDetail } from "../../shared/src/api.ts";
 import {
   isAllowedNativeRedirect,
   parseNativeDeepLink,
+  resolveNativeIntentPath,
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
 import { createSingleFlight } from "../../shared/src/session.ts";
+
+test("client metadata follows the Kitezh app header contract", () => {
+  assert.deepEqual(
+    createClientMetadataHeaders({
+      appVersion: "v0.1.4",
+      clientPlatform: "ios",
+      os: "ios",
+    }),
+    {
+      "App-Name": "Kitezh",
+      "App-Version": "v0.1.4",
+      "Client-Platform": "ios",
+      OS: "ios",
+    },
+  );
+});
 
 test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
@@ -38,8 +56,15 @@ test("system locale resolves to the device language when supported", () => {
 test("theme resolver returns semantic palettes for every mode", () => {
   assert.equal(resolveTheme("dark", "light"), "dark");
   assert.equal(resolveTheme("system", "dark"), "dark");
-  assert.ok(colors.light.primary);
-  assert.ok(colors.dark.primary);
+  for (const palette of [colors.light, colors.dark]) {
+    assert.ok(palette.background);
+    assert.ok(palette.surface);
+    assert.ok(palette.surfaceHover);
+    assert.ok(palette.text);
+    assert.ok(palette.primary);
+  }
+  assert.ok(controlSizes.mobile >= 48);
+  assert.ok(controlSizes.mobileIconTarget >= 44);
   assert.equal(messages.tr.signIn, "Giriş yap");
 });
 
@@ -212,6 +237,27 @@ test("native deep links accept only registered routes", () => {
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
+});
+
+test("native intent routes registered callback links without callback parameters", () => {
+  assert.equal(
+    resolveNativeIntentPath("kitezh://oauth/callback?code=secret&state=state"),
+    "/oauth/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "kitezh://admin/oauth/callback?code=secret&state=state",
+    ),
+    "/admin/oauth/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath("kitezh://logout/callback"),
+    "/logout/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath("https://example.com/oauth/callback"),
+    null,
+  );
 });
 
 test("session refresh operations are single-flight and recover after completion", async () => {

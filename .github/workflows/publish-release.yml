@@ -1,0 +1,458 @@
+name: Publish GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-release:
+    name: Prepare shared draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      ci_run_id: ${{ steps.ci.outputs.run_id }}
+    steps:
+      - name: Validate release tag
+        id: release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a version tag such as v0.1.4; received '${RELEASE_TAG}'." >&2
+            exit 1
+          fi
+          {
+            echo "release_tag=${RELEASE_TAG}"
+            echo "release_sha=${RELEASE_SHA}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Find successful main CI run
+        id: ci
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 2400))
+          while (( SECONDS < deadline )); do
+            response="$(curl --fail --silent --show-error \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${RELEASE_SHA}&per_page=100")"
+            ci_run="$(jq -c --arg sha "${RELEASE_SHA}" '
+              [.workflow_runs[] | select(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .event == "push"
+              )]
+              | sort_by(.run_number, .run_attempt)
+              | last // empty
+            ' <<< "${response}")"
+            if [[ -n "${ci_run}" ]]; then
+              run_id="$(jq -r '.id' <<< "${ci_run}")"
+              status="$(jq -r '.status' <<< "${ci_run}")"
+              conclusion="$(jq -r '.conclusion // empty' <<< "${ci_run}")"
+              if [[ "${status}" == "completed" ]]; then
+                if [[ "${conclusion}" == "success" ]]; then
+                  echo "Found successful main CI run ${run_id} for ${RELEASE_SHA}."
+                  echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+                  exit 0
+                fi
+                echo "Main CI run ${run_id} completed with '${conclusion}'; release artifacts are unavailable." >&2
+                exit 1
+              fi
+              echo "Main CI run ${run_id} is ${status}; waiting before preparing the release."
+            else
+              echo "Main CI run for ${RELEASE_SHA} is not visible yet; waiting before preparing the release."
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for successful main CI for ${RELEASE_SHA}; release artifacts are unavailable." >&2
+          exit 1
+
+      - name: Create or preserve the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --repo "${GH_REPO}" \
+              --verify-tag \
+              --draft \
+              --title "${RELEASE_TAG}" \
+              --generate-notes
+          else
+            gh release edit "${RELEASE_TAG}" --draft --repo "${GH_REPO}"
+          fi
+
+  desktop:
+    name: Package desktop
+    needs: prepare-release
+    permissions:
+      contents: write
+      id-token: write
+    uses: ./.github/workflows/desktop-release.yml
+    with:
+      release_tag: ${{ needs.prepare-release.outputs.release_tag }}
+    secrets: inherit
+
+  mobile:
+    name: Package mobile
+    needs: prepare-release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/mobile-release.yml
+    with:
+      release_tag: ${{ needs.prepare-release.outputs.release_tag }}
+    secrets: inherit
+
+  publish-image-architecture:
+    name: Publish Docker image (${{ matrix.architecture }})
+    needs:
+      - prepare-release
+      - desktop
+      - mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runtime_image: scratch
+          - architecture: arm64
+            runtime_image: gcr.io/distroless/base-debian12:nonroot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: backend-release
+    permissions:
+      contents: read
+      actions: read
+    env:
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+      NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_sha }}
+
+      - name: Download native executable
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: backend-native-${{ matrix.architecture }}
+          path: target
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.prepare-release.outputs.ci_run_id }}
+
+      - name: Verify Docker publishing credentials
+        run: |
+          set -euo pipefail
+          test -n "${DOCKERHUB_USERNAME}"
+          test -n "${DOCKERHUB_TOKEN}"
+          test -s target/native-executable
+          test -d target/classes
+          test -n "$(find target/classes -type f -print -quit)"
+          chmod +x target/native-executable
+
+      - name: Set up Java
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Publish versioned architecture image
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          ./mvnw -B -ntp -Pprod,native -DskipTests \
+            -Dskip.frontend=true \
+            -Dapplication.version="${VERSION}" \
+            -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
+            -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
+            jib:build \
+            -Djib.to.image="docker.io/${DOCKERHUB_USERNAME}/kitezh:${VERSION}-${NATIVE_ARCHITECTURE}" \
+            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
+            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
+
+  publish-image-manifests:
+    name: Publish multi-architecture Docker tags
+    needs:
+      - prepare-release
+      - publish-image-architecture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: backend-release
+    outputs:
+      image_digest: ${{ steps.manifests.outputs.image_digest }}
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_sha }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Create and verify release and latest manifests
+        id: manifests
+        env:
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          IMAGE="docker.io/${DOCKERHUB_USERNAME}/kitezh"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-arm64"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-arm64"
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+          docker buildx imagetools inspect "${IMAGE}:latest"
+          digest="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" | awk '$1 == "Digest:" { print $2; exit }')"
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Could not resolve the immutable release image digest." >&2
+            exit 1
+          fi
+          echo "image_digest=${digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Update Docker Hub description
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          README_PATH="docs/README-dockerhub.md"
+          if [[ ! -f "${README_PATH}" ]]; then
+            echo "${README_PATH} not found; skipping Docker Hub README update."
+            exit 0
+          fi
+
+          TOKEN="$(
+            jq -n \
+              --arg identifier "${DOCKERHUB_USERNAME}" \
+              --arg secret "${DOCKERHUB_TOKEN}" \
+              '{identifier: $identifier, secret: $secret}' \
+            | curl -fsS -X POST \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              https://hub.docker.com/v2/auth/token \
+            | jq -er '.access_token')"
+
+          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
+            | curl -fsS -X PATCH \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/kitezh"
+
+  deploy-render:
+    name: Deploy versioned image to Render
+    needs:
+      - prepare-release
+      - publish-image-manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    concurrency:
+      group: render-production-deploy
+      cancel-in-progress: false
+    environment: backend-release
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+      RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.RENDER_RELEASE_DEPLOY_HOOK_URL }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      IMAGE_DIGEST: ${{ needs.publish-image-manifests.outputs.image_digest }}
+    steps:
+      - name: Verify Render deployment configuration
+        id: render-config
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${RENDER_RELEASE_DEPLOY_HOOK_URL}" || {
+            echo "RENDER_RELEASE_DEPLOY_HOOK_URL is required; keeping the GitHub Release as a draft." >&2
+            exit 1
+          }
+          test -n "${RENDER_API_KEY}" || {
+            echo "RENDER_API_KEY is required to verify the live deployment; keeping the GitHub Release as a draft." >&2
+            exit 1
+          }
+          if [[ "${RENDER_RELEASE_DEPLOY_HOOK_URL}" =~ /deploy/(srv-[A-Za-z0-9]+) ]]; then
+            echo "service_id=${BASH_REMATCH[1]}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Could not read the Render service ID from the deploy hook URL." >&2
+            exit 1
+          fi
+
+      - name: Trigger Render deploy with the immutable image
+        env:
+          RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
+        run: |
+          set -euo pipefail
+          IMAGE="docker.io/${DOCKERHUB_USERNAME}/kitezh@${IMAGE_DIGEST}"
+          response_file="$(mktemp)"
+          trap 'rm -f "${response_file}"' EXIT
+          request_started_at=$(( $(date +%s) - 5 ))
+          created_after="$(date -u -d "@${request_started_at}" '+%Y-%m-%dT%H:%M:%SZ')"
+          http_status="$(curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
+            --get \
+            --data-urlencode "imgURL=${IMAGE}" \
+            "${RENDER_RELEASE_DEPLOY_HOOK_URL}")"
+          case "${http_status}" in
+            200)
+              deploy_id="$(jq -er '.deploy.id // empty' "${response_file}")"
+              if [[ -z "${deploy_id}" ]]; then
+                echo "Render started a deploy but did not return its deploy ID." >&2
+                exit 1
+              fi
+              ;;
+            202)
+              echo "Render queued the requested deploy behind an in-progress deployment; locating its deploy record."
+              deadline=$((SECONDS + 1200))
+              deploy_id=""
+              while [[ -z "${deploy_id}" ]] && (( SECONDS < deadline )); do
+                deploys="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
+                  -H "Authorization: Bearer ${RENDER_API_KEY}" \
+                  -H 'Accept: application/json' \
+                  --get \
+                  --data-urlencode "createdAfter=${created_after}" \
+                  --data-urlencode 'limit=100' \
+                  "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys")"
+                deploy_id="$(jq -r --arg digest "@${IMAGE_DIGEST}" \
+                  '[.. | objects | select((.image.ref // "") | endswith($digest))] | first | .id // empty' \
+                  <<< "${deploys}")"
+                if [[ -z "${deploy_id}" ]]; then
+                  sleep 15
+                fi
+              done
+              if [[ -z "${deploy_id}" ]]; then
+                echo "Render accepted the deploy but did not create a matching deploy record before timeout." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Render deploy hook returned HTTP ${http_status}; refusing to publish the GitHub Release." >&2
+              exit 1
+              ;;
+          esac
+          echo "Render accepted deploy ${deploy_id} for ${IMAGE}."
+          echo "RENDER_DEPLOY_ID=${deploy_id}" >> "${GITHUB_ENV}"
+
+      - name: Wait for the exact Render deploy to become live
+        env:
+          RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
+        run: |
+          set -euo pipefail
+          deploy_url="https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys/${RENDER_DEPLOY_ID}"
+          deadline=$((SECONDS + 1200))
+          while (( SECONDS < deadline )); do
+            deploy="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H 'Accept: application/json' \
+              "${deploy_url}")"
+            status="$(jq -er '.status' <<< "${deploy}")"
+            image_ref="$(jq -r '.image.ref // empty' <<< "${deploy}")"
+            if [[ "${image_ref}" != *"@${IMAGE_DIGEST}" ]]; then
+              echo "Render deploy ${RENDER_DEPLOY_ID} resolved to an unexpected image reference." >&2
+              exit 1
+            fi
+            echo "Render deploy status: ${status}"
+            case "${status}" in
+              live)
+                echo "Render is serving the requested immutable image ${image_ref}."
+                exit 0
+                ;;
+              build_failed|update_failed|pre_deploy_failed|canceled|deactivated)
+                echo "Render deploy ended with status '${status}'; keeping the GitHub Release as a draft." >&2
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for Render deploy ${RENDER_DEPLOY_ID}; keeping the GitHub Release as a draft." >&2
+          exit 1
+
+      - name: Verify the public readiness endpoint
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 24 --retry-all-errors --retry-delay 10 \
+            --max-time 20 \
+            https://kitezh.onrender.com/actuator/health/readiness
+
+  publish-github-release:
+    name: Validate assets and publish GitHub Release
+    needs:
+      - prepare-release
+      - desktop
+      - mobile
+      - publish-image-manifests
+      - deploy-render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Verify required desktop and mobile assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" --json assets --jq '.assets | map(.name)')"
+          for pattern in '\.AppImage$' '\.deb$' '\.dmg$' '\.exe$' '\.apk$' '\.ipa$'; do
+            if ! jq -e --arg pattern "${pattern}" 'any(.[]; test($pattern; "i"))' <<< "${assets}" >/dev/null; then
+              echo "Required release asset matching ${pattern} is missing; keeping ${RELEASE_TAG} as a draft." >&2
+              exit 1
+            fi
+          done
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: gh release edit "${RELEASE_TAG}" --draft=false --repo "${GH_REPO}"

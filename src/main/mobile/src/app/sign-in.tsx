@@ -9,9 +9,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
-import { spacing } from "@/theme/tokens";
+import { controlSizes, spacing, typography } from "@/theme/tokens";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 
 export default function SignInScreen() {
@@ -26,9 +27,16 @@ export default function SignInScreen() {
     >
       <View style={styles.content}>
         <Pressable
-          accessibilityLabel={dictionary.continue}
+          accessibilityLabel={dictionary.back}
+          accessibilityRole="button"
           onPress={() => router.back()}
-          style={styles.back}
+          style={({ pressed }) => [
+            styles.back,
+            {
+              backgroundColor: palette.surfaceMuted,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
         >
           <AppIcon
             name="arrowRight"
@@ -37,7 +45,7 @@ export default function SignInScreen() {
             style={{ transform: [{ rotate: "180deg" }] }}
           />
         </Pressable>
-        <AppIcon name="shield" size={48} color={palette.primary} />
+        <BrandMark size={72} />
         <Text style={[styles.title, { color: palette.text }]}>Kitezh</Text>
         <Text style={[styles.message, { color: palette.textMuted }]}>
           {dictionary.appTagline}
@@ -54,6 +62,7 @@ export default function SignInScreen() {
           accessibilityRole="button"
           accessibilityState={{ disabled: pending }}
           disabled={pending}
+          testID="sign-in-submit"
           onPress={() => void signIn()}
           style={[
             styles.action,
@@ -106,12 +115,16 @@ const styles = StyleSheet.create({
   },
   back: {
     alignSelf: "flex-start",
-    padding: spacing.sm,
+    alignItems: "center",
+    borderRadius: 22,
+    height: 44,
+    justifyContent: "center",
     position: "absolute",
     top: spacing.sm,
     left: spacing.md,
+    width: 44,
   },
-  title: { fontSize: 30, fontWeight: "800", marginTop: spacing.md },
+  title: { fontSize: typography.pageTitle, fontWeight: "800", marginTop: spacing.md },
   message: {
     fontSize: 16,
     lineHeight: 24,
@@ -133,19 +146,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   action: {
+    alignSelf: "stretch",
     alignItems: "center",
-    borderRadius: 999,
+    borderRadius: 14,
     flexDirection: "row",
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.lg,
-    minHeight: 52,
-    paddingHorizontal: spacing.xl,
+    minHeight: controlSizes.mobile,
+    paddingHorizontal: spacing.lg,
   },
   browserActions: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.lg,
+    justifyContent: "center",
     marginTop: spacing.md,
   },
   browserAction: {

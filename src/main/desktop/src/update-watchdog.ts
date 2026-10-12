@@ -51,7 +51,6 @@ export async function restoreInstallation(
         await cp(state.backupPath, state.targetPath, { force: true });
       }
       await rm(state.backupPath, { recursive: true, force: true });
-      await rm(recoveryPath, { force: true });
       if (launch) {
         spawn(state.executablePath, [], {
           detached: true,

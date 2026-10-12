@@ -31,6 +31,9 @@
     "test:e2e:packaged:roles": "node --test e2e/packaged-client-roles.test.mjs",
     "test:e2e:google": "node --test e2e/google-authenticated.test.mjs",
     "test:e2e:providers": "node --test e2e/social-provider-authenticated.test.mjs",
+    "test:unit:coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
+    "test:sonar-coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs e2e/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
+    "smoke:package": "node scripts/smoke-packaged-app.mjs",
     "build": "pnpm run build:main && pnpm run build:native",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",
@@ -39,6 +42,7 @@
   "devDependencies": {
     "@types/js-yaml": "4.0.9",
     "@types/node": "24.10.1",
+    "c8": "10.1.3",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
     "playwright-core": "1.63.0",
@@ -58,6 +62,10 @@
       "assets/**/*",
       "package.json"
     ],
+    "electronLanguages": [
+      "en-US",
+      "tr"
+    ],
     "protocols": [
       {
         "name": "Kitezh OAuth callback",
@@ -68,6 +76,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
+      "compression": "maximum",
       "artifactName": "kitezh-${version}-macos-${arch}.${ext}",
       "target": [
         "dmg",

@@ -1,3 +1,5 @@
+import { createClientMetadataHeaders } from "@kitezh/shared/client-metadata";
+
 export type DesktopAuthCallback = {
   state: string;
   code: string | null;
@@ -17,6 +19,11 @@ export type PendingAuthorization = {
   redirectUri: string;
   createdAt: number;
 };
+
+export type DesktopConsoleName = "admin" | "account";
+export type PendingAuthorizationStore = Partial<
+  Record<DesktopConsoleName, PendingAuthorization>
+>;
 
 export type DesktopTokens = {
   accessToken: string;
@@ -39,15 +46,62 @@ export function isPendingAuthorizationValid(
   );
 }
 
+export function parsePendingAuthorizationStore(
+  value: unknown,
+  now = Date.now(),
+): PendingAuthorizationStore {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const input = value as Record<string, unknown>;
+  const store: PendingAuthorizationStore = {};
+  for (const consoleName of ["admin", "account"] as const) {
+    const candidate = input[consoleName];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate))
+      continue;
+
+    const pending = candidate as Partial<PendingAuthorization>;
+    const expectedClientId = `desktop-${consoleName}-console`;
+    if (
+      typeof pending.state !== "string" ||
+      pending.state.length < 16 ||
+      pending.state.length > 256 ||
+      typeof pending.codeVerifier !== "string" ||
+      pending.codeVerifier.length < 43 ||
+      pending.codeVerifier.length > 128 ||
+      pending.clientId !== expectedClientId ||
+      pending.redirectUri !== "kitezh://oauth/callback" ||
+      typeof pending.createdAt !== "number" ||
+      !Number.isFinite(pending.createdAt) ||
+      !isPendingAuthorizationValid(
+        pending as PendingAuthorization,
+        pending.state,
+        now,
+      )
+    ) {
+      continue;
+    }
+    store[consoleName] = pending as PendingAuthorization;
+  }
+  return store;
+}
+
 export async function exchangeAuthorizationCode(
   fetcher: typeof fetch,
   apiBaseUrl: string,
   pending: PendingAuthorization,
   code: string,
+  clientMetadata: {
+    appVersion: string;
+    clientPlatform: "desktop";
+    os: string;
+  },
 ): Promise<DesktopTokens> {
   const response = await fetcher(`${apiBaseUrl}/oauth2/token`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      ...createClientMetadataHeaders(clientMetadata),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
     body: new URLSearchParams({
       client_id: pending.clientId,
       code,

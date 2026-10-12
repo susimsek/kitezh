@@ -28,6 +28,12 @@ public final class AuthoritiesConstants {
 
     public static final String GROUP_MANAGER = "ROLE_GROUP_MANAGER";
 
+    public static final String ORGANIZATION_VIEWER = "ROLE_ORGANIZATION_VIEWER";
+
+    public static final String ORGANIZATION_QUERY = "ROLE_ORGANIZATION_QUERY";
+
+    public static final String ORGANIZATION_MANAGER = "ROLE_ORGANIZATION_MANAGER";
+
     public static final String CLIENT_VIEWER = "ROLE_CLIENT_VIEWER";
 
     /** Keycloak {@code query-clients} equivalent for client discovery. */

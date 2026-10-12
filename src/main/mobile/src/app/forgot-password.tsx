@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { requestPasswordReset } from "@/api/public-api";
 import { AppIcon } from "@/components/AppIcon";
+import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -55,9 +56,7 @@ export default function ForgotPasswordScreen() {
           <AppIcon name="arrowLeft" size={18} color={palette.primary} />
           <Text style={{ color: palette.primary }}>{dictionary.back}</Text>
         </Pressable>
-        <View style={[styles.logo, { backgroundColor: palette.primary }]}>
-          <AppIcon name="shield" size={38} color={palette.onPrimary} />
-        </View>
+        <BrandMark size={72} />
         <Text style={[styles.title, { color: palette.text }]}>
           {dictionary.forgotTitle}
         </Text>
@@ -141,13 +140,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.xs,
     marginBottom: spacing.xl,
-  },
-  logo: {
-    alignItems: "center",
-    borderRadius: radii.lg,
-    height: 72,
-    justifyContent: "center",
-    width: 72,
   },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   help: { fontSize: 15, lineHeight: 22, marginTop: spacing.sm },

@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminSessionService {
 
     private static final String ACTIVE_STATUS = "active";
+    private static final String CLIENT_NOT_FOUND_MESSAGE = "Client not found";
+    private static final String CLIENT_RESOURCE_TYPE = "client";
 
     private final AdminUserService adminUserService;
     private final UserSessionRepository userSessionRepository;
@@ -51,7 +53,7 @@ public class AdminSessionService {
         var client =
                 clientRepository
                         .findByClientId(clientId.trim())
-                        .orElseThrow(() -> ApiException.notFound("Client not found"));
+                        .orElseThrow(() -> ApiException.notFound(CLIENT_NOT_FOUND_MESSAGE));
         List<String> sessionIds =
                 authorizationRepository.findDistinctSessionIdsByRegisteredClientId(client.getId());
         if (sessionIds.isEmpty()) {
@@ -107,7 +109,7 @@ public class AdminSessionService {
     @Transactional(readOnly = true)
     public Page<AdminSessionDTO> clientSessions(String clientId, Pageable pageable) {
         if (!clientRepository.existsById(clientId)) {
-            throw ApiException.notFound("Client not found");
+            throw ApiException.notFound(CLIENT_NOT_FOUND_MESSAGE);
         }
         List<String> sessionIds =
                 authorizationRepository.findDistinctSessionIdsByRegisteredClientId(clientId);
@@ -162,22 +164,22 @@ public class AdminSessionService {
     @Transactional
     public void deleteClientSession(String clientId, String sessionId) {
         if (!clientRepository.existsById(clientId)) {
-            throw ApiException.notFound("Client not found");
+            throw ApiException.notFound(CLIENT_NOT_FOUND_MESSAGE);
         }
         if (!authorizationRepository.existsByRegisteredClientIdAndSessionId(clientId, sessionId)) {
             throw ApiException.notFound("Client session not found");
         }
         sessionInvalidationService.invalidateClientSession(clientId, sessionId);
-        adminAuditEventService.record("client.session.deleted", "client", clientId);
+        adminAuditEventService.record("client.session.deleted", CLIENT_RESOURCE_TYPE, clientId);
     }
 
     @Transactional
     public void deleteClientSessions(String clientId) {
         if (!clientRepository.existsById(clientId)) {
-            throw ApiException.notFound("Client not found");
+            throw ApiException.notFound(CLIENT_NOT_FOUND_MESSAGE);
         }
         sessionInvalidationService.invalidateClientSessions(clientId);
-        adminAuditEventService.record("client.sessions.deleted", "client", clientId);
+        adminAuditEventService.record("client.sessions.deleted", CLIENT_RESOURCE_TYPE, clientId);
     }
 
     @Transactional
@@ -198,9 +200,9 @@ public class AdminSessionService {
         RegisteredClientEntity client =
                 clientRepository
                         .findById(clientId)
-                        .orElseThrow(() -> ApiException.notFound("Client not found"));
+                        .orElseThrow(() -> ApiException.notFound(CLIENT_NOT_FOUND_MESSAGE));
         revocationPolicyService.revokeClient(client.getClientId());
-        adminAuditEventService.record("client.tokens.revoked", "client", clientId);
+        adminAuditEventService.record("client.tokens.revoked", CLIENT_RESOURCE_TYPE, clientId);
     }
 
     private static String normalizeStatus(String status) {

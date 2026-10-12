@@ -55,6 +55,12 @@ export function AdminShell({ locale, dictionary, children }: Props) {
       "layerGroup",
       access?.queryGroups || access?.viewGroups || access?.viewUsers,
     ],
+    [
+      "/organizations",
+      dictionary.admin.nav.organizations,
+      "layerGroup",
+      access?.queryOrganizations || access?.viewOrganizations || access?.isAdmin,
+    ],
     ["/sessions", dictionary.admin.nav.sessions, "laptop", access?.viewSessions],
     ["/offline-sessions", dictionary.admin.nav.offlineSessions, "clock", access?.viewConsents],
     ["/consents", dictionary.admin.nav.consents, "shieldHalved", access?.viewConsents],

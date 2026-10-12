@@ -84,6 +84,29 @@ class CorsConfigTest {
                 .isEqualTo(RENDERER_ORIGIN);
     }
 
+    @Test
+    void allowsCherryStyleClientMetadataHeadersForConfiguredRenderer() throws Exception {
+        MockHttpServletRequest request =
+                request("OPTIONS", "/api/account/profile", RENDERER_ORIGIN);
+        request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET");
+        request.addHeader(
+                HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                "app-name, app-version, client-platform, os");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new CorsConfig()
+                .corsFilter(RENDERER_ORIGIN)
+                .getFilter()
+                .doFilter(request, response, (_, _) -> {});
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS))
+                .containsIgnoringCase("App-Name")
+                .containsIgnoringCase("App-Version")
+                .containsIgnoringCase("Client-Platform")
+                .containsIgnoringCase("OS");
+    }
+
     private static MockHttpServletRequest request(String method, String path, String origin) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, path);
         request.setContentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE);

@@ -1,0 +1,536 @@
+name: Mobile Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Version tag to build and publish mobile packages for
+        required: true
+        default: v0.1.4
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Version tag to build and publish mobile packages for
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24.18.0"
+  PNPM_VERSION: "11.22.0"
+
+jobs:
+  resolve-release:
+    name: Resolve release version
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      release_version: ${{ steps.release.outputs.release_version }}
+      android_version_code: ${{ steps.release.outputs.android_version_code }}
+      current_release: ${{ steps.release.outputs.current_release }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ format('refs/tags/{0}', inputs.release_tag) }}
+          fetch-depth: 0
+
+      - name: Resolve release tag and version
+        id: release
+        shell: bash
+        env:
+          DISPATCH_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_tag="${DISPATCH_TAG}"
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a version tag such as v0.1.4; received '${release_tag}'." >&2
+            exit 1
+          fi
+          RELEASE_SHA="$(git rev-list -n 1 "${release_tag}")"
+          release_version="${release_tag#v}"
+          IFS=. read -r major minor patch <<< "${release_version}"
+          android_version_code="$((major * 1000000 + minor * 1000 + patch))"
+          {
+            echo "release_tag=${release_tag}"
+            echo "release_sha=${RELEASE_SHA}"
+            echo "release_version=${release_version}"
+            echo "android_version_code=${android_version_code}"
+            echo "current_release=true"
+          } >> "${GITHUB_OUTPUT}"
+
+  android:
+    name: Build signed Android APK
+    needs: resolve-release
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: mobile-release
+    permissions:
+      contents: read
+    env:
+      EXPO_PUBLIC_APP_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+      ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+      ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+      ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+      ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          install: false
+
+      - name: Set up Java
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Set mobile release version
+        working-directory: src/main/mobile
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+          ANDROID_VERSION_CODE: ${{ needs.resolve-release.outputs.android_version_code }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const appConfig = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          appConfig.expo.version = process.env.RELEASE_VERSION;
+          appConfig.expo.android.versionCode = Number(process.env.ANDROID_VERSION_CODE);
+          fs.writeFileSync('app.json', `${JSON.stringify(appConfig, null, 2)}\n`);
+          NODE
+
+      - name: Check Android signing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for secret_name in \
+            ANDROID_RELEASE_KEYSTORE_BASE64 \
+            ANDROID_RELEASE_KEYSTORE_PASSWORD \
+            ANDROID_RELEASE_KEY_ALIAS \
+            ANDROID_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!secret_name}" ]]; then
+              echo "${secret_name} must be configured in the mobile-release environment." >&2
+              exit 1
+            fi
+          done
+
+      - name: Generate native Android project
+        working-directory: src/main/mobile
+        run: pnpm exec expo prebuild --clean --platform android
+
+      - name: Install Android NDK with retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          sdkmanager_path="$(command -v sdkmanager || true)"
+          if [[ -z "${sdkmanager_path}" ]]; then
+            sdkmanager_path="$(find "${sdk_root}/cmdline-tools" -path '*/bin/sdkmanager' -type f -print -quit)"
+          fi
+          if [[ -z "${sdkmanager_path}" || ! -x "${sdkmanager_path}" ]]; then
+            echo "Android sdkmanager was not found under ${sdk_root}." >&2
+            exit 1
+          fi
+
+          ndk_version="27.1.12297006"
+          for attempt in 1 2 3; do
+            echo "Installing Android NDK ${ndk_version} (attempt ${attempt}/3)."
+            if "${sdkmanager_path}" --sdk_root="${sdk_root}" --install "ndk;${ndk_version}"; then
+              test -x "${sdk_root}/ndk/${ndk_version}/ndk-build"
+              exit 0
+            fi
+            rm -rf "${sdk_root}/ndk/${ndk_version}"
+            if [[ "${attempt}" -lt 3 ]]; then
+              sleep "$((attempt * 15))"
+            fi
+          done
+          echo "Could not install Android NDK ${ndk_version} after three attempts." >&2
+          exit 1
+
+      - name: Build and sign release APK
+        working-directory: src/main/mobile/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore_path="${RUNNER_TEMP}/kitezh-release.keystore"
+          printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
+          ./gradlew --no-daemon --stacktrace --build-cache --console=plain assembleRelease \
+            "-PreactNativeArchitectures=arm64-v8a" \
+            "-Pandroid.enableMinifyInReleaseBuilds=true" \
+            "-Pandroid.enableShrinkResourcesInReleaseBuilds=true" \
+            "-Pandroid.enableBundleCompression=true" \
+            "-Pexpo.useLegacyPackaging=true" \
+            "-Pandroid.injected.signing.store.file=${keystore_path}" \
+            "-Pandroid.injected.signing.store.password=${KEYSTORE_PASSWORD}" \
+            "-Pandroid.injected.signing.key.alias=${KEY_ALIAS}" \
+            "-Pandroid.injected.signing.key.password=${KEY_PASSWORD}"
+          apk_path="app/build/outputs/apk/release/app-release.apk"
+          test -s "${apk_path}"
+          if unzip -Z1 "${apk_path}" | grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/'; then
+            echo "The release APK contains unsupported non-ARM64 native libraries." >&2
+            exit 1
+          fi
+          if ! unzip -Z1 "${apk_path}" | grep -q '^lib/arm64-v8a/'; then
+            echo "The release APK does not contain ARM64 native libraries." >&2
+            exit 1
+          fi
+          apk_size_bytes="$(stat -c '%s' "${apk_path}")"
+          apk_size_mib="$(node -e 'process.stdout.write((Number(process.argv[1]) / 1048576).toFixed(2))' "${apk_size_bytes}")"
+          {
+            echo '### Android release package size'
+            echo "- ABI: arm64-v8a"
+            echo "- APK: ${apk_size_bytes} bytes (${apk_size_mib} MiB)"
+            echo '- R8 minification and resource shrinking: enabled'
+            echo '- Hermes bundle and native libraries: compressed'
+          } >> "${GITHUB_STEP_SUMMARY}"
+          mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
+          cp "${apk_path}" \
+            "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-android.apk"
+
+      - name: Upload Android package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-android
+          path: ${{ runner.temp }}/mobile-release-assets/*.apk
+          if-no-files-found: error
+
+  ios:
+    name: Build iOS IPA
+    needs:
+      - resolve-release
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    environment: mobile-release
+    permissions:
+      contents: read
+    env:
+      EXPO_PUBLIC_APP_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+      IOS_SIGNING_MODE: ${{ vars.IOS_SIGNING_MODE || 'unsigned' }}
+      IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 || '' }}
+      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD || '' }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 || '' }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID || '' }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/mobile/pnpm-lock.yaml
+          install: false
+
+      - name: Install mobile dependencies
+        working-directory: src/main/mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Set mobile release version
+        working-directory: src/main/mobile
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.release_version }}
+          IOS_BUILD_NUMBER: ${{ needs.resolve-release.outputs.android_version_code }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const appConfig = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          appConfig.expo.version = process.env.RELEASE_VERSION;
+          appConfig.expo.ios.buildNumber = process.env.IOS_BUILD_NUMBER;
+          fs.writeFileSync('app.json', `${JSON.stringify(appConfig, null, 2)}\n`);
+          NODE
+
+      - name: Generate native iOS project
+        working-directory: src/main/mobile
+        run: pnpm exec expo prebuild --clean --platform ios --no-install
+
+      - name: Cache CocoaPods and React Native iOS archives
+        id: ios-dependency-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          # React Native stores its prebuilt ReactNativeCore and ReactNativeDependencies tarballs
+          # in ~/Library/Caches/ReactNative, outside CocoaPods' own download cache. Keep both
+          # caches and the specs checkout so clean Expo prebuilds can reuse all three.
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/Library/Caches/ReactNative
+            ~/.cocoapods/repos
+          key: ios-dependencies-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile', 'src/main/mobile/ios/Podfile.properties.json') }}
+          restore-keys: |
+            ios-dependencies-v2-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install iOS dependencies
+        working-directory: src/main/mobile/ios
+        run: pod install
+
+      - name: Record Xcode version
+        id: xcode-version
+        shell: bash
+        run: echo "version=$(xcodebuild -version | tr '\n' '-' | tr ' ' '-')" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache Xcode build products
+        id: xcode-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/kitezh-ios-build
+          key: xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile', 'src/main/mobile/ios/Podfile.lock') }}-${{ github.sha }}
+          restore-keys: |
+            xcode-derived-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode-version.outputs.version }}-${{ hashFiles('src/main/mobile/pnpm-lock.yaml', 'src/main/mobile/ios/Podfile', 'src/main/mobile/ios/Podfile.lock') }}-
+
+      - name: Report iOS build cache status
+        env:
+          IOS_DEPENDENCY_CACHE_HIT: ${{ steps.ios-dependency-cache.outputs.cache-hit }}
+          XCODE_CACHE_HIT: ${{ steps.xcode-cache.outputs.cache-hit }}
+        run: |
+          {
+            echo '### Build cache status'
+            if [[ "${IOS_DEPENDENCY_CACHE_HIT}" == "true" ]]; then
+              echo '- CocoaPods, React Native iOS archives, and CocoaPods specs: exact cache hit'
+            else
+              echo '- CocoaPods, React Native iOS archives, and CocoaPods specs: no exact hit (restore-key match or cache miss)'
+            fi
+            if [[ "${XCODE_CACHE_HIT}" == "true" ]]; then
+              echo '- Xcode DerivedData: exact cache hit'
+            else
+              echo '- Xcode DerivedData: no exact hit (restore-key match or cache miss)'
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Resolve iOS signing mode
+        id: ios-signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          signing_values=(
+            IOS_DISTRIBUTION_CERTIFICATE_BASE64
+            IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+            IOS_PROVISIONING_PROFILE_BASE64
+            IOS_TEAM_ID
+          )
+          case "${IOS_SIGNING_MODE}" in
+            unsigned)
+              echo "mode=unsigned" >> "${GITHUB_OUTPUT}"
+              echo "iOS signing mode is unsigned; producing an IPA for personal sideloading."
+              ;;
+            signed)
+              for secret_name in "${signing_values[@]}"; do
+                if [[ -z "${!secret_name}" ]]; then
+                  echo "${secret_name} is required when IOS_SIGNING_MODE=signed." >&2
+                  exit 1
+                fi
+              done
+              echo "mode=signed" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "IOS_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Import iOS distribution certificate
+        if: steps.ios-signing.outputs.mode == 'signed'
+        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9 # v7.1.0
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+
+      - name: Install iOS provisioning profile
+        if: steps.ios-signing.outputs.mode == 'signed'
+        id: ios-profile
+        shell: bash
+        env:
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          profile_path="${RUNNER_TEMP}/kitezh.mobileprovision"
+          printf '%s' "${PROVISIONING_PROFILE_BASE64}" | base64 -D > "${profile_path}"
+          profile_directory="${HOME}/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "${profile_directory}"
+          security cms -D -i "${profile_path}" > "${RUNNER_TEMP}/kitezh-profile.plist"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print UUID' "${RUNNER_TEMP}/kitezh-profile.plist")"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print Name' "${RUNNER_TEMP}/kitezh-profile.plist")"
+          installed_profile="${profile_directory}/${profile_uuid}.mobileprovision"
+          cp "${profile_path}" "${installed_profile}"
+          rm -f "${profile_path}" "${RUNNER_TEMP}/kitezh-profile.plist"
+          {
+            echo "profile_uuid=${profile_uuid}"
+            echo "profile_name=${profile_name}"
+            echo "installed_profile=${installed_profile}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build unsigned iOS app
+        if: steps.ios-signing.outputs.mode == 'unsigned'
+        working-directory: src/main/mobile
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace ios/Kitezh.xcworkspace \
+            -scheme Kitezh \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "${RUNNER_TEMP}/kitezh-ios-build" \
+            -showBuildTimingSummary \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+          app_path="${RUNNER_TEMP}/kitezh-ios-build/Build/Products/Release-iphoneos/Kitezh.app"
+          test -d "${app_path}"
+          package_directory="${RUNNER_TEMP}/kitezh-ios-package/Payload"
+          mkdir -p "${package_directory}"
+          ditto "${app_path}" "${package_directory}/Kitezh.app"
+          mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
+          (cd "${RUNNER_TEMP}/kitezh-ios-package" && zip -qry \
+            "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios-unsigned.ipa" Payload)
+          unzip -l "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios-unsigned.ipa" | grep -F 'Payload/Kitezh.app/' >/dev/null
+
+      - name: Archive and export signed iOS IPA
+        if: steps.ios-signing.outputs.mode == 'signed'
+        working-directory: src/main/mobile
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_PROFILE_UUID: ${{ steps.ios-profile.outputs.profile_uuid }}
+          IOS_PROFILE_NAME: ${{ steps.ios-profile.outputs.profile_name }}
+          IOS_BUNDLE_IDENTIFIER: io.github.susimsek.kitezh.mobile
+        run: |
+          set -euo pipefail
+          archive_path="${RUNNER_TEMP}/Kitezh.xcarchive"
+          export_path="${RUNNER_TEMP}/kitezh-ios-export"
+          export_options="${RUNNER_TEMP}/kitezh-export-options.plist"
+          xcodebuild \
+            -workspace ios/Kitezh.xcworkspace \
+            -scheme Kitezh \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "${archive_path}" \
+            -derivedDataPath "${RUNNER_TEMP}/kitezh-ios-build" \
+            -showBuildTimingSummary \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            DEVELOPMENT_TEAM="${IOS_TEAM_ID}" \
+            PROVISIONING_PROFILE="${IOS_PROFILE_UUID}" \
+            PROVISIONING_PROFILE_SPECIFIER="${IOS_PROFILE_NAME}" \
+            archive
+          plutil -create xml1 "${export_options}"
+          /usr/libexec/PlistBuddy -c 'Add :method string ad-hoc' "${export_options}"
+          /usr/libexec/PlistBuddy -c "Add :teamID string ${IOS_TEAM_ID}" "${export_options}"
+          /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "${export_options}"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "${export_options}"
+          /usr/libexec/PlistBuddy -c \
+            "Add :provisioningProfiles:${IOS_BUNDLE_IDENTIFIER} string ${IOS_PROFILE_NAME}" \
+            "${export_options}"
+          xcodebuild \
+            -exportArchive \
+            -archivePath "${archive_path}" \
+            -exportPath "${export_path}" \
+            -exportOptionsPlist "${export_options}"
+          mkdir -p "${RUNNER_TEMP}/mobile-release-assets"
+          cp "${export_path}/Kitezh.ipa" \
+            "${RUNNER_TEMP}/mobile-release-assets/kitezh-${{ needs.resolve-release.outputs.release_version }}-ios.ipa"
+          codesign --verify --deep --strict "${export_path}/Payload/Kitezh.app"
+
+      - name: Remove installed iOS provisioning profile
+        if: always() && steps.ios-profile.outputs.installed_profile != ''
+        env:
+          INSTALLED_PROFILE: ${{ steps.ios-profile.outputs.installed_profile }}
+        run: rm -f "${INSTALLED_PROFILE}"
+
+      - name: Upload iOS package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-ios
+          path: ${{ runner.temp }}/mobile-release-assets/*.ipa
+          if-no-files-found: error
+
+  publish:
+    name: Upload Mobile Assets
+    needs:
+      - resolve-release
+      - android
+      - ios
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' && needs.android.result == 'success' && needs.ios.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download mobile packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: mobile-*
+          path: mobile-release-assets
+          merge-multiple: true
+
+      - name: Upload packages to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(mobile-release-assets/*)
+          if [[ ${#assets[@]} -ne 2 ]]; then
+            echo "Expected the Android APK and iOS IPA, received ${#assets[@]} files." >&2
+            exit 1
+          fi
+          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
+            if ! gh release create "${RELEASE_TAG}" \
+                --repo "${GH_REPO}" \
+                --verify-tag \
+                --draft \
+                --title "${RELEASE_TAG}" \
+                --generate-notes; then
+              gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null
+            fi
+          fi
+          gh release edit "${RELEASE_TAG}" --draft --repo "${GH_REPO}"
+
+          declare -A allowed_assets=()
+          for asset in "${assets[@]}"; do
+            allowed_assets["$(basename "${asset}")"]=1
+          done
+
+          while IFS=$'\t' read -r asset_id asset_name; do
+            if [[ ("${asset_name}" == *.apk || "${asset_name}" == *.ipa) && -z "${allowed_assets["${asset_name}"]+present}" ]]; then
+              echo "Removing stale mobile release asset: ${asset_name}"
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+            fi
+          done < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
+
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber --repo "${GH_REPO}"

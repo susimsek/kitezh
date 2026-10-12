@@ -16,6 +16,7 @@
       "types": "./dist/theme.d.ts",
       "default": "./dist/theme.js"
     },
+    "./theme/runtime": "./src/theme-runtime.cjs",
     "./i18n": {
       "types": "./dist/i18n.d.ts",
       "default": "./dist/i18n.js"
@@ -51,9 +52,14 @@
     "./session": {
       "types": "./dist/session.d.ts",
       "default": "./dist/session.js"
+    },
+    "./client-metadata": {
+      "types": "./src/client-metadata.d.cts",
+      "require": "./src/client-metadata.cjs",
+      "default": "./src/client-metadata.cjs"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json && node scripts/copy-runtime-assets.mjs"
   }
 }

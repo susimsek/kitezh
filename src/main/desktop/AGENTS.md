@@ -17,18 +17,18 @@ These instructions apply to `src/main/desktop/**` and supplement the repository-
 
 ## Quick Reference
 
-| Action | Command |
-| --- | --- |
-| Install dependencies | `pnpm install --frozen-lockfile` |
-| Type check | `pnpm typecheck` |
-| Build main/preload | `pnpm run build:main` |
-| Build renderer and Electron code | `pnpm run build` |
-| Run desktop unit tests | `pnpm test:unit` |
-| Run Electron E2E tests | `pnpm test:e2e` |
-| Run desktop security tests | `pnpm test` |
-| Run local desktop app | `pnpm dev` |
-| Run against deployed API | `pnpm start` |
-| Build installers | `pnpm package` |
+| Action                           | Command                          |
+| -------------------------------- | -------------------------------- |
+| Install dependencies             | `pnpm install --frozen-lockfile` |
+| Type check                       | `pnpm typecheck`                 |
+| Build main/preload               | `pnpm run build:main`            |
+| Build renderer and Electron code | `pnpm run build`                 |
+| Run desktop unit tests           | `pnpm test:unit`                 |
+| Run Electron E2E tests           | `pnpm test:e2e`                  |
+| Run desktop security tests       | `pnpm test`                      |
+| Run local desktop app            | `pnpm dev`                       |
+| Run against deployed API         | `pnpm start`                     |
+| Build installers                 | `pnpm package`                   |
 
 Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 
@@ -101,6 +101,9 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Keep Electron E2E independently configurable from the web suite: desktop tests use the
   desktop package's pinned `playwright-core` Electron launcher and Node test runner, while
   web browser tests use `@playwright/test` under `src/main/web/e2e`.
+- Electron E2E must set `DESKTOP_E2E_BACKGROUND=true`, keep every test window hidden, and avoid
+  app/window focus or bring-to-front calls. Use the main-process visibility helpers so automated
+  tests never take over the user's desktop.
 - Run `pnpm package` when changing packaging configuration, protocol registration, assets, preload/main behavior, or renderer integration.
 - Add or update tests for:
   - callback route and protocol validation;
@@ -121,7 +124,8 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - Keep release artifact names lowercase and explicit about version, platform, and architecture; use a
   `-setup` suffix only for installer artifacts. The product name shown inside the application may
   remain title-cased independently of the downloadable filename.
-- Preserve the current platform targets: macOS x64/universal DMG/ZIP, Linux x64 AppImage/deb/rpm/snap plus ARM64 AppImage/deb, and Windows NSIS/portable/AppX unless a release decision changes them.
+- Preserve the current platform targets: separate macOS x64 and ARM64 DMG/ZIP packages, Linux x64 AppImage/deb/rpm/snap plus ARM64 AppImage/deb, and Windows NSIS/portable/AppX unless a release decision changes them.
+- In the desktop release workflow, build the static renderer once and pass it to every platform package job as a short-lived artifact. Package jobs must build only the Electron main/preload code and must not rebuild the renderer.
 - Build each platform in its supported CI environment; do not claim that a local package is signed or notarized.
 - Upload installers as CI artifacts before publishing them. Do not place generated installers or blockmaps in source control.
 - Publish only distributable installers (`.dmg`, `.zip`, `.AppImage`, `.deb`, `.rpm`, `.snap`, `.appx`, and `.exe`),
@@ -136,11 +140,74 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 ## UI and Renderer Standards
 
 - Follow `src/main/web/AGENTS.md` for all shared renderer components, forms, validation, localization, icons, responsive layout, accessibility, loading states, and theme behavior.
+- Treat the Web UI standards as the semantic behavior reference. Native Electron windows and dialogs
+  must use desktop interaction patterns; do not reproduce a mobile layout or copy Web DOM components
+  into a native window. ChatGPT desktop/mobile may inform hierarchy and spacing, but Kitezh keeps its
+  own product identity and keyboard-first desktop behavior.
+- The authenticated Desktop console renderer is currently generated from the Web application by
+  `scripts/build-renderer.mjs`. Until that renderer is migrated to independently owned Desktop
+  screens, any visual change under `src/main/web` affects both Web and Desktop. Keep the migration
+  marked in `src/main/mobile/WEB-MOBILE-FEATURE-MATRIX.md`; do not claim native Desktop styling or
+  screen ownership based only on the bundled Web renderer. Desktop-only sign-in, settings, update,
+  and confirmation windows are authored in the Desktop source and must remain independently themed.
+- Keep native window typography, spacing, control heights, radii, borders, and action colors aligned
+  through shared semantic tokens or a small common Desktop style helper. Avoid slightly different
+  hand-written CSS for the same action or control across the login, settings, update, and confirmation
+  windows. Keep text readable at narrow window sizes and with long Turkish labels.
+- Use a clear window title and content hierarchy, one main content surface, consistent window
+  insets, and compact sections. Avoid unnecessary nested frames or empty outer panels. Size dialogs
+  to their content with sensible minimum dimensions; allow content to scroll rather than clipping
+  at smaller displays or 200% zoom.
+- Use the same semantic action treatment everywhere: primary for the main action, secondary for
+  cancel/back, and danger for destructive actions. Every action must have visible keyboard focus,
+  keyboard access, screen-reader name, and a disabled/loading state that remains distinguishable.
+- Verify system/light/dark appearance, English/Turkish, keyboard focus order, narrow windows, 200%
+  zoom, reduced motion, forced colors/high contrast, loading/empty/error states, and long text for
+  every materially changed native window. Capture screenshots from background E2E runs where
+  practical; never bring test windows to the foreground.
 - Keep the desktop sign-in and console chooser visually consistent with the web login surface. Reuse shared cards, buttons, icons, typography, spacing, light/dark tokens, and localized messages.
 - Keep Admin and Account actions separate and clearly labeled. Preserve the existing solid Bootstrap button variants; do not introduce outline button variants or one-off icons.
 - Every asynchronous action must disable duplicate submission and show the inline progress spinner while it is pending, including sign-in, refresh, logout, and retry actions.
 - Verify light and dark themes, keyboard focus, narrow windows, long localized text, offline/error banners, disabled/loading states, and screen-reader labels.
 - Do not expose sensitive authentication details in visible error messages or client-side telemetry.
+
+### Operating-system conventions
+
+- Keep one Kitezh visual identity across operating systems through the shared semantic palette,
+  spacing, type roles, and icon meanings. Let each OS supply its familiar window chrome, input
+  behavior, keyboard conventions, and accessibility behavior; do not make every platform look like
+  a web page in a native window.
+- Use the system font stack for native windows (`-apple-system` on macOS, `Segoe UI` on Windows,
+  and the system sans-serif fallback on Linux). Keep shared type roles and readable line lengths,
+  but do not bundle a web font just to make native windows look identical across operating systems.
+- **macOS:** respect the native title bar and traffic-light controls; support standard menu roles
+  and Command-key shortcuts; keep dialogs focused and sized to their content; preserve Escape,
+  Return, and system window-close behavior. Use native window placement and remember only valid
+  display bounds. Follow Apple window, keyboard, and accessibility guidance
+  ([windows](https://developer.apple.com/design/human-interface-guidelines/windows),
+  [keyboards](https://developer.apple.com/design/human-interface-guidelines/keyboards/),
+  [accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)).
+- **Windows:** retain familiar title-bar and system-menu behavior; use Ctrl-key shortcuts and
+  standard Enter/Escape dialog actions; keep all controls keyboard reachable with a visible focus
+  indicator; support Windows high-contrast/forced-colors mode and text scaling. Do not replace
+  system window controls with custom chrome unless the feature has a tested accessibility path.
+- **Linux:** work with window-manager sizing, moving, focus, and close behavior; avoid assumptions
+  about a specific desktop environment or display scale; keep menus and dialogs usable with the
+  keyboard and system theme. Treat missing optional desktop integration as a supported state.
+- Keep the app's explicit light/dark/system preference separate from the OS theme source. In
+  `system` mode follow OS appearance changes immediately; in explicit modes keep every native
+  window, dialog, and renderer surface on the selected palette. Never leave a native dialog on a
+  stale hard-coded dark or light palette.
+- Use shared semantic color roles for background, surface, text, muted text, border, primary,
+  destructive, and success states. Pair color with text/icon/state, preserve contrast, and use the
+  same action hierarchy across sign-in, settings, updates, errors, and confirmations.
+- Native windows must reflow at narrow widths and high display scaling. Keep primary actions visible
+  or reachable by scrolling, allow localized labels to wrap, and avoid horizontal scrolling for
+  ordinary forms and settings.
+- Before changing a native window, check macOS, Windows, and Linux-specific behavior where the
+  affected feature exists, plus light/dark/system, English/Turkish, keyboard-only navigation,
+  high contrast, reduced motion, long text, and loading/error states. E2E runs must stay in the
+  background and must not focus or raise test windows.
 
 ## Common Mistakes to Avoid
 

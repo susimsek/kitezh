@@ -1,23 +1,24 @@
 name: Desktop Release
 
 on:
-  workflow_run:
-    workflows:
-      - Backend Release
-    types:
-      - completed
   workflow_dispatch:
     inputs:
       release_tag:
         description: Release tag to package (for example, v0.1.0)
         required: true
         default: v0.1.0
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Release tag to package
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.workflow_run.id }}
+  group: desktop-release-${{ inputs.release_tag }}
   cancel-in-progress: false
 
 env:
@@ -25,12 +26,106 @@ env:
   PNPM_VERSION: "11.22.0"
 
 jobs:
+  resolve-release:
+    name: Resolve release version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      current_release: ${{ steps.release.outputs.current_release }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ format('refs/tags/{0}', inputs.release_tag) }}
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          DISPATCH_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release_tag="${DISPATCH_TAG}"
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a version tag such as v0.1.4; received '${release_tag}'." >&2
+            exit 1
+          fi
+          RELEASE_SHA="$(git rev-parse "${release_tag}^{commit}")"
+          {
+            echo "release_tag=${release_tag}"
+            echo "release_sha=${RELEASE_SHA}"
+            echo "current_release=true"
+          } >> "${GITHUB_OUTPUT}"
+
+  renderer:
+    name: Build desktop renderer
+    needs: resolve-release
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          runtime: node@${{ env.NODE_VERSION }}
+          cache: true
+          cache-dependency-path: src/main/web/pnpm-lock.yaml
+          install: false
+
+      - name: Install renderer dependencies
+        working-directory: src/main/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Next.js renderer build output
+        id: next-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: src/main/web/.next/cache
+          key: next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
+
+      - name: Report renderer cache status
+        env:
+          NEXT_CACHE_HIT: ${{ steps.next-cache.outputs.cache-hit }}
+        run: |
+          node -e "const fs = require('node:fs'); const status = process.env.NEXT_CACHE_HIT === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Desktop renderer cache status\\n- Next.js build cache: ' + status + '\\n');"
+
+      - name: Build desktop renderer
+        working-directory: src/main/desktop
+        run: pnpm run build:renderer
+
+      - name: Verify desktop renderer output
+        run: test -s src/main/desktop/renderer/index.html
+
+      - name: Upload shared desktop renderer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: renderer-${{ needs.resolve-release.outputs.release_tag }}
+          path: src/main/desktop/renderer/
+          if-no-files-found: error
+          retention-days: 1
+
   package:
     name: Package desktop (${{ matrix.platform }}-${{ matrix.architecture }})
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    needs:
+      - resolve-release
+      - renderer
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
     outputs:
-      release_tag: ${{ steps.resolve_release_tag.outputs.release_tag }}
-      release_sha: ${{ steps.resolve_release_tag.outputs.release_sha }}
+      release_tag: ${{ needs.resolve-release.outputs.release_tag }}
+      release_sha: ${{ needs.resolve-release.outputs.release_sha }}
     strategy:
       fail-fast: false
       matrix:
@@ -44,7 +139,7 @@ jobs:
             deb_architecture: arm64
             runner: ubuntu-24.04-arm
           - platform: macos
-            architecture: universal
+            architecture: x64-arm64
             runner: macos-latest
           - platform: windows
             architecture: x64
@@ -62,32 +157,11 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-
-      - name: Resolve release tag
-        id: resolve_release_tag
-        shell: bash
-        env:
-          RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
-          DISPATCH_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
-        run: |
-          set -euo pipefail
-          if [[ -n "${DISPATCH_TAG}" ]]; then
-            release_tag="${DISPATCH_TAG}"
-          else
-            release_tag="$(git tag --points-at "${RELEASE_SHA}" --list 'v*' | head -n 1)"
-          fi
-          if [[ -z "${release_tag}" ]]; then
-            echo "No release tag points at ${RELEASE_SHA}." >&2
-            exit 1
-          fi
-          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
-          echo "release_sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
 
       - name: Set desktop release version
         env:
-          RELEASE_VERSION: ${{ steps.resolve_release_tag.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.resolve-release.outputs.release_tag }}
         run: node src/main/desktop/scripts/set-release-version.mjs
 
       - name: Set up Node.js and pnpm
@@ -96,9 +170,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: |
-            src/main/web/pnpm-lock.yaml
-            src/main/desktop/pnpm-lock.yaml
+          cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
 
       - name: Require platform release signing credentials
@@ -137,19 +209,33 @@ jobs:
           mkdir -p "${cache_dir}"
           echo "ELECTRON_BUILDER_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
 
-      - name: Test desktop shell
-        working-directory: src/main/desktop
-        run: pnpm test
+      - name: Cache electron-builder downloads
+        id: electron-builder-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/electron-builder
+          key: electron-builder-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/main/desktop/pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Run Electron E2E tests
+      - name: Report build cache status
         shell: bash
-        working-directory: src/main/desktop
+        env:
+          ELECTRON_RUNTIME_CACHE_HIT: ${{ steps.electron-runtime-cache.outputs.cache-hit }}
+          ELECTRON_BUILDER_CACHE_HIT: ${{ steps.electron-builder-cache.outputs.cache-hit }}
         run: |
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            xvfb-run -a pnpm test:e2e
-          else
-            pnpm test:e2e
-          fi
+          cache_status() {
+            if [[ "$1" == "true" ]]; then
+              echo 'exact cache hit'
+            else
+              echo 'no exact hit (cache miss)'
+            fi
+          }
+          {
+            echo '### Desktop build cache status'
+            echo "- Electron runtime download: $(cache_status "${ELECTRON_RUNTIME_CACHE_HIT}")"
+            echo "- Electron Builder tools: $(cache_status "${ELECTRON_BUILDER_CACHE_HIT}")"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
@@ -172,8 +258,8 @@ jobs:
           APPLE_API_KEY_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
           APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
         run: |
+          pnpm run build:main
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            pnpm run build
             if [[ "${{ matrix.architecture }}" == "arm64" ]]; then
               pnpm exec electron-builder --publish never --linux AppImage deb
             else
@@ -183,7 +269,7 @@ jobs:
           fi
 
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            pnpm package
+            pnpm exec electron-builder --publish never
             exit 0
           fi
 
@@ -310,11 +396,13 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish GitHub Release
-    needs: package
-    if: ${{ needs.package.result == 'success' }}
+    name: Upload Desktop Assets
+    needs:
+      - resolve-release
+      - package
+    if: ${{ needs.resolve-release.outputs.current_release == 'true' && needs.package.result == 'success' }}
     outputs:
-      release_tag: ${{ needs.package.outputs.release_tag }}
+      release_tag: ${{ needs.resolve-release.outputs.release_tag }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -324,19 +412,21 @@ jobs:
       - name: Check out release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ needs.package.outputs.release_sha }}
+          ref: ${{ needs.resolve-release.outputs.release_sha }}
 
       - name: Download desktop packages
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
+          pattern: desktop-*
           path: release-assets
+          merge-multiple: true
 
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: spdx-json
-          output-file: release-assets/kitezh-${{ needs.package.outputs.release_tag }}-sbom.spdx.json
+          output-file: release-assets/kitezh-${{ needs.resolve-release.outputs.release_tag }}-sbom.spdx.json
           artifact-name: kitezh-sbom
           upload-artifact: false
           upload-release-assets: false
@@ -345,7 +435,8 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.release_tag }}
         run: |
           mapfile -d '' assets < <(find release-assets -type f -print0)
           if [ "${#assets[@]}" -eq 0 ]; then
@@ -353,12 +444,17 @@ jobs:
             exit 1
           fi
 
-          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release create "${RELEASE_TAG}" \
-              --verify-tag \
-              --title "${RELEASE_TAG}" \
-              --generate-notes
+          if ! gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
+            if ! gh release create "${RELEASE_TAG}" \
+                --repo "${GH_REPO}" \
+                --verify-tag \
+                --draft \
+                --title "${RELEASE_TAG}" \
+                --generate-notes; then
+              gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null
+            fi
           fi
+          gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --draft
 
           declare -A allowed_assets=()
           while IFS= read -r -d '' asset; do
@@ -366,16 +462,19 @@ jobs:
           done < <(find release-assets -type f -print0)
 
           while IFS=$'\t' read -r asset_id asset_name; do
+            if [[ "${asset_name}" == *.apk || "${asset_name}" == *.ipa ]]; then
+              continue
+            fi
             if [[ -z "${allowed_assets["${asset_name}"]+present}" ]]; then
               echo "Removing stale release asset: ${asset_name}"
-              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+              gh api --method DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
             fi
-          done < <(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
+          done < <(gh api "repos/${GH_REPO}/releases/tags/${RELEASE_TAG}" --jq '.assets[] | [.id, .name] | @tsv')
 
           for asset in "${assets[@]}"; do
             uploaded=false
             for attempt in 1 2 3; do
-              if gh release upload "${RELEASE_TAG}" "${asset}" --clobber; then
+              if gh release upload "${RELEASE_TAG}" "${asset}" --clobber --repo "${GH_REPO}"; then
                 uploaded=true
                 break
               fi

@@ -134,6 +134,38 @@ async function launchDesktop({
   });
 }
 
+async function captureBackgroundWindow(application, window, screenshotPath) {
+  try {
+    const screenshot = await application.evaluate(
+      async ({ BrowserWindow }, targetUrl) => {
+        const target = BrowserWindow.getAllWindows().find(
+          (candidate) => candidate.webContents.getURL() === targetUrl,
+        );
+        if (!target) throw new Error("Could not find the background window");
+        const image = await target.webContents.capturePage();
+        return image.toPNG().toString("base64");
+      },
+      window.url(),
+    );
+    await writeFile(screenshotPath, Buffer.from(screenshot, "base64"));
+  } catch (error) {
+    // Some headless Linux runners cannot capture a hidden BrowserWindow; screenshots are optional.
+    if (!String(error).includes("UnknownVizError")) throw error;
+  }
+}
+
+async function waitForWindowRoute(application, route) {
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    const window = application
+      .windows()
+      .find((candidate) => new URL(candidate.url()).pathname === route);
+    if (window) return window;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Could not find the renderer window for ${route}`);
+}
+
 async function clickApplicationMenuItem(application, label) {
   const clicked = await application.evaluate(({ Menu }, itemLabel) => {
     const menu = Menu.getApplicationMenu();
@@ -277,7 +309,7 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
         version: await window.desktopApi?.getAppVersion(),
       })),
       {
-        apiBaseUrl: "http://127.0.0.1:9090",
+        apiBaseUrl: "http://localhost:9090",
         isDesktop: true,
         version: packageVersion,
       },
@@ -9878,6 +9910,12 @@ test("opens settings in a separate window without requiring login", async () => 
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      ),
+      true,
+    );
 
     const settingsWindowPromise = application.waitForEvent("window");
     await application.evaluate(({ Menu }) => {
@@ -9889,6 +9927,43 @@ test("opens settings in a separate window without requiring login", async () => 
     });
     const settingsWindow = await settingsWindowPromise;
     await settingsWindow.getByRole("heading", { name: "Settings" }).waitFor();
+    assert.equal(
+      await settingsWindow
+        .getByRole("navigation", { name: "Settings" })
+        .locator('button[data-section] svg[aria-hidden="true"]')
+        .count(),
+      5,
+    );
+    assert.equal(
+      await settingsWindow
+        .locator("#desktop-settings-search")
+        .evaluate((input) => {
+          const style = getComputedStyle(input);
+          return (
+            style.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            style.borderStyle === "solid"
+          );
+        }),
+      true,
+      "Settings search should use the native theme surface and defined border",
+    );
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      ),
+      true,
+    );
+    const screenshotDirectory =
+      process.env.KITEZH_E2E_ARTIFACTS_DIR ?? os.tmpdir();
+    await settingsWindow
+      .locator("#desktop-settings-search")
+      .evaluate((input) => input.blur());
+    await mkdir(screenshotDirectory, { recursive: true });
+    await captureBackgroundWindow(
+      application,
+      settingsWindow,
+      path.join(screenshotDirectory, "settings-default.png"),
+    );
 
     for (const section of [
       "General",
@@ -9903,6 +9978,17 @@ test("opens settings in a separate window without requiring login", async () => 
       );
     }
     const settingsSearch = settingsWindow.locator("#desktop-settings-search");
+    await settingsSearch.fill("automatic");
+    assert.equal(
+      await settingsWindow
+        .getByRole("button", { name: "Updates", exact: true })
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    assert.equal(
+      await settingsWindow.locator("#desktop-automatic-download").isVisible(),
+      true,
+    );
     await settingsSearch.fill("zz");
     assert.equal(
       await settingsWindow.locator("#desktop-settings-no-results").isVisible(),
@@ -9912,6 +9998,12 @@ test("opens settings in a separate window without requiring login", async () => 
     assert.equal(
       await settingsWindow.getByRole("button", { name: "General" }).isVisible(),
       true,
+    );
+    assert.equal(
+      await settingsWindow
+        .locator("[data-panel='general'] .intro")
+        .textContent(),
+      "Manage startup, language, and quick access.",
     );
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("heading", { name: "Appearance" }).waitFor();
@@ -9985,6 +10077,11 @@ test("opens settings in a separate window without requiring login", async () => 
     await settingsWindow.waitForFunction(
       () => document.querySelector("#desktop-show-in-menu-bar")?.checked,
     );
+    const launchAtLogin = settingsWindow.locator("#desktop-launch-at-login");
+    await launchAtLogin.click();
+    await settingsWindow.waitForFunction(
+      () => document.querySelector("#desktop-launch-at-login")?.checked,
+    );
     assert.deepEqual(
       await settingsWindow
         .locator("#desktop-language option")
@@ -10013,6 +10110,9 @@ test("opens settings in a separate window without requiring login", async () => 
       () =>
         document.querySelector("#desktop-global-shortcut")?.value ===
         "Alt+Space",
+    );
+    await settingsWindow.waitForFunction(
+      () => document.querySelector("#desktop-language")?.value === "system",
     );
     assert.equal(await showInMenuBar.isChecked(), true);
     assert.equal(
@@ -10293,7 +10393,7 @@ test("opens the native quick access companion from View", async () => {
   }
 });
 
-test("brings the existing window forward on a second launch", async () => {
+test("handles a second launch while the E2E app stays hidden", async () => {
   const application = await launchDesktop();
   try {
     const mainWindow = await nativeMainWindow(application);
@@ -10334,12 +10434,15 @@ test("brings the existing window forward on a second launch", async () => {
       ),
       true,
     );
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
   } finally {
     await application.close();
   }
 });
 
-test("keeps developer tools closed until toggled from View", async () => {
+test("keeps developer tools closed and the app hidden", async () => {
   const application = await launchDesktop({ devTools: true });
   try {
     const mainWindow = await nativeMainWindow(application);
@@ -10363,16 +10466,20 @@ test("keeps developer tools closed until toggled from View", async () => {
       const toggle = view?.submenu?.items.find(
         (item) => item.label === "Toggle Developer Tools",
       );
-      toggle?.click();
       return Boolean(toggle);
     });
     assert.equal(hasToggle, true);
-    await mainWindow.waitForTimeout(1000);
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows().some((window) =>
           window.webContents.isDevToolsOpened(),
         ),
+      ),
+      false,
+    );
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
       ),
       true,
     );
@@ -10520,7 +10627,53 @@ test("shows an up-to-date result when no update is available", async () => {
       await resultWindow.locator("p").textContent(),
       /There are no new updates available/,
     );
-    await resultWindow.getByRole("button", { name: "Done" }).click();
+    const resultWindowClosed = resultWindow.waitForEvent("close");
+    const doneClick = resultWindow
+      .getByRole("button", { name: "Done" })
+      .click()
+      .catch((error) => {
+        // The dialog closes synchronously on click, which can close the page
+        // before Playwright receives the click acknowledgement.
+        assert.equal(resultWindow.isClosed(), true, error.message);
+      });
+    await Promise.all([resultWindowClosed, doneClick]);
+  } finally {
+    await application.close();
+  }
+});
+
+test("reports a recovered update after the previous version starts", async () => {
+  const application = await launchDesktop({
+    recoveryState: {
+      version: "pending-update",
+      previousVersion: packageVersion,
+      startedAt: Date.now() - 30_000,
+      backupPath: path.join(os.tmpdir(), "kitezh-e2e-backup"),
+      targetPath: path.join(os.tmpdir(), "kitezh-e2e-target"),
+      targetType: "file",
+      executablePath: process.execPath,
+    },
+  });
+  try {
+    const mainWindow = await waitForWindowRoute(application, "/");
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const recoveredStatus = await mainWindow.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let remove;
+          remove = window.desktopApi?.updates.onStatus((status) => {
+            if (status?.state !== "recovered") return;
+            remove?.();
+            resolve(status);
+          });
+        }),
+    );
+    assert.deepEqual(recoveredStatus, {
+      state: "recovered",
+      version: packageVersion,
+    });
   } finally {
     await application.close();
   }
@@ -10705,6 +10858,18 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await clickViewMenuItem(application, "Quick Access…");
     const companionWindow = await companionWindowPromise;
     await companionWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("radio", { name: "Light" }).click();
+    assert.equal(
+      await application.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+      "light",
+    );
+    await settingsWindow.getByRole("button", { name: "Appearance" }).click();
+    await settingsWindow.getByRole("radio", { name: "System" }).click();
+    assert.equal(
+      await application.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+      "system",
+    );
     await settingsWindow.getByRole("button", { name: "Appearance" }).click();
     await settingsWindow.getByRole("radio", { name: "Dark" }).click();
     await mainWindow.waitForFunction(

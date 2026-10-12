@@ -37,6 +37,20 @@ test.describe("administration console", () => {
     await expect(page.locator('input[name="username"]')).toHaveValue(/.+/);
   });
 
+  test("renders the organization administration surface", async ({ page, request }) => {
+    await visitConsole(page, "admin", "/organizations");
+    await expect(page).toHaveURL(/\/admin\/organizations$/);
+    await expect(
+      page.getByRole("heading", { name: /Organizations|Organizasyonlar/i }),
+    ).toBeVisible();
+    await expect(page.locator("table")).toBeVisible();
+
+    const response = await apiRequest(request, page, "/api/admin/organizations?size=10");
+    expect(response.ok()).toBeTruthy();
+    const body = (await response.json()) as { content: unknown[] };
+    expect(body.content).toBeDefined();
+  });
+
   test("opens session administration and exposes the global revoke action", async ({ page }) => {
     await visitConsole(page, "admin", "/sessions");
     await expect(page.getByRole("heading", { name: /Sessions|Oturumlar/i })).toBeVisible();

@@ -23,37 +23,56 @@ function redirect(response, location) {
 }
 
 function bearerIsValid(request) {
-  return request.headers.authorization === `Bearer ${fixtureTokens.accessToken}`;
+  return (
+    request.headers.authorization === `Bearer ${fixtureTokens.accessToken}`
+  );
 }
 
 function authorizePage(url) {
   const redirectUri = url.searchParams.get("redirect_uri");
   const state = url.searchParams.get("state");
   if (!redirectUri || !state) return null;
+  const callback = new URL(redirectUri);
+  if (
+    callback.protocol !== "kitezh:" ||
+    callback.host !== "oauth" ||
+    callback.pathname !== "/callback"
+  ) {
+    return null;
+  }
+  callback.searchParams.set("code", randomBytes(18).toString("hex"));
+  callback.searchParams.set("state", state);
+  const callbackUrl = callback.toString();
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Kitezh fixture sign in</title></head>
 <body><main><h1>Kitezh fixture account</h1>
 <p>This deterministic account is used only by native development-build tests.</p>
-<form method="post">
-<input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}">
-<input type="hidden" name="state" value="${escapeHtml(state)}">
-<button type="submit">Continue with fixture account</button>
-</form></main></body></html>`;
+<a href="${escapeHtml(callbackUrl)}">Continue with fixture account</a>
+</main></body></html>`;
 }
 
 function escapeHtml(value) {
-  return value.replaceAll("&", "&amp;").replaceAll("\"", "&quot;").replaceAll("<", "&lt;");
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;");
 }
 
 export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
   const server = createServer(async (request, response) => {
-    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? host}`);
+    const url = new URL(
+      request.url ?? "/",
+      `http://${request.headers.host ?? host}`,
+    );
 
     if (request.method === "GET" && url.pathname === "/health") {
       writeJson(response, 200, { status: "ok" });
       return;
     }
-    if (request.method === "GET" && url.pathname === "/.well-known/openid-configuration") {
+    if (
+      request.method === "GET" &&
+      url.pathname === "/.well-known/openid-configuration"
+    ) {
       const issuer = `http://${url.host}`;
       writeJson(response, 200, {
         issuer,
@@ -69,7 +88,10 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
         writeJson(response, 400, { title: "Invalid authorization request" });
         return;
       }
-      response.writeHead(200, { "Cache-Control": "no-store", "Content-Type": "text/html; charset=utf-8" });
+      response.writeHead(200, {
+        "Cache-Control": "no-store",
+        "Content-Type": "text/html; charset=utf-8",
+      });
       response.end(page);
       return;
     }
@@ -128,7 +150,13 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
         writeJson(response, 401, { title: "Unauthorized", status: 401 });
         return;
       }
-      writeJson(response, 200, { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 });
+      writeJson(response, 200, {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        number: 0,
+        size: 20,
+      });
       return;
     }
     if (url.pathname === "/fixture/forbidden") {
@@ -137,7 +165,9 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
     }
     if (url.pathname === "/fixture/timeout") {
       const delayMs = Number(url.searchParams.get("delay") ?? 30_000);
-      await new Promise((resolve) => setTimeout(resolve, Number.isFinite(delayMs) ? delayMs : 30_000));
+      await new Promise((resolve) =>
+        setTimeout(resolve, Number.isFinite(delayMs) ? delayMs : 30_000),
+      );
       writeJson(response, 504, { title: "Gateway Timeout", status: 504 });
       return;
     }
@@ -149,19 +179,30 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
     async listen() {
       await new Promise((resolve) => server.listen(port, host, resolve));
       const address = server.address();
-      if (!address || typeof address === "string") throw new Error("Fixture server did not bind");
-      return { host, port: address.port, issuer: `http://${host}:${address.port}` };
+      if (!address || typeof address === "string")
+        throw new Error("Fixture server did not bind");
+      return {
+        host,
+        port: address.port,
+        issuer: `http://${host}:${address.port}`,
+      };
     },
     close() {
-      return new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+      return new Promise((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
     },
   };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = new Map();
-  for (let index = 2; index < process.argv.length; index += 2) args.set(process.argv[index], process.argv[index + 1]);
-  const fixture = createFixtureServer({ host: args.get("--host") ?? "127.0.0.1", port: Number(args.get("--port") ?? 8081) });
+  for (let index = 2; index < process.argv.length; index += 2)
+    args.set(process.argv[index], process.argv[index + 1]);
+  const fixture = createFixtureServer({
+    host: args.get("--host") ?? "127.0.0.1",
+    port: Number(args.get("--port") ?? 8081),
+  });
   const bound = await fixture.listen();
   console.log(`Native fixture listening at ${bound.issuer}`);
   process.on("SIGTERM", () => void fixture.close());

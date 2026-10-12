@@ -10,7 +10,7 @@ import { Icon, type IconName } from "@/components/shared/Icon";
 import {
   DESKTOP_RELEASES_URL,
   fetchLatestDesktopRelease,
-  findDesktopAssetUrl,
+  findReleaseAssetUrl,
   type DesktopRelease,
 } from "@/lib/desktop-downloads";
 
@@ -28,6 +28,9 @@ type DownloadPlatform = {
   icon: IconName;
   title: string;
   description: string;
+  installationNote?: string;
+  helpLinks?: { label: string; href: string }[];
+  showWhenAssetExists?: RegExp;
   groups: DownloadGroup[];
 };
 
@@ -50,9 +53,12 @@ const platformAssets = {
     },
   },
   macos: {
-    universal: /-macos-universal\.dmg$/,
+    appleSilicon: /-macos-arm64\.dmg$/,
     intel: /-macos-x64\.dmg$/,
   },
+  android: /-android\.apk$/,
+  ios: /-ios(?:-unsigned)?\.ipa$/,
+  iosSigned: /-ios\.ipa$/,
 };
 
 function asset(matcher: RegExp, label: string): DownloadAsset {
@@ -62,23 +68,28 @@ function asset(matcher: RegExp, label: string): DownloadAsset {
 function DownloadLink({
   asset: downloadAsset,
   release,
+  unavailableLabel,
 }: {
   asset: DownloadAsset;
   release: DesktopRelease | null;
+  unavailableLabel: string;
 }) {
-  const href = findDesktopAssetUrl(release, downloadAsset.matcher);
+  const href = findReleaseAssetUrl(release, downloadAsset.matcher);
   if (!href) {
     return (
-      <Button
-        type="button"
-        variant="primary"
-        className="download-asset-button"
-        disabled
-        aria-disabled="true"
-      >
-        <ActionIcon action="download" />
-        {downloadAsset.label}
-      </Button>
+      <div className="download-asset-unavailable">
+        <Button
+          type="button"
+          variant="primary"
+          className="download-asset-button"
+          disabled
+          aria-disabled="true"
+        >
+          <ActionIcon action="download" />
+          {downloadAsset.label}
+        </Button>
+        <span className="small text-body-secondary">{unavailableLabel}</span>
+      </div>
     );
   }
 
@@ -95,6 +106,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
   const [release, setRelease] = useState<DesktopRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
   const [releaseError, setReleaseError] = useState(false);
+  const signedIpa = findReleaseAssetUrl(release, platformAssets.iosSigned);
 
   const fetchRelease = useCallback((signal?: AbortSignal) => {
     return fetchLatestDesktopRelease(signal)
@@ -165,13 +177,50 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
         {
           label: copy.macos.architecture,
           assets: [
-            asset(platformAssets.macos.universal, copy.macos.assets.universal),
+            asset(platformAssets.macos.appleSilicon, copy.macos.assets.appleSilicon),
             asset(platformAssets.macos.intel, copy.macos.assets.intel),
           ],
         },
       ],
     },
+    {
+      icon: "android",
+      title: copy.android.title,
+      description: copy.android.description,
+      installationNote: copy.android.installationNote,
+      showWhenAssetExists: platformAssets.android,
+      groups: [
+        {
+          label: copy.android.architecture,
+          assets: [asset(platformAssets.android, copy.android.asset)],
+        },
+      ],
+    },
+    {
+      icon: "apple",
+      title: copy.ios.title,
+      description: signedIpa ? copy.ios.signedDescription : copy.ios.description,
+      installationNote: signedIpa ? copy.ios.signedInstallationNote : copy.ios.installationNote,
+      showWhenAssetExists: platformAssets.ios,
+      helpLinks: signedIpa
+        ? undefined
+        : [
+            { label: copy.ios.altStore, href: "https://altstore.io/" },
+            { label: copy.ios.sideloadly, href: "https://sideloadly.io/" },
+          ],
+      groups: [
+        {
+          label: copy.ios.architecture,
+          assets: [asset(platformAssets.ios, signedIpa ? copy.ios.signedAsset : copy.ios.asset)],
+        },
+      ],
+    },
   ];
+  const visiblePlatforms = platforms.filter(
+    (platform) =>
+      !platform.showWhenAssetExists ||
+      Boolean(findReleaseAssetUrl(release, platform.showWhenAssetExists)),
+  );
 
   return (
     <main className="download-page py-4 py-md-5">
@@ -196,8 +245,8 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
           </Alert>
         ) : (
           <Row className="download-platforms g-4 g-lg-5 justify-content-center">
-            {platforms.map((platform) => (
-              <Col key={platform.title} xs={12} md={4}>
+            {visiblePlatforms.map((platform) => (
+              <Col key={platform.title} xs={12} md={6} lg={4}>
                 <section className="download-platform h-100">
                   <div className="download-platform-icon text-primary mb-3" aria-hidden="true">
                     <Icon icon={platform.icon} size="3x" />
@@ -216,12 +265,27 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
                               key={downloadAsset.label}
                               asset={downloadAsset}
                               release={release}
+                              unavailableLabel={copy.unavailable}
                             />
                           ))}
                         </div>
                       </div>
                     ))}
                   </Stack>
+                  {platform.installationNote && (
+                    <p className="download-installation-note small text-body-secondary mt-3 mb-0">
+                      {platform.installationNote}
+                    </p>
+                  )}
+                  {platform.helpLinks && (
+                    <div className="download-installation-links d-flex flex-wrap gap-3 mt-2">
+                      {platform.helpLinks.map((link) => (
+                        <a key={link.href} href={link.href} target="_blank" rel="noreferrer">
+                          {link.label}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </section>
               </Col>
             ))}

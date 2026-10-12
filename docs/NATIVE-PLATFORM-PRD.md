@@ -103,7 +103,7 @@ so a native implementation can be audited against behavior without copying its m
    clients, client scopes, identity providers, sessions, consents, keys, events, and settings.
 3. Add pagination, server-side filters, authority-aware actions, destructive confirmations, audit
    feedback, and session invalidation for every mutable Admin screen.
-4. Add Android/iOS development-build and device E2E coverage; Expo web export is not native E2E.
+4. Add native development-build coverage for Android and iOS. Device-level acceptance is run on iOS and Desktop; Android emulator E2E is outside the user's requested verification scope. Expo web export is not native E2E.
 5. Define the mobile release/update strategy (store updates or Expo Updates) before exposing an
    update action in the mobile UI.
 
@@ -427,8 +427,10 @@ executable validation. No commit or push was performed.
 
 ### Şuayb progress checklist
 
-`[ ]` not started, `[~]` in progress, and `[x]` complete. An item becomes `[x]` only after its
-acceptance evidence is linked in the feature matrix.
+`[ ]` not started, `[~]` in progress, `[B]` blocked by a missing external contract/configuration,
+and `[x]` complete. An item becomes `[x]` only after its acceptance evidence is linked in the
+feature matrix. A blocked item must name the missing dependency and must not weaken security to
+simulate it.
 
 - [~] Mobile Admin client registration and isolated session namespace: `mobile-admin-console` is registered with the `admin-api` scope, `kitezh://admin/oauth/callback` and `kitezh://admin/logout/callback` redirects, and a separate `kitezh.mobile.admin.session` SecureStore key; native Admin screens remain to be built
 - [~] Mobile native Admin shell and navigation: `/admin` now has a native sign-in boundary, Admin session provider, dashboard shell, tab navigation, loading, 401/403, and retry states; resource screens remain to be built
@@ -453,12 +455,15 @@ acceptance evidence is linked in the feature matrix.
 - [~] Focused CI and packaged smoke-test gate: mobile typecheck, lint, unit tests, boundary checks, web build, and fixture contract run in `mobile-quality`; Android/iOS packaged device evidence remains manual
 - [~] Feature-matrix evidence and explicit blocker gate: PRD and mobile matrix link boundary, fixture, deep-link, Maestro, and workflow evidence; authenticated callback/offline/device results remain explicit blockers
 
-### Local verification record (2026-10-09)
+Progress on 2026-10-11: **17 of 22 complete; 4 in progress and 1 blocked**. Android emulator E2E is not required by the user's acceptance scope; Android source/build checks remain useful, while device-level verification is performed on iOS and Desktop. The remaining notification item is blocked by the missing authenticated backend event/action and device-registration contract, not by lack of a local test environment. The requested commit, push,
+tag, and release are gated on all 22 checklist items being complete with evidence.
+
+### Local verification record (2026-10-10)
 
 The following results are from the source and local runs on macOS arm64. They are recorded
 separately from the 22-item completion checklist: a local unit or development-build pass does not
-complete an item whose acceptance criteria still require an authenticated flow, a packaged artifact,
-both operating systems, or a real-device run.
+complete an item whose acceptance criteria still require an authenticated flow, a target-platform
+packaged artifact, or a real-device run.
 
 | Status | Target                              | Local result       | Evidence                                                                                                                                                                                                                                                                                                                                                                     | Checklist impact                                                                                                                                                                |
 | ------ | ----------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -511,7 +516,7 @@ Every native vertical slice must pass the following state matrix:
 | Theme/language   | Current screen and persisted preference update immediately         | All open windows, dialogs, menu/tray, and persisted preference update immediately   |
 | Accessibility    | Labels, roles, touch target, screen reader announcement            | Keyboard traversal, focus ring, screen reader labels, high contrast, reduced motion |
 
-Required checks for each slice are mobile typecheck/lint/unit/build plus native E2E, desktop
+Required checks for each slice are mobile typecheck/lint/unit/build plus iOS native E2E, desktop
 typecheck/unit/E2E plus packaged smoke tests, and `git diff --check`. Update the feature matrix
 only after the target-specific acceptance checks pass. Web tests remain necessary because Web is the
 behavior reference, but a Web Playwright pass cannot substitute for native E2E.

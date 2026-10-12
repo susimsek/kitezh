@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 const command =
   process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "pnpm";
@@ -15,6 +17,9 @@ const config = JSON.parse(
 
 const android = config.android;
 const filters = android?.intentFilters ?? [];
+const splashPlugin = config.plugins?.find(
+  ([pluginName]) => pluginName === "expo-splash-screen",
+);
 const requiredRoutes = new Set([
   "oauth/callback",
   "logout/callback",
@@ -33,7 +38,16 @@ const configuredRoutes = new Set(
 
 if (
   config.scheme !== "kitezh" ||
+  config.name !== "Kitezh" ||
   android?.package !== "io.github.susimsek.kitezh.mobile" ||
+  !config.icon ||
+  !existsSync(resolve(config.icon)) ||
+  !existsSync(resolve("assets/icon.png")) ||
+  !existsSync(resolve("assets/android-icon-foreground.png")) ||
+  !splashPlugin?.[1]?.image ||
+  !existsSync(resolve(splashPlugin[1].image)) ||
+  !splashPlugin[1]?.dark?.image ||
+  !existsSync(resolve(splashPlugin[1].dark.image)) ||
   requiredRoutes.size !== configuredRoutes.size ||
   [...requiredRoutes].some((route) => !configuredRoutes.has(route))
 ) {

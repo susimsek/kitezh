@@ -13,6 +13,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:9090",
+    headless: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",

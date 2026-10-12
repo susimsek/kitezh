@@ -1,7 +1,10 @@
-import { authorizationServerIssuer } from "@/config";
+import { authorizationServerIssuer } from "../config.ts";
 import type { AccountSocialLink } from "../../../shared/src/contracts.ts";
+import { createClientMetadataHeaders } from "../../../shared/src/client-metadata.cjs";
 import {
   classifyApiError,
+  createNativeRequestSignal,
+  DEFAULT_NATIVE_API_TIMEOUT_MS,
   parseProblemDetail,
   type ApiErrorKind,
   type ProblemDetail,
@@ -106,11 +109,18 @@ export class AccountApiError extends Error {
 type RequestOptions = {
   refreshAccessToken?: () => Promise<string | null>;
   signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 function accountApiUrl(path: string) {
   return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
 }
+
+const clientHeaders = createClientMetadataHeaders({
+  appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? "0.1.0",
+  clientPlatform: process.env.EXPO_OS === "ios" ? "ios" : "android",
+  os: process.env.EXPO_OS === "ios" ? "ios" : "android",
+});
 
 async function readErrorData(response: Response) {
   try {
@@ -129,6 +139,10 @@ async function requestAccount<T>(
   message: string,
 ): Promise<T> {
   let response: Response;
+  const requestSignal = createNativeRequestSignal(
+    options.timeoutMs ?? DEFAULT_NATIVE_API_TIMEOUT_MS,
+    options.signal,
+  );
   try {
     response = await fetch(accountApiUrl(path), {
       ...init,
@@ -136,14 +150,19 @@ async function requestAccount<T>(
         ...init.headers,
         Accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
+        ...clientHeaders,
       },
-      signal: options.signal,
+      signal: requestSignal.signal,
     });
   } catch (cause) {
-    if (cause instanceof Error && cause.name === "AbortError") {
-      throw cause;
-    }
-    throw new AccountApiError(0, message, cause);
+    const failure = requestSignal.timedOut()
+      ? Object.assign(new Error("Native API request timed out"), {
+          name: "TimeoutError",
+        })
+      : cause;
+    throw new AccountApiError(0, message, failure);
+  } finally {
+    requestSignal.dispose();
   }
 
   if (response.status === 401 && !retried && options.refreshAccessToken) {
