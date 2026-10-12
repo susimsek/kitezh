@@ -26,6 +26,8 @@ describe("desktop connectivity guard", () => {
     window.desktopApi = {
       isDesktop: true,
       apiBaseUrl: "https://kitezh.onrender.com",
+      appVersion: "0.1.4",
+      os: "macOS",
     } as never;
 
     expect(apiUrl("http://127.0.0.1:9090/avatars/admin?v=1")).toBe(

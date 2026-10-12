@@ -89,6 +89,10 @@ if (
 }
 app.setName(DESKTOP_APP_NAME);
 
+function desktopOsIdentifier() {
+  return process.platform;
+}
+
 function showWindow(window: BrowserWindow) {
   if (backgroundE2e) return;
   window.show();
@@ -862,6 +866,11 @@ async function storeAuthorizationCode(
     getApiBaseUrl(),
     pending,
     code,
+    {
+      appVersion: app.getVersion(),
+      clientPlatform: "desktop",
+      os: desktopOsIdentifier(),
+    },
   );
   const vault = await readVault();
   vault[consoleName] = tokens;
@@ -2312,11 +2321,18 @@ function registerIpc() {
     event.returnValue = {
       apiBaseUrl: getApiBaseUrl(),
       protocol: DESKTOP_PROTOCOL,
+      appVersion: app.getVersion(),
+      os: desktopOsIdentifier(),
     };
   });
   ipcMain.handle("desktop:config", (event) => {
     assertTrustedSender(event);
-    return { apiBaseUrl: getApiBaseUrl(), protocol: DESKTOP_PROTOCOL };
+    return {
+      apiBaseUrl: getApiBaseUrl(),
+      protocol: DESKTOP_PROTOCOL,
+      appVersion: app.getVersion(),
+      os: desktopOsIdentifier(),
+    };
   });
   ipcMain.handle("desktop:open-external", async (event, value: unknown) => {
     assertTrustedSender(event);

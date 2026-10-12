@@ -2,11 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { messages, resolveLocale } from "../../shared/src/i18n.ts";
-import {
-  colors,
-  controlSizes,
-  resolveTheme,
-} from "../../shared/src/theme.ts";
+import { createClientMetadataHeaders } from "../../shared/src/client-metadata.cjs";
+import { colors, controlSizes, resolveTheme } from "../../shared/src/theme.ts";
 import { getMobileConsoleConfig } from "./config.ts";
 import { sessionStorageKey } from "./auth/session-keys.ts";
 import {
@@ -18,10 +15,7 @@ import type {
   DesktopLanguageMode,
   SocialProviderAvailability,
 } from "../../shared/src/contracts.ts";
-import {
-  classifyApiError,
-  parseProblemDetail,
-} from "../../shared/src/api.ts";
+import { classifyApiError, parseProblemDetail } from "../../shared/src/api.ts";
 import {
   isAllowedNativeRedirect,
   parseNativeDeepLink,
@@ -29,6 +23,22 @@ import {
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
 import { createSingleFlight } from "../../shared/src/session.ts";
+
+test("client metadata follows the Kitezh app header contract", () => {
+  assert.deepEqual(
+    createClientMetadataHeaders({
+      appVersion: "v0.1.4",
+      clientPlatform: "ios",
+      os: "ios",
+    }),
+    {
+      "App-Name": "Kitezh",
+      "App-Version": "v0.1.4",
+      "Client-Platform": "ios",
+      OS: "ios",
+    },
+  );
+});
 
 test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
@@ -77,7 +87,12 @@ test("mobile console contracts isolate account and admin sessions", () => {
   const admin = getMobileConsoleConfig("admin");
 
   assert.equal(account.clientId, "mobile-account-console");
-  assert.deepEqual(account.scopes, ["openid", "profile", "email", "account-api"]);
+  assert.deepEqual(account.scopes, [
+    "openid",
+    "profile",
+    "email",
+    "account-api",
+  ]);
   assert.equal(account.redirectUri, "kitezh://oauth/callback");
   assert.equal(admin.clientId, "mobile-admin-console");
   assert.deepEqual(admin.scopes, ["openid", "profile", "email", "admin-api"]);
@@ -96,7 +111,10 @@ test("shared API errors preserve native status semantics without transport detai
   ]);
   assert.equal(classifyApiError(401), "unauthorized");
   assert.equal(classifyApiError(403), "forbidden");
-  assert.equal(classifyApiError(0, new DOMException("timeout", "AbortError")), "timeout");
+  assert.equal(
+    classifyApiError(0, new DOMException("timeout", "AbortError")),
+    "timeout",
+  );
   assert.equal(classifyApiError(0, new Error("network")), "offline");
 });
 
@@ -147,7 +165,9 @@ test("native deep links accept only registered routes", () => {
     kind: "admin-logout-callback",
   });
   assert.equal(
-    parseNativeDeepLink("https://kitezh.onrender.com/verify-email?token=secret"),
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com/verify-email?token=secret",
+    ),
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
@@ -159,7 +179,9 @@ test("native intent routes registered callback links without callback parameters
     "/oauth/callback",
   );
   assert.equal(
-    resolveNativeIntentPath("kitezh://admin/oauth/callback?code=secret&state=state"),
+    resolveNativeIntentPath(
+      "kitezh://admin/oauth/callback?code=secret&state=state",
+    ),
     "/admin/oauth/callback",
   );
   assert.equal(

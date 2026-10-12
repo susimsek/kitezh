@@ -1,4 +1,5 @@
 import { authorizationServerIssuer } from "../config.ts";
+import { createClientMetadataHeaders } from "../../../shared/src/client-metadata.cjs";
 import {
   classifyApiError,
   createNativeRequestSignal,
@@ -249,7 +250,10 @@ export type AdminIdentityProviderRequest = {
   samlPassSubject: boolean;
 };
 
-export type AdminClientCreated = { client: AdminClient; clientSecret: string | null };
+export type AdminClientCreated = {
+  client: AdminClient;
+  clientSecret: string | null;
+};
 
 export class AdminApiError extends Error {
   readonly status: number;
@@ -275,6 +279,12 @@ function adminApiUrl(path: string) {
   return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
 }
 
+const clientHeaders = createClientMetadataHeaders({
+  appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? "0.1.0",
+  clientPlatform: process.env.EXPO_OS === "ios" ? "ios" : "android",
+  os: process.env.EXPO_OS === "ios" ? "ios" : "android",
+});
+
 async function requestAdmin<T>(
   accessToken: string,
   path: string,
@@ -294,6 +304,7 @@ async function requestAdmin<T>(
         ...init.headers,
         Accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
+        ...clientHeaders,
       },
       signal: requestSignal.signal,
     });
@@ -311,13 +322,7 @@ async function requestAdmin<T>(
   if (response.status === 401 && !retried && options.refreshAccessToken) {
     const refreshedAccessToken = await options.refreshAccessToken();
     if (refreshedAccessToken) {
-      return requestAdmin(
-        refreshedAccessToken,
-        path,
-        options,
-        true,
-        init,
-      );
+      return requestAdmin(refreshedAccessToken, path, options, true, init);
     }
   }
   if (!response.ok) {
@@ -327,7 +332,11 @@ async function requestAdmin<T>(
     } catch {
       data = undefined;
     }
-    throw new AdminApiError(response.status, "Administration request failed", data);
+    throw new AdminApiError(
+      response.status,
+      "Administration request failed",
+      data,
+    );
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
@@ -545,13 +554,32 @@ export function listAdminKeys(
   size = 10,
   options: RequestOptions = {},
 ) {
-  const params = new URLSearchParams({ q: query, page: String(page), size: String(size), sort: "createdAt,desc" });
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "createdAt,desc",
+  });
   if (active !== undefined) params.set("active", String(active));
-  return requestAdmin<AdminPage<AdminKey>>(accessToken, `/api/admin/keys?${params.toString()}`, options, false);
+  return requestAdmin<AdminPage<AdminKey>>(
+    accessToken,
+    `/api/admin/keys?${params.toString()}`,
+    options,
+    false,
+  );
 }
 
-export function rotateAdminKey(accessToken: string, options: RequestOptions = {}) {
-  return requestAdmin<AdminKey>(accessToken, "/api/admin/keys/rotate", options, false, { method: "POST" });
+export function rotateAdminKey(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminKey>(
+    accessToken,
+    "/api/admin/keys/rotate",
+    options,
+    false,
+    { method: "POST" },
+  );
 }
 
 export function listAdminEvents(
@@ -561,12 +589,30 @@ export function listAdminEvents(
   size = 10,
   options: RequestOptions = {},
 ) {
-  const params = new URLSearchParams({ q: query, action: "", targetType: "", targetId: "", page: String(page), size: String(size), sort: "occurredAt,desc" });
-  return requestAdmin<AdminPage<AdminEvent>>(accessToken, `/api/admin/events?${params.toString()}`, options, false);
+  const params = new URLSearchParams({
+    q: query,
+    action: "",
+    targetType: "",
+    targetId: "",
+    page: String(page),
+    size: String(size),
+    sort: "occurredAt,desc",
+  });
+  return requestAdmin<AdminPage<AdminEvent>>(
+    accessToken,
+    `/api/admin/events?${params.toString()}`,
+    options,
+    false,
+  );
 }
 
-export function deleteAdminEvents(accessToken: string, options: RequestOptions = {}) {
-  return requestAdmin<void>(accessToken, "/api/admin/events", options, false, { method: "DELETE" });
+export function deleteAdminEvents(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<void>(accessToken, "/api/admin/events", options, false, {
+    method: "DELETE",
+  });
 }
 
 export function revokeAdminConsent(
@@ -650,7 +696,12 @@ export function createAdminUser(
   request: AdminUserRequest,
   options: RequestOptions = {},
 ) {
-  return jsonRequest<AdminUser>(accessToken, "/api/admin/users", request, options);
+  return jsonRequest<AdminUser>(
+    accessToken,
+    "/api/admin/users",
+    request,
+    options,
+  );
 }
 
 export function updateAdminUser(
@@ -673,7 +724,12 @@ export function createAdminClient(
   request: AdminClientRequest,
   options: RequestOptions = {},
 ) {
-  return jsonRequest<AdminClientCreated>(accessToken, "/api/admin/clients", request, options);
+  return jsonRequest<AdminClientCreated>(
+    accessToken,
+    "/api/admin/clients",
+    request,
+    options,
+  );
 }
 
 export function updateAdminClient(
@@ -752,7 +808,12 @@ export function createAdminRole(
   request: AdminRoleRequest,
   options: RequestOptions = {},
 ) {
-  return jsonRequest<AdminRole>(accessToken, "/api/admin/roles", request, options);
+  return jsonRequest<AdminRole>(
+    accessToken,
+    "/api/admin/roles",
+    request,
+    options,
+  );
 }
 
 export function updateAdminRole(
@@ -789,7 +850,12 @@ export function createAdminGroup(
   request: AdminGroupRequest,
   options: RequestOptions = {},
 ) {
-  return jsonRequest<AdminGroup>(accessToken, "/api/admin/groups", request, options);
+  return jsonRequest<AdminGroup>(
+    accessToken,
+    "/api/admin/groups",
+    request,
+    options,
+  );
 }
 
 export function updateAdminGroup(

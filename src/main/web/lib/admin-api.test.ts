@@ -28,7 +28,14 @@ describe("admin API", () => {
 
   it("configures axios instances to accept all statuses", () => {
     expect(mockAxios.create).toHaveBeenCalledWith(
-      expect.objectContaining({ validateStatus: expect.any(Function) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "App-Name": "Kitezh",
+          "App-Version": "vdevelopment",
+          "Client-Platform": "web",
+        }),
+        validateStatus: expect.any(Function),
+      }),
     );
     expect(mockAxios.create.mock.calls[0][0].validateStatus()).toBe(true);
   });

@@ -1,5 +1,6 @@
 import { authorizationServerIssuer } from "../config.ts";
 import type { AccountSocialLink } from "../../../shared/src/contracts.ts";
+import { createClientMetadataHeaders } from "../../../shared/src/client-metadata.cjs";
 import {
   classifyApiError,
   createNativeRequestSignal,
@@ -115,6 +116,12 @@ function accountApiUrl(path: string) {
   return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
 }
 
+const clientHeaders = createClientMetadataHeaders({
+  appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? "0.1.0",
+  clientPlatform: process.env.EXPO_OS === "ios" ? "ios" : "android",
+  os: process.env.EXPO_OS === "ios" ? "ios" : "android",
+});
+
 async function readErrorData(response: Response) {
   try {
     return await response.json();
@@ -143,6 +150,7 @@ async function requestAccount<T>(
         ...init.headers,
         Accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
+        ...clientHeaders,
       },
       signal: requestSignal.signal,
     });

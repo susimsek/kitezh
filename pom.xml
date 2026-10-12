@@ -291,6 +291,9 @@
 						</goals>
 						<configuration>
 							<arguments>pnpm build</arguments>
+							<environmentVariables>
+								<NEXT_PUBLIC_APP_VERSION>${application.version}</NEXT_PUBLIC_APP_VERSION>
+							</environmentVariables>
 						</configuration>
 					</execution>
 					<execution>

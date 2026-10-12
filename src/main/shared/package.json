@@ -16,6 +16,11 @@
     "./contracts": "./src/contracts.ts",
     "./api": "./src/api.ts",
     "./auth": "./src/auth.ts",
-    "./session": "./src/session.ts"
+    "./session": "./src/session.ts",
+    "./client-metadata": {
+      "types": "./src/client-metadata.d.cts",
+      "require": "./src/client-metadata.cjs",
+      "default": "./src/client-metadata.cjs"
+    }
   }
 }

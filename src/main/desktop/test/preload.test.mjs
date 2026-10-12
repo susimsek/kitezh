@@ -8,7 +8,12 @@ const invocations = [];
 const ipcRenderer = {
   sendSync: (channel) => {
     assert.equal(channel, "desktop:config-sync");
-    return { apiBaseUrl: "http://localhost:9090", protocol: "kitezh" };
+    return {
+      apiBaseUrl: "http://localhost:9090",
+      protocol: "kitezh",
+      appVersion: "0.1.4",
+      os: "darwin",
+    };
   },
   invoke: (channel, ...args) => {
     invocations.push([channel, ...args]);
@@ -45,6 +50,8 @@ test("exposes the narrow desktop API and forwards IPC operations", async () => {
   assert.equal(exposedApi.isDesktop, true);
   assert.equal(exposedApi.apiBaseUrl, "http://localhost:9090");
   assert.equal(exposedApi.protocol, "kitezh");
+  assert.equal(exposedApi.appVersion, "0.1.4");
+  assert.equal(exposedApi.os, "darwin");
 
   await exposedApi.auth.startLogin({ state: "state" });
   await exposedApi.auth.getSession("account");

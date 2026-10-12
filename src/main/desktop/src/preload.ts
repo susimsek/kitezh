@@ -3,12 +3,16 @@ import { contextBridge, ipcRenderer } from "electron";
 const config = ipcRenderer.sendSync("desktop:config-sync") as {
   apiBaseUrl: string;
   protocol: string;
+  appVersion: string;
+  os: string;
 };
 
 contextBridge.exposeInMainWorld("desktopApi", {
   isDesktop: true,
   apiBaseUrl: config.apiBaseUrl,
   protocol: config.protocol,
+  appVersion: config.appVersion,
+  os: config.os,
   auth: {
     startLogin: (request: unknown) =>
       ipcRenderer.invoke("desktop:auth-start-login", request),

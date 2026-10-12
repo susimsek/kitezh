@@ -76,6 +76,7 @@ jobs:
     permissions:
       contents: read
     env:
+      EXPO_PUBLIC_APP_VERSION: ${{ needs.resolve-release.outputs.release_version }}
       ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
       ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
       ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
@@ -233,6 +234,7 @@ jobs:
     permissions:
       contents: read
     env:
+      EXPO_PUBLIC_APP_VERSION: ${{ needs.resolve-release.outputs.release_version }}
       IOS_SIGNING_MODE: ${{ vars.IOS_SIGNING_MODE || 'unsigned' }}
       IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 || '' }}
       IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD || '' }}

@@ -113,7 +113,9 @@ test("account endpoints use their protected methods, bodies, and encoded resourc
     method?: string;
     body?: BodyInit | null;
   }[] = [];
+  let firstRequestHeaders: Headers | undefined;
   globalThis.fetch = async (input, init) => {
+    firstRequestHeaders ??= new Headers(init?.headers);
     requests.push({
       path:
         new URL(input.toString()).pathname + new URL(input.toString()).search,
@@ -232,6 +234,10 @@ test("account endpoints use their protected methods, bodies, and encoded resourc
       },
     ]);
     assert.ok(requests.every(({ method }) => method !== undefined));
+    assert.equal(firstRequestHeaders?.get("App-Name"), "Kitezh");
+    assert.equal(firstRequestHeaders?.get("App-Version"), "v0.1.0");
+    assert.equal(firstRequestHeaders?.get("Client-Platform"), "android");
+    assert.equal(firstRequestHeaders?.get("OS"), "android");
   } finally {
     globalThis.fetch = originalFetch;
   }

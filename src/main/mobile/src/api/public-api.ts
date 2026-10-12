@@ -1,5 +1,6 @@
 import { authorizationServerIssuer } from "../config.ts";
 import type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
+import { createClientMetadataHeaders } from "../../../shared/src/client-metadata.cjs";
 import {
   classifyApiError,
   parseProblemDetail,
@@ -32,6 +33,12 @@ function apiUrl(path: string) {
   return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
 }
 
+const clientHeaders = createClientMetadataHeaders({
+  appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? "0.1.0",
+  clientPlatform: process.env.EXPO_OS === "ios" ? "ios" : "android",
+  os: process.env.EXPO_OS === "ios" ? "ios" : "android",
+});
+
 async function readError(response: Response) {
   try {
     return await response.json();
@@ -51,6 +58,7 @@ async function post<T>(
       body: JSON.stringify(body),
       headers: {
         Accept: "application/json",
+        ...clientHeaders,
         "Content-Type": "application/json",
         ...(options.locale ? { "Accept-Language": options.locale } : {}),
       },
@@ -73,7 +81,7 @@ async function post<T>(
 export async function getCaptchaSettings(): Promise<CaptchaSettings> {
   try {
     const response = await fetch(apiUrl("/api/auth/registration-captcha"), {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...clientHeaders },
     });
     if (!response.ok) {
       throw new PublicApiError(
