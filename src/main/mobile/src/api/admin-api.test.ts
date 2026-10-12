@@ -1,9 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
-
-installAxiosFetchMockCompatibility();
-
 import {
   AdminApiError,
   getAdminDashboard,
@@ -41,6 +37,10 @@ import {
   listAdminEvents,
   deleteAdminEvents,
 } from "./admin-api.ts";
+
+import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
+
+installAxiosFetchMockCompatibility();
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -116,7 +116,7 @@ test("admin API exposes Retry-After metadata for throttled calls", async () => {
       (error: unknown) =>
         error instanceof AdminApiError &&
         error.kind === "rate-limited" &&
-        error.retryAfterSeconds === 9,
+        error.retryAfterMs === 9_000,
     );
   } finally {
     globalThis.fetch = originalFetch;

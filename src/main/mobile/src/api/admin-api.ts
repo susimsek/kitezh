@@ -2,7 +2,9 @@ import {
   classifyApiError,
   createNativeRequestSignal,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
+  parseRetryAfterMs,
   parseProblemDetail,
+  readRetryAfterHeader,
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
@@ -263,13 +265,20 @@ export class AdminApiError extends Error {
   readonly status: number;
   readonly kind: ApiErrorKind;
   readonly problem: ProblemDetail | undefined;
+  readonly retryAfterMs: number | undefined;
 
-  constructor(status: number, message: string, data?: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    data?: unknown,
+    retryAfter?: string,
+  ) {
     super(message);
     this.name = "AdminApiError";
     this.status = status;
     this.kind = classifyApiError(status, data);
     this.problem = parseProblemDetail(data);
+    this.retryAfterMs = parseRetryAfterMs(retryAfter);
   }
 }
 
@@ -308,6 +317,7 @@ async function requestAdmin<T>(
         response.status,
         "Administration request failed",
         readMobileResponseData(response.data),
+        readRetryAfterHeader(response.headers),
       );
     }
     if (response.status === 204) return undefined as T;

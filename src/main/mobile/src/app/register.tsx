@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,10 +14,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getCaptchaSettings, registerAccount } from "@/api/public-api";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
+import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { authorizationServerIssuer } from "@/config";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
+import { problemFieldErrors } from "../../../shared/src/api.ts";
 
 export default function RegisterScreen() {
   const { dictionary, resolvedLocale } = useLocale();
@@ -34,6 +35,7 @@ export default function RegisterScreen() {
   const [browserPending, setBrowserPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [browserError, setBrowserError] = useState(false);
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export default function RegisterScreen() {
     }
     setPending(true);
     setError(null);
+    setFieldErrors({});
     try {
       await registerAccount({
         username: username.trim(),
@@ -74,7 +77,8 @@ export default function RegisterScreen() {
         locale: resolvedLocale,
       });
       setSuccess(true);
-    } catch {
+    } catch (cause) {
+      setFieldErrors(problemFieldErrors(cause));
       setError(dictionary.registrationError);
     } finally {
       setPending(false);
@@ -100,7 +104,7 @@ export default function RegisterScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView
+      <MobileFormScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
@@ -171,39 +175,73 @@ export default function RegisterScreen() {
             <Field
               label={dictionary.username}
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(value) => {
+                setUsername(value);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "username"),
+                );
+              }}
+              error={fieldErrors.username}
               palette={palette}
             />
             <Field
               label={dictionary.firstName}
               value={firstName}
-              onChangeText={setFirstName}
+              onChangeText={(value) => {
+                setFirstName(value);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "firstName"),
+                );
+              }}
+              error={fieldErrors.firstName}
               palette={palette}
             />
             <Field
               label={dictionary.lastName}
               value={lastName}
-              onChangeText={setLastName}
+              onChangeText={(value) => {
+                setLastName(value);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "lastName"),
+                );
+              }}
+              error={fieldErrors.lastName}
               palette={palette}
             />
             <Field
               label={dictionary.email}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setFieldErrors((current) => omitFieldError(current, "email"));
+              }}
+              error={fieldErrors.email}
               keyboardType="email-address"
               palette={palette}
             />
             <Field
               label={dictionary.newPassword}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "password"),
+                );
+              }}
+              error={fieldErrors.password}
               secureTextEntry
               palette={palette}
             />
             <Field
               label={dictionary.confirmPassword}
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "confirmPassword"),
+                );
+              }}
+              error={fieldErrors.confirmPassword}
               secureTextEntry
               palette={palette}
             />
@@ -232,7 +270,7 @@ export default function RegisterScreen() {
             </Pressable>
           </View>
         )}
-      </ScrollView>
+      </MobileFormScrollView>
     </SafeAreaView>
   );
 }
@@ -241,6 +279,7 @@ function Field({
   label,
   value,
   onChangeText,
+  error,
   palette,
   secureTextEntry = false,
   keyboardType = "default",
@@ -248,6 +287,7 @@ function Field({
   label: string;
   value: string;
   onChangeText: (value: string) => void;
+  error?: string;
   palette: ReturnType<typeof useTheme>["palette"];
   secureTextEntry?: boolean;
   keyboardType?: "default" | "email-address";
@@ -257,6 +297,7 @@ function Field({
       <Text style={[styles.label, { color: palette.text }]}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={error}
         autoCapitalize="none"
         keyboardType={keyboardType}
         onChangeText={onChangeText}
@@ -265,12 +306,28 @@ function Field({
         secureTextEntry={secureTextEntry}
         style={[
           styles.input,
-          { borderColor: palette.border, color: palette.text },
+          {
+            borderColor: error ? palette.danger : palette.border,
+            color: palette.text,
+          },
         ]}
         value={value}
       />
+      {error ? (
+        <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
+}
+
+function omitFieldError(
+  errors: Record<string, string>,
+  field: string,
+): Record<string, string> {
+  const { [field]: _removed, ...remaining } = errors;
+  return remaining;
 }
 
 const styles = StyleSheet.create({

@@ -1,10 +1,9 @@
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import {
   AccountApiError,
   generateRecoveryCodes,
@@ -43,6 +43,8 @@ export default function MfaScreen() {
   );
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const mfaActionInFlight = useRef(false);
+  const recoveryActionInFlight = useRef(false);
 
   const load = useCallback(
     async (retry = false) => {
@@ -90,7 +92,8 @@ export default function MfaScreen() {
   }, [load, session]);
 
   const setupMfa = useCallback(async () => {
-    if (!session || loading) return;
+    if (!session || loading || mfaActionInFlight.current) return;
+    mfaActionInFlight.current = true;
     setLoading(true);
     setError(false);
     try {
@@ -106,17 +109,19 @@ export default function MfaScreen() {
       setError(true);
     } finally {
       setLoading(false);
+      mfaActionInFlight.current = false;
     }
   }, [loading, refreshSession, session]);
 
   const mutate = useCallback(
     async (action: "enable" | "disable") => {
       const expectedDigits = setup?.digits ?? mfaStatus?.digits ?? 6;
-      if (!session || loading) return;
+      if (!session || loading || mfaActionInFlight.current) return;
       if (!new RegExp(`^\\d{${expectedDigits}}$`).test(code)) {
         setCodeError(true);
         return;
       }
+      mfaActionInFlight.current = true;
       setLoading(true);
       setError(false);
       setCodeError(false);
@@ -136,6 +141,7 @@ export default function MfaScreen() {
         }
       } finally {
         setLoading(false);
+        mfaActionInFlight.current = false;
       }
     },
     [
@@ -150,7 +156,15 @@ export default function MfaScreen() {
   );
 
   const createRecoveryCodes = useCallback(async () => {
-    if (!session || recoveryLoading || !mfaStatus?.enabled) return;
+    if (
+      !session ||
+      recoveryLoading ||
+      recoveryActionInFlight.current ||
+      !mfaStatus?.enabled
+    ) {
+      return;
+    }
+    recoveryActionInFlight.current = true;
     setRecoveryLoading(true);
     setError(false);
     try {
@@ -169,6 +183,7 @@ export default function MfaScreen() {
       setError(true);
     } finally {
       setRecoveryLoading(false);
+      recoveryActionInFlight.current = false;
     }
   }, [mfaStatus?.enabled, recoveryLoading, refreshSession, session]);
 
@@ -191,7 +206,7 @@ export default function MfaScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <MobileFormScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -341,7 +356,7 @@ export default function MfaScreen() {
             ) : null}
           </>
         )}
-      </ScrollView>
+      </MobileFormScrollView>
     </SafeAreaView>
   );
 }

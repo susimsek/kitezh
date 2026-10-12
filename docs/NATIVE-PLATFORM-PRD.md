@@ -271,84 +271,45 @@ Each owner must update the feature matrix with evidence, mark unavailable backen
 registrations as **Blocked**, and link focused tests or packaged smoke results. A person may review
 another owner's work, but a review does not transfer implementation ownership.
 
-### Nail progress checklist
+### Nail progress record (2026-10-12)
 
-Status reflects source and unit-test evidence on `nailunluu-dev`. `[~]` means implementation is
-partial and acceptance remains; `[B]` names a required contract/configuration that is absent. No
-item is marked complete until its full native acceptance evidence exists.
+The 22 assigned checklist entries are tracked separately below (the PRD scope intentionally has
+overlapping implementation and audit checks). At this review, **4 are complete, 13 are in progress,
+and 5 are blocked**. Blocked items require a backend/mobile contract or native platform adapter;
+none is simulated with a weaker flow.
 
-**Mobile P0 (3)**
+| # | Assigned item | Status | Source evidence / remaining acceptance |
+| -: | --- | :---: | --- |
+| 1 | P0 social-provider login completion | [B] | `/api/auth/social-providers` and separate mobile clients exist, but no server operation binds the selected provider alias to the pending mobile PKCE transaction. Keep the native provider picker disabled; do not exchange provider tokens directly. |
+| 2 | P0 single-session lifecycle | [~] | Namespace-isolated, schema-versioned SecureStore records; single-flight refresh, one 401 retry, and logout revision protection are implemented. API/storage tests pass; native-device restart/logout evidence remains. |
+| 3 | P0 app and universal links | [~] | Custom `kitezh://` callback/action routes, Android filters, Expo scheme, and both server client registrations are present. HTTPS universal-link association files/domain ownership are not configured; device callback/replay verification remains. |
+| 4 | P1 passkey enrollment/login | [B] | WebAuthn server/browser routes exist, but the mobile package has no native Credential Manager/AuthenticationServices adapter. Do not send platform credentials through Web components or report unsupported hardware as supported. |
+| 5 | P1 MFA and required actions | [~] | Account TOTP setup, verification, recovery-code and enable/disable flows are native. Authentication challenges and server-owned required actions continue in the system browser and return through validated PKCE state; native component/device acceptance remains. |
+| 6 | P1 OAuth consent | [B] | Mobile clients do not require consent and the consent view is bound to the server browser session. There is no native consent-request handoff contract; do not auto-approve or reproduce consent without the server request context. |
+| 7 | P1 social account-link completion | [B] | Native status, configured-provider gating, confirmed unlink, and refresh-after-browser-return exist. Server success redirects to `/account/security?social_linked=1`; it does not provide a registered native callback. |
+| 8 | P1 CIBA approvals | [~] | Authenticated list and approve/deny adapters and native screen are implemented; MFA/step-up-required approvals remain disabled. API/component tests exist; device acceptance and native step-up remain. |
+| 9 | P1 native notices | [x] | `MobileNoticeProvider` supplies localized, theme-aware, accessible in-app notices with bounded auto-dismiss and dismiss action. OS push/action routing belongs to the separate backend event-contract blocker. |
+| 10 | Audit: OAuth browser lifecycle | [~] | Each sign-in creates a fresh Expo AuthRequest state/verifier; the PKCE transaction is stored only in namespaced SecureStore for five minutes and atomically consumed before exchange. Cold-start callback parsing and timeout are implemented; component and device callback/replay acceptance remains unverified in this sandbox. |
+| 11 | Audit: discovery/configuration | [~] | Issuer, client ID, custom redirect scheme, OIDC issuer, and same-origin HTTPS endpoints are validated before browser launch. Pure contract tests pass; add/run native discovery failure and timeout device evidence. |
+| 12 | Audit: refresh races | [~] | Refresh has a shared expiry skew and single-flight; logout/re-auth invalidate stale refresh revisions and API requests retry once after 401. Unit/API tests pass; device lifecycle evidence remains. |
+| 13 | Audit: error contract | [~] | Shared Problem Detail parser covers violations; stable kinds include 401/403, validation, conflict, rate limit, unavailable, timeout, offline and cancellation; `Retry-After` is exposed. Registration, profile, and password forms map server field violations inline, and mobile API requests follow the active English/Turkish locale. Broader error-state and native component acceptance remains. |
+| 14 | Audit: public API resilience | [x] | Public auth/CAPTCHA adapters accept abort and timeout options, retain HTTP status, reject malformed CAPTCHA payloads as unavailable, and never expose transport details. Focused tests pass. |
+| 15 | Audit: SecureStore lifecycle | [~] | Account/Admin namespaces, versioned envelopes, legacy migration, invalid-version cleanup, expiring PKCE transaction records, and explicit Android backup exclusion are implemented. Storage tests pass; keychain-lock, restore, reinstall, and platform device acceptance remain. |
+| 16 | Audit: navigation/deep links | [~] | Protected routes redirect signed-out users; callback routes replace navigation; OAuth query values are stripped from route paths; action tokens are format-checked. Unsaved-form confirmation, universal links, and cold/warm device acceptance remain. |
+| 17 | Audit: device UX | [~] | Safe-area screens, accessible roles/labels, minimum control tokens, and a shared keyboard-avoiding form scroller are implemented. Dynamic type/orientation/reduced-motion and VoiceOver/TalkBack device acceptance remain. |
+| 18 | Audit: locale/theme changes | [~] | English/Turkish catalogs have a parity test; persisted user/system locale updates native API `Accept-Language` and refreshes the system locale when the app resumes. Live system/light/dark theme resolution and settings controls exist. Full-route device/browser-return checks and long translated errors remain. |
+| 19 | Contract: capability negotiation | [B] | No backend capability/version endpoint or compatibility policy exists. Backend must define the response before clients negotiate capabilities. |
+| 20 | Contract: error taxonomy | [x] | Shared error kind contract distinguishes offline, cancelled, timeout, unauthorized, forbidden, validation, conflict, rate-limited, unavailable, server, HTTP, and update states; status/Retry-After contract tests pass. |
+| 21 | Contract: session model | [x] | Shared session record defines access/ID/refresh ownership and expiry; per-client namespace, versioned storage, 60-second refresh skew, single-flight and logout invalidation are covered by shared/mobile tests. |
+| 22 | Contract: deep-link model | [~] | Shared parser defines allowed custom routes, one-time action-token shape, and PKCE state/verifier transaction binding. HTTPS universal links and rerun of the native cold/warm callback suite remain. |
 
-- [B] Social provider login completion: typed discovery now validates the public endpoint's alias
-  shape and icon allowlist (`src/main/mobile/src/api/public-api.test.ts`). Native provider start and
-  callback completion still need a server-defined mobile provider-selection/callback contract. The
-  `mobile-account-console` registration exists; provider tokens remain server-side.
-- [~] Session lifecycle: per-console process-wide refresh single-flight, logout/sign-in generation
-  invalidation, versioned SecureStore records, legacy-record migration, malformed-record cleanup,
-  and scoped session keys are implemented and unit-tested. Process restart and authenticated device
-  refresh/logout race evidence remains.
-- [~] App links: custom OAuth/logout/reset/verify routes and client redirects are registered. Deep
-  link action tokens now require a bounded base64url shape and survive intent routing; unit tests
-  cover callback query stripping and reset/verify token forwarding. HTTPS associated domains are
-  not configured, and device callback replay/resume evidence remains.
-
-**Mobile P1 (6)**
-
-- [~] Passkeys: account credential management endpoints exist; native authentication ceremonies,
-  capability negotiation, and unsupported-device fallback remain.
-- [B] MFA and required actions: account TOTP settings exist, but no mobile login-challenge contract
-  covers TOTP/recovery/passkey-required actions and first-invalid focus.
-- [B] Consent: both mobile client registrations currently disable authorization consent; a pending
-  consent and native callback contract is required before enabling this flow.
-- [B] Social account linking: server-authoritative status and unlink APIs exist; native callback
-  completion needs a server mobile-link callback contract.
-- [~] CIBA approvals: account-authenticated list/approve/deny endpoints are confirmed in
-  `src/main/java/io/github/susimsek/kitezh/web/CibaController.java`; native adapter, screen,
-  step-up states, and focused tests remain.
-- [B] Notifications: authenticated notification event/action and device-registration contract is
-  absent; do not synthesize actions or unread counts.
-
-**Mobile audit rows (9)**
-
-- [~] OAuth browser lifecycle: PKCE and cancellation handling exist; durable transaction restore,
-  stale/replayed callback coverage, and device resume/timeout evidence remain.
-- [~] Discovery/configuration: provider discovery is typed and validated; OIDC discovery/TLS and
-  malformed-metadata failures still need explicit localized diagnostics and device tests.
-- [~] Refresh races: namespace-scoped single-flight and stale-write prevention are covered by unit
-  tests; authenticated device concurrency and restart evidence remain.
-- [~] Error contract: shared taxonomy covers validation, 401/403, conflict, 429, unavailable,
-  timeout, offline, and server errors; EN/TR keys, field violations, and Retry-After parsing exist.
-  Screen-level field mapping and complete device coverage remain.
-- [~] Public API resilience: public GET/POST adapters support deadlines/cancellation, retain HTTP
-  status and Retry-After, and distinguish timeout/offline; endpoint-specific safe retry policy and
-  cancellation integration tests remain.
-- [~] SecureStore lifecycle: namespaced versioned records, legacy migration, invalid-record
-  cleanup, and Android backup exclusions exist; keychain access-group, reinstall/restore/OS-lock,
-  and device evidence remain.
-- [~] Navigation/deep links: exact scheme routes and action-token shape/forwarding are covered;
-  protected-route consistency and OAuth cold/warm replay behavior remain.
-- [~] Device UX: native controls and touch labels exist; VoiceOver/TalkBack, dynamic type, reduced
-  motion, orientation, and keyboard-avoidance acceptance remains.
-- [~] Locale/theme changes: system/light/dark and English/Turkish settings persist and update live;
-  complete route/error-state and accessibility coverage remains.
-
-**Cross-client contracts (4)**
-
-- [~] Capability negotiation: shared capability/version types exist; no server negotiation
-  endpoint or consuming clients exist yet.
-- [~] Error taxonomy: shared status classification, Problem Detail violations, Retry-After, and
-  EN/TR message keys are implemented and unit-tested; platform screens still need consistent use.
-- [~] Session model: shared session shape plus mobile per-console storage version/namespace and
-  refresh invalidation rules are implemented; desktop/web adoption and full native lifecycle tests
-  remain.
-- [~] Deep-link model: shared callback/reset/verify route contract validates allowed schemes,
-  state, and bounded action tokens; persisted verifier/replay and HTTPS-origin policies remain.
-
-Evidence: `src/main/mobile/src/shared.contract.test.ts`,
-`src/main/mobile/src/api/public-api.test.ts`, and
-`src/main/mobile/src/auth/session-operations.test.ts`. Current Nail checklist: **0 complete, 17 in
-progress, 5 blocked**. The blocked items require server-owned mobile callback/consent/notification
-contracts; do not loosen client registration or authentication to simulate them.
+Current local evidence: mobile Node unit/contract suite **58/58 passed**, TypeScript typecheck,
+Prettier, ESLint, Expo scheme/SecureStore configuration, and native boundary/security checks passed.
+Jest component coverage could not start because the Windows sandbox denied native `realpath` for
+both its default temp directory and a workspace temp path; the local fixture-server test was denied
+loopback `127.0.0.1` access. No iOS/Android device test was run in this Windows session. Do not
+mark the in-progress rows complete until their target-specific acceptance evidence is rerun
+successfully.
 
 ### Şuayb progress checklist
 

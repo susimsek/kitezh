@@ -10,6 +10,8 @@ export type SingleFlight<T> = {
   pending: () => boolean;
 };
 
+export const NATIVE_REFRESH_EXPIRY_SKEW_MS = 60_000;
+
 export function createSingleFlight<T>(): SingleFlight<T> {
   let active: Promise<T> | null = null;
   return {

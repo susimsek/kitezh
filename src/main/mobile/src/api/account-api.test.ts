@@ -1,12 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
-
-installAxiosFetchMockCompatibility();
-
 import {
   AccountApiError,
   changeAccountPassword,
+  decideCibaRequest,
   deleteAccount,
   generateRecoveryCodes,
   getAccountProfile,
@@ -14,6 +11,7 @@ import {
   getRecoveryCodesStatus,
   listAccountApplications,
   listAccountSessions,
+  listCibaRequests,
   listOfflineSessions,
   listSocialLinks,
   mutateMfa,
@@ -25,6 +23,112 @@ import {
   unlinkSocialProvider,
   updateAccountProfile,
 } from "./account-api.ts";
+
+import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
+
+installAxiosFetchMockCompatibility();
+
+test("CIBA requests use the authenticated account API and preserve encoded IDs", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: { url: string; init?: RequestInit }[] = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: input.toString(), init });
+    return requests.length === 1
+      ? new Response(
+          JSON.stringify({
+            content: [],
+            totalElements: 0,
+            totalPages: 0,
+            number: 0,
+            size: 20,
+          }),
+          { status: 200 },
+        )
+      : new Response(null, { status: 204 });
+  };
+
+  try {
+    assert.equal((await listCibaRequests("access-token")).size, 20);
+    await decideCibaRequest(
+      "access-token",
+      { authReqId: "request/one", userCode: "A+B 2" },
+      "approve",
+    );
+    assert.deepEqual(
+      requests.map(({ url, init }) => ({
+        path: new URL(url).pathname,
+        query: new URL(url).search,
+        method: init?.method,
+        authorization: new Headers(init?.headers).get("Authorization"),
+      })),
+      [
+        {
+          path: "/api/ciba/requests",
+          query: "?page=0&size=20&sort=createdAt,desc",
+          method: "GET",
+          authorization: "Bearer access-token",
+        },
+        {
+          path: "/api/ciba/requests/request%2Fone/approve",
+          query: "?user_code=A%2BB%202",
+          method: "POST",
+          authorization: "Bearer access-token",
+        },
+      ],
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("CIBA decisions preserve forbidden responses without retrying", async () => {
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests += 1;
+    return new Response(JSON.stringify({ detail: "Forbidden" }), {
+      status: 403,
+    });
+  };
+
+  try {
+    await assert.rejects(
+      decideCibaRequest(
+        "access-token",
+        { authReqId: "request-1", userCode: "ABCD-1234" },
+        "approve",
+      ),
+      (error: unknown) =>
+        error instanceof AccountApiError &&
+        error.status === 403 &&
+        error.kind === "forbidden",
+    );
+    assert.equal(requests, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rate-limited account responses expose the server retry delay", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ title: "Try later" }), {
+      status: 429,
+      headers: { "Retry-After": "7" },
+    });
+
+  try {
+    await assert.rejects(
+      getAccountProfile("access-token"),
+      (error: unknown) =>
+        error instanceof AccountApiError &&
+        error.kind === "rate-limited" &&
+        error.retryAfterMs === 7_000,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("account requests classify transport failures as offline without leaking details", async () => {
   const originalFetch = globalThis.fetch;
