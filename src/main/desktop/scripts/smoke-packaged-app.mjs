@@ -107,6 +107,8 @@ try {
     {
       apiBaseUrl: "http://127.0.0.1:9090",
       protocol: "kitezh",
+      appVersion: packageJson.version,
+      os: process.platform,
     },
   );
   assert.equal(
