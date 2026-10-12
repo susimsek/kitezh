@@ -166,7 +166,33 @@ const button = (label, options = {}) => {
     actionIcons[options.action] ??
     (label === text("save") ? "check" : null);
   const icon = iconName ? icons[iconName] : null;
-  return `<button class="${options.danger ? "danger-button" : "primary-button"}" type="${options.type ?? "button"}" data-action="${options.action ?? ""}" ${options.provider ? `data-provider="${escapeHtml(options.provider)}"` : ""} ${options.id != null ? `data-id="${escapeHtml(options.id)}"` : ""} ${options.child != null ? `data-child="${escapeHtml(options.child)}"` : ""} ${options.clientRoleId != null ? `data-client-role-id="${escapeHtml(options.clientRoleId)}"` : ""} ${options.memberId != null ? `data-member-id="${escapeHtml(options.memberId)}"` : ""} ${options.memberKind != null ? `data-member-kind="${escapeHtml(options.memberKind)}"` : ""} ${options.mapper != null ? `data-mapper="${escapeHtml(options.mapper)}"` : ""} ${options.index != null ? `data-index="${options.index}"` : ""} ${options.disabled || options.busy || (options.mutation && state.offline) ? "disabled" : ""} ${options.busy ? 'aria-busy="true"' : ""}>${spin(options.busy)}${icon ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>` : ""}${escapeHtml(label)}</button>`;
+  const optionalAttribute = (name, value) =>
+    value == null ? "" : `${name}="${escapeHtml(value)}"`;
+  const attributes = [
+    `class="${options.danger ? "danger-button" : "primary-button"}"`,
+    `type="${options.type ?? "button"}"`,
+    `data-action="${options.action ?? ""}"`,
+    options.provider
+      ? optionalAttribute("data-provider", options.provider)
+      : "",
+    optionalAttribute("data-id", options.id),
+    optionalAttribute("data-child", options.child),
+    optionalAttribute("data-client-role-id", options.clientRoleId),
+    optionalAttribute("data-member-id", options.memberId),
+    optionalAttribute("data-member-kind", options.memberKind),
+    optionalAttribute("data-mapper", options.mapper),
+    options.index == null ? "" : `data-index="${options.index}"`,
+    options.disabled || options.busy || (options.mutation && state.offline)
+      ? "disabled"
+      : "",
+    options.busy ? 'aria-busy="true"' : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const iconMarkup = icon
+    ? `<span class="button-icon" aria-hidden="true">${escapeHtml(icon.unicode)}</span>`
+    : "";
+  return `<button ${attributes}>${spin(options.busy)}${iconMarkup}${escapeHtml(label)}</button>`;
 };
 const field = (
   name,
@@ -2878,7 +2904,7 @@ function adminAdminLocalizationContent() {
             const deleteControls = deletePending
               ? `<div class="actions"><span role="status">${escapeHtml(text("adminMessageOverrideDeletePrompt"))}</span>${button(text("adminMessageOverrideDelete"), { action: "admin-message-delete-confirm", id: item.id, danger: true, busy: state.busy === `admin-message-delete:${item.id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-message-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
               : `<div class="actions">${button(text("adminMessageOverrideDelete"), { action: "admin-message-delete-request", id: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, itemErrors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, itemErrors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, itemErrors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(itemErrors.messageValue)}">${escapeHtml(values.messageValue ?? "")}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(itemErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form>${deleteControls}</article>`;
+            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, itemErrors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, itemErrors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, itemErrors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(itemErrors.messageValue)}">${escapeHtml(formString(values.messageValue, ""))}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(itemErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form>${deleteControls}</article>`;
           })
           .join("")}</div>`
       : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`
@@ -3301,6 +3327,10 @@ function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+function formString(value, fallback = "") {
+  return typeof value === "string" ? value : String(fallback);
+}
+
 function clientConfigurationFormDraft(form) {
   const draft = formValues(form);
   delete draft.cibaClientNotificationToken;
@@ -3693,7 +3723,7 @@ async function submitForm(form) {
   const values = formValues(form);
   if (form.dataset.form === "admin-client-role-search") {
     const clientId = form.dataset.clientId ?? "";
-    const query = String(values.q ?? "").trim();
+    const query = String(formString(values.q, "")).trim();
     await loadClientRoles(clientId, 0, query, `client-role-search:${clientId}`);
     return;
   }
@@ -3716,8 +3746,8 @@ async function submitForm(form) {
     )
       return;
     const body = {
-      name: String(values.name ?? "").trim(),
-      description: String(values.description ?? "").trim() || null,
+      name: String(formString(values.name, "")).trim(),
+      description: String(formString(values.description, "")).trim() || null,
     };
     const localErrors = {};
     if (!body.name) localErrors.name = text("adminRequired");
@@ -3809,8 +3839,8 @@ async function submitForm(form) {
       return;
 
     const draft = samlIdentityProviderConfigurationFormDraft(form);
-    const signingKey = String(values.samlSigningPrivateKey ?? "").trim();
-    const decryptionKey = String(values.samlDecryptionPrivateKey ?? "").trim();
+    const signingKey = String(formString(values.samlSigningPrivateKey, "")).trim();
+    const decryptionKey = String(formString(values.samlDecryptionPrivateKey, "")).trim();
     const localErrors = {};
     if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.registrationId))
       localErrors.registrationId = text("adminRequired");
@@ -4028,7 +4058,7 @@ async function submitForm(form) {
       return;
 
     const draft = identityProviderConfigurationFormDraft(form);
-    const secret = String(values.clientSecret ?? "");
+    const secret = String(formString(values.clientSecret, ""));
     const localErrors = {};
     if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.registrationId))
       localErrors.registrationId = text("adminRequired");
@@ -4164,7 +4194,7 @@ async function submitForm(form) {
     const user = (state.data.users?.content ?? []).find(
       (candidate) => Number(candidate.id) === id,
     );
-    const password = String(values.password ?? "");
+    const password = String(formString(values.password, ""));
     if (
       state.offline ||
       !Number.isSafeInteger(id) ||
@@ -4238,8 +4268,8 @@ async function submitForm(form) {
     const user = (state.data.users?.content ?? []).find(
       (candidate) => Number(candidate.id) === userId,
     );
-    const action = String(values.action ?? "");
-    const lifespan = String(values.lifespan ?? "");
+    const action = String(formString(values.action, ""));
+    const lifespan = String(formString(values.lifespan, ""));
     if (
       state.offline ||
       !Number.isSafeInteger(userId) ||
@@ -4275,7 +4305,7 @@ async function submitForm(form) {
     const passkeyIndex = Number(form.dataset.passkeyIndex);
     const target = `${userId}:${passkeyIndex}`;
     const path = adminUserPasskeyPath(userId, passkeyIndex);
-    const label = String(values.label ?? "").trim();
+    const label = String(formString(values.label, "")).trim();
     if (
       state.offline ||
       !path ||
@@ -4322,7 +4352,7 @@ async function submitForm(form) {
       !["applicationRoles", "clientRoleIds"].includes(kind)
     )
       return;
-    mapping[`${kind}Query`] = String(values.q ?? "").trim();
+    mapping[`${kind}Query`] = String(formString(values.q, "")).trim();
     state.error = null;
     state.busy = `client-scope-role-candidates:${scopeId}:${kind}`;
     render();
@@ -4353,8 +4383,8 @@ async function submitForm(form) {
       );
     const listValue = (name) => clientCreateLineValues(values[name] ?? "");
     const body = {
-      clientId: String(values.clientId ?? "").trim(),
-      clientName: String(values.clientName ?? "").trim(),
+      clientId: String(formString(values.clientId, "")).trim(),
+      clientName: String(formString(values.clientName, "")).trim(),
       clientAuthenticationMethods: checkedValues("clientAuthenticationMethods"),
       authorizationGrantTypes: checkedValues("authorizationGrantTypes"),
       redirectUris: listValue("redirectUris"),
@@ -4369,41 +4399,41 @@ async function submitForm(form) {
       dpopRefreshTokenOnly: form.elements.namedItem("dpopRefreshTokenOnly")
         .checked,
       dpopSigningAlgorithms: listValue("dpopSigningAlgorithms"),
-      cibaDeliveryMode: String(values.cibaDeliveryMode ?? "poll"),
+      cibaDeliveryMode: String(formString(values.cibaDeliveryMode, "poll")),
       cibaNotificationEndpoint:
-        String(values.cibaNotificationEndpoint ?? "").trim() || null,
+        String(formString(values.cibaNotificationEndpoint, "")).trim() || null,
       cibaClientNotificationToken: String(
-        values.cibaClientNotificationToken ?? "",
+        formString(values.cibaClientNotificationToken, ""),
       ),
       authorizationCodeTimeToLive:
-        String(values.authorizationCodeTimeToLive ?? "").trim() || null,
+        String(formString(values.authorizationCodeTimeToLive, "")).trim() || null,
       accessTokenTimeToLive:
-        String(values.accessTokenTimeToLive ?? "").trim() || null,
+        String(formString(values.accessTokenTimeToLive, "")).trim() || null,
       refreshTokenTimeToLive:
-        String(values.refreshTokenTimeToLive ?? "").trim() || null,
+        String(formString(values.refreshTokenTimeToLive, "")).trim() || null,
       serviceAccountEnabled: form.elements.namedItem("serviceAccountEnabled")
         .checked,
       clientSecretTimeToLive:
-        String(values.clientSecretTimeToLive ?? "").trim() || null,
+        String(formString(values.clientSecretTimeToLive, "")).trim() || null,
       enabled: form.elements.namedItem("enabled").checked,
-      rootUrl: String(values.rootUrl ?? "").trim(),
-      homeUrl: String(values.homeUrl ?? "").trim(),
+      rootUrl: String(formString(values.rootUrl, "")).trim(),
+      homeUrl: String(formString(values.homeUrl, "")).trim(),
       webOrigins: listValue("webOrigins"),
-      adminUrl: String(values.adminUrl ?? "").trim(),
+      adminUrl: String(formString(values.adminUrl, "")).trim(),
       frontChannelLogout: form.elements.namedItem("frontChannelLogout").checked,
       backchannelLogout: form.elements.namedItem("backchannelLogout").checked,
-      jwkSetUrl: String(values.jwkSetUrl ?? "").trim(),
+      jwkSetUrl: String(formString(values.jwkSetUrl, "")).trim(),
       tokenEndpointAuthenticationSigningAlgorithm: String(
-        values.tokenEndpointAuthenticationSigningAlgorithm ?? "",
+        formString(values.tokenEndpointAuthenticationSigningAlgorithm, ""),
       ).trim(),
       x509CertificateSubjectDN: String(
-        values.x509CertificateSubjectDN ?? "",
+        formString(values.x509CertificateSubjectDN, ""),
       ).trim(),
       clientSecretGracePeriod:
-        String(values.clientSecretGracePeriod ?? "").trim() || null,
+        String(formString(values.clientSecretGracePeriod, "")).trim() || null,
       offlineSessionIdle:
-        String(values.offlineSessionIdle ?? "").trim() || null,
-      offlineSessionMax: String(values.offlineSessionMax ?? "").trim() || null,
+        String(formString(values.offlineSessionIdle, "")).trim() || null,
+      offlineSessionMax: String(formString(values.offlineSessionMax, "")).trim() || null,
       tokenExchangeDownscopeOnly: form.elements.namedItem(
         "tokenExchangeDownscopeOnly",
       ).checked,
@@ -4521,7 +4551,7 @@ async function submitForm(form) {
       !form.reportValidity()
     )
       return;
-    const body = { clientName: String(values.clientName ?? "").trim() };
+    const body = { clientName: String(formString(values.clientName, "")).trim() };
     state.data.clientMetadataDrafts ??= {};
     state.data.clientMetadataDrafts[id] = body;
     state.data.clientMetadataErrorId = id;
@@ -4634,15 +4664,15 @@ async function submitForm(form) {
     )
       return;
     const body = {
-      displayName: String(values.displayName ?? "").trim(),
+      displayName: String(formString(values.displayName, "")).trim(),
       enabled: form.elements.namedItem("enabled").checked,
       hideOnLogin: form.elements.namedItem("hideOnLogin").checked,
       accountLinkingOnly: form.elements.namedItem("accountLinkingOnly").checked,
       trustEmail: form.elements.namedItem("trustEmail").checked,
       mfaRequired: form.elements.namedItem("mfaRequired").checked,
       guiOrder: Number(values.guiOrder),
-      showInAccountConsole: String(values.showInAccountConsole ?? ""),
-      syncMode: String(values.syncMode ?? ""),
+      showInAccountConsole: String(formString(values.showInAccountConsole, "")),
+      syncMode: String(formString(values.syncMode, "")),
     };
     state.data.identityProviderPolicyDrafts ??= {};
     state.data.identityProviderPolicyDrafts[id] = body;
@@ -4698,11 +4728,11 @@ async function submitForm(form) {
       return;
     if (!form.reportValidity()) return;
     const body = {
-      name: String(values.name ?? "").trim(),
-      sourceClaim: String(values.sourceClaim ?? "").trim(),
-      target: String(values.target ?? "").trim(),
-      mapperType: String(values.mapperType ?? ""),
-      syncMode: String(values.syncMode ?? ""),
+      name: String(formString(values.name, "")).trim(),
+      sourceClaim: String(formString(values.sourceClaim, "")).trim(),
+      target: String(formString(values.target, "")).trim(),
+      mapperType: String(formString(values.mapperType, "")),
+      syncMode: String(formString(values.syncMode, "")),
       addToIdToken: form.elements.namedItem("addToIdToken").checked,
       addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
     };
@@ -4791,12 +4821,12 @@ async function submitForm(form) {
     )
       return;
     const body = {
-      name: String(values.name ?? "").trim(),
-      mapperType: String(values.mapperType ?? ""),
-      source: String(values.source ?? "").trim() || null,
-      claimName: String(values.claimName ?? "").trim() || null,
-      value: String(values.value ?? "").trim() || null,
-      priority: Number(values.priority ?? 100),
+      name: String(formString(values.name, "")).trim(),
+      mapperType: String(formString(values.mapperType, "")),
+      source: String(formString(values.source, "")).trim() || null,
+      claimName: String(formString(values.claimName, "")).trim() || null,
+      value: String(formString(values.value, "")).trim() || null,
+      priority: Number(formString(values.priority, 100)),
       addToIdToken: form.elements.namedItem("addToIdToken").checked,
       addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
     };
@@ -4917,12 +4947,12 @@ async function submitForm(form) {
     )
       return;
     const body = {
-      name: String(values.name ?? "").trim(),
-      mapperType: String(values.mapperType ?? ""),
-      source: String(values.source ?? "").trim() || null,
-      claimName: String(values.claimName ?? "").trim() || null,
-      value: String(values.value ?? "").trim() || null,
-      priority: Number(values.priority ?? 100),
+      name: String(formString(values.name, "")).trim(),
+      mapperType: String(formString(values.mapperType, "")),
+      source: String(formString(values.source, "")).trim() || null,
+      claimName: String(formString(values.claimName, "")).trim() || null,
+      value: String(formString(values.value, "")).trim() || null,
+      priority: Number(formString(values.priority, 100)),
       addToIdToken: form.elements.namedItem("addToIdToken").checked,
       addToAccessToken: form.elements.namedItem("addToAccessToken").checked,
     };
@@ -5061,7 +5091,7 @@ async function submitForm(form) {
     const group = (state.data.groups?.content ?? []).find(
       (item) => Number(item.id) === id,
     );
-    const name = String(values.name ?? "").trim();
+    const name = String(formString(values.name, "")).trim();
     if (!Number.isSafeInteger(id) || id < 1 || !group || !form.reportValidity())
       return;
     state.data.groupNameDrafts ??= {};
@@ -5095,10 +5125,10 @@ async function submitForm(form) {
     if (!Number.isSafeInteger(id) || id < 1 || !user || !form.reportValidity())
       return;
     const body = {
-      username: String(values.username ?? "").trim(),
-      firstName: String(values.firstName ?? "").trim() || null,
-      lastName: String(values.lastName ?? "").trim() || null,
-      email: String(values.email ?? "").trim() || null,
+      username: String(formString(values.username, "")).trim(),
+      firstName: String(formString(values.firstName, "")).trim() || null,
+      lastName: String(formString(values.lastName, "")).trim() || null,
+      email: String(formString(values.email, "")).trim() || null,
       emailVerified: form.elements.namedItem("emailVerified").checked,
       enabled: form.elements.namedItem("enabled").checked,
       roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
@@ -5140,10 +5170,10 @@ async function submitForm(form) {
   if (form.dataset.form === "admin-localization-message-create") {
     if (!form.reportValidity()) return;
     const body = {
-      locale: String(values.locale ?? "").trim(),
-      bundle: String(values.bundle ?? "").trim(),
-      messageKey: String(values.messageKey ?? "").trim(),
-      messageValue: String(values.messageValue ?? "").trim(),
+      locale: String(formString(values.locale, "")).trim(),
+      bundle: String(formString(values.bundle, "")).trim(),
+      messageKey: String(formString(values.messageKey, "")).trim(),
+      messageValue: String(formString(values.messageValue, "")).trim(),
     };
     if (
       !/^[A-Za-z]{2,10}$/.test(body.locale) ||
@@ -5182,8 +5212,8 @@ async function submitForm(form) {
     if (!scopeName || !form.reportValidity()) return;
     const body = {
       name: scopeName,
-      displayName: String(values.displayName ?? "").trim() || null,
-      description: String(values.description ?? "").trim() || null,
+      displayName: String(formString(values.displayName, "")).trim() || null,
+      description: String(formString(values.description, "")).trim() || null,
     };
     state.data.adminClientScopeDrafts ??= {};
     state.data.adminClientScopeDrafts[scopeId] = body;
@@ -5212,7 +5242,7 @@ async function submitForm(form) {
     const roleName = form.dataset.roleName ?? "";
     if (!/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName)) return;
     if (!form.reportValidity()) return;
-    const description = String(values.description ?? "").trim() || null;
+    const description = String(formString(values.description, "")).trim() || null;
     state.data.adminRoleDrafts ??= {};
     state.data.adminRoleDrafts[roleName] = {
       description: description ?? "",
@@ -5240,8 +5270,8 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-role-create") {
     const body = {
-      name: String(values.name ?? "").trim(),
-      description: String(values.description ?? "").trim() || null,
+      name: String(formString(values.name, "")).trim(),
+      description: String(formString(values.description, "")).trim() || null,
     };
     const localErrors = {};
     if (!body.name) localErrors.name = text("adminRoleNameRequired");
@@ -5290,7 +5320,7 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-group-create") {
     const body = {
-      name: String(values.name ?? "").trim(),
+      name: String(formString(values.name, "")).trim(),
       parentId: null,
       attributes: {},
       defaultGroup: false,
@@ -5398,7 +5428,7 @@ async function submitForm(form) {
     const parent = (state.data.groups?.content ?? []).find(
       (group) => Number(group.id) === parentId,
     );
-    const name = String(values.name ?? "").trim();
+    const name = String(formString(values.name, "")).trim();
     if (!Number.isSafeInteger(parentId) || parentId < 1 || !parent) return;
     if (!name) {
       state.data.groupChildCreateErrorId = parentId;
@@ -5448,13 +5478,13 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-client-create") {
     const bodyDraft = {
-      clientId: String(values.clientId ?? "").trim(),
-      clientName: String(values.clientName ?? "").trim(),
+      clientId: String(formString(values.clientId, "")).trim(),
+      clientName: String(formString(values.clientName, "")).trim(),
       authenticationMode:
         values.authenticationMode === "public" ? "public" : "confidential",
-      redirectUris: String(values.redirectUris ?? ""),
-      postLogoutRedirectUris: String(values.postLogoutRedirectUris ?? ""),
-      scopes: String(values.scopes ?? "").trim(),
+      redirectUris: String(formString(values.redirectUris, "")),
+      postLogoutRedirectUris: String(formString(values.postLogoutRedirectUris, "")),
+      scopes: String(formString(values.scopes, "")).trim(),
       requireAuthorizationConsent: form.elements.namedItem(
         "requireAuthorizationConsent",
       ).checked,
@@ -5577,9 +5607,9 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-client-scope-create") {
     const body = {
-      name: String(values.name ?? "").trim(),
-      displayName: String(values.displayName ?? "").trim() || null,
-      description: String(values.description ?? "").trim() || null,
+      name: String(formString(values.name, "")).trim(),
+      displayName: String(formString(values.displayName, "")).trim() || null,
+      description: String(formString(values.description, "")).trim() || null,
     };
     const localErrors = {};
     if (!body.name) localErrors.name = text("adminClientScopeNameRequired");
@@ -5657,12 +5687,12 @@ async function submitForm(form) {
       return;
     }
     const body = {
-      username: String(values.username ?? "").trim(),
-      firstName: String(values.firstName ?? "").trim() || null,
-      lastName: String(values.lastName ?? "").trim() || null,
-      email: String(values.email ?? "").trim() || null,
+      username: String(formString(values.username, "")).trim(),
+      firstName: String(formString(values.firstName, "")).trim() || null,
+      lastName: String(formString(values.lastName, "")).trim() || null,
+      email: String(formString(values.email, "")).trim() || null,
       emailVerified: form.elements.namedItem("emailVerified").checked,
-      password: String(values.password ?? ""),
+      password: String(formString(values.password, "")),
       temporary: form.elements.namedItem("temporary").checked,
       enabled: form.elements.namedItem("enabled").checked,
       roles: [...form.querySelectorAll('input[name="roles"]:checked')].map(
@@ -5736,7 +5766,7 @@ async function submitForm(form) {
       internationalizationEnabled: form.elements.namedItem(
         "internationalizationEnabled",
       ).checked,
-      defaultLocale: String(values.defaultLocale ?? ""),
+      defaultLocale: String(formString(values.defaultLocale, "")),
       supportedLocales: [
         ...form.querySelectorAll('input[name="supportedLocales"]:checked'),
       ].map((input) => input.value),
@@ -5768,10 +5798,10 @@ async function submitForm(form) {
     const id = Number(form.dataset.id);
     if (!Number.isSafeInteger(id) || id < 1) return;
     const body = {
-      locale: String(values.locale ?? "").trim(),
-      bundle: String(values.bundle ?? "").trim(),
-      messageKey: String(values.messageKey ?? "").trim(),
-      messageValue: String(values.messageValue ?? "").trim(),
+      locale: String(formString(values.locale, "")).trim(),
+      bundle: String(formString(values.bundle, "")).trim(),
+      messageKey: String(formString(values.messageKey, "")).trim(),
+      messageValue: String(formString(values.messageValue, "")).trim(),
     };
     state.data.adminMessageOverrideDrafts ??= {};
     state.data.adminMessageOverrideDrafts[id] = { id, ...body };
@@ -5802,10 +5832,10 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-branding") {
     const body = {
-      applicationName: String(values.applicationName ?? "").trim(),
-      primaryColor: String(values.primaryColor ?? "").trim(),
-      accentColor: String(values.accentColor ?? "").trim(),
-      backgroundColor: String(values.backgroundColor ?? "").trim(),
+      applicationName: String(formString(values.applicationName, "")).trim(),
+      primaryColor: String(formString(values.primaryColor, "")).trim(),
+      accentColor: String(formString(values.accentColor, "")).trim(),
+      backgroundColor: String(formString(values.backgroundColor, "")).trim(),
     };
     state.data.adminBrandingDraft = body;
     state.busy = "admin-branding";
@@ -5875,16 +5905,16 @@ async function submitForm(form) {
     const draft = state.data.adminEmailDraft ?? {};
     const body = {
       enabled: form.elements.namedItem("enabled").checked,
-      fromAddress: String(values.fromAddress ?? "").trim(),
-      baseUrl: String(values.baseUrl ?? "").trim(),
-      host: String(values.host ?? "").trim(),
+      fromAddress: String(formString(values.fromAddress, "")).trim(),
+      baseUrl: String(formString(values.baseUrl, "")).trim(),
+      host: String(formString(values.host, "")).trim(),
       port: Number(values.port),
       username:
-        String(values.username ?? "").trim() ||
+        String(formString(values.username, "")).trim() ||
         draft.username ||
         current.username ||
         "",
-      password: String(values.password ?? ""),
+      password: String(formString(values.password, "")),
       smtpAuth: form.elements.namedItem("smtpAuth").checked,
       starttls: form.elements.namedItem("starttls").checked,
       ssl: form.elements.namedItem("ssl").checked,
@@ -5918,7 +5948,7 @@ async function submitForm(form) {
       userVerification: String(values.userVerification),
       mfaRequired: form.elements.namedItem("mfaRequired").checked,
       stepUpRequired: form.elements.namedItem("stepUpRequired").checked,
-      stepUpAcr: String(values.stepUpAcr ?? "").trim() || null,
+      stepUpAcr: String(formString(values.stepUpAcr, "")).trim() || null,
     };
     state.data.cibaPolicyDraft = body;
     state.busy = "admin-ciba-policy";
@@ -5941,8 +5971,8 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-offline-access-policy") {
     const body = {
-      idleTimeout: String(values.idleTimeout ?? "").trim(),
-      maxLifespan: String(values.maxLifespan ?? "").trim() || null,
+      idleTimeout: String(formString(values.idleTimeout, "")).trim(),
+      maxLifespan: String(formString(values.maxLifespan, "")).trim() || null,
       maxLimited: form.elements.namedItem("maxLimited").checked,
     };
     state.data.offlineAccessPolicyDraft = body;
@@ -5966,10 +5996,10 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "profile") {
     state.data.accountProfileDraft = {
-      firstName: String(values.firstName ?? ""),
-      lastName: String(values.lastName ?? ""),
-      email: String(values.email ?? ""),
-      preferredLocale: String(values.preferredLocale ?? "en"),
+      firstName: String(formString(values.firstName, "")),
+      lastName: String(formString(values.lastName, "")),
+      email: String(formString(values.email, "")),
+      preferredLocale: String(formString(values.preferredLocale, "en")),
     };
     if (values.email && !/^\S+@\S+\.\S+$/.test(values.email)) {
       state.error = {
