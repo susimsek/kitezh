@@ -1683,3 +1683,50 @@ test("maps request timeouts and validation problems to typed responses", async (
   assert.equal(validationResponse.kind, "validation");
   assert.equal(validationResponse.body.violations[0].field, "name");
 });
+
+test("allows only bounded Account and Admin notification feed and read paths", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, options) => {
+    requests.push({
+      path: new URL(String(url)).pathname,
+      method: options.method,
+    });
+    return new Response("0", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  for (const [consoleName, base] of [
+    ["account", "/api/account/notifications"],
+    ["admin", "/api/admin/notifications"],
+  ]) {
+    await adapter.request({
+      console: consoleName,
+      path: `${base}?page=0&size=20`,
+    });
+    await adapter.request({
+      console: consoleName,
+      path: `${base}/unread-count`,
+    });
+    await adapter.request({
+      console: consoleName,
+      path: `${base}/9a418c80-2b43-4afe-977f-17ea426e8c80/read`,
+      method: "PUT",
+    });
+    for (const [path, method] of [
+      [`${base}?size=101`, "GET"],
+      [`${base}?page=-1`, "GET"],
+      [`${base}?includePrivate=true`, "GET"],
+      [`${base}/unread-count?userId=2`, "GET"],
+      [`${base}/not-a-uuid/read`, "PUT"],
+      [`${base}/9a418c80-2b43-4afe-977f-17ea426e8c80/read`, "DELETE"],
+    ]) {
+      await assert.rejects(
+        adapter.request({ console: consoleName, path, method }),
+        /not allowed/,
+        `${method} ${path} must be rejected`,
+      );
+    }
+  }
+  assert.equal(requests.length, 6);
+});

@@ -183,6 +183,13 @@ class AccountSecurityEndpointsIT {
 
             UserEntity changed = userRepository.findByUsername(username).orElseThrow();
             assertThat(passwordEncoder.matches("Changed-test12!", changed.getPassword())).isTrue();
+
+            mockMvc.perform(get("/api/account/notifications").with(account(username)))
+                    .andExpect(status().isOk())
+                    .andExpect(
+                            jsonPath("$.content[0].messageKey")
+                                    .value("notificationAccountPasswordChanged"))
+                    .andExpect(jsonPath("$.content[0].read").value(false));
         } finally {
             userRepository
                     .findByUsername(username)

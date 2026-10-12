@@ -81,6 +81,8 @@ public class AdminApiSecurityConfig {
                                         .hasAuthority(AuthoritiesConstants.ADMIN)
                                         .requestMatchers("/api/admin/whoami")
                                         .hasAuthority("SCOPE_admin-api")
+                                        .requestMatchers("/api/admin/notifications/**")
+                                        .hasAuthority(AuthoritiesConstants.ADMIN)
                                         .requestMatchers(
                                                 HttpMethod.GET, "/api/admin/profile-attributes")
                                         .hasAnyAuthority(

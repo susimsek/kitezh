@@ -935,6 +935,230 @@ test("preserves Account profile drafts offline and completes native social linki
   }
 });
 
+test("shows durable Account notifications in both locales and prevents duplicate reads", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__notificationReadCount = 0;
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        const json = (body, status = 200) =>
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          });
+        if (requestUrl.pathname === "/oauth2/token")
+          return json({
+            access_token: "notification-test-token",
+            expires_in: 3600,
+          });
+        if (requestUrl.pathname === "/api/account/profile")
+          return json({
+            firstName: "Ada",
+            lastName: "Lovelace",
+            preferredLocale: "en",
+          });
+        if (
+          requestUrl.pathname === "/api/account/notifications" &&
+          method === "GET"
+        )
+          return json({
+            content: [
+              {
+                id: "9a418c80-2b43-4afe-977f-17ea426e8c80",
+                messageKey: "notificationAccountMfaEnabled",
+                createdAt: "2026-10-12T08:30:00Z",
+                read: false,
+              },
+            ],
+          });
+        if (requestUrl.pathname === "/api/account/notifications/unread-count")
+          return json(1);
+        if (requestUrl.pathname.endsWith("/read") && method === "PUT") {
+          globalThis.__notificationReadCount += 1;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          return json(null);
+        }
+        throw new Error("Unexpected notification E2E request");
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window
+      .getByRole("button", { name: "Account Console", exact: true })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in", exact: true })
+      .waitFor();
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=notification-e2e-code`,
+      );
+    });
+    await window
+      .getByRole("button", { name: "Notifications", exact: true })
+      .click();
+    await window
+      .getByText("Multi-factor authentication was enabled.", { exact: true })
+      .waitFor();
+    await window
+      .getByText("Unread notifications: 1", { exact: true })
+      .waitFor();
+    const markRead = window.getByRole("button", { name: "Mark as read" });
+    await markRead.click();
+    assert.equal(await markRead.isDisabled(), true);
+    assert.equal(await markRead.locator(".spinner").count(), 1);
+    assert.equal(
+      await application.evaluate(() => globalThis.__notificationReadCount),
+      1,
+    );
+    await window.getByText("Read", { exact: true }).waitFor();
+    await window.getByRole("button", { name: "Turkish", exact: true }).click();
+    await window
+      .getByText("Çok faktörlü kimlik doğrulama etkinleştirildi.", {
+        exact: true,
+      })
+      .waitFor();
+    await window.getByText("Okundu", { exact: true }).waitFor();
+    assert.equal(
+      await application.evaluate(() => globalThis.__notificationReadCount),
+      1,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("shows and marks Admin durable notifications read on Windows", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      globalThis.__adminNotificationReadCount = 0;
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const method = String(init?.method ?? "GET").toUpperCase();
+        const json = (body, status = 200) =>
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          });
+        if (requestUrl.pathname === "/oauth2/token")
+          return json({
+            access_token: "admin-notification-test-token",
+            expires_in: 3600,
+          });
+        if (requestUrl.pathname === "/api/admin/whoami")
+          return json({
+            access: {
+              isAdmin: true,
+              queryUsers: true,
+              viewUsers: true,
+              manageUsers: true,
+              viewRoles: true,
+              manageRoles: true,
+              queryGroups: true,
+              viewGroups: true,
+              manageGroups: true,
+              queryClients: true,
+              viewClients: true,
+              manageClients: true,
+              viewSessions: true,
+              manageSessions: true,
+              viewConsents: true,
+              manageConsents: true,
+              viewEvents: true,
+              manageEvents: true,
+              viewKeys: true,
+              manageKeys: true,
+            },
+          });
+        if (requestUrl.pathname === "/api/admin/dashboard")
+          return json({ clients: 0, users: 0, sessions: 0, consents: 0 });
+        if (requestUrl.pathname === "/api/admin/events")
+          return json({ content: [] });
+        if (requestUrl.pathname === "/api/admin/server-info")
+          return json({ issuer: "test", activeSigningKey: null });
+        if (requestUrl.pathname === "/actuator/health/readiness")
+          return json({ status: "UP" });
+        if (
+          requestUrl.pathname === "/api/admin/notifications" &&
+          method === "GET"
+        )
+          return json({
+            content: [
+              {
+                id: "a7728187-3c02-4a0e-a90f-d0dd4338384f",
+                messageKey: "notificationAdminUserRegistered",
+                createdAt: "2026-10-12T08:30:00Z",
+                read: false,
+              },
+            ],
+          });
+        if (requestUrl.pathname === "/api/admin/notifications/unread-count")
+          return json(1);
+        if (requestUrl.pathname.endsWith("/read") && method === "PUT") {
+          globalThis.__adminNotificationReadCount += 1;
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          return json(null);
+        }
+        throw new Error("Unexpected Admin notification E2E request");
+      };
+    });
+    const window = await nativeMainWindow(application);
+    await window
+      .getByRole("button", { name: "Administration Console", exact: true })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in", exact: true })
+      .waitFor();
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=admin-notification-e2e-code`,
+      );
+    });
+    await window
+      .getByRole("button", { name: "Notifications", exact: true })
+      .click();
+    await window
+      .getByText("A new account was registered.", { exact: true })
+      .waitFor();
+    await window
+      .getByText("Unread notifications: 1", { exact: true })
+      .waitFor();
+    const markRead = window.getByRole("button", { name: "Mark as read" });
+    await markRead.click();
+    assert.equal(await markRead.isDisabled(), true);
+    assert.equal(await markRead.locator(".spinner").count(), 1);
+    await window.getByText("Read", { exact: true }).waitFor();
+    assert.equal(
+      await application.evaluate(() => globalThis.__adminNotificationReadCount),
+      1,
+    );
+    await window.getByRole("button", { name: "Turkish", exact: true }).click();
+    await window
+      .getByText("Yeni bir hesap kaydedildi.", { exact: true })
+      .waitFor();
+  } finally {
+    await application.close();
+  }
+});
+
 test("guards native Account security and revocation actions while pending", async () => {
   const application = await launchDesktop();
   try {

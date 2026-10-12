@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.kitezh.domain.AuthorizationConsentEntity;
 import io.github.susimsek.kitezh.domain.AuthorizationConsentId;
 import io.github.susimsek.kitezh.domain.AuthorizationEntity;
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.RegisteredClientEntity;
 import io.github.susimsek.kitezh.mapper.AccountApplicationMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
@@ -16,6 +17,7 @@ import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.ClientRepository;
 import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +37,7 @@ class AccountApplicationServiceTest {
     @Mock private ClientRepository clientRepository;
     @Mock private AuthorizationServerMapperSupport mapperSupport;
     @Mock private AdminAuditEventService auditEventService;
+    @Mock private NotificationService notificationService;
 
     @Test
     void mapsAuthorizedApplicationsInBatches() {
@@ -122,6 +125,8 @@ class AccountApplicationServiceTest {
         verify(authorizationRepository).delete(session);
         verify(auditEventService)
                 .record("account.offline-session.revoked", "offline-session", "auth-1");
+        verify(notificationService)
+                .publishAccount("alice", NotificationType.ACCOUNT_OFFLINE_SESSION_REVOKED);
     }
 
     @Test
@@ -155,6 +160,7 @@ class AccountApplicationServiceTest {
                 clientRepository,
                 mapperSupport,
                 auditEventService,
+                notificationService,
                 Mappers.getMapper(AccountApplicationMapper.class));
     }
 }

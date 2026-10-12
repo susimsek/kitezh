@@ -46,6 +46,52 @@ function isAllowedApiPath(
   method: string,
   path: string,
 ) {
+  const notificationsPath =
+    namespace === "admin"
+      ? "/api/admin/notifications"
+      : "/api/account/notifications";
+  if (
+    path === notificationsPath ||
+    path.startsWith(`${notificationsPath}?`) ||
+    path.startsWith(`${notificationsPath}/`)
+  ) {
+    try {
+      const url = new URL(path, "https://desktop.invalid");
+      if (url.origin !== "https://desktop.invalid" || url.hash) return false;
+      const keys = [...url.searchParams.keys()];
+      if (
+        [...new Set(keys)].some(
+          (key) => url.searchParams.getAll(key).length !== 1,
+        ) ||
+        keys.some((key) => !["page", "size", "sort"].includes(key))
+      )
+        return false;
+      if (url.pathname === notificationsPath) {
+        const page = url.searchParams.get("page");
+        const size = url.searchParams.get("size");
+        const sort = url.searchParams.get("sort");
+        return (
+          method === "GET" &&
+          (page === null || /^(0|[1-9]\d{0,6})$/.test(page)) &&
+          (size === null ||
+            (/^[1-9]\d{0,2}$/.test(size) && Number(size) <= 100)) &&
+          (sort === null || sort === "createdAt,desc")
+        );
+      }
+      if (url.pathname === `${notificationsPath}/unread-count`)
+        return method === "GET" && keys.length === 0;
+      return (
+        method === "PUT" &&
+        new RegExp(
+          `^${notificationsPath}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/read$`,
+          "i",
+        ).test(url.pathname) &&
+        keys.length === 0
+      );
+    } catch {
+      return false;
+    }
+  }
   if (namespace === "admin") {
     if (method === "GET" && path === "/api/admin/whoami") return true;
     if (method === "POST" && path === "/api/admin/keys/rotate") return true;

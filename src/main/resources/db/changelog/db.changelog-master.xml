@@ -46,4 +46,5 @@
 	<include file="db/changelog/changes/032-create-authentication-flows.xml"/>
 	<include file="db/changelog/changes/033-create-authorization-revocation-policy.xml"/>
 	<include file="db/changelog/changes/034-create-desktop-social-link-transactions.xml"/>
+	<include file="db/changelog/changes/035-create-notifications.xml"/>
 </databaseChangeLog>

@@ -289,6 +289,7 @@ const adminNavigation = [
     (access) => access?.isAdmin === true,
   ],
   ["sessions", "adminSessions", (access) => access?.viewSessions === true],
+  ["notifications", "notificationsTitle", (access) => access?.isAdmin === true],
   ["consents", "adminConsents", (access) => access?.viewConsents === true],
   [
     "offline-sessions",
@@ -502,7 +503,7 @@ function shell() {
           .filter(([, , allowed]) => allowed(state.data.adminAccess))
           .map(([route, messageKey]) => navButton(route, text(messageKey)))
           .join("")
-      : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("settings", text("settings"))}`;
+      : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("notifications", text("notificationsTitle"))}${navButton("settings", text("settings"))}`;
   const authorizedRoute =
     state.error?.kind === "forbidden" && state.console === "admin"
       ? firstAuthorizedAdminRoute()
@@ -546,6 +547,7 @@ function routeTitle() {
       clients: text("adminClients"),
       "identity-providers": text("adminIdentityProviders"),
       sessions: text("adminSessions"),
+      notifications: text("notificationsTitle"),
       consents: text("adminConsents"),
       "offline-sessions": text("adminOfflineSessions"),
       events: text("adminEvents"),
@@ -564,6 +566,7 @@ function routeTitle() {
     sessions: text("sessionsTitle"),
     applications: text("applicationsTitle"),
     settings: text("settingsTitle"),
+    notifications: text("notificationsTitle"),
   }[state.route];
 }
 
@@ -582,6 +585,7 @@ function routeDescription() {
       clients: text("adminSearchClients"),
       "identity-providers": text("adminSearchIdentityProviders"),
       sessions: text("adminSearchSessions"),
+      notifications: text("notificationsDescription"),
       consents: text("adminSearchConsents"),
       "offline-sessions": text("offlineSessionsHelp"),
       events: text("adminSearchEvents"),
@@ -600,6 +604,7 @@ function routeDescription() {
     sessions: text("sessionsError"),
     applications: text("applicationsError"),
     settings: text("desktopSettingsDescription"),
+    notifications: text("notificationsDescription"),
   }[state.route];
 }
 
@@ -617,10 +622,12 @@ function content() {
   if (state.route === "security") return securityContent();
   if (state.route === "sessions") return sessionsContent();
   if (state.route === "applications") return applicationsContent();
+  if (state.route === "notifications") return notificationsContent();
   return settingsContent();
 }
 
 function adminContent() {
+  if (state.route === "notifications") return notificationsContent();
   if (state.route === "users") return adminUsersContent();
   if (state.route === "user-create") return adminUserCreateContent();
   if (state.route === "roles") return adminRolesContent();
@@ -673,6 +680,36 @@ function adminContent() {
     )
     .join("");
   return `<div class="dashboard-layout"><section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${statCards}</section><section class="dashboard-panels"><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.heartPulse?.unicode ?? "")}</span>${escapeHtml(text("adminServerHealth"))}</h2><div class="health-row"><span class="health-badge ${health === "UP" ? "is-up" : "is-down"}" role="status">${escapeHtml(health)}</span><span>${escapeHtml(text("adminReadinessProbe"))}</span></div><p class="issuer-value">${escapeHtml(server.issuer ?? "—")}</p>${navButton("configuration", text("adminOpenServerInfo"))}</article><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.key?.unicode ?? "")}</span>${escapeHtml(text("adminActiveSigningKey"))}</h2>${signingKey ? `<p class="signing-key-id">${escapeHtml(signingKey.kid)}</p><span class="key-algorithm">${escapeHtml(signingKey.algorithm)}</span>` : '<p class="empty-value">—</p>'}${navButton("keys", text("adminManageKeys"))}</article></section><section class="card dashboard-events"><div class="dashboard-events-heading"><div><h2><span aria-hidden="true">${escapeHtml(icons.clockRotateLeft?.unicode ?? "")}</span>${escapeHtml(text("adminRecentEvents"))}</h2><p>${escapeHtml(text("adminRecentActivity"))}</p></div>${navButton("events", text("adminViewAll"))}</div><div class="dashboard-event-list">${eventRows || `<p class="empty-value">${escapeHtml(text("adminNoRecentEvents"))}</p>`}</div></section></div>`;
+}
+
+function notificationsContent() {
+  const page = state.data.notifications ?? { content: [] };
+  const items = Array.isArray(page.content) ? page.content : [];
+  const unread = Number.isSafeInteger(state.data.notificationUnreadCount)
+    ? state.data.notificationUnreadCount
+    : 0;
+  const itemRows = items
+    .map((item) => {
+      const busy = state.busy === `notification-read:${item.id}`;
+      const key = typeof item.messageKey === "string" ? item.messageKey : "";
+      const safeMessageKeys = new Set([
+        "notificationAccountPasswordChanged",
+        "notificationAccountMfaEnabled",
+        "notificationAccountMfaDisabled",
+        "notificationAccountSessionRevoked",
+        "notificationAdminUserRegistered",
+      ]);
+      const createdAt =
+        typeof item.createdAt === "string" ? item.createdAt : "";
+      const date = Number.isNaN(Date.parse(createdAt))
+        ? ""
+        : new Date(createdAt).toLocaleString(
+            state.locale === "tr" ? "tr-TR" : "en-US",
+          );
+      return `<article class="list-item"><div><strong>${escapeHtml(text(safeMessageKeys.has(key) ? key : "notificationsUnknown"))}</strong><span class="muted">${escapeHtml(date)}</span><span>${escapeHtml(item.read ? text("notificationRead") : text("notificationUnread"))}</span></div>${item.read ? "" : button(text("notificationMarkRead"), { action: "notification-read", id: item.id, busy, disabled: state.offline || Boolean(state.busy) })}</article>`;
+    })
+    .join("");
+  return `<section class="card" aria-label="${escapeHtml(text("notificationsTitle"))}"><h2>${escapeHtml(text("notificationsTitle"))}</h2><p>${escapeHtml(text("notificationsUnreadCount"))}: ${unread}</p>${items.length ? `<div class="list">${itemRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("notificationsEmpty"))}</div>`}<div class="actions">${button(text("refresh"), { action: "notifications-refresh", busy: state.busy === "notifications-refresh", disabled: state.offline || Boolean(state.busy) })}</div></section>`;
 }
 
 function adminUsersContent() {
@@ -2981,6 +3018,18 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         health.status === "fulfilled" && health.value?.status === "UP"
           ? "UP"
           : "DOWN";
+    }
+    if (state.route === "notifications") {
+      const base =
+        state.console === "admin"
+          ? "/api/admin/notifications"
+          : "/api/account/notifications";
+      const [page, unreadCount] = await Promise.all([
+        request(`${base}?page=0&size=20`),
+        request(`${base}/unread-count`),
+      ]);
+      state.data.notifications = page;
+      state.data.notificationUnreadCount = unreadCount;
     }
     if (state.console === "admin" && state.route === "users") {
       const query = new URLSearchParams({
@@ -6014,6 +6063,50 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "notification-read") {
+    const id = element.dataset.id ?? "";
+    if (
+      state.busy ||
+      state.offline ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id,
+      )
+    )
+      return;
+    state.busy = `notification-read:${id}`;
+    state.error = null;
+    render();
+    try {
+      const base =
+        state.console === "admin"
+          ? "/api/admin/notifications"
+          : "/api/account/notifications";
+      await request(`${base}/${encodeURIComponent(id)}/read`, {
+        method: "PUT",
+      });
+      const item = (state.data.notifications?.content ?? []).find(
+        (entry) => entry.id === id,
+      );
+      if (item) item.read = true;
+      state.data.notificationUnreadCount = Math.max(
+        0,
+        (state.data.notificationUnreadCount ?? 0) - 1,
+      );
+    } catch {
+      /* request rendered localized authorization or transport feedback */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "notifications-refresh") {
+    if (state.busy || state.offline) return;
+    state.busy = "notifications-refresh";
+    await loadRoute({ keepContent: true });
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "admin-client-role-composites-toggle") {
     if (
       state.busy ||
