@@ -5944,8 +5944,8 @@ async function submitForm(form) {
     const body = {
       requestLifespanSeconds: Number(values.requestLifespanSeconds),
       pollingIntervalSeconds: Number(values.pollingIntervalSeconds),
-      deliveryMode: String(values.deliveryMode),
-      userVerification: String(values.userVerification),
+      deliveryMode: formString(values.deliveryMode),
+      userVerification: formString(values.userVerification),
       mfaRequired: form.elements.namedItem("mfaRequired").checked,
       stepUpRequired: form.elements.namedItem("stepUpRequired").checked,
       stepUpAcr: String(formString(values.stepUpAcr, "")).trim() || null,
@@ -6018,10 +6018,10 @@ async function submitForm(form) {
       state.profile = await request("/api/account/profile", {
         method: "PUT",
         body: {
-          firstName: String(values.firstName).trim(),
-          lastName: String(values.lastName).trim(),
-          email: String(values.email).trim(),
-          currentPassword: String(values.currentPassword).trim() || undefined,
+          firstName: formString(values.firstName).trim(),
+          lastName: formString(values.lastName).trim(),
+          email: formString(values.email).trim(),
+          currentPassword: formString(values.currentPassword).trim() || undefined,
         },
       });
       await request("/api/auth/localization/me", {
@@ -6039,7 +6039,7 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "password") {
     if (
-      String(values.newPassword).length < 12 ||
+      formString(values.newPassword).length < 12 ||
       values.newPassword !== values.confirmPassword
     ) {
       state.error = { message: text("passwordMismatch") };
@@ -9665,7 +9665,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.userQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.userPage = 0;
       state.data.adminSelectedUserIds = [];
@@ -9697,7 +9697,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.roleQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.rolePage = 0;
       state.busy = "roles-search";
@@ -9725,7 +9725,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.groupQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.groupPage = 0;
       state.busy = "groups-search";
@@ -9753,7 +9753,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.clientScopeQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.clientScopePage = 0;
       state.busy = "client-scopes-search";
@@ -9814,7 +9814,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.clientQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.clientPage = 0;
       state.busy = "clients-search";
@@ -9858,7 +9858,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.identityProviderQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.identityProviderPage = 0;
       state.busy = "identity-providers-search";
@@ -9888,8 +9888,8 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       const values = new FormData(event.currentTarget);
-      state.data.adminSessionQuery = String(values.get("q") ?? "").trim();
-      state.data.adminSessionStatus = String(values.get("status") ?? "active");
+      state.data.adminSessionQuery = String(formString(values.get("q"), "")).trim();
+      state.data.adminSessionStatus = String(formString(values.get("status"), "active"));
       state.data.adminSessionPage = 0;
       state.busy = "admin-sessions-search";
       void loadRoute({ keepContent: true }).finally(() => {
@@ -9916,7 +9916,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.adminConsentQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.adminConsentPage = 0;
       state.busy = "admin-consents-search";
@@ -9959,7 +9959,7 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       state.data.adminEventQuery = String(
-        new FormData(event.currentTarget).get("q") ?? "",
+        formString(new FormData(event.currentTarget).get("q"), ""),
       ).trim();
       state.data.adminEventPage = 0;
       state.busy = "admin-events-search";
@@ -9987,8 +9987,8 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       const values = new FormData(event.currentTarget);
-      state.data.adminKeyQuery = String(values.get("q") ?? "").trim();
-      state.data.adminKeyActive = String(values.get("active") ?? "all");
+      state.data.adminKeyQuery = String(formString(values.get("q"), "")).trim();
+      state.data.adminKeyActive = String(formString(values.get("active"), "all"));
       state.data.adminKeyPage = 0;
       state.busy = "admin-keys-search";
       void loadRoute({ keepContent: true }).finally(() => {
