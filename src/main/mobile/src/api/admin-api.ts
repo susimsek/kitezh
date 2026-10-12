@@ -1,5 +1,3 @@
-import { authorizationServerIssuer } from "../config.ts";
-import { createClientMetadataHeaders } from "../../../shared/src/client-metadata.cjs";
 import {
   classifyApiError,
   createNativeRequestSignal,
@@ -8,6 +6,12 @@ import {
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
+import {
+  createMobileApiClient,
+  getMobileTransportCause,
+  readMobileResponseData,
+  toHeaderRecord,
+} from "./http-client.ts";
 
 export type AdminDashboard = {
   clients: number;
@@ -275,71 +279,49 @@ type RequestOptions = {
   timeoutMs?: number;
 };
 
-function adminApiUrl(path: string) {
-  return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
-}
-
-const clientHeaders = createClientMetadataHeaders({
-  appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? "0.1.0",
-  clientPlatform: process.env.EXPO_OS === "ios" ? "ios" : "android",
-  os: process.env.EXPO_OS === "ios" ? "ios" : "android",
-});
+const adminClient = createMobileApiClient(DEFAULT_NATIVE_API_TIMEOUT_MS);
 
 async function requestAdmin<T>(
   accessToken: string,
   path: string,
   options: RequestOptions,
-  retried: boolean,
   init: RequestInit = {},
 ): Promise<T> {
-  let response: Response;
   const requestSignal = createNativeRequestSignal(
     options.timeoutMs ?? DEFAULT_NATIVE_API_TIMEOUT_MS,
     options.signal,
   );
   try {
-    response = await fetch(adminApiUrl(path), {
-      ...init,
-      headers: {
-        ...init.headers,
-        Accept: "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        ...clientHeaders,
+    const response = await adminClient.request<T>(
+      {
+        data: init.body,
+        headers: toHeaderRecord(init.headers),
+        method: init.method,
+        signal: requestSignal.signal,
+        timeout: options.timeoutMs ?? DEFAULT_NATIVE_API_TIMEOUT_MS,
+        url: path,
       },
-      signal: requestSignal.signal,
-    });
+      { accessToken, refreshAccessToken: options.refreshAccessToken },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new AdminApiError(
+        response.status,
+        "Administration request failed",
+        readMobileResponseData(response.data),
+      );
+    }
+    if (response.status === 204) return undefined as T;
+    return readMobileResponseData(response.data) as T;
   } catch (cause) {
-    const failure = requestSignal.timedOut()
-      ? Object.assign(new Error("Native API request timed out"), {
-          name: "TimeoutError",
-        })
-      : cause;
-    throw new AdminApiError(0, "Administration request failed", failure);
+    if (cause instanceof AdminApiError) throw cause;
+    throw new AdminApiError(
+      0,
+      "Administration request failed",
+      getMobileTransportCause(cause, requestSignal.timedOut()),
+    );
   } finally {
     requestSignal.dispose();
   }
-
-  if (response.status === 401 && !retried && options.refreshAccessToken) {
-    const refreshedAccessToken = await options.refreshAccessToken();
-    if (refreshedAccessToken) {
-      return requestAdmin(refreshedAccessToken, path, options, true, init);
-    }
-  }
-  if (!response.ok) {
-    let data: unknown;
-    try {
-      data = await response.json();
-    } catch {
-      data = undefined;
-    }
-    throw new AdminApiError(
-      response.status,
-      "Administration request failed",
-      data,
-    );
-  }
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
 }
 
 export function getAdminDashboard(
@@ -350,7 +332,6 @@ export function getAdminDashboard(
     accessToken,
     "/api/admin/dashboard",
     options,
-    false,
   );
 }
 
@@ -371,7 +352,6 @@ export function listAdminUsers(
     accessToken,
     `/api/admin/users?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -392,7 +372,6 @@ export function listAdminClients(
     accessToken,
     `/api/admin/clients?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -413,7 +392,6 @@ export function listAdminClientScopes(
     accessToken,
     `/api/admin/client-scopes?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -434,7 +412,6 @@ export function listAdminRoles(
     accessToken,
     `/api/admin/roles?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -455,7 +432,6 @@ export function listAdminGroups(
     accessToken,
     `/api/admin/groups?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -476,7 +452,6 @@ export function listAdminIdentityProviders(
     accessToken,
     `/api/admin/identity-providers?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -501,7 +476,6 @@ export function listAdminSessions(
     accessToken,
     `/api/admin/sessions?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -514,7 +488,6 @@ export function deleteAdminSession(
     accessToken,
     `/api/admin/sessions/${encodeURIComponent(sessionId)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -542,7 +515,6 @@ export function listAdminConsents(
     accessToken,
     `/api/admin/consents?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -565,7 +537,6 @@ export function listAdminKeys(
     accessToken,
     `/api/admin/keys?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -577,7 +548,6 @@ export function rotateAdminKey(
     accessToken,
     "/api/admin/keys/rotate",
     options,
-    false,
     { method: "POST" },
   );
 }
@@ -602,7 +572,6 @@ export function listAdminEvents(
     accessToken,
     `/api/admin/events?${params.toString()}`,
     options,
-    false,
   );
 }
 
@@ -610,7 +579,7 @@ export function deleteAdminEvents(
   accessToken: string,
   options: RequestOptions = {},
 ) {
-  return requestAdmin<void>(accessToken, "/api/admin/events", options, false, {
+  return requestAdmin<void>(accessToken, "/api/admin/events", options, {
     method: "DELETE",
   });
 }
@@ -625,7 +594,6 @@ export function revokeAdminConsent(
     accessToken,
     `/api/admin/consents/${encodeURIComponent(clientId)}/${encodeURIComponent(username)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -640,7 +608,6 @@ export function setAdminUserEnabled(
     accessToken,
     `/api/admin/users/${encodeURIComponent(userId)}/enabled`,
     options,
-    false,
     {
       body: JSON.stringify({ enabled }),
       headers: { "Content-Type": "application/json" },
@@ -658,7 +625,6 @@ export function deleteAdminUser(
     accessToken,
     `/api/admin/users/${encodeURIComponent(userId)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -672,7 +638,6 @@ export function unlockAdminUser(
     accessToken,
     `/api/admin/users/${encodeURIComponent(userId)}/unlock`,
     options,
-    false,
     { method: "POST" },
   );
 }
@@ -684,7 +649,7 @@ function jsonRequest<T>(
   options: RequestOptions = {},
   method: "POST" | "PUT" = "POST",
 ) {
-  return requestAdmin<T>(accessToken, path, options, false, {
+  return requestAdmin<T>(accessToken, path, options, {
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
     method,
@@ -756,7 +721,6 @@ export function deleteAdminClient(
     accessToken,
     `/api/admin/clients/${encodeURIComponent(clientId)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -798,7 +762,6 @@ export function deleteAdminClientScope(
     accessToken,
     `/api/admin/client-scopes/${encodeURIComponent(scopeId)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -840,7 +803,6 @@ export function deleteAdminRole(
     accessToken,
     `/api/admin/roles/${encodeURIComponent(roleName)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -882,7 +844,6 @@ export function deleteAdminGroup(
     accessToken,
     `/api/admin/groups/${encodeURIComponent(groupId)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }
@@ -924,7 +885,6 @@ export function deleteAdminIdentityProvider(
     accessToken,
     `/api/admin/identity-providers/${encodeURIComponent(providerId)}`,
     options,
-    false,
     { method: "DELETE" },
   );
 }

@@ -1,12 +1,17 @@
-import { authorizationServerIssuer } from "../config.ts";
 import type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
-import { createClientMetadataHeaders } from "../../../shared/src/client-metadata.cjs";
 import {
   classifyApiError,
+  DEFAULT_NATIVE_API_TIMEOUT_MS,
   parseProblemDetail,
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
+import {
+  createMobileApiClient,
+  getMobileTransportCause,
+  readMobileResponseData,
+  toHeaderRecord,
+} from "./http-client.ts";
 
 export class PublicApiError extends Error {
   readonly status: number;
@@ -29,68 +34,60 @@ type RequestOptions = { locale?: string };
 export type CaptchaSettings = { enabled: boolean };
 export type { SocialProviderAvailability };
 
-function apiUrl(path: string) {
-  return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
-}
-
-const clientHeaders = createClientMetadataHeaders({
-  appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? "0.1.0",
-  clientPlatform: process.env.EXPO_OS === "ios" ? "ios" : "android",
-  os: process.env.EXPO_OS === "ios" ? "ios" : "android",
-});
-
-async function readError(response: Response) {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
-}
+const publicClient = createMobileApiClient(DEFAULT_NATIVE_API_TIMEOUT_MS);
 
 async function post<T>(
   path: string,
   body: unknown,
   options: RequestOptions = {},
 ) {
-  let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
-      body: JSON.stringify(body),
+    const response = await publicClient.request<T>({
+      data: JSON.stringify(body),
       headers: {
-        Accept: "application/json",
-        ...clientHeaders,
         "Content-Type": "application/json",
         ...(options.locale ? { "Accept-Language": options.locale } : {}),
       },
       method: "POST",
+      url: path,
     });
+    if (response.status < 200 || response.status >= 300) {
+      throw new PublicApiError(
+        response.status,
+        "Public account request failed",
+        readMobileResponseData(response.data),
+      );
+    }
+    if (response.status === 204 || response.status === 201) {
+      return undefined as T;
+    }
+    return readMobileResponseData(response.data) as T;
   } catch (cause) {
-    throw new PublicApiError(0, "Network request failed", cause);
-  }
-  if (!response.ok) {
+    if (cause instanceof PublicApiError) throw cause;
     throw new PublicApiError(
-      response.status,
-      "Public account request failed",
-      await readError(response),
+      0,
+      "Network request failed",
+      getMobileTransportCause(cause, false),
     );
   }
-  if (response.status === 204 || response.status === 201) return undefined as T;
-  return (await response.json()) as T;
 }
 
 export async function getCaptchaSettings(): Promise<CaptchaSettings> {
   try {
-    const response = await fetch(apiUrl("/api/auth/registration-captcha"), {
-      headers: { Accept: "application/json", ...clientHeaders },
+    const response = await publicClient.request<{ enabled?: unknown }>({
+      method: "GET",
+      url: "/api/auth/registration-captcha",
     });
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       throw new PublicApiError(
         response.status,
         "Registration CAPTCHA settings request failed",
-        await readError(response),
+        readMobileResponseData(response.data),
       );
     }
-    const value = (await response.json()) as { enabled?: unknown };
+    const value = readMobileResponseData(response.data) as {
+      enabled?: unknown;
+    };
     return { enabled: value.enabled === true };
   } catch {
     throw new PublicApiError(0, "Registration CAPTCHA settings unavailable");

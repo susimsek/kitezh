@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
+
+installAxiosFetchMockCompatibility();
 
 import {
   AccountApiError,
@@ -44,15 +47,11 @@ test("account requests classify transport failures as offline without leaking de
 
 test("account request deadlines surface a typed timeout error", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (_input, init) =>
-    new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener(
-        "abort",
-        () =>
-          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
-        { once: true },
-      );
-    });
+  globalThis.fetch = async (_input, init) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(init?.signal?.aborted, true);
+    throw Object.assign(new Error("aborted"), { name: "AbortError" });
+  };
 
   try {
     await assert.rejects(

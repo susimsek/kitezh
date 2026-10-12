@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
+
+installAxiosFetchMockCompatibility();
 
 import {
   AdminApiError,
@@ -105,15 +108,11 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
 
 test("admin requests classify timeout and offline failures", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (_input, init) =>
-    new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener(
-        "abort",
-        () =>
-          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
-        { once: true },
-      );
-    });
+  globalThis.fetch = async (_input, init) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(init?.signal?.aborted, true);
+    throw Object.assign(new Error("aborted"), { name: "AbortError" });
+  };
   try {
     await assert.rejects(
       getAdminDashboard("access-token", { timeoutMs: 5 }),

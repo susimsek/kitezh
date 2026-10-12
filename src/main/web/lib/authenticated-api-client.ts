@@ -1,13 +1,10 @@
-import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig } from "axios";
+import axios from "axios";
+import { createApiClient, type ApiTokenHandlers } from "@kitezh/shared/api-client";
 import { apiUrl, assertDesktopOnline } from "./desktop-api";
 import { getClientMetadataHeaders } from "./client-metadata";
 
-export type TokenHandlers = {
-  refresh: () => Promise<string | null>;
-  unauthorized: () => void;
-};
-
-type RetriableRequest = InternalAxiosRequestConfig & { _consoleRetried?: boolean };
+export type TokenHandlers = ApiTokenHandlers & { unauthorized: () => void };
 
 type PageMetadata = {
   number: number;
@@ -17,34 +14,18 @@ type PageMetadata = {
 };
 
 export function createAuthenticatedApiClient() {
-  let tokenHandlers: TokenHandlers | undefined;
-  const client = axios.create({
+  const apiClient = createApiClient(axios, {
     baseURL: apiUrl("/"),
     headers: getClientMetadataHeaders(),
-    validateStatus: () => true,
-  });
-
-  client.interceptors.response.use(async (response) => {
-    response.data = normalizePageResponse(response.data);
-    const request = response.config as RetriableRequest;
-    if (response.status !== 401 || request._consoleRetried || !tokenHandlers) {
+    transformResponse: (response) => {
+      response.data = normalizePageResponse(response.data);
       return response;
-    }
-
-    const accessToken = await tokenHandlers.refresh();
-    if (!accessToken) {
-      tokenHandlers.unauthorized();
-      return response;
-    }
-
-    request._consoleRetried = true;
-    request.headers.set("Authorization", `Bearer ${accessToken}`);
-    return client.request(request);
+    },
   });
 
   return {
     registerTokenHandlers(handlers: TokenHandlers | undefined) {
-      tokenHandlers = handlers;
+      apiClient.registerTokenHandlers(handlers);
     },
     request<T>(accessToken: string, config: AxiosRequestConfig) {
       try {
@@ -52,14 +33,7 @@ export function createAuthenticatedApiClient() {
       } catch (error) {
         return Promise.reject(error);
       }
-      return client.request<T>({
-        ...config,
-        headers: {
-          ...config.headers,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        validateStatus: () => true,
-      });
+      return apiClient.request<T>(config, { accessToken });
     },
   };
 }
