@@ -48,7 +48,7 @@ export function OrganizationCreateForm({ dictionary }: Readonly<{ dictionary: Di
       if (response.status >= 300) {
         const result = applyProblemToForm(response.data, setError, { fields: ["alias", "name"] });
         if (result.firstField) return;
-        throw new Error();
+        throw new Error("Request failed");
       }
       router.push(`/admin/organizations/${response.data.id}`);
     } catch {

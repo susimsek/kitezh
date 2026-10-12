@@ -155,7 +155,7 @@ function AdminResourcesContent({
       url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${resource === "users" ? `&enabled=${status}` : resource === "keys" ? `&active=${status}` : resource === "sessions" ? `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}` : resource === "consents" ? `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}` : ""}`,
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setError(false);
         setItems(response.data.content as User[] | Session[] | Consent[] | Key[]);
         setTotalPages(response.data.totalPages);

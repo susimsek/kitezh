@@ -49,7 +49,7 @@ export function OrganizationsTable({ dictionary }: Readonly<{ dictionary: Dictio
       url: `/api/admin/organizations?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}`,
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setOrganizations(response.data.content);
         setTotalPages(response.data.totalPages);
         setTotalElements(response.data.totalElements);

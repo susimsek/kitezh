@@ -384,7 +384,7 @@ export default function LoginSettingsPage({
     if (!accessToken) return;
     adminRequest<LoginSettingsResponse>(accessToken, { url: "/api/admin/settings/login" })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         reset(normalizeSettings(response.data));
         setLoaded(true);
       })
@@ -397,7 +397,7 @@ export default function LoginSettingsPage({
       url: "/api/admin/settings/registration-captcha",
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setCaptcha({ ...defaultCaptchaSettings, ...response.data });
         setCaptchaLoaded(true);
       })
@@ -410,7 +410,7 @@ export default function LoginSettingsPage({
       url: "/api/admin/settings/social-providers",
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         resetSocial({
           providers: response.data.map((provider) => ({
             ...provider,
@@ -477,7 +477,7 @@ export default function LoginSettingsPage({
         url: "/api/admin/settings/login",
         data: values,
       });
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       reset({ ...defaultSettings, ...response.data });
       alerts.addAlert(copy.saved);
     } catch {
@@ -529,7 +529,7 @@ export default function LoginSettingsPage({
           },
         },
       );
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       resetSocial({
         providers: response.data.map((provider) => ({
           ...provider,
@@ -574,7 +574,7 @@ export default function LoginSettingsPage({
           },
         },
       );
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       setCaptcha({ ...defaultCaptchaSettings, ...response.data });
       alerts.addAlert(copy.captchaSaved);
     } catch {

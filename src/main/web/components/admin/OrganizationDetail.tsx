@@ -166,7 +166,7 @@ export function OrganizationDetail({
               providerResult,
             ].some((response) => response.status >= 300)
           )
-            throw new Error();
+            throw new Error("Request failed");
           setOrganization(org.data);
           setMembers(memberPage.data.content);
           setDomains(domainResult.data);
@@ -197,7 +197,7 @@ export function OrganizationDetail({
     setSaving(true);
     try {
       const response = await adminRequest(accessToken, { url, method, data });
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       reset();
       load();
     } catch {
