@@ -1,10 +1,10 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppIcon } from "@/components/AppIcon";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
-import { radii, spacing } from "@/theme/tokens";
+import { controlSizes, radii, spacing } from "@/theme/tokens";
 
 type AccountTab = "account" | "security" | "applications" | "settings";
 
@@ -47,7 +47,7 @@ export function AccountTabBar({ active }: { active: AccountTab }) {
             style={({ pressed }) => [
               styles.tab,
               {
-                backgroundColor: selected
+                backgroundColor: selected && Platform.OS === "android"
                   ? palette.surfaceMuted
                   : "transparent",
                 opacity: pressed ? 0.7 : 1,
@@ -60,11 +60,12 @@ export function AccountTabBar({ active }: { active: AccountTab }) {
               size={17}
             />
             <Text
-              numberOfLines={1}
+              allowFontScaling
               style={{
                 color: selected ? palette.primary : palette.textMuted,
-                fontSize: 12,
+                fontSize: Platform.OS === "ios" ? 11 : 12,
                 fontWeight: selected ? "700" : "500",
+                textAlign: "center",
               }}
             >
               {labels[tab.key]}
@@ -78,20 +79,20 @@ export function AccountTabBar({ active }: { active: AccountTab }) {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    padding: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
   },
   tab: {
     alignItems: "center",
-    borderRadius: radii.md,
+    borderRadius: Platform.OS === "android" ? radii.pill : radii.sm,
     flex: 1,
     gap: spacing.xs,
     justifyContent: "center",
-    minHeight: 56,
+    minHeight: controlSizes.mobile,
     paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
   },
 });

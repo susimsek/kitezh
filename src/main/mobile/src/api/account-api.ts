@@ -1,14 +1,18 @@
-import { authorizationServerIssuer } from "../config.ts";
 import type { AccountSocialLink } from "../../../shared/src/contracts.ts";
 import {
   classifyApiError,
   createNativeRequestSignal,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
   parseProblemDetail,
-  parseRetryAfterSeconds,
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
+import {
+  createMobileApiClient,
+  getMobileTransportCause,
+  readMobileResponseData,
+  toHeaderRecord,
+} from "./http-client.ts";
 
 export type { AccountSocialLink };
 
@@ -95,21 +99,14 @@ export class AccountApiError extends Error {
   readonly data: unknown;
   readonly kind: ApiErrorKind;
   readonly problem: ProblemDetail | undefined;
-  readonly retryAfterSeconds: number | undefined;
 
-  constructor(
-    status: number,
-    message: string,
-    data?: unknown,
-    retryAfterSeconds?: number,
-  ) {
+  constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.name = "AccountApiError";
     this.status = status;
     this.data = data;
     this.kind = classifyApiError(status, data);
     this.problem = parseProblemDetail(data);
-    this.retryAfterSeconds = retryAfterSeconds ?? this.problem?.retryAfterSeconds;
   }
 }
 
@@ -119,77 +116,50 @@ type RequestOptions = {
   timeoutMs?: number;
 };
 
-function accountApiUrl(path: string) {
-  return `${authorizationServerIssuer.replace(/\/$/, "")}${path}`;
-}
-
-async function readErrorData(response: Response) {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
-}
+const accountClient = createMobileApiClient(DEFAULT_NATIVE_API_TIMEOUT_MS);
 
 async function requestAccount<T>(
   accessToken: string,
   path: string,
   init: RequestInit,
   options: RequestOptions,
-  retried: boolean,
   message: string,
 ): Promise<T> {
-  let response: Response;
   const requestSignal = createNativeRequestSignal(
     options.timeoutMs ?? DEFAULT_NATIVE_API_TIMEOUT_MS,
     options.signal,
   );
   try {
-    response = await fetch(accountApiUrl(path), {
-      ...init,
-      headers: {
-        ...init.headers,
-        Accept: "application/json",
-        Authorization: `Bearer ${accessToken}`,
+    const response = await accountClient.request<T>(
+      {
+        data: init.body,
+        headers: toHeaderRecord(init.headers),
+        method: init.method,
+        signal: requestSignal.signal,
+        timeout: options.timeoutMs ?? DEFAULT_NATIVE_API_TIMEOUT_MS,
+        url: path,
       },
-      signal: requestSignal.signal,
-    });
+      { accessToken, refreshAccessToken: options.refreshAccessToken },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new AccountApiError(
+        response.status,
+        message,
+        readMobileResponseData(response.data),
+      );
+    }
+    if (response.status === 204) return undefined as T;
+    return readMobileResponseData(response.data) as T;
   } catch (cause) {
-    const failure = requestSignal.timedOut()
-      ? Object.assign(new Error("Native API request timed out"), {
-          name: "TimeoutError",
-        })
-      : cause;
-    throw new AccountApiError(0, message, failure);
+    if (cause instanceof AccountApiError) throw cause;
+    throw new AccountApiError(
+      0,
+      message,
+      getMobileTransportCause(cause, requestSignal.timedOut()),
+    );
   } finally {
     requestSignal.dispose();
   }
-
-  if (response.status === 401 && !retried && options.refreshAccessToken) {
-    const refreshedAccessToken = await options.refreshAccessToken();
-    if (refreshedAccessToken) {
-      return requestAccount<T>(
-        refreshedAccessToken,
-        path,
-        init,
-        options,
-        true,
-        message,
-      );
-    }
-  }
-
-  if (!response.ok) {
-    throw new AccountApiError(
-      response.status,
-      message,
-      await readErrorData(response),
-      parseRetryAfterSeconds(response.headers.get("Retry-After")),
-    );
-  }
-
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
 }
 
 export function getAccountProfile(
@@ -201,7 +171,6 @@ export function getAccountProfile(
     "/api/account/profile",
     { method: "GET" },
     options,
-    false,
     "Account profile request failed",
   );
 }
@@ -222,7 +191,6 @@ export function updateAccountProfile(
       method: "PUT",
     },
     options,
-    false,
     "Account profile update failed",
   );
 }
@@ -241,7 +209,6 @@ export function changeAccountPassword(
       method: "PUT",
     },
     options,
-    false,
     "Account password request failed",
   );
 }
@@ -255,7 +222,6 @@ export function listAccountSessions(
     "/api/account/sessions?page=0&size=20",
     { method: "GET" },
     options,
-    false,
     "Account sessions request failed",
   );
 }
@@ -269,7 +235,6 @@ export function signOutOtherAccountSessions(
     "/api/account/sessions/others",
     { method: "DELETE" },
     options,
-    false,
     "Account sessions request failed",
   );
 }
@@ -284,7 +249,6 @@ export function signOutAccountSession(
     `/api/account/sessions/${encodeURIComponent(sessionId)}`,
     { method: "DELETE" },
     options,
-    false,
     "Account session request failed",
   );
 }
@@ -298,7 +262,6 @@ export function listAccountApplications(
     "/api/account/applications?page=0&size=20",
     { method: "GET" },
     options,
-    false,
     "Account applications request failed",
   );
 }
@@ -313,7 +276,6 @@ export function revokeAccountApplication(
     `/api/account/applications/${encodeURIComponent(clientId)}`,
     { method: "DELETE" },
     options,
-    false,
     "Account application request failed",
   );
 }
@@ -327,7 +289,6 @@ export function listOfflineSessions(
     "/api/account/offline-sessions?page=0&size=20",
     { method: "GET" },
     options,
-    false,
     "Offline sessions request failed",
   );
 }
@@ -342,7 +303,6 @@ export function revokeOfflineSession(
     `/api/account/offline-sessions/${encodeURIComponent(sessionId)}`,
     { method: "DELETE" },
     options,
-    false,
     "Offline session request failed",
   );
 }
@@ -361,7 +321,6 @@ export function deleteAccount(
       method: "DELETE",
     },
     options,
-    false,
     "Account deletion request failed",
   );
 }
@@ -375,7 +334,6 @@ export function getMfaStatus(
     "/api/account/mfa",
     { method: "GET" },
     options,
-    false,
     "MFA status request failed",
   );
 }
@@ -389,7 +347,6 @@ export function startMfaSetup(
     "/api/account/mfa/setup",
     { method: "POST" },
     options,
-    false,
     "MFA setup request failed",
   );
 }
@@ -409,7 +366,6 @@ export function mutateMfa(
       method: "POST",
     },
     options,
-    false,
     "MFA request failed",
   );
 }
@@ -423,7 +379,6 @@ export function getRecoveryCodesStatus(
     "/api/account/mfa/recovery-codes",
     { method: "GET" },
     options,
-    false,
     "Recovery code status request failed",
   );
 }
@@ -437,7 +392,6 @@ export function generateRecoveryCodes(
     "/api/account/mfa/recovery-codes",
     { method: "POST" },
     options,
-    false,
     "Recovery code request failed",
   );
 }
@@ -451,7 +405,6 @@ export function listSocialLinks(
     "/api/account/social-links",
     { method: "GET" },
     options,
-    false,
     "Social links request failed",
   );
 }
@@ -466,7 +419,6 @@ export function unlinkSocialProvider(
     `/api/account/social-links/${encodeURIComponent(provider)}`,
     { method: "DELETE" },
     options,
-    false,
     "Social link request failed",
   );
 }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +16,15 @@ const packageJson = JSON.parse(
 const releaseDirectory = path.join(desktopDirectory, "release");
 const packagedAppPaths = {
   darwin: [
-    `mac-${process.arch}/Kitezh.app/Contents/MacOS/Kitezh`,
-    "mac-universal/Kitezh.app/Contents/MacOS/Kitezh",
+    ...(process.arch === "arm64"
+      ? [
+          "mac-arm64/Kitezh.app/Contents/MacOS/Kitezh",
+          "mac/Kitezh.app/Contents/MacOS/Kitezh",
+        ]
+      : [
+          "mac/Kitezh.app/Contents/MacOS/Kitezh",
+          "mac-x64/Kitezh.app/Contents/MacOS/Kitezh",
+        ]),
   ],
   linux: [
     "linux-unpacked/kitezh",
@@ -46,6 +53,28 @@ async function firstExistingPath(paths) {
 const executablePath = await firstExistingPath(
   packagedAppPaths[process.platform] ?? [],
 );
+if (process.platform === "darwin") {
+  const appContents = path.resolve(path.dirname(executablePath), "..");
+  const electronResources = path.join(
+    appContents,
+    "Frameworks",
+    "Electron Framework.framework",
+    "Versions",
+    "A",
+    "Resources",
+  );
+  const packagedLocales = (await readdir(electronResources, {
+    withFileTypes: true,
+  }))
+    .filter((entry) => entry.isDirectory() && entry.name.endsWith(".lproj"))
+    .map((entry) => entry.name)
+    .sort();
+  assert.deepEqual(
+    packagedLocales,
+    ["en.lproj", "tr.lproj"],
+    "Packaged Electron should retain English and Turkish locale resources",
+  );
+}
 const userDataDirectory = await mkdtemp(
   path.join(os.tmpdir(), "kitezh-packaged-smoke-"),
 );
@@ -78,6 +107,8 @@ try {
     {
       apiBaseUrl: "http://127.0.0.1:9090",
       protocol: "kitezh",
+      appVersion: packageJson.version,
+      os: process.platform,
     },
   );
   assert.equal(

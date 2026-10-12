@@ -1,44 +1,13 @@
 import * as SecureStore from "expo-secure-store";
 
-import {
-  sessionStorageKey,
-  type MobileSessionNamespace,
-} from "./session-keys.ts";
-import type { NativeSession } from "../../../shared/src/api.ts";
-import { parseSessionRecord, serializeSessionRecord } from "./session-record.ts";
+import { createSessionStorage } from "./session-storage";
 
-export { sessionStorageKey } from "./session-keys.ts";
-export type { MobileSessionNamespace } from "./session-keys.ts";
+export { sessionStorageKey } from "./session-keys";
+export type { MobileSessionNamespace } from "./session-keys";
+export type { MobileSession } from "./session-storage";
 
-export type MobileSession = NativeSession;
+const nativeSessionStorage = createSessionStorage(SecureStore);
 
-export async function readSession(
-  namespace: MobileSessionNamespace = "account",
-): Promise<MobileSession | null> {
-  const stored = await SecureStore.getItemAsync(sessionStorageKey(namespace));
-  if (!stored) return null;
-  try {
-    const session = parseSessionRecord(stored, namespace);
-    if (session) return session;
-  } catch {
-    // Invalid SecureStore data is removed below; no credential material is logged.
-  }
-  await SecureStore.deleteItemAsync(sessionStorageKey(namespace));
-  return null;
-}
-
-export async function writeSession(
-  session: MobileSession,
-  namespace: MobileSessionNamespace = "account",
-) {
-  await SecureStore.setItemAsync(
-    sessionStorageKey(namespace),
-    serializeSessionRecord(session, namespace),
-  );
-}
-
-export async function clearSession(
-  namespace: MobileSessionNamespace = "account",
-) {
-  await SecureStore.deleteItemAsync(sessionStorageKey(namespace));
-}
+export const readSession = nativeSessionStorage.readSession;
+export const writeSession = nativeSessionStorage.writeSession;
+export const clearSession = nativeSessionStorage.clearSession;

@@ -30,6 +30,7 @@ type DownloadPlatform = {
   description: string;
   installationNote?: string;
   helpLinks?: { label: string; href: string }[];
+  showWhenAssetExists?: RegExp;
   groups: DownloadGroup[];
 };
 
@@ -52,7 +53,7 @@ const platformAssets = {
     },
   },
   macos: {
-    universal: /-macos-universal\.dmg$/,
+    appleSilicon: /-macos-arm64\.dmg$/,
     intel: /-macos-x64\.dmg$/,
   },
   android: /-android\.apk$/,
@@ -176,7 +177,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
         {
           label: copy.macos.architecture,
           assets: [
-            asset(platformAssets.macos.universal, copy.macos.assets.universal),
+            asset(platformAssets.macos.appleSilicon, copy.macos.assets.appleSilicon),
             asset(platformAssets.macos.intel, copy.macos.assets.intel),
           ],
         },
@@ -187,6 +188,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
       title: copy.android.title,
       description: copy.android.description,
       installationNote: copy.android.installationNote,
+      showWhenAssetExists: platformAssets.android,
       groups: [
         {
           label: copy.android.architecture,
@@ -199,6 +201,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
       title: copy.ios.title,
       description: signedIpa ? copy.ios.signedDescription : copy.ios.description,
       installationNote: signedIpa ? copy.ios.signedInstallationNote : copy.ios.installationNote,
+      showWhenAssetExists: platformAssets.ios,
       helpLinks: signedIpa
         ? undefined
         : [
@@ -213,6 +216,11 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
       ],
     },
   ];
+  const visiblePlatforms = platforms.filter(
+    (platform) =>
+      !platform.showWhenAssetExists ||
+      Boolean(findReleaseAssetUrl(release, platform.showWhenAssetExists)),
+  );
 
   return (
     <main className="download-page py-4 py-md-5">
@@ -237,7 +245,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
           </Alert>
         ) : (
           <Row className="download-platforms g-4 g-lg-5 justify-content-center">
-            {platforms.map((platform) => (
+            {visiblePlatforms.map((platform) => (
               <Col key={platform.title} xs={12} md={6} lg={4}>
                 <section className="download-platform h-100">
                   <div className="download-platform-icon text-primary mb-3" aria-hidden="true">

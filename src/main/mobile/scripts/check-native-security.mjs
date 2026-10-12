@@ -1,7 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = path.resolve(new URL(".", import.meta.url).pathname, "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const forbidden = [
   {
     label: "diagnostic secret logging",
@@ -13,7 +14,8 @@ const forbidden = [
   },
   {
     label: "password or token in a diagnostic string",
-    pattern: /(?:console|logger|diagnostic)[^\n]{0,80}(?:password|accessToken|refreshToken|idToken)/i,
+    pattern:
+      /(?:console|logger|diagnostic)[^\n]{0,80}(?:password|accessToken|refreshToken|idToken)/i,
   },
 ];
 
@@ -36,7 +38,9 @@ for (const filePath of await sourceFiles(path.join(root, "src"))) {
     const match = contents.match(rule.pattern);
     if (match) {
       const line = contents.slice(0, match.index).split("\n").length;
-      violations.push(`${path.relative(root, filePath)}:${line} uses ${rule.label}`);
+      violations.push(
+        `${path.relative(root, filePath)}:${line} uses ${rule.label}`,
+      );
     }
   }
 }
@@ -46,5 +50,7 @@ if (violations.length > 0) {
   for (const violation of violations) console.error(`- ${violation}`);
   process.exitCode = 1;
 } else {
-  console.log("Native security check passed without secret logging or token-bearing URLs.");
+  console.log(
+    "Native security check passed without secret logging or token-bearing URLs.",
+  );
 }

@@ -68,6 +68,7 @@ out/
 ######################
 node_modules/
 node/
+**/coverage/
 tsconfig.tsbuildinfo
 src/main/desktop/node_modules/
 src/main/desktop/dist/

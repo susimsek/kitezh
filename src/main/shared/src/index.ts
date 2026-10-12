@@ -5,3 +5,4 @@ export * from "./contracts";
 export * from "./api";
 export * from "./auth";
 export * from "./session";
+export * from "./client-metadata.cjs";

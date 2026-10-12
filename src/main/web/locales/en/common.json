@@ -159,10 +159,10 @@
     },
     "macos": {
       "title": "macOS",
-      "description": "Universal and Intel disk images for macOS.",
+      "description": "Separate disk images for Apple Silicon and Intel Macs.",
       "architecture": "Disk images",
       "assets": {
-        "universal": "Universal",
+        "appleSilicon": "Apple Silicon",
         "intel": "Intel"
       }
     },

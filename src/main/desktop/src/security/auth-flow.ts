@@ -1,3 +1,5 @@
+import { createClientMetadataHeaders } from "@kitezh/shared/client-metadata";
+
 export type DesktopAuthCallback = {
   state: string;
   code: string | null;
@@ -82,10 +84,18 @@ export async function exchangeAuthorizationCode(
   apiBaseUrl: string,
   pending: PendingAuthorization,
   code: string,
+  clientMetadata: {
+    appVersion: string;
+    clientPlatform: "desktop";
+    os: string;
+  },
 ): Promise<DesktopTokens> {
   const response = await fetcher(`${apiBaseUrl}/oauth2/token`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      ...createClientMetadataHeaders(clientMetadata),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
     body: new URLSearchParams({
       client_id: pending.clientId,
       code,

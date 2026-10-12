@@ -13,7 +13,8 @@
 [![Spring Security](https://img.shields.io/badge/Spring%20Security-Authorization%20Server-6DB33F?logo=springsecurity&logoColor=white)](https://docs.spring.io/spring-security/reference/servlet/oauth2/authorization-server/index.html)
 [![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-Persistence-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-data-jpa/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-UI-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![React](https://img.shields.io/badge/React-Web-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![React Native](https://img.shields.io/badge/React%20Native-Mobile-61DAFB?logo=react&logoColor=white)](https://reactnative.dev/)
 [![Electron](https://img.shields.io/badge/Electron-Desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Liquibase](https://img.shields.io/badge/Liquibase-Migrations-2A62FF?logo=liquibase&logoColor=white)](https://www.liquibase.com/)
 [![GraalVM](https://img.shields.io/badge/GraalVM-25%2B-FF6600?logo=graalvm)](https://www.graalvm.org/)
@@ -379,7 +380,10 @@ Electron test under Xvfb; macOS and Windows run it on their native runners.
 Branch builds upload Linux, macOS, and Windows installers as short-lived GitHub Actions artifacts.
 To publish a versioned desktop release, push a version tag such as `v0.1.0`; the
 `desktop-release` workflow attaches the platform installers to the matching GitHub Release.
-Each release includes macOS x64 and universal DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
+After the backend release succeeds, desktop and mobile packaging run independently from the same
+tag. The backend prepares a shared draft release record; each platform uploads and replaces only
+its own assets, then makes the release public when its packages are ready.
+Each release includes separate macOS Apple Silicon and Intel DMG/ZIP packages, Linux x64 AppImage, Debian, RPM,
 and Snap packages, Linux ARM64 AppImage and Debian packages, Windows NSIS, portable EXE, and AppX
 packages, plus an SPDX JSON software bill of materials.
 The public download page keeps a stable layout and reads the latest release through the
@@ -1420,7 +1424,7 @@ terraform -chdir=terraform destroy -auto-approve
 
 ## Continuous Integration
 
-Validation pipeline: `.github/workflows/ci.yml`; versioned backend images: `.github/workflows/backend-release.yml`
+Validation pipeline: `.github/workflows/ci.yml`; versioned release publishing: `.github/workflows/publish-release.yml`
 
 - Docker Compose, Helm, and Terraform definitions are validated on every branch.
 - `./mvnw verify` for backend tests + quality gates

@@ -193,9 +193,14 @@ test("exchanges the authorization code with PKCE and validates the token respons
       createdAt: Date.now(),
     },
     "code",
+    { appVersion: "0.1.4", clientPlatform: "desktop", os: "darwin" },
   );
   assert.equal(request.url, "https://example.test/oauth2/token");
   assert.match(request.init.body.toString(), /code_verifier=verifier/);
+  assert.equal(request.init.headers["App-Name"], "Kitezh");
+  assert.equal(request.init.headers["App-Version"], "v0.1.4");
+  assert.equal(request.init.headers["Client-Platform"], "desktop");
+  assert.equal(request.init.headers.OS, "darwin");
   assert.equal(tokens.accessToken, "access");
   assert.equal(tokens.refreshToken, "refresh");
 });

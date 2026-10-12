@@ -1,0 +1,13 @@
+${AnsiColor.BRIGHT_CYAN}
+ _  _______ _______ ______ _______    _
+ | |/ /_   _|__   __|  ____|___  / |  | |
+ | ' /  | |    | |  | |__     / /| |__| |
+ |  <   | |    | |  |  __|   / / |  __  |
+ | . \ _| |_   | |  | |____ / /__| |  | |
+ |_|\_\_____|  |_|  |______/_____|_|  |_|
+${AnsiColor.BRIGHT_BLUE}
+IDENTITY & ACCESS PLATFORM
+${AnsiColor.DEFAULT}
+Version ${spring.application.version}
+Profiles: ${spring.profiles.active:default}
+Spring Boot Version: ${spring-boot.version}

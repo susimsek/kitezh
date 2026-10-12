@@ -21,13 +21,18 @@ const packageVersion = JSON.parse(
 async function launchDesktop({
   devTools = false,
   recoveryState,
-  apiBaseUrl = "http://127.0.0.1:9090",
+  apiBaseUrl = "http://localhost:9090",
   updatePreviewState,
   updatePreviewVersion = "0.1.1",
 } = {}) {
   const userDataDirectory = await mkdtemp(
     path.join(os.tmpdir(), "kitezh-desktop-e2e-"),
   );
+  await writeFile(
+    path.join(userDataDirectory, "desktop-language-mode.json"),
+    "en",
+  );
+  await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
   if (recoveryState) {
     await writeFile(
       path.join(userDataDirectory, "desktop-update-recovery.json"),
@@ -36,10 +41,7 @@ async function launchDesktop({
     );
   }
   return electron.launch({
-    args: [
-      `--user-data-dir=${userDataDirectory}`,
-      desktopDirectory,
-    ],
+    args: [`--user-data-dir=${userDataDirectory}`, desktopDirectory],
     cwd: desktopDirectory,
     env: {
       ...process.env,
@@ -181,7 +183,7 @@ test("opens the trusted renderer and exposes the narrow desktop bridge", async (
         version: await window.desktopApi?.getAppVersion(),
       })),
       {
-        apiBaseUrl: "http://127.0.0.1:9090",
+        apiBaseUrl: "http://localhost:9090",
         isDesktop: true,
         version: packageVersion,
       },
@@ -321,6 +323,11 @@ test("opens settings in a separate window without requiring login", async () => 
     await settingsWindow.waitForFunction(
       () => document.querySelector("#desktop-show-in-menu-bar")?.checked,
     );
+    const launchAtLogin = settingsWindow.locator("#desktop-launch-at-login");
+    await launchAtLogin.click();
+    await settingsWindow.waitForFunction(
+      () => document.querySelector("#desktop-launch-at-login")?.checked,
+    );
     assert.deepEqual(
       await settingsWindow
         .locator("#desktop-language option")
@@ -346,17 +353,34 @@ test("opens settings in a separate window without requiring login", async () => 
         document.querySelector("#desktop-global-shortcut")?.value ===
         "Alt+Space",
     );
+    await settingsWindow.waitForFunction(
+      () => document.querySelector("#desktop-language")?.value === "system",
+    );
     assert.equal(await showInMenuBar.isChecked(), true);
     assert.equal(
       await settingsWindow.locator("#desktop-language").inputValue(),
       "system",
     );
-    await settingsWindow.getByRole("button", { name: "Diagnostics" }).click();
+    const savedPreferences = await mainWindow.evaluate(() =>
+      window.desktopApi.preferences.set({
+        automaticDownload: true,
+        notifications: false,
+      }),
+    );
+    assert.equal(savedPreferences.automaticDownload, true);
+    assert.equal(savedPreferences.notifications, false);
+    const isTurkish = await application.evaluate(({ app }) =>
+      app.getLocale().toLowerCase().startsWith("tr"),
+    );
+    const diagnosticsLabel = isTurkish ? "Tanı bilgileri" : "Diagnostics";
     await settingsWindow
-      .getByRole("heading", { name: "Diagnostics" })
+      .getByRole("button", { name: diagnosticsLabel })
+      .click();
+    await settingsWindow
+      .getByRole("heading", { name: diagnosticsLabel })
       .waitFor();
     const copyDiagnostics = settingsWindow.getByRole("button", {
-      name: "Copy diagnostics",
+      name: isTurkish ? "Tanı bilgilerini kopyala" : "Copy diagnostics",
     });
     assert.equal(await copyDiagnostics.count(), 1);
     await settingsWindow.emulateMedia({
@@ -423,7 +447,7 @@ test("opens settings in a separate window without requiring login", async () => 
     });
     assert.equal(
       await settingsWindow
-        .getByRole("button", { name: "Appearance" })
+        .getByRole("button", { name: isTurkish ? "Görünüm" : "Appearance" })
         .isVisible(),
       true,
     );
@@ -446,7 +470,9 @@ test("opens settings in a separate window without requiring login", async () => 
     );
     assert.equal(
       await mainWindow
-        .getByRole("heading", { name: "Choose a console" })
+        .getByRole("heading", {
+          name: isTurkish ? "Bir konsol seçin" : "Choose a console",
+        })
         .count(),
       1,
     );
@@ -628,7 +654,7 @@ test("completes a desktop OAuth callback and keeps credentials out of diagnostic
       {
         console: "account",
         authorizationUrl:
-          "http://127.0.0.1:9090/oauth2/authorize?client_id=desktop-account-console",
+          "http://localhost:9090/oauth2/authorize?client_id=desktop-account-console",
         state,
         codeVerifier,
         clientId: "desktop-account-console",
@@ -764,7 +790,16 @@ test("shows an up-to-date result when no update is available", async () => {
       await resultWindow.locator("p").textContent(),
       /There are no new updates available/,
     );
-    await resultWindow.getByRole("button", { name: "Done" }).click();
+    const resultWindowClosed = resultWindow.waitForEvent("close");
+    const doneClick = resultWindow
+      .getByRole("button", { name: "Done" })
+      .click()
+      .catch((error) => {
+        // The dialog closes synchronously on click, which can close the page
+        // before Playwright receives the click acknowledgement.
+        assert.equal(resultWindow.isClosed(), true, error.message);
+      });
+    await Promise.all([resultWindowClosed, doneClick]);
   } finally {
     await application.close();
   }
@@ -892,7 +927,7 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       await availableWindow.evaluate(
         () => getComputedStyle(document.body).backgroundColor,
       ),
-      "rgb(32, 33, 36)",
+      "rgb(33, 37, 41)",
     );
   } finally {
     await application.close();

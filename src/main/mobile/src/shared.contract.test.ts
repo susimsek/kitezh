@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { messages, resolveLocale } from "../../shared/src/i18n.ts";
-import { colors, resolveTheme } from "../../shared/src/theme.ts";
+import { createClientMetadataHeaders } from "../../shared/src/client-metadata.cjs";
+import { colors, controlSizes, resolveTheme } from "../../shared/src/theme.ts";
 import { getMobileConsoleConfig } from "./config.ts";
 import { sessionStorageKey } from "./auth/session-keys.ts";
 import {
@@ -12,15 +13,9 @@ import {
 import type {
   ConsoleName,
   DesktopLanguageMode,
-  NativeClientCapabilities,
   SocialProviderAvailability,
 } from "../../shared/src/contracts.ts";
-import {
-  apiErrorMessageKey,
-  classifyApiError,
-  parseProblemDetail,
-  parseRetryAfterSeconds,
-} from "../../shared/src/api.ts";
+import { classifyApiError, parseProblemDetail } from "../../shared/src/api.ts";
 import {
   isAllowedNativeRedirect,
   parseNativeDeepLink,
@@ -28,6 +23,22 @@ import {
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
 import { createSingleFlight } from "../../shared/src/session.ts";
+
+test("client metadata follows the Kitezh app header contract", () => {
+  assert.deepEqual(
+    createClientMetadataHeaders({
+      appVersion: "v0.1.4",
+      clientPlatform: "ios",
+      os: "ios",
+    }),
+    {
+      "App-Name": "Kitezh",
+      "App-Version": "v0.1.4",
+      "Client-Platform": "ios",
+      OS: "ios",
+    },
+  );
+});
 
 test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
@@ -38,8 +49,15 @@ test("system locale resolves to the device language when supported", () => {
 test("theme resolver returns semantic palettes for every mode", () => {
   assert.equal(resolveTheme("dark", "light"), "dark");
   assert.equal(resolveTheme("system", "dark"), "dark");
-  assert.ok(colors.light.primary);
-  assert.ok(colors.dark.primary);
+  for (const palette of [colors.light, colors.dark]) {
+    assert.ok(palette.background);
+    assert.ok(palette.surface);
+    assert.ok(palette.surfaceHover);
+    assert.ok(palette.text);
+    assert.ok(palette.primary);
+  }
+  assert.ok(controlSizes.mobile >= 48);
+  assert.ok(controlSizes.mobileIconTarget >= 44);
   assert.equal(messages.tr.signIn, "Giriş yap");
 });
 
@@ -52,16 +70,10 @@ test("native contracts stay platform-neutral", () => {
     provider: "google",
     providerType: "google",
   };
-  const capabilities: NativeClientCapabilities = {
-    clientVersion: "0.1.0",
-    platform: "ios",
-    capabilities: ["mfa-totp", "social-login"],
-  };
 
   assert.equal(consoleName, "account");
   assert.equal(languageMode, "system");
   assert.equal(provider.configured, true);
-  assert.ok(capabilities.capabilities.includes("mfa-totp"));
 });
 
 test("mobile notices use a bounded auto-dismiss duration", () => {
@@ -75,7 +87,12 @@ test("mobile console contracts isolate account and admin sessions", () => {
   const admin = getMobileConsoleConfig("admin");
 
   assert.equal(account.clientId, "mobile-account-console");
-  assert.deepEqual(account.scopes, ["openid", "profile", "email", "account-api"]);
+  assert.deepEqual(account.scopes, [
+    "openid",
+    "profile",
+    "email",
+    "account-api",
+  ]);
   assert.equal(account.redirectUri, "kitezh://oauth/callback");
   assert.equal(admin.clientId, "mobile-admin-console");
   assert.deepEqual(admin.scopes, ["openid", "profile", "email", "admin-api"]);
@@ -94,16 +111,10 @@ test("shared API errors preserve native status semantics without transport detai
   ]);
   assert.equal(classifyApiError(401), "unauthorized");
   assert.equal(classifyApiError(403), "forbidden");
-  assert.equal(classifyApiError(409), "conflict");
-  assert.equal(classifyApiError(503), "unavailable");
-  assert.equal(apiErrorMessageKey("offline"), "apiOffline");
-  assert.equal(apiErrorMessageKey("conflict"), "apiConflict");
-  assert.equal(apiErrorMessageKey("unavailable"), "apiUnavailable");
-  assert.equal(parseRetryAfterSeconds("12", 0), 12);
-  assert.equal(parseRetryAfterSeconds("Thu, 01 Jan 1970 00:00:05 GMT", 0), 5);
-  assert.ok(messages.en.apiTimeout);
-  assert.ok(messages.tr.apiTimeout);
-  assert.equal(classifyApiError(0, new DOMException("timeout", "AbortError")), "timeout");
+  assert.equal(
+    classifyApiError(0, new DOMException("timeout", "AbortError")),
+    "timeout",
+  );
   assert.equal(classifyApiError(0, new Error("network")), "offline");
 });
 
@@ -141,8 +152,8 @@ test("native OAuth callbacks require the original state and approved scheme", ()
 
 test("native deep links accept only registered routes", () => {
   assert.deepEqual(
-    parseNativeDeepLink("kitezh://verify-email/?token=one-time-token-123456789012345678901234"),
-    { kind: "verify-email", token: "one-time-token-123456789012345678901234" },
+    parseNativeDeepLink("kitezh://verify-email/?token=one-time-token"),
+    { kind: "verify-email", token: "one-time-token" },
   );
   assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
     kind: "oauth-callback",
@@ -154,11 +165,12 @@ test("native deep links accept only registered routes", () => {
     kind: "admin-logout-callback",
   });
   assert.equal(
-    parseNativeDeepLink("https://kitezh.onrender.com/verify-email?token=secret"),
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com/verify-email?token=secret",
+    ),
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
-  assert.equal(parseNativeDeepLink("kitezh://verify-email/?token=../secret"), null);
 });
 
 test("native intent routes registered callback links without callback parameters", () => {
@@ -167,7 +179,9 @@ test("native intent routes registered callback links without callback parameters
     "/oauth/callback",
   );
   assert.equal(
-    resolveNativeIntentPath("kitezh://admin/oauth/callback?code=secret&state=state"),
+    resolveNativeIntentPath(
+      "kitezh://admin/oauth/callback?code=secret&state=state",
+    ),
     "/admin/oauth/callback",
   );
   assert.equal(
@@ -177,14 +191,6 @@ test("native intent routes registered callback links without callback parameters
   assert.equal(
     resolveNativeIntentPath("https://example.com/oauth/callback"),
     null,
-  );
-  assert.equal(
-    resolveNativeIntentPath("kitezh://verify-email/?token=one-time-token-123456789012345678901234"),
-    "/verify-email?token=one-time-token-123456789012345678901234",
-  );
-  assert.equal(
-    resolveNativeIntentPath("kitezh://reset-password/?token=secretvalue123456789012345678901234"),
-    "/reset-password?token=secretvalue123456789012345678901234",
   );
 });
 

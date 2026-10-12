@@ -15,7 +15,7 @@ import { AccountTabBar } from "@/components/AccountTabBar";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
-import { radii, spacing } from "@/theme/tokens";
+import { radii, spacing, typography } from "@/theme/tokens";
 
 export default function SettingsScreen() {
   const { dictionary, locale, reset: resetLocale, setLocale } = useLocale();
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 40,
   },
-  title: { fontSize: 26, fontWeight: "700" },
+  title: { fontSize: typography.pageTitle, fontWeight: "700" },
   sectionHeading: {
     alignItems: "center",
     flexDirection: "row",

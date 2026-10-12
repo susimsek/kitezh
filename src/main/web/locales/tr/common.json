@@ -159,10 +159,10 @@
     },
     "macos": {
       "title": "macOS",
-      "description": "macOS için Universal ve Intel disk imajları.",
+      "description": "Apple Silicon ve Intel Mac'ler için ayrı disk imajları.",
       "architecture": "Disk imajları",
       "assets": {
-        "universal": "Universal",
+        "appleSilicon": "Apple Silicon",
         "intel": "Intel"
       }
     },

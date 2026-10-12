@@ -12,7 +12,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
-import { spacing } from "@/theme/tokens";
+import { controlSizes, spacing, typography } from "@/theme/tokens";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 
 export default function SignInScreen() {
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     left: spacing.md,
     width: 44,
   },
-  title: { fontSize: 30, fontWeight: "800", marginTop: spacing.md },
+  title: { fontSize: typography.pageTitle, fontWeight: "800", marginTop: spacing.md },
   message: {
     fontSize: 16,
     lineHeight: 24,
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.lg,
-    minHeight: 52,
+    minHeight: controlSizes.mobile,
     paddingHorizontal: spacing.lg,
   },
   browserActions: {

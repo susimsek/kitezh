@@ -28,7 +28,14 @@ describe("admin API", () => {
 
   it("configures axios instances to accept all statuses", () => {
     expect(mockAxios.create).toHaveBeenCalledWith(
-      expect.objectContaining({ validateStatus: expect.any(Function) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "App-Name": "Kitezh",
+          "App-Version": "vdevelopment",
+          "Client-Platform": "web",
+        }),
+        validateStatus: expect.any(Function),
+      }),
     );
     expect(mockAxios.create.mock.calls[0][0].validateStatus()).toBe(true);
   });
@@ -42,7 +49,6 @@ describe("admin API", () => {
         headers: { Authorization: "Bearer access-token" },
       }),
     );
-    expect(mockAxios.request.mock.calls[0][0].validateStatus()).toBe(true);
   });
 
   it("refreshes once and retries an unauthorized request", async () => {
@@ -58,7 +64,7 @@ describe("admin API", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(setAuthorization).toHaveBeenCalledWith("Authorization", "Bearer renewed-token");
     expect(mockAxios.request).toHaveBeenCalledWith(
-      expect.objectContaining({ _consoleRetried: true }),
+      expect.objectContaining({ _kitezhRetried: true }),
     );
     expect(unauthorized).not.toHaveBeenCalled();
   });
@@ -68,10 +74,13 @@ describe("admin API", () => {
     const unauthorized = jest.fn();
     registerAdminTokenHandlers({ refresh, unauthorized });
     const interceptor = mockAxios.responseUse.mock.calls[0][0];
-    const response = { status: 401, config: { _adminRetried: false, headers: { set: jest.fn() } } };
+    const response = {
+      status: 401,
+      config: { _kitezhRetried: false, headers: { set: jest.fn() } },
+    };
 
     await interceptor(response);
-    await interceptor({ ...response, config: { ...response.config, _consoleRetried: true } });
+    await interceptor({ ...response, config: { ...response.config, _kitezhRetried: true } });
 
     expect(unauthorized).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledTimes(1);

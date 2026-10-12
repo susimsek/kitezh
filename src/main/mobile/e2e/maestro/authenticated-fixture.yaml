@@ -6,9 +6,9 @@ appId: io.github.susimsek.kitezh.mobile
 - extendedWaitUntil:
     visible: "Kitezh logo"
     timeout: 180000
-- tapOn:
-    text: "Dil"
-    optional: true
+- tapOn: "Settings|Ayarlar"
+- tapOn: "English|İngilizce"
+- tapOn: "Back|Geri"
 - tapOn: "Continue|Devam et"
 - tapOn: "Sign in"
 # iOS may ask once to allow the app to use the local fixture domain for sign-in.
