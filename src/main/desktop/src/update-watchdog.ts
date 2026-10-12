@@ -9,6 +9,8 @@ import path from "node:path";
 const HEALTH_WINDOW_MS = 30_000;
 const RETRY_DELAY_MS = 500;
 const MAX_RESTORE_ATTEMPTS = 30;
+const RECOVERY_FILE_NAME = "desktop-update-recovery.json";
+const BACKUP_FILE_PREFIX = "desktop-update-backup-";
 
 type RecoveryState = {
   backupPath: string;
@@ -19,6 +21,81 @@ type RecoveryState = {
   previousVersion: string;
   startedAt: number;
 };
+
+type RecoveryContext = {
+  userDataPath: string;
+  platform: string;
+  executablePath: string;
+  appImage?: string;
+};
+
+function pathsEqual(left: string, right: string, platform: string) {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return platform === "win32"
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
+}
+
+function expectedRollbackTarget(context: RecoveryContext) {
+  if (context.platform === "darwin") {
+    return {
+      path: path.resolve(context.executablePath, "../../../"),
+      type: "directory",
+      executable: context.executablePath,
+    } as const;
+  }
+  if (context.platform === "win32") {
+    return {
+      path: path.dirname(context.executablePath),
+      type: "directory",
+      executable: context.executablePath,
+    } as const;
+  }
+  if (context.platform === "linux" && context.appImage) {
+    return {
+      path: context.appImage,
+      type: "file",
+      executable: context.appImage,
+    } as const;
+  }
+  return null;
+}
+
+export function isValidRecoveryState(
+  value: unknown,
+  context: RecoveryContext,
+): value is RecoveryState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<RecoveryState>;
+  const target = expectedRollbackTarget(context);
+  if (
+    !target ||
+    typeof state.backupPath !== "string" ||
+    !path.isAbsolute(state.backupPath) ||
+    typeof state.targetPath !== "string" ||
+    !path.isAbsolute(state.targetPath) ||
+    typeof state.executablePath !== "string" ||
+    !path.isAbsolute(state.executablePath) ||
+    typeof state.version !== "string" ||
+    state.version.length === 0 ||
+    typeof state.previousVersion !== "string" ||
+    state.previousVersion.length === 0 ||
+    !Number.isSafeInteger(state.startedAt) ||
+    state.targetType !== target.type
+  ) {
+    return false;
+  }
+
+  const backupPath = path.resolve(state.backupPath);
+  return (
+    pathsEqual(path.dirname(backupPath), context.userDataPath, context.platform) &&
+    path.basename(backupPath).startsWith(BACKUP_FILE_PREFIX) &&
+    /^desktop-update-backup-\d+$/.test(path.basename(backupPath)) &&
+    pathsEqual(state.targetPath, target.path, context.platform) &&
+    pathsEqual(state.executablePath, target.executable, context.platform)
+  );
+}
 
 const sleep = (milliseconds: number) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -66,14 +143,28 @@ export async function restoreInstallation(
 }
 
 async function run() {
-  const recoveryPath = process.argv[2];
-  const parentPid = Number(process.argv[3]);
-  if (!recoveryPath || !Number.isInteger(parentPid)) return;
+  const watchdogPath = __filename;
+  const recoveryPath = path.join(
+    path.dirname(watchdogPath),
+    RECOVERY_FILE_NAME,
+  );
+  const parentPid = Number(process.argv[2]);
+  if (!Number.isSafeInteger(parentPid) || parentPid <= 0) return;
 
-  let state: RecoveryState;
+  let state: unknown;
   try {
-    state = JSON.parse(await readFile(recoveryPath, "utf8")) as RecoveryState;
+    state = JSON.parse(await readFile(recoveryPath, "utf8"));
   } catch {
+    return;
+  }
+  if (
+    !isValidRecoveryState(state, {
+      userDataPath: path.dirname(watchdogPath),
+      platform: process.platform,
+      executablePath: process.execPath,
+      appImage: process.env.APPIMAGE,
+    })
+  ) {
     return;
   }
 

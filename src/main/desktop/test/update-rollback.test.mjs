@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { restoreInstallation } from "../dist/update-watchdog.js";
+import {
+  isValidRecoveryState,
+  restoreInstallation,
+} from "../dist/update-watchdog.js";
 import { supportsAutoUpdate } from "../dist/update.js";
 
 test("keeps Linux system packages outside the in-app update path", () => {
@@ -47,6 +50,44 @@ test("keeps Linux system packages outside the in-app update path", () => {
       packaged: true,
       platform: "linux",
     }),
+    false,
+  );
+});
+
+test("accepts only a recovery state for the current supported installation", () => {
+  const userDataPath = path.join(os.tmpdir(), "kitezh-user-data");
+  const executablePath = path.join(os.tmpdir(), "Kitezh", "Kitezh.exe");
+  const safeState = {
+    backupPath: path.join(userDataPath, "desktop-update-backup-123"),
+    targetPath: path.dirname(executablePath),
+    targetType: "directory",
+    executablePath,
+    version: "0.2.0",
+    previousVersion: "0.1.0",
+    startedAt: Date.now(),
+  };
+  const context = {
+    userDataPath,
+    platform: "win32",
+    executablePath,
+  };
+
+  assert.equal(isValidRecoveryState(safeState, context), true);
+  assert.equal(
+    isValidRecoveryState(
+      { ...safeState, targetPath: path.dirname(userDataPath) },
+      context,
+    ),
+    false,
+  );
+  assert.equal(
+    isValidRecoveryState(
+      {
+        ...safeState,
+        backupPath: path.join(userDataPath, "..", "outside-backup"),
+      },
+      context,
+    ),
     false,
   );
 });

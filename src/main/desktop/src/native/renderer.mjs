@@ -14,7 +14,7 @@ const state = {
   profile: null,
   data: {},
   loading: true,
-  busy: null,
+  busy: /** @type {string | null} */ (null),
   error: null,
   notice: null,
   offline: !navigator.onLine,

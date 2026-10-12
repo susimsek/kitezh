@@ -205,7 +205,7 @@ async function startRollbackWatchdog() {
   await cp(source, destination, { force: true });
   const child = spawn(
     process.execPath,
-    [destination, updateRecoveryPath(), `${process.pid}`],
+    [destination, `${process.pid}`],
     {
       detached: true,
       stdio: "ignore",
