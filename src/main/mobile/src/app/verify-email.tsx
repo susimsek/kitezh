@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -45,6 +45,53 @@ export default function VerifyEmailScreen() {
     }
   };
 
+  let verificationContent: ReactNode = null;
+  if (pending || !attempted) {
+    verificationContent = (
+      <ActivityIndicator
+        accessibilityLabel={dictionary.loading}
+        color={palette.primary}
+        style={styles.status}
+      />
+    );
+  } else if (completed) {
+    verificationContent = (
+      <View style={[styles.message, { borderColor: palette.success }]}>
+        <Text style={{ color: palette.success }}>
+          {dictionary.verifyEmailSuccess}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.replace("/sign-in")}
+          style={styles.action}
+        >
+          <Text style={{ color: palette.primary, fontWeight: "700" }}>
+            {dictionary.signIn}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  } else if (failed) {
+    verificationContent = (
+      <View style={[styles.message, { borderColor: palette.danger }]}>
+        <Text style={{ color: palette.danger }}>
+          {dictionary.verifyEmailError}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: pending }}
+          disabled={pending}
+          onPress={() => void submit()}
+          style={styles.action}
+        >
+          <Text style={{ color: palette.primary, fontWeight: "700" }}>
+            {dictionary.sessionsRetry}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   useEffect(() => {
     queueMicrotask(() => void submit());
     // The action token is immutable for the lifetime of this screen.
@@ -72,45 +119,7 @@ export default function VerifyEmailScreen() {
         <Text style={[styles.help, { color: palette.textMuted }]}>
           {dictionary.verifyEmailHelp}
         </Text>
-        {pending || !attempted ? (
-          <ActivityIndicator
-            accessibilityLabel={dictionary.loading}
-            color={palette.primary}
-            style={styles.status}
-          />
-        ) : completed ? (
-          <View style={[styles.message, { borderColor: palette.success }]}>
-            <Text style={{ color: palette.success }}>
-              {dictionary.verifyEmailSuccess}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.replace("/sign-in")}
-              style={styles.action}
-            >
-              <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                {dictionary.signIn}
-              </Text>
-            </Pressable>
-          </View>
-        ) : failed ? (
-          <View style={[styles.message, { borderColor: palette.danger }]}>
-            <Text style={{ color: palette.danger }}>
-              {dictionary.verifyEmailError}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: pending }}
-              disabled={pending}
-              onPress={() => void submit()}
-              style={styles.action}
-            >
-              <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                {dictionary.sessionsRetry}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
+        {verificationContent}
       </ScrollView>
     </SafeAreaView>
   );

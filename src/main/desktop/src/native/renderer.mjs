@@ -21,6 +21,8 @@ const state = {
   authStarting: false,
   authCanceling: false,
 };
+const chooseLazy = (condition, whenTrue, whenFalse) =>
+  condition ? whenTrue() : whenFalse();
 const PLATFORM_CONSOLE_CLIENT_IDS = new Set([
   "admin-console",
   "account-console",
@@ -229,43 +231,58 @@ const pageHeader = (title, description) => {
           disabled: state.offline || Boolean(state.busy),
           icon: "add",
         })
-      : state.console === "admin" && createRole
-        ? button(text("adminCreateRole"), {
-            action: "create-role",
-            busy:
-              state.busy === "role-create-route" ||
-              state.busy === "route:roles",
-            disabled: state.offline || Boolean(state.busy),
-            icon: "add",
-          })
-        : state.console === "admin" && createGroup
-          ? button(text("adminCreateGroup"), {
-              action: "create-group",
+      : chooseLazy(
+          state.console === "admin" && createRole,
+          () =>
+            button(text("adminCreateRole"), {
+              action: "create-role",
               busy:
-                state.busy === "group-create-route" ||
-                state.busy === "route:groups",
+                state.busy === "role-create-route" ||
+                state.busy === "route:roles",
               disabled: state.offline || Boolean(state.busy),
               icon: "add",
-            })
-          : state.console === "admin" && createClient
-            ? button(text("adminCreateClient"), {
-                action: "create-client",
-                busy:
-                  state.busy === "client-create-route" ||
-                  state.busy === "route:clients",
-                disabled: state.offline || Boolean(state.busy),
-                icon: "add",
-              })
-            : state.console === "admin" && createClientScope
-              ? button(text("adminCreateClientScope"), {
-                  action: "create-client-scope",
+            }),
+          () =>
+            chooseLazy(
+              state.console === "admin" && createGroup,
+              () =>
+                button(text("adminCreateGroup"), {
+                  action: "create-group",
                   busy:
-                    state.busy === "client-scope-create-route" ||
-                    state.busy === "route:client-scopes",
+                    state.busy === "group-create-route" ||
+                    state.busy === "route:groups",
                   disabled: state.offline || Boolean(state.busy),
                   icon: "add",
-                })
-              : "";
+                }),
+              () =>
+                chooseLazy(
+                  state.console === "admin" && createClient,
+                  () =>
+                    button(text("adminCreateClient"), {
+                      action: "create-client",
+                      busy:
+                        state.busy === "client-create-route" ||
+                        state.busy === "route:clients",
+                      disabled: state.offline || Boolean(state.busy),
+                      icon: "add",
+                    }),
+                  () =>
+                    chooseLazy(
+                      state.console === "admin" && createClientScope,
+                      () =>
+                        button(text("adminCreateClientScope"), {
+                          action: "create-client-scope",
+                          busy:
+                            state.busy === "client-scope-create-route" ||
+                            state.busy === "route:client-scopes",
+                          disabled: state.offline || Boolean(state.busy),
+                          icon: "add",
+                        }),
+                      () => "",
+                    ),
+                ),
+            ),
+        );
   return `<div class="topbar"><div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><div class="actions">${createAction}${button(text("signOut"), { action: "logout", busy: state.busy === "logout", icon: "logout" })}</div></div>`;
 };
 
@@ -537,20 +554,29 @@ function shell() {
   const errorAction =
     state.error?.kind === "unauthorized"
       ? button(text("signIn"), { action: "sign-in" })
-      : authorizedRoute
-        ? button(text("adminForbiddenReturn"), {
-            action: "admin-return-authorized",
-            busy: state.busy === "admin-return-authorized",
-          })
-        : state.error?.kind === "forbidden" && state.console === "admin"
-          ? ""
-          : button(
-              state.console === "admin"
-                ? text("adminRetry")
-                : text("sessionsRetry"),
-              { action: "retry", busy: state.busy === "retry" },
-            );
-  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? `<div class="notice warning" role="status">${escapeHtml(text("offlineNotice"))}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}${state.error ? `<div class="notice error" role="alert">${escapeHtml(problemMessage(state.error))} ${errorAction}</div>` : ""}${content()}</div></main></div>`;
+      : chooseLazy(
+          authorizedRoute,
+          () =>
+            button(text("adminForbiddenReturn"), {
+              action: "admin-return-authorized",
+              busy: state.busy === "admin-return-authorized",
+            }),
+          () =>
+            chooseLazy(
+              state.error?.kind === "forbidden" && state.console === "admin",
+              () => "",
+              () =>
+                button(
+                  chooseLazy(
+                    state.console === "admin",
+                    () => text("adminRetry"),
+                    () => text("sessionsRetry"),
+                  ),
+                  { action: "retry", busy: state.busy === "retry" },
+                ),
+            ),
+        );
+  return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? '<div class="notice warning" role="status">' + escapeHtml(text("offlineNotice")) + "</div>" : ""}${state.notice ? '<div class="notice success" role="status">' + escapeHtml(state.notice) + "</div>" : ""}${state.error ? '<div class="notice error" role="alert">' + escapeHtml(problemMessage(state.error)) + " " + errorAction + "</div>" : ""}${content()}</div></main></div>`;
 }
 
 function navButton(route, label) {
@@ -705,7 +731,7 @@ function adminContent() {
         `<div class="dashboard-event"><span class="event-action">${escapeHtml(event.action)}</span><div class="event-summary"><strong>${escapeHtml(event.actor)}</strong><span>${escapeHtml(event.targetType)}</span><small>${escapeHtml(event.targetId)}</small></div><time datetime="${escapeHtml(event.occurredAt)}">${escapeHtml(new Date(event.occurredAt).toLocaleString(state.locale === "tr" ? "tr-TR" : "en-US"))}</time></div>`,
     )
     .join("");
-  return `<div class="dashboard-layout"><section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${statCards}</section><section class="dashboard-panels"><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.heartPulse?.unicode ?? "")}</span>${escapeHtml(text("adminServerHealth"))}</h2><div class="health-row"><span class="health-badge ${health === "UP" ? "is-up" : "is-down"}" role="status">${escapeHtml(health)}</span><span>${escapeHtml(text("adminReadinessProbe"))}</span></div><p class="issuer-value">${escapeHtml(server.issuer ?? "—")}</p>${navButton("configuration", text("adminOpenServerInfo"))}</article><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.key?.unicode ?? "")}</span>${escapeHtml(text("adminActiveSigningKey"))}</h2>${signingKey ? `<p class="signing-key-id">${escapeHtml(signingKey.kid)}</p><span class="key-algorithm">${escapeHtml(signingKey.algorithm)}</span>` : '<p class="empty-value">—</p>'}${navButton("keys", text("adminManageKeys"))}</article></section><section class="card dashboard-events"><div class="dashboard-events-heading"><div><h2><span aria-hidden="true">${escapeHtml(icons.clockRotateLeft?.unicode ?? "")}</span>${escapeHtml(text("adminRecentEvents"))}</h2><p>${escapeHtml(text("adminRecentActivity"))}</p></div>${navButton("events", text("adminViewAll"))}</div><div class="dashboard-event-list">${eventRows || `<p class="empty-value">${escapeHtml(text("adminNoRecentEvents"))}</p>`}</div></section></div>`;
+  return `<div class="dashboard-layout"><section class="stat-grid" aria-label="${escapeHtml(text("adminDashboard"))}">${statCards}</section><section class="dashboard-panels"><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.heartPulse?.unicode ?? "")}</span>${escapeHtml(text("adminServerHealth"))}</h2><div class="health-row"><span class="health-badge ${health === "UP" ? "is-up" : "is-down"}" role="status">${escapeHtml(health)}</span><span>${escapeHtml(text("adminReadinessProbe"))}</span></div><p class="issuer-value">${escapeHtml(server.issuer ?? "—")}</p>${navButton("configuration", text("adminOpenServerInfo"))}</article><article class="card dashboard-panel"><h2><span aria-hidden="true">${escapeHtml(icons.key?.unicode ?? "")}</span>${escapeHtml(text("adminActiveSigningKey"))}</h2>${signingKey ? '<p class="signing-key-id">' + escapeHtml(signingKey.kid) + '</p><span class="key-algorithm">' + escapeHtml(signingKey.algorithm) + "</span>" : '<p class="empty-value">—</p>'}${navButton("keys", text("adminManageKeys"))}</article></section><section class="card dashboard-events"><div class="dashboard-events-heading"><div><h2><span aria-hidden="true">${escapeHtml(icons.clockRotateLeft?.unicode ?? "")}</span>${escapeHtml(text("adminRecentEvents"))}</h2><p>${escapeHtml(text("adminRecentActivity"))}</p></div>${navButton("events", text("adminViewAll"))}</div><div class="dashboard-event-list">${eventRows || '<p class="empty-value">' + escapeHtml(text("adminNoRecentEvents")) + "</p>"}</div></section></div>`;
 }
 
 function notificationsContent() {
@@ -730,12 +756,16 @@ function notificationsContent() {
       const date = Number.isNaN(Date.parse(createdAt))
         ? ""
         : new Date(createdAt).toLocaleString(
-            state.locale === "tr" ? "tr-TR" : "en-US",
+            chooseLazy(
+              state.locale === "tr",
+              () => "tr-TR",
+              () => "en-US",
+            ),
           );
       return `<article class="list-item"><div><strong>${escapeHtml(text(safeMessageKeys.has(key) ? key : "notificationsUnknown"))}</strong><span class="muted">${escapeHtml(date)}</span><span>${escapeHtml(item.read ? text("notificationRead") : text("notificationUnread"))}</span></div>${item.read ? "" : button(text("notificationMarkRead"), { action: "notification-read", id: item.id, busy, disabled: state.offline || Boolean(state.busy) })}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("notificationsTitle"))}"><h2>${escapeHtml(text("notificationsTitle"))}</h2><p>${escapeHtml(text("notificationsUnreadCount"))}: ${unread}</p>${items.length ? `<div class="list">${itemRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("notificationsEmpty"))}</div>`}<div class="actions">${button(text("refresh"), { action: "notifications-refresh", busy: state.busy === "notifications-refresh", disabled: state.offline || Boolean(state.busy) })}</div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("notificationsTitle"))}"><h2>${escapeHtml(text("notificationsTitle"))}</h2><p>${escapeHtml(text("notificationsUnreadCount"))}: ${unread}</p>${items.length ? '<div class="list">' + itemRows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("notificationsEmpty")) + "</div>"}<div class="actions">${button(text("refresh"), { action: "notifications-refresh", busy: state.busy === "notifications-refresh", disabled: state.offline || Boolean(state.busy) })}</div></section>`;
 }
 
 function adminUsersContent() {
@@ -765,22 +795,51 @@ function adminUsersContent() {
       const confirming =
         Number(state.data.userDisableConfirmId) === Number(user.id);
       const enabledControls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDisableUserPrompt"))}</span>${button(text("adminDisableUser"), { action: "admin-user-toggle-confirm", id: user.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-toggle-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-        : `<div class="actions">${button(text(user.enabled ? "adminDisableUser" : "adminEnableUser"), { action: "admin-user-toggle-enabled", id: user.id, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDisableUserPrompt"))}</span>${button(text("adminDisableUser"), { action: "admin-user-toggle-confirm", id: user.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-toggle-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
+        : `<div class="actions">${button(
+            text(
+              chooseLazy(
+                user.enabled,
+                () => "adminDisableUser",
+                () => "adminEnableUser",
+              ),
+            ),
+            {
+              action: "admin-user-toggle-enabled",
+              id: user.id,
+              disabled: state.offline || Boolean(state.busy),
+            },
+          )}</div>`;
       const deleteConfirming =
         Number(state.data.userDeleteConfirmId) === Number(user.id);
       const deleting = state.busy === `user-delete:${user.id}`;
       const deleteControls = deleteConfirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteUserPrompt"))}</span>${button(text("adminDeleteUser"), { action: "admin-user-delete-confirm", id: user.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteUserPrompt"))}</span>${button(text("adminDeleteUser"), { action: "admin-user-delete-confirm", id: user.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-delete-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminDeleteUser"), { action: "admin-user-delete-request", id: user.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       const totpConfirming =
         Number(state.data.userTotpResetConfirmId) === Number(user.id);
       const totpBusy = state.busy === `user-totp-reset:${user.id}`;
       const totpControls = !user.totpEnabled
         ? ""
-        : totpConfirming
-          ? `<div class="actions"><span role="status">${escapeHtml(text("adminResetAuthenticatorPrompt"))}</span>${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-confirm", id: user.id, danger: true, busy: totpBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-totp-reset-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-          : `<div class="actions">${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-request", id: user.id, icon: "reset", disabled: state.offline || Boolean(state.busy) })}</div>`;
+        : chooseLazy(
+            totpConfirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminResetAuthenticatorPrompt"))}</span>${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-confirm", id: user.id, danger: true, busy: totpBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-totp-reset-cancel" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminResetAuthenticator"), { action: "admin-user-totp-reset-request", id: user.id, icon: "reset", disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
       const unlockBusy = state.busy === `user-unlock:${user.id}`;
       const actionEmailOpen =
         Number(state.data.userActionEmailOpenId) === Number(user.id);
@@ -814,7 +873,11 @@ function adminUsersContent() {
         disabled: state.offline || Boolean(state.busy),
       });
       const passwordResetForm = passwordResetOpen
-        ? `<form class="card" data-form="admin-user-password-reset" data-user-id="${escapeHtml(user.id)}" novalidate><div class="field"><label for="user-password-${escapeHtml(user.id)}">${escapeHtml(text("newPassword"))}</label><input id="user-password-${escapeHtml(user.id)}" name="password" type="password" aria-invalid="${Boolean(passwordResetErrors.password)}" minlength="12" maxlength="128" autocomplete="new-password" required/><div class="field-error">${escapeHtml(passwordResetErrors.password ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="temporary"/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><div class="actions">${button(text("adminSetPassword"), { type: "submit", busy: passwordResetBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-password-reset-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-user-password-reset" data-user-id="${escapeHtml(user.id)}" novalidate><div class="field"><label for="user-password-${escapeHtml(user.id)}">${escapeHtml(text("newPassword"))}</label><input id="user-password-${escapeHtml(user.id)}" name="password" type="password" aria-invalid="${Boolean(passwordResetErrors.password)}" minlength="12" maxlength="128" autocomplete="new-password" required/><div class="field-error">${escapeHtml(passwordResetErrors.password ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="temporary"/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><div class="actions">${button(text("adminSetPassword"), { type: "submit", busy: passwordResetBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-password-reset-cancel" data-id="${escapeHtml(user.id)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const passkeysOpen =
         Number(state.data.userPasskeysOpenId) === Number(user.id);
@@ -846,9 +909,51 @@ function adminUsersContent() {
         : (user.assignedRoles ?? user.authorities ?? []);
       const updateBusy = state.busy === `user-update:${user.id}`;
       const editForm = editing
-        ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${(editDraft.emailVerified ?? user.emailVerified) ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${(editDraft.enabled ?? user.enabled) ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${editRoles.length ? editRoles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(editErrors.roles ?? (state.data.userEditErrorId === Number(user.id) ? (state.data.userEditLocalError ?? "") : ""))}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-user-edit" data-user-id="${escapeHtml(user.id)}" novalidate><div class="form-grid">${field("username", text("username"), editDraft.username ?? user.username ?? "", editErrors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), editDraft.firstName ?? user.firstName ?? "", editErrors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), editDraft.lastName ?? user.lastName ?? "", editErrors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), editDraft.email ?? user.email ?? "", editErrors.email, "email", 'maxlength="200" autocomplete="email"')}</div><label class="settings-row"><input type="checkbox" name="emailVerified" ${chooseLazy(
+            editDraft.emailVerified ?? user.emailVerified,
+            () => "checked",
+            () => "",
+          )}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${chooseLazy(
+            editDraft.enabled ?? user.enabled,
+            () => "checked",
+            () => "",
+          )}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${chooseLazy(
+            editRoles.length,
+            () =>
+              editRoles
+                .map(
+                  (role) =>
+                    '<label class="settings-row"><input type="checkbox" name="roles" value="' +
+                    escapeHtml(role.name) +
+                    '" ' +
+                    chooseLazy(
+                      selectedRoles.includes(role.name),
+                      () => "checked",
+                      () => "",
+                    ) +
+                    "/>" +
+                    escapeHtml(role.name) +
+                    "</label>",
+                )
+                .join(""),
+            () =>
+              '<div class="empty" role="status">' +
+              escapeHtml(text("adminNoRoles")) +
+              "</div>",
+          )}<div class="field-error">${escapeHtml(
+            editErrors.roles ??
+              chooseLazy(
+                state.data.userEditErrorId === Number(user.id),
+                () => state.data.userEditLocalError ?? "",
+                () => "",
+              ),
+          )}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: updateBusy, disabled: state.offline || Boolean(state.busy) || editRoles.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-edit-cancel" data-id="${escapeHtml(user.id)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><label class="settings-row"><input type="checkbox" data-action="admin-user-bulk-select" data-id="${escapeHtml(user.id)}" aria-label="${escapeHtml(text("adminSelectUser"))} ${escapeHtml(user.username)}" ${userSelected ? "checked" : ""} ${state.busy || state.offline ? "disabled" : ""}/>${escapeHtml(text("adminSelectUser"))}</label><strong>${escapeHtml(user.username)}</strong>${user.email ? `<span class="muted">${escapeHtml(user.email)}</span>` : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.email && !user.emailVerified ? `<span>${escapeHtml(text("adminUserEmailNotVerified"))}</span>` : ""}${user.locked ? `<span>${escapeHtml(text("adminUserLocked"))}</span>` : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === `user-edit-roles:${user.id}`, disabled: state.offline || Boolean(state.busy) })}${actionEmailControl}${profileAttributesControl}${avatarControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${actionEmailOpen ? adminUserActionEmailContent(user.id) : ""}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}${avatarOpen ? adminUserAvatarContent(user) : ""}</article>`;
+      return `<article class="list-item" data-user-id="${escapeHtml(user.id)}"><div><label class="settings-row"><input type="checkbox" data-action="admin-user-bulk-select" data-id="${escapeHtml(user.id)}" aria-label="${escapeHtml(text("adminSelectUser"))} ${escapeHtml(user.username)}" ${userSelected ? "checked" : ""} ${state.busy || state.offline ? "disabled" : ""}/>${escapeHtml(text("adminSelectUser"))}</label><strong>${escapeHtml(user.username)}</strong>${user.email ? '<span class="muted">' + escapeHtml(user.email) + "</span>" : ""}<span class="muted">${escapeHtml((user.effectiveRoles ?? user.authorities ?? []).join(", "))}</span><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span>${user.email && !user.emailVerified ? "<span>" + escapeHtml(text("adminUserEmailNotVerified")) + "</span>" : ""}${user.locked ? "<span>" + escapeHtml(text("adminUserLocked")) + "</span>" : ""}</div><div>${button(text("adminEditUser"), { action: "admin-user-edit-toggle", id: user.id, busy: state.busy === "user-edit-roles:" + user.id + "", disabled: state.offline || Boolean(state.busy) })}${actionEmailControl}${profileAttributesControl}${avatarControl}${passwordResetControl}${unlockControl}${totpControls}${passkeysControl}${enabledControls}${deleteControls}</div>${editForm}${passwordResetForm}${actionEmailOpen ? adminUserActionEmailContent(user.id) : ""}${passkeysOpen ? adminUserPasskeysContent(user.id) : ""}${Number(state.data.userProfileAttributesOpenId) === Number(user.id) ? adminUserProfileAttributesContent(user.id) : ""}${avatarOpen ? adminUserAvatarContent(user) : ""}</article>`;
     })
     .join("");
   const bulkAction = state.data.adminUserBulkConfirmAction;
@@ -860,9 +965,45 @@ function adminUsersContent() {
         state.offline || Boolean(state.busy) || selectedUserIds.size === 0,
     });
   const bulkControls = selectedUserIds.size
-    ? `<section class="card" aria-label="${escapeHtml(text("adminSelectedUsers"))}"><span>${escapeHtml(text("adminSelectedUsers"))}: ${selectedUserIds.size}</span><div class="actions">${bulkButton("ENABLE", "adminBulkEnableUsers")}${bulkButton("DISABLE", "adminBulkDisableUsers")}${bulkButton("DELETE", "adminBulkDeleteUsers", true)}</div>${bulkAction ? `<div class="actions"><span role="status">${escapeHtml(text("adminBulkUserPrompt"))}</span>${button(text(bulkAction === "ENABLE" ? "adminBulkEnableUsers" : bulkAction === "DISABLE" ? "adminBulkDisableUsers" : "adminBulkDeleteUsers"), { action: "admin-user-bulk-confirm", danger: bulkAction === "DELETE", busy: state.busy === "user-bulk-action", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-bulk-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>` : ""}</section>`
+    ? `<section class="card" aria-label="${escapeHtml(text("adminSelectedUsers"))}"><span>${escapeHtml(text("adminSelectedUsers"))}: ${selectedUserIds.size}</span><div class="actions">${bulkButton("ENABLE", "adminBulkEnableUsers")}${bulkButton("DISABLE", "adminBulkDisableUsers")}${bulkButton("DELETE", "adminBulkDeleteUsers", true)}</div>${chooseLazy(
+        bulkAction,
+        () =>
+          '<div class="actions"><span role="status">' +
+          escapeHtml(text("adminBulkUserPrompt")) +
+          "</span>" +
+          button(
+            text(
+              chooseLazy(
+                bulkAction === "ENABLE",
+                () => "adminBulkEnableUsers",
+                () =>
+                  chooseLazy(
+                    bulkAction === "DISABLE",
+                    () => "adminBulkDisableUsers",
+                    () => "adminBulkDeleteUsers",
+                  ),
+              ),
+            ),
+            {
+              action: "admin-user-bulk-confirm",
+              danger: bulkAction === "DELETE",
+              busy: state.busy === "user-bulk-action",
+              disabled: state.offline || Boolean(state.busy),
+            },
+          ) +
+          '<button class="secondary-button" type="button" data-action="admin-user-bulk-cancel" ' +
+          chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          ) +
+          ">" +
+          escapeHtml(text("cancel")) +
+          "</button></div>",
+        () => "",
+      )}</section>`
     : "";
-  return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${bulkControls}${users.length ? `<div class="list">${userRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminUsers"))}"><form id="admin-user-search" class="actions" role="search"><input id="admin-user-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchUsers"))}" value="${escapeHtml(state.data.userQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchUsers"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "users-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "users-search")}${escapeHtml(text("adminSearchUsers"))}</button></form>${bulkControls}${users.length ? '<div class="list">' + userRows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoUsers")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminUsers"))} pagination"><button class="secondary-button" type="button" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "users-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminUserActionEmailContent(userId) {
@@ -911,9 +1052,11 @@ function adminUserProfileAttributesContent(userId) {
         const type =
           definition.type === "EMAIL"
             ? "email"
-            : definition.type === "INTEGER"
-              ? "number"
-              : "text";
+            : chooseLazy(
+                definition.type === "INTEGER",
+                () => "number",
+                () => "text",
+              );
         const constraints = [
           definition.minLength != null
             ? `minlength="${Number(definition.minLength)}"`
@@ -934,7 +1077,7 @@ function adminUserProfileAttributesContent(userId) {
     })
     .join("");
   const saveBusy = state.busy === `user-profile-attributes-save:${userId}`;
-  return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><form data-form="admin-user-profile-attributes" data-user-id="${escapeHtml(userId)}" novalidate><div class="form-grid">${fields || `<div class="empty" role="status">${escapeHtml(text("adminNoProfileAttributes"))}</div>`}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: saveBusy, disabled: state.offline || definitions.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-profile-attributes-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><form data-form="admin-user-profile-attributes" data-user-id="${escapeHtml(userId)}" novalidate><div class="form-grid">${fields || '<div class="empty" role="status">' + escapeHtml(text("adminNoProfileAttributes")) + "</div>"}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: saveBusy, disabled: state.offline || definitions.length === 0 })}<button class="secondary-button" type="button" data-action="admin-user-profile-attributes-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
 }
 
 function adminUserAvatarContent(user) {
@@ -945,15 +1088,23 @@ function adminUserAvatarContent(user) {
   const uploadBusy = state.busy === `admin-avatar-upload:${userId}`;
   const deleteBusy = state.busy === `admin-avatar-delete:${userId}`;
   const deleteControl = source
-    ? confirming
-      ? `<div class="actions"><span role="status">${escapeHtml(text("adminUserAvatarRemovePrompt"))}</span>${button(text("adminUserAvatarRemove"), { action: "admin-user-avatar-delete-confirm", id: userId, danger: true, busy: deleteBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-avatar-delete-cancel" data-id="${userId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-      : button(text("adminUserAvatarRemove"), {
-          action: "admin-user-avatar-delete-request",
-          id: userId,
-          disabled: state.offline || Boolean(state.busy),
-        })
+    ? chooseLazy(
+        confirming,
+        () =>
+          `<div class="actions"><span role="status">${escapeHtml(text("adminUserAvatarRemovePrompt"))}</span>${button(text("adminUserAvatarRemove"), { action: "admin-user-avatar-delete-confirm", id: userId, danger: true, busy: deleteBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-avatar-delete-cancel" data-id="${userId}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`,
+        () =>
+          button(text("adminUserAvatarRemove"), {
+            action: "admin-user-avatar-delete-request",
+            id: userId,
+            disabled: state.offline || Boolean(state.busy),
+          }),
+      )
     : "";
-  return `<section class="card" aria-label="${escapeHtml(text("adminUserAvatar"))}">${source ? `<img class="admin-user-avatar" src="${escapeHtml(source)}" alt="${escapeHtml(text("adminUserAvatar"))}"/>` : `<p>${escapeHtml(text("adminUserAvatarEmpty"))}</p>`}<label class="field" for="admin-user-avatar-file-${userId}">${escapeHtml(text("adminUserAvatar"))}<input id="admin-user-avatar-file-${userId}" type="file" accept="image/jpeg,image/png" data-admin-avatar-file="${userId}" ${state.offline || state.busy ? "disabled" : ""}/></label><p class="muted">${escapeHtml(text("adminUserAvatarHelp"))}</p>${error ? `<p class="field-error" role="alert">${escapeHtml(error)}</p>` : ""}<div class="actions">${button(text("adminUserAvatarUpload"), { action: "admin-user-avatar-upload", id: userId, busy: uploadBusy, disabled: state.offline })}${deleteControl}<button class="secondary-button" type="button" data-action="admin-user-avatar-close" data-id="${userId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminUserAvatar"))}">${source ? '<img class="admin-user-avatar" src="' + escapeHtml(source) + '" alt="' + escapeHtml(text("adminUserAvatar")) + '"/>' : "<p>" + escapeHtml(text("adminUserAvatarEmpty")) + "</p>"}<label class="field" for="admin-user-avatar-file-${userId}">${escapeHtml(text("adminUserAvatar"))}<input id="admin-user-avatar-file-${userId}" type="file" accept="image/jpeg,image/png" data-admin-avatar-file="${userId}" ${state.offline || state.busy ? "disabled" : ""}/></label><p class="muted">${escapeHtml(text("adminUserAvatarHelp"))}</p>${error ? '<p class="field-error" role="alert">' + escapeHtml(error) + "</p>" : ""}<div class="actions">${button(text("adminUserAvatarUpload"), { action: "admin-user-avatar-upload", id: userId, busy: uploadBusy, disabled: state.offline })}${deleteControl}<button class="secondary-button" type="button" data-action="admin-user-avatar-close" data-id="${userId}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
 }
 
 function adminUserPasskeysContent(userId) {
@@ -984,10 +1135,18 @@ function adminUserPasskeysContent(userId) {
       const deleteBusy = state.busy === `admin-passkey-delete:${target}`;
       const labelId = `admin-passkey-label-${userId}-${index}`;
       const renameForm = editing
-        ? `<form class="card" data-form="admin-user-passkey-rename" data-user-id="${escapeHtml(userId)}" data-passkey-index="${index}" novalidate><div class="field"><label for="${labelId}">${escapeHtml(text("adminPasskeyLabel"))}</label><input id="${labelId}" name="label" type="text" value="${escapeHtml(draft ?? passkey.label)}" maxlength="100" aria-invalid="${Boolean(errors.label)}" required/><div class="field-error">${escapeHtml(errors.label ?? "")}</div></div><div class="actions">${button(text("adminRenamePasskey"), { type: "submit", busy: renameBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-passkey-rename-cancel" data-id="${escapeHtml(userId)}" data-index="${index}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-user-passkey-rename" data-user-id="${escapeHtml(userId)}" data-passkey-index="${index}" novalidate><div class="field"><label for="${labelId}">${escapeHtml(text("adminPasskeyLabel"))}</label><input id="${labelId}" name="label" type="text" value="${escapeHtml(draft ?? passkey.label)}" maxlength="100" aria-invalid="${Boolean(errors.label)}" required/><div class="field-error">${escapeHtml(errors.label ?? "")}</div></div><div class="actions">${button(text("adminRenamePasskey"), { type: "submit", busy: renameBusy, disabled: state.offline })}<button class="secondary-button" type="button" data-action="admin-user-passkey-rename-cancel" data-id="${escapeHtml(userId)}" data-index="${index}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const deleteControls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeletePasskeyPrompt"))}</span>${button(text("adminDeletePasskey"), { action: "admin-user-passkey-delete-confirm", id: userId, index, danger: true, busy: deleteBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-passkey-delete-cancel" data-id="${escapeHtml(userId)}" data-index="${index}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeletePasskeyPrompt"))}</span>${button(text("adminDeletePasskey"), { action: "admin-user-passkey-delete-confirm", id: userId, index, danger: true, busy: deleteBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-user-passkey-delete-cancel" data-id="${escapeHtml(userId)}" data-index="${index}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : button(text("adminDeletePasskey"), {
             action: "admin-user-passkey-delete-request",
             id: userId,
@@ -1013,7 +1172,7 @@ function adminUserPasskeysContent(userId) {
     disabled:
       pageNumber + 1 >= totalPages || state.offline || Boolean(state.busy),
   });
-  return `<section class="card" aria-label="${escapeHtml(text("adminManagePasskeys"))}"><div class="actions"><h3>${escapeHtml(text("adminManagePasskeys"))}</h3><button class="secondary-button" type="button" data-action="admin-user-passkeys-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>${rows ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoPasskeys"))}</div>`}${totalPages > 1 ? `<div class="actions" aria-label="${escapeHtml(text("adminManagePasskeys"))} pagination">${previousPage}<span>${escapeHtml(text("adminPage"))} ${pageNumber + 1} / ${totalPages}</span>${nextPage}</div>` : ""}</section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminManagePasskeys"))}"><div class="actions"><h3>${escapeHtml(text("adminManagePasskeys"))}</h3><button class="secondary-button" type="button" data-action="admin-user-passkeys-close" data-id="${escapeHtml(userId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>${rows ? '<div class="list">' + rows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoPasskeys")) + "</div>"}${totalPages > 1 ? '<div class="actions" aria-label="' + escapeHtml(text("adminManagePasskeys")) + ' pagination">' + previousPage + "<span>" + escapeHtml(text("adminPage")) + " " + (pageNumber + 1) + " / " + totalPages + "</span>" + nextPage + "</div>" : ""}</section>`;
 }
 
 function adminUserPasskeyPath(userId, index) {
@@ -1061,9 +1220,11 @@ function adminUserCreateContent() {
           const type =
             definition.type === "EMAIL"
               ? "email"
-              : definition.type === "INTEGER"
-                ? "number"
-                : "text";
+              : chooseLazy(
+                  definition.type === "INTEGER",
+                  () => "number",
+                  () => "text",
+                );
           const constraints = [
             definition.minLength != null
               ? `minlength="${Number(definition.minLength)}"`
@@ -1083,7 +1244,7 @@ function adminUserCreateContent() {
         return `<div class="field"><label for="${id}">${label}</label>${input}<div class="field-error">${escapeHtml(error)}</div></div>`;
       })
       .join("");
-    return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><p role="status">${escapeHtml(text("adminUserCreatedProfileSaveFailed"))}</p><form data-form="admin-user-create" data-created-user-id="${createdUserId}" novalidate><div class="form-grid">${fields || `<div class="empty" role="status">${escapeHtml(text("adminNoProfileAttributes"))}</div>`}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "user-create-profile-save", disabled: state.offline || definitions.length === 0 })}</div></form></section>`;
+    return `<section class="card" aria-label="${escapeHtml(text("adminProfileAttributes"))}"><p role="status">${escapeHtml(text("adminUserCreatedProfileSaveFailed"))}</p><form data-form="admin-user-create" data-created-user-id="${createdUserId}" novalidate><div class="form-grid">${fields || '<div class="empty" role="status">' + escapeHtml(text("adminNoProfileAttributes")) + "</div>"}</div><p class="muted">${escapeHtml(text("adminProfileAttributesHelp"))}</p><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "user-create-profile-save", disabled: state.offline || definitions.length === 0 })}</div></form></section>`;
   }
   const draft = state.data.userCreateDraft ?? {};
   const roles = Array.isArray(state.data.userCreateRoles)
@@ -1114,9 +1275,11 @@ function adminUserCreateContent() {
       const type =
         definition.type === "EMAIL"
           ? "email"
-          : definition.type === "INTEGER"
-            ? "number"
-            : "text";
+          : chooseLazy(
+              definition.type === "INTEGER",
+              () => "number",
+              () => "text",
+            );
       const constraints = [
         definition.minLength != null
           ? `minlength="${Number(definition.minLength)}"`
@@ -1132,7 +1295,28 @@ function adminUserCreateContent() {
       return `<div class="field"><label for="${id}">${label}</label><input ${common} type="${type}" value="${escapeHtml(values[0] ?? "")}" ${constraints}/><div class="field-error">${escapeHtml(error)}</div></div>`;
     })
     .join("");
-  return `<section class="card"><form data-form="admin-user-create" novalidate><div class="form-grid">${field("username", text("username"), draft.username ?? "", errors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), draft.firstName ?? "", errors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), draft.lastName ?? "", errors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), draft.email ?? "", errors.email, "email", 'maxlength="200" autocomplete="email"')}${field("password", text("newPassword"), "", errors.password, "password", 'minlength="12" maxlength="128" autocomplete="new-password" required')}${profileFields}</div><label class="settings-row"><input type="checkbox" name="temporary" ${draft.temporary ? "checked" : ""}/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><label class="settings-row"><input type="checkbox" name="emailVerified" ${draft.emailVerified ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${draft.enabled !== false ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${roles.length ? roles.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error" id="roles-error">${escapeHtml(errors.roles ?? "")}</div></fieldset><div class="actions">${button(text("adminCreateUser"), { type: "submit", busy: state.busy === "user-create", disabled: state.offline || roles.length === 0 || !state.data.userCreateProfileDefinitionsLoaded })}</div></form></section>`;
+  return `<section class="card"><form data-form="admin-user-create" novalidate><div class="form-grid">${field("username", text("username"), draft.username ?? "", errors.username, "text", 'maxlength="100" autocomplete="username" required')}${field("firstName", text("firstName"), draft.firstName ?? "", errors.firstName, "text", 'maxlength="100" autocomplete="given-name"')}${field("lastName", text("lastName"), draft.lastName ?? "", errors.lastName, "text", 'maxlength="100" autocomplete="family-name"')}${field("email", text("email"), draft.email ?? "", errors.email, "email", 'maxlength="200" autocomplete="email"')}${field("password", text("newPassword"), "", errors.password, "password", 'minlength="12" maxlength="128" autocomplete="new-password" required')}${profileFields}</div><label class="settings-row"><input type="checkbox" name="temporary" ${draft.temporary ? "checked" : ""}/>${escapeHtml(text("adminUserTemporaryPassword"))}</label><label class="settings-row"><input type="checkbox" name="emailVerified" ${draft.emailVerified ? "checked" : ""}/>${escapeHtml(text("adminUserEmailVerified"))}</label><label class="settings-row"><input type="checkbox" name="enabled" ${draft.enabled !== false ? "checked" : ""}/>${escapeHtml(text("adminEnabled"))}</label><fieldset class="field"><legend>${escapeHtml(text("adminRoles"))}</legend>${
+    roles.length
+      ? roles
+          .map(
+            (role) =>
+              '<label class="settings-row"><input type="checkbox" name="roles" value="' +
+              escapeHtml(role.name) +
+              '" ' +
+              chooseLazy(
+                selectedRoles.includes(role.name),
+                () => "checked",
+                () => "",
+              ) +
+              "/>" +
+              escapeHtml(role.name) +
+              "</label>",
+          )
+          .join("")
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoRoles")) +
+        "</div>"
+  }<div class="field-error" id="roles-error">${escapeHtml(errors.roles ?? "")}</div></fieldset><div class="actions">${button(text("adminCreateUser"), { type: "submit", busy: state.busy === "user-create", disabled: state.offline || roles.length === 0 || !state.data.userCreateProfileDefinitionsLoaded })}</div></form></section>`;
 }
 
 function adminRolesContent() {
@@ -1153,7 +1337,11 @@ function adminRolesContent() {
       const confirming = state.data.roleDeleteConfirmName === role.name;
       const descriptionId = `role-description-${role.name}`;
       const deleteControls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteRolePrompt"))}</span>${button(text("adminDeleteRole"), { action: "admin-role-delete-confirm", id: role.name, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteRolePrompt"))}</span>${button(text("adminDeleteRole"), { action: "admin-role-delete-confirm", id: role.name, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-delete-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminDeleteRole"), { action: "admin-role-delete-request", id: role.name, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       const composition = state.data.adminRoleCompositions?.[role.name];
       const compositionButton = state.data.adminAccess?.manageRoles
@@ -1170,7 +1358,7 @@ function adminRolesContent() {
       return `<article class="list-item" data-role-name="${escapeHtml(role.name)}"><strong>${escapeHtml(role.name)}</strong><form class="actions" data-form="admin-role-edit" data-role-name="${escapeHtml(role.name)}"><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminRoleDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? role.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(roleErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form>${compositionButton}${compositionPanel}${deleteControls}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminRoles"))}"><form id="admin-role-search" class="actions" role="search"><input id="admin-role-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchRoles"))}" value="${escapeHtml(state.data.roleQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchRoles"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "roles-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "roles-search")}${escapeHtml(text("adminSearchRoles"))}</button></form>${roles.length ? `<div class="list">${roleRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminRoles"))} pagination"><button class="secondary-button" type="button" data-role-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-role-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminRoles"))}"><form id="admin-role-search" class="actions" role="search"><input id="admin-role-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchRoles"))}" value="${escapeHtml(state.data.roleQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchRoles"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "roles-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "roles-search")}${escapeHtml(text("adminSearchRoles"))}</button></form>${roles.length ? '<div class="list">' + roleRows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoRoles")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminRoles"))} pagination"><button class="secondary-button" type="button" data-role-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-role-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "roles-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminRoleCompositionPanel(roleName, composition) {
@@ -1208,9 +1396,17 @@ function adminRoleCompositionPanel(roleName, composition) {
           const confirming = composition.removeConfirmName === name;
           const busy =
             state.busy === `role-composite-remove:${roleName}:${name}`;
-          const controls = confirming
-            ? `<div class="actions"><span role="status">${escapeHtml(text("adminRoleCompositeRemoveConfirm"))}</span>${button(text("adminRoleCompositeRemove"), { action: "admin-role-composite-remove-confirm", id: roleName, child: name, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-composite-remove-cancel" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-            : `<div class="actions">${button(text("adminRoleCompositeRemove"), { action: "admin-role-composite-remove-request", id: roleName, child: name, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          const controls = chooseLazy(
+            confirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminRoleCompositeRemoveConfirm"))}</span>${button(text("adminRoleCompositeRemove"), { action: "admin-role-composite-remove-confirm", id: roleName, child: name, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-composite-remove-cancel" data-id="${escapeHtml(roleName)}" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminRoleCompositeRemove"), { action: "admin-role-composite-remove-request", id: roleName, child: name, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
           return `<article class="list-item"><strong>${escapeHtml(name)}</strong>${controls}</article>`;
         })
         .join("")
@@ -1219,7 +1415,7 @@ function adminRoleCompositionPanel(roleName, composition) {
     .filter((candidate) => !roleNames.includes(candidate.name))
     .map(
       (candidate) =>
-        `<article class="list-item"><div><strong>${escapeHtml(candidate.name)}</strong><span class="muted">${escapeHtml(candidate.description ?? "")}</span></div>${button(text("adminRoleCompositeAdd"), { action: "admin-role-composite-add", id: roleName, child: candidate.name, busy: state.busy === `role-composite-add:${roleName}:${candidate.name}`, disabled: state.offline || Boolean(state.busy) })}</article>`,
+        `<article class="list-item"><div><strong>${escapeHtml(candidate.name)}</strong><span class="muted">${escapeHtml(candidate.description ?? "")}</span></div>${button(text("adminRoleCompositeAdd"), { action: "admin-role-composite-add", id: roleName, child: candidate.name, busy: state.busy === "role-composite-add:" + roleName + ":" + candidate.name + "", disabled: state.offline || Boolean(state.busy) })}</article>`,
     )
     .join("");
   const clientRoleRows = clientRoles.length
@@ -1229,9 +1425,17 @@ function adminRoleCompositionPanel(roleName, composition) {
           const confirming = composition.removeClientConfirmId === roleId;
           const busy =
             state.busy === `role-client-composite-remove:${roleName}:${roleId}`;
-          const controls = confirming
-            ? `<div class="actions"><span role="status">${escapeHtml(text("adminRoleCompositeClientRemoveConfirm"))}</span>${button(text("adminRoleCompositeClientRemove"), { action: "admin-role-client-composite-remove-confirm", id: roleName, clientRoleId: roleId, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-client-composite-remove-cancel" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-            : `<div class="actions">${button(text("adminRoleCompositeClientRemove"), { action: "admin-role-client-composite-remove-request", id: roleName, clientRoleId: roleId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          const controls = chooseLazy(
+            confirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminRoleCompositeClientRemoveConfirm"))}</span>${button(text("adminRoleCompositeClientRemove"), { action: "admin-role-client-composite-remove-confirm", id: roleName, clientRoleId: roleId, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-role-client-composite-remove-cancel" data-id="${escapeHtml(roleName)}" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminRoleCompositeClientRemove"), { action: "admin-role-client-composite-remove-request", id: roleName, clientRoleId: roleId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
           return `<article class="list-item"><div><strong>${escapeHtml(role.clientId)} / ${escapeHtml(role.name)}</strong><span class="muted">${escapeHtml(role.description ?? "")}</span></div>${controls}</article>`;
         })
         .join("")
@@ -1243,14 +1447,14 @@ function adminRoleCompositionPanel(roleName, composition) {
     )
     .map(
       (candidate) =>
-        `<article class="list-item"><div><strong>${escapeHtml(candidate.clientId)} / ${escapeHtml(candidate.name)}</strong><span class="muted">${escapeHtml(candidate.description ?? "")}</span></div>${button(text("adminRoleCompositeClientAdd"), { action: "admin-role-client-composite-add", id: roleName, clientRoleId: candidate.id, busy: state.busy === `role-client-composite-add:${roleName}:${candidate.id}`, disabled: state.offline || Boolean(state.busy) })}</article>`,
+        `<article class="list-item"><div><strong>${escapeHtml(candidate.clientId)} / ${escapeHtml(candidate.name)}</strong><span class="muted">${escapeHtml(candidate.description ?? "")}</span></div>${button(text("adminRoleCompositeClientAdd"), { action: "admin-role-client-composite-add", id: roleName, clientRoleId: candidate.id, busy: state.busy === "role-client-composite-add:" + roleName + ":" + candidate.id + "", disabled: state.offline || Boolean(state.busy) })}</article>`,
     )
     .join("");
   const loading = state.busy === `role-compositions:${roleName}`;
   const searching = state.busy === `role-composite-search:${roleName}`;
   const clientSearching =
     state.busy === `role-client-composite-search:${roleName}`;
-  return `<section class="card" data-role-composition="${escapeHtml(roleName)}" aria-label="${escapeHtml(text("adminRoleCompositesTitle"))}"><h3>${escapeHtml(text("adminRoleCompositesTitle"))}</h3><p class="muted">${escapeHtml(text("adminRoleCompositesHelp"))}</p>${loading ? `<div role="status">${escapeHtml(text("loading"))}</div>` : rows}<div class="actions"><input name="q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeSearch"))}" value="${escapeHtml(composition.query ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeSearch"), { action: "admin-role-composite-search", id: roleName, busy: searching, disabled: state.offline || Boolean(state.busy) })}</div>${candidateRows}<h3>${escapeHtml(text("adminRoleCompositeClientTitle"))}</h3>${loading ? `<div role="status">${escapeHtml(text("loading"))}</div>` : clientRoleRows}<div class="actions"><input name="client-q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeClientSearch"))}" value="${escapeHtml(composition.clientQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeClientSearch"), { action: "admin-role-client-composite-search", id: roleName, busy: clientSearching, disabled: state.offline || Boolean(state.busy) })}</div>${clientCandidateRows}<button class="secondary-button" type="button" data-action="admin-role-compositions-close" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
+  return `<section class="card" data-role-composition="${escapeHtml(roleName)}" aria-label="${escapeHtml(text("adminRoleCompositesTitle"))}"><h3>${escapeHtml(text("adminRoleCompositesTitle"))}</h3><p class="muted">${escapeHtml(text("adminRoleCompositesHelp"))}</p>${loading ? '<div role="status">' + escapeHtml(text("loading")) + "</div>" : rows}<div class="actions"><input name="q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeSearch"))}" value="${escapeHtml(composition.query ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeSearch"), { action: "admin-role-composite-search", id: roleName, busy: searching, disabled: state.offline || Boolean(state.busy) })}</div>${candidateRows}<h3>${escapeHtml(text("adminRoleCompositeClientTitle"))}</h3>${loading ? '<div role="status">' + escapeHtml(text("loading")) + "</div>" : clientRoleRows}<div class="actions"><input name="client-q" type="search" aria-label="${escapeHtml(text("adminRoleCompositeClientSearch"))}" value="${escapeHtml(composition.clientQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminRoleCompositeClientSearch"), { action: "admin-role-client-composite-search", id: roleName, busy: clientSearching, disabled: state.offline || Boolean(state.busy) })}</div>${clientCandidateRows}<button class="secondary-button" type="button" data-action="admin-role-compositions-close" data-id="${escapeHtml(roleName)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
 }
 
 function adminRoleCreateContent() {
@@ -1272,7 +1476,11 @@ function adminGroupsContent() {
         Number(state.data.groupDeleteConfirmId) === Number(group.id);
       const busy = state.busy === `group-delete:${group.id}`;
       const controls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteGroupPrompt"))}</span>${button(text("adminDeleteGroup"), { action: "admin-group-delete-confirm", id: group.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteGroupPrompt"))}</span>${button(text("adminDeleteGroup"), { action: "admin-group-delete-confirm", id: group.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-delete-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminDeleteGroup"), { action: "admin-group-delete-request", id: group.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       const memberState = state.data.groupMembers?.[group.id];
       const memberPanel =
@@ -1310,15 +1518,46 @@ function adminGroupsContent() {
         ? renderGroupPermissions(group.id)
         : "";
       const nameForm = editingName
-        ? `<form class="card" data-form="admin-group-rename" data-group-id="${escapeHtml(group.id)}"><div class="field"><label for="group-name-${escapeHtml(group.id)}">${escapeHtml(text("adminGroupName"))}</label><input id="group-name-${escapeHtml(group.id)}" name="name" type="text" value="${escapeHtml(nameDraft.name ?? group.name ?? "")}" maxlength="100" required/><div class="field-error">${escapeHtml(nameErrors.name ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-name-update:${group.id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-name-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-group-rename" data-group-id="${escapeHtml(group.id)}"><div class="field"><label for="group-name-${escapeHtml(group.id)}">${escapeHtml(text("adminGroupName"))}</label><input id="group-name-${escapeHtml(group.id)}" name="name" type="text" value="${escapeHtml(nameDraft.name ?? group.name ?? "")}" maxlength="100" required/><div class="field-error">${escapeHtml(nameErrors.name ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "group-name-update:" + group.id + "", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-name-cancel" data-id="${escapeHtml(group.id)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const roleForm = editingRoles
-        ? `<form class="card" data-form="admin-group-roles" data-group-id="${escapeHtml(group.id)}"><fieldset class="field"><legend>${escapeHtml(text("adminEditGroupRoles"))}</legend>${roleCatalog.length ? roleCatalog.map((role) => `<label class="settings-row"><input type="checkbox" name="roles" value="${escapeHtml(role.name)}" ${selectedRoles.includes(role.name) ? "checked" : ""}/>${escapeHtml(role.name)}</label>`).join("") : `<div class="empty" role="status">${escapeHtml(text("adminNoRoles"))}</div>`}<div class="field-error">${escapeHtml(roleErrors.roles ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `group-roles-update:${group.id}`, disabled: state.offline || Boolean(state.busy) || roleCatalog.length === 0 })}<button class="secondary-button" type="button" data-action="admin-group-roles-cancel" data-id="${escapeHtml(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-group-roles" data-group-id="${escapeHtml(group.id)}"><fieldset class="field"><legend>${escapeHtml(text("adminEditGroupRoles"))}</legend>${chooseLazy(
+            roleCatalog.length,
+            () =>
+              roleCatalog
+                .map(
+                  (role) =>
+                    '<label class="settings-row"><input type="checkbox" name="roles" value="' +
+                    escapeHtml(role.name) +
+                    '" ' +
+                    chooseLazy(
+                      selectedRoles.includes(role.name),
+                      () => "checked",
+                      () => "",
+                    ) +
+                    "/>" +
+                    escapeHtml(role.name) +
+                    "</label>",
+                )
+                .join(""),
+            () =>
+              '<div class="empty" role="status">' +
+              escapeHtml(text("adminNoRoles")) +
+              "</div>",
+          )}<div class="field-error">${escapeHtml(roleErrors.roles ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "group-roles-update:" + group.id + "", disabled: state.offline || Boolean(state.busy) || roleCatalog.length === 0 })}<button class="secondary-button" type="button" data-action="admin-group-roles-cancel" data-id="${escapeHtml(group.id)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
-      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminCreateChildGroup"), { action: "admin-group-child-create-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupName"), { action: "admin-group-name-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === `group-role-catalog:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === `group-members:${group.id}`, disabled: Boolean(state.busy) })}${button(text("adminManageGroupPermissions"), { action: "admin-group-permissions-toggle", id: group.id, busy: state.busy === `group-permissions:${group.id}`, disabled: state.offline || Boolean(state.busy) })}${controls}</div>${childCreateForm}${groupPermissionsPanel}${nameForm}${roleForm}${memberPanel}</article>`;
+      return `<article class="list-item" data-group-id="${escapeHtml(group.id)}"><div><strong>${escapeHtml(group.path || group.name)}</strong><span class="muted">${escapeHtml((group.effectiveRoles ?? group.roles ?? []).join(", "))}</span><span>${Number.isSafeInteger(group.userCount) ? group.userCount : 0}</span></div><div>${button(text("adminCreateChildGroup"), { action: "admin-group-child-create-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupName"), { action: "admin-group-name-toggle", id: group.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminEditGroupRoles"), { action: "admin-group-roles-toggle", id: group.id, busy: state.busy === "group-role-catalog:" + group.id + "", disabled: state.offline || Boolean(state.busy) })}${button(text("adminManageGroupMembers"), { action: "admin-group-members-toggle", id: group.id, busy: state.busy === "group-members:" + group.id + "", disabled: Boolean(state.busy) })}${button(text("adminManageGroupPermissions"), { action: "admin-group-permissions-toggle", id: group.id, busy: state.busy === "group-permissions:" + group.id + "", disabled: state.offline || Boolean(state.busy) })}${controls}</div>${childCreateForm}${groupPermissionsPanel}${nameForm}${roleForm}${memberPanel}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminGroups"))}"><form id="admin-group-search" class="actions" role="search"><input id="admin-group-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchGroups"))}" value="${escapeHtml(state.data.groupQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchGroups"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "groups-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "groups-search")}${escapeHtml(text("adminSearchGroups"))}</button></form>${groups.length ? '<div class="list">' + rows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoGroups")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminGroups"))} pagination"><button class="secondary-button" type="button" data-group-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-group-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "groups-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function renderGroupChildCreateForm(group) {
@@ -1348,7 +1587,24 @@ function renderGroupPermissions(groupId) {
     ? draft
         .map(
           (assignment, index) =>
-            `<div class="list-item" data-group-permission-index="${index}"><div><strong>${escapeHtml(assignment.username)}</strong><select name="permission" aria-label="${escapeHtml(text("adminGroupPermission"))} ${escapeHtml(assignment.username)}">${permissionOptions.map((permission) => `<option value="${permission}" ${assignment.permission === permission ? "selected" : ""}>${permission}</option>`).join("")}</select></div>${button(text("adminRemoveGroupPermission"), { action: "admin-group-permission-remove", id: index, provider: groupId, danger: true, disabled: Boolean(state.busy) })}</div>`,
+            `<div class="list-item" data-group-permission-index="${index}"><div><strong>${escapeHtml(assignment.username)}</strong><select name="permission" aria-label="${escapeHtml(text("adminGroupPermission"))} ${escapeHtml(assignment.username)}">${permissionOptions
+              .map(
+                (permission) =>
+                  '<option value="' +
+                  permission +
+                  '" ' +
+                  chooseLazy(
+                    assignment.permission === permission,
+                    () => "selected",
+                    () => "",
+                  ) +
+                  ">" +
+                  permission +
+                  "</option>",
+              )
+              .join(
+                "",
+              )}</select></div>${button(text("adminRemoveGroupPermission"), { action: "admin-group-permission-remove", id: index, provider: groupId, danger: true, disabled: Boolean(state.busy) })}</div>`,
         )
         .join("")
     : `<div class="empty" role="status">${escapeHtml(text("adminNoGroupPermissions"))}</div>`;
@@ -1364,7 +1620,7 @@ function renderGroupPermissions(groupId) {
         `<option value="${escapeHtml(user.id)}">${escapeHtml(user.username)}</option>`,
     )
     .join("");
-  return `<form class="card" data-form="admin-group-permissions" data-group-id="${escapeHtml(groupId)}"><h3>${escapeHtml(text("adminGroupPermissions"))}</h3><div class="list">${rows}</div><div class="field"><label for="group-permission-user-${escapeHtml(groupId)}">${escapeHtml(text("adminUsers"))}</label><select id="group-permission-user-${escapeHtml(groupId)}" name="newUserId">${availableUsers}</select></div><div class="field"><label for="group-permission-kind-${escapeHtml(groupId)}">${escapeHtml(text("adminGroupPermission"))}</label><select id="group-permission-kind-${escapeHtml(groupId)}" name="newPermission">${permissionOptions.map((permission) => `<option value="${permission}">${permission}</option>`).join("")}</select></div><div class="actions">${button(text("adminAddGroupPermission"), { action: "admin-group-permission-add", id: groupId, disabled: state.offline || Boolean(state.busy) || draft.length >= 200 || users.length === 0 })}${button(text("save"), { type: "submit", busy: state.busy === `group-permissions-save:${groupId}`, disabled: state.offline || Boolean(state.busy) })}</div></form>`;
+  return `<form class="card" data-form="admin-group-permissions" data-group-id="${escapeHtml(groupId)}"><h3>${escapeHtml(text("adminGroupPermissions"))}</h3><div class="list">${rows}</div><div class="field"><label for="group-permission-user-${escapeHtml(groupId)}">${escapeHtml(text("adminUsers"))}</label><select id="group-permission-user-${escapeHtml(groupId)}" name="newUserId">${availableUsers}</select></div><div class="field"><label for="group-permission-kind-${escapeHtml(groupId)}">${escapeHtml(text("adminGroupPermission"))}</label><select id="group-permission-kind-${escapeHtml(groupId)}" name="newPermission">${permissionOptions.map((permission) => '<option value="' + permission + '">' + permission + "</option>").join("")}</select></div><div class="actions">${button(text("adminAddGroupPermission"), { action: "admin-group-permission-add", id: groupId, disabled: state.offline || Boolean(state.busy) || draft.length >= 200 || users.length === 0 })}${button(text("save"), { type: "submit", busy: state.busy === "group-permissions-save:" + groupId + "", disabled: state.offline || Boolean(state.busy) })}</div></form>`;
 }
 
 function renderGroupMembers(groupId, memberState) {
@@ -1383,7 +1639,46 @@ function renderGroupMembers(groupId, memberState) {
           const confirming = Number(removeConfirmId) === Number(user.id);
           const busy =
             state.busy === `group-member-remove:${groupId}:${user.id}`;
-          return `<div class="list-item"><div><strong>${escapeHtml(user.username)}</strong><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div>${confirming ? `<div class="actions"><span role="status">${escapeHtml(text("adminRemoveGroupUserPrompt"))}</span>${button(text("adminRemoveGroupUser"), { action: "admin-group-member-remove-confirm", id: user.id, provider: groupId, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-group-member-remove-cancel" data-provider="${escapeHtml(groupId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>` : button(text("adminRemoveGroupUser"), { action: "admin-group-member-remove-request", id: user.id, provider: groupId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          return `<div class="list-item"><div><strong>${escapeHtml(user.username)}</strong><span>${escapeHtml(
+            chooseLazy(
+              user.enabled,
+              () => text("adminUserEnabled"),
+              () => text("adminUserDisabled"),
+            ),
+          )}</span></div>${chooseLazy(
+            confirming,
+            () =>
+              '<div class="actions"><span role="status">' +
+              escapeHtml(text("adminRemoveGroupUserPrompt")) +
+              "</span>" +
+              button(text("adminRemoveGroupUser"), {
+                action: "admin-group-member-remove-confirm",
+                id: user.id,
+                provider: groupId,
+                danger: true,
+                busy,
+                disabled: state.offline || Boolean(state.busy),
+              }) +
+              '<button class="secondary-button" type="button" data-action="admin-group-member-remove-cancel" data-provider="' +
+              escapeHtml(groupId) +
+              '" ' +
+              chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              ) +
+              ">" +
+              escapeHtml(text("cancel")) +
+              "</button></div>",
+            () =>
+              button(text("adminRemoveGroupUser"), {
+                action: "admin-group-member-remove-request",
+                id: user.id,
+                provider: groupId,
+                danger: true,
+                disabled: state.offline || Boolean(state.busy),
+              }),
+          )}</div>`;
         })
         .join("")
     : `<div class="empty" role="status">${escapeHtml(text("adminNoGroupMembers"))}</div>`;
@@ -1391,7 +1686,13 @@ function renderGroupMembers(groupId, memberState) {
     ? available
         .map((user) => {
           const busy = state.busy === `group-member-add:${groupId}:${user.id}`;
-          return `<div class="list-item"><div><strong>${escapeHtml(user.username)}</strong><span>${escapeHtml(user.enabled ? text("adminUserEnabled") : text("adminUserDisabled"))}</span></div>${button(text("adminAddGroupUser"), { action: "admin-group-member-add", id: user.id, provider: groupId, busy, disabled: state.offline || Boolean(state.busy) })}</div>`;
+          return `<div class="list-item"><div><strong>${escapeHtml(user.username)}</strong><span>${escapeHtml(
+            chooseLazy(
+              user.enabled,
+              () => text("adminUserEnabled"),
+              () => text("adminUserDisabled"),
+            ),
+          )}</span></div>${button(text("adminAddGroupUser"), { action: "admin-group-member-add", id: user.id, provider: groupId, busy, disabled: state.offline || Boolean(state.busy) })}</div>`;
         })
         .join("")
     : `<div class="empty" role="status">${escapeHtml(text("adminNoAvailableUsers"))}</div>`;
@@ -1468,19 +1769,44 @@ function clientScopeRoleMappingPanel(scopeId) {
     roles.length
       ? roles
           .map((role) => {
-            const value = kind === "applicationRoles" ? role.name : role.id;
-            const label =
-              kind === "applicationRoles"
-                ? role.name
-                : `${role.clientId ? `${role.clientId} · ` : ""}${role.name}`;
-            const description = role.description
-              ? `<span class="muted">${escapeHtml(role.description)}</span>`
-              : "";
-            return `<label class="settings-row"><span><strong>${escapeHtml(label)}</strong>${description}</span><input type="checkbox" name="${kind}" value="${escapeHtml(value)}" ${selected.some((entry) => String(entry) === String(value)) ? "checked" : ""}/></label>`;
+            const value = chooseLazy(
+              kind === "applicationRoles",
+              () => role.name,
+              () => role.id,
+            );
+            const label = chooseLazy(
+              kind === "applicationRoles",
+              () => role.name,
+              () =>
+                `${chooseLazy(
+                  role.clientId,
+                  () => "" + role.clientId + " · ",
+                  () => "",
+                )}${role.name}`,
+            );
+            const description = chooseLazy(
+              role.description,
+              () =>
+                `<span class="muted">${escapeHtml(role.description)}</span>`,
+              () => "",
+            );
+            return `<label class="settings-row"><span><strong>${escapeHtml(label)}</strong>${description}</span><input type="checkbox" name="${kind}" value="${escapeHtml(value)}" ${chooseLazy(
+              selected.some((entry) => String(entry) === String(value)),
+              () => "checked",
+              () => "",
+            )}/></label>`;
           })
           .join("")
-      : `<div class="empty" role="status">${escapeHtml(text(kind === "applicationRoles" ? "adminNoApplicationRoles" : "adminNoClientRoles"))}</div>`;
-  return `<section class="card" data-client-scope-role-mappings-panel="true" data-scope-id="${escapeHtml(scopeId)}"><h3>${escapeHtml(text("adminClientScopeRoleMappings"))}</h3><fieldset><legend>${escapeHtml(text("adminApplicationRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="applicationRoles"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchApplicationRoles"))}" value="${escapeHtml(applicationQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === `client-scope-role-candidates:${scopeId}:applicationRoles` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-scope-role-candidates:${scopeId}:applicationRoles`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(applicationRoles, "applicationRoles", applicationRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) - 1}" ${Number(applicationPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:applicationRoles`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${applicationPage.totalPages ? Number(applicationPage.number) + 1 : 0} / ${Number(applicationPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) + 1}" ${Number(applicationPage.number ?? 0) + 1 >= Number(applicationPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:applicationRoles`)}${escapeHtml(text("adminNext"))}</button></div></fieldset><fieldset><legend>${escapeHtml(text("adminClientRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="clientRoleIds"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchClientRoles"))}" value="${escapeHtml(clientQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === `client-scope-role-candidates:${scopeId}:clientRoleIds` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-scope-role-candidates:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(clientRoles, "clientRoleIds", clientRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) - 1}" ${Number(clientPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${clientPage.totalPages ? Number(clientPage.number) + 1 : 0} / ${Number(clientPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) + 1}" ${Number(clientPage.number ?? 0) + 1 >= Number(clientPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === `client-scope-role-page:${scopeId}:clientRoleIds`)}${escapeHtml(text("adminNext"))}</button></div></fieldset><div class="actions">${button(text("save"), { action: "admin-client-scope-role-mappings-save", id: scopeId, busy: state.busy === `client-scope-role-mappings-save:${scopeId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-role-mappings-cancel" data-id="${escapeHtml(scopeId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
+      : `<div class="empty" role="status">${escapeHtml(
+          text(
+            chooseLazy(
+              kind === "applicationRoles",
+              () => "adminNoApplicationRoles",
+              () => "adminNoClientRoles",
+            ),
+          ),
+        )}</div>`;
+  return `<section class="card" data-client-scope-role-mappings-panel="true" data-scope-id="${escapeHtml(scopeId)}"><h3>${escapeHtml(text("adminClientScopeRoleMappings"))}</h3><fieldset><legend>${escapeHtml(text("adminApplicationRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="applicationRoles"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchApplicationRoles"))}" value="${escapeHtml(applicationQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === "client-scope-role-candidates:" + scopeId + ":applicationRoles" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scope-role-candidates:" + scopeId + ":applicationRoles")}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(applicationRoles, "applicationRoles", applicationRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) - 1}" ${Number(applicationPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scope-role-page:" + scopeId + ":applicationRoles")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${applicationPage.totalPages ? Number(applicationPage.number) + 1 : 0} / ${Number(applicationPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="applicationRoles" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(applicationPage.number ?? 0) + 1}" ${Number(applicationPage.number ?? 0) + 1 >= Number(applicationPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scope-role-page:" + scopeId + ":applicationRoles")}${escapeHtml(text("adminNext"))}</button></div></fieldset><fieldset><legend>${escapeHtml(text("adminClientRoles"))}</legend><form class="actions" data-form="admin-client-scope-role-candidate-search" data-scope-id="${escapeHtml(scopeId)}" data-role-kind="clientRoleIds"><input type="search" name="q" aria-label="${escapeHtml(text("adminSearchClientRoles"))}" value="${escapeHtml(clientQuery)}" maxlength="200"/><button class="secondary-button" type="submit" ${state.busy === "client-scope-role-candidates:" + scopeId + ":clientRoleIds" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scope-role-candidates:" + scopeId + ":clientRoleIds")}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${candidateList(clientRoles, "clientRoleIds", clientRoleDraft)}<div class="actions"><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) - 1}" ${Number(clientPage.number ?? 0) <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scope-role-page:" + scopeId + ":clientRoleIds")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${clientPage.totalPages ? Number(clientPage.number) + 1 : 0} / ${Number(clientPage.totalPages ?? 0)}</span><button class="secondary-button" type="button" data-client-scope-role-page="clientRoleIds" data-scope-id="${escapeHtml(scopeId)}" data-page="${Number(clientPage.number ?? 0) + 1}" ${Number(clientPage.number ?? 0) + 1 >= Number(clientPage.totalPages ?? 0) || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scope-role-page:" + scopeId + ":clientRoleIds")}${escapeHtml(text("adminNext"))}</button></div></fieldset><div class="actions">${button(text("save"), { action: "admin-client-scope-role-mappings-save", id: scopeId, busy: state.busy === "client-scope-role-mappings-save:" + scopeId + "", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-role-mappings-cancel" data-id="${escapeHtml(scopeId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></section>`;
 }
 
 function clientScopeMappersPanel(scopeId) {
@@ -1517,7 +1843,44 @@ function clientScopeMappersPanel(scopeId) {
   ];
   const editorForm =
     editor?.scopeId === scopeId
-      ? `<form class="card" data-form="admin-client-scope-mapper" data-scope-id="${escapeHtml(scopeId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(text(mapperId ? "adminEditClientScopeMapper" : "adminCreateClientScopeMapper"))}</h3>${field("name", text("adminClientScopeMapperName"), draft.name ?? mapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("source", text("adminClientScopeMapperSource"), draft.source ?? mapper?.source ?? "", errors.source, "text", 'maxlength="200"')}<div class="field"><label for="client-scope-mapper-type">${escapeHtml(text("adminClientScopeMapperType"))}</label><select id="client-scope-mapper-type" name="mapperType">${options.map((option) => `<option value="${option}" ${(draft.mapperType ?? mapper?.mapperType ?? "email") === option ? "selected" : ""}>${option}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div>${field("claimName", text("adminClientScopeMapperClaim"), draft.claimName ?? mapper?.claimName ?? "email", errors.claimName, "text", 'maxlength="200"')}${field("value", text("adminClientScopeMapperValue"), draft.value ?? mapper?.value ?? "", errors.value, "text", 'maxlength="1000"')}${field("priority", text("adminClientScopeMapperPriority"), draft.priority ?? mapper?.priority ?? 100, errors.priority, "number", 'min="0" max="10000" step="1"')}<label class="settings-row"><input type="checkbox" name="addToIdToken" ${(draft.addToIdToken ?? mapper?.addToIdToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${(draft.addToAccessToken ?? mapper?.addToAccessToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-mapper-editor-cancel" data-id="${escapeHtml(scopeId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+      ? `<form class="card" data-form="admin-client-scope-mapper" data-scope-id="${escapeHtml(scopeId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(
+          text(
+            chooseLazy(
+              mapperId,
+              () => "adminEditClientScopeMapper",
+              () => "adminCreateClientScopeMapper",
+            ),
+          ),
+        )}</h3>${field("name", text("adminClientScopeMapperName"), draft.name ?? mapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("source", text("adminClientScopeMapperSource"), draft.source ?? mapper?.source ?? "", errors.source, "text", 'maxlength="200"')}<div class="field"><label for="client-scope-mapper-type">${escapeHtml(text("adminClientScopeMapperType"))}</label><select id="client-scope-mapper-type" name="mapperType">${options
+          .map(
+            (option) =>
+              '<option value="' +
+              option +
+              '" ' +
+              chooseLazy(
+                (draft.mapperType ?? mapper?.mapperType ?? "email") === option,
+                () => "selected",
+                () => "",
+              ) +
+              ">" +
+              option +
+              "</option>",
+          )
+          .join(
+            "",
+          )}</select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div>${field("claimName", text("adminClientScopeMapperClaim"), draft.claimName ?? mapper?.claimName ?? "email", errors.claimName, "text", 'maxlength="200"')}${field("value", text("adminClientScopeMapperValue"), draft.value ?? mapper?.value ?? "", errors.value, "text", 'maxlength="1000"')}${field("priority", text("adminClientScopeMapperPriority"), draft.priority ?? mapper?.priority ?? 100, errors.priority, "number", 'min="0" max="10000" step="1"')}<label class="settings-row"><input type="checkbox" name="addToIdToken" ${chooseLazy(
+          draft.addToIdToken ?? mapper?.addToIdToken ?? true,
+          () => "checked",
+          () => "",
+        )}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${chooseLazy(
+          draft.addToAccessToken ?? mapper?.addToAccessToken ?? true,
+          () => "checked",
+          () => "",
+        )}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-mapper-editor-cancel" data-id="${escapeHtml(scopeId)}" ${chooseLazy(
+          state.busy,
+          () => "disabled",
+          () => "",
+        )}>${escapeHtml(text("cancel"))}</button></div></form>`
       : "";
   const deleteConfirm = state.data.clientScopeMapperDeleteConfirm;
   const rows = mappers.length
@@ -1528,10 +1891,26 @@ function clientScopeMappersPanel(scopeId) {
             deleteConfirm?.mapperId === String(item.id);
           const deleting =
             state.busy === `client-scope-mapper-delete:${scopeId}:${item.id}`;
-          const controls = confirming
-            ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopeMapperPrompt"))}</span>${button(text("adminDeleteClientScopeMapper"), { action: "admin-client-scope-mapper-delete-confirm", id: scopeId, mapper: item.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-mapper-delete-cancel" data-id="${escapeHtml(scopeId)}" data-mapper="${escapeHtml(item.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-            : `<div class="actions">${button(text("adminEditClientScopeMapper"), { action: "admin-client-scope-mapper-edit", id: scopeId, mapper: item.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientScopeMapper"), { action: "admin-client-scope-mapper-delete-request", id: scopeId, mapper: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-          return `<article class="list-item" data-client-scope-mapper-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.name)}</strong><span class="muted">${escapeHtml(`${item.mapperType} · ${item.claimName}`)}</span></div><span>${escapeHtml(text(item.addToIdToken ? "adminMapperAddToIdToken" : "adminMapperAddToAccessToken"))}</span>${controls}</article>`;
+          const controls = chooseLazy(
+            confirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopeMapperPrompt"))}</span>${button(text("adminDeleteClientScopeMapper"), { action: "admin-client-scope-mapper-delete-confirm", id: scopeId, mapper: item.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-mapper-delete-cancel" data-id="${escapeHtml(scopeId)}" data-mapper="${escapeHtml(item.id)}" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminEditClientScopeMapper"), { action: "admin-client-scope-mapper-edit", id: scopeId, mapper: item.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientScopeMapper"), { action: "admin-client-scope-mapper-delete-request", id: scopeId, mapper: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
+          return `<article class="list-item" data-client-scope-mapper-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.name)}</strong><span class="muted">${escapeHtml("" + item.mapperType + " · " + item.claimName + "")}</span></div><span>${escapeHtml(
+            text(
+              chooseLazy(
+                item.addToIdToken,
+                () => "adminMapperAddToIdToken",
+                () => "adminMapperAddToAccessToken",
+              ),
+            ),
+          )}</span>${controls}</article>`;
         })
         .join("")
     : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopeMappers"))}</div>`;
@@ -1572,7 +1951,44 @@ function clientMappersPanel(clientId) {
   ];
   const editorForm =
     editor?.clientId === clientId
-      ? `<form class="card" data-form="admin-client-mapper" data-client-id="${escapeHtml(clientId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(text(mapperId ? "adminEditClientMapper" : "adminCreateClientMapper"))}</h3>${field("name", text("adminClientMapperName"), draft.name ?? mapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("source", text("adminClientMapperSource"), draft.source ?? mapper?.source ?? "", errors.source, "text", 'maxlength="200"')}<div class="field"><label for="client-mapper-type">${escapeHtml(text("adminClientMapperType"))}</label><select id="client-mapper-type" name="mapperType">${options.map((option) => `<option value="${option}" ${(draft.mapperType ?? mapper?.mapperType ?? "email") === option ? "selected" : ""}>${option}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div>${field("claimName", text("adminClientMapperClaim"), draft.claimName ?? mapper?.claimName ?? "email", errors.claimName, "text", 'maxlength="200"')}${field("value", text("adminClientMapperValue"), draft.value ?? mapper?.value ?? "", errors.value, "text", 'maxlength="1000"')}${field("priority", text("adminClientMapperPriority"), draft.priority ?? mapper?.priority ?? 100, errors.priority, "number", 'min="0" max="10000" step="1"')}<label class="settings-row"><input type="checkbox" name="addToIdToken" ${(draft.addToIdToken ?? mapper?.addToIdToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${(draft.addToAccessToken ?? mapper?.addToAccessToken ?? true) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-mapper-editor-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+      ? `<form class="card" data-form="admin-client-mapper" data-client-id="${escapeHtml(clientId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(
+          text(
+            chooseLazy(
+              mapperId,
+              () => "adminEditClientMapper",
+              () => "adminCreateClientMapper",
+            ),
+          ),
+        )}</h3>${field("name", text("adminClientMapperName"), draft.name ?? mapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("source", text("adminClientMapperSource"), draft.source ?? mapper?.source ?? "", errors.source, "text", 'maxlength="200"')}<div class="field"><label for="client-mapper-type">${escapeHtml(text("adminClientMapperType"))}</label><select id="client-mapper-type" name="mapperType">${options
+          .map(
+            (option) =>
+              '<option value="' +
+              option +
+              '" ' +
+              chooseLazy(
+                (draft.mapperType ?? mapper?.mapperType ?? "email") === option,
+                () => "selected",
+                () => "",
+              ) +
+              ">" +
+              option +
+              "</option>",
+          )
+          .join(
+            "",
+          )}</select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div>${field("claimName", text("adminClientMapperClaim"), draft.claimName ?? mapper?.claimName ?? "email", errors.claimName, "text", 'maxlength="200"')}${field("value", text("adminClientMapperValue"), draft.value ?? mapper?.value ?? "", errors.value, "text", 'maxlength="1000"')}${field("priority", text("adminClientMapperPriority"), draft.priority ?? mapper?.priority ?? 100, errors.priority, "number", 'min="0" max="10000" step="1"')}<label class="settings-row"><input type="checkbox" name="addToIdToken" ${chooseLazy(
+          draft.addToIdToken ?? mapper?.addToIdToken ?? true,
+          () => "checked",
+          () => "",
+        )}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${chooseLazy(
+          draft.addToAccessToken ?? mapper?.addToAccessToken ?? true,
+          () => "checked",
+          () => "",
+        )}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-mapper-editor-cancel" data-id="${escapeHtml(clientId)}" ${chooseLazy(
+          state.busy,
+          () => "disabled",
+          () => "",
+        )}>${escapeHtml(text("cancel"))}</button></div></form>`
       : "";
   const deleteConfirm = state.data.clientMapperDeleteConfirm;
   const rows = mappers.length
@@ -1583,10 +1999,26 @@ function clientMappersPanel(clientId) {
             deleteConfirm?.mapperId === String(item.id);
           const deleting =
             state.busy === `client-mapper-delete:${clientId}:${item.id}`;
-          const controls = confirming
-            ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientMapperPrompt"))}</span>${button(text("adminDeleteClientMapper"), { action: "admin-client-mapper-delete-confirm", id: clientId, mapper: item.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-mapper-delete-cancel" data-id="${escapeHtml(clientId)}" data-mapper="${escapeHtml(item.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-            : `<div class="actions">${button(text("adminEditClientMapper"), { action: "admin-client-mapper-edit", id: clientId, mapper: item.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientMapper"), { action: "admin-client-mapper-delete-request", id: clientId, mapper: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-          return `<article class="list-item" data-client-mapper-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.name)}</strong><span class="muted">${escapeHtml(`${item.mapperType} · ${item.claimName}`)}</span></div><span>${escapeHtml(text(item.addToIdToken ? "adminMapperAddToIdToken" : "adminMapperAddToAccessToken"))}</span>${controls}</article>`;
+          const controls = chooseLazy(
+            confirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientMapperPrompt"))}</span>${button(text("adminDeleteClientMapper"), { action: "admin-client-mapper-delete-confirm", id: clientId, mapper: item.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-mapper-delete-cancel" data-id="${escapeHtml(clientId)}" data-mapper="${escapeHtml(item.id)}" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminEditClientMapper"), { action: "admin-client-mapper-edit", id: clientId, mapper: item.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientMapper"), { action: "admin-client-mapper-delete-request", id: clientId, mapper: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
+          return `<article class="list-item" data-client-mapper-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.name)}</strong><span class="muted">${escapeHtml("" + item.mapperType + " · " + item.claimName + "")}</span></div><span>${escapeHtml(
+            text(
+              chooseLazy(
+                item.addToIdToken,
+                () => "adminMapperAddToIdToken",
+                () => "adminMapperAddToAccessToken",
+              ),
+            ),
+          )}</span>${controls}</article>`;
         })
         .join("")
     : `<div class="empty" role="status">${escapeHtml(text("adminNoClientMappers"))}</div>`;
@@ -1620,26 +2052,34 @@ function adminClientScopesContent() {
         : `<form class="actions" data-form="admin-client-scope-edit" data-scope-id="${escapeHtml(scope.id)}" data-scope-name="${escapeHtml(scope.name)}"><div class="field"><label for="${escapeHtml(displayNameId)}">${escapeHtml(text("adminClientScopeDisplayName"))}</label><input id="${escapeHtml(displayNameId)}" name="displayName" type="text" value="${escapeHtml(draft.displayName ?? scope.displayName ?? "")}" maxlength="200"/><div class="field-error">${escapeHtml(scopeErrors.displayName ?? "")}</div></div><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminClientScopeDescription"))}</label><input id="${escapeHtml(descriptionId)}" name="description" type="text" value="${escapeHtml(draft.description ?? scope.description ?? "")}" maxlength="500"/><div class="field-error">${escapeHtml(scopeErrors.description ?? "")}</div></div>${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}</form>`;
       const deleteControls = scope.builtIn
         ? ""
-        : confirming
-          ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopePrompt"))}</span>${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-confirm", id: scope.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-          : `<div class="actions">${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-request", id: scope.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        : chooseLazy(
+            confirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientScopePrompt"))}</span>${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-confirm", id: scope.id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-delete-cancel" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminDeleteClientScope"), { action: "admin-client-scope-delete-request", id: scope.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
       const roleMappingsOpen =
         state.data.adminClientScopeRoleMappingsOpenId === scope.id;
       const roleMappingControls = scope.builtIn
         ? ""
-        : `<div class="actions">${button(text("adminManageClientScopeRoles"), { action: "admin-client-scope-role-mappings-toggle", id: scope.id, busy: state.busy === `client-scope-role-mappings-load:${scope.id}`, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        : `<div class="actions">${button(text("adminManageClientScopeRoles"), { action: "admin-client-scope-role-mappings-toggle", id: scope.id, busy: state.busy === "client-scope-role-mappings-load:" + scope.id + "", disabled: state.offline || Boolean(state.busy) })}</div>`;
       const roleMappingPanel = roleMappingsOpen
         ? clientScopeRoleMappingPanel(scope.id)
         : "";
       const mappersOpen = state.data.clientScopeMappersOpenId === scope.id;
       const mapperControls = scope.builtIn
         ? ""
-        : `<div class="actions">${button(text("adminManageClientScopeMappers"), { action: "admin-client-scope-mappers-toggle", id: scope.id, busy: state.busy === `client-scope-mappers:${scope.id}`, disabled: state.offline || Boolean(state.busy) })}</div>`;
+        : `<div class="actions">${button(text("adminManageClientScopeMappers"), { action: "admin-client-scope-mappers-toggle", id: scope.id, busy: state.busy === "client-scope-mappers:" + scope.id + "", disabled: state.offline || Boolean(state.busy) })}</div>`;
       const mapperPanel = mappersOpen ? clientScopeMappersPanel(scope.id) : "";
       return `<article class="list-item" data-client-scope-id="${escapeHtml(scope.id)}">${metadata}<span>${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span>${deleteControls}${roleMappingControls}${roleMappingPanel}${mapperControls}${mapperPanel}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? `<div class="list">${scopeRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminClientScopes"))}"><form id="admin-client-scope-search" class="actions" role="search"><input id="admin-client-scope-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClientScopes"))}" value="${escapeHtml(state.data.clientScopeQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClientScopes"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "client-scopes-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-scopes-search")}${escapeHtml(text("adminSearchClientScopes"))}</button></form>${scopes.length ? '<div class="list">' + scopeRows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoClientScopes")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminClientScopes"))} pagination"><button class="secondary-button" type="button" data-client-scope-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-scope-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-scopes-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminClientScopeCreateContent() {
@@ -1719,7 +2159,15 @@ function adminClientConfigurationForm(id) {
     `<fieldset class="field"><legend>${escapeHtml(text(key))}</legend>${options
       .map(
         (option) =>
-          `<label class="settings-row"><span>${escapeHtml(option)}</span><input type="checkbox" name="${name}" value="${escapeHtml(option)}" ${(draft[name] ?? "").split("\n").includes(option) ? "checked" : ""}/></label>`,
+          '<label class="settings-row"><span>' +
+          escapeHtml(option) +
+          '</span><input type="checkbox" name="' +
+          name +
+          '" value="' +
+          escapeHtml(option) +
+          '" ' +
+          ((draft[name] ?? "").split("\n").includes(option) ? "checked" : "") +
+          "/></label>",
       )
       .join(
         "",
@@ -1730,7 +2178,13 @@ function adminClientConfigurationForm(id) {
     `<div class="field"><label for="client-config-${name}">${escapeHtml(text(key))}</label><select id="client-config-${name}" name="${name}">${options
       .map(
         (option) =>
-          `<option value="${option}" ${value === option ? "selected" : ""}>${option}</option>`,
+          '<option value="' +
+          option +
+          '" ' +
+          (value === option ? "selected" : "") +
+          ">" +
+          option +
+          "</option>",
       )
       .join(
         "",
@@ -1750,7 +2204,6 @@ function adminClientConfigurationForm(id) {
     "urn:openid:params:grant-type:ciba",
     "urn:ietf:params:oauth:grant-type:token-exchange",
   ];
-  const algorithmOptions = ["RS256", "ES256"];
   const tokenExchangeAudiences = draft.tokenExchangeAllowedAudiences ?? "";
   return `<form class="card" data-form="admin-client-configuration" data-client-id="${escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminEditClientConfiguration"))}</h3><div class="muted">${escapeHtml(text("adminClientSecretNeverDisplayed"))}</div>${field("clientId", text("adminClientId"), draft.clientId ?? "", errors.clientId, "text", 'maxlength="100" required')}${field("clientName", text("adminClientName"), draft.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}${checks("clientAuthenticationMethods", "adminClientAuthenticationMethods", authOptions)}${checks("authorizationGrantTypes", "adminClientGrantTypes", grantOptions)}${listField("redirectUris", "adminClientRedirectUris", draft.redirectUris, true)}${listField("postLogoutRedirectUris", "adminClientPostLogoutUris", draft.postLogoutRedirectUris)}${listField("scopes", "adminClientScopesInput", draft.scopes, true)}${checkbox("requireAuthorizationConsent", "adminClientRequireConsent", draft.requireAuthorizationConsent)}${checkbox("requireProofKey", "adminClientRequireProofKey", draft.requireProofKey)}${checkbox("requireDpop", "adminClientRequireDpop", draft.requireDpop)}${checkbox("requireDpopJkt", "adminClientRequireDpopJkt", draft.requireDpopJkt)}${checkbox("dpopRefreshTokenOnly", "adminClientDpopRefreshOnly", draft.dpopRefreshTokenOnly)}${listField("dpopSigningAlgorithms", "adminClientDpopAlgorithms", draft.dpopSigningAlgorithms, true)}<div class="form-grid">${selectField("cibaDeliveryMode", "adminClientCibaMode", draft.cibaDeliveryMode ?? "poll", ["poll", "ping", "push"])}${field("cibaNotificationEndpoint", text("adminClientCibaEndpoint"), draft.cibaNotificationEndpoint ?? "", errors.cibaNotificationEndpoint)}${field("authorizationCodeTimeToLive", text("adminClientAuthorizationCodeTtl"), draft.authorizationCodeTimeToLive ?? "", errors.authorizationCodeTimeToLive)}${field("accessTokenTimeToLive", text("adminClientAccessTokenTtl"), draft.accessTokenTimeToLive ?? "", errors.accessTokenTimeToLive)}${field("refreshTokenTimeToLive", text("adminClientRefreshTokenTtl"), draft.refreshTokenTimeToLive ?? "", errors.refreshTokenTimeToLive)}${field("clientSecretTimeToLive", text("adminClientSecretTtl"), draft.clientSecretTimeToLive ?? "", errors.clientSecretTimeToLive)}${field("clientSecretGracePeriod", text("adminClientSecretGracePeriod"), "", errors.clientSecretGracePeriod, "text", 'placeholder="PT24H"')}${field("offlineSessionIdle", text("adminClientOfflineSessionIdle"), draft.offlineSessionIdle ?? "", errors.offlineSessionIdle)}${field("offlineSessionMax", text("adminClientOfflineSessionMax"), draft.offlineSessionMax ?? "", errors.offlineSessionMax)}${field("rootUrl", text("adminClientRootUrl"), draft.rootUrl ?? "", errors.rootUrl)}${field("homeUrl", text("adminClientHomeUrl"), draft.homeUrl ?? "", errors.homeUrl)}${field(["admin", "Url"].join(""), text("adminClientAdminUrl"), draft.adminUrl ?? "", errors.adminUrl)}${field("jwkSetUrl", text("adminClientJwksUrl"), draft.jwkSetUrl ?? "", errors.jwkSetUrl)}${field("tokenEndpointAuthenticationSigningAlgorithm", text("adminClientSigningAlgorithm"), draft.tokenEndpointAuthenticationSigningAlgorithm ?? "", errors.tokenEndpointAuthenticationSigningAlgorithm)}${field("x509CertificateSubjectDN", text("adminClientCertificateSubject"), draft.x509CertificateSubjectDN ?? "", errors.x509CertificateSubjectDN)}</div>${listField("webOrigins", "adminClientWebOrigins", draft.webOrigins)}${listField("tokenExchangeAllowedAudiences", "adminClientTokenExchangeAudiences", tokenExchangeAudiences)}${checkbox("serviceAccountEnabled", "adminClientServiceAccountEnabled", draft.serviceAccountEnabled)}${checkbox("enabled", "adminClientEnabled", draft.enabled)}${checkbox("frontChannelLogout", "adminClientFrontChannelLogout", draft.frontChannelLogout)}${checkbox("backchannelLogout", "adminClientBackchannelLogout", draft.backchannelLogout)}${checkbox("tokenExchangeDownscopeOnly", "adminClientTokenExchangeDownscope", draft.tokenExchangeDownscopeOnly)}${checkbox("tokenExchangeAllowDelegation", "adminClientTokenExchangeDelegation", draft.tokenExchangeAllowDelegation)}<div class="field"><label for="client-config-cibaClientNotificationToken">${escapeHtml(text("adminClientCibaToken"))}</label><input id="client-config-cibaClientNotificationToken" type="password" name="cibaClientNotificationToken" maxlength="512" autocomplete="new-password"/><div class="muted">${escapeHtml(text(client.cibaClientNotificationTokenConfigured ? "adminClientCibaTokenPreserved" : "adminClientCibaTokenOptional"))}</div><div class="field-error">${escapeHtml(errors.cibaClientNotificationToken ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-configuration-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
 }
@@ -1795,10 +2248,10 @@ function clientScopeAssignmentsPanel(clientId) {
       const name = String(scope.name ?? "");
       if (!name || name.length > 100) return "";
       const inputId = `client-scope-assignment-${clientId}-${name}`;
-      return `<article class="list-item"><div><strong>${escapeHtml(scope.displayName || name)}</strong><span class="muted">${escapeHtml(scope.description ?? name)}</span></div><label class="settings-row" for="${escapeHtml(`${inputId}-default`)}"><input id="${escapeHtml(`${inputId}-default`)}" type="checkbox" name="defaultScopes" value="${escapeHtml(name)}" ${defaults.includes(name) ? "checked" : ""}/>${escapeHtml(text("adminClientScopeDefault"))}</label><label class="settings-row" for="${escapeHtml(`${inputId}-optional`)}"><input id="${escapeHtml(`${inputId}-optional`)}" type="checkbox" name="optionalScopes" value="${escapeHtml(name)}" ${optional.includes(name) ? "checked" : ""}/>${escapeHtml(text("adminClientScopeOptional"))}</label></article>`;
+      return `<article class="list-item"><div><strong>${escapeHtml(scope.displayName || name)}</strong><span class="muted">${escapeHtml(scope.description ?? name)}</span></div><label class="settings-row" for="${escapeHtml("" + inputId + "-default")}"><input id="${escapeHtml("" + inputId + "-default")}" type="checkbox" name="defaultScopes" value="${escapeHtml(name)}" ${defaults.includes(name) ? "checked" : ""}/>${escapeHtml(text("adminClientScopeDefault"))}</label><label class="settings-row" for="${escapeHtml("" + inputId + "-optional")}"><input id="${escapeHtml("" + inputId + "-optional")}" type="checkbox" name="optionalScopes" value="${escapeHtml(name)}" ${optional.includes(name) ? "checked" : ""}/>${escapeHtml(text("adminClientScopeOptional"))}</label></article>`;
     })
     .join("");
-  return `<section class="card" data-client-scope-assignments-panel="true" data-client-id="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientScopeAssignments"))}"><form data-form="admin-client-scope-assignments" data-client-id="${escapeHtml(clientId)}"><fieldset><legend>${escapeHtml(text("adminClientScopeAssignmentsHelp"))}</legend>${rows || `<div class="empty" role="status">${escapeHtml(text("adminNoClientScopes"))}</div>`}</fieldset><div class="field-error" role="alert">${escapeHtml(localError)}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-scope-assignments-save:${clientId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-assignments-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
+  return `<section class="card" data-client-scope-assignments-panel="true" data-client-id="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientScopeAssignments"))}"><form data-form="admin-client-scope-assignments" data-client-id="${escapeHtml(clientId)}"><fieldset><legend>${escapeHtml(text("adminClientScopeAssignmentsHelp"))}</legend>${rows || '<div class="empty" role="status">' + escapeHtml(text("adminNoClientScopes")) + "</div>"}</fieldset><div class="field-error" role="alert">${escapeHtml(localError)}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "client-scope-assignments-save:" + clientId + "", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-scope-assignments-cancel" data-id="${escapeHtml(clientId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form></section>`;
 }
 
 function clientRoleAssignmentPanel(clientId, roleId, roleName) {
@@ -1839,7 +2292,11 @@ function clientRoleAssignmentPanel(clientId, roleId, roleName) {
           state.busy ===
           `client-role-assignment-remove:${clientId}:${roleId}:${kind}:${memberId}`;
         const actions = confirming
-          ? `<div class="actions"><span role="status">${escapeHtml(confirmLabel)}</span>${button(removeLabel, { action: "admin-client-role-assignment-remove-confirm", id: clientId, clientRoleId: roleId, memberId, memberKind: kind, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-assignment-remove-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" data-member-id="${escapeHtml(memberId)}" data-member-kind="${kind}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+          ? `<div class="actions"><span role="status">${escapeHtml(confirmLabel)}</span>${button(removeLabel, { action: "admin-client-role-assignment-remove-confirm", id: clientId, clientRoleId: roleId, memberId, memberKind: kind, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-assignment-remove-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" data-member-id="${escapeHtml(memberId)}" data-member-kind="${kind}" ${chooseLazy(
+              state.busy,
+              () => "disabled",
+              () => "",
+            )}>${escapeHtml(text("cancel"))}</button></div>`
           : `<div class="actions">${button(removeLabel, { action: "admin-client-role-assignment-remove-request", id: clientId, clientRoleId: roleId, memberId, memberKind: kind, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
         return `<article class="list-item"><strong>${escapeHtml(kind === "user" ? member.username : member.path || member.name)}</strong>${actions}</article>`;
       })
@@ -1876,7 +2333,7 @@ function clientRoleAssignmentPanel(clientId, roleId, roleName) {
     state.busy === `client-role-assignment-search:${clientId}:${roleId}:user`;
   const groupSearching =
     state.busy === `client-role-assignment-search:${clientId}:${roleId}:group`;
-  return `<section class="card" data-client-role-assignments="${escapeHtml(key)}" aria-label="${escapeHtml(text("adminManageClientRoleAssignments"))}"><h4>${escapeHtml(roleName)}</h4><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedUsers"))}</legend>${memberRows(users, "user") || `<div class="empty" role="status">${escapeHtml(text("adminNoUsers"))}</div>`}<div class="actions"><input name="user-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchUsers"))}" value="${escapeHtml(assignment.userQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "user", busy: userSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="user" role="alert">${escapeHtml(assignment.userSearchError ? text(assignment.userSearchError) : "")}</div>${candidateRows(userCandidates, "user")}</fieldset><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedGroups"))}</legend>${memberRows(groups, "group") || `<div class="empty" role="status">${escapeHtml(text("adminNoGroups"))}</div>`}<div class="actions"><input name="group-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchGroups"))}" value="${escapeHtml(assignment.groupQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "group", busy: groupSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="group" role="alert">${escapeHtml(assignment.groupSearchError ? text(assignment.groupSearchError) : "")}</div>${candidateRows(groupCandidates, "group")}</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-assignments-close" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
+  return `<section class="card" data-client-role-assignments="${escapeHtml(key)}" aria-label="${escapeHtml(text("adminManageClientRoleAssignments"))}"><h4>${escapeHtml(roleName)}</h4><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedUsers"))}</legend>${memberRows(users, "user") || '<div class="empty" role="status">' + escapeHtml(text("adminNoUsers")) + "</div>"}<div class="actions"><input name="user-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchUsers"))}" value="${escapeHtml(assignment.userQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "user", busy: userSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="user" role="alert">${escapeHtml(assignment.userSearchError ? text(assignment.userSearchError) : "")}</div>${candidateRows(userCandidates, "user")}</fieldset><fieldset><legend>${escapeHtml(text("adminClientRoleAssignedGroups"))}</legend>${memberRows(groups, "group") || '<div class="empty" role="status">' + escapeHtml(text("adminNoGroups")) + "</div>"}<div class="actions"><input name="group-q" type="search" aria-label="${escapeHtml(text("adminClientRoleSearchGroups"))}" value="${escapeHtml(assignment.groupQuery ?? "")}" maxlength="100" minlength="2"/>${button(text("adminSearchRoleCandidates"), { action: "admin-client-role-assignment-search", id: clientId, clientRoleId: roleId, memberKind: "group", busy: groupSearching, disabled: state.offline || Boolean(state.busy) })}</div><div class="field-error" data-assignment-search-error="group" role="alert">${escapeHtml(assignment.groupSearchError ? text(assignment.groupSearchError) : "")}</div>${candidateRows(groupCandidates, "group")}</fieldset><button class="secondary-button" type="button" data-action="admin-client-role-assignments-close" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></section>`;
 }
 
 function clientRoleCompositePanel(clientId, roleId, roleName) {
@@ -1914,18 +2371,28 @@ function clientRoleCompositePanel(clientId, roleId, roleName) {
     roles.length
       ? roles
           .map((role) => {
-            const memberId = kind === "realm" ? role.name : String(role.id);
+            const memberId = chooseLazy(
+              kind === "realm",
+              () => role.name,
+              () => String(role.id),
+            );
             const confirming =
               composition.confirm?.kind === kind &&
               composition.confirm.id === memberId;
-            const removeMessageKey =
-              kind === "realm"
-                ? "adminRoleCompositeRemove"
-                : "adminRoleCompositeClientRemove";
-            const label =
-              kind === "realm" ? role.name : role.clientId + " / " + role.name;
-            const controls = confirming
-              ? '<div class="actions"><span role="status">' +
+            const removeMessageKey = chooseLazy(
+              kind === "realm",
+              () => "adminRoleCompositeRemove",
+              () => "adminRoleCompositeClientRemove",
+            );
+            const label = chooseLazy(
+              kind === "realm",
+              () => role.name,
+              () => role.clientId + " / " + role.name,
+            );
+            const controls = chooseLazy(
+              confirming,
+              () =>
+                '<div class="actions"><span role="status">' +
                 escapeHtml(text("adminClientRoleCompositeSessionImpact")) +
                 "</span>" +
                 button(text(removeMessageKey), {
@@ -1956,11 +2423,16 @@ function clientRoleCompositePanel(clientId, roleId, roleName) {
                 '" data-member-kind="' +
                 kind +
                 '" ' +
-                (state.busy ? "disabled" : "") +
+                chooseLazy(
+                  state.busy,
+                  () => "disabled",
+                  () => "",
+                ) +
                 ">" +
                 escapeHtml(text("cancel")) +
-                "</button></div>"
-              : '<div class="actions">' +
+                "</button></div>",
+              () =>
+                '<div class="actions">' +
                 button(text(removeMessageKey), {
                   action: "admin-client-role-composite-remove-request",
                   id: clientId,
@@ -1970,7 +2442,8 @@ function clientRoleCompositePanel(clientId, roleId, roleName) {
                   danger: true,
                   disabled: state.offline || Boolean(state.busy),
                 }) +
-                "</div>";
+                "</div>",
+            );
             return (
               '<article class="list-item"><strong>' +
               escapeHtml(label) +
@@ -1983,9 +2456,11 @@ function clientRoleCompositePanel(clientId, roleId, roleName) {
       : '<div class="empty" role="status">' +
         escapeHtml(
           text(
-            kind === "realm"
-              ? "adminClientRoleCompositeEmptyRealm"
-              : "adminClientRoleCompositeEmptyClient",
+            chooseLazy(
+              kind === "realm",
+              () => "adminClientRoleCompositeEmptyRealm",
+              () => "adminClientRoleCompositeEmptyClient",
+            ),
           ),
         ) +
         "</div>";
@@ -2044,7 +2519,11 @@ function clientRoleCompositePanel(clientId, roleId, roleName) {
             '" data-member-kind="' +
             kind +
             '" ' +
-            (state.busy ? "disabled" : "") +
+            chooseLazy(
+              state.busy,
+              () => "disabled",
+              () => "",
+            ) +
             ">" +
             escapeHtml(text("cancel")) +
             "</button></div>"
@@ -2148,10 +2627,18 @@ function clientRolesPanel(clientId) {
       const deleting =
         state.busy === `client-role-delete:${clientId}:${roleId}`;
       const editForm = editing
-        ? `<form class="card" data-form="admin-client-role-update" data-client-id="${escapeHtml(clientId)}" data-role-id="${escapeHtml(roleId)}" novalidate>${field("name", text("adminClientRoleName"), draft.name ?? role.name ?? "", errors.name, "text", 'maxlength="100" pattern="[A-Za-z0-9._:-]+" required')}${field("description", text("adminClientRoleDescription"), draft.description ?? role.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-role-update:${clientId}:${roleId}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-edit-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-client-role-update" data-client-id="${escapeHtml(clientId)}" data-role-id="${escapeHtml(roleId)}" novalidate>${field("name", text("adminClientRoleName"), draft.name ?? role.name ?? "", errors.name, "text", 'maxlength="100" pattern="[A-Za-z0-9._:-]+" required')}${field("description", text("adminClientRoleDescription"), draft.description ?? role.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "client-role-update:" + clientId + ":" + roleId + "", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-edit-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const deleteControls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientRolePrompt"))}</span>${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-confirm", id: clientId, clientRoleId: roleId, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-delete-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientRolePrompt"))}</span>${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-confirm", id: clientId, clientRoleId: roleId, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-role-delete-cancel" data-id="${escapeHtml(clientId)}" data-client-role-id="${escapeHtml(roleId)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminEditClientRole"), { action: "admin-client-role-edit", id: clientId, clientRoleId: roleId, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteClientRole"), { action: "admin-client-role-delete-request", id: clientId, clientRoleId: roleId, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       const assignmentToggle = button(
         text("adminManageClientRoleAssignments"),
@@ -2184,12 +2671,12 @@ function clientRolesPanel(clientId) {
   const draft = panel.createDraft ?? {};
   const errors =
     panel.errorRoleId === "new" ? violations(state.error?.body) : {};
-  const createForm = `<form class="card" data-form="admin-client-role-create" data-client-id="${escapeHtml(clientId)}" novalidate><h3>${escapeHtml(text("adminCreateClientRole"))}</h3>${field("name", text("adminClientRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="100" pattern="[A-Za-z0-9._:-]+" required')}${field("description", text("adminClientRoleDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="actions">${button(text("adminCreateClientRole"), { type: "submit", busy: state.busy === `client-role-create:${clientId}`, disabled: state.offline || Boolean(state.busy) })}</div></form>`;
+  const createForm = `<form class="card" data-form="admin-client-role-create" data-client-id="${escapeHtml(clientId)}" novalidate><h3>${escapeHtml(text("adminCreateClientRole"))}</h3>${field("name", text("adminClientRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="100" pattern="[A-Za-z0-9._:-]+" required')}${field("description", text("adminClientRoleDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}<div class="actions">${button(text("adminCreateClientRole"), { type: "submit", busy: state.busy === "client-role-create:" + clientId + "", disabled: state.offline || Boolean(state.busy) })}</div></form>`;
   const currentPage = Number.isSafeInteger(page.number) ? page.number : 0;
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" data-client-roles-panel="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientRolesTitle"))}"><h3>${escapeHtml(text("adminClientRolesTitle"))}</h3><form class="actions" data-form="admin-client-role-search" data-client-id="${escapeHtml(clientId)}" role="search"><input name="q" type="search" aria-label="${escapeHtml(text("adminClientRoleName"))}" value="${escapeHtml(panel.query ?? "")}" maxlength="100"/><button class="secondary-button" type="submit" ${state.busy === `client-role-search:${clientId}` ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === `client-role-search:${clientId}`)}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${roles.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminClientRoleCrudEmpty"))}</div>`}<div class="actions"><button class="secondary-button" type="button" data-client-role-page="${escapeHtml(clientId)}" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === `client-role-page:${clientId}`)}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages ? currentPage + 1 : 0} / ${totalPages}</span><button class="secondary-button" type="button" data-client-role-page="${escapeHtml(clientId)}" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === `client-role-page:${clientId}`)}${escapeHtml(text("adminNext"))}</button></div>${createForm}</section>`;
+  return `<section class="card" data-client-roles-panel="${escapeHtml(clientId)}" aria-label="${escapeHtml(text("adminClientRolesTitle"))}"><h3>${escapeHtml(text("adminClientRolesTitle"))}</h3><form class="actions" data-form="admin-client-role-search" data-client-id="${escapeHtml(clientId)}" role="search"><input name="q" type="search" aria-label="${escapeHtml(text("adminClientRoleName"))}" value="${escapeHtml(panel.query ?? "")}" maxlength="100"/><button class="secondary-button" type="submit" ${state.busy === "client-role-search:" + clientId + "" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "client-role-search:" + clientId + "")}${escapeHtml(text("adminSearchRoleCandidates"))}</button></form>${roles.length ? '<div class="list">' + rows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminClientRoleCrudEmpty")) + "</div>"}<div class="actions"><button class="secondary-button" type="button" data-client-role-page="${escapeHtml(clientId)}" data-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "client-role-page:" + clientId + "")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages ? currentPage + 1 : 0} / ${totalPages}</span><button class="secondary-button" type="button" data-client-role-page="${escapeHtml(clientId)}" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "client-role-page:" + clientId + "")}${escapeHtml(text("adminNext"))}</button></div>${createForm}</section>`;
 }
 
 async function loadClientRoles(clientId, page, query, busyKey) {
@@ -2286,7 +2773,11 @@ function adminClientsContent() {
           ? violations(state.error?.body)
           : {};
       const editForm = editing
-        ? `<form class="card" data-form="admin-client-native-metadata" data-client-id="${escapeHtml(id)}" novalidate>${field("clientName", text("adminClientName"), draft.clientName ?? client.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `client-metadata-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-metadata-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+        ? `<form class="card" data-form="admin-client-native-metadata" data-client-id="${escapeHtml(id)}" novalidate>${field("clientName", text("adminClientName"), draft.clientName ?? client.clientName ?? "", errors.clientName, "text", 'maxlength="200" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "client-metadata-save:" + id + "", disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-metadata-cancel" data-id="${escapeHtml(id)}" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div></form>`
         : "";
       const configurationEditing = state.data.clientConfigurationEditId === id;
       const configurationForm = configurationEditing
@@ -2331,13 +2822,21 @@ function adminClientsContent() {
       const deleting = state.busy === `client-delete:${id}`;
       const deleteControls = protectedClient
         ? `<span>${escapeHtml(text("adminBuiltIn"))}</span>`
-        : confirming
-          ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-          : `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientConfiguration"), { action: "admin-client-configuration-edit", id, busy: state.busy === `client-configuration-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === `client-metadata-load:${id}`, disabled: state.offline || Boolean(state.busy) || protectedClient })}${assignmentsToggle}${mappersToggle}${clientRolesToggle}</div>${configurationForm}${editForm}${assignmentsPanel}${mappersPanel}${clientRolesContent}${deleteControls}</article>`;
+        : chooseLazy(
+            confirming,
+            () =>
+              `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteClientPrompt"))}</span>${button(text("adminDeleteClient"), { action: "admin-client-delete-confirm", id, danger: true, busy: deleting, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-client-delete-cancel" data-id="${escapeHtml(id)}" ${chooseLazy(
+                state.busy,
+                () => "disabled",
+                () => "",
+              )}>${escapeHtml(text("cancel"))}</button></div>`,
+            () =>
+              `<div class="actions">${button(text("adminDeleteClient"), { action: "admin-client-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+          );
+      return `<article class="list-item" data-client-id="${escapeHtml(id)}"><div><strong>${escapeHtml(client.clientName || client.clientId)}</strong><span class="muted">${escapeHtml(client.clientId)}</span><span class="muted">${escapeHtml((client.scopes ?? []).join(", "))}</span></div><span>${escapeHtml(client.requireProofKey ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditClientConfiguration"), { action: "admin-client-configuration-edit", id, busy: state.busy === "client-configuration-load:" + id + "", disabled: state.offline || Boolean(state.busy) || protectedClient })}${button(text("adminEditClientMetadata"), { action: "admin-client-metadata-edit", id, busy: state.busy === "client-metadata-load:" + id + "", disabled: state.offline || Boolean(state.busy) || protectedClient })}${assignmentsToggle}${mappersToggle}${clientRolesToggle}</div>${configurationForm}${editForm}${assignmentsPanel}${mappersPanel}${clientRolesContent}${deleteControls}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? `<div class="list">${clientRows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoClients"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminClients"))}"><form id="admin-client-search" class="actions" role="search"><input id="admin-client-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchClients"))}" value="${escapeHtml(state.data.clientQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchClients"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "clients-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "clients-search")}${escapeHtml(text("adminSearchClients"))}</button></form>${clients.length ? '<div class="list">' + clientRows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoClients")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminClients"))} pagination"><button class="secondary-button" type="button" data-client-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-client-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "clients-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function renderIdentityProviderMappers(providerId) {
@@ -2358,7 +2857,66 @@ function renderIdentityProviderMappers(providerId) {
   const formBusy = state.busy === `provider-mapper-save:${errorKey}`;
   const mapperEditor =
     editor?.providerId === providerId
-      ? `<form class="card" data-form="admin-provider-mapper" data-provider-id="${escapeHtml(providerId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(text(mapperId ? "adminEditProviderMapper" : "adminCreateProviderMapper"))}</h3>${field("name", text("adminProviderMapperName"), draft.name ?? selectedMapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("sourceClaim", text("adminProviderMapperSource"), draft.sourceClaim ?? selectedMapper?.sourceClaim ?? "", errors.sourceClaim, "text", 'maxlength="200" required')}${field("target", text("adminProviderMapperTarget"), draft.target ?? selectedMapper?.target ?? "", errors.target, "text", 'maxlength="200" required')}<div class="field"><label for="provider-mapper-type">${escapeHtml(text("adminProviderMapperType"))}</label><select id="provider-mapper-type" name="mapperType"><option value="user-attribute" ${(draft.mapperType ?? selectedMapper?.mapperType ?? "user-attribute") === "user-attribute" ? "selected" : ""}>user-attribute</option><option value="claim" ${(draft.mapperType ?? selectedMapper?.mapperType) === "claim" ? "selected" : ""}>claim</option><option value="role" ${(draft.mapperType ?? selectedMapper?.mapperType) === "role" ? "selected" : ""}>role</option><option value="group" ${(draft.mapperType ?? selectedMapper?.mapperType) === "group" ? "selected" : ""}>group</option></select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div><div class="field"><label for="provider-mapper-sync-mode">${escapeHtml(text("adminProviderMapperSyncMode"))}</label><select id="provider-mapper-sync-mode" name="syncMode"><option value="inherit" ${(draft.syncMode ?? selectedMapper?.syncMode ?? "inherit") === "inherit" ? "selected" : ""}>inherit</option><option value="legacy" ${(draft.syncMode ?? selectedMapper?.syncMode) === "legacy" ? "selected" : ""}>legacy</option><option value="import" ${(draft.syncMode ?? selectedMapper?.syncMode) === "import" ? "selected" : ""}>import</option><option value="read_only" ${(draft.syncMode ?? selectedMapper?.syncMode) === "read_only" ? "selected" : ""}>read_only</option><option value="force" ${(draft.syncMode ?? selectedMapper?.syncMode) === "force" ? "selected" : ""}>force</option></select><div class="field-error">${escapeHtml(errors.syncMode ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="addToIdToken" ${(draft.addToIdToken ?? selectedMapper?.addToIdToken) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${(draft.addToAccessToken ?? selectedMapper?.addToAccessToken) ? "checked" : ""}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: formBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-editor-cancel" data-provider="${escapeHtml(providerId)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
+      ? `<form class="card" data-form="admin-provider-mapper" data-provider-id="${escapeHtml(providerId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(
+          text(
+            chooseLazy(
+              mapperId,
+              () => "adminEditProviderMapper",
+              () => "adminCreateProviderMapper",
+            ),
+          ),
+        )}</h3>${field("name", text("adminProviderMapperName"), draft.name ?? selectedMapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("sourceClaim", text("adminProviderMapperSource"), draft.sourceClaim ?? selectedMapper?.sourceClaim ?? "", errors.sourceClaim, "text", 'maxlength="200" required')}${field("target", text("adminProviderMapperTarget"), draft.target ?? selectedMapper?.target ?? "", errors.target, "text", 'maxlength="200" required')}<div class="field"><label for="provider-mapper-type">${escapeHtml(text("adminProviderMapperType"))}</label><select id="provider-mapper-type" name="mapperType"><option value="user-attribute" ${chooseLazy(
+          (draft.mapperType ??
+            selectedMapper?.mapperType ??
+            "user-attribute") === "user-attribute",
+          () => "selected",
+          () => "",
+        )}>user-attribute</option><option value="claim" ${chooseLazy(
+          (draft.mapperType ?? selectedMapper?.mapperType) === "claim",
+          () => "selected",
+          () => "",
+        )}>claim</option><option value="role" ${chooseLazy(
+          (draft.mapperType ?? selectedMapper?.mapperType) === "role",
+          () => "selected",
+          () => "",
+        )}>role</option><option value="group" ${chooseLazy(
+          (draft.mapperType ?? selectedMapper?.mapperType) === "group",
+          () => "selected",
+          () => "",
+        )}>group</option></select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div><div class="field"><label for="provider-mapper-sync-mode">${escapeHtml(text("adminProviderMapperSyncMode"))}</label><select id="provider-mapper-sync-mode" name="syncMode"><option value="inherit" ${chooseLazy(
+          (draft.syncMode ?? selectedMapper?.syncMode ?? "inherit") ===
+            "inherit",
+          () => "selected",
+          () => "",
+        )}>inherit</option><option value="legacy" ${chooseLazy(
+          (draft.syncMode ?? selectedMapper?.syncMode) === "legacy",
+          () => "selected",
+          () => "",
+        )}>legacy</option><option value="import" ${chooseLazy(
+          (draft.syncMode ?? selectedMapper?.syncMode) === "import",
+          () => "selected",
+          () => "",
+        )}>import</option><option value="read_only" ${chooseLazy(
+          (draft.syncMode ?? selectedMapper?.syncMode) === "read_only",
+          () => "selected",
+          () => "",
+        )}>read_only</option><option value="force" ${chooseLazy(
+          (draft.syncMode ?? selectedMapper?.syncMode) === "force",
+          () => "selected",
+          () => "",
+        )}>force</option></select><div class="field-error">${escapeHtml(errors.syncMode ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="addToIdToken" ${chooseLazy(
+          draft.addToIdToken ?? selectedMapper?.addToIdToken,
+          () => "checked",
+          () => "",
+        )}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${chooseLazy(
+          draft.addToAccessToken ?? selectedMapper?.addToAccessToken,
+          () => "checked",
+          () => "",
+        )}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: formBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-editor-cancel" data-provider="${escapeHtml(providerId)}" ${chooseLazy(
+          state.busy,
+          () => "disabled",
+          () => "",
+        )}>${escapeHtml(text("cancel"))}</button></div></form>`
       : "";
   const addMapperButton = button(text("adminAddProviderMapper"), {
     action: "admin-provider-mapper-create",
@@ -2375,14 +2933,78 @@ function renderIdentityProviderMappers(providerId) {
               confirmation?.mapperId === mapper.id;
             const busy =
               state.busy ===
-              `provider-mapper-delete:${providerId}:${mapper.id}`;
-            const controls = confirming
-              ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteProviderMapperPrompt"))}</span>${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-confirm", provider: providerId, id: mapper.id, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-delete-cancel" data-provider="${escapeHtml(providerId)}" data-id="${escapeHtml(mapper.id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-              : `<div class="actions">${button(text("adminEditProviderMapper"), { action: "admin-provider-mapper-edit", provider: providerId, id: mapper.id, disabled: state.offline || Boolean(state.busy) })}${button(text("adminDeleteProviderMapper"), { action: "admin-provider-mapper-delete-request", provider: providerId, id: mapper.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-            return `<article class="list-item" data-provider-mapper-id="${escapeHtml(mapper.id)}"><div><strong>${escapeHtml(mapper.name)}</strong><span class="muted">${escapeHtml(`${mapper.sourceClaim} → ${mapper.target} · ${mapper.mapperType}`)}</span></div><span>${escapeHtml(mapper.syncMode)}</span>${controls}</article>`;
+              "provider-mapper-delete:" + providerId + ":" + mapper.id + "";
+            const controls = chooseLazy(
+              confirming,
+              () =>
+                '<div class="actions"><span role="status">' +
+                escapeHtml(text("adminDeleteProviderMapperPrompt")) +
+                "</span>" +
+                button(text("adminDeleteProviderMapper"), {
+                  action: "admin-provider-mapper-delete-confirm",
+                  provider: providerId,
+                  id: mapper.id,
+                  danger: true,
+                  busy,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                '<button class="secondary-button" type="button" data-action="admin-provider-mapper-delete-cancel" data-provider="' +
+                escapeHtml(providerId) +
+                '" data-id="' +
+                escapeHtml(mapper.id) +
+                '" ' +
+                chooseLazy(
+                  state.busy,
+                  () => "disabled",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("cancel")) +
+                "</button></div>",
+              () =>
+                '<div class="actions">' +
+                button(text("adminEditProviderMapper"), {
+                  action: "admin-provider-mapper-edit",
+                  provider: providerId,
+                  id: mapper.id,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                "" +
+                button(text("adminDeleteProviderMapper"), {
+                  action: "admin-provider-mapper-delete-request",
+                  provider: providerId,
+                  id: mapper.id,
+                  danger: true,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                "</div>",
+            );
+            return (
+              '<article class="list-item" data-provider-mapper-id="' +
+              escapeHtml(mapper.id) +
+              '"><div><strong>' +
+              escapeHtml(mapper.name) +
+              '</strong><span class="muted">' +
+              escapeHtml(
+                "" +
+                  mapper.sourceClaim +
+                  " → " +
+                  mapper.target +
+                  " · " +
+                  mapper.mapperType +
+                  "",
+              ) +
+              "</span></div><span>" +
+              escapeHtml(mapper.syncMode) +
+              "</span>" +
+              controls +
+              "</article>"
+            );
           })
           .join("")
-      : `<div class="empty" role="status">${escapeHtml(text("adminNoProviderMappers"))}</div>`
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoProviderMappers")) +
+        "</div>"
   }</div><div class="actions">${addMapperButton}</div>${mapperEditor}</section>`;
 }
 
@@ -2401,12 +3023,15 @@ function adminIdentityProvidersContent() {
   const createForm =
     openConfigurationId === "new"
       ? identityProviderConfigurationForm("new")
-      : openConfigurationId === "new-saml"
-        ? samlIdentityProviderConfigurationForm("new-saml")
-        : "";
+      : chooseLazy(
+          openConfigurationId === "new-saml",
+          () => samlIdentityProviderConfigurationForm("new-saml"),
+          () => "",
+        );
   return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminIdentityProviders"))}</h2><div class="actions">${button(text("adminAddOidcProvider"), { action: "admin-oidc-provider-create", icon: "add", busy: state.busy === "identity-provider-create", disabled: state.offline || Boolean(state.busy) })}${button(text("adminAddSamlProvider"), { action: "admin-saml-provider-create", icon: "add", disabled: state.offline || Boolean(state.busy) })}</div></div>${createForm}<form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${
     providers.length
-      ? `<div class="list">${providers
+      ? '<div class="list">' +
+        providers
           .map((provider) => {
             const id = String(provider.id ?? "");
             const policy = state.data.identityProviderPolicies?.[id];
@@ -2414,27 +3039,212 @@ function adminIdentityProvidersContent() {
               state.data.identityProviderPolicyOpenId === id;
             const policyDraft =
               state.data.identityProviderPolicyDrafts?.[id] ?? policy ?? {};
-            const policyErrors =
-              state.data.identityProviderPolicyErrorId === id
-                ? violations(state.error?.body)
-                : {};
+            const policyErrors = chooseLazy(
+              state.data.identityProviderPolicyErrorId === id,
+              () => violations(state.error?.body),
+              () => ({}),
+            );
             const confirming =
               state.data.identityProviderDeleteConfirmId === id;
             const editingConnection =
               state.data.identityProviderConfigurationOpenId === id;
-            const connectionForm = editingConnection
-              ? provider.providerType === "saml"
-                ? samlIdentityProviderConfigurationForm(id)
-                : identityProviderConfigurationForm(id)
-              : "";
-            const controls = confirming
-              ? `<div class="actions"><span role="status">${escapeHtml(text("adminDeleteIdentityProviderPrompt"))}</span>${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-confirm", id, danger: true, busy: state.busy === `identity-provider-delete:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-              : `<div class="actions">${button(text("adminDeleteIdentityProvider"), { action: "admin-identity-provider-delete-request", id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-            const policyForm =
-              editingPolicy && policy
-                ? `<form class="card" data-form="admin-identity-provider-policy" data-provider-id="${escapeHtml(id)}"><div class="field"><label for="provider-policy-name-${escapeHtml(id)}">${escapeHtml(text("adminProviderDisplayName"))}</label><input id="provider-policy-name-${escapeHtml(id)}" name="displayName" type="text" value="${escapeHtml(policyDraft.displayName ?? policy.displayName)}" maxlength="100" required/><div class="field-error">${escapeHtml(policyErrors.displayName ?? "")}</div></div><label class="settings-row"><span>${escapeHtml(text("adminProviderEnabled"))}</span><input name="enabled" type="checkbox" ${(policyDraft.enabled ?? policy.enabled) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderHideOnLogin"))}</span><input name="hideOnLogin" type="checkbox" ${(policyDraft.hideOnLogin ?? policy.hideOnLogin) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderLinkingOnly"))}</span><input name="accountLinkingOnly" type="checkbox" ${(policyDraft.accountLinkingOnly ?? policy.accountLinkingOnly) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderTrustEmail"))}</span><input name="trustEmail" type="checkbox" ${(policyDraft.trustEmail ?? policy.trustEmail) ? "checked" : ""}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderRequireMfa"))}</span><input name="mfaRequired" type="checkbox" ${(policyDraft.mfaRequired ?? policy.mfaRequired) ? "checked" : ""}/></label><div class="field"><label for="provider-policy-order-${escapeHtml(id)}">${escapeHtml(text("adminProviderOrder"))}</label><input id="provider-policy-order-${escapeHtml(id)}" name="guiOrder" type="number" min="0" max="2147483647" value="${escapeHtml(policyDraft.guiOrder ?? policy.guiOrder)}" required/><div class="field-error">${escapeHtml(policyErrors.guiOrder ?? "")}</div></div><div class="field"><label for="provider-policy-visibility-${escapeHtml(id)}">${escapeHtml(text("adminProviderAccountVisibility"))}</label><select id="provider-policy-visibility-${escapeHtml(id)}" name="showInAccountConsole"><option value="always" ${(policyDraft.showInAccountConsole ?? policy.showInAccountConsole) === "always" ? "selected" : ""}>${escapeHtml(text("adminProviderAlways"))}</option><option value="when-linked" ${(policyDraft.showInAccountConsole ?? policy.showInAccountConsole) === "when-linked" ? "selected" : ""}>${escapeHtml(text("adminProviderWhenLinked"))}</option><option value="never" ${(policyDraft.showInAccountConsole ?? policy.showInAccountConsole) === "never" ? "selected" : ""}>${escapeHtml(text("adminProviderNever"))}</option></select><div class="field-error">${escapeHtml(policyErrors.showInAccountConsole ?? "")}</div></div><div class="field"><label for="provider-policy-sync-${escapeHtml(id)}">${escapeHtml(text("adminProviderSyncMode"))}</label><select id="provider-policy-sync-${escapeHtml(id)}" name="syncMode"><option value="legacy" ${(policyDraft.syncMode ?? policy.syncMode) === "legacy" ? "selected" : ""}>legacy</option><option value="import" ${(policyDraft.syncMode ?? policy.syncMode) === "import" ? "selected" : ""}>import</option><option value="read_only" ${(policyDraft.syncMode ?? policy.syncMode) === "read_only" ? "selected" : ""}>read_only</option><option value="force" ${(policyDraft.syncMode ?? policy.syncMode) === "force" ? "selected" : ""}>force</option></select><div class="field-error">${escapeHtml(policyErrors.syncMode ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `identity-provider-policy-save:${id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-identity-provider-policy-cancel" data-id="${escapeHtml(id)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`
-                : "";
-            const mapperBusy = state.busy === `provider-mappers:${id}`;
+            const connectionForm = chooseLazy(
+              editingConnection,
+              () =>
+                chooseLazy(
+                  provider.providerType === "saml",
+                  () => samlIdentityProviderConfigurationForm(id),
+                  () => identityProviderConfigurationForm(id),
+                ),
+              () => "",
+            );
+            const controls = chooseLazy(
+              confirming,
+              () =>
+                '<div class="actions"><span role="status">' +
+                escapeHtml(text("adminDeleteIdentityProviderPrompt")) +
+                "</span>" +
+                button(text("adminDeleteIdentityProvider"), {
+                  action: "admin-identity-provider-delete-confirm",
+                  id,
+                  danger: true,
+                  busy: state.busy === "identity-provider-delete:" + id + "",
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                '<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="' +
+                escapeHtml(id) +
+                '" ' +
+                chooseLazy(
+                  state.busy,
+                  () => "disabled",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("cancel")) +
+                "</button></div>",
+              () =>
+                '<div class="actions">' +
+                button(text("adminDeleteIdentityProvider"), {
+                  action: "admin-identity-provider-delete-request",
+                  id,
+                  danger: true,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                "</div>",
+            );
+            const policyForm = chooseLazy(
+              editingPolicy && policy,
+              () =>
+                '<form class="card" data-form="admin-identity-provider-policy" data-provider-id="' +
+                escapeHtml(id) +
+                '"><div class="field"><label for="provider-policy-name-' +
+                escapeHtml(id) +
+                '">' +
+                escapeHtml(text("adminProviderDisplayName")) +
+                '</label><input id="provider-policy-name-' +
+                escapeHtml(id) +
+                '" name="displayName" type="text" value="' +
+                escapeHtml(policyDraft.displayName ?? policy.displayName) +
+                '" maxlength="100" required/><div class="field-error">' +
+                escapeHtml(policyErrors.displayName ?? "") +
+                '</div></div><label class="settings-row"><span>' +
+                escapeHtml(text("adminProviderEnabled")) +
+                '</span><input name="enabled" type="checkbox" ' +
+                chooseLazy(
+                  policyDraft.enabled ?? policy.enabled,
+                  () => "checked",
+                  () => "",
+                ) +
+                '/></label><label class="settings-row"><span>' +
+                escapeHtml(text("adminProviderHideOnLogin")) +
+                '</span><input name="hideOnLogin" type="checkbox" ' +
+                chooseLazy(
+                  policyDraft.hideOnLogin ?? policy.hideOnLogin,
+                  () => "checked",
+                  () => "",
+                ) +
+                '/></label><label class="settings-row"><span>' +
+                escapeHtml(text("adminProviderLinkingOnly")) +
+                '</span><input name="accountLinkingOnly" type="checkbox" ' +
+                chooseLazy(
+                  policyDraft.accountLinkingOnly ?? policy.accountLinkingOnly,
+                  () => "checked",
+                  () => "",
+                ) +
+                '/></label><label class="settings-row"><span>' +
+                escapeHtml(text("adminProviderTrustEmail")) +
+                '</span><input name="trustEmail" type="checkbox" ' +
+                chooseLazy(
+                  policyDraft.trustEmail ?? policy.trustEmail,
+                  () => "checked",
+                  () => "",
+                ) +
+                '/></label><label class="settings-row"><span>' +
+                escapeHtml(text("adminProviderRequireMfa")) +
+                '</span><input name="mfaRequired" type="checkbox" ' +
+                chooseLazy(
+                  policyDraft.mfaRequired ?? policy.mfaRequired,
+                  () => "checked",
+                  () => "",
+                ) +
+                '/></label><div class="field"><label for="provider-policy-order-' +
+                escapeHtml(id) +
+                '">' +
+                escapeHtml(text("adminProviderOrder")) +
+                '</label><input id="provider-policy-order-' +
+                escapeHtml(id) +
+                '" name="guiOrder" type="number" min="0" max="2147483647" value="' +
+                escapeHtml(policyDraft.guiOrder ?? policy.guiOrder) +
+                '" required/><div class="field-error">' +
+                escapeHtml(policyErrors.guiOrder ?? "") +
+                '</div></div><div class="field"><label for="provider-policy-visibility-' +
+                escapeHtml(id) +
+                '">' +
+                escapeHtml(text("adminProviderAccountVisibility")) +
+                '</label><select id="provider-policy-visibility-' +
+                escapeHtml(id) +
+                '" name="showInAccountConsole"><option value="always" ' +
+                chooseLazy(
+                  (policyDraft.showInAccountConsole ??
+                    policy.showInAccountConsole) === "always",
+                  () => "selected",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("adminProviderAlways")) +
+                '</option><option value="when-linked" ' +
+                chooseLazy(
+                  (policyDraft.showInAccountConsole ??
+                    policy.showInAccountConsole) === "when-linked",
+                  () => "selected",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("adminProviderWhenLinked")) +
+                '</option><option value="never" ' +
+                chooseLazy(
+                  (policyDraft.showInAccountConsole ??
+                    policy.showInAccountConsole) === "never",
+                  () => "selected",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("adminProviderNever")) +
+                '</option></select><div class="field-error">' +
+                escapeHtml(policyErrors.showInAccountConsole ?? "") +
+                '</div></div><div class="field"><label for="provider-policy-sync-' +
+                escapeHtml(id) +
+                '">' +
+                escapeHtml(text("adminProviderSyncMode")) +
+                '</label><select id="provider-policy-sync-' +
+                escapeHtml(id) +
+                '" name="syncMode"><option value="legacy" ' +
+                chooseLazy(
+                  (policyDraft.syncMode ?? policy.syncMode) === "legacy",
+                  () => "selected",
+                  () => "",
+                ) +
+                '>legacy</option><option value="import" ' +
+                chooseLazy(
+                  (policyDraft.syncMode ?? policy.syncMode) === "import",
+                  () => "selected",
+                  () => "",
+                ) +
+                '>import</option><option value="read_only" ' +
+                chooseLazy(
+                  (policyDraft.syncMode ?? policy.syncMode) === "read_only",
+                  () => "selected",
+                  () => "",
+                ) +
+                '>read_only</option><option value="force" ' +
+                chooseLazy(
+                  (policyDraft.syncMode ?? policy.syncMode) === "force",
+                  () => "selected",
+                  () => "",
+                ) +
+                '>force</option></select><div class="field-error">' +
+                escapeHtml(policyErrors.syncMode ?? "") +
+                '</div></div><div class="actions">' +
+                button(text("save"), {
+                  type: "submit",
+                  busy:
+                    state.busy === "identity-provider-policy-save:" + id + "",
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                '<button class="secondary-button" type="button" data-action="admin-identity-provider-policy-cancel" data-id="' +
+                escapeHtml(id) +
+                '" ' +
+                chooseLazy(
+                  state.busy,
+                  () => "disabled",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("cancel")) +
+                "</button></div></form>",
+              () => "",
+            );
+            const mapperBusy = state.busy === "provider-mappers:" + id + "";
             const mapperButton = button(text("adminManageProviderMappers"), {
               action: "admin-provider-mappers-toggle",
               id,
@@ -2442,30 +3252,91 @@ function adminIdentityProvidersContent() {
               disabled: state.offline || Boolean(state.busy),
             });
             const mapperPanel = renderIdentityProviderMappers(id);
-            const connectionButton = !["oidc", "saml"].includes(
-              provider.providerType,
-            )
-              ? ""
-              : button(
+            const connectionButton = chooseLazy(
+              !["oidc", "saml"].includes(provider.providerType),
+              () => "",
+              () =>
+                button(
                   text(
-                    provider.providerType === "saml"
-                      ? "adminEditSamlConfiguration"
-                      : "adminEditProviderConnection",
+                    chooseLazy(
+                      provider.providerType === "saml",
+                      () => "adminEditSamlConfiguration",
+                      () => "adminEditProviderConnection",
+                    ),
                   ),
                   {
-                    action:
-                      provider.providerType === "saml"
-                        ? "admin-saml-provider-config-edit"
-                        : "admin-identity-provider-config-edit",
+                    action: chooseLazy(
+                      provider.providerType === "saml",
+                      () => "admin-saml-provider-config-edit",
+                      () => "admin-identity-provider-config-edit",
+                    ),
                     id,
-                    busy: state.busy === `identity-provider-config-load:${id}`,
+                    busy:
+                      state.busy === "identity-provider-config-load:" + id + "",
                     disabled: state.offline || Boolean(state.busy),
                   },
-                );
-            return `<article class="list-item" data-identity-provider-id="${escapeHtml(id)}"><div><strong>${escapeHtml(provider.displayName || provider.alias)}</strong><span class="muted">${escapeHtml(`${provider.providerType} · ${provider.alias}`)}</span><span class="muted">${escapeHtml(`${provider.mapperCount} ${text("adminProviderMappers")}`)}</span></div><span>${escapeHtml(provider.enabled ? text("adminProviderEnabled") : text("adminProviderDisabled"))} · ${escapeHtml(provider.configured ? text("adminConfigured") : text("adminUnconfigured"))}</span><div class="actions">${button(text("adminEditProviderPolicy"), { action: "admin-identity-provider-policy-toggle", id, busy: state.busy === `identity-provider-policy-load:${id}`, disabled: state.offline || Boolean(state.busy) })}${connectionButton}${mapperButton}${controls}</div>${connectionForm}${policyForm}${mapperPanel}</article>`;
+                ),
+            );
+            return (
+              '<article class="list-item" data-identity-provider-id="' +
+              escapeHtml(id) +
+              '"><div><strong>' +
+              escapeHtml(provider.displayName || provider.alias) +
+              '</strong><span class="muted">' +
+              escapeHtml(
+                "" + provider.providerType + " · " + provider.alias + "",
+              ) +
+              '</span><span class="muted">' +
+              escapeHtml(
+                "" +
+                  provider.mapperCount +
+                  " " +
+                  text("adminProviderMappers") +
+                  "",
+              ) +
+              "</span></div><span>" +
+              escapeHtml(
+                chooseLazy(
+                  provider.enabled,
+                  () => text("adminProviderEnabled"),
+                  () => text("adminProviderDisabled"),
+                ),
+              ) +
+              " · " +
+              escapeHtml(
+                chooseLazy(
+                  provider.configured,
+                  () => text("adminConfigured"),
+                  () => text("adminUnconfigured"),
+                ),
+              ) +
+              '</span><div class="actions">' +
+              button(text("adminEditProviderPolicy"), {
+                action: "admin-identity-provider-policy-toggle",
+                id,
+                busy: state.busy === "identity-provider-policy-load:" + id + "",
+                disabled: state.offline || Boolean(state.busy),
+              }) +
+              "" +
+              connectionButton +
+              "" +
+              mapperButton +
+              "" +
+              controls +
+              "</div>" +
+              connectionForm +
+              "" +
+              policyForm +
+              "" +
+              mapperPanel +
+              "</article>"
+            );
           })
-          .join("")}</div>`
-      : `<div class="empty" role="status">${escapeHtml(text("adminNoIdentityProviders"))}</div>`
+          .join("") +
+        "</div>"
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoIdentityProviders")) +
+        "</div>"
   }<div class="actions" aria-label="${escapeHtml(text("adminIdentityProviders"))} pagination"><button class="secondary-button" type="button" data-identity-provider-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-identity-provider-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
@@ -2650,9 +3521,11 @@ function identityProviderConfigurationForm(id) {
     `<div class="field"><label for="provider-config-${key}-${name}">${escapeHtml(text(label))}</label><input id="provider-config-${key}-${name}" name="${name}" type="${type}" value="${type === "password" ? "" : escapeHtml(value(name))}" ${attributes}/>${required(name)}</div>`;
   const secretHint = creating
     ? text("adminProviderSecretRequired")
-    : baseline?.clientSecretConfigured
-      ? text("adminProviderSecretConfigured")
-      : text("adminProviderSecretRequired");
+    : chooseLazy(
+        baseline?.clientSecretConfigured,
+        () => text("adminProviderSecretConfigured"),
+        () => text("adminProviderSecretRequired"),
+      );
   const authenticationMethod = value("clientAuthenticationMethod");
   const authenticationMethods = ["client_secret_basic", "client_secret_post"];
   const selectedLegacyMethod = authenticationMethods.includes(
@@ -2663,10 +3536,16 @@ function identityProviderConfigurationForm(id) {
   const authenticationMethodField = `<div class="field"><label for="provider-config-${key}-clientAuthenticationMethod">${escapeHtml(text("adminProviderClientAuthenticationMethod"))}</label><select id="provider-config-${key}-clientAuthenticationMethod" name="clientAuthenticationMethod" required>${selectedLegacyMethod}${authenticationMethods
     .map(
       (method) =>
-        `<option value="${method}" ${authenticationMethod === method ? "selected" : ""}>${method}</option>`,
+        '<option value="' +
+        method +
+        '" ' +
+        (authenticationMethod === method ? "selected" : "") +
+        ">" +
+        method +
+        "</option>",
     )
     .join("")}</select>${required("clientAuthenticationMethod")}</div>`;
-  return `<form class="card" data-form="admin-identity-provider-connection" data-provider-id="${creating ? "" : escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminProviderConnectionTitle"))}</h3>${textField("registrationId", "adminProviderRegistrationId", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("displayName", "adminProviderDisplayName", "text", 'maxlength="100" required')}${textField("alias", "adminProviderAlias", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("iconKey", "adminProviderIconKey", "text", 'maxlength="40" pattern="[a-z][a-z0-9_-]{0,39}" required')}${textField("clientId", "adminProviderClientId", "text", 'maxlength="500" required')}${textField("clientSecret", "adminProviderClientSecret", "password", `maxlength="1000" autocomplete="new-password" ${creating || !baseline?.clientSecretConfigured ? "required" : ""}`)}<div class="muted">${escapeHtml(secretHint)} ${escapeHtml(text("adminProviderConnectionSecretHint"))}</div>${textField("authorizationUri", "adminProviderAuthorizationUri", "url", 'maxlength="1000" required')}${textField("tokenUri", "adminProviderTokenUri", "url", 'maxlength="1000" required')}${textField("userInfoUri", "adminProviderUserInfoUri", "url", 'maxlength="1000"')}${textField("jwkSetUri", "adminProviderJwkSetUri", "url", 'maxlength="1000"')}${textField("issuerUri", "adminProviderIssuerUri", "url", 'maxlength="1000"')}${authenticationMethodField}${textField("scopes", "adminProviderScopes", "text", 'maxlength="1000" required')}${textField("userNameAttribute", "adminProviderUserNameAttribute", "text", 'maxlength="100" required')}<div class="actions">${button(text(creating ? "adminAddOidcProvider" : "save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy), icon: creating ? "add" : "check" })}<button class="secondary-button" type="button" data-action="admin-identity-provider-config-cancel" data-provider-id="${escapeHtml(key)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
+  return `<form class="card" data-form="admin-identity-provider-connection" data-provider-id="${creating ? "" : escapeHtml(id)}" novalidate><h3>${escapeHtml(text("adminProviderConnectionTitle"))}</h3>${textField("registrationId", "adminProviderRegistrationId", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("displayName", "adminProviderDisplayName", "text", 'maxlength="100" required')}${textField("alias", "adminProviderAlias", "text", 'maxlength="50" pattern="[a-z0-9][a-z0-9_-]{0,49}" required')}${textField("iconKey", "adminProviderIconKey", "text", 'maxlength="40" pattern="[a-z][a-z0-9_-]{0,39}" required')}${textField("clientId", "adminProviderClientId", "text", 'maxlength="500" required')}${textField("clientSecret", "adminProviderClientSecret", "password", 'maxlength="1000" autocomplete="new-password" ' + (creating || !baseline?.clientSecretConfigured ? "required" : "") + "")}<div class="muted">${escapeHtml(secretHint)} ${escapeHtml(text("adminProviderConnectionSecretHint"))}</div>${textField("authorizationUri", "adminProviderAuthorizationUri", "url", 'maxlength="1000" required')}${textField("tokenUri", "adminProviderTokenUri", "url", 'maxlength="1000" required')}${textField("userInfoUri", "adminProviderUserInfoUri", "url", 'maxlength="1000"')}${textField("jwkSetUri", "adminProviderJwkSetUri", "url", 'maxlength="1000"')}${textField("issuerUri", "adminProviderIssuerUri", "url", 'maxlength="1000"')}${authenticationMethodField}${textField("scopes", "adminProviderScopes", "text", 'maxlength="1000" required')}${textField("userNameAttribute", "adminProviderUserNameAttribute", "text", 'maxlength="100" required')}<div class="actions">${button(text(creating ? "adminAddOidcProvider" : "save"), { type: "submit", busy, disabled: state.offline || Boolean(state.busy), icon: creating ? "add" : "check" })}<button class="secondary-button" type="button" data-action="admin-identity-provider-config-cancel" data-provider-id="${escapeHtml(key)}" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div></form>`;
 }
 
 function samlIdentityProviderConfigurationForm(id) {
@@ -2681,11 +3560,41 @@ function samlIdentityProviderConfigurationForm(id) {
   const busy = state.busy === `identity-provider-config-save:${key}`;
   const value = (name) => draft[name] ?? "";
   const field = (name, label, type = "text", attributes = "") =>
-    `<div class="field"><label for="saml-config-${key}-${name}">${escapeHtml(text(label))}</label>${type === "textarea" ? `<textarea id="saml-config-${key}-${name}" name="${name}" ${attributes}>${escapeHtml(value(name))}</textarea>` : `<input id="saml-config-${key}-${name}" name="${name}" type="${type}" value="${type === "password" ? "" : escapeHtml(value(name))}" ${attributes}/>`}<div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
+    `<div class="field"><label for="saml-config-${key}-${name}">${escapeHtml(text(label))}</label>${
+      type === "textarea"
+        ? '<textarea id="saml-config-' +
+          key +
+          "-" +
+          name +
+          '" name="' +
+          name +
+          '" ' +
+          attributes +
+          ">" +
+          escapeHtml(value(name)) +
+          "</textarea>"
+        : '<input id="saml-config-' +
+          key +
+          "-" +
+          name +
+          '" name="' +
+          name +
+          '" type="' +
+          type +
+          '" value="' +
+          chooseLazy(
+            type === "password",
+            () => "",
+            () => escapeHtml(value(name)),
+          ) +
+          '" ' +
+          attributes +
+          "/>"
+    }<div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
   const checkbox = (name, label, defaultValue = false) =>
     `<label class="settings-row"><span>${escapeHtml(text(label))}</span><input name="${name}" type="checkbox" ${(draft[name] ?? defaultValue) ? "checked" : ""}/></label>`;
   const select = (name, label, options, defaultValue) =>
-    `<div class="field"><label for="saml-config-${key}-${name}">${escapeHtml(text(label))}</label><select id="saml-config-${key}-${name}" name="${name}">${options.map((option) => `<option value="${option}" ${(value(name) || defaultValue) === option ? "selected" : ""}>${option}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
+    `<div class="field"><label for="saml-config-${key}-${name}">${escapeHtml(text(label))}</label><select id="saml-config-${key}-${name}" name="${name}">${options.map((option) => '<option value="' + option + '" ' + ((value(name) || defaultValue) === option ? "selected" : "") + ">" + option + "</option>").join("")}</select><div class="field-error">${escapeHtml(errors[name] ?? "")}</div></div>`;
   const signingKeyHint = baseline?.samlSigningPrivateKeyConfigured
     ? text("adminSamlSigningKeyConfigured")
     : "";
@@ -2714,17 +3623,29 @@ function adminAdminSessionsContent() {
       const confirming = state.data.adminSessionDeleteConfirmId === session.id;
       const busy = state.busy === `admin-session-delete:${index}`;
       const controls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminSessionDeleteConfirm"))}</span>${button(text("adminSessionDelete"), { action: "admin-session-delete-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-session-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminSessionDeleteConfirm"))}</span>${button(text("adminSessionDelete"), { action: "admin-session-delete-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-session-delete-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminSessionDelete"), { action: "admin-session-delete-request", index, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       return `<article class="list-item"><div><strong>${escapeHtml(session.username)}</strong><span class="muted">${Number.isSafeInteger(session.authorizationCount) ? session.authorizationCount : 0} ${escapeHtml(text("adminAuthorizations"))}</span></div><span>${escapeHtml(session.active ? text("adminActive") : text("adminExpired"))}</span>${controls}</article>`;
     })
     .join("");
   const revokeAllControls = !canRevokeAll
     ? ""
-    : revokeAllConfirming
-      ? `<div class="actions"><span role="status">${escapeHtml(text("adminSessionRevokeAllConfirm"))}</span>${button(text("adminSessionRevokeAll"), { action: "admin-session-revoke-all-confirm", danger: true, busy: revokeAllBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-session-revoke-all-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-      : `<div class="actions">${button(text("adminSessionRevokeAll"), { action: "admin-session-revoke-all-request", danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-  return `<section class="card" aria-label="${escapeHtml(text("adminSessions"))}"><form id="admin-session-search" class="actions" role="search"><input id="admin-session-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchSessions"))}" value="${escapeHtml(state.data.adminSessionQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchSessions"))}" maxlength="200"/><select id="admin-session-status" name="status" aria-label="${escapeHtml(text("adminSessions"))}"><option value="active" ${state.data.adminSessionStatus !== "expired" ? "selected" : ""}>${escapeHtml(text("adminActive"))}</option><option value="expired" ${state.data.adminSessionStatus === "expired" ? "selected" : ""}>${escapeHtml(text("adminExpired"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-sessions-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-sessions-search")}${escapeHtml(text("adminSearchSessions"))}</button></form>${sessions.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoSessions"))}</div>`}${revokeAllControls}<div class="actions" aria-label="${escapeHtml(text("adminSessions"))} pagination"><button class="secondary-button" type="button" data-admin-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+    : chooseLazy(
+        revokeAllConfirming,
+        () =>
+          `<div class="actions"><span role="status">${escapeHtml(text("adminSessionRevokeAllConfirm"))}</span>${button(text("adminSessionRevokeAll"), { action: "admin-session-revoke-all-confirm", danger: true, busy: revokeAllBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-session-revoke-all-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`,
+        () =>
+          `<div class="actions">${button(text("adminSessionRevokeAll"), { action: "admin-session-revoke-all-request", danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`,
+      );
+  return `<section class="card" aria-label="${escapeHtml(text("adminSessions"))}"><form id="admin-session-search" class="actions" role="search"><input id="admin-session-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchSessions"))}" value="${escapeHtml(state.data.adminSessionQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchSessions"))}" maxlength="200"/><select id="admin-session-status" name="status" aria-label="${escapeHtml(text("adminSessions"))}"><option value="active" ${state.data.adminSessionStatus !== "expired" ? "selected" : ""}>${escapeHtml(text("adminActive"))}</option><option value="expired" ${state.data.adminSessionStatus === "expired" ? "selected" : ""}>${escapeHtml(text("adminExpired"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-sessions-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-sessions-search")}${escapeHtml(text("adminSearchSessions"))}</button></form>${sessions.length ? '<div class="list">' + rows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoSessions")) + "</div>"}${revokeAllControls}<div class="actions" aria-label="${escapeHtml(text("adminSessions"))} pagination"><button class="secondary-button" type="button" data-admin-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminConsentsContent() {
@@ -2747,12 +3668,16 @@ function adminAdminConsentsContent() {
       const confirming = state.data.consentRevokeConfirmKey === consentKey;
       const busy = state.busy === `admin-consent-revoke:${index}`;
       const controls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminConsentRevokeConfirm"))}</span>${button(text("adminConsentRevoke"), { action: "admin-consent-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-consent-revoke-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminConsentRevokeConfirm"))}</span>${button(text("adminConsentRevoke"), { action: "admin-consent-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-consent-revoke-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminConsentRevoke"), { action: "admin-consent-revoke-request", index, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       return `<article class="list-item"><div><strong>${escapeHtml(consent.clientName || consent.clientId)}</strong><span class="muted">${escapeHtml(consent.principalName)}</span><span class="muted">${escapeHtml((consent.authorities ?? []).join(", "))}</span></div>${controls}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminConsents"))}"><form id="admin-consent-search" class="actions" role="search"><input id="admin-consent-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchConsents"))}" value="${escapeHtml(state.data.adminConsentQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchConsents"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "admin-consents-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-consents-search")}${escapeHtml(text("adminSearchConsents"))}</button></form>${consents.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoConsents"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminConsents"))} pagination"><button class="secondary-button" type="button" data-admin-consent-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-consent-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminConsents"))}"><form id="admin-consent-search" class="actions" role="search"><input id="admin-consent-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchConsents"))}" value="${escapeHtml(state.data.adminConsentQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchConsents"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "admin-consents-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-consents-search")}${escapeHtml(text("adminSearchConsents"))}</button></form>${consents.length ? '<div class="list">' + rows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoConsents")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminConsents"))} pagination"><button class="secondary-button" type="button" data-admin-consent-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-consent-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-consents-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminOfflineSessionsContent() {
@@ -2772,12 +3697,16 @@ function adminAdminOfflineSessionsContent() {
         state.data.offlineSessionDeleteConfirmId === session.id;
       const busy = state.busy === `admin-offline-session-delete:${index}`;
       const controls = confirming
-        ? `<div class="actions"><span role="status">${escapeHtml(text("adminOfflineSessionRevokePrompt"))}</span>${button(text("adminRevokeOfflineSession"), { action: "admin-offline-session-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-offline-session-revoke-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+        ? `<div class="actions"><span role="status">${escapeHtml(text("adminOfflineSessionRevokePrompt"))}</span>${button(text("adminRevokeOfflineSession"), { action: "admin-offline-session-revoke-confirm", index, danger: true, busy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-offline-session-revoke-cancel" ${chooseLazy(
+            state.busy,
+            () => "disabled",
+            () => "",
+          )}>${escapeHtml(text("cancel"))}</button></div>`
         : `<div class="actions">${button(text("adminRevokeOfflineSession"), { action: "admin-offline-session-revoke-request", index, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
       return `<article class="list-item"><div><strong>${escapeHtml(session.clientName || session.clientId)}</strong><span class="muted">${escapeHtml(session.username)}</span></div>${controls}</article>`;
     })
     .join("");
-  return `<section class="card" aria-label="${escapeHtml(text("adminOfflineSessions"))}">${sessions.length ? `<div class="list">${rows}</div>` : `<div class="empty" role="status">${escapeHtml(text("offlineSessionsEmpty"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminOfflineSessions"))} pagination"><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminOfflineSessions"))}">${sessions.length ? '<div class="list">' + rows + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("offlineSessionsEmpty")) + "</div>"}<div class="actions" aria-label="${escapeHtml(text("adminOfflineSessions"))} pagination"><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-offline-session-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-offline-sessions-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminEventsContent() {
@@ -2791,7 +3720,44 @@ function adminAdminEventsContent() {
   const totalPages = Number.isSafeInteger(page.totalPages)
     ? page.totalPages
     : 0;
-  return `<section class="card" aria-label="${escapeHtml(text("adminEvents"))}"><form id="admin-event-search" class="actions" role="search"><input id="admin-event-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchEvents"))}" value="${escapeHtml(state.data.adminEventQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchEvents"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "admin-events-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-events-search")}${escapeHtml(text("adminSearchEvents"))}</button></form>${events.length ? `<div class="list">${events.map((event) => `<article class="list-item"><div><strong>${escapeHtml(event.action)}</strong><span class="muted">${escapeHtml(`${event.actor} · ${event.targetType} ${event.targetId}`)}</span></div><time datetime="${escapeHtml(event.occurredAt)}">${escapeHtml(new Date(event.occurredAt).toLocaleString(state.locale === "tr" ? "tr-TR" : "en-US"))}</time></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoEvents"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminEvents"))} pagination"><button class="secondary-button" type="button" data-admin-event-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-events-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-event-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-events-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminEvents"))}"><form id="admin-event-search" class="actions" role="search"><input id="admin-event-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchEvents"))}" value="${escapeHtml(state.data.adminEventQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchEvents"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "admin-events-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-events-search")}${escapeHtml(text("adminSearchEvents"))}</button></form>${
+    events.length
+      ? '<div class="list">' +
+        events
+          .map(
+            (event) =>
+              '<article class="list-item"><div><strong>' +
+              escapeHtml(event.action) +
+              '</strong><span class="muted">' +
+              escapeHtml(
+                "" +
+                  event.actor +
+                  " · " +
+                  event.targetType +
+                  " " +
+                  event.targetId +
+                  "",
+              ) +
+              '</span></div><time datetime="' +
+              escapeHtml(event.occurredAt) +
+              '">' +
+              escapeHtml(
+                new Date(event.occurredAt).toLocaleString(
+                  chooseLazy(
+                    state.locale === "tr",
+                    () => "tr-TR",
+                    () => "en-US",
+                  ),
+                ),
+              ) +
+              "</time></article>",
+          )
+          .join("") +
+        "</div>"
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoEvents")) +
+        "</div>"
+  }<div class="actions" aria-label="${escapeHtml(text("adminEvents"))} pagination"><button class="secondary-button" type="button" data-admin-event-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-events-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-event-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-events-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminKeysContent() {
@@ -2806,9 +3772,40 @@ function adminAdminKeysContent() {
     ? page.totalPages
     : 0;
   const rotateConfirm = state.data.adminKeyRotateConfirm
-    ? `<div class="actions"><span role="status">${escapeHtml(text("adminRotateSigningKeyConfirm"))}</span>${button(text("adminRotateSigningKeyNow"), { action: "admin-key-rotate-confirm", danger: true, busy: state.busy === "admin-key-rotate", mutation: true })}<button class="secondary-button" type="button" data-action="admin-key-rotate-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+    ? `<div class="actions"><span role="status">${escapeHtml(text("adminRotateSigningKeyConfirm"))}</span>${button(text("adminRotateSigningKeyNow"), { action: "admin-key-rotate-confirm", danger: true, busy: state.busy === "admin-key-rotate", mutation: true })}<button class="secondary-button" type="button" data-action="admin-key-rotate-cancel" ${chooseLazy(
+        state.busy,
+        () => "disabled",
+        () => "",
+      )}>${escapeHtml(text("cancel"))}</button></div>`
     : `<div class="actions">${button(text("adminRotateSigningKey"), { action: "admin-key-rotate-request", mutation: true })}</div>`;
-  return `<section class="card" aria-label="${escapeHtml(text("adminKeys"))}"><form id="admin-key-search" class="actions" role="search"><input id="admin-key-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchKeys"))}" value="${escapeHtml(state.data.adminKeyQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchKeys"))}" maxlength="200"/><select id="admin-key-active" name="active" aria-label="${escapeHtml(text("adminKeys"))}"><option value="all" ${state.data.adminKeyActive === "all" ? "selected" : ""}>${escapeHtml(text("adminKeys"))}</option><option value="true" ${state.data.adminKeyActive !== "all" && state.data.adminKeyActive !== "false" ? "selected" : ""}>${escapeHtml(text("adminKeyActive"))}</option><option value="false" ${state.data.adminKeyActive === "false" ? "selected" : ""}>${escapeHtml(text("adminKeyInactive"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-keys-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-keys-search")}${escapeHtml(text("adminSearchKeys"))}</button></form>${rotateConfirm}${keys.length ? `<div class="list">${keys.map((key) => `<article class="list-item"><div><strong>${escapeHtml(key.kid)}</strong><span class="muted">${escapeHtml(`${key.type} · ${key.algorithm} · ${key.use}`)}</span></div><span>${escapeHtml(key.active ? text("adminKeyActive") : text("adminKeyInactive"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoKeys"))}</div>`}<div class="actions" aria-label="${escapeHtml(text("adminKeys"))} pagination"><button class="secondary-button" type="button" data-admin-key-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-keys-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-key-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-keys-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
+  return `<section class="card" aria-label="${escapeHtml(text("adminKeys"))}"><form id="admin-key-search" class="actions" role="search"><input id="admin-key-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchKeys"))}" value="${escapeHtml(state.data.adminKeyQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchKeys"))}" maxlength="200"/><select id="admin-key-active" name="active" aria-label="${escapeHtml(text("adminKeys"))}"><option value="all" ${state.data.adminKeyActive === "all" ? "selected" : ""}>${escapeHtml(text("adminKeys"))}</option><option value="true" ${state.data.adminKeyActive !== "all" && state.data.adminKeyActive !== "false" ? "selected" : ""}>${escapeHtml(text("adminKeyActive"))}</option><option value="false" ${state.data.adminKeyActive === "false" ? "selected" : ""}>${escapeHtml(text("adminKeyInactive"))}</option></select><button class="primary-button" type="submit" ${state.busy === "admin-keys-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "admin-keys-search")}${escapeHtml(text("adminSearchKeys"))}</button></form>${rotateConfirm}${
+    keys.length
+      ? '<div class="list">' +
+        keys
+          .map(
+            (key) =>
+              '<article class="list-item"><div><strong>' +
+              escapeHtml(key.kid) +
+              '</strong><span class="muted">' +
+              escapeHtml(
+                "" + key.type + " · " + key.algorithm + " · " + key.use + "",
+              ) +
+              "</span></div><span>" +
+              escapeHtml(
+                chooseLazy(
+                  key.active,
+                  () => text("adminKeyActive"),
+                  () => text("adminKeyInactive"),
+                ),
+              ) +
+              "</span></article>",
+          )
+          .join("") +
+        "</div>"
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoKeys")) +
+        "</div>"
+  }<div class="actions" aria-label="${escapeHtml(text("adminKeys"))} pagination"><button class="secondary-button" type="button" data-admin-key-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-keys-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-admin-key-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-keys-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 function adminAdminPoliciesContent() {
@@ -2819,7 +3816,11 @@ function adminAdminPoliciesContent() {
   const errors = violations(state.error?.body);
   const revokeBusy = state.busy === "admin-offline-access-revoke";
   const revokeAll = state.data.offlineAccessRevokeConfirm
-    ? `<div class="actions"><span role="status">${escapeHtml(text("adminRevokeAllOfflineTokensConfirm"))}</span>${button(text("adminRevokeAllOfflineTokens"), { action: "admin-offline-access-revoke-confirm", danger: true, busy: revokeBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-offline-access-revoke-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
+    ? `<div class="actions"><span role="status">${escapeHtml(text("adminRevokeAllOfflineTokensConfirm"))}</span>${button(text("adminRevokeAllOfflineTokens"), { action: "admin-offline-access-revoke-confirm", danger: true, busy: revokeBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-offline-access-revoke-cancel" ${chooseLazy(
+        state.busy,
+        () => "disabled",
+        () => "",
+      )}>${escapeHtml(text("cancel"))}</button></div>`
     : `<div class="settings-row"><div><strong>${escapeHtml(text("adminRevokeAllOfflineTokensTitle"))}</strong><p class="muted">${escapeHtml(text("adminRevokeAllOfflineTokensHelp"))}</p></div>${button(text("adminRevokeAllOfflineTokens"), { action: "admin-offline-access-revoke-request", danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
   return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><form data-form="admin-ciba-policy" novalidate>${field("requestLifespanSeconds", text("adminRequestLifespan"), cibaDraft.requestLifespanSeconds ?? "", errors.requestLifespanSeconds, "number", 'min="30" max="3600" required')}${field("pollingIntervalSeconds", text("adminPollingInterval"), cibaDraft.pollingIntervalSeconds ?? "", errors.pollingIntervalSeconds, "number", 'min="1" max="300" required')}<div class="field"><label for="deliveryMode">${escapeHtml(text("adminDeliveryMode"))}</label><select id="deliveryMode" name="deliveryMode"><option value="all" ${cibaDraft.deliveryMode === "all" ? "selected" : ""}>all</option><option value="poll" ${cibaDraft.deliveryMode === "poll" ? "selected" : ""}>poll</option><option value="ping" ${cibaDraft.deliveryMode === "ping" ? "selected" : ""}>ping</option><option value="push" ${cibaDraft.deliveryMode === "push" ? "selected" : ""}>push</option></select><div class="field-error">${escapeHtml(errors.deliveryMode ?? "")}</div></div><div class="field"><label for="userVerification">${escapeHtml(text("adminUserVerification"))}</label><select id="userVerification" name="userVerification"><option value="required" ${cibaDraft.userVerification === "required" ? "selected" : ""}>required</option><option value="preferred" ${cibaDraft.userVerification === "preferred" ? "selected" : ""}>preferred</option><option value="discouraged" ${cibaDraft.userVerification === "discouraged" ? "selected" : ""}>discouraged</option></select><div class="field-error">${escapeHtml(errors.userVerification ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="mfaRequired" ${cibaDraft.mfaRequired ? "checked" : ""}/>${escapeHtml(text("adminMfaRequired"))}</label><label class="settings-row"><input type="checkbox" name="stepUpRequired" ${cibaDraft.stepUpRequired ? "checked" : ""}/>${escapeHtml(text("adminStepUpRequired"))}</label>${field("stepUpAcr", text("adminStepUpAcr"), cibaDraft.stepUpAcr ?? "", errors.stepUpAcr, "text", 'maxlength="100"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-ciba-policy", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><form data-form="admin-offline-access-policy" novalidate>${field("idleTimeout", text("adminIdleTimeout"), offlineDraft.idleTimeout ?? "", errors.idleTimeout, "text", 'required placeholder="P30D"')}${field("maxLifespan", text("adminMaxLifespan"), offlineDraft.maxLifespan ?? "", errors.maxLifespan, "text", 'placeholder="P180D"')}<div class="field"><label class="settings-row"><input type="checkbox" name="maxLimited" ${offlineDraft.maxLimited ? "checked" : ""}/>${escapeHtml(text("adminMaxLimited"))}</label><div class="field-error">${escapeHtml(errors.maxLimited ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-offline-access-policy", disabled: state.offline })}</div></form><div class="actions">${revokeAll}</div></section></div>`;
 }
@@ -2844,7 +3845,7 @@ function adminAdminConfigurationContent() {
     ["adminSessionTimeout", server.sessionTimeout],
   ];
   const activeKey = server.activeSigningKey;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}</div><form data-form="admin-branding" novalidate>${field("applicationName", text("adminApplicationName"), brandingDraft.applicationName ?? "", brandingErrors.applicationName, "text", 'maxlength="100" required')}${field("primaryColor", text("adminPrimaryColor"), brandingDraft.primaryColor ?? "", brandingErrors.primaryColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("accentColor", text("adminAccentColor"), brandingDraft.accentColor ?? "", brandingErrors.accentColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("backgroundColor", text("adminBackgroundColor"), brandingDraft.backgroundColor ?? "", brandingErrors.backgroundColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-branding", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), `${activeKey.kid} · ${activeKey.type} · ${activeKey.algorithm} · ${activeKey.use}`) : ""}</div></section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminBranding"))}"><h2>${escapeHtml(text("adminBranding"))}</h2><div class="list">${row(text("adminLogoPath"), branding.logoPath)}${row(text("adminFaviconPath"), branding.faviconPath)}${row(text("adminAppleTouchIconPath"), branding.appleTouchIconPath)}</div><form data-form="admin-branding" novalidate>${field("applicationName", text("adminApplicationName"), brandingDraft.applicationName ?? "", brandingErrors.applicationName, "text", 'maxlength="100" required')}${field("primaryColor", text("adminPrimaryColor"), brandingDraft.primaryColor ?? "", brandingErrors.primaryColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("accentColor", text("adminAccentColor"), brandingDraft.accentColor ?? "", brandingErrors.accentColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}${field("backgroundColor", text("adminBackgroundColor"), brandingDraft.backgroundColor ?? "", brandingErrors.backgroundColor, "text", 'pattern="#[0-9A-Fa-f]{6}" maxlength="7" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-branding", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminServerInfo"))}"><h2>${escapeHtml(text("adminServerInfo"))}</h2><div class="list">${endpoints.map(([key, value]) => row(text(key), value)).join("")}${activeKey ? row(text("adminActiveSigningKey"), "" + activeKey.kid + " · " + activeKey.type + " · " + activeKey.algorithm + " · " + activeKey.use + "") : ""}</div></section></div>`;
 }
 
 function adminAdminLoginEmailContent() {
@@ -2883,31 +3884,149 @@ function adminAdminLocalizationContent() {
       ...overrides.map((item) => item.bundle).filter(Boolean),
     ]),
   ];
-  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${localizationDraft.defaultLocale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => `<label class="settings-row"><input type="checkbox" name="supportedLocales" value="${escapeHtml(locale)}" ${supportedLocales.includes(locale) ? "checked" : ""}/>${escapeHtml(locale)}</label>`).join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings", disabled: state.offline })}</div></form>`;
+  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => '<option value="' + escapeHtml(locale) + '" ' + (localizationDraft.defaultLocale === locale ? "selected" : "") + ">" + escapeHtml(locale) + "</option>").join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => '<label class="settings-row"><input type="checkbox" name="supportedLocales" value="' + escapeHtml(locale) + '" ' + (supportedLocales.includes(locale) ? "checked" : "") + "/>" + escapeHtml(locale) + "</label>").join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings", disabled: state.offline })}</div></form>`;
   const overrideField = (item, name, label, value, error) => {
     const id = `override-${item.id}-${name}`;
-    return `<div class="field"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" name="${name}" value="${escapeHtml(value ?? "")}" aria-invalid="${Boolean(error)}" required maxlength="${name === "messageValue" ? 4000 : name === "locale" ? 10 : name === "bundle" ? 50 : 255}"/><div class="field-error" id="${id}-error">${escapeHtml(error ?? "")}</div></div>`;
+    return `<div class="field"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" name="${name}" value="${escapeHtml(value ?? "")}" aria-invalid="${Boolean(error)}" required maxlength="${
+      name === "messageValue"
+        ? 4000
+        : chooseLazy(
+            name === "locale",
+            () => 10,
+            () =>
+              chooseLazy(
+                name === "bundle",
+                () => 50,
+                () => 255,
+              ),
+          )
+    }"/><div class="field-error" id="${id}-error">${escapeHtml(error ?? "")}</div></div>`;
   };
   const createDraft = state.data.adminMessageOverrideCreateDraft ?? {};
   const createErrors = messageErrorTarget === "create" ? errors : {};
-  const createForm = `<form data-form="admin-localization-message-create" novalidate><div class="field"><label for="new-override-locale">${escapeHtml(text("adminMessageLocale"))}</label><select id="new-override-locale" name="locale" required>${supportedLocales.map((locale) => `<option value="${escapeHtml(locale)}" ${createDraft.locale === locale ? "selected" : ""}>${escapeHtml(locale)}</option>`).join("")}</select><div class="field-error">${escapeHtml(createErrors.locale ?? "")}</div></div><div class="field"><label for="new-override-bundle">${escapeHtml(text("adminMessageBundle"))}</label><select id="new-override-bundle" name="bundle" required>${availableBundles.map((bundle) => `<option value="${escapeHtml(bundle)}" ${createDraft.bundle === bundle ? "selected" : ""}>${escapeHtml(bundle)}</option>`).join("")}</select><div class="field-error">${escapeHtml(createErrors.bundle ?? "")}</div></div>${field("messageKey", text("adminMessageKey"), createDraft.messageKey ?? "", createErrors.messageKey, "text", 'maxlength="255" pattern="[A-Za-z0-9_.-]+" required')}<div class="field"><label for="new-override-value">${escapeHtml(text("adminMessageValue"))}</label><textarea id="new-override-value" name="messageValue" required maxlength="4000">${escapeHtml(createDraft.messageValue ?? "")}</textarea><div class="field-error">${escapeHtml(createErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("adminCreateMessageOverride"), { type: "submit", busy: state.busy === "admin-message-create", disabled: state.offline })}</div></form>`;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLocalizationSettings"))}"><h2>${escapeHtml(text("adminLocalizationSettings"))}</h2><div class="list">${row(text("adminLocalizationEnabled"), settings.internationalizationEnabled === true ? text("adminEnabled") : settings.internationalizationEnabled === false ? text("adminDisabled") : undefined)}${row(text("adminDefaultLocale"), settings.defaultLocale)}${row(text("adminSupportedLocales"), list(settings.supportedLocales))}${row(text("adminAvailableLocales"), list(settings.availableLocales))}${row(text("adminAvailableBundles"), list(settings.availableBundles))}</div></section><section class="card" aria-label="${escapeHtml(text("adminMessageOverrides"))}"><h2>${escapeHtml(text("adminMessageOverrides"))}</h2>${
+  const createForm = `<form data-form="admin-localization-message-create" novalidate><div class="field"><label for="new-override-locale">${escapeHtml(text("adminMessageLocale"))}</label><select id="new-override-locale" name="locale" required>${supportedLocales.map((locale) => '<option value="' + escapeHtml(locale) + '" ' + (createDraft.locale === locale ? "selected" : "") + ">" + escapeHtml(locale) + "</option>").join("")}</select><div class="field-error">${escapeHtml(createErrors.locale ?? "")}</div></div><div class="field"><label for="new-override-bundle">${escapeHtml(text("adminMessageBundle"))}</label><select id="new-override-bundle" name="bundle" required>${availableBundles.map((bundle) => '<option value="' + escapeHtml(bundle) + '" ' + (createDraft.bundle === bundle ? "selected" : "") + ">" + escapeHtml(bundle) + "</option>").join("")}</select><div class="field-error">${escapeHtml(createErrors.bundle ?? "")}</div></div>${field("messageKey", text("adminMessageKey"), createDraft.messageKey ?? "", createErrors.messageKey, "text", 'maxlength="255" pattern="[A-Za-z0-9_.-]+" required')}<div class="field"><label for="new-override-value">${escapeHtml(text("adminMessageValue"))}</label><textarea id="new-override-value" name="messageValue" required maxlength="4000">${escapeHtml(createDraft.messageValue ?? "")}</textarea><div class="field-error">${escapeHtml(createErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("adminCreateMessageOverride"), { type: "submit", busy: state.busy === "admin-message-create", disabled: state.offline })}</div></form>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminLocalizationSettings"))}"><h2>${escapeHtml(text("adminLocalizationSettings"))}</h2><div class="list">${row(
+    text("adminLocalizationEnabled"),
+    settings.internationalizationEnabled === true
+      ? text("adminEnabled")
+      : chooseLazy(
+          settings.internationalizationEnabled === false,
+          () => text("adminDisabled"),
+          () => undefined,
+        ),
+  )}${row(text("adminDefaultLocale"), settings.defaultLocale)}${row(text("adminSupportedLocales"), list(settings.supportedLocales))}${row(text("adminAvailableLocales"), list(settings.availableLocales))}${row(text("adminAvailableBundles"), list(settings.availableBundles))}</div></section><section class="card" aria-label="${escapeHtml(text("adminMessageOverrides"))}"><h2>${escapeHtml(text("adminMessageOverrides"))}</h2>${
     overrides.length
-      ? `<div class="list">${overrides
+      ? '<div class="list">' +
+        overrides
           .map((item) => {
             const values = drafts[item.id] ?? item;
-            const itemErrors =
-              messageErrorTarget === `update:${item.id}` ? errors : {};
+            const itemErrors = chooseLazy(
+              messageErrorTarget === "update:" + item.id + "",
+              () => errors,
+              () => ({}),
+            );
             const deletePending =
               String(state.data.adminMessageDeleteConfirmId) ===
               String(item.id);
-            const deleteControls = deletePending
-              ? `<div class="actions"><span role="status">${escapeHtml(text("adminMessageOverrideDeletePrompt"))}</span>${button(text("adminMessageOverrideDelete"), { action: "admin-message-delete-confirm", id: item.id, danger: true, busy: state.busy === `admin-message-delete:${item.id}`, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-message-delete-cancel" ${state.busy ? "disabled" : ""}>${escapeHtml(text("cancel"))}</button></div>`
-              : `<div class="actions">${button(text("adminMessageOverrideDelete"), { action: "admin-message-delete-request", id: item.id, danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-            return `<article class="list-item"><strong>${escapeHtml(`${item.locale} · ${item.bundle} · ${item.messageKey}`)}</strong><form data-form="admin-localization-message" data-id="${escapeHtml(item.id)}" novalidate>${overrideField(item, "locale", text("adminMessageLocale"), values.locale, itemErrors.locale)}${overrideField(item, "bundle", text("adminMessageBundle"), values.bundle, itemErrors.bundle)}${overrideField(item, "messageKey", text("adminMessageKey"), values.messageKey, itemErrors.messageKey)}<div class="field"><label for="override-${escapeHtml(item.id)}-messageValue">${escapeHtml(text("adminMessageValue"))}</label><textarea id="override-${escapeHtml(item.id)}-messageValue" name="messageValue" required maxlength="4000" aria-invalid="${Boolean(itemErrors.messageValue)}">${escapeHtml(formString(values.messageValue, ""))}</textarea><div class="field-error" id="override-${escapeHtml(item.id)}-messageValue-error">${escapeHtml(itemErrors.messageValue ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `admin-message-${item.id}`, disabled: state.offline })}</div></form>${deleteControls}</article>`;
+            const deleteControls = chooseLazy(
+              deletePending,
+              () =>
+                '<div class="actions"><span role="status">' +
+                escapeHtml(text("adminMessageOverrideDeletePrompt")) +
+                "</span>" +
+                button(text("adminMessageOverrideDelete"), {
+                  action: "admin-message-delete-confirm",
+                  id: item.id,
+                  danger: true,
+                  busy: state.busy === "admin-message-delete:" + item.id + "",
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                '<button class="secondary-button" type="button" data-action="admin-message-delete-cancel" ' +
+                chooseLazy(
+                  state.busy,
+                  () => "disabled",
+                  () => "",
+                ) +
+                ">" +
+                escapeHtml(text("cancel")) +
+                "</button></div>",
+              () =>
+                '<div class="actions">' +
+                button(text("adminMessageOverrideDelete"), {
+                  action: "admin-message-delete-request",
+                  id: item.id,
+                  danger: true,
+                  disabled: state.offline || Boolean(state.busy),
+                }) +
+                "</div>",
+            );
+            return (
+              '<article class="list-item"><strong>' +
+              escapeHtml(
+                "" +
+                  item.locale +
+                  " · " +
+                  item.bundle +
+                  " · " +
+                  item.messageKey +
+                  "",
+              ) +
+              '</strong><form data-form="admin-localization-message" data-id="' +
+              escapeHtml(item.id) +
+              '" novalidate>' +
+              overrideField(
+                item,
+                "locale",
+                text("adminMessageLocale"),
+                values.locale,
+                itemErrors.locale,
+              ) +
+              "" +
+              overrideField(
+                item,
+                "bundle",
+                text("adminMessageBundle"),
+                values.bundle,
+                itemErrors.bundle,
+              ) +
+              "" +
+              overrideField(
+                item,
+                "messageKey",
+                text("adminMessageKey"),
+                values.messageKey,
+                itemErrors.messageKey,
+              ) +
+              '<div class="field"><label for="override-' +
+              escapeHtml(item.id) +
+              '-messageValue">' +
+              escapeHtml(text("adminMessageValue")) +
+              '</label><textarea id="override-' +
+              escapeHtml(item.id) +
+              '-messageValue" name="messageValue" required maxlength="4000" aria-invalid="' +
+              Boolean(itemErrors.messageValue) +
+              '">' +
+              escapeHtml(formString(values.messageValue, "")) +
+              '</textarea><div class="field-error" id="override-' +
+              escapeHtml(item.id) +
+              '-messageValue-error">' +
+              escapeHtml(itemErrors.messageValue ?? "") +
+              '</div></div><div class="actions">' +
+              button(text("save"), {
+                type: "submit",
+                busy: state.busy === "admin-message-" + item.id + "",
+                disabled: state.offline,
+              }) +
+              "</div></form>" +
+              deleteControls +
+              "</article>"
+            );
           })
-          .join("")}</div>`
-      : `<div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div>`
+          .join("") +
+        "</div>"
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoMessageOverrides")) +
+        "</div>"
   }${createForm}${localizationSettingsForm}</section></div>`;
 }
 
@@ -2918,9 +4037,11 @@ function adminAdminLdapContent() {
   const enabled = (value) =>
     value === true
       ? text("adminEnabled")
-      : value === false
-        ? text("adminDisabled")
-        : text("adminNotConfigured");
+      : chooseLazy(
+          value === false,
+          () => text("adminDisabled"),
+          () => text("adminNotConfigured"),
+        );
   const count = (value) =>
     Number.isSafeInteger(value) && value >= 0 ? String(value) : "0";
   if (providers.length === 0)
@@ -2928,7 +4049,65 @@ function adminAdminLdapContent() {
   return `<section class="card" aria-label="${escapeHtml(text("adminLdap"))}"><div class="list">${providers
     .map(
       (provider) =>
-        `<article class="list-item"><div><strong>${escapeHtml(provider.name)}</strong><span class="muted">${escapeHtml(`${provider.vendor ?? "LDAP"} · ${provider.authenticationType ?? ""} · ${provider.editMode ?? ""}`)}</span><span class="muted">${escapeHtml(text("adminLdapSyncSummary"))}: ${escapeHtml(count(provider.lastSyncImported))} ${escapeHtml(text("adminLdapImported"))} · ${escapeHtml(count(provider.lastSyncUpdated))} ${escapeHtml(text("adminLdapUpdated"))}</span>${provider.lastSyncAt ? `<time class="muted" datetime="${escapeHtml(provider.lastSyncAt)}">${escapeHtml(new Date(provider.lastSyncAt).toLocaleString(state.locale === "tr" ? "tr-TR" : "en-US"))}</time>` : ""}</div><div><span>${escapeHtml(provider.enabled ? text("adminEnabled") : text("adminDisabled"))}</span><span class="muted">${escapeHtml(text("adminLdapImportUsers"))}: ${escapeHtml(enabled(provider.importUsers))}</span><span class="muted">${escapeHtml(text("adminLdapTrustEmail"))}: ${escapeHtml(enabled(provider.trustEmail))}</span>${provider.lastSyncStatus ? `<span class="muted">${escapeHtml(text("adminLdapSyncStatus"))}: ${escapeHtml(provider.lastSyncStatus)}</span>` : ""}</div></article>`,
+        '<article class="list-item"><div><strong>' +
+        escapeHtml(provider.name) +
+        '</strong><span class="muted">' +
+        escapeHtml(
+          "" +
+            (provider.vendor ?? "LDAP") +
+            " · " +
+            (provider.authenticationType ?? "") +
+            " · " +
+            (provider.editMode ?? "") +
+            "",
+        ) +
+        '</span><span class="muted">' +
+        escapeHtml(text("adminLdapSyncSummary")) +
+        ": " +
+        escapeHtml(count(provider.lastSyncImported)) +
+        " " +
+        escapeHtml(text("adminLdapImported")) +
+        " · " +
+        escapeHtml(count(provider.lastSyncUpdated)) +
+        " " +
+        escapeHtml(text("adminLdapUpdated")) +
+        "</span>" +
+        (provider.lastSyncAt
+          ? '<time class="muted" datetime="' +
+            escapeHtml(provider.lastSyncAt) +
+            '">' +
+            escapeHtml(
+              new Date(provider.lastSyncAt).toLocaleString(
+                chooseLazy(
+                  state.locale === "tr",
+                  () => "tr-TR",
+                  () => "en-US",
+                ),
+              ),
+            ) +
+            "</time>"
+          : "") +
+        "</div><div><span>" +
+        escapeHtml(
+          provider.enabled ? text("adminEnabled") : text("adminDisabled"),
+        ) +
+        '</span><span class="muted">' +
+        escapeHtml(text("adminLdapImportUsers")) +
+        ": " +
+        escapeHtml(enabled(provider.importUsers)) +
+        '</span><span class="muted">' +
+        escapeHtml(text("adminLdapTrustEmail")) +
+        ": " +
+        escapeHtml(enabled(provider.trustEmail)) +
+        "</span>" +
+        (provider.lastSyncStatus
+          ? '<span class="muted">' +
+            escapeHtml(text("adminLdapSyncStatus")) +
+            ": " +
+            escapeHtml(provider.lastSyncStatus) +
+            "</span>"
+          : "") +
+        "</div></article>",
     )
     .join("")}</div></section>`;
 }
@@ -2941,13 +4120,47 @@ function adminAdminAuthenticationContent() {
   const providers = Array.isArray(state.data.adminExecutionProviders)
     ? state.data.adminExecutionProviders
     : [];
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminAuthenticationFlows"))}"><h2>${escapeHtml(text("adminAuthenticationFlows"))}</h2>${flows.length ? `<div class="list">${flows.map((flow) => `<article class="list-item"><div><strong>${escapeHtml(flow.name)}</strong><span class="muted">${escapeHtml(`${flow.alias} · ${flow.flowType}`)}</span>${flow.description ? `<span class="muted">${escapeHtml(flow.description)}</span>` : ""}</div><span>${escapeHtml(flow.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoAuthenticationFlows"))}</div>`}</section><section class="card" aria-label="${escapeHtml(text("adminAuthenticationBindings"))}"><h2>${escapeHtml(text("adminAuthenticationBindings"))}</h2>${bindings.length ? `<div class="list">${bindings.map((binding) => `<article class="list-item"><strong>${escapeHtml(binding.bindingType)}</strong><span>${escapeHtml(binding.flowName ?? text("adminNotConfigured"))}</span></article>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoAuthenticationBindings"))}</div>`}</section><section class="card" aria-label="${escapeHtml(text("adminExecutionProviders"))}"><h2>${escapeHtml(text("adminExecutionProviders"))}</h2>${providers.length ? `<div class="list">${providers.map((provider) => `<div class="list-item"><span>${escapeHtml(provider)}</span></div>`).join("")}</div>` : `<div class="empty" role="status">${escapeHtml(text("adminNoExecutionProviders"))}</div>`}</section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminAuthenticationFlows"))}"><h2>${escapeHtml(text("adminAuthenticationFlows"))}</h2>${
+    flows.length
+      ? '<div class="list">' +
+        flows
+          .map(
+            (flow) =>
+              '<article class="list-item"><div><strong>' +
+              escapeHtml(flow.name) +
+              '</strong><span class="muted">' +
+              escapeHtml("" + flow.alias + " · " + flow.flowType + "") +
+              "</span>" +
+              chooseLazy(
+                flow.description,
+                () =>
+                  '<span class="muted">' +
+                  escapeHtml(flow.description) +
+                  "</span>",
+                () => "",
+              ) +
+              "</div><span>" +
+              escapeHtml(
+                chooseLazy(
+                  flow.builtIn,
+                  () => text("adminBuiltIn"),
+                  () => text("adminCustom"),
+                ),
+              ) +
+              "</span></article>",
+          )
+          .join("") +
+        "</div>"
+      : '<div class="empty" role="status">' +
+        escapeHtml(text("adminNoAuthenticationFlows")) +
+        "</div>"
+  }</section><section class="card" aria-label="${escapeHtml(text("adminAuthenticationBindings"))}"><h2>${escapeHtml(text("adminAuthenticationBindings"))}</h2>${bindings.length ? '<div class="list">' + bindings.map((binding) => '<article class="list-item"><strong>' + escapeHtml(binding.bindingType) + "</strong><span>" + escapeHtml(binding.flowName ?? text("adminNotConfigured")) + "</span></article>").join("") + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoAuthenticationBindings")) + "</div>"}</section><section class="card" aria-label="${escapeHtml(text("adminExecutionProviders"))}"><h2>${escapeHtml(text("adminExecutionProviders"))}</h2>${providers.length ? '<div class="list">' + providers.map((provider) => '<div class="list-item"><span>' + escapeHtml(provider) + "</span></div>").join("") + "</div>" : '<div class="empty" role="status">' + escapeHtml(text("adminNoExecutionProviders")) + "</div>"}</section></div>`;
 }
 
 function profileContent() {
   const profile = {
-    ...(state.profile ?? {}),
-    ...(state.data.accountProfileDraft ?? {}),
+    ...state.profile,
+    ...state.data.accountProfileDraft,
   };
   const errors = violations(state.error?.body);
   return `<section class="card"><h2>${escapeHtml(text("firstName"))} &amp; ${escapeHtml(text("lastName"))}</h2><p>${escapeHtml(text("profileLoadError"))}</p><form data-form="profile" novalidate><div class="form-grid">${field("firstName", text("firstName"), profile.firstName ?? "", errors.firstName)}${field("lastName", text("lastName"), profile.lastName ?? "", errors.lastName)}${field("email", text("email"), profile.email ?? "", errors.email, "email")}<div class="field"><label for="preferredLocale">${escapeHtml(text("language"))}</label><select id="preferredLocale" name="preferredLocale"><option value="en" ${profile.preferredLocale === "en" ? "selected" : ""}>${escapeHtml(text("english"))}</option><option value="tr" ${profile.preferredLocale === "tr" ? "selected" : ""}>${escapeHtml(text("turkish"))}</option></select><div class="field-error"></div></div>${field("currentPassword", text("currentPassword"), "", errors.currentPassword, "password", 'autocomplete="current-password"')}</div><div class="actions">${button(text("save"), { action: "save-profile", type: "submit", busy: state.busy === "profile", mutation: true })}</div></form></section>`;
@@ -2957,7 +4170,106 @@ function securityContent() {
   const mfa = state.data.mfa ?? {};
   const social = state.data.social ?? [];
   const passwordErrors = violations(state.error?.body);
-  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("passwordPolicy"))}</h2><p>${escapeHtml(text("securityTitle"))}</p><form data-form="password" novalidate>${field("currentPassword", text("currentPassword"), "", passwordErrors.currentPassword, "password")}${field("newPassword", text("newPassword"), "", passwordErrors.newPassword, "password")}${field("confirmPassword", text("confirmPassword"), "", passwordErrors.confirmPassword, "password")}<div class="actions">${button(text("save"), { action: "save-password", type: "submit", busy: state.busy === "password", mutation: true })}</div></form></section><section class="card"><h2>${escapeHtml(text("mfaTitle"))}</h2><p>${escapeHtml(text("mfaHelp"))}</p>${mfa.available === false ? `<div class="notice">${escapeHtml(text("mfaUnavailable"))}</div>` : mfa.enabled ? `<div class="notice success">${escapeHtml(text("mfaEnabled"))}</div>${field("mfaCode", text("mfaCode"), "", "", "text", 'inputmode="numeric" maxlength="${mfa.digits ?? 6}"')}${button(text("mfaDisable"), { action: "mfa-disable", busy: state.busy === "mfa", mutation: true })}` : mfa.setup ? `<div class="notice">${escapeHtml(text("mfaSecret"))}: <code>${escapeHtml(mfa.setup.secret ?? "")}</code></div>${field("mfaCode", text("mfaCode"), "", "", "text", 'inputmode="numeric" maxlength="${mfa.setup.digits ?? 6}"')}${button(text("mfaEnable"), { action: "mfa-enable", busy: state.busy === "mfa", mutation: true })}` : button(text("mfaSetup"), { action: "mfa-setup", busy: state.busy === "mfa", mutation: true })}</section><section class="card"><h2>${escapeHtml(text("socialLinksTitle"))}</h2><p>${escapeHtml(text("socialLinksHelp"))}</p><div class="list">${social.length ? social.map((link) => `<div class="list-item"><div><strong>${escapeHtml(link.displayName ?? link.provider)}</strong><span class="muted">${escapeHtml(link.linked ? text("socialConnected") : link.configured && link.enabled ? text("socialNotConnected") : text("socialNotConfigured"))}</span></div>${link.linked ? button(text("socialRemove"), { action: "social-remove", danger: true, busy: state.busy === "social", mutation: true }) : button(text("socialConnect"), { action: "social-start", busy: state.busy === "social", disabled: !link.configured || !link.enabled, mutation: true, provider: link.provider })}</div>`).join("") : `<div class="empty">${escapeHtml(text("socialLinksEmpty"))}</div>`}</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
+  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("passwordPolicy"))}</h2><p>${escapeHtml(text("securityTitle"))}</p><form data-form="password" novalidate>${field("currentPassword", text("currentPassword"), "", passwordErrors.currentPassword, "password")}${field("newPassword", text("newPassword"), "", passwordErrors.newPassword, "password")}${field("confirmPassword", text("confirmPassword"), "", passwordErrors.confirmPassword, "password")}<div class="actions">${button(text("save"), { action: "save-password", type: "submit", busy: state.busy === "password", mutation: true })}</div></form></section><section class="card"><h2>${escapeHtml(text("mfaTitle"))}</h2><p>${escapeHtml(text("mfaHelp"))}</p>${
+    mfa.available === false
+      ? '<div class="notice">' + escapeHtml(text("mfaUnavailable")) + "</div>"
+      : chooseLazy(
+          mfa.enabled,
+          () =>
+            '<div class="notice success">' +
+            escapeHtml(text("mfaEnabled")) +
+            "</div>" +
+            field(
+              "mfaCode",
+              text("mfaCode"),
+              "",
+              "",
+              "text",
+              'inputmode="numeric" maxlength="${mfa.digits ?? 6}"',
+            ) +
+            "" +
+            button(text("mfaDisable"), {
+              action: "mfa-disable",
+              busy: state.busy === "mfa",
+              mutation: true,
+            }) +
+            "",
+          () =>
+            chooseLazy(
+              mfa.setup,
+              () =>
+                '<div class="notice">' +
+                escapeHtml(text("mfaSecret")) +
+                ": <code>" +
+                escapeHtml(mfa.setup.secret ?? "") +
+                "</code></div>" +
+                field(
+                  "mfaCode",
+                  text("mfaCode"),
+                  "",
+                  "",
+                  "text",
+                  'inputmode="numeric" maxlength="${mfa.setup.digits ?? 6}"',
+                ) +
+                "" +
+                button(text("mfaEnable"), {
+                  action: "mfa-enable",
+                  busy: state.busy === "mfa",
+                  mutation: true,
+                }) +
+                "",
+              () =>
+                button(text("mfaSetup"), {
+                  action: "mfa-setup",
+                  busy: state.busy === "mfa",
+                  mutation: true,
+                }),
+            ),
+        )
+  }</section><section class="card"><h2>${escapeHtml(text("socialLinksTitle"))}</h2><p>${escapeHtml(text("socialLinksHelp"))}</p><div class="list">${
+    social.length
+      ? social
+          .map(
+            (link) =>
+              '<div class="list-item"><div><strong>' +
+              escapeHtml(link.displayName ?? link.provider) +
+              '</strong><span class="muted">' +
+              escapeHtml(
+                chooseLazy(
+                  link.linked,
+                  () => text("socialConnected"),
+                  () =>
+                    chooseLazy(
+                      link.configured && link.enabled,
+                      () => text("socialNotConnected"),
+                      () => text("socialNotConfigured"),
+                    ),
+                ),
+              ) +
+              "</span></div>" +
+              chooseLazy(
+                link.linked,
+                () =>
+                  button(text("socialRemove"), {
+                    action: "social-remove",
+                    danger: true,
+                    busy: state.busy === "social",
+                    mutation: true,
+                  }),
+                () =>
+                  button(text("socialConnect"), {
+                    action: "social-start",
+                    busy: state.busy === "social",
+                    disabled: !link.configured || !link.enabled,
+                    mutation: true,
+                    provider: link.provider,
+                  }),
+              ) +
+              "</div>",
+          )
+          .join("")
+      : '<div class="empty">' + escapeHtml(text("socialLinksEmpty")) + "</div>"
+  }</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
 }
 
 function pageItems(items, emptyText, renderItem) {
@@ -2968,13 +4280,13 @@ function pageItems(items, emptyText, renderItem) {
 
 function sessionsContent() {
   const sessions = state.data.sessions ?? [];
-  return `<section class="card"><h2>${escapeHtml(text("sessionsTitle"))}</h2><p>${escapeHtml(text("sessionsError"))}</p>${pageItems(sessions, text("sessionsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.current ? text("currentSession") : item.id)}</strong><span class="muted">${escapeHtml(item.createdAt ?? "")} · ${escapeHtml(item.lastAccessedAt ?? "")}</span></div>${item.current ? "" : button(text("signOutSession"), { action: "delete-session", danger: true, mutation: true })}</div>`)}<div class="actions">${button(text("signOutOthers"), { action: "delete-other-sessions", busy: state.busy === "sessions", mutation: true })}</div></section>`;
+  return `<section class="card"><h2>${escapeHtml(text("sessionsTitle"))}</h2><p>${escapeHtml(text("sessionsError"))}</p>${pageItems(sessions, text("sessionsEmpty"), (item) => '<div class="list-item" data-id="' + escapeHtml(item.id) + '"><div><strong>' + escapeHtml(item.current ? text("currentSession") : item.id) + '</strong><span class="muted">' + escapeHtml(item.createdAt ?? "") + " · " + escapeHtml(item.lastAccessedAt ?? "") + "</span></div>" + (item.current ? "" : button(text("signOutSession"), { action: "delete-session", danger: true, mutation: true })) + "</div>")}<div class="actions">${button(text("signOutOthers"), { action: "delete-other-sessions", busy: state.busy === "sessions", mutation: true })}</div></section>`;
 }
 
 function applicationsContent() {
   const applications = state.data.applications ?? [];
   const offline = state.data.offlineSessions ?? [];
-  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("applicationsTitle"))}</h2><p>${escapeHtml(text("applicationsError"))}</p>${pageItems(applications, text("applicationsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.clientId)}"><div><strong>${escapeHtml(item.clientName ?? item.clientId)}</strong><span class="muted">${escapeHtml((item.scopes ?? []).join(", "))}</span></div>${button(text("revokeApplication"), { action: "revoke-application", danger: true, busy: state.busy === "revoke-application", mutation: true })}</div>`)}</section><section class="card"><h2>${escapeHtml(text("offlineSessionsTitle"))}</h2><p>${escapeHtml(text("offlineSessionsHelp"))}</p>${pageItems(offline, text("offlineSessionsEmpty"), (item) => `<div class="list-item" data-id="${escapeHtml(item.id)}"><div><strong>${escapeHtml(item.clientName ?? item.clientId)}</strong><span class="muted">${escapeHtml(item.issuedAt ?? "")}</span></div>${button(text("revokeOfflineSession"), { action: "revoke-offline", danger: true, busy: state.busy === "revoke-offline", mutation: true })}</div>`)}</section></div>`;
+  return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("applicationsTitle"))}</h2><p>${escapeHtml(text("applicationsError"))}</p>${pageItems(applications, text("applicationsEmpty"), (item) => '<div class="list-item" data-id="' + escapeHtml(item.clientId) + '"><div><strong>' + escapeHtml(item.clientName ?? item.clientId) + '</strong><span class="muted">' + escapeHtml((item.scopes ?? []).join(", ")) + "</span></div>" + button(text("revokeApplication"), { action: "revoke-application", danger: true, busy: state.busy === "revoke-application", mutation: true }) + "</div>")}</section><section class="card"><h2>${escapeHtml(text("offlineSessionsTitle"))}</h2><p>${escapeHtml(text("offlineSessionsHelp"))}</p>${pageItems(offline, text("offlineSessionsEmpty"), (item) => '<div class="list-item" data-id="' + escapeHtml(item.id) + '"><div><strong>' + escapeHtml(item.clientName ?? item.clientId) + '</strong><span class="muted">' + escapeHtml(item.issuedAt ?? "") + "</span></div>" + button(text("revokeOfflineSession"), { action: "revoke-offline", danger: true, busy: state.busy === "revoke-offline", mutation: true }) + "</div>")}</section></div>`;
 }
 
 function settingsContent() {
@@ -2987,7 +4299,22 @@ function loginContent() {
   }
   const title =
     state.console === "admin" ? text("adminTitle") : text("accountTitle");
-  return `<div class="login"><section class="card login-card"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text("signInNote"))}</p>${state.error ? `<div class="notice error" role="alert">${escapeHtml(state.error.message)}</div>` : ""}${state.notice ? `<div class="notice success" role="status">${escapeHtml(state.notice)}</div>` : ""}<div class="actions">${button(text("signIn"), { action: "sign-in", busy: state.authStarting && !state.authCanceling, disabled: state.authStarting })}${state.authStarting ? button(text("cancelSignIn"), { action: "cancel-sign-in", busy: state.authCanceling, disabled: state.authCanceling }) : button(state.console === "admin" ? text("accountTitle") : text("adminTitle"), { action: "switch-console" })}</div></section></div>`;
+  return `<div class="login"><section class="card login-card"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text("signInNote"))}</p>${state.error ? '<div class="notice error" role="alert">' + escapeHtml(state.error.message) + "</div>" : ""}${state.notice ? '<div class="notice success" role="status">' + escapeHtml(state.notice) + "</div>" : ""}<div class="actions">${button(text("signIn"), { action: "sign-in", busy: state.authStarting && !state.authCanceling, disabled: state.authStarting })}${
+    state.authStarting
+      ? button(text("cancelSignIn"), {
+          action: "cancel-sign-in",
+          busy: state.authCanceling,
+          disabled: state.authCanceling,
+        })
+      : button(
+          chooseLazy(
+            state.console === "admin",
+            () => text("accountTitle"),
+            () => text("adminTitle"),
+          ),
+          { action: "switch-console" },
+        )
+  }</div></section></div>`;
 }
 
 function render() {
@@ -3365,9 +4692,11 @@ function profileAttributeValues(form) {
               .split(/\r?\n/)
               .map((item) => item.trim())
               .filter(Boolean)
-          : value.trim()
-            ? [value.trim()]
-            : [];
+          : chooseLazy(
+              value.trim(),
+              () => [value.trim()],
+              () => [],
+            );
       return [input.dataset.profileAttribute, values];
     }),
   );
@@ -3488,6 +4817,7 @@ function preserveOfflineDrafts() {
         state.data.userCreateDraft.profile = profileAttributeValues(form);
       } else {
         const { password: _password, ...draft } = values;
+        void _password;
         state.data.userCreateDraft = {
           ...draft,
           profile: profileAttributeValues(form),
@@ -3784,7 +5114,7 @@ async function submitForm(form) {
       : `client-role-update:${clientId}:${roleId}`;
     render();
     try {
-      const path = `/api/admin/clients/${encodeURIComponent(clientId)}/roles${creating ? "" : `/${encodeURIComponent(roleId)}`}`;
+      const path = `/api/admin/clients/${encodeURIComponent(clientId)}/roles${creating ? "" : "/" + encodeURIComponent(roleId) + ""}`;
       const result = await request(path, {
         method: creating ? "POST" : "PUT",
         body,
@@ -3839,8 +5169,12 @@ async function submitForm(form) {
       return;
 
     const draft = samlIdentityProviderConfigurationFormDraft(form);
-    const signingKey = String(formString(values.samlSigningPrivateKey, "")).trim();
-    const decryptionKey = String(formString(values.samlDecryptionPrivateKey, "")).trim();
+    const signingKey = String(
+      formString(values.samlSigningPrivateKey, ""),
+    ).trim();
+    const decryptionKey = String(
+      formString(values.samlDecryptionPrivateKey, ""),
+    ).trim();
     const localErrors = {};
     if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(draft.registrationId))
       localErrors.registrationId = text("adminRequired");
@@ -4191,7 +5525,7 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-user-password-reset") {
     const id = Number(form.dataset.userId);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     const password = String(formString(values.password, ""));
@@ -4406,7 +5740,8 @@ async function submitForm(form) {
         formString(values.cibaClientNotificationToken, ""),
       ),
       authorizationCodeTimeToLive:
-        String(formString(values.authorizationCodeTimeToLive, "")).trim() || null,
+        String(formString(values.authorizationCodeTimeToLive, "")).trim() ||
+        null,
       accessTokenTimeToLive:
         String(formString(values.accessTokenTimeToLive, "")).trim() || null,
       refreshTokenTimeToLive:
@@ -4433,7 +5768,8 @@ async function submitForm(form) {
         String(formString(values.clientSecretGracePeriod, "")).trim() || null,
       offlineSessionIdle:
         String(formString(values.offlineSessionIdle, "")).trim() || null,
-      offlineSessionMax: String(formString(values.offlineSessionMax, "")).trim() || null,
+      offlineSessionMax:
+        String(formString(values.offlineSessionMax, "")).trim() || null,
       tokenExchangeDownscopeOnly: form.elements.namedItem(
         "tokenExchangeDownscopeOnly",
       ).checked,
@@ -4515,6 +5851,7 @@ async function submitForm(form) {
         serviceAccountUsername: _serviceAccountUsername,
         ...safeUpdated
       } = updated;
+      void _serviceAccountUsername;
       state.data.clientConfiguration = safeUpdated;
       state.data.clients = {
         ...state.data.clients,
@@ -4551,7 +5888,9 @@ async function submitForm(form) {
       !form.reportValidity()
     )
       return;
-    const body = { clientName: String(formString(values.clientName, "")).trim() };
+    const body = {
+      clientName: String(formString(values.clientName, "")).trim(),
+    };
     state.data.clientMetadataDrafts ??= {};
     state.data.clientMetadataDrafts[id] = body;
     state.data.clientMetadataErrorId = id;
@@ -4654,7 +5993,7 @@ async function submitForm(form) {
   if (form.dataset.form === "admin-identity-provider-policy") {
     const id = form.dataset.providerId ?? "";
     const providers = state.data.identityProviders?.content ?? [];
-    const provider = providers.find((item) => item.id === id);
+    const provider = providers.some((item) => item.id === id);
     if (
       state.offline ||
       !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
@@ -4759,7 +6098,7 @@ async function submitForm(form) {
     state.busy = `provider-mapper-save:${errorKey}`;
     render();
     try {
-      const path = `/api/admin/identity-providers/${providerId}/mappers${mapperId ? `/${mapperId}` : ""}`;
+      const path = `/api/admin/identity-providers/${providerId}/mappers${mapperId ? "/" + mapperId + "" : ""}`;
       const saved = await request(path, {
         method: mapperId ? "PUT" : "POST",
         body,
@@ -4771,7 +6110,11 @@ async function submitForm(form) {
       };
       state.data.identityProviderMappers[providerId] = mapperId
         ? mappers.map((mapper) =>
-            mapper.id === mapperId ? savedMapper : mapper,
+            chooseLazy(
+              mapper.id === mapperId,
+              () => savedMapper,
+              () => mapper,
+            ),
           )
         : [...mappers, savedMapper];
       state.data.identityProviders = {
@@ -4780,11 +6123,16 @@ async function submitForm(form) {
           item.id === providerId
             ? {
                 ...item,
-                mapperCount: mapperId
-                  ? item.mapperCount
-                  : (Number.isSafeInteger(item.mapperCount)
-                      ? item.mapperCount
-                      : 0) + 1,
+                mapperCount: chooseLazy(
+                  mapperId,
+                  () => item.mapperCount,
+                  () =>
+                    chooseLazy(
+                      Number.isSafeInteger(item.mapperCount),
+                      () => item.mapperCount,
+                      () => 0,
+                    ) + 1,
+                ),
               }
             : item,
         ),
@@ -4905,14 +6253,20 @@ async function submitForm(form) {
     render();
     try {
       const saved = await request(
-        `/api/admin/client-scopes/${scopeId}/mappers${mapperId ? `/${mapperId}` : ""}`,
+        `/api/admin/client-scopes/${scopeId}/mappers${mapperId ? "/" + mapperId + "" : ""}`,
         {
           method: mapperId ? "PUT" : "POST",
           body,
         },
       );
       state.data.clientScopeMappers[scopeId] = mapperId
-        ? mappers.map((item) => (String(item.id) === mapperId ? saved : item))
+        ? mappers.map((item) =>
+            chooseLazy(
+              String(item.id) === mapperId,
+              () => saved,
+              () => item,
+            ),
+          )
         : [...mappers, saved];
       delete state.data.clientScopeMapperDrafts[scopeId][draftKey];
       state.data.clientScopeMapperEditor = null;
@@ -4932,7 +6286,7 @@ async function submitForm(form) {
   if (form.dataset.form === "admin-client-mapper") {
     const clientId = form.dataset.clientId ?? "";
     const mapperId = form.dataset.mapperId || null;
-    const client = (state.data.clients?.content ?? []).find(
+    const client = (state.data.clients?.content ?? []).some(
       (item) => String(item.id) === clientId,
     );
     const mappers = state.data.clientMappers?.[clientId] ?? [];
@@ -5032,11 +6386,17 @@ async function submitForm(form) {
     render();
     try {
       const saved = await request(
-        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers${mapperId ? `/${mapperId}` : ""}`,
+        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers${mapperId ? "/" + mapperId + "" : ""}`,
         { method: mapperId ? "PUT" : "POST", body },
       );
       state.data.clientMappers[clientId] = mapperId
-        ? mappers.map((item) => (String(item.id) === mapperId ? saved : item))
+        ? mappers.map((item) =>
+            chooseLazy(
+              String(item.id) === mapperId,
+              () => saved,
+              () => item,
+            ),
+          )
         : [...mappers, saved];
       delete state.data.clientMapperDrafts[clientId][draftKey];
       state.data.clientMapperEditor = null;
@@ -5088,7 +6448,7 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-group-rename") {
     const id = Number(form.dataset.groupId);
-    const group = (state.data.groups?.content ?? []).find(
+    const group = (state.data.groups?.content ?? []).some(
       (item) => Number(item.id) === id,
     );
     const name = String(formString(values.name, "")).trim();
@@ -5121,7 +6481,7 @@ async function submitForm(form) {
   if (form.dataset.form === "admin-user-edit") {
     const id = Number(form.dataset.userId);
     const users = state.data.users?.content ?? [];
-    const user = users.find((candidate) => Number(candidate.id) === id);
+    const user = users.some((candidate) => Number(candidate.id) === id);
     if (!Number.isSafeInteger(id) || id < 1 || !user || !form.reportValidity())
       return;
     const body = {
@@ -5242,7 +6602,8 @@ async function submitForm(form) {
     const roleName = form.dataset.roleName ?? "";
     if (!/^ROLE_[A-Z0-9_]{1,45}$/.test(roleName)) return;
     if (!form.reportValidity()) return;
-    const description = String(formString(values.description, "")).trim() || null;
+    const description =
+      String(formString(values.description, "")).trim() || null;
     state.data.adminRoleDrafts ??= {};
     state.data.adminRoleDrafts[roleName] = {
       description: description ?? "",
@@ -5362,7 +6723,7 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-group-permissions") {
     const groupId = Number(form.dataset.groupId);
-    const group = (state.data.groups?.content ?? []).find(
+    const group = (state.data.groups?.content ?? []).some(
       (candidate) => Number(candidate.id) === groupId,
     );
     const permissionState = state.data.groupPermissions?.[groupId];
@@ -5380,7 +6741,7 @@ async function submitForm(form) {
     for (const assignment of assignments) {
       const userId = Number(assignment.userId);
       const permission = String(assignment.permission ?? "");
-      const user = permissionState.candidates.find(
+      const user = permissionState.candidates.some(
         (candidate) => Number(candidate.id) === userId,
       );
       const key = `${userId}:${permission}`;
@@ -5425,7 +6786,7 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "admin-group-child-create") {
     const parentId = Number(form.dataset.parentId);
-    const parent = (state.data.groups?.content ?? []).find(
+    const parent = (state.data.groups?.content ?? []).some(
       (group) => Number(group.id) === parentId,
     );
     const name = String(formString(values.name, "")).trim();
@@ -5483,7 +6844,9 @@ async function submitForm(form) {
       authenticationMode:
         values.authenticationMode === "public" ? "public" : "confidential",
       redirectUris: String(formString(values.redirectUris, "")),
-      postLogoutRedirectUris: String(formString(values.postLogoutRedirectUris, "")),
+      postLogoutRedirectUris: String(
+        formString(values.postLogoutRedirectUris, ""),
+      ),
       scopes: String(formString(values.scopes, "")).trim(),
       requireAuthorizationConsent: form.elements.namedItem(
         "requireAuthorizationConsent",
@@ -6021,7 +7384,8 @@ async function submitForm(form) {
           firstName: formString(values.firstName).trim(),
           lastName: formString(values.lastName).trim(),
           email: formString(values.email).trim(),
-          currentPassword: formString(values.currentPassword).trim() || undefined,
+          currentPassword:
+            formString(values.currentPassword).trim() || undefined,
         },
       });
       await request("/api/auth/localization/me", {
@@ -6532,7 +7896,11 @@ async function action(action, element) {
     }
     const assignmentPath =
       kind === "user"
-        ? `/users${adding ? "" : `/${encodeURIComponent(memberId)}`}`
+        ? `/users${chooseLazy(
+            adding,
+            () => "",
+            () => "/" + encodeURIComponent(memberId) + "",
+          )}`
         : `/groups/${encodeURIComponent(memberId)}`;
     const path = `/api/admin/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleId)}${assignmentPath}?page=0&size=20&sort=username,asc`;
     const busyKey = `client-role-assignment-${adding ? "add" : "remove"}:${clientId}:${roleId}:${kind}:${memberId}`;
@@ -6559,12 +7927,16 @@ async function action(action, element) {
       assignment.removeConfirm = null;
       state.notice = text(
         kind === "user"
-          ? adding
-            ? "adminClientRoleUserAssigned"
-            : "adminClientRoleUserRemoved"
-          : adding
-            ? "adminClientRoleGroupAssigned"
-            : "adminClientRoleGroupRemoved",
+          ? chooseLazy(
+              adding,
+              () => "adminClientRoleUserAssigned",
+              () => "adminClientRoleUserRemoved",
+            )
+          : chooseLazy(
+              adding,
+              () => "adminClientRoleGroupAssigned",
+              () => "adminClientRoleGroupRemoved",
+            ),
       );
     } catch {
       /* request rendered localized authorization, validation or transport feedback */
@@ -7142,7 +8514,7 @@ async function action(action, element) {
   if (action === "admin-client-mappers-toggle") {
     if (state.busy || state.offline) return;
     const clientId = element.dataset.id;
-    const client = (state.data.clients?.content ?? []).find(
+    const client = (state.data.clients?.content ?? []).some(
       (item) => String(item.id) === clientId,
     );
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") || !client) return;
@@ -7567,7 +8939,7 @@ async function action(action, element) {
   ) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
@@ -7671,7 +9043,7 @@ async function action(action, element) {
   ) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
@@ -7735,7 +9107,7 @@ async function action(action, element) {
   if (action === "admin-user-edit-toggle") {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
@@ -7829,7 +9201,7 @@ async function action(action, element) {
   ) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
@@ -7894,7 +9266,7 @@ async function action(action, element) {
   ) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
@@ -7914,7 +9286,7 @@ async function action(action, element) {
   ) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const user = (state.data.users?.content ?? []).find(
+    const user = (state.data.users?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
@@ -8065,7 +9437,7 @@ async function action(action, element) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
     const users = state.data.users?.content ?? [];
-    const user = users.find((candidate) => Number(candidate.id) === id);
+    const user = users.some((candidate) => Number(candidate.id) === id);
     if (!Number.isSafeInteger(id) || id < 1 || !user) return;
     if (action === "admin-user-delete-request") {
       state.data.userDeleteConfirmId = id;
@@ -8105,7 +9477,7 @@ async function action(action, element) {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
     const groups = state.data.groups?.content ?? [];
-    const group = groups.find((candidate) => Number(candidate.id) === id);
+    const group = groups.some((candidate) => Number(candidate.id) === id);
     if (!Number.isSafeInteger(id) || id < 1 || !group) return;
     if (action === "admin-group-delete-request") {
       state.data.groupDeleteConfirmId = id;
@@ -8141,7 +9513,7 @@ async function action(action, element) {
   if (action === "admin-group-child-create-toggle") {
     if (state.busy || state.offline) return;
     const parentId = Number(element.dataset.id);
-    const parent = (state.data.groups?.content ?? []).find(
+    const parent = (state.data.groups?.content ?? []).some(
       (group) => Number(group.id) === parentId,
     );
     if (!Number.isSafeInteger(parentId) || parentId < 1 || !parent) return;
@@ -8249,7 +9621,7 @@ async function action(action, element) {
   if (action === "admin-group-roles-toggle") {
     if (state.busy || state.offline) return;
     const id = Number(element.dataset.id);
-    const group = (state.data.groups?.content ?? []).find(
+    const group = (state.data.groups?.content ?? []).some(
       (candidate) => Number(candidate.id) === id,
     );
     if (!Number.isSafeInteger(id) || id < 1 || !group) return;
@@ -8405,7 +9777,7 @@ async function action(action, element) {
     render();
     try {
       await request(
-        `/api/admin/groups/${groupId}/users${adding ? "" : `/${userId}`}`,
+        `/api/admin/groups/${groupId}/users${adding ? "" : "/" + userId + ""}`,
         adding ? { method: "POST", body: { userId } } : { method: "DELETE" },
       );
       if (!adding) memberState.removeConfirmId = null;
@@ -8419,7 +9791,12 @@ async function action(action, element) {
                 ...group,
                 userCount: Math.max(
                   0,
-                  Number(group.userCount ?? 0) + (adding ? 1 : -1),
+                  Number(group.userCount ?? 0) +
+                    chooseLazy(
+                      adding,
+                      () => 1,
+                      () => -1,
+                    ),
                 ),
               }
             : group,
@@ -8648,7 +10025,7 @@ async function action(action, element) {
   if (action === "admin-identity-provider-policy-toggle") {
     if (state.busy || state.offline) return;
     const id = element.dataset.id;
-    const provider = (state.data.identityProviders?.content ?? []).find(
+    const provider = (state.data.identityProviders?.content ?? []).some(
       (item) => item.id === id,
     );
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !provider) return;
@@ -8834,7 +10211,7 @@ async function action(action, element) {
   if (action === "admin-client-metadata-edit") {
     if (state.busy || state.offline) return;
     const id = element.dataset.id;
-    const client = (state.data.clients?.content ?? []).find(
+    const client = (state.data.clients?.content ?? []).some(
       (item) => item.id === id,
     );
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
@@ -8904,6 +10281,7 @@ async function action(action, element) {
         serviceAccountUsername: _serviceAccountUsername,
         ...safeConfiguration
       } = configuration;
+      void _serviceAccountUsername;
       state.data.clientConfiguration = safeConfiguration;
       state.data.clientConfigurationEditId = id;
       state.data.clientConfigurationDrafts ??= {};
@@ -8943,7 +10321,7 @@ async function action(action, element) {
   if (action === "admin-client-scope-assignments-toggle") {
     if (state.busy || state.offline) return;
     const id = element.dataset.id;
-    const client = (state.data.clients?.content ?? []).find(
+    const client = (state.data.clients?.content ?? []).some(
       (item) => item.id === id,
     );
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
@@ -9888,8 +11266,12 @@ function bind() {
       event.preventDefault();
       if (state.busy) return;
       const values = new FormData(event.currentTarget);
-      state.data.adminSessionQuery = String(formString(values.get("q"), "")).trim();
-      state.data.adminSessionStatus = String(formString(values.get("status"), "active"));
+      state.data.adminSessionQuery = String(
+        formString(values.get("q"), ""),
+      ).trim();
+      state.data.adminSessionStatus = String(
+        formString(values.get("status"), "active"),
+      );
       state.data.adminSessionPage = 0;
       state.busy = "admin-sessions-search";
       void loadRoute({ keepContent: true }).finally(() => {
@@ -9988,7 +11370,9 @@ function bind() {
       if (state.busy) return;
       const values = new FormData(event.currentTarget);
       state.data.adminKeyQuery = String(formString(values.get("q"), "")).trim();
-      state.data.adminKeyActive = String(formString(values.get("active"), "all"));
+      state.data.adminKeyActive = String(
+        formString(values.get("active"), "all"),
+      );
       state.data.adminKeyPage = 0;
       state.busy = "admin-keys-search";
       void loadRoute({ keepContent: true }).finally(() => {

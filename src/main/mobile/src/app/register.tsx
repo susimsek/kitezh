@@ -120,7 +120,7 @@ export default function RegisterScreen() {
         <Text style={[styles.help, { color: palette.textMuted }]}>
           {dictionary.registrationHelp}
         </Text>
-        {success ? (
+        {success && (
           <View style={[styles.message, { borderColor: palette.primary }]}>
             <Text style={{ color: palette.primary }}>
               {dictionary.registrationSuccess}
@@ -135,13 +135,15 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
           </View>
-        ) : captchaEnabled === null ? (
+        )}
+        {!success && captchaEnabled === null && (
           <ActivityIndicator
             color={palette.primary}
             accessibilityLabel={dictionary.loading}
             style={styles.loading}
           />
-        ) : captchaEnabled ? (
+        )}
+        {!success && captchaEnabled === true && (
           <View style={[styles.message, { borderColor: palette.border }]}>
             <Text style={{ color: palette.text }}>
               {dictionary.registrationCaptcha}
@@ -166,7 +168,8 @@ export default function RegisterScreen() {
               </Text>
             ) : null}
           </View>
-        ) : (
+        )}
+        {!success && captchaEnabled === false && (
           <View style={styles.form}>
             <Field
               label={dictionary.username}

@@ -22,7 +22,15 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { colors, iconMetadata, messages, type ThemeMode } from "@kitezh/shared";
+import {
+  colors,
+  iconMetadata,
+  messages,
+  type DesktopSocialLinkCompleteRequest,
+  type DesktopSocialLinkStartRequest,
+  type DesktopSocialLinkStartResponse,
+  type ThemeMode,
+} from "@kitezh/shared";
 import {
   controlSizes,
   radii,
@@ -57,11 +65,6 @@ import {
   readPendingAuthorizationStore,
   writePendingAuthorizationStore,
 } from "./security/auth-transaction-vault";
-import type {
-  DesktopSocialLinkCompleteRequest,
-  DesktopSocialLinkStartRequest,
-  DesktopSocialLinkStartResponse,
-} from "@kitezh/shared";
 import {
   isTrustedRendererFrame,
   isTrustedRendererUrl,
@@ -457,7 +460,7 @@ async function nativeRendererHtml() {
     messages,
     colors,
     icons: iconMetadata,
-  }).replace(/</g, "\\u003c");
+  }).replaceAll(/</g, String.raw`\u003c`);
   return source.replace(
     '<script type="module" src="app://renderer/native/renderer.mjs"></script>',
     `<script>globalThis.__KITEZH_NATIVE_BOOTSTRAP__=${bootstrap};</script><script type="module" src="app://renderer/native/renderer.mjs"></script>`,
@@ -1292,9 +1295,9 @@ const desktopApiAdapter = createDesktopApiAdapter({
 function base64Url(value: Buffer) {
   return value
     .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+    .replaceAll(/\+/g, "-")
+    .replaceAll(/\//g, "_")
+    .replaceAll(/=+$/g, "");
 }
 
 function assertSocialProvider(value: unknown): asserts value is string {
@@ -1499,12 +1502,12 @@ async function showSettingsWindow() {
     focusWindow(settingsWindow);
     return;
   }
-  const settingsParent =
-    desktopLoginWindow?.isVisible() === true
-      ? desktopLoginWindow
-      : mainWindow?.isVisible() === true
-        ? mainWindow
-        : undefined;
+  let settingsParent: BrowserWindow | undefined;
+  if (desktopLoginWindow?.isVisible() === true) {
+    settingsParent = desktopLoginWindow;
+  } else if (mainWindow?.isVisible() === true) {
+    settingsParent = mainWindow;
+  }
   settingsWindow = new BrowserWindow({
     parent: settingsParent,
     modal: false,

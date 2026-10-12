@@ -231,7 +231,7 @@ export function DownloadPage({ dictionary }: Readonly<{ dictionary: Dictionary }
           <p className="lead text-body-secondary mb-0">{copy.subtitle}</p>
         </Stack>
 
-        {releaseLoading ? (
+        {releaseLoading && (
           <div
             className="download-release-loading d-flex flex-column align-items-center justify-content-center gap-3 py-5"
             role="status"
@@ -239,11 +239,13 @@ export function DownloadPage({ dictionary }: Readonly<{ dictionary: Dictionary }
             <Spinner animation="border" aria-hidden="true" />
             <span>{copy.loading}</span>
           </div>
-        ) : releaseError ? (
+        )}
+        {!releaseLoading && releaseError && (
           <Alert variant="danger" className="download-release-error text-center mx-auto">
             {copy.loadError}
           </Alert>
-        ) : (
+        )}
+        {!releaseLoading && !releaseError && (
           <Row className="download-platforms g-4 g-lg-5 justify-content-center">
             {visiblePlatforms.map((platform) => (
               <Col key={platform.title} xs={12} md={6} lg={4}>

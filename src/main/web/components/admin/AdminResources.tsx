@@ -119,6 +119,11 @@ function AdminResourcesContent({
     null,
   );
   const [rotating, setRotating] = useState(false);
+  let defaultSort = "username,asc";
+  if (resource === "sessions") defaultSort = "lastAccessTime,desc";
+  else if (resource === "consents") defaultSort = "id.principalName,asc";
+  else if (resource === "keys") defaultSort = "createdAt,desc";
+
   const {
     clientId,
     clearFilters,
@@ -140,19 +145,21 @@ function AdminResourcesContent({
   } = useAdminTableState(
     10,
     resource === "users" || resource === "keys" || resource === "sessions",
-    resource === "sessions"
-      ? "lastAccessTime,desc"
-      : resource === "consents"
-        ? "id.principalName,asc"
-        : resource === "keys"
-          ? "createdAt,desc"
-          : "username,asc",
+    defaultSort,
   );
 
   useEffect(() => {
     if (!accessToken) return;
+    let resourceFilters = "";
+    if (resource === "users") resourceFilters = `&enabled=${status}`;
+    else if (resource === "keys") resourceFilters = `&active=${status}`;
+    else if (resource === "sessions") {
+      resourceFilters = `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}`;
+    } else if (resource === "consents") {
+      resourceFilters = `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}`;
+    }
     adminRequest<PageResponse<User | Session | Consent | Key>>(accessToken, {
-      url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${resource === "users" ? `&enabled=${status}` : resource === "keys" ? `&active=${status}` : resource === "sessions" ? `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}` : resource === "consents" ? `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}` : ""}`,
+      url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${resourceFilters}`,
     })
       .then((response) => {
         if (response.status >= 300) throw new Error("Request failed");
@@ -178,37 +185,62 @@ function AdminResourcesContent({
     status,
   ]);
 
+  let statusLabel = status;
+  if (status === "true") statusLabel = copy.active;
+  else if (status === "false") statusLabel = copy.passive;
   const activeFilters = [
     query && { label: copy.search, value: query, onRemove: () => setQuery("") },
     status && {
       label: copy.status,
-      value: status === "true" ? copy.active : status === "false" ? copy.passive : status,
+      value: statusLabel,
       onRemove: () => setStatus(""),
     },
     clientId && { label: copy.client, value: clientId, onRemove: () => setClientId("") },
     username && { label: copy.user, value: username, onRemove: () => setUsername("") },
     scope && { label: copy.scope, value: scope, onRemove: () => setScope("") },
   ].filter(Boolean) as { label: string; value: string; onRemove: () => void }[];
-  const sortOptions =
-    resource === "sessions"
-      ? [
-          { value: "lastAccessTime,desc", label: copy.newest },
-          { value: "lastAccessTime,asc", label: copy.oldest },
-        ]
-      : resource === "consents"
-        ? [
-            { value: "id.principalName,asc", label: `${copy.user} · ${copy.ascending}` },
-            { value: "id.principalName,desc", label: `${copy.user} · ${copy.descending}` },
-          ]
-        : resource === "keys"
-          ? [
-              { value: "createdAt,desc", label: copy.newest },
-              { value: "createdAt,asc", label: copy.oldest },
-            ]
-          : [
-              { value: "username,asc", label: `${copy.username} · ${copy.ascending}` },
-              { value: "username,desc", label: `${copy.username} · ${copy.descending}` },
-            ];
+  let sortOptions: { value: string; label: string }[];
+  if (resource === "sessions") {
+    sortOptions = [
+      { value: "lastAccessTime,desc", label: copy.newest },
+      { value: "lastAccessTime,asc", label: copy.oldest },
+    ];
+  } else if (resource === "consents") {
+    sortOptions = [
+      { value: "id.principalName,asc", label: `${copy.user} · ${copy.ascending}` },
+      { value: "id.principalName,desc", label: `${copy.user} · ${copy.descending}` },
+    ];
+  } else if (resource === "keys") {
+    sortOptions = [
+      { value: "createdAt,desc", label: copy.newest },
+      { value: "createdAt,asc", label: copy.oldest },
+    ];
+  } else {
+    sortOptions = [
+      { value: "username,asc", label: `${copy.username} · ${copy.ascending}` },
+      { value: "username,desc", label: `${copy.username} · ${copy.descending}` },
+    ];
+  }
+  const bulkActionDetails = {
+    ENABLE: {
+      label: copy.bulkEnable,
+      action: "enable" as const,
+      variant: "primary" as const,
+      message: copy.bulkEnableConfirm,
+    },
+    DISABLE: {
+      label: copy.bulkDisable,
+      action: "disable" as const,
+      variant: "warning" as const,
+      message: copy.bulkDisableConfirm,
+    },
+    DELETE: {
+      label: copy.bulkDelete,
+      action: "delete" as const,
+      variant: "danger" as const,
+      message: copy.bulkDeleteConfirm,
+    },
+  }[bulkAction ?? "DELETE"];
 
   const request = async <T,>(
     url: string,
@@ -540,27 +572,11 @@ function AdminResourcesContent({
       />
       <ConfirmModal
         cancelLabel={copy.cancel}
-        confirmLabel={
-          bulkAction === "ENABLE"
-            ? copy.bulkEnable
-            : bulkAction === "DISABLE"
-              ? copy.bulkDisable
-              : copy.bulkDelete
-        }
-        confirmAction={
-          bulkAction === "ENABLE" ? "enable" : bulkAction === "DISABLE" ? "disable" : "delete"
-        }
-        confirmVariant={
-          bulkAction === "ENABLE" ? "primary" : bulkAction === "DISABLE" ? "warning" : "danger"
-        }
+        confirmLabel={bulkActionDetails.label}
+        confirmAction={bulkActionDetails.action}
+        confirmVariant={bulkActionDetails.variant}
         busy={bulkBusy}
-        message={
-          bulkAction === "ENABLE"
-            ? copy.bulkEnableConfirm
-            : bulkAction === "DISABLE"
-              ? copy.bulkDisableConfirm
-              : copy.bulkDeleteConfirm
-        }
+        message={bulkActionDetails.message}
         onCancel={() => {
           if (!bulkBusy) setBulkAction(null);
         }}

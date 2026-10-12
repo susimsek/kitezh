@@ -73,6 +73,30 @@ type Binding = {
 };
 type AuthenticationCopy = Dictionary["admin"]["authentication"];
 
+function requirementLabel(value: Requirement, copy: AuthenticationCopy) {
+  switch (value) {
+    case "REQUIRED":
+      return copy.required;
+    case "ALTERNATIVE":
+      return copy.alternative;
+    case "DISABLED":
+      return copy.disabled;
+    case "CONDITIONAL":
+      return copy.conditional;
+  }
+}
+
+function requirementVariant(requirement: Requirement | null) {
+  switch (requirement) {
+    case "DISABLED":
+      return "secondary";
+    case "CONDITIONAL":
+      return "warning";
+    default:
+      return "primary";
+  }
+}
+
 const requirements: Requirement[] = ["REQUIRED", "ALTERNATIVE", "DISABLED", "CONDITIONAL"];
 const executionRequirements: Exclude<Requirement, "CONDITIONAL">[] = [
   "REQUIRED",
@@ -884,13 +908,7 @@ function FlowForm({
               <Form.Select disabled={metadataLocked} {...register("requirement")}>
                 {requirements.map((value) => (
                   <option key={value} value={value}>
-                    {value === "REQUIRED"
-                      ? copy.required
-                      : value === "ALTERNATIVE"
-                        ? copy.alternative
-                        : value === "DISABLED"
-                          ? copy.disabled
-                          : copy.conditional}
+                    {requirementLabel(value, copy)}
                   </option>
                 ))}
               </Form.Select>
@@ -998,11 +1016,7 @@ function ExecutionForm({
             <Form.Select {...register("requirement")}>
               {executionRequirements.map((value) => (
                 <option key={value} value={value}>
-                  {value === "REQUIRED"
-                    ? copy.required
-                    : value === "ALTERNATIVE"
-                      ? copy.alternative
-                      : copy.disabled}
+                  {requirementLabel(value, copy)}
                 </option>
               ))}
             </Form.Select>
@@ -1092,17 +1106,7 @@ function NodeRow({
         <small className="text-body-secondary font-monospace">{secondary}</small>
       </button>
       <div className="d-flex align-items-center gap-2">
-        <Badge
-          bg={
-            requirement === "DISABLED"
-              ? "secondary"
-              : requirement === "CONDITIONAL"
-                ? "warning"
-                : "primary"
-          }
-        >
-          {requirement}
-        </Badge>
+        <Badge bg={requirementVariant(requirement)}>{requirement}</Badge>
         <Button
           aria-label={copy.moveUp}
           disabled={disabled || movingNodeKey !== null}

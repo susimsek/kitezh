@@ -32,14 +32,14 @@ export function redactDiagnosticText(value: string) {
     )
     .replace(
       new RegExp(
-        `(["']?(?:${SENSITIVE_KEYS})["']?\\s*[=:]\\s*)(["'])(.*?)\\2`,
+        String.raw`(["']?(?:${SENSITIVE_KEYS})["']?\s*[=:]\s*)(["'])(.*?)\2`,
         "gi",
       ),
       "$1[redacted]",
     )
     .replace(
       new RegExp(
-        `(["']?(?:${SENSITIVE_KEYS})["']?\\s*[=:]\\s*)[^\\s&,;]+`,
+        String.raw`(["']?(?:${SENSITIVE_KEYS})["']?\s*[=:]\s*)[^\s&,;]+`,
         "gi",
       ),
       "$1[redacted]",
