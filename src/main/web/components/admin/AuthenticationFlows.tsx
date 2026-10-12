@@ -835,7 +835,7 @@ function FlowForm({
   submitting,
   topLevel = false,
   metadataLocked = false,
-}: FlowFormProps) {
+}: Readonly<FlowFormProps>) {
   const {
     register,
     handleSubmit,
@@ -949,7 +949,7 @@ function ExecutionForm({
   submitLabel,
   submitting,
   metadataLocked = false,
-}: ExecutionFormProps) {
+}: Readonly<ExecutionFormProps>) {
   const {
     register,
     handleSubmit,
@@ -1074,7 +1074,7 @@ function NodeRow({
   movingNodeKey,
   nodeKey,
   opening,
-}: NodeRowProps) {
+}: Readonly<NodeRowProps>) {
   const movingUp = movingNodeKey === `${nodeKey}-UP`;
   const movingDown = movingNodeKey === `${nodeKey}-DOWN`;
   return (
@@ -1145,7 +1145,7 @@ function NodeRow({
   );
 }
 
-function BindingsCard({ bindings, flows, copy, saving, onSave }: BindingsCardProps) {
+function BindingsCard({ bindings, flows, copy, saving, onSave }: Readonly<BindingsCardProps>) {
   return (
     <Card className="admin-panel-card">
       <Card.Body>

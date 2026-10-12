@@ -69,11 +69,11 @@ function DownloadLink({
   asset: downloadAsset,
   release,
   unavailableLabel,
-}: {
+}: Readonly<{
   asset: DownloadAsset;
   release: DesktopRelease | null;
   unavailableLabel: string;
-}) {
+}>) {
   const href = findReleaseAssetUrl(release, downloadAsset.matcher);
   if (!href) {
     return (
@@ -101,7 +101,7 @@ function DownloadLink({
   );
 }
 
-export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
+export function DownloadPage({ dictionary }: Readonly<{ dictionary: Dictionary }>) {
   const copy = dictionary.download;
   const [release, setRelease] = useState<DesktopRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);

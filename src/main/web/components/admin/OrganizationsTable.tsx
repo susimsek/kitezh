@@ -29,7 +29,7 @@ type Organization = {
   groupCount: number;
 };
 
-export function OrganizationsTable({ dictionary }: { dictionary: Dictionary }) {
+export function OrganizationsTable({ dictionary }: Readonly<{ dictionary: Dictionary }>) {
   const { access, accessToken } = useAdminAuth();
   const copy = dictionary.admin.organizations;
   const [organizations, setOrganizations] = useState<Organization[]>([]);

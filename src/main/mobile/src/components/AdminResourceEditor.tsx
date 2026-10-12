@@ -12,14 +12,14 @@ function ActionButton({
   onPress,
   palette,
   secondary = false,
-}: {
+}: Readonly<{
   label: string;
   busy: boolean;
   disabled?: boolean;
   onPress: () => void;
   palette: ReturnType<typeof useTheme>["palette"];
   secondary?: boolean;
-}) {
+}>) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -131,12 +131,12 @@ export function AdminResourceEditor({
   onCancel,
   onSave,
   saving,
-}: {
+}: Readonly<{
   initial: AdminEditorState;
   onCancel: () => void;
   onSave: (values: Record<string, string>) => void;
   saving: boolean;
-}) {
+}>) {
   const { palette } = useTheme();
   const { dictionary } = useLocale();
   const [values, setValues] = useState(initial.values);

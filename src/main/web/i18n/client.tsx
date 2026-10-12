@@ -13,7 +13,7 @@ import { setLocale } from "@/store/locale-slice";
 import { useAppDispatch } from "@/store/hooks";
 import { messageBundles } from "./bundles";
 
-export function ClientI18nProvider({ children }: { children: ReactNode }) {
+export function ClientI18nProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [initialLocale] = useState(() => {
     const desktopSystemLanguage =
       isDesktopRuntime() && localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system";

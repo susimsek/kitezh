@@ -49,12 +49,12 @@ export function ClientDetail({
   dictionary,
   id,
   tab = "settings",
-}: {
+}: Readonly<{
   locale: Locale;
   dictionary: Dictionary;
   id: string | null;
   tab?: string | null;
-}) {
+}>) {
   const router = useRouter();
   const { access, accessToken } = useAdminAuth();
   const alerts = useConsoleAlerts();

@@ -14,7 +14,7 @@ import { applyProblemToForm } from "@/lib/problem-detail";
 import { useAdminAuth } from "./AdminAuthProvider";
 import { AdminActionIcon } from "./AdminActionIcon";
 
-export function OrganizationCreateForm({ dictionary }: { dictionary: Dictionary }) {
+export function OrganizationCreateForm({ dictionary }: Readonly<{ dictionary: Dictionary }>) {
   const { access, accessToken } = useAdminAuth();
   const router = useRouter();
   const alerts = useConsoleAlerts();

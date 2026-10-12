@@ -238,10 +238,10 @@ export type LoginSettingsSection =
 export default function LoginSettingsPage({
   embedded = false,
   focusSection,
-}: {
+}: Readonly<{
   embedded?: boolean;
   focusSection?: LoginSettingsSection;
-}) {
+}>) {
   const dictionary = useDictionary();
   const copy = dictionary.admin.loginSettings;
   const validation = dictionary.admin.common.validation;
@@ -1426,12 +1426,12 @@ function NumberField({
   label,
   error,
   registration,
-}: {
+}: Readonly<{
   id: string;
   label: string;
   error?: string;
   registration: UseFormRegisterReturn;
-}) {
+}>) {
   return (
     <Form.Group controlId={id}>
       <Form.Label>{label}</Form.Label>
@@ -1448,7 +1448,7 @@ function WebAuthnPolicyFields({
   register,
   errors,
   labels,
-}: {
+}: Readonly<{
   title: string;
   help: string;
   prefix: "webauthnPolicy" | "webauthnPasswordlessPolicy";
@@ -1482,7 +1482,7 @@ function WebAuthnPolicyFields({
     signatureAlgorithmsHelp: string;
     acceptableAaguidsHelp: string;
   };
-}) {
+}>) {
   const policyErrors = errors[prefix] as FieldErrors<WebAuthnPolicy> | undefined;
   const path = (field: keyof WebAuthnPolicy) => `${prefix}.${field}` as Path<Settings>;
   const fieldError = (field: keyof WebAuthnPolicy) => policyErrors?.[field]?.message;
@@ -1577,7 +1577,7 @@ function WebAuthnPolicyFields({
   );
 }
 
-function SaveButton({ copy, isSubmitting }: { copy: string; isSubmitting: boolean }) {
+function SaveButton({ copy, isSubmitting }: Readonly<{ copy: string; isSubmitting: boolean }>) {
   return (
     <div className="admin-form-actions mt-4">
       <Button disabled={isSubmitting} type="submit">

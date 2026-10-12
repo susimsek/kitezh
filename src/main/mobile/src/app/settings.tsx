@@ -165,11 +165,11 @@ function SectionHeading({
   icon,
   label,
   palette,
-}: {
+}: Readonly<{
   icon: "globe" | "sun";
   label: string;
   palette: ReturnType<typeof useTheme>["palette"];
-}) {
+}>) {
   return (
     <View style={styles.sectionHeading}>
       <View
@@ -189,12 +189,12 @@ function Option({
   onPress,
   palette,
   selected,
-}: {
+}: Readonly<{
   label: string;
   onPress: () => void;
   palette: ReturnType<typeof useTheme>["palette"];
   selected: boolean;
-}) {
+}>) {
   return (
     <Pressable
       accessibilityRole="radio"

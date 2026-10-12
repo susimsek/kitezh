@@ -26,7 +26,7 @@ type Props = {
   children: React.ReactNode;
 };
 
-export function AdminShell({ locale, dictionary, children }: Props) {
+export function AdminShell({ locale, dictionary, children }: Readonly<Props>) {
   const pathname = usePathname();
   const branding = useBranding();
   const { access, accessToken, avatarUrl, idTokenParsed, logout, tokenParsed, username } =

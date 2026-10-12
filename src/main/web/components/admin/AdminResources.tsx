@@ -85,11 +85,11 @@ export function AdminResources({
   resource,
   copy,
   locale,
-}: {
+}: Readonly<{
   resource: Resource;
   copy: Copy;
   locale?: Locale;
-}) {
+}>) {
   return <AdminResourcesContent copy={copy} key={resource} locale={locale} resource={resource} />;
 }
 
@@ -97,11 +97,11 @@ function AdminResourcesContent({
   resource,
   copy,
   locale,
-}: {
+}: Readonly<{
   resource: Resource;
   copy: Copy;
   locale?: Locale;
-}) {
+}>) {
   const { access, accessToken, logout, username: currentUsername } = useAdminAuth();
   const alerts = useConsoleAlerts();
   const [items, setItems] = useState<User[] | Session[] | Consent[] | Key[]>([]);
@@ -591,7 +591,7 @@ function UsersTable({
   locale,
   selectedIds,
   onSelectionChange,
-}: {
+}: Readonly<{
   items: User[];
   request: AdminRequest;
   copy: Copy;
@@ -599,7 +599,7 @@ function UsersTable({
   locale?: Locale;
   selectedIds: number[];
   onSelectionChange: (ids: number[]) => void;
-}) {
+}>) {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const allSelected = items.length > 0 && items.every((user) => selectedIds.includes(user.id));
 
@@ -742,7 +742,7 @@ function SessionsTable({
   currentUsername,
   locale,
   logout,
-}: {
+}: Readonly<{
   items: Session[];
   request: AdminRequest;
   copy: Copy;
@@ -751,7 +751,7 @@ function SessionsTable({
   currentUsername: string | null;
   locale?: Locale;
   logout?: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
-}) {
+}>) {
   const date = useDateTimeFormatter();
   const [sessionAction, setSessionAction] = useState<{
     url: string;
@@ -980,13 +980,13 @@ function ConsentsTable({
   copy,
   canManage,
   locale,
-}: {
+}: Readonly<{
   items: Consent[];
   request: AdminRequest;
   copy: Copy;
   canManage: boolean;
   locale?: Locale;
-}) {
+}>) {
   const [consentToRevoke, setConsentToRevoke] = useState<Consent | null>(null);
   const formatDate = useDateTimeFormatter();
   return (
@@ -1084,7 +1084,7 @@ function ConsentsTable({
   );
 }
 
-function KeysTable({ items, copy }: { items: Key[]; copy: Copy }) {
+function KeysTable({ items, copy }: Readonly<{ items: Key[]; copy: Copy }>) {
   const date = useDateTimeFormatter();
   return (
     <>

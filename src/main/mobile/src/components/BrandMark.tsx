@@ -7,7 +7,7 @@ type BrandMarkProps = {
   style?: StyleProp<ImageStyle>;
 };
 
-export function BrandMark({ size = 64, style }: BrandMarkProps) {
+export function BrandMark({ size = 64, style }: Readonly<BrandMarkProps>) {
   return (
     <Image
       accessible

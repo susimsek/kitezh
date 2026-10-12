@@ -60,7 +60,10 @@ type Provider = {
   enabled: boolean;
 };
 
-export function OrganizationDetail({ dictionary, id }: { dictionary: Dictionary; id: string }) {
+export function OrganizationDetail({
+  dictionary,
+  id,
+}: Readonly<{ dictionary: Dictionary; id: string }>) {
   const { access, accessToken } = useAdminAuth();
   const copy = dictionary.admin.organizations;
   const organizationId = Number(id);
@@ -535,7 +538,10 @@ export function OrganizationDetail({ dictionary, id }: { dictionary: Dictionary;
   );
 }
 
-function CollectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function CollectionCard({
+  title,
+  children,
+}: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
     <Card className="admin-panel-card h-100">
       <Card.Body>
