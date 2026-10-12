@@ -1967,7 +1967,9 @@ function setTrayVisibility(visible: boolean) {
 function setDockVisibility(visible: boolean) {
   if (process.platform !== "darwin") return;
   if (visible) {
-    app.dock?.show();
+    void app.dock
+      ?.show()
+      .catch(() => appendDiagnosticEvent("dock-visibility-failed"));
   } else {
     app.dock?.hide();
   }
@@ -3201,6 +3203,11 @@ if (!hasLock) {
         "activate",
         () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
       );
+  }).catch((error: unknown) => {
+    void appendDiagnosticEvent("app-startup-failed", {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+    app.quit();
   });
   process.on("uncaughtExceptionMonitor", (error) => {
     void appendDiagnosticEvent("uncaught-exception", {

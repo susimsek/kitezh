@@ -4574,14 +4574,14 @@ async function submitForm(form) {
             .map((input) => input.value)
             .filter((name) => available.has(name)),
         ),
-      ].sort(),
+      ].sort((left, right) => left.localeCompare(right)),
       optionalScopes: [
         ...new Set(
           [...form.querySelectorAll('input[name="optionalScopes"]:checked')]
             .map((input) => input.value)
             .filter((name) => available.has(name)),
         ),
-      ].sort(),
+      ].sort((left, right) => left.localeCompare(right)),
     };
     const overlap = body.defaultScopes.some((name) =>
       body.optionalScopes.includes(name),
@@ -7020,7 +7020,7 @@ async function action(action, element) {
           .map((input) => input.value.trim())
           .filter(Boolean),
       ),
-    ].sort();
+    ].sort((left, right) => left.localeCompare(right));
     const clientRoleIds = [
       ...new Set(
         [...panel.querySelectorAll('input[name="clientRoleIds"]:checked')]
