@@ -82,6 +82,8 @@ a,
   min-height: auto;
   padding-inline: 0;
   border-radius: 0.35rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 .btn:disabled,
@@ -97,11 +99,6 @@ a,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.btn-link {
-  display: inline-flex;
-  align-items: center;
 }
 
 :where(button, a, input, select, textarea):focus-visible {
@@ -906,10 +903,14 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
 .admin-panel-card > .card-footer {
   background: var(--bs-body-bg);
   border-top-color: var(--bs-border-color-translucent);
+  padding: 0.65rem 1rem;
 }
 
 .admin-resource-filters {
   background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color-translucent);
+  border-bottom: 0 !important;
+  border-radius: var(--admin-surface-radius) var(--admin-surface-radius) 0 0;
 }
 
 .admin-resource-filters .admin-search-input .form-control {
@@ -1302,24 +1303,21 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
 }
 
 /* Keycloak-style table pagination */
-.admin-panel-card > .card-footer {
-  padding: 0;
-}
-
 .admin-pagination {
-  min-height: 3.65rem;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 1rem;
   padding: 0.65rem 0.9rem;
-  font-size: 0.8125rem;
+  min-height: 2.25rem;
+  font-size: 0.875rem;
 }
 
 .admin-pagination-summary {
   min-width: 6.5rem;
   white-space: nowrap;
   text-align: right;
+  margin-right: auto;
 }
 
 .admin-pagination-size {
@@ -1330,7 +1328,8 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
 }
 
 .admin-pagination-size .form-select {
-  width: 4.6rem;
+  width: auto;
+  min-width: 4.5rem;
   min-height: var(--console-control-height-sm);
   padding-top: 0.2rem;
   padding-bottom: 0.2rem;
@@ -1434,11 +1433,6 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
   background: var(--bs-body-bg);
   color: var(--bs-secondary-color);
 }
-.admin-resource-filters {
-  border: 1px solid var(--bs-border-color-translucent);
-  border-bottom: 0 !important;
-  border-radius: var(--admin-surface-radius) var(--admin-surface-radius) 0 0;
-}
 .admin-resource-filters + .admin-panel-card,
 .admin-resource-filters + .console-table-surface {
   border-top-left-radius: 0;
@@ -1455,30 +1449,6 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
   flex-basis: 100%;
   justify-content: flex-start;
   margin-left: 0 !important;
-}
-
-.admin-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1rem;
-  min-height: 2.25rem;
-  font-size: 0.875rem;
-}
-.admin-pagination-summary {
-  margin-right: auto;
-}
-.admin-pagination-size {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.admin-pagination-size .form-select {
-  width: auto;
-  min-width: 4.5rem;
-}
-.admin-panel-card > .card-footer {
-  padding: 0.65rem 1rem;
 }
 
 .admin-row-actions-toggle {
@@ -1776,9 +1746,6 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
 }
 .admin-detail-section {
   box-shadow: none !important;
-}
-.account-app .admin-main-inner {
-  max-width: 82rem;
 }
 .account-page-header {
   max-width: 56rem;
