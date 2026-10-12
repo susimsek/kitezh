@@ -327,7 +327,11 @@ jobs:
             "${RENDER_RELEASE_DEPLOY_HOOK_URL}")"
           case "${http_status}" in
             200)
-              deploy_id="$(jq -er '.id' "${response_file}")"
+              deploy_id="$(jq -er '.deploy.id // empty' "${response_file}")"
+              if [[ -z "${deploy_id}" ]]; then
+                echo "Render started a deploy but did not return its deploy ID." >&2
+                exit 1
+              fi
               ;;
             202)
               echo "Render queued the requested deploy behind an in-progress deployment; locating its deploy record."
@@ -354,8 +358,8 @@ jobs:
               fi
               ;;
             *)
-            echo "Render deploy hook returned HTTP ${http_status}; refusing to publish the GitHub Release." >&2
-            exit 1
+              echo "Render deploy hook returned HTTP ${http_status}; refusing to publish the GitHub Release." >&2
+              exit 1
               ;;
           esac
           echo "Render accepted deploy ${deploy_id} for ${IMAGE}."
