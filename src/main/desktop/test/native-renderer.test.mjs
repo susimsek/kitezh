@@ -365,6 +365,93 @@ test("native Account renderer completes social-link success and error callbacks"
   }
 });
 
+test("native Account social unlink confirms, reports forbidden access, and blocks duplicate requests", async () => {
+  const harness = await renderConsole();
+  let linked = true;
+  let finishUnlink;
+  let deleteAttempts = 0;
+  const confirmations = [false, true, true];
+  const previousConfirm = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "confirm",
+  );
+  Object.defineProperty(globalThis, "confirm", {
+    configurable: true,
+    writable: true,
+    value: () => confirmations.shift() ?? true,
+  });
+  harness.setResponse("/api/account/social-links", "GET", () => [
+    {
+      provider: "github",
+      displayName: "GitHub",
+      configured: true,
+      enabled: true,
+      linked,
+    },
+  ]);
+  harness.setResponse("/api/account/social-links/github", "DELETE", () => {
+    deleteAttempts += 1;
+    if (deleteAttempts === 1)
+      return {
+        status: 403,
+        kind: "forbidden",
+        body: { detail: "Provider unlinking is forbidden" },
+      };
+    return new Promise((resolve) => {
+      finishUnlink = () => {
+        linked = false;
+        resolve({ status: 204 });
+      };
+    });
+  });
+
+  try {
+    const { calls, document } = harness;
+    document.querySelector('[data-route="security"]').click();
+    await settle();
+    const unlink = () =>
+      document.querySelector('[data-action="social-remove"]');
+    assert.ok(unlink());
+
+    unlink().click();
+    await settle();
+    assert.equal(deleteAttempts, 0, "canceling must keep the provider linked");
+
+    unlink().click();
+    await settle();
+    assert.match(
+      document.querySelector('[role="alert"]').textContent,
+      /403|forbidden/i,
+    );
+
+    unlink().click();
+    await settle();
+    const busyUnlink = unlink();
+    assert.equal(busyUnlink.disabled, true);
+    assert.ok(busyUnlink.querySelector(".spinner"));
+    busyUnlink.click();
+    await settle();
+    assert.equal(
+      calls.filter(
+        ({ path, method }) =>
+          path === "/api/account/social-links/github" && method === "DELETE",
+      ).length,
+      2,
+      "a pending provider unlink must reject duplicate submissions",
+    );
+
+    finishUnlink();
+    await settle();
+    assert.equal(unlink(), null);
+    assert.equal(document.querySelector('[role="status"]') !== null, true);
+  } finally {
+    harness.restore();
+    if (previousConfirm)
+      Object.defineProperty(globalThis, "confirm", previousConfirm);
+    else delete globalThis.confirm;
+  }
+});
+
 test("native Account renderer presents field-level server validation errors", async () => {
   const harness = await renderConsole();
   harness.setResponse("/api/account/profile", "PUT", () => ({
@@ -557,6 +644,115 @@ test("native Account session revocation confirms, disables duplicates, and refre
           path === "/api/account/sessions?page=0&size=20" && method === "GET",
       ).length,
       2,
+    );
+  } finally {
+    harness.restore();
+    if (previousConfirm)
+      Object.defineProperty(globalThis, "confirm", previousConfirm);
+    else delete globalThis.confirm;
+  }
+});
+
+test("native Account application and offline-session revocation handles cancel, pending, and forbidden responses", async () => {
+  const harness = await renderConsole();
+  let finishApplicationRevoke;
+  let confirmations = [false, true, true];
+  const previousConfirm = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "confirm",
+  );
+  Object.defineProperty(globalThis, "confirm", {
+    configurable: true,
+    writable: true,
+    value: () => confirmations.shift() ?? true,
+  });
+  harness.setResponse(
+    "/api/account/applications/desktop-client",
+    "DELETE",
+    () =>
+      new Promise((resolve) => {
+        finishApplicationRevoke = () => resolve({ status: 204 });
+      }),
+  );
+  harness.setResponse(
+    "/api/account/offline-sessions/offline-session",
+    "DELETE",
+    () => ({
+      status: 403,
+      kind: "forbidden",
+      body: { detail: "You cannot revoke this session" },
+    }),
+  );
+
+  try {
+    const { calls, document } = harness;
+    document.querySelector('[data-route="applications"]').click();
+    await settle();
+
+    const applicationItem = document.querySelector(
+      '[data-id="desktop-client"]',
+    );
+    const applicationButton = applicationItem.querySelector(
+      '[data-action="revoke-application"]',
+    );
+    applicationButton.click();
+    await settle();
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/account/applications/desktop-client" &&
+          method === "DELETE",
+      ),
+      false,
+      "canceling the confirmation must not revoke the application",
+    );
+
+    applicationButton.click();
+    await settle();
+    const busyApplicationButton = document.querySelector(
+      '[data-id="desktop-client"] [data-action="revoke-application"]',
+    );
+    assert.equal(busyApplicationButton.disabled, true);
+    assert.ok(busyApplicationButton.querySelector(".spinner"));
+    busyApplicationButton.click();
+    await settle();
+    assert.equal(
+      calls.filter(
+        ({ path, method }) =>
+          path === "/api/account/applications/desktop-client" &&
+          method === "DELETE",
+      ).length,
+      1,
+      "a pending revoke must reject duplicate submissions",
+    );
+
+    finishApplicationRevoke();
+    await settle();
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/account/applications/desktop-client" &&
+          method === "DELETE",
+      ),
+      true,
+    );
+
+    document
+      .querySelector(
+        '[data-id="offline-session"] [data-action="revoke-offline"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/account/offline-sessions/offline-session" &&
+          method === "DELETE",
+      ),
+    );
+    assert.match(
+      document.querySelector('[role="alert"]').textContent,
+      /403|forbidden/i,
     );
   } finally {
     harness.restore();

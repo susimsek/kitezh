@@ -546,6 +546,28 @@ test("native Admin role-composition panel renders and cancels removals", async (
       { id: 12, clientId: "console-client", name: "read" },
     ],
   }));
+  harness.setResponse(
+    "/api/admin/roles/ROLE_USER/available-composites?q=EDIT&page=0&size=10&sort=name,asc",
+    "GET",
+    () => ({
+      content: [
+        { name: "ROLE_EDITOR" },
+        { name: "ROLE_USER" },
+        { name: "invalid role" },
+      ],
+    }),
+  );
+  harness.setResponse(
+    "/api/admin/roles/ROLE_USER/available-client-composites?q=core&page=0&size=10&sort=name,asc",
+    "GET",
+    () => ({
+      content: [
+        { id: 42, clientId: "desktop-core", name: "read" },
+        { id: 0, clientId: "desktop-core", name: "invalid" },
+        { id: 43, clientId: "unsafe client", name: "invalid" },
+      ],
+    }),
+  );
 
   try {
     const { calls, document } = harness;
@@ -565,7 +587,44 @@ test("native Admin role-composition panel renders and cancels removals", async (
     assert.match(panel.textContent, /console-client \/ read/);
     assert.ok(calls.some(({ path }) => path === "/api/admin/roles/ROLE_USER"));
 
-    panel
+    panel.querySelector('input[name="q"]').value = "EDIT";
+    panel.querySelector('[data-action="admin-role-composite-search"]').click();
+    await settle();
+    const roleSearchPanel = document.querySelector(
+      '[data-role-composition="ROLE_USER"]',
+    );
+    assert.match(roleSearchPanel.textContent, /ROLE_EDITOR/);
+    assert.equal(roleSearchPanel.textContent.includes("invalid role"), false);
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path ===
+          "/api/admin/roles/ROLE_USER/available-composites?q=EDIT&page=0&size=10&sort=name,asc",
+      ),
+    );
+
+    roleSearchPanel.querySelector('input[name="client-q"]').value = "core";
+    roleSearchPanel
+      .querySelector('[data-action="admin-role-client-composite-search"]')
+      .click();
+    await settle();
+    const clientSearchPanel = document.querySelector(
+      '[data-role-composition="ROLE_USER"]',
+    );
+    assert.match(clientSearchPanel.textContent, /desktop-core \/ read/);
+    assert.equal(
+      clientSearchPanel.textContent.includes("unsafe client"),
+      false,
+    );
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path ===
+          "/api/admin/roles/ROLE_USER/available-client-composites?q=core&page=0&size=10&sort=name,asc",
+      ),
+    );
+
+    clientSearchPanel
       .querySelector('[data-action="admin-role-composite-remove-request"]')
       .click();
     await settle();
@@ -2045,6 +2104,70 @@ test("native Admin passkey management renames and confirms credential deletion",
         ({ path, method }) => path === credentialPath && method === "DELETE",
       ).length,
       1,
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native Admin passkey pagination loads and returns to bounded pages", async () => {
+  const harness = await renderConsole("admin");
+  const firstPagePath =
+    "/api/admin/users/1/webauthn/credentials?page=0&size=100";
+  const secondPagePath =
+    "/api/admin/users/1/webauthn/credentials?page=1&size=100";
+  harness.setResponse(firstPagePath, "GET", () => ({
+    content: [
+      { credentialId: "credential_1", label: "Work laptop", transports: [] },
+    ],
+    totalElements: 2,
+    totalPages: 2,
+    number: 0,
+  }));
+  harness.setResponse(secondPagePath, "GET", () => ({
+    content: [
+      { credentialId: "credential_2", label: "Security key", transports: [] },
+    ],
+    totalElements: 2,
+    totalPages: 2,
+    number: 1,
+  }));
+
+  try {
+    const { calls, document } = harness;
+    document.querySelector('[data-route="users"]').click();
+    for (let turn = 0; turn < 30; turn += 1) {
+      await settle();
+      if (!document.querySelector('[data-route="users"]').disabled) break;
+    }
+    document
+      .querySelector('[data-action="admin-user-passkeys-toggle"][data-id="1"]')
+      .click();
+    await settle();
+    assert.ok(document.querySelector('[data-passkey-index="0"]'));
+
+    document
+      .querySelector('[data-action="admin-user-passkey-page"][data-index="1"]')
+      .click();
+    await settle();
+    assert.equal(
+      document.querySelector('[data-passkey-index="0"] strong').textContent,
+      "Security key",
+    );
+    assert.ok(calls.some(({ path }) => path === secondPagePath));
+
+    document
+      .querySelector('[data-action="admin-user-passkey-page"][data-index="0"]')
+      .click();
+    await settle();
+    assert.equal(
+      document.querySelector('[data-passkey-index="0"] strong').textContent,
+      "Work laptop",
+    );
+    assert.equal(
+      calls.filter(({ path }) => path === firstPagePath).length,
+      2,
+      "opening the panel and returning to its first page should load page zero",
     );
   } finally {
     harness.restore();
@@ -3727,6 +3850,156 @@ test("native Admin client role assignment and composite panels load bounded cand
       ),
     );
     assert.ok(calls.some(({ path }) => path === "clear-all-sessions"));
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native Admin client roles validate edits and require confirmed deletion", async () => {
+  const harness = await renderConsole("admin");
+  let finishDelete;
+  harness.setResponse(
+    "/api/admin/clients/console-client/roles?q=&page=0&size=20&sort=name%2Casc",
+    "GET",
+    () => ({
+      content: [{ id: 23, name: "REPORT_VIEWER", description: "Read reports" }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+    }),
+  );
+  harness.setResponse(
+    "/api/admin/clients/console-client/roles/23",
+    "PUT",
+    ({ body }) => ({ id: 23, ...body }),
+  );
+  harness.setResponse(
+    "/api/admin/clients/console-client/roles/23",
+    "DELETE",
+    () =>
+      new Promise((resolve) => {
+        finishDelete = () => resolve({ status: 204 });
+      }),
+  );
+
+  try {
+    const { calls, document } = harness;
+    document.querySelector('[data-route="clients"]').click();
+    for (let turn = 0; turn < 30; turn += 1) {
+      await settle();
+      if (!document.querySelector('[data-route="clients"]').disabled) break;
+    }
+    document
+      .querySelector(
+        '[data-action="admin-client-roles-toggle"][data-id="console-client"]',
+      )
+      .click();
+    await settle();
+
+    document
+      .querySelector(
+        '[data-action="admin-client-role-edit"][data-client-role-id="23"]',
+      )
+      .click();
+    await settle();
+    let form = document.querySelector('[data-form="admin-client-role-update"]');
+    assert.ok(form);
+    form.elements.namedItem("name").value = "invalid role name";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/clients/console-client/roles/23" &&
+          method === "PUT",
+      ),
+      false,
+      "invalid client role names must not reach the API",
+    );
+
+    form = document.querySelector('[data-form="admin-client-role-update"]');
+    form.elements.namedItem("name").value = "REPORT_READER";
+    form.elements.namedItem("description").value = "Read-only reports";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method, body }) =>
+          path === "/api/admin/clients/console-client/roles/23" &&
+          method === "PUT" &&
+          body.name === "REPORT_READER" &&
+          body.description === "Read-only reports",
+      ),
+    );
+
+    document
+      .querySelector(
+        '[data-action="admin-client-role-delete-request"][data-client-role-id="23"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector(
+        '[data-action="admin-client-role-delete-confirm"][data-client-role-id="23"]',
+      ),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-client-role-delete-cancel"][data-client-role-id="23"]',
+      )
+      .click();
+    await settle();
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/clients/console-client/roles/23" &&
+          method === "DELETE",
+      ),
+      false,
+      "canceling role deletion must preserve the role",
+    );
+
+    document
+      .querySelector(
+        '[data-action="admin-client-role-delete-request"][data-client-role-id="23"]',
+      )
+      .click();
+    await settle();
+    document
+      .querySelector(
+        '[data-action="admin-client-role-delete-confirm"][data-client-role-id="23"]',
+      )
+      .click();
+    await settle();
+    const busyDelete = document.querySelector(
+      '[data-action="admin-client-role-delete-confirm"][data-client-role-id="23"]',
+    );
+    assert.equal(busyDelete.disabled, true);
+    assert.ok(busyDelete.querySelector(".spinner"));
+    busyDelete.click();
+    await settle();
+    assert.equal(
+      calls.filter(
+        ({ path, method }) =>
+          path === "/api/admin/clients/console-client/roles/23" &&
+          method === "DELETE",
+      ).length,
+      1,
+    );
+
+    finishDelete();
+    await settle();
+    assert.equal(document.querySelector('[data-client-role-id="23"]'), null);
   } finally {
     harness.restore();
   }

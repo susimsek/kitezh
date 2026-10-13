@@ -595,6 +595,7 @@ test("preserves Account profile drafts offline and completes native social linki
       globalThis.__socialLinkRequests = [];
       globalThis.__socialLinkCompletions = [];
       globalThis.__socialLinkCompleted = false;
+      globalThis.__socialLinkResponseStatus = null;
       shell.openExternal = async (url) => {
         globalThis.__pendingAuthorizationUrl = url;
       };
@@ -690,6 +691,10 @@ test("preserves Account profile drafts offline and completes native social linki
           globalThis.__socialLinkCompletions.push(
             JSON.parse(String(init.body)),
           );
+          if (globalThis.__socialLinkResponseStatus)
+            return new Response(null, {
+              status: globalThis.__socialLinkResponseStatus,
+            });
           globalThis.__socialLinkCompleted = true;
           return new Response(null, { status: 204 });
         }
@@ -969,6 +974,51 @@ test("preserves Account profile drafts offline and completes native social linki
     assert.equal(socialLinkCompletions.length, 1);
     assert.equal(socialLinkCompletions[0].code, "test-social-link-code");
     assert.match(socialLinkCompletions[0].codeVerifier, /^[A-Za-z0-9_-]{43}$/);
+
+    for (const [responseStatus, requestIndex] of [
+      [403, 1],
+      [503, 2],
+    ]) {
+      await window.evaluate(async () => {
+        await window.desktopApi.auth.socialLink.start("github");
+      });
+      let requestCount = 0;
+      for (
+        let attempt = 0;
+        attempt < 40 && requestCount <= requestIndex;
+        attempt += 1
+      ) {
+        requestCount = await application.evaluate(
+          () => globalThis.__socialLinkRequests?.length ?? 0,
+        );
+        if (requestCount <= requestIndex)
+          await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      assert.equal(requestCount, requestIndex + 1);
+      await application.evaluate((_, status) => {
+        globalThis.__socialLinkResponseStatus = status;
+      }, responseStatus);
+      const state = await application.evaluate(
+        (_, index) => globalThis.__socialLinkRequests[index].body.state,
+        requestIndex,
+      );
+      await application.evaluate(
+        ({ app }, callbackState, index) => {
+          app.emit(
+            "open-url",
+            { preventDefault() {} },
+            `kitezh://social-link/callback?state=${callbackState}&code=test-link-${index}`,
+          );
+        },
+        state,
+        requestIndex,
+      );
+      await window.getByRole("alert").waitFor();
+      const completionCount = await application.evaluate(
+        () => globalThis.__socialLinkCompletions.length,
+      );
+      assert.equal(completionCount, requestIndex + 1);
+    }
   } finally {
     await application.close();
   }

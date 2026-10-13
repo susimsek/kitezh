@@ -236,8 +236,17 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
       name: "Cancel sign-in",
       exact: true,
     });
-    await cancelSignIn.click();
-    await cancelSignIn.locator(".spinner").waitFor({ state: "visible" });
+    const cancelProgress = await mainWindow.evaluate(() => {
+      document.querySelector('button[data-action="cancel-sign-in"]').click();
+      const button = document.querySelector(
+        'button[data-action="cancel-sign-in"]',
+      );
+      return {
+        disabled: button.disabled,
+        spinnerVisible: Boolean(button.querySelector(".spinner")),
+      };
+    });
+    assert.deepEqual(cancelProgress, { disabled: true, spinnerVisible: true });
     await mainWindow
       .getByText("Sign-in canceled. You can try again.", { exact: true })
       .waitFor();

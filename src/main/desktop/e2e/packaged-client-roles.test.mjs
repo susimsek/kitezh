@@ -63,10 +63,27 @@ async function signIn(application) {
 }
 
 async function guardedClick(button) {
-  await button.click();
-  assert.equal(await button.isDisabled(), true);
-  assert.equal(await button.getAttribute("aria-busy"), "true");
-  assert.equal(await button.locator(".spinner").count(), 1);
+  const progress = await button.evaluate((element) => {
+    const action = element.dataset.action;
+    const formName = element.closest("form")?.dataset.form;
+    const selector = action
+      ? `button[data-action="${action}"]`
+      : formName
+        ? `form[data-form="${formName}"] button[type="submit"]`
+        : null;
+    element.click();
+    const current = selector ? document.querySelector(selector) : element;
+    return {
+      disabled: current?.disabled === true,
+      busy: current?.getAttribute("aria-busy"),
+      spinnerCount: current?.querySelectorAll(".spinner").length ?? 0,
+    };
+  });
+  assert.deepEqual(progress, {
+    disabled: true,
+    busy: "true",
+    spinnerCount: 1,
+  });
   await button.dispatchEvent("click");
 }
 
@@ -247,7 +264,9 @@ test(
       });
       assert.equal(userAssigned.status, 200);
       assert.equal(
-        userAssigned.body.users.content.some((user) => user.id === userId),
+        userAssigned.body.users.content.some(
+          (user) => Number(user.id) === Number(userId),
+        ),
         true,
       );
 
