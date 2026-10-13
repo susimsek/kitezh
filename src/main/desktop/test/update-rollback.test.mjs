@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -255,3 +257,68 @@ test("restores an AppImage file backup and preserves the recovery marker for sta
   assert.equal(await readFile(recoveryPath, "utf8"), "pending");
   await assert.rejects(readFile(backupPath));
 });
+
+test(
+  "Windows watchdog leaves a healthy installation untouched after marker cleanup",
+  {
+    skip: process.platform !== "win32",
+  },
+  async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "kitezh-watchdog-health-"),
+    );
+    const sourcePath = new URL("../dist/update-watchdog.js", import.meta.url);
+    const watchdogPath = path.join(root, "update-watchdog.js");
+    const recoveryPath = path.join(root, "desktop-update-recovery.json");
+    const backupPath = path.join(root, "desktop-update-backup-123");
+    const targetPath = path.dirname(process.execPath);
+    let parent;
+    let watchdog;
+
+    try {
+      await cp(sourcePath, watchdogPath);
+      await mkdir(backupPath);
+      await writeFile(
+        path.join(backupPath, "previous-version.txt"),
+        "previous",
+      );
+      await writeFile(
+        recoveryPath,
+        JSON.stringify({
+          backupPath,
+          targetPath,
+          targetType: "directory",
+          executablePath: process.execPath,
+          version: "0.2.0",
+          previousVersion: "0.1.0",
+          startedAt: Date.now(),
+        }),
+      );
+      parent = spawn(process.execPath, ["-e", "setTimeout(() => {}, 100)"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      watchdog = spawn(process.execPath, [watchdogPath, String(parent.pid)], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+
+      await once(parent, "exit");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await rm(recoveryPath, { force: true });
+      const watchdogExit = once(watchdog, "exit");
+      const watchdogTimeout = setTimeout(() => watchdog.kill(), 5_000);
+      const [exitCode] = await watchdogExit;
+      clearTimeout(watchdogTimeout);
+      assert.equal(exitCode, 0);
+      assert.equal(
+        await readFile(path.join(backupPath, "previous-version.txt"), "utf8"),
+        "previous",
+      );
+    } finally {
+      if (parent && parent.exitCode === null) parent.kill();
+      if (watchdog && watchdog.exitCode === null) watchdog.kill();
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

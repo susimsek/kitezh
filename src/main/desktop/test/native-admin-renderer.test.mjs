@@ -230,6 +230,174 @@ test("native Admin renderer covers every authorized primary route", async () => 
   }
 });
 
+test("native Admin user creation persists profile attributes and retries a failed profile save", async () => {
+  const harness = await renderConsole("admin");
+  let profileSaveAttempts = 0;
+  harness.setResponse("/api/admin/profile-attributes", "GET", () => [
+    {
+      name: "department",
+      displayName: "Department",
+      type: "STRING",
+      enabled: true,
+      builtIn: false,
+      required: true,
+      minLength: 2,
+      maxLength: 80,
+      pattern: "^[A-Za-z ]+$",
+    },
+    {
+      name: "contactEmail",
+      displayName: "Contact email",
+      type: "EMAIL",
+      enabled: true,
+      builtIn: false,
+    },
+    {
+      name: "seatCount",
+      displayName: "Seat count",
+      type: "INTEGER",
+      enabled: true,
+      builtIn: false,
+    },
+    {
+      name: "enabledFeature",
+      displayName: "Enabled feature",
+      type: "BOOLEAN",
+      enabled: true,
+      builtIn: false,
+    },
+    {
+      name: "aliases",
+      displayName: "Aliases",
+      type: "STRING",
+      enabled: true,
+      builtIn: false,
+      multivalued: true,
+    },
+    {
+      name: "invalid name!",
+      type: "STRING",
+      enabled: true,
+      builtIn: false,
+    },
+    {
+      name: "disabledAttribute",
+      type: "STRING",
+      enabled: false,
+      builtIn: false,
+    },
+    {
+      name: "builtInAttribute",
+      type: "STRING",
+      enabled: true,
+      builtIn: true,
+    },
+  ]);
+  harness.setResponse(
+    "/api/admin/users/9/profile-attributes",
+    "PUT",
+    ({ body }) => {
+      profileSaveAttempts += 1;
+      if (profileSaveAttempts === 1) return { status: 503, body: {} };
+      return body;
+    },
+  );
+
+  try {
+    const { calls, document } = harness;
+    for (let turn = 0; turn < 40; turn += 1) {
+      await settle();
+      if (document.querySelector('[data-route="users"]')) break;
+    }
+    document.querySelector('[data-route="users"]').click();
+    await settle();
+    document.querySelector('[data-action="create-user"]').click();
+    await settle();
+    const createForm = document.querySelector(
+      '[data-form="admin-user-create"]',
+    );
+    assert.ok(createForm);
+    assert.ok(
+      createForm.querySelector('[type="email"][name="attribute-contactEmail"]'),
+    );
+    assert.ok(
+      createForm.querySelector('[type="number"][name="attribute-seatCount"]'),
+    );
+    assert.ok(
+      createForm.querySelector('select[name="attribute-enabledFeature"]'),
+    );
+    assert.ok(createForm.querySelector('textarea[name="attribute-aliases"]'));
+    assert.equal(
+      createForm.querySelector('[name="attribute-invalid name!"]'),
+      null,
+    );
+    assert.equal(
+      createForm.querySelector('[name="attribute-disabledAttribute"]'),
+      null,
+    );
+    assert.equal(
+      createForm.querySelector('[name="attribute-builtInAttribute"]'),
+      null,
+    );
+
+    createForm.elements.namedItem("username").value = "grace-profile";
+    createForm.elements.namedItem("password").value = "Strong-Test-Password-42";
+    createForm.querySelector('[name="attribute-department"]').value =
+      "Research";
+    createForm.querySelector('[name="attribute-contactEmail"]').value =
+      "grace@example.test";
+    createForm.querySelector('[name="attribute-seatCount"]').value = "4";
+    createForm.querySelector('[name="attribute-enabledFeature"]').value =
+      "true";
+    createForm.querySelector('[name="attribute-aliases"]').value =
+      "G. Hopper\nRear Admiral";
+    createForm.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+
+    const retryForm = document.querySelector('[data-form="admin-user-create"]');
+    assert.equal(retryForm.dataset.createdUserId, "9");
+    assert.equal(
+      retryForm.querySelector('[name="attribute-department"]').value,
+      "Research",
+    );
+    assert.equal(profileSaveAttempts, 1);
+    retryForm.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+
+    const profileRequests = calls.filter(
+      ({ path, method }) =>
+        path === "/api/admin/users/9/profile-attributes" && method === "PUT",
+    );
+    assert.equal(profileRequests.length, 2);
+    assert.deepEqual(profileRequests[0].body.attributes, {
+      department: ["Research"],
+      contactEmail: ["grace@example.test"],
+      seatCount: ["4"],
+      enabledFeature: ["true"],
+      aliases: ["G. Hopper", "Rear Admiral"],
+    });
+    assert.equal(profileSaveAttempts, 2);
+    assert.equal(
+      document
+        .querySelector('[data-route="users"]')
+        .getAttribute("aria-current"),
+      "page",
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native Admin group permissions validates, edits, and persists assignments", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/groups/3/permissions", "GET", () => []);
@@ -1889,6 +2057,9 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
     attributes: {
       departments: ["Platform"],
       publicProfile: ["false"],
+      contactEmail: ["ada@example.test"],
+      seatCount: ["4"],
+      biography: ["Identity engineer"],
     },
     definitions: [
       {
@@ -1907,6 +2078,33 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
         builtIn: false,
         multivalued: false,
         required: false,
+      },
+      {
+        name: "contactEmail",
+        displayName: "Contact email",
+        type: "EMAIL",
+        enabled: true,
+        builtIn: false,
+        minLength: 5,
+        maxLength: 120,
+      },
+      {
+        name: "seatCount",
+        displayName: "Seat count",
+        type: "INTEGER",
+        enabled: true,
+        builtIn: false,
+        minLength: 1,
+        maxLength: 3,
+        pattern: "^[0-9]+$",
+      },
+      {
+        name: "biography",
+        displayName: "Biography",
+        type: "STRING",
+        enabled: true,
+        builtIn: false,
+        pattern: "^[A-Za-z ]+$",
       },
     ],
   }));
@@ -1933,10 +2131,37 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
       '[data-form="admin-user-profile-attributes"]',
     );
     assert.ok(form);
+    assert.equal(
+      form.querySelector('[name="attribute-contactEmail"]').type,
+      "email",
+    );
+    assert.equal(
+      form.querySelector('[name="attribute-seatCount"]').type,
+      "number",
+    );
+    assert.equal(
+      form.querySelector('[name="attribute-seatCount"]').getAttribute("step"),
+      "1",
+    );
+    assert.equal(
+      form.querySelector('[name="attribute-biography"]').type,
+      "text",
+    );
+    assert.equal(
+      form
+        .querySelector('[name="attribute-biography"]')
+        .getAttribute("pattern"),
+      "^[A-Za-z ]+$",
+    );
     form.querySelector('[data-profile-attribute="departments"]').value =
       " Platform \n Security \n \n";
     form.querySelector('[data-profile-attribute="publicProfile"]').value =
       "false";
+    form.querySelector('[data-profile-attribute="contactEmail"]').value =
+      "ada@example.test";
+    form.querySelector('[data-profile-attribute="seatCount"]').value = "4";
+    form.querySelector('[data-profile-attribute="biography"]').value =
+      "Identity engineer";
     form.dispatchEvent(
       new document.defaultView.Event("submit", {
         bubbles: true,
@@ -1951,7 +2176,10 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
           path === "/api/admin/users/1/profile-attributes" &&
           method === "PUT" &&
           body.attributes.departments.join(",") === "Platform,Security" &&
-          body.attributes.publicProfile[0] === "false",
+          body.attributes.publicProfile[0] === "false" &&
+          body.attributes.contactEmail[0] === "ada@example.test" &&
+          body.attributes.seatCount[0] === "4" &&
+          body.attributes.biography[0] === "Identity engineer",
       ),
     );
   } finally {

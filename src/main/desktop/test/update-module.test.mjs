@@ -22,6 +22,7 @@ const updateHandlers = new Map();
 const publishedStatuses = [];
 const updateOperations = [];
 let recoveryMarker;
+let recoveryState;
 let quitAndInstallCalls = 0;
 const updateDirectory = await mkdtemp(path.join(os.tmpdir(), "kitezh-update-"));
 await mkdir(path.join(updateDirectory, "assets"), { recursive: true });
@@ -59,6 +60,7 @@ const runtime = {
   }),
   updateDownload: async () => undefined,
 };
+const successfulManifestFetch = runtime.netFetch;
 const autoUpdater = {
   autoInstallOnAppQuit: false,
   autoDownload: true,
@@ -100,7 +102,22 @@ Module._load = function (request, parent, isMain) {
       readFile: async (...args) => {
         if (String(args[0]).endsWith("update-manifest-public-key.pem"))
           return originalFsPromises.readFile(...args);
+        if (
+          String(args[0]).endsWith("desktop-update-recovery.json") &&
+          recoveryState
+        )
+          return JSON.stringify(recoveryState);
         throw new Error("No recovery marker in isolated updater test.");
+      },
+      unlink: async (...args) => {
+        if (
+          String(args[0]).endsWith("desktop-update-recovery.json") &&
+          recoveryState
+        ) {
+          recoveryState = undefined;
+          return;
+        }
+        return originalFsPromises.unlink(...args);
       },
     };
   }
@@ -125,6 +142,14 @@ after(async () => {
 
 test("configures the updater, checks signed release metadata, and reports update events", async () => {
   const previousAutoUpdate = process.env.DESKTOP_AUTO_UPDATE;
+  const backupPath = path.join(updateDirectory, "startup-recovery-backup");
+  await writeFile(backupPath, "previous-version");
+  recoveryState = {
+    version: runtime.version,
+    previousVersion: "0.1.2",
+    startedAt: Date.now() - 20_000,
+    backupPath,
+  };
   delete process.env.DESKTOP_AUTO_UPDATE;
   update.configureAutoUpdater((status) => publishedStatuses.push(status));
 
@@ -133,8 +158,23 @@ test("configures the updater, checks signed release metadata, and reports update
   assert.equal(autoUpdater.allowDowngrade, false);
 
   await update.checkForUpdates();
-  assert.equal(publishedStatuses[0].state, "checking");
+  assert.ok(publishedStatuses.some(({ state }) => state === "checking"));
   assert.equal(runtime.updateCheck !== undefined, true);
+  for (
+    let turn = 0;
+    turn < 20 && !publishedStatuses.some(({ state }) => state === "recovered");
+    turn += 1
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.ok(
+    publishedStatuses.some(
+      (status) =>
+        status.state === "recovered" && status.version === runtime.version,
+    ),
+  );
+  await assert.rejects(originalFsPromises.readFile(backupPath));
+  recoveryState = undefined;
 
   updateHandlers.get("checking-for-update")();
   updateHandlers.get("update-available")({ version: "0.1.4" });
@@ -165,6 +205,70 @@ test("returns download results and publishes download errors", async () => {
     state: "error",
     message: "Desktop update could not be downloaded.",
   });
+});
+
+test("fails closed when the signed manifest or updater metadata is unavailable", async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    if (delay === 2_000 || delay === 5_000) {
+      return /** @type {NodeJS.Timeout} */ ({});
+    }
+    return originalSetTimeout(callback, delay, ...args);
+  };
+
+  try {
+    update.configureAutoUpdater((status) => publishedStatuses.push(status));
+    runtime.netFetch = async () => ({ status: 503, ok: false });
+    const beforeManifestFailure = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeManifestFailure), [
+      { state: "checking" },
+      { state: "error", message: "Desktop update could not be checked." },
+    ]);
+    assert.equal(await update.downloadUpdate(), false);
+
+    runtime.netFetch = successfulManifestFetch;
+    runtime.updateCheck = async () => null;
+    const beforeMissingMetadata = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeMissingMetadata), [
+      { state: "checking" },
+      { state: "error", message: "Desktop update could not be checked." },
+    ]);
+
+    runtime.updateCheck = async () => ({
+      isUpdateAvailable: false,
+      updateInfo: { version: "0.1.4" },
+    });
+    const beforeNoUpdate = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeNoUpdate), [
+      { state: "checking" },
+      { state: "not-available" },
+    ]);
+
+    runtime.updateCheck = async () => ({
+      isUpdateAvailable: true,
+      updateInfo: { version: "0.1.4" },
+    });
+    await update.checkForUpdates();
+    updateHandlers.get("update-downloaded")({ version: "0.1.4" });
+    const beforeUpdaterError = publishedStatuses.length;
+    updateHandlers.get("error")(new Error("test-only updater failure"));
+    assert.deepEqual(publishedStatuses.slice(beforeUpdaterError), [
+      {
+        state: "error",
+        message: "Desktop update could not be completed.",
+      },
+    ]);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    runtime.netFetch = successfulManifestFetch;
+    runtime.updateCheck = async () => ({
+      isUpdateAvailable: true,
+      updateInfo: { version: "0.1.4" },
+    });
+  }
 });
 
 test("prepares a reversible Windows update and starts installation only after its watchdog", async () => {
