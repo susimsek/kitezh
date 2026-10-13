@@ -1251,7 +1251,7 @@ html[data-desktop-connectivity="offline"] button.btn-outline-danger {
   .admin-data-table .font-monospace {
     white-space: normal;
     overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 
   .admin-data-table > tbody > tr > td + td {

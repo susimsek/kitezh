@@ -86,9 +86,9 @@ export function AdminResources({
   copy,
   locale,
 }: {
-  resource: Resource;
-  copy: Copy;
-  locale?: Locale;
+  readonly resource: Resource;
+  readonly copy: Copy;
+  readonly locale?: Locale;
 }) {
   return <AdminResourcesContent copy={copy} key={resource} locale={locale} resource={resource} />;
 }
@@ -98,9 +98,9 @@ function AdminResourcesContent({
   copy,
   locale,
 }: {
-  resource: Resource;
-  copy: Copy;
-  locale?: Locale;
+  readonly resource: Resource;
+  readonly copy: Copy;
+  readonly locale?: Locale;
 }) {
   const { access, accessToken, logout, username: currentUsername } = useAdminAuth();
   const alerts = useConsoleAlerts();
@@ -140,19 +140,45 @@ function AdminResourcesContent({
   } = useAdminTableState(
     10,
     resource === "users" || resource === "keys" || resource === "sessions",
-    resource === "sessions"
-      ? "lastAccessTime,desc"
-      : resource === "consents"
-        ? "id.principalName,asc"
-        : resource === "keys"
-          ? "createdAt,desc"
-          : "username,asc",
+    (() => {
+      if (resource === "sessions") {
+        return "lastAccessTime,desc";
+      } else {
+        if (resource === "consents") {
+          return "id.principalName,asc";
+        } else {
+          if (resource === "keys") {
+            return "createdAt,desc";
+          } else {
+            return "username,asc";
+          }
+        }
+      }
+    })(),
   );
 
   useEffect(() => {
     if (!accessToken) return;
     adminRequest<PageResponse<User | Session | Consent | Key>>(accessToken, {
-      url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${resource === "users" ? `&enabled=${status}` : resource === "keys" ? `&active=${status}` : resource === "sessions" ? `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}` : resource === "consents" ? `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}` : ""}`,
+      url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${(() => {
+        if (resource === "users") {
+          return `&enabled=${status}`;
+        } else {
+          if (resource === "keys") {
+            return `&active=${status}`;
+          } else {
+            if (resource === "sessions") {
+              return `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}`;
+            } else {
+              if (resource === "consents") {
+                return `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}`;
+              } else {
+                return "";
+              }
+            }
+          }
+        }
+      })()}`,
     })
       .then((response) => {
         if (response.status >= 300) throw new Error();
@@ -182,33 +208,50 @@ function AdminResourcesContent({
     query && { label: copy.search, value: query, onRemove: () => setQuery("") },
     status && {
       label: copy.status,
-      value: status === "true" ? copy.active : status === "false" ? copy.passive : status,
+      value: (() => {
+        if (status === "true") {
+          return copy.active;
+        } else {
+          if (status === "false") {
+            return copy.passive;
+          } else {
+            return status;
+          }
+        }
+      })(),
       onRemove: () => setStatus(""),
     },
     clientId && { label: copy.client, value: clientId, onRemove: () => setClientId("") },
     username && { label: copy.user, value: username, onRemove: () => setUsername("") },
     scope && { label: copy.scope, value: scope, onRemove: () => setScope("") },
   ].filter(Boolean) as { label: string; value: string; onRemove: () => void }[];
-  const sortOptions =
-    resource === "sessions"
-      ? [
-          { value: "lastAccessTime,desc", label: copy.newest },
-          { value: "lastAccessTime,asc", label: copy.oldest },
-        ]
-      : resource === "consents"
-        ? [
-            { value: "id.principalName,asc", label: `${copy.user} · ${copy.ascending}` },
-            { value: "id.principalName,desc", label: `${copy.user} · ${copy.descending}` },
-          ]
-        : resource === "keys"
-          ? [
-              { value: "createdAt,desc", label: copy.newest },
-              { value: "createdAt,asc", label: copy.oldest },
-            ]
-          : [
-              { value: "username,asc", label: `${copy.username} · ${copy.ascending}` },
-              { value: "username,desc", label: `${copy.username} · ${copy.descending}` },
-            ];
+  const sortOptions = (() => {
+    if (resource === "sessions") {
+      return [
+        { value: "lastAccessTime,desc", label: copy.newest },
+        { value: "lastAccessTime,asc", label: copy.oldest },
+      ];
+    } else {
+      if (resource === "consents") {
+        return [
+          { value: "id.principalName,asc", label: `${copy.user} · ${copy.ascending}` },
+          { value: "id.principalName,desc", label: `${copy.user} · ${copy.descending}` },
+        ];
+      } else {
+        if (resource === "keys") {
+          return [
+            { value: "createdAt,desc", label: copy.newest },
+            { value: "createdAt,asc", label: copy.oldest },
+          ];
+        } else {
+          return [
+            { value: "username,asc", label: `${copy.username} · ${copy.ascending}` },
+            { value: "username,desc", label: `${copy.username} · ${copy.descending}` },
+          ];
+        }
+      }
+    }
+  })();
 
   const request = async <T,>(
     url: string,
@@ -309,7 +352,7 @@ function AdminResourcesContent({
             {resource === "users" && access?.manageUsers && locale && (
               <>
                 {selectedUserIds.length > 0 && (
-                  <div aria-label={copy.bulkActions} className="admin-bulk-actions" role="group">
+                  <fieldset aria-label={copy.bulkActions} className="admin-bulk-actions">
                     <Badge bg="secondary" className="admin-bulk-selection-count">
                       {copy.selectedUsers.replace("{count}", String(selectedUserIds.length))}
                     </Badge>
@@ -340,7 +383,7 @@ function AdminResourcesContent({
                       <AdminActionIcon action="delete" />
                       {copy.bulkDelete}
                     </Button>
-                  </div>
+                  </fieldset>
                 )}
                 <Link className="btn btn-primary" href={`/admin/users/new`}>
                   <AdminActionIcon action="add" />
@@ -540,27 +583,51 @@ function AdminResourcesContent({
       />
       <ConfirmModal
         cancelLabel={copy.cancel}
-        confirmLabel={
-          bulkAction === "ENABLE"
-            ? copy.bulkEnable
-            : bulkAction === "DISABLE"
-              ? copy.bulkDisable
-              : copy.bulkDelete
-        }
-        confirmAction={
-          bulkAction === "ENABLE" ? "enable" : bulkAction === "DISABLE" ? "disable" : "delete"
-        }
-        confirmVariant={
-          bulkAction === "ENABLE" ? "primary" : bulkAction === "DISABLE" ? "warning" : "danger"
-        }
+        confirmLabel={(() => {
+          if (bulkAction === "ENABLE") {
+            return copy.bulkEnable;
+          } else {
+            if (bulkAction === "DISABLE") {
+              return copy.bulkDisable;
+            } else {
+              return copy.bulkDelete;
+            }
+          }
+        })()}
+        confirmAction={(() => {
+          if (bulkAction === "ENABLE") {
+            return "enable";
+          } else {
+            if (bulkAction === "DISABLE") {
+              return "disable";
+            } else {
+              return "delete";
+            }
+          }
+        })()}
+        confirmVariant={(() => {
+          if (bulkAction === "ENABLE") {
+            return "primary";
+          } else {
+            if (bulkAction === "DISABLE") {
+              return "warning";
+            } else {
+              return "danger";
+            }
+          }
+        })()}
         busy={bulkBusy}
-        message={
-          bulkAction === "ENABLE"
-            ? copy.bulkEnableConfirm
-            : bulkAction === "DISABLE"
-              ? copy.bulkDisableConfirm
-              : copy.bulkDeleteConfirm
-        }
+        message={(() => {
+          if (bulkAction === "ENABLE") {
+            return copy.bulkEnableConfirm;
+          } else {
+            if (bulkAction === "DISABLE") {
+              return copy.bulkDisableConfirm;
+            } else {
+              return copy.bulkDeleteConfirm;
+            }
+          }
+        })()}
         onCancel={() => {
           if (!bulkBusy) setBulkAction(null);
         }}
@@ -592,13 +659,13 @@ function UsersTable({
   selectedIds,
   onSelectionChange,
 }: {
-  items: User[];
-  request: AdminRequest;
-  copy: Copy;
-  canManage: boolean;
-  locale?: Locale;
-  selectedIds: number[];
-  onSelectionChange: (ids: number[]) => void;
+  readonly items: User[];
+  readonly request: AdminRequest;
+  readonly copy: Copy;
+  readonly canManage: boolean;
+  readonly locale?: Locale;
+  readonly selectedIds: number[];
+  readonly onSelectionChange: (ids: number[]) => void;
 }) {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const allSelected = items.length > 0 && items.every((user) => selectedIds.includes(user.id));
@@ -743,14 +810,14 @@ function SessionsTable({
   locale,
   logout,
 }: {
-  items: Session[];
-  request: AdminRequest;
-  copy: Copy;
-  canManage: boolean;
-  accessToken: string | null;
-  currentUsername: string | null;
-  locale?: Locale;
-  logout?: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
+  readonly items: Session[];
+  readonly request: AdminRequest;
+  readonly copy: Copy;
+  readonly canManage: boolean;
+  readonly accessToken: string | null;
+  readonly currentUsername: string | null;
+  readonly locale?: Locale;
+  readonly logout?: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
 }) {
   const date = useDateTimeFormatter();
   const [sessionAction, setSessionAction] = useState<{
@@ -906,68 +973,76 @@ function SessionsTable({
           <Modal.Title>{copy.sessionDetails}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {detailLoading && !detail ? (
-            <LoadingState />
-          ) : detail ? (
-            <div className="d-grid gap-4">
-              <dl className="row mb-0">
-                <dt className="col-sm-4">{copy.sessionId}</dt>
-                <dd className="col-sm-8 font-monospace text-break">{detail.session.id}</dd>
-                <dt className="col-sm-4">{copy.user}</dt>
-                <dd className="col-sm-8">{detail.session.username ?? "-"}</dd>
-                <dt className="col-sm-4">{copy.created}</dt>
-                <dd className="col-sm-8">{date(detail.session.createdAt)}</dd>
-                <dt className="col-sm-4">{copy.lastActive}</dt>
-                <dd className="col-sm-8">{date(detail.session.lastAccessedAt)}</dd>
-                <dt className="col-sm-4">{copy.expires}</dt>
-                <dd className="col-sm-8">{date(detail.session.expiresAt)}</dd>
-              </dl>
-              <div>
-                <h3 className="h6">{copy.authorizations}</h3>
-                {detail.authorizations.length === 0 ? (
-                  <div className="text-body-secondary">{copy.noAuthorizations}</div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-sm align-middle mb-0">
-                      <thead>
-                        <tr>
-                          <th>{copy.client}</th>
-                          <th>{copy.grantType}</th>
-                          <th>{copy.grantedScopes}</th>
-                          <th>{copy.accessTokenExpires}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.authorizations.map((authorization) => (
-                          <tr key={authorization.id}>
-                            <td>
-                              <div>{authorization.clientName}</div>
-                              <div className="small text-body-secondary font-monospace">
-                                {authorization.clientId}
-                              </div>
-                            </td>
-                            <td>{authorization.grantType}</td>
-                            <td>
-                              {authorization.scopes.map((scope) => (
-                                <Badge bg="secondary" className="me-1" key={scope}>
-                                  {scope}
-                                </Badge>
+          {(() => {
+            if (detailLoading && !detail) {
+              return <LoadingState />;
+            } else {
+              if (detail) {
+                return (
+                  <div className="d-grid gap-4">
+                    <dl className="row mb-0">
+                      <dt className="col-sm-4">{copy.sessionId}</dt>
+                      <dd className="col-sm-8 font-monospace text-break">{detail.session.id}</dd>
+                      <dt className="col-sm-4">{copy.user}</dt>
+                      <dd className="col-sm-8">{detail.session.username ?? "-"}</dd>
+                      <dt className="col-sm-4">{copy.created}</dt>
+                      <dd className="col-sm-8">{date(detail.session.createdAt)}</dd>
+                      <dt className="col-sm-4">{copy.lastActive}</dt>
+                      <dd className="col-sm-8">{date(detail.session.lastAccessedAt)}</dd>
+                      <dt className="col-sm-4">{copy.expires}</dt>
+                      <dd className="col-sm-8">{date(detail.session.expiresAt)}</dd>
+                    </dl>
+                    <div>
+                      <h3 className="h6">{copy.authorizations}</h3>
+                      {detail.authorizations.length === 0 ? (
+                        <div className="text-body-secondary">{copy.noAuthorizations}</div>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th>{copy.client}</th>
+                                <th>{copy.grantType}</th>
+                                <th>{copy.grantedScopes}</th>
+                                <th>{copy.accessTokenExpires}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {detail.authorizations.map((authorization) => (
+                                <tr key={authorization.id}>
+                                  <td>
+                                    <div>{authorization.clientName}</div>
+                                    <div className="small text-body-secondary font-monospace">
+                                      {authorization.clientId}
+                                    </div>
+                                  </td>
+                                  <td>{authorization.grantType}</td>
+                                  <td>
+                                    {authorization.scopes.map((scope) => (
+                                      <Badge bg="secondary" className="me-1" key={scope}>
+                                        {scope}
+                                      </Badge>
+                                    ))}
+                                  </td>
+                                  <td>
+                                    {authorization.accessTokenExpiresAt
+                                      ? date(authorization.accessTokenExpiresAt)
+                                      : "-"}
+                                  </td>
+                                </tr>
                               ))}
-                            </td>
-                            <td>
-                              {authorization.accessTokenExpiresAt
-                                ? date(authorization.accessTokenExpiresAt)
-                                : "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          ) : null}
+                );
+              } else {
+                return null;
+              }
+            }
+          })()}
         </Modal.Body>
       </Modal>
     </>
@@ -981,11 +1056,11 @@ function ConsentsTable({
   canManage,
   locale,
 }: {
-  items: Consent[];
-  request: AdminRequest;
-  copy: Copy;
-  canManage: boolean;
-  locale?: Locale;
+  readonly items: Consent[];
+  readonly request: AdminRequest;
+  readonly copy: Copy;
+  readonly canManage: boolean;
+  readonly locale?: Locale;
 }) {
   const [consentToRevoke, setConsentToRevoke] = useState<Consent | null>(null);
   const formatDate = useDateTimeFormatter();
@@ -1084,7 +1159,7 @@ function ConsentsTable({
   );
 }
 
-function KeysTable({ items, copy }: { items: Key[]; copy: Copy }) {
+function KeysTable({ items, copy }: { readonly items: Key[]; readonly copy: Copy }) {
   const date = useDateTimeFormatter();
   return (
     <>

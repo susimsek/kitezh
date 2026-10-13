@@ -8,6 +8,21 @@ export type ConsoleName = "admin" | "account";
 
 export type DesktopLanguageMode = "system" | "en" | "tr";
 
+export type NativeClientCapability =
+  | "passkeys"
+  | "mfa-totp"
+  | "mfa-recovery-codes"
+  | "social-login"
+  | "social-linking"
+  | "ciba-approval"
+  | "native-updates";
+
+export type NativeClientCapabilities = {
+  clientVersion: string;
+  platform: "android" | "ios" | "desktop" | "web";
+  capabilities: NativeClientCapability[];
+};
+
 export type DesktopUpdateStatus =
   | { state: "unsupported" }
   | { state: "checking" }

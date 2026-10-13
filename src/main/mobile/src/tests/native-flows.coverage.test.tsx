@@ -240,6 +240,13 @@ it("validates and completes native account registration", async () => {
   jest
     .mocked(publicApi.getCaptchaSettings)
     .mockResolvedValue({ enabled: false });
+  jest.mocked(publicApi.registerAccount).mockRejectedValueOnce(
+    Object.assign(new Error("validation failed"), {
+      problem: {
+        violations: [{ field: "email", message: "Invalid email address" }],
+      },
+    }),
+  );
   jest.mocked(publicApi.registerAccount).mockResolvedValue(undefined);
 
   render(<RegisterScreen />);
@@ -258,6 +265,12 @@ it("validates and completes native account registration", async () => {
       target: { value },
     });
   }
+  fireEvent.click(create);
+  expect(await screen.findByText("Invalid email address")).toBeVisible();
+  fireEvent.change(screen.getByPlaceholderText("email"), {
+    target: { value: "alice@example.test" },
+  });
+  jest.mocked(publicApi.registerAccount).mockResolvedValueOnce(undefined);
   fireEvent.click(create);
   await waitFor(() =>
     expect(publicApi.registerAccount).toHaveBeenCalledWith(

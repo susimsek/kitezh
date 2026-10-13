@@ -56,7 +56,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
+      ["expo-secure-store", { "configureAndroidBackup": true }],
       [
         "expo-splash-screen",
         {

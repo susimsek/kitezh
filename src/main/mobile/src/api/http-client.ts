@@ -1,10 +1,12 @@
-import axios from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import {
   createApiClient,
   getApiTransportCause,
   readApiResponseData,
 } from "@kitezh/shared/api-client";
+import type { ApiClientRequestOptions } from "@kitezh/shared/api-client";
 import { createClientMetadataHeaders } from "@kitezh/shared/client-metadata";
+import { getMobileApiLocale } from "../i18n/api-locale.ts";
 import { authorizationServerIssuer } from "../config.ts";
 
 const clientHeaders = createClientMetadataHeaders({
@@ -14,12 +16,30 @@ const clientHeaders = createClientMetadataHeaders({
 });
 
 export function createMobileApiClient(timeout: number) {
-  return createApiClient(axios, {
+  const client = createApiClient(axios, {
     adapter: ["xhr", "fetch"],
     baseURL: authorizationServerIssuer.replace(/\/$/, ""),
     headers: { Accept: "application/json", ...clientHeaders },
     timeout,
   });
+  return {
+    ...client,
+    request<T = unknown>(
+      config: AxiosRequestConfig,
+      options?: ApiClientRequestOptions,
+    ): Promise<AxiosResponse<T>> {
+      return client.request<T>(
+        {
+          ...config,
+          headers: {
+            "Accept-Language": getMobileApiLocale(),
+            ...config.headers,
+          },
+        },
+        options,
+      );
+    },
+  };
 }
 
 export function toHeaderRecord(headers?: HeadersInit) {
@@ -34,10 +54,16 @@ export function readMobileResponseData(value: unknown) {
   return readApiResponseData(value);
 }
 
-export function getMobileTransportCause(error: unknown, timedOut: boolean) {
-  return timedOut
-    ? Object.assign(new Error("Native API request timed out"), {
-        name: "TimeoutError",
-      })
-    : getApiTransportCause(error);
+export function getMobileTransportCause(error: unknown) {
+  if (error instanceof Error && error.name === "TimeoutError") return error;
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT")
+  ) {
+    return Object.assign(new Error("Native API request timed out"), {
+      name: "TimeoutError",
+    });
+  }
+  return getApiTransportCause(error);
 }

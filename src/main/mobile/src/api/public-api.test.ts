@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
-
-installAxiosFetchMockCompatibility();
-
 import {
   PublicApiError,
   getCaptchaSettings,
@@ -13,6 +10,9 @@ import {
   resetPassword,
   verifyEmail,
 } from "./public-api.ts";
+import { setMobileApiLocale } from "../i18n/api-locale.ts";
+
+installAxiosFetchMockCompatibility();
 
 test("reads the shared cached application release metadata endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -43,20 +43,26 @@ test("reads the shared cached application release metadata endpoint", async () =
 
 test("captcha settings accepts only a boolean enabled value", async () => {
   const originalFetch = globalThis.fetch;
-  const values = [{ enabled: true }, { enabled: "true" }, {}];
+  const values = [{ enabled: true }, { enabled: "true" }];
   globalThis.fetch = async () =>
     new Response(JSON.stringify(values.shift()), { status: 200 });
 
   try {
     assert.deepEqual(await getCaptchaSettings(), { enabled: true });
-    assert.deepEqual(await getCaptchaSettings(), { enabled: false });
-    assert.deepEqual(await getCaptchaSettings(), { enabled: false });
+    await assert.rejects(
+      getCaptchaSettings(),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 502 &&
+        error.kind === "unavailable",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
 test("public account mutations send localized JSON requests to their endpoints", async () => {
+  setMobileApiLocale("tr");
   const originalFetch = globalThis.fetch;
   const requests: { url: string; init?: RequestInit }[] = [];
   globalThis.fetch = async (input, init) => {
@@ -125,7 +131,7 @@ test("public account mutations send localized JSON requests to their endpoints",
         {
           path: "/api/auth/reset-password",
           method: "POST",
-          locale: null,
+          locale: "tr",
           appName: "Kitezh",
           appVersion: "v0.1.0",
           clientPlatform: "android",
@@ -139,7 +145,7 @@ test("public account mutations send localized JSON requests to their endpoints",
         {
           path: "/api/auth/verify-email",
           method: "POST",
-          locale: null,
+          locale: "tr",
           appName: "Kitezh",
           appVersion: "v0.1.0",
           clientPlatform: "android",
@@ -153,6 +159,61 @@ test("public account mutations send localized JSON requests to their endpoints",
         ({ init }) =>
           new Headers(init?.headers).get("Accept") === "application/json",
       ),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("public auth requests forward cancellation and timeout controls", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  let requestSignal: AbortSignal | null | undefined;
+  globalThis.fetch = async (_input, init) => {
+    requestSignal = init?.signal;
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    await verifyEmail("one-time-token", {
+      signal: controller.signal,
+      timeoutMs: 3210,
+    });
+    assert.ok(requestSignal instanceof AbortSignal);
+    assert.equal(controller.signal.aborted, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("public auth requests distinguish caller cancellation from timeout", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_input, init) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(init?.signal?.aborted, true);
+    throw Object.assign(new Error("aborted"), { name: "AbortError" });
+  };
+
+  try {
+    const controller = new AbortController();
+    const cancelled = verifyEmail("one-time-token", {
+      signal: controller.signal,
+      timeoutMs: 1000,
+    });
+    controller.abort();
+    await assert.rejects(
+      cancelled,
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 0 &&
+        error.kind === "cancelled",
+    );
+    await assert.rejects(
+      verifyEmail("one-time-token", { timeoutMs: 5 }),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 0 &&
+        error.kind === "timeout",
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -265,8 +326,8 @@ test("public APIs parse successful JSON and normalize CAPTCHA response errors", 
       getCaptchaSettings(),
       (error: unknown) =>
         error instanceof PublicApiError &&
-        error.status === 0 &&
-        error.message === "Registration CAPTCHA settings unavailable",
+        error.status === 503 &&
+        error.kind === "unavailable",
     );
 
     globalThis.fetch = async () => new Response("not-json", { status: 200 });
@@ -274,8 +335,8 @@ test("public APIs parse successful JSON and normalize CAPTCHA response errors", 
       getCaptchaSettings(),
       (error: unknown) =>
         error instanceof PublicApiError &&
-        error.status === 0 &&
-        error.message === "Registration CAPTCHA settings unavailable",
+        error.status === 502 &&
+        error.kind === "unavailable",
     );
   } finally {
     globalThis.fetch = originalFetch;

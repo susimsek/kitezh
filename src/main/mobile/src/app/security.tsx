@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
+import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { AccountTabBar } from "@/components/AccountTabBar";
 import {
   AccountApiError,
@@ -314,7 +314,7 @@ export default function SecurityScreen() {
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
       <View style={styles.screen}>
-        <ScrollView
+        <MobileFormScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         >
@@ -609,7 +609,7 @@ export default function SecurityScreen() {
             </Text>
           </Pressable>
         </View>
-        </ScrollView>
+        </MobileFormScrollView>
         <AccountTabBar active="security" />
       </View>
     </SafeAreaView>

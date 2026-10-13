@@ -2,7 +2,9 @@ import {
   classifyApiError,
   createNativeRequestSignal,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
+  parseRetryAfterMs,
   parseProblemDetail,
+  readRetryAfterHeader,
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
@@ -263,13 +265,20 @@ export class AdminApiError extends Error {
   readonly status: number;
   readonly kind: ApiErrorKind;
   readonly problem: ProblemDetail | undefined;
+  readonly retryAfterMs: number | undefined;
 
-  constructor(status: number, message: string, data?: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    data?: unknown,
+    retryAfter?: string,
+  ) {
     super(message);
     this.name = "AdminApiError";
     this.status = status;
     this.kind = classifyApiError(status, data);
     this.problem = parseProblemDetail(data);
+    this.retryAfterMs = parseRetryAfterMs(retryAfter);
   }
 }
 
@@ -308,16 +317,20 @@ async function requestAdmin<T>(
         response.status,
         "Administration request failed",
         readMobileResponseData(response.data),
+        readRetryAfterHeader(response.headers),
       );
     }
     if (response.status === 204) return undefined as T;
     return readMobileResponseData(response.data) as T;
-  } catch (cause) {
-    if (cause instanceof AdminApiError) throw cause;
+  } catch (error) {
+    if (error instanceof AdminApiError) throw error;
+    const cause = requestSignal.signal.aborted
+      ? requestSignal.signal.reason
+      : error;
     throw new AdminApiError(
       0,
       "Administration request failed",
-      getMobileTransportCause(cause, requestSignal.timedOut()),
+      getMobileTransportCause(cause),
     );
   } finally {
     requestSignal.dispose();
@@ -492,23 +505,27 @@ export function deleteAdminSession(
   );
 }
 
+export type AdminConsentQuery = Readonly<{
+  query?: string;
+  clientId?: string;
+  username?: string;
+  scope?: string;
+  page?: number;
+  size?: number;
+}>;
+
 export function listAdminConsents(
   accessToken: string,
-  query = "",
-  clientId = "",
-  username = "",
-  scope = "",
-  page = 0,
-  size = 10,
+  filters: AdminConsentQuery = {},
   options: RequestOptions = {},
 ) {
   const params = new URLSearchParams({
-    q: query,
-    clientId,
-    username,
-    scope,
-    page: String(page),
-    size: String(size),
+    q: filters.query ?? "",
+    clientId: filters.clientId ?? "",
+    username: filters.username ?? "",
+    scope: filters.scope ?? "",
+    page: String(filters.page ?? 0),
+    size: String(filters.size ?? 10),
     sort: "id.principalName,asc",
   });
   return requestAdmin<AdminPage<AdminConsent>>(

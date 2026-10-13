@@ -3,7 +3,9 @@ import {
   classifyApiError,
   createNativeRequestSignal,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
+  parseRetryAfterMs,
   parseProblemDetail,
+  readRetryAfterHeader,
   type ApiErrorKind,
   type ProblemDetail,
 } from "../../../shared/src/api.ts";
@@ -61,6 +63,19 @@ export type AccountOfflineSession = {
   expiresAt: string | null;
 };
 
+export type CibaPendingRequest = {
+  authReqId: string;
+  userCode: string;
+  bindingMessage: string | null;
+  authorizedScopes: string;
+  deliveryMode: string;
+  createdAt: string;
+  expiresAt: string;
+  status: string;
+  mfaRequired: boolean;
+  stepUpRequired: boolean;
+};
+
 export type AccountPage<T> = {
   content: T[];
   totalElements: number;
@@ -99,14 +114,21 @@ export class AccountApiError extends Error {
   readonly data: unknown;
   readonly kind: ApiErrorKind;
   readonly problem: ProblemDetail | undefined;
+  readonly retryAfterMs: number | undefined;
 
-  constructor(status: number, message: string, data?: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    data?: unknown,
+    retryAfter?: string,
+  ) {
     super(message);
     this.name = "AccountApiError";
     this.status = status;
     this.data = data;
     this.kind = classifyApiError(status, data);
     this.problem = parseProblemDetail(data);
+    this.retryAfterMs = parseRetryAfterMs(retryAfter);
   }
 }
 
@@ -146,17 +168,17 @@ async function requestAccount<T>(
         response.status,
         message,
         readMobileResponseData(response.data),
+        readRetryAfterHeader(response.headers),
       );
     }
     if (response.status === 204) return undefined as T;
     return readMobileResponseData(response.data) as T;
-  } catch (cause) {
-    if (cause instanceof AccountApiError) throw cause;
-    throw new AccountApiError(
-      0,
-      message,
-      getMobileTransportCause(cause, requestSignal.timedOut()),
-    );
+  } catch (error) {
+    if (error instanceof AccountApiError) throw error;
+    const cause = requestSignal.signal.aborted
+      ? requestSignal.signal.reason
+      : error;
+    throw new AccountApiError(0, message, getMobileTransportCause(cause));
   } finally {
     requestSignal.dispose();
   }
@@ -304,6 +326,34 @@ export function revokeOfflineSession(
     { method: "DELETE" },
     options,
     "Offline session request failed",
+  );
+}
+
+export function listCibaRequests(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<AccountPage<CibaPendingRequest>>(
+    accessToken,
+    "/api/ciba/requests?page=0&size=20&sort=createdAt,desc",
+    { method: "GET" },
+    options,
+    "CIBA requests could not be loaded",
+  );
+}
+
+export function decideCibaRequest(
+  accessToken: string,
+  request: Pick<CibaPendingRequest, "authReqId" | "userCode">,
+  decision: "approve" | "deny",
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    `/api/ciba/requests/${encodeURIComponent(request.authReqId)}/${decision}?user_code=${encodeURIComponent(request.userCode)}`,
+    { method: "POST" },
+    options,
+    "CIBA request decision failed",
   );
 }
 

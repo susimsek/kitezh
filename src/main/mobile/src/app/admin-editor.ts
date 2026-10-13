@@ -205,7 +205,18 @@ export function editorValues(
   const values: Record<string, string> = { ...editorDefaults(resource) };
   for (const key of Object.keys(values)) {
     const value = source[key];
-    if (value !== null && value !== undefined) values[key] = String(value);
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      values[key] = String(value);
+    } else if (
+      Array.isArray(value) &&
+      value.every((entry) => typeof entry === "string")
+    ) {
+      values[key] = value.join(",");
+    }
   }
   if (resource === "users") {
     values.password = "";
@@ -213,20 +224,24 @@ export function editorValues(
       values.roles = (source.effectiveRoles as string[]).join(",");
   }
   if (resource === "clients") {
-    values.clientId = String(source.clientId ?? "");
-    values.clientName = String(source.clientName ?? "");
+    values.clientId = toDisplayString(source.clientId);
+    values.clientName = toDisplayString(source.clientName);
     values.scopes = Array.isArray(source.scopes)
       ? source.scopes.join(",")
       : "openid,profile";
   }
   if (resource === "identity-providers") {
-    values.registrationId = String(source.registrationId ?? "");
-    values.providerType = String(source.providerType ?? "oidc");
-    values.displayName = String(source.displayName ?? "");
-    values.alias = String(source.alias ?? "");
+    values.registrationId = toDisplayString(source.registrationId);
+    values.providerType = toDisplayString(source.providerType, "oidc");
+    values.displayName = toDisplayString(source.displayName);
+    values.alias = toDisplayString(source.alias);
     values.iconKey = "generic";
   }
   return values;
+}
+
+function toDisplayString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
 }
 
 function splitValues(value: string, separator = /[,\n]/) {

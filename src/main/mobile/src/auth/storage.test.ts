@@ -19,9 +19,10 @@ function createStore(value: string | null) {
 }
 
 test("reads valid sessions and fills missing optional tokens", async () => {
-  const storage = createSessionStorage(
-    createStore(JSON.stringify({ accessToken: "access", expiresAt: 123 })),
+  const store = createStore(
+    JSON.stringify({ accessToken: "access", expiresAt: 123 }),
   );
+  const storage = createSessionStorage(store);
 
   assert.deepEqual(await storage.readSession(), {
     accessToken: "access",
@@ -29,6 +30,18 @@ test("reads valid sessions and fills missing optional tokens", async () => {
     idToken: null,
     expiresAt: 123,
   });
+  assert.deepEqual(
+    JSON.parse(store.entries.get("kitezh.mobile.account.session")!),
+    {
+      schemaVersion: 1,
+      session: {
+        accessToken: "access",
+        refreshToken: null,
+        idToken: null,
+        expiresAt: 123,
+      },
+    },
+  );
 });
 
 test("rejects absent, malformed, and invalid session values", async () => {
@@ -41,11 +54,23 @@ test("rejects absent, malformed, and invalid session values", async () => {
     JSON.stringify({ accessToken: "access", expiresAt: 123, refreshToken: 2 }),
     JSON.stringify({ accessToken: "access", expiresAt: 123, idToken: false }),
   ]) {
-    assert.equal(
-      await createSessionStorage(createStore(stored)).readSession(),
-      null,
-    );
+    const store = createStore(stored);
+    assert.equal(await createSessionStorage(store).readSession(), null);
+    if (stored !== null) {
+      assert.equal(store.entries.has("kitezh.mobile.account.session"), false);
+    }
   }
+});
+
+test("rejects and removes sessions from unsupported storage versions", async () => {
+  const store = createStore(
+    JSON.stringify({
+      schemaVersion: 2,
+      session: { accessToken: "access", expiresAt: 123 },
+    }),
+  );
+  assert.equal(await createSessionStorage(store).readSession(), null);
+  assert.equal(store.entries.has("kitezh.mobile.account.session"), false);
 });
 
 test("writes and clears sessions in their isolated namespace", async () => {
@@ -59,9 +84,12 @@ test("writes and clears sessions in their isolated namespace", async () => {
   };
 
   await storage.writeSession(session, "admin");
-  assert.equal(
-    store.entries.get("kitezh.mobile.admin.session"),
-    JSON.stringify(session),
+  assert.deepEqual(
+    JSON.parse(store.entries.get("kitezh.mobile.admin.session")!),
+    {
+      schemaVersion: 1,
+      session,
+    },
   );
   await storage.clearSession("admin");
   assert.equal(store.entries.has("kitezh.mobile.admin.session"), false);

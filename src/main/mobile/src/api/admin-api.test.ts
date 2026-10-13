@@ -1,9 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
-
-installAxiosFetchMockCompatibility();
-
 import {
   AdminApiError,
   getAdminDashboard,
@@ -41,6 +37,10 @@ import {
   listAdminEvents,
   deleteAdminEvents,
 } from "./admin-api.ts";
+
+import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
+
+installAxiosFetchMockCompatibility();
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -100,6 +100,23 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
       getAdminDashboard("access-token"),
       (error: unknown) =>
         error instanceof AdminApiError && error.status === 403,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin API exposes Retry-After metadata for throttled calls", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(null, { status: 429, headers: { "Retry-After": "9" } });
+  try {
+    await assert.rejects(
+      getAdminDashboard("access-token"),
+      (error: unknown) =>
+        error instanceof AdminApiError &&
+        error.kind === "rate-limited" &&
+        error.retryAfterMs === 9_000,
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -556,13 +573,12 @@ test("admin consents request encodes all filters and stable sort", async () => {
     );
   };
   try {
-    await listAdminConsents(
-      "access-token",
-      "account",
-      "account-console",
-      "ada",
-      "openid",
-    );
+    await listAdminConsents("access-token", {
+      query: "account",
+      clientId: "account-console",
+      username: "ada",
+      scope: "openid",
+    });
     assert.equal(
       request,
       "https://kitezh.onrender.com/api/admin/consents?q=account&clientId=account-console&username=ada&scope=openid&page=0&size=10&sort=id.principalName%2Casc",

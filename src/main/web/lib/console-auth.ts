@@ -100,7 +100,7 @@ export function useConsoleAuth(config: ConsoleAuthConfig, consoleKind: ConsoleKi
       const idPayload = decodeJwt(nextIdToken ?? undefined);
       const refreshPayload = decodeJwt(nextRefreshToken ?? undefined);
 
-      if (expectedNonce && (!idPayload || idPayload.nonce !== expectedNonce)) {
+      if (expectedNonce && idPayload?.nonce !== expectedNonce) {
         clearAuthentication(false);
         throw new Error("Invalid nonce");
       }

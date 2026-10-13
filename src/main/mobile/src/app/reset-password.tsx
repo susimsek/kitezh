@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { resetPassword } from "@/api/public-api";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
+import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -58,7 +58,7 @@ export default function ResetPasswordScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <ScrollView
+      <MobileFormScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
@@ -156,7 +156,7 @@ export default function ResetPasswordScreen() {
             </Pressable>
           </View>
         )}
-      </ScrollView>
+      </MobileFormScrollView>
     </SafeAreaView>
   );
 }

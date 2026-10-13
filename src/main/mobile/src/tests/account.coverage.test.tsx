@@ -4,14 +4,21 @@ import * as accountApi from "@/api/account-api";
 import AccountScreen from "../app/account";
 import ApplicationsScreen from "../app/applications";
 
-jest.mock("@/api/account-api", () => ({
-  getAccountProfile: jest.fn(),
-  updateAccountProfile: jest.fn(),
-  listAccountApplications: jest.fn(),
-  listOfflineSessions: jest.fn(),
-  revokeAccountApplication: jest.fn(),
-  revokeOfflineSession: jest.fn(),
-}));
+jest.mock("@/api/account-api", () => {
+  const actual =
+    jest.requireActual<typeof import("@/api/account-api")>("@/api/account-api");
+  return {
+    AccountApiError: actual.AccountApiError,
+    getAccountProfile: jest.fn(),
+    updateAccountProfile: jest.fn(),
+    listAccountApplications: jest.fn(),
+    listCibaRequests: jest.fn(),
+    decideCibaRequest: jest.fn(),
+    listOfflineSessions: jest.fn(),
+    revokeAccountApplication: jest.fn(),
+    revokeOfflineSession: jest.fn(),
+  };
+});
 jest.mock("@/auth/MobileAuthProvider", () => ({
   MobileAuthProvider: ({ children }: { children: React.ReactNode }) => children,
   useMobileAuth: (() => {
@@ -69,6 +76,13 @@ beforeEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
   mockShowNotice.mockClear();
+  jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
+    content: [],
+    number: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  });
 });
 
 it("loads and saves the account profile, including email validation", async () => {
@@ -160,6 +174,65 @@ it("renders connected applications and offline sessions", async () => {
   expect(screen.getByText("offlineExpires: offlineNoExpiry")).toBeVisible();
 });
 
+it("shows CIBA decisions and blocks approval when step-up is required", async () => {
+  jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
+    content: [
+      {
+        authReqId: "request-1",
+        userCode: "ABCD-1234",
+        bindingMessage: "Approve account sign-in",
+        authorizedScopes: "openid profile",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: false,
+        stepUpRequired: false,
+      },
+      {
+        authReqId: "request-2",
+        userCode: "WXYZ-5678",
+        bindingMessage: null,
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: true,
+        stepUpRequired: true,
+      },
+    ],
+    number: 0,
+    size: 20,
+    totalElements: 2,
+    totalPages: 1,
+  });
+  jest.mocked(accountApi.decideCibaRequest).mockResolvedValue(undefined);
+
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("Approve account sign-in")).toBeVisible();
+  expect(screen.getByText(/ABCD-1234/)).toBeVisible();
+  expect(screen.getByText("cibaMfaAndStepUpRequired")).toBeVisible();
+  const approveButtons = screen.getAllByRole("button", { name: "cibaApprove" });
+  expect(approveButtons[1]).toBeDisabled();
+  fireEvent.click(approveButtons[0]);
+  await waitFor(() =>
+    expect(accountApi.decideCibaRequest).toHaveBeenCalledWith(
+      "access",
+      expect.objectContaining({ authReqId: "request-1" }),
+      "approve",
+      expect.any(Object),
+    ),
+  );
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "success",
+      message: "cibaApproved",
+    }),
+  );
+});
+
 it("loads a profile after retrying a failed profile request", async () => {
   jest
     .mocked(accountApi.getAccountProfile)
@@ -220,6 +293,44 @@ it("reports profile save failures and routes to native account sections", async 
   }
   fireEvent.click(screen.getByRole("button", { name: "continue" }));
   expect(router.replace).toHaveBeenCalledWith("/");
+});
+
+it("maps server profile validation to the matching native fields", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue({
+    username: "alice",
+    firstName: "Alice",
+    lastName: "Smith",
+    email: "alice@example.test",
+    pendingEmail: null,
+    emailVerified: true,
+    preferredLocale: null,
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
+  });
+  jest.mocked(accountApi.updateAccountProfile).mockRejectedValue(
+    new accountApi.AccountApiError(422, "invalid profile", {
+      violations: [
+        { field: "firstName", message: "firstNameRejected" },
+        { field: "email", message: "emailRejected" },
+      ],
+    }),
+  );
+
+  render(<AccountScreen />);
+  fireEvent.change(await screen.findByPlaceholderText("firstName"), {
+    target: { value: "Taylor" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("email"), {
+    target: { value: "alice@example.test" },
+  });
+  const save = screen.getByRole("button", { name: "save" });
+  fireEvent.click(save);
+  fireEvent.click(save);
+
+  expect(await screen.findByText("firstNameRejected")).toBeVisible();
+  expect(screen.getByText("emailRejected")).toBeVisible();
+  expect(screen.queryByText("profileSaveError")).not.toBeInTheDocument();
+  expect(accountApi.updateAccountProfile).toHaveBeenCalledTimes(1);
 });
 
 it("shows application errors and recovers after retry", async () => {

@@ -108,7 +108,13 @@ export default function AdminEventsPage() {
     }
   };
 
-  const types = useMemo(() => [...new Set(events.map((event) => event.action))].sort(), [events]);
+  const types = useMemo(
+    () =>
+      [...new Set(events.map((event) => event.action))].sort((left, right) =>
+        left.localeCompare(right, locale),
+      ),
+    [events, locale],
+  );
   const activeFilters = [
     query && { label: copy.search, value: query, onRemove: () => setQuery("") },
     action && { label: copy.action, value: action, onRemove: () => setAction("") },

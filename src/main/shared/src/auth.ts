@@ -16,6 +16,71 @@ export type ValidAuthorizationCallback = {
   state: string;
 };
 
+export type AuthorizationDiscovery = {
+  issuer?: string;
+  authorizationEndpoint?: string;
+  tokenEndpoint?: string;
+  endSessionEndpoint?: string;
+};
+
+/**
+ * Validates OIDC metadata before a native client trusts its endpoints.
+ * Development may use loopback HTTP; every other issuer/endpoint must use TLS.
+ */
+export function validateNativeAuthorizationConfig(
+  issuer: string,
+  clientId: string,
+  redirectUri: string,
+  discovery?: AuthorizationDiscovery | null,
+): boolean {
+  try {
+    const issuerUrl = new URL(issuer);
+    const redirect = new URL(redirectUri);
+    const localIssuer =
+      issuerUrl.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "::1"].includes(issuerUrl.hostname);
+    const allowedProtocol = (url: URL) =>
+      url.protocol === "https:" ||
+      (localIssuer &&
+        url.protocol === "http:" &&
+        url.hostname === issuerUrl.hostname);
+
+    if (
+      !allowedProtocol(issuerUrl) ||
+      !clientId.trim() ||
+      redirect.protocol !== "kitezh:" ||
+      !discovery?.issuer ||
+      !discovery.authorizationEndpoint ||
+      !discovery.tokenEndpoint
+    ) {
+      return false;
+    }
+
+    const metadataIssuer = new URL(discovery.issuer);
+    const authorizationEndpoint = new URL(discovery.authorizationEndpoint);
+    const tokenEndpoint = new URL(discovery.tokenEndpoint);
+    const endSessionEndpoint = discovery.endSessionEndpoint
+      ? new URL(discovery.endSessionEndpoint)
+      : undefined;
+    if (
+      metadataIssuer.origin !== issuerUrl.origin ||
+      metadataIssuer.pathname.replace(/\/$/, "") !==
+        issuerUrl.pathname.replace(/\/$/, "") ||
+      !allowedProtocol(authorizationEndpoint) ||
+      !allowedProtocol(tokenEndpoint) ||
+      authorizationEndpoint.origin !== issuerUrl.origin ||
+      tokenEndpoint.origin !== issuerUrl.origin ||
+      (endSessionEndpoint && endSessionEndpoint.origin !== issuerUrl.origin) ||
+      (endSessionEndpoint && !allowedProtocol(endSessionEndpoint))
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function validateAuthorizationCallback(
   params: AuthorizationCallbackParams,
   expectedState: string | undefined,
@@ -85,9 +150,10 @@ export function parseNativeDeepLink(value: string): NativeDeepLink | null {
       url.pathname === "/"
     ) {
       const token = url.searchParams.get("token")?.trim();
+      if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
       const kind =
         url.hostname === "verify-email" ? "verify-email" : "reset-password";
-      return token ? { kind, token } : null;
+      return { kind, token };
     }
     return null;
   } catch {
@@ -108,8 +174,8 @@ export function resolveNativeIntentPath(value: string): string | null {
     case "admin-logout-callback":
       return "/admin/logout/callback";
     case "verify-email":
-      return "/verify-email";
+      return `/verify-email?token=${encodeURIComponent(deepLink.token ?? "")}`;
     case "reset-password":
-      return "/reset-password";
+      return `/reset-password?token=${encodeURIComponent(deepLink.token ?? "")}`;
   }
 }
