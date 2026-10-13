@@ -7,11 +7,39 @@ installAxiosFetchMockCompatibility();
 import {
   PublicApiError,
   getCaptchaSettings,
+  getLatestReleaseMetadata,
   registerAccount,
   requestPasswordReset,
   resetPassword,
   verifyEmail,
 } from "./public-api.ts";
+
+test("reads the shared cached application release metadata endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  const metadata = {
+    tag: "v0.1.5",
+    version: "0.1.5",
+    releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v0.1.5",
+    assets: {
+      androidApk:
+        "https://github.com/susimsek/kitezh/releases/download/v0.1.5/kitezh-0.1.5-android.apk",
+      iosUnsignedIpa:
+        "https://github.com/susimsek/kitezh/releases/download/v0.1.5/kitezh-0.1.5-ios-unsigned.ipa",
+    },
+  };
+  let requestedPath = "";
+  globalThis.fetch = async (input) => {
+    requestedPath = new URL(input.toString()).pathname;
+    return new Response(JSON.stringify(metadata), { status: 200 });
+  };
+
+  try {
+    assert.deepEqual(await getLatestReleaseMetadata(), metadata);
+    assert.equal(requestedPath, "/api/public/app-release");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("captcha settings accepts only a boolean enabled value", async () => {
   const originalFetch = globalThis.fetch;

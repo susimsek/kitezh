@@ -35,7 +35,7 @@ app:
       initial-capacity: 50
       maximum-size: 100
       overrides:
-        desktopLatestRelease:
+        latestAppRelease:
           ttl: PT15M
           initial-capacity: 1
           maximum-size: 1

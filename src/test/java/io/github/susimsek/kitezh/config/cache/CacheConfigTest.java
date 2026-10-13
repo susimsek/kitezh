@@ -39,7 +39,7 @@ import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
 import io.github.susimsek.kitezh.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
-import io.github.susimsek.kitezh.service.DesktopReleaseService;
+import io.github.susimsek.kitezh.service.AppReleaseMetadataService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.HashMap;
@@ -83,21 +83,21 @@ class CacheConfigTest {
         assertThat(cacheManager).isInstanceOf(CaffeineCacheManager.class);
         Cache cache = cacheManager.getCache(UserRepository.USER_BY_USERNAME_CACHE);
         assertThat(cache).isNotNull();
-        assertThat(cacheManager.getCache(DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE))
+        assertThat(cacheManager.getCache(AppReleaseMetadataService.LATEST_APP_RELEASE_CACHE))
                 .isNotNull();
         cache.put("key", "value");
         assertThat(cache.get("key", String.class)).isEqualTo("value");
     }
 
     @Test
-    void appliesDesktopReleaseCacheTtlSeparately() {
+    void appliesApplicationReleaseCacheTtlSeparately() {
         CaffeineCacheManager cacheManager =
                 (CaffeineCacheManager) new CacheConfig(applicationProperties()).cacheManager();
 
         com.github.benmanes.caffeine.cache.Cache<?, ?> nativeCache =
                 ((org.springframework.cache.caffeine.CaffeineCache)
                                 cacheManager.getCache(
-                                        DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE))
+                                        AppReleaseMetadataService.LATEST_APP_RELEASE_CACHE))
                         .getNativeCache();
 
         assertThat(nativeCache.policy().expireAfterWrite()).isPresent();
@@ -291,7 +291,7 @@ class CacheConfigTest {
                                 10,
                                 100,
                                 Map.of(
-                                        DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE,
+                                        AppReleaseMetadataService.LATEST_APP_RELEASE_CACHE,
                                         new ApplicationProperties.CacheOverride(
                                                 Duration.ofMinutes(15), 1, 1)))),
                 new ApplicationProperties.Session("0 * * * * *"),

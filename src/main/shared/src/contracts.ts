@@ -18,6 +18,13 @@ export type DesktopUpdateStatus =
   | { state: "recovered"; version: string }
   | { state: "error"; message: string };
 
+export type ReleaseMetadata = {
+  tag: string;
+  version: string;
+  releaseUrl: string;
+  assets: Record<string, string>;
+};
+
 export type SocialProviderAvailability = {
   provider: string;
   providerType: string;

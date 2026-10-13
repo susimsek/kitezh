@@ -215,7 +215,7 @@ public class SecurityConfig {
                                         .authenticated()
                                         .requestMatchers("/api/auth/**")
                                         .permitAll()
-                                        .requestMatchers("/api/public/desktop-release")
+                                        .requestMatchers("/api/public/app-release")
                                         .permitAll()
                                         .requestMatchers("/oauth2/bc-authorize")
                                         .permitAll()

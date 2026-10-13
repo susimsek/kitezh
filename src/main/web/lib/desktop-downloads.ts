@@ -1,16 +1,13 @@
+import type { ReleaseMetadata } from "@kitezh/shared/contracts";
+
 export const DESKTOP_RELEASES_URL = "https://github.com/susimsek/kitezh/releases/latest";
 
-const DESKTOP_RELEASE_API_URL = "/api/public/desktop-release";
+const APP_RELEASE_API_URL = "/api/public/app-release";
 
-export type DesktopRelease = {
-  tag: string;
-  version: string;
-  releaseUrl: string;
-  assets: Record<string, string>;
-};
+export type DesktopRelease = ReleaseMetadata;
 
 export async function fetchLatestDesktopRelease(signal?: AbortSignal): Promise<DesktopRelease> {
-  const response = await fetch(DESKTOP_RELEASE_API_URL, {
+  const response = await fetch(APP_RELEASE_API_URL, {
     headers: { Accept: "application/json" },
     signal,
   });

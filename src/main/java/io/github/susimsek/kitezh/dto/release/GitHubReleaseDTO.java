@@ -1,4 +1,4 @@
-package io.github.susimsek.kitezh.dto.desktop;
+package io.github.susimsek.kitezh.dto.release;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-@Schema(name = "GitHubRelease", description = "GitHub release metadata used by the download page.")
+@Schema(
+        name = "GitHubRelease",
+        description = "GitHub release metadata used to build application release metadata.")
 public record GitHubReleaseDTO(
         @JsonProperty("tag_name")
                 @Schema(

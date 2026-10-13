@@ -1,10 +1,10 @@
-package io.github.susimsek.kitezh.dto.desktop;
+package io.github.susimsek.kitezh.dto.release;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 
-@Schema(name = "DesktopRelease", description = "Latest Kitezh desktop release metadata.")
-public record DesktopReleaseDTO(
+@Schema(name = "AppReleaseMetadata", description = "Latest Kitezh application release metadata.")
+public record AppReleaseMetadataDTO(
         @Schema(
                         description = "Git tag of the release.",
                         example = "v0.1.0",
@@ -22,6 +22,6 @@ public record DesktopReleaseDTO(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 String releaseUrl,
         @Schema(
-                        description = "Allowlisted versioned desktop asset URLs.",
+                        description = "Allowlisted versioned application asset URLs.",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 Map<String, String> assets) {}

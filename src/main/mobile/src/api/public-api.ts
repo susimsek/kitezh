@@ -1,4 +1,7 @@
-import type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
+import type {
+  ReleaseMetadata,
+  SocialProviderAvailability,
+} from "../../../shared/src/contracts.ts";
 import {
   classifyApiError,
   DEFAULT_NATIVE_API_TIMEOUT_MS,
@@ -10,7 +13,6 @@ import {
   createMobileApiClient,
   getMobileTransportCause,
   readMobileResponseData,
-  toHeaderRecord,
 } from "./http-client.ts";
 
 export class PublicApiError extends Error {
@@ -35,6 +37,31 @@ export type CaptchaSettings = { enabled: boolean };
 export type { SocialProviderAvailability };
 
 const publicClient = createMobileApiClient(DEFAULT_NATIVE_API_TIMEOUT_MS);
+
+export async function getLatestReleaseMetadata(): Promise<ReleaseMetadata> {
+  try {
+    const response = await publicClient.request<ReleaseMetadata>({
+      headers: { Accept: "application/json" },
+      method: "GET",
+      url: "/api/public/app-release",
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new PublicApiError(
+        response.status,
+        "Release metadata request failed",
+        readMobileResponseData(response.data),
+      );
+    }
+    return readMobileResponseData(response.data) as ReleaseMetadata;
+  } catch (cause) {
+    if (cause instanceof PublicApiError) throw cause;
+    throw new PublicApiError(
+      0,
+      "Release metadata request failed",
+      getMobileTransportCause(cause, false),
+    );
+  }
+}
 
 async function post<T>(
   path: string,

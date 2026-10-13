@@ -73,10 +73,15 @@ unsigned IPA. Partial signing configuration fails before the Xcode build.
 
 The iOS IPA is for testing, not App Store or TestFlight submission. The user signs it with a personal
 Apple Account through AltStore or Sideloadly; free provisioning expires after seven days and needs
-to be refreshed. Initial sideload setup requires a Mac or PC. These GitHub download builds do not
-provide automatic mobile updates. The separate EAS production profile remains available for store
-builds. Do not expose an OTA update channel until an EAS project, update URL, privacy disclosure,
-staged rollout, and rollback owner are configured.
+to be refreshed. Initial sideload setup requires a Mac or PC. The mobile app checks the shared,
+backend-cached `/api/public/app-release` metadata at launch and when it returns to the foreground
+after six hours.
+The metadata is shared with the web download page and contains allowlisted assets for desktop,
+Android, and iOS. Android can download the versioned APK and hand it to Android's package installer;
+the user must allow installs from Kitezh and confirm the installation. iOS opens the release page so
+the user can install the IPA with AltStore or Sideloadly; iOS does not permit this app to install an
+unsigned IPA itself. This release check is separate from EAS OTA updates, which remain disabled
+until an EAS project, update URL, privacy disclosure, staged rollout, and rollback owner are set up.
 
 To roll back a store release, stop the rollout and promote the last compatible build; do not use an
 OTA rollback to cross a native runtime boundary. Device builds must be validated on both Android

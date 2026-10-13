@@ -1,4 +1,4 @@
-package io.github.susimsek.kitezh.dto.desktop;
+package io.github.susimsek.kitezh.dto.release;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
