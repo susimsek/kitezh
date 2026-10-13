@@ -24,6 +24,7 @@ const updateOperations = [];
 let recoveryMarker;
 let recoveryState;
 let quitAndInstallCalls = 0;
+let failNextBackupCopy = false;
 const updateDirectory = await mkdtemp(path.join(os.tmpdir(), "kitezh-update-"));
 await mkdir(path.join(updateDirectory, "assets"), { recursive: true });
 const signingKeys = generateKeyPairSync("ed25519");
@@ -94,7 +95,16 @@ Module._load = function (request, parent, isMain) {
       ...originalFsPromises,
       mkdir: async (...args) =>
         updateOperations.push({ operation: "mkdir", args }),
-      cp: async (...args) => updateOperations.push({ operation: "cp", args }),
+      cp: async (...args) => {
+        if (
+          failNextBackupCopy &&
+          String(args[1]).includes("desktop-update-backup-")
+        ) {
+          failNextBackupCopy = false;
+          throw new Error("test-only backup preparation failure");
+        }
+        updateOperations.push({ operation: "cp", args });
+      },
       writeFile: async (...args) => {
         updateOperations.push({ operation: "writeFile", args });
         recoveryMarker = JSON.parse(String(args[1]));
@@ -335,5 +345,65 @@ test("reports all development update preview outcomes without contacting the upd
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
+  }
+});
+
+test("keeps unsupported update installs disabled and reports backup preparation failures", async () => {
+  const previousPreview = process.env.DESKTOP_UPDATE_PREVIEW;
+  const previousSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) =>
+    delay === 2_000
+      ? /** @type {NodeJS.Timeout} */ ({})
+      : previousSetTimeout(callback, delay, ...args);
+
+  try {
+    runtime.packaged = false;
+    delete process.env.DESKTOP_UPDATE_PREVIEW;
+    const beforeUnsupported = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeUnsupported), [
+      { state: "unsupported" },
+    ]);
+
+    runtime.packaged = true;
+    updateOperations.length = 0;
+    quitAndInstallCalls = 0;
+    failNextBackupCopy = true;
+    updateHandlers.get("update-downloaded")({ version: "0.1.4" });
+    const beforePreparationFailure = publishedStatuses.length;
+    update.installUpdate();
+    for (
+      let turn = 0;
+      turn < 20 &&
+      !publishedStatuses
+        .slice(beforePreparationFailure)
+        .some(
+          ({ message }) => message === "Desktop update could not be prepared.",
+        );
+      turn += 1
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    assert.ok(
+      publishedStatuses
+        .slice(beforePreparationFailure)
+        .some(
+          ({ state, message }) =>
+            state === "error" &&
+            message === "Desktop update could not be prepared.",
+        ),
+    );
+    assert.equal(
+      updateOperations.some(({ operation }) => operation === "writeFile"),
+      false,
+    );
+    assert.equal(quitAndInstallCalls, 0);
+  } finally {
+    globalThis.setTimeout = previousSetTimeout;
+    runtime.packaged = true;
+    failNextBackupCopy = false;
+    if (previousPreview === undefined)
+      delete process.env.DESKTOP_UPDATE_PREVIEW;
+    else process.env.DESKTOP_UPDATE_PREVIEW = previousPreview;
   }
 });

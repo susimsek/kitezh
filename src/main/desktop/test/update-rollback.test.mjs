@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   isValidRecoveryState,
@@ -264,20 +265,59 @@ test(
     skip: process.platform !== "win32",
   },
   async () => {
-    const root = await mkdtemp(
-      path.join(os.tmpdir(), "kitezh-watchdog-health-"),
+    const watchdogPath = fileURLToPath(
+      new URL("../dist/update-watchdog.js", import.meta.url),
     );
-    const sourcePath = new URL("../dist/update-watchdog.js", import.meta.url);
-    const watchdogPath = path.join(root, "update-watchdog.js");
-    const recoveryPath = path.join(root, "desktop-update-recovery.json");
-    const backupPath = path.join(root, "desktop-update-backup-123");
+    const watchdogDirectory = path.dirname(watchdogPath);
+    const recoveryPath = path.join(
+      watchdogDirectory,
+      "desktop-update-recovery.json",
+    );
+    const backupPath = path.join(
+      watchdogDirectory,
+      `desktop-update-backup-${Date.now()}`,
+    );
     const targetPath = path.dirname(process.execPath);
     let parent;
     let watchdog;
+    let createdBackup = false;
+    let createdRecoveryMarker = false;
 
     try {
-      await cp(sourcePath, watchdogPath);
+      await assert.rejects(readFile(recoveryPath));
+      for (const pid of ["invalid-pid", "2147483647"]) {
+        const invalidRun = spawn(process.execPath, [watchdogPath, pid], {
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        const [exitCode] = await once(invalidRun, "exit");
+        assert.equal(exitCode, 0);
+      }
+      await writeFile(
+        recoveryPath,
+        JSON.stringify({
+          backupPath: path.join(watchdogDirectory, "desktop-update-backup-123"),
+          targetPath: path.join(watchdogDirectory, "unexpected-target"),
+          targetType: "directory",
+          executablePath: process.execPath,
+          version: "0.2.0",
+          previousVersion: "0.1.0",
+          startedAt: Date.now(),
+        }),
+      );
+      const invalidRecovery = spawn(
+        process.execPath,
+        [watchdogPath, "2147483647"],
+        {
+          stdio: "ignore",
+          windowsHide: true,
+        },
+      );
+      const [invalidRecoveryExit] = await once(invalidRecovery, "exit");
+      assert.equal(invalidRecoveryExit, 0);
+      await rm(recoveryPath, { force: true });
       await mkdir(backupPath);
+      createdBackup = true;
       await writeFile(
         path.join(backupPath, "previous-version.txt"),
         "previous",
@@ -294,6 +334,7 @@ test(
           startedAt: Date.now(),
         }),
       );
+      createdRecoveryMarker = true;
       parent = spawn(process.execPath, ["-e", "setTimeout(() => {}, 100)"], {
         stdio: "ignore",
         windowsHide: true,
@@ -318,7 +359,8 @@ test(
     } finally {
       if (parent && parent.exitCode === null) parent.kill();
       if (watchdog && watchdog.exitCode === null) watchdog.kill();
-      await rm(root, { recursive: true, force: true });
+      if (createdRecoveryMarker) await rm(recoveryPath, { force: true });
+      if (createdBackup) await rm(backupPath, { recursive: true, force: true });
     }
   },
 );

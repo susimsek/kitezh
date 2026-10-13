@@ -10701,6 +10701,36 @@ test("reports a recovered update after the previous version starts", async () =>
   }
 });
 
+test("keeps the Windows update backup during the startup health window", async () => {
+  const backupDirectory = await mkdtemp(
+    path.join(os.tmpdir(), "kitezh-e2e-health-backup-"),
+  );
+  const backupFile = path.join(backupDirectory, "previous-version.txt");
+  await writeFile(backupFile, "previous-version");
+  const application = await launchDesktop({
+    recoveryState: {
+      version: packageVersion,
+      previousVersion: "previous-version",
+      startedAt: Date.now() - 500,
+      backupPath: backupDirectory,
+      targetPath: path.join(os.tmpdir(), "kitezh-e2e-target"),
+      targetType: "directory",
+      executablePath: process.execPath,
+    },
+  });
+
+  try {
+    const mainWindow = await nativeMainWindow(application);
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    assert.equal(await readFile(backupFile, "utf8"), "previous-version");
+  } finally {
+    await application.close();
+    await rm(backupDirectory, { recursive: true, force: true });
+  }
+});
+
 test("rejects an unsigned update manifest in the Windows main process", async () => {
   const application = await launchDesktop({ autoUpdate: "true" });
   try {
