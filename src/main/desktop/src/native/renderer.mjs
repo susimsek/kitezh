@@ -1460,7 +1460,7 @@ function adminRoleCompositionPanel(roleName, composition) {
 function adminRoleCreateContent() {
   const draft = state.data.adminRoleCreateDraft ?? {};
   const errors = violations(state.error?.body);
-  return `<section class="card"><form data-form="admin-role-create" novalidate>${field("name", text("adminRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="50" pattern="ROLE_[A-Z0-9_]+" autocomplete="off" required')}${field("description", text("adminRoleDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}${button(text("adminCreateRole"), { type: "submit", busy: state.busy === "role-create", disabled: state.offline })}</form></section>`;
+  return `<section class="card"><form data-form="admin-role-create" novalidate>${field("name", text("adminRoleName"), draft.name ?? "", errors.name, "text", 'maxlength="50" autocomplete="off" required')}${field("description", text("adminRoleDescription"), draft.description ?? "", errors.description, "text", 'maxlength="500"')}${button(text("adminCreateRole"), { type: "submit", busy: state.busy === "role-create", disabled: state.offline })}</form></section>`;
 }
 
 function adminGroupsContent() {
@@ -2218,7 +2218,19 @@ function clientCreateLineValues(value) {
 function isAbsoluteFragmentFreeUri(value) {
   try {
     const uri = new URL(value);
-    return Boolean(uri.protocol) && !uri.hash;
+    return (
+      Boolean(uri.protocol) &&
+      !uri.hash &&
+      ![
+        "about:",
+        "blob:",
+        "data:",
+        "file:",
+        "filesystem:",
+        "javascript:",
+        "vbscript:",
+      ].includes(uri.protocol)
+    );
   } catch {
     return false;
   }
@@ -4280,7 +4292,7 @@ function pageItems(items, emptyText, renderItem) {
 
 function sessionsContent() {
   const sessions = state.data.sessions ?? [];
-  return `<section class="card"><h2>${escapeHtml(text("sessionsTitle"))}</h2><p>${escapeHtml(text("sessionsError"))}</p>${pageItems(sessions, text("sessionsEmpty"), (item) => '<div class="list-item" data-id="' + escapeHtml(item.id) + '"><div><strong>' + escapeHtml(item.current ? text("currentSession") : item.id) + '</strong><span class="muted">' + escapeHtml(item.createdAt ?? "") + " · " + escapeHtml(item.lastAccessedAt ?? "") + "</span></div>" + (item.current ? "" : button(text("signOutSession"), { action: "delete-session", danger: true, mutation: true })) + "</div>")}<div class="actions">${button(text("signOutOthers"), { action: "delete-other-sessions", busy: state.busy === "sessions", mutation: true })}</div></section>`;
+  return `<section class="card"><h2>${escapeHtml(text("sessionsTitle"))}</h2><p>${escapeHtml(text("sessionsError"))}</p>${pageItems(sessions, text("sessionsEmpty"), (item) => '<div class="list-item" data-id="' + escapeHtml(item.id) + '"><div><strong>' + escapeHtml(item.current ? text("currentSession") : item.id) + '</strong><span class="muted">' + escapeHtml(item.createdAt ?? "") + " · " + escapeHtml(item.lastAccessedAt ?? "") + "</span></div>" + (item.current ? "" : button(text("signOutSession"), { action: "delete-session", danger: true, busy: state.busy === "sessions", mutation: true })) + "</div>")}<div class="actions">${button(text("signOutOthers"), { action: "delete-other-sessions", busy: state.busy === "sessions", mutation: true })}</div></section>`;
 }
 
 function applicationsContent() {
@@ -7239,8 +7251,11 @@ async function submitForm(form) {
     if (body.otpRequired && !body.otpEnabled) {
       const message = text("adminOtpRequiredNeedsEnabled");
       state.error = {
-        message,
-        body: { violations: [{ field: "otpRequired", message }] },
+        kind: "validation",
+        body: {
+          detail: message,
+          violations: [{ field: "otpRequired", message }],
+        },
       };
       render();
       return;
@@ -7406,7 +7421,14 @@ async function submitForm(form) {
       formString(values.newPassword).length < 12 ||
       values.newPassword !== values.confirmPassword
     ) {
-      state.error = { message: text("passwordMismatch") };
+      const message = text("passwordMismatch");
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: message,
+          violations: [{ field: "newPassword", message }],
+        },
+      };
       render();
       return;
     }
@@ -7432,7 +7454,14 @@ async function submitForm(form) {
   }
   if (form.dataset.form === "delete") {
     if (!values.deletePassword) {
-      state.error = { message: text("passwordRequired") };
+      const message = text("passwordRequired");
+      state.error = {
+        kind: "validation",
+        body: {
+          detail: message,
+          violations: [{ field: "deletePassword", message }],
+        },
+      };
       render();
       return;
     }

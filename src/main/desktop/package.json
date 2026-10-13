@@ -31,8 +31,8 @@
     "test:e2e:packaged:roles": "node --test e2e/packaged-client-roles.test.mjs",
     "test:e2e:google": "node --test e2e/google-authenticated.test.mjs",
     "test:e2e:providers": "node --test e2e/social-provider-authenticated.test.mjs",
-    "test:unit:coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
-    "test:sonar-coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs e2e/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
+    "test:unit:coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --include='src/native/**/*.mjs' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
+    "test:sonar-coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --include='src/native/**/*.mjs' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs e2e/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
     "smoke:package": "node scripts/smoke-packaged-app.mjs",
     "build": "pnpm run build:main && pnpm run build:native",
     "start": "node scripts/run-desktop.mjs production",
@@ -45,6 +45,7 @@
     "c8": "10.1.3",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
+    "jsdom": "30.0.1",
     "playwright-core": "1.63.0",
     "typescript": "5.9.2"
   },

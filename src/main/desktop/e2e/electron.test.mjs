@@ -20,7 +20,6 @@ const electronExecutable = require("electron");
 const packageVersion = JSON.parse(
   await readFile(path.join(desktopDirectory, "package.json"), "utf8"),
 ).version;
-
 function readWindowsAppearance() {
   const output = execFileSync(
     "powershell.exe",
@@ -98,7 +97,9 @@ function onePixelPng() {
 
 async function launchDesktop({
   devTools = false,
+  background = false,
   autoUpdate = "false",
+  recoveryState,
   updatePreviewState,
   updatePreviewVersion = "0.1.1",
   updatePreviewAutomatic = false,
@@ -111,6 +112,11 @@ async function launchDesktop({
     "en",
   );
   await writeFile(path.join(userDataDirectory, "desktop-language.json"), "en");
+  if (recoveryState)
+    await writeFile(
+      path.join(userDataDirectory, "desktop-update-recovery.json"),
+      JSON.stringify(recoveryState),
+    );
   return electron.launch({
     args: [`--user-data-dir=${userDataDirectory}`, desktopDirectory],
     cwd: desktopDirectory,
@@ -119,6 +125,7 @@ async function launchDesktop({
       DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
       DESKTOP_AUTO_UPDATE: autoUpdate,
       DESKTOP_DEVTOOLS: devTools ? "true" : "false",
+      ...(background ? { DESKTOP_E2E_BACKGROUND: "true" } : {}),
       ...(updatePreviewState
         ? {
             DESKTOP_UPDATE_PREVIEW: "true",
@@ -309,7 +316,7 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
         version: await window.desktopApi?.getAppVersion(),
       })),
       {
-        apiBaseUrl: "http://localhost:9090",
+        apiBaseUrl: "http://127.0.0.1:9090",
         isDesktop: true,
         version: packageVersion,
       },
@@ -9911,10 +9918,15 @@ test("opens settings in a separate window without requiring login", async () => 
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
     assert.equal(
-      await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      await application.evaluate(
+        ({ BrowserWindow }, targetUrl) =>
+          BrowserWindow.getAllWindows()
+            .find((window) => window.webContents.getURL() === targetUrl)
+            ?.isVisible(),
+        mainWindow.url(),
       ),
-      true,
+      false,
+      "the unauthenticated console window should stay hidden",
     );
 
     const settingsWindowPromise = application.waitForEvent("window");
@@ -9948,10 +9960,15 @@ test("opens settings in a separate window without requiring login", async () => 
       "Settings search should use the native theme surface and defined border",
     );
     assert.equal(
-      await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      await application.evaluate(
+        ({ BrowserWindow }, targetUrl) =>
+          BrowserWindow.getAllWindows()
+            .find((window) => window.webContents.getURL() === targetUrl)
+            ?.isVisible(),
+        settingsWindow.url(),
       ),
       true,
+      "settings should be visible without showing the unauthenticated console",
     );
     const screenshotDirectory =
       process.env.KITEZH_E2E_ARTIFACTS_DIR ?? os.tmpdir();
@@ -10478,10 +10495,15 @@ test("keeps developer tools closed and the app hidden", async () => {
       false,
     );
     assert.equal(
-      await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows().every((window) => !window.isVisible()),
+      await application.evaluate(
+        ({ BrowserWindow }, targetUrl) =>
+          !BrowserWindow.getAllWindows()
+            .find((window) => window.webContents.getURL() === targetUrl)
+            ?.isVisible(),
+        mainWindow.url(),
       ),
       true,
+      "the unauthenticated console should remain hidden",
     );
   } finally {
     await application.close();
@@ -10655,7 +10677,7 @@ test("reports a recovered update after the previous version starts", async () =>
     },
   });
   try {
-    const mainWindow = await waitForWindowRoute(application, "/");
+    const mainWindow = await nativeMainWindow(application);
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
       .waitFor();
@@ -10877,7 +10899,7 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     );
     await companionWindow.waitForFunction(
       () =>
-        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+        getComputedStyle(document.body).backgroundColor === "rgb(33, 37, 41)",
     );
     assert.equal(
       await mainWindow.evaluate(() =>
@@ -10885,7 +10907,7 @@ test("localizes and themes the update dialog with desktop preferences", async ()
           .getPropertyValue("--background")
           .trim(),
       ),
-      "#111418",
+      "#212529",
     );
     await settingsWindow.getByRole("button", { name: "General" }).click();
     await settingsWindow.locator("#desktop-language").selectOption("tr");
@@ -10961,18 +10983,18 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       await availableWindow.evaluate(
         () => getComputedStyle(document.body).backgroundColor,
       ),
-      "rgb(17, 20, 24)",
+      "rgb(33, 37, 41)",
     );
     await mainWindow.evaluate(async () => window.desktopApi.theme.set("light"));
     await availableWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
-        "rgb(247, 249, 252)",
+        "rgb(248, 249, 250)",
     );
     await companionWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
-        "rgb(247, 249, 252)",
+        "rgb(248, 249, 250)",
     );
     await mainWindow.evaluate(async () =>
       window.desktopApi.theme.set("system"),
@@ -10981,7 +11003,7 @@ test("localizes and themes the update dialog with desktop preferences", async ()
       () => document.documentElement.dataset.theme,
     );
     const systemDialogBackground =
-      systemTheme === "dark" ? "rgb(17, 20, 24)" : "rgb(247, 249, 252)";
+      systemTheme === "dark" ? "rgb(33, 37, 41)" : "rgb(248, 249, 250)";
     await availableWindow.waitForFunction(
       (background) =>
         getComputedStyle(document.body).backgroundColor === background,
@@ -11008,15 +11030,15 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     );
     await availableWindow.waitForFunction(
       () =>
-        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+        getComputedStyle(document.body).backgroundColor === "rgb(33, 37, 41)",
     );
     await companionWindow.waitForFunction(
       () =>
-        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+        getComputedStyle(document.body).backgroundColor === "rgb(33, 37, 41)",
     );
     await liveSettingsWindow.waitForFunction(
       () =>
-        getComputedStyle(document.body).backgroundColor === "rgb(17, 20, 24)",
+        getComputedStyle(document.body).backgroundColor === "rgb(33, 37, 41)",
     );
     await application.evaluate(({ nativeTheme }) => {
       nativeTheme.themeSource = "light";
@@ -11027,17 +11049,17 @@ test("localizes and themes the update dialog with desktop preferences", async ()
     await availableWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
-        "rgb(247, 249, 252)",
+        "rgb(248, 249, 250)",
     );
     await companionWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
-        "rgb(247, 249, 252)",
+        "rgb(248, 249, 250)",
     );
     await liveSettingsWindow.waitForFunction(
       () =>
         getComputedStyle(document.body).backgroundColor ===
-        "rgb(247, 249, 252)",
+        "rgb(248, 249, 250)",
     );
     const liveSettingsClosed = liveSettingsWindow.waitForEvent("close");
     await closeNativeSettings(application);
@@ -11089,7 +11111,7 @@ test(
       ]) {
         setWindowsAppearance(mode);
         const background =
-          theme === "dark" ? "rgb(17, 20, 24)" : "rgb(247, 249, 252)";
+          theme === "dark" ? "rgb(33, 37, 41)" : "rgb(248, 249, 250)";
         await mainWindow.waitForFunction(
           (expectedTheme) =>
             document.documentElement.dataset.theme === expectedTheme,

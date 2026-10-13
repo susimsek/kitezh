@@ -19,6 +19,11 @@ import {
   isAllowedExternalUrl,
 } from "../dist/config.js";
 import {
+  DEFAULT_API_BASE_URL,
+  LOCAL_API_BASE_URL,
+  getApiBaseUrl as getPublicApiBaseUrl,
+} from "../dist/api-base-url.js";
+import {
   isTrustedRendererFrame,
   isTrustedRendererUrl,
 } from "../dist/security/origin-policy.js";
@@ -303,6 +308,15 @@ test("accepts only configured API and external origins", () => {
   assert.equal(isAllowedExternalUrl("javascript:alert(1)"), false);
 });
 
+test("exports the configured API URL contract from its public adapter", () => {
+  assert.equal(DEFAULT_API_BASE_URL, "https://kitezh.onrender.com");
+  assert.equal(LOCAL_API_BASE_URL, "http://localhost:9090");
+  assert.equal(
+    getPublicApiBaseUrl("http://localhost:9090"),
+    LOCAL_API_BASE_URL,
+  );
+});
+
 test("restores the default quick-access shortcut when a custom shortcut conflicts", () => {
   const attempts = [];
   const adapter = {
@@ -342,4 +356,59 @@ test("reports when both the requested and fallback shortcuts are unavailable", (
     ),
     { registered: false, accelerator: "CommandOrControl+Shift+K" },
   );
+});
+
+test("global shortcut registration handles success and unavailable accelerators", () => {
+  let unregistered = 0;
+  const callback = () => {};
+  const primary = registerGlobalShortcutWithFallback(
+    {
+      unregisterAll() {
+        unregistered += 1;
+      },
+      register(accelerator, registeredCallback) {
+        assert.equal(registeredCallback, callback);
+        return accelerator === "Ctrl+Shift+K";
+      },
+    },
+    "Ctrl+Shift+K",
+    "Alt+Space",
+    callback,
+  );
+  assert.deepEqual(primary, { registered: true, accelerator: "Ctrl+Shift+K" });
+
+  const fallback = registerGlobalShortcutWithFallback(
+    {
+      unregisterAll() {
+        unregistered += 1;
+      },
+      register(accelerator) {
+        if (accelerator === "Ctrl+Shift+K") throw new Error("shortcut busy");
+        return true;
+      },
+    },
+    "Ctrl+Shift+K",
+    "Alt+Space",
+    callback,
+  );
+  assert.deepEqual(fallback, { registered: false, accelerator: "Alt+Space" });
+
+  const sameAccelerator = registerGlobalShortcutWithFallback(
+    {
+      unregisterAll() {
+        unregistered += 1;
+      },
+      register() {
+        throw new Error("shortcut busy");
+      },
+    },
+    "Alt+Space",
+    "Alt+Space",
+    callback,
+  );
+  assert.deepEqual(sameAccelerator, {
+    registered: false,
+    accelerator: "Alt+Space",
+  });
+  assert.equal(unregistered, 3);
 });

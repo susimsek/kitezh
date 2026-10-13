@@ -7,6 +7,8 @@ import path from "node:path";
 import test, { after } from "node:test";
 
 const originalLoad = Module._load;
+const originalFsPromises = originalLoad("node:fs/promises", null);
+const originalChildProcess = originalLoad("node:child_process", null);
 const originalAppImage = process.env.APPIMAGE;
 if (process.platform === "linux" && !process.env.APPIMAGE) {
   process.env.APPIMAGE = "/tmp/kitezh-test.AppImage";
@@ -18,6 +20,9 @@ after(() => {
 
 const updateHandlers = new Map();
 const publishedStatuses = [];
+const updateOperations = [];
+let recoveryMarker;
+let quitAndInstallCalls = 0;
 const updateDirectory = await mkdtemp(path.join(os.tmpdir(), "kitezh-update-"));
 await mkdir(path.join(updateDirectory, "assets"), { recursive: true });
 const signingKeys = generateKeyPairSync("ed25519");
@@ -61,14 +66,19 @@ const autoUpdater = {
   on: (event, handler) => updateHandlers.set(event, handler),
   checkForUpdates: (...args) => runtime.updateCheck(...args),
   downloadUpdate: (...args) => runtime.updateDownload(...args),
-  quitAndInstall: async () => undefined,
+  quitAndInstall: async (...args) => {
+    quitAndInstallCalls += 1;
+    updateOperations.push({ operation: "quitAndInstall", args });
+  },
 };
 
 Module._load = function (request, parent, isMain) {
   if (request === "electron") {
     return {
       app: {
-        isPackaged: runtime.packaged,
+        get isPackaged() {
+          return runtime.packaged;
+        },
         getPath: () => runtime.userData,
         getVersion: () => runtime.version,
         getAppPath: () => runtime.appPath,
@@ -77,6 +87,32 @@ Module._load = function (request, parent, isMain) {
     };
   }
   if (request === "electron-updater") return { autoUpdater };
+  if (request === "node:fs/promises") {
+    return {
+      ...originalFsPromises,
+      mkdir: async (...args) =>
+        updateOperations.push({ operation: "mkdir", args }),
+      cp: async (...args) => updateOperations.push({ operation: "cp", args }),
+      writeFile: async (...args) => {
+        updateOperations.push({ operation: "writeFile", args });
+        recoveryMarker = JSON.parse(String(args[1]));
+      },
+      readFile: async (...args) => {
+        if (String(args[0]).endsWith("update-manifest-public-key.pem"))
+          return originalFsPromises.readFile(...args);
+        throw new Error("No recovery marker in isolated updater test.");
+      },
+    };
+  }
+  if (request === "node:child_process") {
+    return {
+      ...originalChildProcess,
+      spawn: (...args) => {
+        updateOperations.push({ operation: "spawn", args });
+        return { unref: () => updateOperations.push({ operation: "unref" }) };
+      },
+    };
+  }
   return originalLoad.call(this, request, parent, isMain);
 };
 
@@ -129,4 +165,71 @@ test("returns download results and publishes download errors", async () => {
     state: "error",
     message: "Desktop update could not be downloaded.",
   });
+});
+
+test("prepares a reversible Windows update and starts installation only after its watchdog", async () => {
+  updateOperations.length = 0;
+  quitAndInstallCalls = 0;
+  updateHandlers.get("update-downloaded")({ version: "0.1.4" });
+
+  update.installUpdate();
+  for (let turn = 0; turn < 20 && quitAndInstallCalls === 0; turn += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  assert.ok(recoveryMarker);
+  assert.equal(recoveryMarker.version, "0.1.4");
+  assert.equal(recoveryMarker.previousVersion, "0.1.3");
+  assert.equal(recoveryMarker.targetType, "directory");
+  assert.equal(recoveryMarker.executablePath, process.execPath);
+  assert.ok(
+    updateOperations.findIndex(({ operation }) => operation === "spawn") <
+      updateOperations.findIndex(
+        ({ operation }) => operation === "quitAndInstall",
+      ),
+  );
+  assert.equal(quitAndInstallCalls, 1);
+  assert.deepEqual(
+    updateOperations.find(({ operation }) => operation === "writeFile").args[2],
+    { mode: 0o600 },
+  );
+});
+
+test("reports all development update preview outcomes without contacting the updater", async () => {
+  const previousPreview = process.env.DESKTOP_UPDATE_PREVIEW;
+  const previousState = process.env.DESKTOP_UPDATE_PREVIEW_STATE;
+  const previousVersion = process.env.DESKTOP_UPDATE_PREVIEW_VERSION;
+  runtime.packaged = false;
+  process.env.DESKTOP_UPDATE_PREVIEW = "true";
+  process.env.DESKTOP_UPDATE_PREVIEW_VERSION = "0.1.5-preview";
+
+  try {
+    for (const [preview, expected] of [
+      ["not-available", "not-available"],
+      ["error", "error"],
+      ["unknown", "available"],
+    ]) {
+      process.env.DESKTOP_UPDATE_PREVIEW_STATE = preview;
+      const before = publishedStatuses.length;
+      await update.checkForUpdates();
+      await new Promise((resolve) => setTimeout(resolve, 1_550));
+      assert.equal(publishedStatuses[before].state, "checking");
+      assert.equal(publishedStatuses.at(-1).state, expected);
+      if (expected === "available")
+        assert.equal(publishedStatuses.at(-1).version, "0.1.5-preview");
+    }
+    assert.equal(await update.downloadUpdate(), false);
+    update.installUpdate();
+    assert.equal(quitAndInstallCalls, 1);
+  } finally {
+    runtime.packaged = true;
+    for (const [name, value] of [
+      ["DESKTOP_UPDATE_PREVIEW", previousPreview],
+      ["DESKTOP_UPDATE_PREVIEW_STATE", previousState],
+      ["DESKTOP_UPDATE_PREVIEW_VERSION", previousVersion],
+    ]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
 });
