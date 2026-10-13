@@ -273,6 +273,7 @@ jobs:
           image_ref="${IMAGE}@${IMAGE_DIGEST}"
           cosign sign --yes "${image_ref}"
           cosign verify \
+            --experimental-oci11 \
             --certificate-identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-release.yml@refs/tags/${RELEASE_TAG}" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${image_ref}"
