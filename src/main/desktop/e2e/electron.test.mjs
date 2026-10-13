@@ -481,6 +481,36 @@ test("opens settings in a separate window without requiring login", async () => 
   }
 });
 
+test("opens the localized About window and reuses it when requested again", async () => {
+  const application = await launchDesktop();
+  try {
+    const mainWindow = await waitForWindowRoute(application, "/");
+    await mainWindow.waitForLoadState("domcontentloaded");
+    await mainWindow.evaluate(() => window.desktopApi.language.set("tr"));
+
+    const aboutWindowPromise = application.waitForEvent("window");
+    await clickApplicationMenuItem(application, "Kitezh hakkında");
+    const aboutWindow = await aboutWindowPromise;
+    await aboutWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+    assert.equal(await aboutWindow.locator("html").getAttribute("lang"), "tr");
+    assert.equal(
+      await aboutWindow.getByText("Güvenli kimlik ve erişim konsolu").count(),
+      1,
+    );
+    assert.equal(await aboutWindow.getByText(/Sürüm/).count(), 1);
+
+    await clickApplicationMenuItem(application, "Kitezh hakkında");
+    assert.equal(
+      application
+        .windows()
+        .filter((window) => window.url().startsWith("data:text/html")).length,
+      1,
+    );
+  } finally {
+    await application.close();
+  }
+});
+
 test("opens the native quick access companion from View", async () => {
   const application = await launchDesktop();
   try {

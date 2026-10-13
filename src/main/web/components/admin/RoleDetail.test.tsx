@@ -155,4 +155,89 @@ describe("RoleDetail", () => {
     render(<RoleDetail locale="en" dictionary={dictionary} name="MISSING" />);
     expect(await screen.findByText(dictionary.admin.roles.operationError)).toBeVisible();
   });
+
+  it("searches, assigns, and removes realm and client composite roles", async () => {
+    const withComposites = {
+      ...detail,
+      compositeRoles: ["ROLE_AUDITOR"],
+      compositeClientRoles: [{ id: "client-role-1", clientId: "account-console", name: "read" }],
+    };
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("available-composites")) {
+        return Promise.resolve({
+          status: 200,
+          data: { content: [{ name: "ROLE_AUDITOR" }] },
+        }) as never;
+      }
+      if (request.url?.includes("available-client-composites")) {
+        return Promise.resolve({
+          status: 200,
+          data: {
+            content: [{ id: "client-role-1", clientId: "account-console", name: "read" }],
+          },
+        }) as never;
+      }
+      if (request.method === "POST" || request.method === "DELETE") {
+        return Promise.resolve({ status: 200, data: withComposites }) as never;
+      }
+      return Promise.resolve({ status: 200, data: withComposites }) as never;
+    });
+
+    render(<RoleDetail locale="en" dictionary={dictionary} name="ROLE_EDITOR" />);
+    expect(await screen.findByRole("heading", { name: "ROLE_EDITOR" })).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText(dictionary.admin.roles.assignComposite), {
+      target: { value: "AUD" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "ROLE_AUDITOR" }));
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.assign })[0]);
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "POST",
+          url: expect.stringContaining("/composites/ROLE_AUDITOR"),
+        }),
+      ),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.remove })[0]);
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "DELETE",
+          url: expect.stringContaining("/composites/ROLE_AUDITOR"),
+        }),
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText(dictionary.admin.roles.assignClientComposite), {
+      target: { value: "rea" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "account-console:read" }));
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.assign })[1]);
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "POST",
+          url: expect.stringContaining("/client-composites/client-role-1"),
+        }),
+      ),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.remove })[1]);
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "DELETE",
+          url: expect.stringContaining("/client-composites/client-role-1"),
+        }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.roles.compositeSaved);
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.roles.compositeRemoved);
+  });
 });
