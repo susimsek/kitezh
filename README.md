@@ -1,6 +1,6 @@
 ![Kitezh](src/main/web/public/brand/logo-wordmark.svg)
 
-[![Latest release](https://img.shields.io/github/v/release/susimsek/kitezh?label=latest%20release)](https://github.com/susimsek/kitezh/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/susimsek/kitezh?label=latest%20release&color=blue)](https://github.com/susimsek/kitezh/releases/latest)
 [![Build Status](https://github.com/susimsek/kitezh/actions/workflows/ci.yml/badge.svg)](https://github.com/susimsek/kitezh/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=kitezh)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kitezh)
