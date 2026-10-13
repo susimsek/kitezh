@@ -1184,6 +1184,17 @@ Push to a registry:
 ./mvnw -DskipTests jib:build -Djib.to.image=YOUR_IMAGE
 ```
 
+New release Docker images are signed keylessly with Sigstore Cosign using the GitHub Actions OIDC
+identity. Existing images are not signed retroactively. Verify a signed image by its immutable
+digest (set `RELEASE_TAG` and `IMAGE_DIGEST` to the release tag and image digest):
+
+```bash
+cosign verify \
+  --certificate-identity="https://github.com/susimsek/kitezh/.github/workflows/publish-release.yml@refs/tags/${RELEASE_TAG}" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  "docker.io/suayb/kitezh@${IMAGE_DIGEST}"
+```
+
 Defaults from `pom.xml`:
 
 - Base image: `eclipse-temurin:25-jre-alpine`
