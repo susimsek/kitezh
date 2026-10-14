@@ -262,6 +262,8 @@ jobs:
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        with:
+          cosign-release: v2.6.1
 
       - name: Sign and verify multi-architecture Docker image
         env:
@@ -273,7 +275,6 @@ jobs:
           image_ref="${IMAGE}@${IMAGE_DIGEST}"
           cosign sign --yes "${image_ref}"
           cosign verify \
-            --experimental-oci11 \
             --certificate-identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-release.yml@refs/tags/${RELEASE_TAG}" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${image_ref}"
