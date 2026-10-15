@@ -304,53 +304,25 @@ function problemMessage(error) {
 }
 
 const adminNavigation = [
-  ["dashboard", "adminDashboard", (access) => access?.isAdmin === true],
-  [
-    "users",
-    "adminUsers",
-    (access) => access?.queryUsers === true || access?.viewUsers === true,
-  ],
-  ["roles", "adminRoles", (access) => access?.viewRoles === true],
-  [
-    "groups",
-    "adminGroups",
-    (access) => access?.queryGroups === true || access?.viewGroups === true,
-  ],
-  [
-    "clients",
-    "adminClients",
-    (access) => access?.queryClients === true || access?.viewClients === true,
-  ],
-  [
-    "client-scopes",
-    "adminClientScopes",
-    (access) => access?.queryClients === true || access?.viewClients === true,
-  ],
-  [
-    "identity-providers",
-    "adminIdentityProviders",
-    (access) => access?.isAdmin === true,
-  ],
-  ["sessions", "adminSessions", (access) => access?.viewSessions === true],
-  ["notifications", "notificationsTitle", (access) => access?.isAdmin === true],
-  ["consents", "adminConsents", (access) => access?.viewConsents === true],
-  [
-    "offline-sessions",
-    "adminOfflineSessions",
-    (access) => access?.viewSessions === true,
-  ],
-  ["events", "adminEvents", (access) => access?.viewEvents === true],
-  ["keys", "adminKeys", (access) => access?.viewKeys === true],
-  ["policies", "adminPolicies", (access) => access?.isAdmin === true],
-  ["configuration", "adminConfiguration", (access) => access?.isAdmin === true],
-  ["login-email", "adminLoginEmail", (access) => access?.isAdmin === true],
-  ["localization", "adminLocalization", (access) => access?.isAdmin === true],
-  ["ldap", "adminLdap", (access) => access?.isAdmin === true],
-  [
-    "authentication",
-    "adminAuthentication",
-    (access) => access?.isAdmin === true,
-  ],
+  ["dashboard", "adminNavDashboard", "gaugeHigh", (access) => access?.isAdmin === true],
+  ["clients", "adminNavClients", "addressCard", (access) => access?.queryClients === true || access?.viewClients === true],
+  ["client-scopes", "adminNavClientScopes", "layerGroup", (access) => access?.queryClients === true || access?.viewClients === true],
+  ["identity-providers", "adminNavIdentityProviders", "globe", (access) => access?.isAdmin === true],
+  ["users", "adminNavUsers", "users", (access) => access?.queryUsers === true || access?.viewUsers === true],
+  ["roles", "adminNavRoles", "userShield", (access) => access?.viewRoles === true],
+  ["groups", "adminNavGroups", "layerGroup", (access) => access?.queryGroups === true || access?.viewGroups === true],
+  ["sessions", "adminNavSessions", "laptop", (access) => access?.viewSessions === true],
+  ["offline-sessions", "adminNavOfflineSessions", "clock", (access) => access?.viewSessions === true],
+  ["consents", "adminNavConsents", "shieldHalved", (access) => access?.viewConsents === true],
+  ["keys", "adminNavKeys", "key", (access) => access?.viewKeys === true],
+  ["events", "adminNavEvents", "clockRotateLeft", (access) => access?.viewEvents === true],
+  ["authentication", "adminNavAuthentication", "userShield", (access) => access?.isAdmin === true],
+  ["configuration", "adminNavSettings", "sliders", (access) => access?.isAdmin === true || access?.viewEvents === true],
+  ["notifications", "notificationsTitle", "globe", (access) => access?.isAdmin === true],
+  ["policies", "adminPolicies", "shieldHalved", (access) => access?.isAdmin === true],
+  ["login-email", "adminLoginEmail", "sliders", (access) => access?.isAdmin === true],
+  ["localization", "adminLocalization", "globe", (access) => access?.isAdmin === true],
+  ["ldap", "adminLdap", "globe", (access) => access?.isAdmin === true],
 ];
 const ADMIN_ACCESS_KEYS = [
   "isAdmin",
@@ -391,7 +363,7 @@ function adminRouteAllowed(route) {
   const routeAccess = adminNavigation.find(
     ([candidate]) => candidate === route,
   );
-  if (routeAccess) return routeAccess[2](access);
+  if (routeAccess) return routeAccess[3](access);
   if (["user-create"].includes(route)) return access.manageUsers;
   if (["role-create"].includes(route)) return access.manageRoles;
   if (["group-create"].includes(route)) return access.manageGroups;
@@ -402,7 +374,7 @@ function adminRouteAllowed(route) {
 
 function firstAuthorizedAdminRoute() {
   return (
-    adminNavigation.find(([, , allowed]) =>
+    adminNavigation.find(([, , , allowed]) =>
       allowed(state.data.adminAccess),
     )?.[0] ?? null
   );
@@ -543,8 +515,8 @@ function shell() {
   const navigation =
     state.console === "admin"
       ? adminNavigation
-          .filter(([, , allowed]) => allowed(state.data.adminAccess))
-          .map(([route, messageKey]) => navButton(route, text(messageKey)))
+          .filter(([, , , allowed]) => allowed(state.data.adminAccess))
+          .map(([route, messageKey, icon]) => navButton(route, text(messageKey), icon))
           .join("")
       : `${navButton("profile", text("firstName"))}${navButton("security", text("security"))}${navButton("sessions", text("sessions"))}${navButton("applications", text("applications"))}${navButton("notifications", text("notificationsTitle"))}${navButton("settings", text("settings"))}`;
   const authorizedRoute =
@@ -579,9 +551,15 @@ function shell() {
   return `<div class="app"><aside class="sidebar" aria-label="${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span>Kitezh</span></div><p class="console-label">${escapeHtml(state.console === "admin" ? text("adminTitle") : text("accountTitle"))}</p><nav class="nav" aria-label="${escapeHtml(text("settings"))}">${navigation}</nav><div class="sidebar-footer">${state.console === "admin" ? button(text("accountTitle"), { action: "switch-account" }) : ""}${button(state.locale === "tr" ? text("english") : text("turkish"), { action: "toggle-locale", busy: state.busy === "locale", icon: "globe" })}</div></aside><main class="main">${pageHeader(routeTitle(), routeDescription())}<div class="content">${state.offline ? '<div class="notice warning" role="status">' + escapeHtml(text("offlineNotice")) + "</div>" : ""}${state.notice ? '<div class="notice success" role="status">' + escapeHtml(state.notice) + "</div>" : ""}${state.error ? '<div class="notice error" role="alert">' + escapeHtml(problemMessage(state.error)) + " " + errorAction + "</div>" : ""}${content()}</div></main></div>`;
 }
 
-function navButton(route, label) {
+function navButton(route, label, icon) {
   const busy = state.busy === `route:${route}`;
-  return `<button type="button" data-route="${route}" aria-current="${state.route === route ? "page" : "false"}" ${busy ? 'disabled aria-busy="true"' : ""}>${spin(busy)}${escapeHtml(label)}</button>`;
+  const metadata = icons[icon];
+  const iconMarkup = metadata?.svg
+    ? `<span class="button-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${metadata.svg}</svg></span>`
+    : metadata
+      ? `<span class="button-icon" aria-hidden="true">${escapeHtml(metadata.unicode)}</span>`
+      : "";
+  return `<button type="button" data-route="${route}" aria-current="${state.route === route ? "page" : "false"}" ${busy ? 'disabled aria-busy="true"' : ""}>${spin(busy)}${iconMarkup}${escapeHtml(label)}</button>`;
 }
 
 function routeTitle() {
