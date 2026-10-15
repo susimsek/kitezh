@@ -103,6 +103,7 @@ public class AuthorizationServerConfig {
             MfaAuthorizationFilter mfaAuthorizationFilter,
             PasswordEncoder passwordEncoder,
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            UmaTicketAuthenticationProvider umaTicketAuthenticationProvider,
             TokenExchangeAuthenticationProvider tokenExchangeAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             SecurityContextRepository securityContextRepository,
@@ -137,6 +138,7 @@ public class AuthorizationServerConfig {
             RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
             MfaAuthorizationFilter mfaAuthorizationFilter,
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            UmaTicketAuthenticationProvider umaTicketAuthenticationProvider,
             TokenExchangeAuthenticationProvider tokenExchangeAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             @Qualifier("authorizationServerSecurityContextRepository")
@@ -151,6 +153,7 @@ public class AuthorizationServerConfig {
                         mfaAuthorizationFilter,
                         passwordEncoder,
                         cibaAuthenticationProvider,
+                        umaTicketAuthenticationProvider,
                         tokenExchangeAuthenticationProvider,
                         socialProviderLogoutSuccessHandler,
                         securityContextRepository,
@@ -267,13 +270,17 @@ public class AuthorizationServerConfig {
                                                         tokenEndpoint
                                                                 .accessTokenRequestConverters(
                                                                         converters ->
-                                                                                converters.add(
-                                                                                        new CibaAuthenticationGrantAuthenticationConverter()))
+                                                                                converters.addAll(
+                                                                                        List.of(
+                                                                                                new CibaAuthenticationGrantAuthenticationConverter())))
                                                                 .accessTokenRequestConverter(
                                                                         new DefaultClientScopesClientCredentialsConverter())
                                                                 .authenticationProvider(
                                                                         dependencies
                                                                                 .cibaAuthenticationProvider())
+                                                                .authenticationProvider(
+                                                                        dependencies
+                                                                                .umaTicketAuthenticationProvider())
                                                                 .authenticationProvider(
                                                                         dependencies
                                                                                 .tokenExchangeAuthenticationProvider())
@@ -328,6 +335,8 @@ public class AuthorizationServerConfig {
             String issuer) {
         addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
         builder.grantType(AuthorizationGrantTypes.TOKEN_EXCHANGE);
+        builder.grantType(AuthorizationGrantTypes.UMA_TICKET);
+        builder.claim("uma2_configuration_endpoint", issuer + "/.well-known/uma2-configuration");
     }
 
     static void addCibaMetadata(
@@ -337,6 +346,8 @@ public class AuthorizationServerConfig {
             String issuer) {
         addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
         builder.grantType(AuthorizationGrantTypes.TOKEN_EXCHANGE);
+        builder.grantType(AuthorizationGrantTypes.UMA_TICKET);
+        builder.claim("uma2_configuration_endpoint", issuer + "/.well-known/uma2-configuration");
     }
 
     private static void addCibaMetadataClaims(
@@ -556,8 +567,29 @@ public class AuthorizationServerConfig {
             appendSessionIdClaim(context, dependencies.authorizationRepository());
             appendDpopConfirmationClaim(context);
             appendCibaAuthReqIdClaim(context);
+            appendUmaPermissionsClaim(context);
             appendTokenExchangeClaims(context);
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void appendUmaPermissionsClaim(JwtEncodingContext context) {
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                || !(context.getAuthorizationGrant()
+                        instanceof UmaTicketAuthenticationToken grant)) {
+            return;
+        }
+        Object permissions =
+                grant.getAdditionalParameters()
+                        .get(UmaTicketAuthenticationToken.AUTHORIZATION_PERMISSIONS);
+        if (permissions instanceof List<?> grantedPermissions && !grantedPermissions.isEmpty()) {
+            context.getClaims().claim("authorization", Map.of("permissions", grantedPermissions));
+            Object resourceServerClientId =
+                    grant.getAdditionalParameters().get("resource_server_client_id");
+            if (resourceServerClientId instanceof String clientId) {
+                context.getClaims().audience(List.of(clientId));
+            }
+        }
     }
 
     private static boolean isAdminAccessToken(JwtEncodingContext context) {

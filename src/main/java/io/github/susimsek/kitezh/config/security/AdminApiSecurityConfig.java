@@ -105,6 +105,24 @@ public class AdminApiSecurityConfig {
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/api/admin/authorization/resources")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.CLIENT_QUERY,
+                                                AuthoritiesConstants.CLIENT_VIEWER,
+                                                AuthoritiesConstants.CLIENT_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/api/admin/authorization/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.CLIENT_VIEWER,
+                                                AuthoritiesConstants.CLIENT_MANAGER)
+                                        .requestMatchers("/api/admin/authorization/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.CLIENT_MANAGER)
                                         .requestMatchers(HttpMethod.GET, "/api/admin/client-scopes")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
