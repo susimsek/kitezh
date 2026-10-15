@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { DESKTOP_LANGUAGE_MODE_KEY } from "@/i18n/locale-cookie";
 import { isDesktopRuntime } from "@/lib/desktop-api";
 
