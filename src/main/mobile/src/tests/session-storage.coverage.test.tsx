@@ -50,6 +50,6 @@ test("native storage writes the serialized session in the requested namespace", 
 
   expect(secureStore.setItemAsync).toHaveBeenCalledWith(
     "kitezh.mobile.account.session",
-    JSON.stringify(session),
+    JSON.stringify({ schemaVersion: 1, session }),
   );
 });

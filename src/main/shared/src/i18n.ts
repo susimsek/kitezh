@@ -320,7 +320,8 @@ export const messages = {
       "Revoke every offline access token now?",
     adminRevokeAllOfflineTokensDone: "All offline access tokens were revoked.",
     adminEvents: "Events",
-    adminEventsDescription: "Audit history for administration and account actions.",
+    adminEventsDescription:
+      "Audit history for administration and account actions.",
     adminSearchEvents: "Search events",
     adminEventRecords: "events",
     adminEventFilter: "Filter events",
@@ -346,7 +347,8 @@ export const messages = {
     adminEventRole: "Role",
     adminEventClientScope: "Client scope",
     adminEventClearAll: "Clear all events",
-    adminEventClearConfirm: "Clear all stored administrative events? This action cannot be undone.",
+    adminEventClearConfirm:
+      "Clear all stored administrative events? This action cannot be undone.",
     adminEventClearError: "Events could not be cleared.",
     adminEventClearSuccess: "All events were cleared.",
     adminNoEvents: "No events found.",
@@ -1473,7 +1475,8 @@ export const messages = {
     adminEventRole: "Rol",
     adminEventClientScope: "İstemci scope'u",
     adminEventClearAll: "Tüm olayları temizle",
-    adminEventClearConfirm: "Saklanan tüm yönetim olayları temizlensin mi? Bu işlem geri alınamaz.",
+    adminEventClearConfirm:
+      "Saklanan tüm yönetim olayları temizlensin mi? Bu işlem geri alınamaz.",
     adminEventClearError: "Olaylar temizlenemedi.",
     adminEventClearSuccess: "Tüm olaylar temizlendi.",
     adminNoEvents: "Olay bulunamadı.",
@@ -1498,7 +1501,8 @@ export const messages = {
     adminRotateSigningKeyNow: "Anahtarı döndür",
     adminSigningKeyRotated: "İmzalama anahtarı döndürüldü.",
     adminKeyRotatedTitle: "İmza anahtarı döndürüldü",
-    adminKeyRotatedHelp: "Yeni etkin imza anahtarının ID'si aşağıda gösterilir.",
+    adminKeyRotatedHelp:
+      "Yeni etkin imza anahtarının ID'si aşağıda gösterilir.",
     adminPolicies: "Politikalar",
     adminPoliciesDescription:
       "Kimlik doğrulama ve çevrimdışı erişim politikalarını inceleyin.",
@@ -2086,7 +2090,6 @@ export const messages = {
     adminRedirectUris: "Yönlendirme URI’leri (satır başına bir tane)",
     adminPostLogoutRedirectUris:
       "Çıkış sonrası URI’leri (satır başına bir tane)",
-    adminProviderRegistrationId: "Kayıt kimliği",
     adminProviderType: "Sağlayıcı türü",
     adminProviderIcon: "İkon anahtarı",
     adminPassword: "İlk parola",
@@ -2094,10 +2097,6 @@ export const messages = {
     adminParentId: "Üst grup kimliği",
     adminCreatedSecret:
       "İstemci sırrı yalnızca bir kez gösterilir; güvenli şekilde saklayın.",
-    adminKeys: "İmzalama anahtarları",
-    adminEvents: "Olaylar",
-    adminSearchKeys: "İmzalama anahtarlarında ara",
-    adminSearchEvents: "Olaylarda ara",
     adminRotateKey: "İmzalama anahtarını döndür",
     adminDeleteEvents: "Tüm olayları sil",
     adminDeleteEventsConfirm: "Tüm denetim olayları kalıcı olarak silinsin mi?",

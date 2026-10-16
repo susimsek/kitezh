@@ -93,18 +93,21 @@ export default function SettingsScreen() {
             </Text>
             <Option
               label={dictionary.system}
+              testID="settings-locale-system"
               selected={locale === "system"}
               onPress={() => setLocale("system")}
               palette={palette}
             />
             <Option
               label={dictionary.english}
+              testID="settings-locale-english"
               selected={locale === "en"}
               onPress={() => setLocale("en")}
               palette={palette}
             />
             <Option
               label={dictionary.turkish}
+              testID="settings-locale-turkish"
               selected={locale === "tr"}
               onPress={() => setLocale("tr")}
               palette={palette}
@@ -127,18 +130,21 @@ export default function SettingsScreen() {
             </Text>
             <Option
               label={dictionary.system}
+              testID="settings-theme-system"
               selected={mode === "system"}
               onPress={() => setMode("system")}
               palette={palette}
             />
             <Option
               label={dictionary.light}
+              testID="settings-theme-light"
               selected={mode === "light"}
               onPress={() => setMode("light")}
               palette={palette}
             />
             <Option
               label={dictionary.dark}
+              testID="settings-theme-dark"
               selected={mode === "dark"}
               onPress={() => setMode("dark")}
               palette={palette}
@@ -257,7 +263,7 @@ function SectionHeading({
   icon: "globe" | "sun" | "reset";
   label: string;
   palette: ReturnType<typeof useTheme>["palette"];
-}>) {
+}) {
   return (
     <View style={styles.sectionHeading}>
       <View
@@ -309,17 +315,20 @@ function Option({
   onPress,
   palette,
   selected,
+  testID,
 }: Readonly<{
   label: string;
   onPress: () => void;
   palette: ReturnType<typeof useTheme>["palette"];
   selected: boolean;
+  testID: string;
 }>) {
   return (
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={onPress}
+      testID={testID}
       style={[styles.option, { borderTopColor: palette.border }]}
     >
       <Text style={[styles.optionLabel, { color: palette.text }]}>{label}</Text>

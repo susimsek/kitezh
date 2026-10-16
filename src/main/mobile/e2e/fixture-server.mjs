@@ -1,11 +1,26 @@
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const fixtureTokens = {
   accessToken: randomBytes(24).toString("hex"),
   refreshToken: randomBytes(24).toString("hex"),
   idToken: randomBytes(24).toString("hex"),
 };
+
+const fixtureCibaRequests = ["approve", "deny"].map((decision) => ({
+  authReqId: `fixture-${decision}`,
+  userCode: decision === "approve" ? "ABCD-EFGH" : "JKLM-NPQR",
+  bindingMessage: `Fixture ${decision} request`,
+  authorizedScopes: "openid profile",
+  deliveryMode: "poll",
+  createdAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+  status: "pending",
+  mfaRequired: false,
+  stepUpRequired: false,
+}));
 
 const jsonHeaders = {
   "Cache-Control": "no-store",
@@ -154,6 +169,69 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       },
     ],
     [
+      "/api/account/applications",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          number: 0,
+          size: 20,
+        });
+      },
+    ],
+    [
+      "/api/account/offline-sessions",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          number: 0,
+          size: 20,
+        });
+      },
+    ],
+    [
+      "GET /api/ciba/requests",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          content: fixtureCibaRequests,
+          totalElements: fixtureCibaRequests.length,
+          totalPages: fixtureCibaRequests.length > 0 ? 1 : 0,
+          number: 0,
+          size: 20,
+        });
+      },
+    ],
+    [
+      "GET /api/account/mfa",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          enabled: false,
+          available: true,
+          required: false,
+          issuer: "Kitezh Fixture",
+          algorithm: "SHA1",
+          digits: 6,
+          periodSeconds: 30,
+        });
+      },
+    ],
+    [
+      "POST /api/account/mfa/setup",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          secret: "JBSWY3DPEHPK3PXP",
+          qrCode:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=",
+          algorithm: "SHA1",
+          digits: 6,
+          periodSeconds: 30,
+        });
+      },
+    ],
+    [
       "/fixture/forbidden",
       (_request, response) => {
         writeJson(response, 403, { title: "Forbidden", status: 403 });
@@ -172,6 +250,28 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       request.url ?? "/",
       `http://${request.headers.host ?? host}`,
     );
+    const cibaDecision = url.pathname.match(
+      /^\/api\/ciba\/requests\/([^/]+)\/(approve|deny)$/,
+    );
+    if (cibaDecision && request.method === "POST") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const requestIndex = fixtureCibaRequests.findIndex(
+        (item) =>
+          item.authReqId === cibaDecision[1] &&
+          item.userCode === url.searchParams.get("user_code"),
+      );
+      if (requestIndex < 0) {
+        writeJson(response, 404, { title: "Not Found", status: 404 });
+        return;
+      }
+      fixtureCibaRequests.splice(requestIndex, 1);
+      response.writeHead(204);
+      response.end();
+      return;
+    }
     const handler =
       routes.get(`${request.method} ${url.pathname}`) ??
       routes.get(url.pathname);
@@ -223,7 +323,10 @@ async function timeoutResponse(url, response) {
   writeJson(response, 504, { title: "Gateway Timeout", status: 504 });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
   const args = new Map();
   for (let index = 2; index < process.argv.length; index += 2)
     args.set(process.argv[index], process.argv[index + 1]);

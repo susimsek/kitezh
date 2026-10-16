@@ -45,8 +45,11 @@
       "types": "./dist/api.d.ts",
       "default": "./dist/api.js"
     },
-    "./api-client": "./src/api-client.cjs",
-    "./api-client": "./src/api-client.cjs",
+    "./api-client": {
+      "types": "./src/api-client.d.cts",
+      "require": "./src/api-client.cjs",
+      "default": "./src/api-client.cjs"
+    },
     "./auth": {
       "types": "./dist/auth.d.ts",
       "default": "./dist/auth.js"

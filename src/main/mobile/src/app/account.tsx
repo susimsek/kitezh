@@ -24,7 +24,6 @@ import {
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
-import { isValidEmailAddress } from "@/utils/email";
 import { problemFieldErrors } from "../../../shared/src/api.ts";
 import { isValidEmail } from "@/validation/email";
 
@@ -89,7 +88,6 @@ export default function AccountScreen() {
   const saveProfile = useCallback(async () => {
     if (!session || !profile || profileSaveInFlight.current) return;
     const trimmedEmail = email.trim();
-    if (trimmedEmail && !isValidEmailAddress(trimmedEmail)) {
     if (trimmedEmail && !isValidEmail(trimmedEmail)) {
       setEmailError(dictionary.invalidEmail);
       return;
@@ -393,8 +391,10 @@ export default function AccountScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={dictionary.applications}
             onPress={() => router.push("/applications")}
             style={styles.settings}
+            testID="account-applications"
           >
             <AppIcon name="globe" size={16} color={palette.primary} />
             <Text style={[styles.secondary, { color: palette.primary }]}>

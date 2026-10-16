@@ -110,6 +110,14 @@ function AuthProbe() {
       <output>{auth.session?.accessToken ?? "no-session"}</output>
       <button onClick={() => void auth.signIn()}>sign-in</button>
       <button onClick={() => void auth.refreshSession(true)}>refresh</button>
+      <button
+        onClick={() => {
+          void auth.refreshSession(true);
+          void auth.refreshSession(true);
+        }}
+      >
+        refresh-twice
+      </button>
       <button onClick={() => void auth.signOut()}>sign-out</button>
     </div>
   );
@@ -328,6 +336,22 @@ it("resumes a cold-start callback from its SecureStore PKCE transaction", async 
   expect(await screen.findByText("signed-in")).toBeVisible();
 });
 
+it("clears the pending transaction when a cold-start callback has no state", async () => {
+  jest
+    .spyOn(Linking, "getInitialURL")
+    .mockResolvedValueOnce(
+      "kitezh://account/oauth/callback?code=untrusted-authorization-code",
+    );
+
+  renderProvider();
+
+  await waitFor(() =>
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(await screen.findByText("signed-out")).toBeVisible();
+});
+
 it("clears a session after refresh failure and rejects use outside its provider", async () => {
   jest.mocked(storage.readSession).mockResolvedValue({
     accessToken: "expired-access-token",
@@ -345,6 +369,44 @@ it("clears a session after refresh failure and rejects use outside its provider"
   expect(await screen.findByText("signed-out")).toBeVisible();
   expect(() => render(<AuthProbe />)).toThrow(
     "useMobileAuth must be used inside MobileAuthProvider",
+  );
+});
+
+it("coalesces concurrent forced refreshes into one token request", async () => {
+  const pendingRefresh = deferred<{
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+    expiresIn: number;
+    issuedAt: number;
+  }>();
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+  mockRefresh.mockReturnValueOnce(pendingRefresh.promise);
+  renderProvider();
+  await screen.findByText("signed-in");
+
+  fireEvent.click(screen.getByRole("button", { name: "refresh-twice" }));
+  await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+  pendingRefresh.resolve({
+    accessToken: "refreshed-access-token",
+    refreshToken: "rotated-refresh-token",
+    idToken: "refreshed-id-token",
+    expiresIn: 300,
+    issuedAt: Math.floor(Date.now() / 1000),
+  });
+
+  await waitFor(() => expect(storage.writeSession).toHaveBeenCalledTimes(1));
+  expect(storage.writeSession).toHaveBeenCalledWith(
+    expect.objectContaining({
+      accessToken: "refreshed-access-token",
+      refreshToken: "rotated-refresh-token",
+    }),
+    "account",
   );
 });
 

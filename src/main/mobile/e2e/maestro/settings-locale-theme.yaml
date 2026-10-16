@@ -8,12 +8,26 @@ appId: io.github.susimsek.kitezh.mobile
     timeout: 180000
 - tapOn: "Settings|Ayarlar"
 - assertVisible: "Settings|Ayarlar"
-- tapOn: "English|İngilizce"
+- tapOn:
+    id: settings-locale-system
+- assertVisible:
+    id: settings-locale-system
+    selected: true
+- tapOn:
+    id: settings-locale-english
 - assertVisible: "Settings"
-- tapOn: "Turkish|Türkçe"
+- tapOn:
+    id: settings-locale-turkish
 - assertVisible: "Ayarlar"
 - assertVisible: "Görünüm"
-- tapOn: "Koyu"
+- tapOn:
+    id: settings-theme-system
+- assertVisible:
+    id: settings-theme-system
+    selected: true
+- tapOn:
+    id: settings-theme-dark
 - assertVisible: "Koyu"
-- tapOn: "Açık"
+- tapOn:
+    id: settings-theme-light
 - assertVisible: "Açık"

@@ -11,9 +11,13 @@ appId: io.github.susimsek.kitezh.mobile
 - tapOn: "Back|Geri"
 - tapOn: "Continue|Devam et"
 - tapOn: "Sign in"
+# Android may show Chrome's first-run account prompt on a clean emulator.
+- tapOn:
+    text: "Use without an account"
+    optional: true
 # iOS may ask once to allow the app to use the local fixture domain for sign-in.
 - tapOn:
-    text: "Continue"
+    text: "^Continue$"
     optional: true
 - tapOn:
     text: "Stay signed out"
@@ -25,13 +29,31 @@ appId: io.github.susimsek.kitezh.mobile
 - extendedWaitUntil:
     visible: "fixture-user"
     timeout: 180000
-- scrollUntilVisible:
-    element:
-      text: "Sign out"
-    direction: DOWN
+- scroll
+- tapOn:
+    point: "50%,56%"
+- assertVisible: "Authorized applications"
+- assertVisible: "Sign-in requests"
+- assertVisible: "Fixture approve request"
+- tapOn: "Approve"
+- assertVisible: "Sign-in request approved."
+- assertVisible: "Fixture deny request"
+- tapOn: "Deny"
+- assertVisible: "Sign-in request denied."
+- tapOn:
+    point: "93%,92%"
+- tapOn: "Account Console"
+- scroll
+- tapOn:
+    point: "50%,64%"
+- assertVisible: "Set up authenticator"
+- tapOn: "Set up authenticator"
+- assertVisible: "Authenticator code"
+- tapOn: "Back"
+- scroll
 - tapOn: "Sign out"
 # iOS asks separately when the logout endpoint opens the local fixture domain.
 - tapOn:
-    text: "Continue"
+    text: "^Continue$"
     optional: true
 - assertVisible: "Sign in"
