@@ -1,5 +1,6 @@
 package io.github.susimsek.kitezh.config.security;
 
+import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
 import io.github.susimsek.kitezh.service.SamlLoginService;
 import io.github.susimsek.kitezh.service.SocialAccountLinkRequiredException;
 import io.github.susimsek.kitezh.service.SocialLoginService;
@@ -17,7 +18,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
@@ -42,18 +42,39 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
 import org.springframework.security.web.context.SecurityContextRepository;
 
 /** Establishes the local application session after Spring Security validates a SAML response. */
-@RequiredArgsConstructor
 public final class SamlLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
 
     private final SamlLoginService samlLoginService;
     private final UserDetailsService userDetailsService;
     private final SecurityContextRepository securityContextRepository;
     private final MfaService mfaService;
+    private final DesktopSocialLinkTransactionService desktopSocialLinkTransactionService;
     private final AuthenticationFailureHandler failureHandler =
             new SimpleUrlAuthenticationFailureHandler("/login?error");
     private final AuthenticationFailureHandler accountLinkFailureHandler =
             new SimpleUrlAuthenticationFailureHandler("/login?account_link_required");
     private final SavedRequestAwareAuthenticationSuccessHandler delegate = delegate();
+
+    public SamlLoginAuthenticationSuccessHandler(
+            SamlLoginService samlLoginService,
+            UserDetailsService userDetailsService,
+            SecurityContextRepository securityContextRepository,
+            MfaService mfaService) {
+        this(samlLoginService, userDetailsService, securityContextRepository, mfaService, null);
+    }
+
+    public SamlLoginAuthenticationSuccessHandler(
+            SamlLoginService samlLoginService,
+            UserDetailsService userDetailsService,
+            SecurityContextRepository securityContextRepository,
+            MfaService mfaService,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+        this.samlLoginService = samlLoginService;
+        this.userDetailsService = userDetailsService;
+        this.securityContextRepository = securityContextRepository;
+        this.mfaService = mfaService;
+        this.desktopSocialLinkTransactionService = desktopSocialLinkTransactionService;
+    }
 
     @Override
     public void onAuthenticationSuccess(
@@ -67,6 +88,9 @@ public final class SamlLoginAuthenticationSuccessHandler implements Authenticati
                         "SAML login requires a SAML authentication");
             }
             String registrationId = registrationId(request);
+            if (completeDesktopLink(request, response, registrationId, samlAuthentication)) {
+                return;
+            }
             Object linkTarget =
                     request.getSession(false) == null
                             ? null
@@ -120,6 +144,31 @@ public final class SamlLoginAuthenticationSuccessHandler implements Authenticati
                             : new AuthenticationServiceException(
                                     "SAML login could not be completed", exception));
         }
+    }
+
+    private boolean completeDesktopLink(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            String registrationId,
+            Saml2Authentication authentication)
+            throws IOException {
+        var session = request.getSession(false);
+        if (session == null || desktopSocialLinkTransactionService == null) {
+            return false;
+        }
+        Object pending =
+                session.getAttribute(DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+        if (!(pending instanceof String token)) {
+            return false;
+        }
+        DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion completion =
+                desktopSocialLinkTransactionService.completeFromBrowser(
+                        token, registrationId, authentication);
+        session.removeAttribute(DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE);
+        response.sendRedirect(
+                desktopSocialLinkTransactionService.callbackUrl(
+                        completion.state(), completion.code(), null));
+        return true;
     }
 
     private Authentication establishLocalSession(

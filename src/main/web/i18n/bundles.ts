@@ -1,5 +1,5 @@
-import en from "@/locales/en/common.json";
-import tr from "@/locales/tr/common.json";
+import en from "@kitezh/shared/web-messages/en";
+import tr from "@kitezh/shared/web-messages/tr";
 
 export const messageBundles = ["login", "account", "admin", "email", "backend", "common"] as const;
 export type MessageBundle = (typeof messageBundles)[number];

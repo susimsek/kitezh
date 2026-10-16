@@ -187,10 +187,10 @@ function promptAndroidAuthSession(
 export function MobileAuthProvider({
   children,
   consoleName = "account",
-}: {
-  readonly children: React.ReactNode;
-  readonly consoleName?: MobileConsole;
-}) {
+}: Readonly<{
+  children: React.ReactNode;
+  consoleName?: MobileConsole;
+}>) {
   const { dictionary, resolvedLocale } = useLocale();
   const consoleConfig = useMemo(
     () => getMobileConsoleConfig(consoleName),

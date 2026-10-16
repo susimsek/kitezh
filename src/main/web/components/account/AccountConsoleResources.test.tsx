@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import i18next from "i18next";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { accountRequest } from "@/lib/account-api";
 import { StoreProvider } from "@/store/StoreProvider";
 

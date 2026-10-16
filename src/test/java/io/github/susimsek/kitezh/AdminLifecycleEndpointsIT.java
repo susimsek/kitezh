@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,99 @@ class AdminLifecycleEndpointsIT {
             mockMvc.perform(delete("/api/admin/roles/{name}", role).with(admin()))
                     .andExpect(status().isNoContent());
         }
+    }
+
+    @Test
+    void administratorCanUpdateCustomClientScopeRoleMappings() throws Exception {
+        String role =
+                "ROLE_SCOPE_IT_"
+                        + UUID.randomUUID().toString().toUpperCase(Locale.ROOT).replace("-", "");
+        String scopeName = "scope-it-" + UUID.randomUUID();
+        String scopeId = null;
+        try {
+            mockMvc.perform(
+                            post("/api/admin/roles")
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"name\":\""
+                                                    + role
+                                                    + "\",\"description\":\"Scope mapping IT\"}"))
+                    .andExpect(status().isCreated());
+
+            String scopeResponse =
+                    mockMvc.perform(
+                                    post("/api/admin/client-scopes")
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"name\":\""
+                                                            + scopeName
+                                                            + "\",\"displayName\":\"Scope mapping"
+                                                            + " IT\"}"))
+                            .andExpect(status().isCreated())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            scopeId = JSON.readTree(scopeResponse).path("id").asString();
+
+            String mappingResponse =
+                    mockMvc.perform(
+                                    put("/api/admin/client-scopes/{id}/role-mappings", scopeId)
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"applicationRoles\":[\""
+                                                            + role
+                                                            + "\"],\"clientRoleIds\":[]}"))
+                            .andExpect(status().isOk())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            assertThat(JSON.readTree(mappingResponse).path("applicationRoles").toString())
+                    .contains(role);
+        } finally {
+            if (scopeId != null) {
+                mockMvc.perform(delete("/api/admin/client-scopes/{id}", scopeId).with(admin()))
+                        .andExpect(status().isNoContent());
+            }
+            mockMvc.perform(delete("/api/admin/roles/{name}", role).with(admin()))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
+    @Test
+    void administratorCanSaveEmailSettingsWithoutExposingOrReplacingPassword() throws Exception {
+        String settingsResponse =
+                mockMvc.perform(get("/api/admin/settings/email").with(admin()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.password").doesNotExist())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        var original = JSON.readTree(settingsResponse);
+        var request = JSON.createObjectNode();
+        request.put("enabled", original.path("enabled").asBoolean());
+        request.put("fromAddress", original.path("fromAddress").asString());
+        request.put("baseUrl", original.path("baseUrl").asString());
+        request.put("host", original.path("host").asString());
+        request.put("port", original.path("port").asInt());
+        request.put("username", original.path("username").asString(""));
+        request.put("password", "");
+        request.put("smtpAuth", original.path("smtpAuth").asBoolean());
+        request.put("starttls", original.path("starttls").asBoolean());
+        request.put("ssl", original.path("ssl").asBoolean());
+
+        mockMvc.perform(
+                        put("/api/admin/settings/email")
+                                .with(admin())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(JSON.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(
+                        jsonPath("$.passwordConfigured")
+                                .value(original.path("passwordConfigured").asBoolean()));
     }
 
     @Test
@@ -211,6 +305,89 @@ class AdminLifecycleEndpointsIT {
                         .getContentAsString();
         String providerId = JSON.readTree(providerResponse).get("id").asString();
         try {
+            mockMvc.perform(
+                            get("/api/admin/identity-providers/{id}/native-policy", providerId)
+                                    .with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC"))
+                    .andExpect(jsonPath("$.clientId").doesNotExist())
+                    .andExpect(jsonPath("$.authorizationUri").doesNotExist());
+            mockMvc.perform(
+                            put("/api/admin/identity-providers/{id}/native-policy", providerId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"displayName\":\"IT OIDC Updated\","
+                                                + "\"enabled\":false,\"hideOnLogin\":true,"
+                                                + "\"accountLinkingOnly\":true,\"trustEmail\":false,"
+                                                + "\"mfaRequired\":true,\"guiOrder\":7,"
+                                                + "\"showInAccountConsole\":\"when-linked\","
+                                                + "\"syncMode\":\"read_only\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC Updated"))
+                    .andExpect(jsonPath("$.syncMode").value("read_only"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").doesNotExist());
+            mockMvc.perform(
+                            put("/api/admin/identity-providers/{id}/native-policy", providerId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"displayName\":\"invalid\",\"guiOrder\":-1}"))
+                    .andExpect(status().isBadRequest());
+            mockMvc.perform(get("/api/admin/identity-providers/{id}", providerId).with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clientId").value("it-client"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").value(true))
+                    .andExpect(
+                            jsonPath("$.authorizationUri")
+                                    .value("https://idp.example.test/authorize"));
+            String updateBody =
+                    JSON.writeValueAsString(
+                            new AdminIdentityProviderRequestDTO(
+                                    id,
+                                    "oidc",
+                                    "IT OIDC Updated",
+                                    id,
+                                    "generic",
+                                    false,
+                                    false,
+                                    true,
+                                    "it-client",
+                                    "",
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    "sub",
+                                    false,
+                                    false,
+                                    99,
+                                    "always",
+                                    "import",
+                                    "https://idp.example.test/authorize-updated",
+                                    "https://idp.example.test/token",
+                                    null,
+                                    null,
+                                    null,
+                                    "client_secret_basic",
+                                    "openid,profile",
+                                    "sub"));
+            mockMvc.perform(
+                            put("/api/admin/identity-providers/{id}", providerId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(updateBody))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC Updated"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").value(true))
+                    .andExpect(jsonPath("$.clientSecret").doesNotExist())
+                    .andExpect(
+                            jsonPath("$.authorizationUri")
+                                    .value("https://idp.example.test/authorize-updated"));
+            mockMvc.perform(get("/api/admin/identity-providers/{id}", providerId).with(admin()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.displayName").value("IT OIDC Updated"))
+                    .andExpect(jsonPath("$.clientSecretConfigured").value(true))
+                    .andExpect(jsonPath("$.clientSecret").doesNotExist());
             String mapperResponse =
                     mockMvc.perform(
                                     post("/api/admin/identity-providers/{id}/mappers", providerId)

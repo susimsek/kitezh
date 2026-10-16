@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.UserAction;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.account.AccountProfileDTO;
@@ -17,6 +18,7 @@ import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.admin.UserAccessInvalidationService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import io.github.susimsek.kitezh.service.security.PasswordService;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,6 +41,7 @@ class AccountProfileServiceTest {
     @Mock private UserActionService userActionService;
     @Mock private LoginSettingsService loginSettingsService;
     @Mock private LdapFederationWriteService ldapFederationWriteService;
+    @Mock private NotificationService notificationService;
 
     @Test
     void normalizesAndUpdatesProfile() {
@@ -97,6 +100,8 @@ class AccountProfileServiceTest {
 
         assertThat(user.getPassword()).isEqualTo("encoded-new");
         verify(auditEventService).record("account.password.updated", "user", "7");
+        verify(notificationService)
+                .publishAccount("alice", NotificationType.ACCOUNT_PASSWORD_CHANGED);
     }
 
     @Test
@@ -168,7 +173,8 @@ class AccountProfileServiceTest {
                 userAccessInvalidationService,
                 userActionService,
                 loginSettingsService,
-                ldapFederationWriteService);
+                ldapFederationWriteService,
+                notificationService);
     }
 
     private AccountProfileService serviceWithSettings() {
@@ -180,7 +186,8 @@ class AccountProfileServiceTest {
                 userAccessInvalidationService,
                 userActionService,
                 loginSettingsService,
-                ldapFederationWriteService);
+                ldapFederationWriteService,
+                notificationService);
     }
 
     private static UserEntity user() {

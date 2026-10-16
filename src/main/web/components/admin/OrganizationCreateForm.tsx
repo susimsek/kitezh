@@ -14,7 +14,7 @@ import { applyProblemToForm } from "@/lib/problem-detail";
 import { useAdminAuth } from "./AdminAuthProvider";
 import { AdminActionIcon } from "./AdminActionIcon";
 
-export function OrganizationCreateForm({ dictionary }: { dictionary: Dictionary }) {
+export function OrganizationCreateForm({ dictionary }: Readonly<{ dictionary: Dictionary }>) {
   const { access, accessToken } = useAdminAuth();
   const router = useRouter();
   const alerts = useConsoleAlerts();
@@ -48,7 +48,7 @@ export function OrganizationCreateForm({ dictionary }: { dictionary: Dictionary 
       if (response.status >= 300) {
         const result = applyProblemToForm(response.data, setError, { fields: ["alias", "name"] });
         if (result.firstField) return;
-        throw new Error();
+        throw new Error("Request failed");
       }
       router.push(`/admin/organizations/${response.data.id}`);
     } catch {

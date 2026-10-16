@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -51,8 +52,16 @@ public class RequiredActionService {
         return pendingInternal(username);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<List<RequiredActionDTO>> pendingIfUserExists(String username) {
+        return userRepository.findByUsername(username).map(this::pendingInternal);
+    }
+
     private List<RequiredActionDTO> pendingInternal(String username) {
-        UserEntity user = findUser(username);
+        return pendingInternal(findUser(username));
+    }
+
+    private List<RequiredActionDTO> pendingInternal(UserEntity user) {
         Map<String, UserRequiredActionEntity> assignments =
                 assignmentRepository.findAllByUserId(user.getId()).stream()
                         .collect(

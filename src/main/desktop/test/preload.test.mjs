@@ -53,12 +53,12 @@ test("exposes the narrow desktop API and forwards IPC operations", async () => {
   assert.equal(exposedApi.appVersion, "0.1.4");
   assert.equal(exposedApi.os, "darwin");
 
-  await exposedApi.auth.startLogin({ state: "state" });
-  await exposedApi.auth.getSession("account");
-  await exposedApi.auth.setSession("account", { accessToken: "token" });
+  await exposedApi.auth.startLogin("account");
+  await exposedApi.auth.hasSession("account");
   await exposedApi.auth.clearSession("account");
   await exposedApi.auth.clearAllSessions();
   await exposedApi.auth.getStorageStatus();
+  await exposedApi.auth.logout("account");
   await exposedApi.auth.openConsole("admin");
   await exposedApi.getConfig();
   await exposedApi.getAppVersion();
@@ -79,12 +79,12 @@ test("exposes the narrow desktop API and forwards IPC operations", async () => {
   await exposedApi.openExternal("https://example.test");
 
   assert.deepEqual(invocations, [
-    ["desktop:auth-start-login", { state: "state" }],
-    ["desktop:auth-get-session", "account"],
-    ["desktop:auth-set-session", "account", { accessToken: "token" }],
+    ["desktop:auth-start-login", "account"],
+    ["desktop:auth-has-session", "account"],
     ["desktop:auth-clear-session", "account"],
     ["desktop:auth-clear-all-sessions"],
     ["desktop:auth-storage-status"],
+    ["desktop:auth-logout", "account"],
     ["desktop:auth-open-console", "admin"],
     ["desktop:config"],
     ["desktop:app-version"],

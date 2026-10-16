@@ -101,6 +101,27 @@ class SocialProviderSettingsServiceTest {
     }
 
     @Test
+    void usesLoginSettingsToggleForBuiltInProviderCatalogEntries() {
+        settings.setGoogleLoginEnabled(true);
+        settings.setGoogleClientId("google-id");
+        settings.setGoogleClientSecretEncrypted("encrypted-google-secret");
+        when(secretCipher.decrypt("encrypted-google-secret")).thenReturn("google-secret");
+
+        SocialProviderEntity provider = new SocialProviderEntity();
+        provider.setRegistrationId("google");
+        provider.setAlias("google");
+        provider.setProviderType("google");
+        provider.setEnabled(false);
+        when(providerRepository.findByRegistrationId("google")).thenReturn(Optional.of(provider));
+
+        assertThat(service.provider("google"))
+                .extracting(
+                        SocialProviderSettingsService.ProviderCredentials::enabled,
+                        SocialProviderSettingsService.ProviderCredentials::configured)
+                .containsExactly(true, true);
+    }
+
+    @Test
     void reportsDisabledStateAndFailsWhenSettingsAreMissing() {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
@@ -125,6 +146,18 @@ class SocialProviderSettingsServiceTest {
         verify(identityRepository).findAllByProvider("google");
         verify(identityRepository).findAllByProvider("microsoft");
         verify(auditEventService).record("social.providers.updated", "social-providers", "default");
+    }
+
+    @Test
+    void acceptsUnconfiguredProviderWithoutClientId() {
+        AdminSocialProviderRequestDTO github =
+                new AdminSocialProviderRequestDTO(
+                        "github", "github", null, null, false, false, false, false, "sub", false,
+                        false, 20, "always");
+
+        service.update(new AdminSocialProvidersRequestDTO(List.of(github)));
+
+        assertThat(settings.getGithubClientId()).isBlank();
     }
 
     @Test

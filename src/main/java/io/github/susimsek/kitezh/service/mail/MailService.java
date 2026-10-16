@@ -85,7 +85,7 @@ public class MailService {
                     false);
             sender.send(mimeMessage);
         } catch (MailException | MessagingException exception) {
-            LOG.warn("SMTP connection test failed", exception);
+            LOG.warn("SMTP connection test failed ({})", exception.getClass().getSimpleName());
             throw ApiException.badRequest(
                     ApiErrorCode.EMAIL_TEST_FAILED, "SMTP connection test failed");
         }
@@ -100,7 +100,7 @@ public class MailService {
             String subjectKey) {
         EmailSettingsService.EmailConfiguration configuration = configuration();
         if (!configuration.enabled()) {
-            LOG.debug("Email delivery is disabled; skipping message to '{}'", recipient);
+            LOG.debug("Email delivery is disabled; skipping message");
             return;
         }
 
@@ -117,7 +117,7 @@ public class MailService {
     private void sendEmailSync(String recipient, String subject, String content, boolean html) {
         EmailSettingsService.EmailConfiguration configuration = configuration();
         if (!configuration.enabled()) {
-            LOG.debug("Email delivery is disabled; skipping message to '{}'", recipient);
+            LOG.debug("Email delivery is disabled; skipping message");
             return;
         }
 
@@ -131,9 +131,9 @@ public class MailService {
             message.setSubject(subject);
             message.setText(content, html);
             sender.send(mimeMessage);
-            LOG.debug("Email sent to '{}'", recipient);
+            LOG.debug("Email sent");
         } catch (MailException | MessagingException exception) {
-            LOG.warn("Email could not be sent to '{}'", recipient, exception);
+            LOG.warn("Email delivery failed ({})", exception.getClass().getSimpleName());
         }
     }
 

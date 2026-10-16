@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { fetchLatestDesktopRelease } from "@/lib/desktop-downloads";
 
 import { DownloadPage } from "./DownloadPage";
@@ -90,16 +90,15 @@ describe("DownloadPage", () => {
 
   it("reports release lookup failures", async () => {
     const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    mockFetchRelease.mockRejectedValueOnce(new Error("offline"));
+    const sensitiveDetails = "authorization=Bearer secret user=ada@example.com";
+    mockFetchRelease.mockRejectedValueOnce(new Error(sensitiveDetails));
 
     render(<DownloadPage dictionary={dictionary} />);
 
     expect(await screen.findByText(dictionary.download.loadError)).toBeVisible();
     expect(screen.queryByRole("link", { name: dictionary.download.downloadChecksums })).toBeNull();
-    expect(warn).toHaveBeenCalledWith(
-      "Unable to resolve the latest desktop release",
-      expect.any(Error),
-    );
+    expect(warn).toHaveBeenCalledWith("Unable to resolve the latest desktop release");
+    expect(warn.mock.calls.flat().join(" ")).not.toContain(sensitiveDetails);
     warn.mockRestore();
   });
 });

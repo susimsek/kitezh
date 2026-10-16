@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { act } from "react";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { adminRequest } from "@/lib/admin-api";
 
 import AuthenticationFlows from "./AuthenticationFlows";
@@ -105,6 +105,15 @@ const detail = {
       providerId: null,
       requirement: "CONDITIONAL" as const,
       priority: 1,
+      builtIn: false,
+    },
+    {
+      nodeType: "EXECUTION" as const,
+      id: 32,
+      name: "Disabled option",
+      providerId: "unused-authenticator",
+      requirement: "DISABLED" as const,
+      priority: 2,
       builtIn: false,
     },
   ],

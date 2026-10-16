@@ -44,31 +44,36 @@ class SocialProviderLogoutEndpointResolverTest {
     }
 
     @Test
-    void fallsBackToProviderLogoutEndpoints() {
+    void fallsBackOnlyToProviderLogoutEndpointsWithSupportedRelyingPartyLogout() {
         ProviderCredentials provider = mock(ProviderCredentials.class);
         when(provider.providerType()).thenReturn("github");
 
-        assertThat(new SocialProviderLogoutEndpointResolver().resolve(provider))
-                .isEqualTo("https://github.com/logout");
+        assertThat(new SocialProviderLogoutEndpointResolver().resolve(provider)).isNull();
+    }
+
+    @Test
+    void doesNotUseLinkedInGlobalLogoutPage() {
+        ProviderCredentials provider = mock(ProviderCredentials.class);
+        when(provider.providerType()).thenReturn("linkedin");
+
+        assertThat(new SocialProviderLogoutEndpointResolver().resolve(provider)).isNull();
     }
 
     @Test
     void handlesNullInvalidAndAllBuiltInProviderFallbacks() {
         SocialProviderLogoutEndpointResolver resolver = new SocialProviderLogoutEndpointResolver();
         assertThat(resolver.resolve(null)).isNull();
-        for (String provider : new String[] {"google", "microsoft", "linkedin"}) {
-            ProviderCredentials credentials = mock(ProviderCredentials.class);
-            when(credentials.providerType()).thenReturn(provider);
-            when(credentials.issuerUri()).thenReturn(" ");
-            assertThat(resolver.resolve(credentials)).isNotBlank();
-        }
+        ProviderCredentials credentials = mock(ProviderCredentials.class);
+        when(credentials.providerType()).thenReturn("microsoft");
+        when(credentials.issuerUri()).thenReturn(" ");
+        assertThat(resolver.resolve(credentials)).isNotBlank();
         ProviderCredentials unknown = mock(ProviderCredentials.class);
         when(unknown.providerType()).thenReturn("custom");
         assertThat(resolver.resolve(unknown)).isNull();
     }
 
     @Test
-    void ignoresInvalidDiscoveryAndUsesFallback() {
+    void ignoresInvalidDiscoveryWithoutUsingGoogleGlobalLogout() {
         RestClient.Builder restClientBuilder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         RestClient restClient = restClientBuilder.build();
@@ -89,7 +94,27 @@ class SocialProviderLogoutEndpointResolverTest {
                                         HttpServiceClientFactory.create(
                                                 OidcDiscoveryClient.class, restClient))
                                 .resolve(provider))
-                .isEqualTo("https://accounts.google.com/Logout");
+                .isNull();
         server.verify();
+    }
+
+    @Test
+    void googleWithoutEndSessionMetadataUsesLocalLogout() {
+        ProviderCredentials provider = new ProviderCredentials("google", "test-id", "test-secret");
+        assertThat(new SocialProviderLogoutEndpointResolver().resolve(provider)).isNull();
+    }
+
+    @Test
+    void googleDiscoveryWithoutEndSessionEndpointUsesLocalLogout() {
+        ProviderCredentials provider = mock(ProviderCredentials.class);
+        when(provider.providerType()).thenReturn("google");
+        when(provider.issuerUri()).thenReturn("https://accounts.google.com");
+        OidcDiscoveryClient discovery = mock(OidcDiscoveryClient.class);
+        when(discovery.discover(
+                        java.net.URI.create(
+                                "https://accounts.google.com/.well-known/openid-configuration")))
+                .thenReturn(java.util.Map.of("issuer", "https://accounts.google.com"));
+
+        assertThat(new SocialProviderLogoutEndpointResolver(discovery).resolve(provider)).isNull();
     }
 }

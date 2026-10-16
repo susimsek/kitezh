@@ -3,10 +3,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import {
-  MobileAuthProvider,
-  useMobileAuth,
-} from "@/auth/MobileAuthProvider";
+import { MobileAuthProvider, useMobileAuth } from "@/auth/MobileAuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import type { MobileConsole } from "@/config";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -18,7 +15,7 @@ type AuthCallbackScreenProps = {
 
 function AuthCallbackContent({
   consoleName = "account",
-}: AuthCallbackScreenProps) {
+}: Readonly<AuthCallbackScreenProps>) {
   const { status } = useMobileAuth();
   const { dictionary } = useLocale();
   const { palette } = useTheme();

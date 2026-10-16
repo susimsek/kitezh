@@ -44,7 +44,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(Exception.class)
     public @Nullable ResponseEntity<Object> handleUnhandled(
             Exception exception, WebRequest request) {
-        log.error("Unhandled API exception", exception);
+        log.error("Unhandled API exception ({})", exception.getClass().getSimpleName());
         ProblemDetail problemDetail =
                 createProblemDetail(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR);
         requestUri(request).ifPresent(problemDetail::setInstance);

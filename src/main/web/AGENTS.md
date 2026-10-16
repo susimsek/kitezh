@@ -34,7 +34,8 @@ These instructions apply to `src/main/web/**` and supplement the repository-root
 - `lib/console-auth.ts`: shared browser OIDC Authorization Code + PKCE, refresh-token, and logout adapter.
 - `lib/admin-api.ts` and `lib/account-api.ts`: authenticated Administration and Account Console API clients.
 - `store/reducers.ts` and `store/*-slice.ts`: the JHipster-style root reducer registry for shared auth, locale, and theme state; page-scoped API data stays local to its feature.
-- `locales/en` and `locales/tr`: English and Turkish user-facing messages.
+- `@kitezh/shared/web-messages/en` and `@kitezh/shared/web-messages/tr`: Web namespaces from the
+  shared English/Turkish message catalog in `src/main/shared/src/web-locales`.
 - `e2e`: web browser E2E specifications and shared Playwright fixtures. Electron tests remain independently configured under `src/main/desktop/e2e`.
 
 ## Code Style and Quality Gates

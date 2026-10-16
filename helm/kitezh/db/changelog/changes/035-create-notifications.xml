@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="035-create-notifications" author="kitezh">
+		<createTable tableName="notifications">
+			<column name="id" type="varchar(36)">
+				<constraints primaryKey="true" nullable="false"/>
+			</column>
+			<column name="audience" type="varchar(16)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="recipient_user_id" type="bigint">
+				<constraints foreignKeyName="fk_notifications_recipient_user" references="users(id)" deleteCascade="true"/>
+			</column>
+			<column name="notification_type" type="varchar(64)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="created_at" type="timestamp">
+				<constraints nullable="false"/>
+			</column>
+		</createTable>
+		<sql>ALTER TABLE notifications ADD CONSTRAINT ck_notifications_audience CHECK
+			((audience = 'ACCOUNT' and recipient_user_id is not null) or (audience = 'ADMIN' and recipient_user_id is null))</sql>
+		<createIndex tableName="notifications" indexName="idx_notifications_audience_created">
+			<column name="audience"/>
+			<column name="created_at" descending="true"/>
+		</createIndex>
+		<createIndex tableName="notifications" indexName="idx_notifications_recipient_created">
+			<column name="recipient_user_id"/>
+			<column name="created_at" descending="true"/>
+		</createIndex>
+
+		<createTable tableName="notification_read_receipts">
+			<column name="id" type="varchar(36)">
+				<constraints primaryKey="true" nullable="false"/>
+			</column>
+			<column name="notification_id" type="varchar(36)">
+				<constraints nullable="false" foreignKeyName="fk_notification_receipt_notification" references="notifications(id)" deleteCascade="true"/>
+			</column>
+			<column name="user_id" type="bigint">
+				<constraints nullable="false" foreignKeyName="fk_notification_receipt_user" references="users(id)" deleteCascade="true"/>
+			</column>
+			<column name="read_at" type="timestamp">
+				<constraints nullable="false"/>
+			</column>
+		</createTable>
+		<addUniqueConstraint tableName="notification_read_receipts"
+			columnNames="notification_id,user_id" constraintName="uk_notification_receipt_user"/>
+		<createIndex tableName="notification_read_receipts" indexName="idx_notification_receipt_user">
+			<column name="user_id"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

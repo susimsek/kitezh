@@ -3,11 +3,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const command =
+  process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "pnpm";
+const args =
   process.platform === "win32"
-    ? ["cmd.exe", ["/d", "/s", "/c", "pnpm exec expo config --json"]]
-    : ["pnpm", ["exec", "expo", "config", "--json"]];
+    ? ["/d", "/s", "/c", "pnpm exec expo config --json"]
+    : ["exec", "expo", "config", "--json"];
 const config = JSON.parse(
-  execFileSync(command[0], command[1], {
+  execFileSync(command, args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
   }),

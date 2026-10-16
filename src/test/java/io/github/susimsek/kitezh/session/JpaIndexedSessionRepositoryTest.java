@@ -11,6 +11,7 @@ import io.github.susimsek.kitezh.config.security.SecurityJsonMapper;
 import io.github.susimsek.kitezh.config.session.SessionConfig;
 import io.github.susimsek.kitezh.domain.UserSessionEntity;
 import io.github.susimsek.kitezh.repository.UserSessionRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -24,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.core.convert.ConversionException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContext;
@@ -104,6 +106,47 @@ class JpaIndexedSessionRepositoryTest {
                                 "admin"))
                 .containsOnlyKeys(session.getId());
         assertThat(repository.findByIndexNameAndIndexValue("unknown", "admin")).isEmpty();
+    }
+
+    @Test
+    void ignoresUnsupportedSerializedSessionAttributes() {
+        UserSessionEntity entity = new UserSessionEntity();
+        entity.setPrimaryId("primary-id");
+        entity.setSessionId("session-id");
+        entity.setCreationTime(System.currentTimeMillis());
+        entity.setLastAccessTime(System.currentTimeMillis());
+        entity.setMaxInactiveInterval(300);
+        entity.setExpiryTime(System.currentTimeMillis() + 300_000);
+        entity.getAttributes()
+                .put(
+                        "SPRING_SECURITY_LAST_EXCEPTION",
+                        "{\"@class\":\"org.springframework.security.authentication.ProviderNotFoundException\"}"
+                                .getBytes(StandardCharsets.UTF_8));
+        store.save(entity);
+
+        JpaSession session = repository.findById(entity.getSessionId());
+
+        assertThat(session).isNotNull();
+        assertThat((Object) session.getAttribute("SPRING_SECURITY_LAST_EXCEPTION")).isNull();
+        repository.save(session);
+
+        assertThat(store.findBySessionId(entity.getSessionId()).orElseThrow().getAttributes())
+                .doesNotContainKey("SPRING_SECURITY_LAST_EXCEPTION");
+    }
+
+    @Test
+    void rejectsUnreadableSecurityContextInsteadOfDiscardingIt() {
+        JpaSession session = repository.createSession();
+        session.setAttribute("alpha", "one");
+        repository.save(session);
+        UserSessionEntity entity = store.findBySessionId(session.getId()).orElseThrow();
+        entity.getAttributes()
+                .put("SPRING_SECURITY_CONTEXT", "invalid-json".getBytes(StandardCharsets.UTF_8));
+        store.save(entity);
+        String sessionId = session.getId();
+
+        assertThatThrownBy(() -> repository.findById(sessionId))
+                .isInstanceOf(ConversionException.class);
     }
 
     @Test

@@ -60,7 +60,10 @@ type Provider = {
   enabled: boolean;
 };
 
-export function OrganizationDetail({ dictionary, id }: { dictionary: Dictionary; id: string }) {
+export function OrganizationDetail({
+  dictionary,
+  id,
+}: Readonly<{ dictionary: Dictionary; id: string }>) {
   const { access, accessToken } = useAdminAuth();
   const copy = dictionary.admin.organizations;
   const organizationId = Number(id);
@@ -163,7 +166,7 @@ export function OrganizationDetail({ dictionary, id }: { dictionary: Dictionary;
               providerResult,
             ].some((response) => response.status >= 300)
           )
-            throw new Error();
+            throw new Error("Request failed");
           setOrganization(org.data);
           setMembers(memberPage.data.content);
           setDomains(domainResult.data);
@@ -194,7 +197,7 @@ export function OrganizationDetail({ dictionary, id }: { dictionary: Dictionary;
     setSaving(true);
     try {
       const response = await adminRequest(accessToken, { url, method, data });
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       reset();
       load();
     } catch {
@@ -535,7 +538,10 @@ export function OrganizationDetail({ dictionary, id }: { dictionary: Dictionary;
   );
 }
 
-function CollectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function CollectionCard({
+  title,
+  children,
+}: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
     <Card className="admin-panel-card h-100">
       <Card.Body>

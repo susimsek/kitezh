@@ -281,7 +281,9 @@ public class RegistrationCaptchaSettingsService {
         try {
             return secretCipher.decrypt(encrypted);
         } catch (IllegalStateException exception) {
-            log.warn("Registration CAPTCHA secret could not be decrypted", exception);
+            log.warn(
+                    "Registration CAPTCHA secret could not be decrypted ({})",
+                    exception.getClass().getSimpleName());
             return "";
         }
     }

@@ -1,5 +1,6 @@
 package io.github.susimsek.kitezh.service.account;
 
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.UserAction;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.account.AccountProfileDTO;
@@ -12,6 +13,7 @@ import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.admin.UserAccessInvalidationService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import io.github.susimsek.kitezh.service.security.PasswordService;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +36,7 @@ public class AccountProfileService {
     private final UserActionService userActionService;
     private final LoginSettingsService loginSettingsService;
     private final LdapFederationWriteService ldapFederationWriteService;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public AccountProfileDTO profile(String username) {
@@ -133,6 +136,7 @@ public class AccountProfileService {
         userRepository.save(user);
         userAccessInvalidationService.invalidate(username);
         auditEventService.record("account.password.updated", "user", user.getId().toString());
+        notificationService.publishAccount(username, NotificationType.ACCOUNT_PASSWORD_CHANGED);
     }
 
     @Transactional

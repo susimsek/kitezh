@@ -57,7 +57,7 @@ const ADMIN_AUTH_CONFIG = {
 
 const AdminAuthRuntimeContext = createContext<AdminAuthRuntime | null>(null);
 
-export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
+export function AdminAuthProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const { refreshAccessToken, logout, beginAuthorization, completeAuthorization } = useConsoleAuth(
     ADMIN_AUTH_CONFIG,
     "admin",

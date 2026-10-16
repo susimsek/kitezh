@@ -4,7 +4,7 @@ import { I18nProvider } from "next-i18next/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import config from "@/i18n.config";
-import en from "@/locales/en/common.json";
+import en from "@kitezh/shared/web-messages/en";
 import { defaultLocale, isLocale } from "./config";
 import type { Dictionary } from "./get-dictionary";
 import { DESKTOP_LANGUAGE_MODE_KEY, detectLocale, persistLocale } from "./locale-cookie";
@@ -13,7 +13,7 @@ import { setLocale } from "@/store/locale-slice";
 import { useAppDispatch } from "@/store/hooks";
 import { messageBundles } from "./bundles";
 
-export function ClientI18nProvider({ children }: { children: ReactNode }) {
+export function ClientI18nProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [initialLocale] = useState(() => {
     const desktopSystemLanguage =
       isDesktopRuntime() && localStorage.getItem(DESKTOP_LANGUAGE_MODE_KEY) === "system";

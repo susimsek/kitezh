@@ -73,6 +73,30 @@ type Binding = {
 };
 type AuthenticationCopy = Dictionary["admin"]["authentication"];
 
+function requirementLabel(value: Requirement, copy: AuthenticationCopy) {
+  switch (value) {
+    case "REQUIRED":
+      return copy.required;
+    case "ALTERNATIVE":
+      return copy.alternative;
+    case "DISABLED":
+      return copy.disabled;
+    case "CONDITIONAL":
+      return copy.conditional;
+  }
+}
+
+function requirementVariant(requirement: Requirement | null) {
+  switch (requirement) {
+    case "DISABLED":
+      return "secondary";
+    case "CONDITIONAL":
+      return "warning";
+    default:
+      return "primary";
+  }
+}
+
 const requirements: Requirement[] = ["REQUIRED", "ALTERNATIVE", "DISABLED", "CONDITIONAL"];
 const executionRequirements: Exclude<Requirement, "CONDITIONAL">[] = [
   "REQUIRED",
@@ -858,7 +882,7 @@ function FlowForm({
   submitting,
   topLevel = false,
   metadataLocked = false,
-}: FlowFormProps) {
+}: Readonly<FlowFormProps>) {
   const {
     register,
     handleSubmit,
@@ -907,21 +931,7 @@ function FlowForm({
               <Form.Select disabled={metadataLocked} {...register("requirement")}>
                 {requirements.map((value) => (
                   <option key={value} value={value}>
-                    {(() => {
-                      if (value === "REQUIRED") {
-                        return copy.required;
-                      } else {
-                        if (value === "ALTERNATIVE") {
-                          return copy.alternative;
-                        } else {
-                          if (value === "DISABLED") {
-                            return copy.disabled;
-                          } else {
-                            return copy.conditional;
-                          }
-                        }
-                      }
-                    })()}
+                    {requirementLabel(value, copy)}
                   </option>
                 ))}
               </Form.Select>
@@ -980,7 +990,7 @@ function ExecutionForm({
   submitLabel,
   submitting,
   metadataLocked = false,
-}: ExecutionFormProps) {
+}: Readonly<ExecutionFormProps>) {
   const {
     register,
     handleSubmit,
@@ -1029,17 +1039,7 @@ function ExecutionForm({
             <Form.Select {...register("requirement")}>
               {executionRequirements.map((value) => (
                 <option key={value} value={value}>
-                  {(() => {
-                    if (value === "REQUIRED") {
-                      return copy.required;
-                    } else {
-                      if (value === "ALTERNATIVE") {
-                        return copy.alternative;
-                      } else {
-                        return copy.disabled;
-                      }
-                    }
-                  })()}
+                  {requirementLabel(value, copy)}
                 </option>
               ))}
             </Form.Select>
@@ -1111,7 +1111,7 @@ function NodeRow({
   movingNodeKey,
   nodeKey,
   opening,
-}: NodeRowProps) {
+}: Readonly<NodeRowProps>) {
   const movingUp = movingNodeKey === `${nodeKey}-UP`;
   const movingDown = movingNodeKey === `${nodeKey}-DOWN`;
   return (
@@ -1129,21 +1129,7 @@ function NodeRow({
         <small className="text-body-secondary font-monospace">{secondary}</small>
       </button>
       <div className="d-flex align-items-center gap-2">
-        <Badge
-          bg={(() => {
-            if (requirement === "DISABLED") {
-              return "secondary";
-            } else {
-              if (requirement === "CONDITIONAL") {
-                return "warning";
-              } else {
-                return "primary";
-              }
-            }
-          })()}
-        >
-          {requirement}
-        </Badge>
+        <Badge bg={requirementVariant(requirement)}>{requirement}</Badge>
         <Button
           aria-label={copy.moveUp}
           disabled={disabled || movingNodeKey !== null}
@@ -1186,7 +1172,7 @@ function NodeRow({
   );
 }
 
-function BindingsCard({ bindings, flows, copy, saving, onSave }: BindingsCardProps) {
+function BindingsCard({ bindings, flows, copy, saving, onSave }: Readonly<BindingsCardProps>) {
   return (
     <Card className="admin-panel-card">
       <Card.Body>

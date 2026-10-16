@@ -109,7 +109,8 @@ function AccountLayout() {
   );
 }
 
-function AccountImpersonationReset({ children }: { children: React.ReactNode }) {
+function AccountImpersonationReset({ children }: Readonly<{ children: React.ReactNode }>) {
+  const dictionary = useDictionary();
   const searchParams = useSearchParams();
   const impersonated = searchParams.get("impersonated") === "1";
   const router = useRouter();
@@ -124,7 +125,10 @@ function AccountImpersonationReset({ children }: { children: React.ReactNode }) 
   if (impersonated)
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center bg-body-tertiary">
-        <div className="spinner-border text-primary" role="status" />
+        <output
+          aria-label={dictionary.account.common.loading}
+          className="spinner-border text-primary"
+        />
       </div>
     );
   return children;
@@ -161,7 +165,7 @@ function LandingLayout() {
   );
 }
 
-function EntityDetail({ entity }: { entity: "group" | "consent" | "client-scope" }) {
+function EntityDetail({ entity }: Readonly<{ entity: "group" | "consent" | "client-scope" }>) {
   const { id = "" } = useParams();
   const props = { locale: useLocale(), dictionary: useDictionary() };
   if (entity === "group") return <GroupDetail key={id} {...props} id={id} />;
@@ -191,9 +195,9 @@ function UserProfileEditPage() {
 
 function AccountPage({
   section,
-}: {
+}: Readonly<{
   section: "profile" | "security" | "sessions" | "applications";
-}) {
+}>) {
   const d = useDictionary();
   const copy = d.account[section];
   return (
@@ -221,7 +225,10 @@ function AccountPage({
   );
 }
 
-function IdentityProviderRoute({ dictionary, locale }: { dictionary: Dictionary; locale: Locale }) {
+function IdentityProviderRoute({
+  dictionary,
+  locale,
+}: Readonly<{ dictionary: Dictionary; locale: Locale }>) {
   const { id = "", section } = useParams<{ id: string; section: string }>();
   const tab = section === "mappers" ? "mappers" : "details";
   return (

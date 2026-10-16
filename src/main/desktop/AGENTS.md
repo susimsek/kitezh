@@ -144,12 +144,12 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
   must use desktop interaction patterns; do not reproduce a mobile layout or copy Web DOM components
   into a native window. ChatGPT desktop/mobile may inform hierarchy and spacing, but Kitezh keeps its
   own product identity and keyboard-first desktop behavior.
-- The authenticated Desktop console renderer is currently generated from the Web application by
-  `scripts/build-renderer.mjs`. Until that renderer is migrated to independently owned Desktop
-  screens, any visual change under `src/main/web` affects both Web and Desktop. Keep the migration
-  marked in `src/main/mobile/WEB-MOBILE-FEATURE-MATRIX.md`; do not claim native Desktop styling or
-  screen ownership based only on the bundled Web renderer. Desktop-only sign-in, settings, update,
-  and confirmation windows are authored in the Desktop source and must remain independently themed.
+- The authenticated Desktop console owns its screens in `src/native/native.html` and
+  `src/native/renderer.mjs`; `scripts/build-native-renderer.mjs` builds the native renderer.
+  `scripts/build-renderer.mjs` is a legacy Web-export helper and must not supply the native release
+  renderer. Keep native acceptance evidence in `docs/NATIVE-DESKTOP-FEATURE-MATRIX.md`; independent
+  screen ownership alone does not prove feature parity. Native sign-in, settings, update, and
+  confirmation windows share `src/ui/native-styles.ts` and must remain independently themed.
 - Keep native window typography, spacing, control heights, radii, borders, and action colors aligned
   through shared semantic tokens or a small common Desktop style helper. Avoid slightly different
   hand-written CSS for the same action or control across the login, settings, update, and confirmation

@@ -15,6 +15,7 @@ import io.github.susimsek.kitezh.domain.ServiceAccountEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.mapper.AdminClientMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
@@ -124,6 +125,41 @@ class AdminClientServiceTest {
         verify(clientRepository).deleteById("client-id");
         verify(serviceAccountRepository).findByClientId("client-id");
         verify(userRepository, never()).delete(any(UserEntity.class));
+    }
+
+    @Test
+    void rejectsDeletingEveryPlatformConsoleClientBeforeRemovingAnyData() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        List<String> consoleClientIds =
+                List.of(
+                        "admin-console",
+                        "account-console",
+                        "desktop-admin-console",
+                        "desktop-account-console",
+                        "mobile-admin-console",
+                        "mobile-account-console");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        List<RegisteredClient> consoleClients =
+                consoleClientIds.stream()
+                        .map(clientId -> registeredClient("client-id", clientId))
+                        .toList();
+        when(registeredClientMapper.toObject(entity, mapperSupport))
+                .thenReturn(
+                        consoleClients.getFirst(),
+                        consoleClients
+                                .subList(1, consoleClients.size())
+                                .toArray(RegisteredClient[]::new));
+
+        for (int index = 0; index < consoleClientIds.size(); index++) {
+            assertThatThrownBy(() -> service().delete("client-id"))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessage("Platform console clients cannot be deleted");
+        }
+
+        verify(authorizationRepository, never()).deleteByRegisteredClientId(any());
+        verify(authorizationConsentRepository, never()).deleteByIdRegisteredClientId(any());
+        verify(clientRepository, never()).deleteById(any());
+        verify(adminAuditEventService, never()).record(any(), any(), any());
     }
 
     @Test
@@ -297,6 +333,47 @@ class AdminClientServiceTest {
         when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(adminConsole);
 
         assertThatThrownBy(() -> service().update("client-id", confidentialRequest()))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("The administration console client cannot be changed");
+    }
+
+    @Test
+    void nativeMetadataUpdateChangesOnlyTheClientNameAndAudits() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient client = registeredClient("client-id", "service-client");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(client);
+
+        var metadata =
+                service()
+                        .updateNativeMetadata(
+                                "client-id", new AdminClientNativeMetadataRequestDTO(" New Name "));
+
+        assertThat(metadata.clientName()).isEqualTo("New Name");
+        assertThat(metadata.clientId()).isEqualTo("service-client");
+        assertThat(savedClient.get().getClientAuthenticationMethods())
+                .contains(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        assertThat(savedClient.get().getAuthorizationGrantTypes())
+                .contains(AuthorizationGrantType.CLIENT_CREDENTIALS);
+        assertThat(savedClient.get().getScopes()).containsExactly("openid");
+        verify(adminAuditEventService).record("client.updated", "client", "client-id");
+    }
+
+    @Test
+    void nativeMetadataUpdateRejectsProtectedAdminConsoleClient() {
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        RegisteredClient adminConsole = registeredClient("client-id", "admin-console");
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(adminConsole);
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .updateNativeMetadata(
+                                                "client-id",
+                                                new AdminClientNativeMetadataRequestDTO(
+                                                        "New Name")))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("The administration console client cannot be changed");
     }
@@ -543,6 +620,107 @@ class AdminClientServiceTest {
         assertThat(savedClient.get().getTokenSettings().getAccessTokenTimeToLive())
                 .isEqualTo(Duration.ofMinutes(9));
         verify(adminAuditEventService).record("client.updated", "client", "client-id");
+    }
+
+    @Test
+    void preservesConfiguredCibaNotificationTokenWhenUpdateLeavesItBlank() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        String configuredToken = "sensitive-ciba-token";
+        RegisteredClient existing =
+                RegisteredClient.from(registeredClient("client-id", "advanced-client"))
+                        .clientSecret("encoded-secret")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.CIBA_DELIVERY_MODE,
+                                                        "ping",
+                                                        ClientSecuritySettings
+                                                                .CIBA_NOTIFICATION_ENDPOINT,
+                                                        "https://example.test/ciba",
+                                                        ClientSecuritySettings
+                                                                .CIBA_CLIENT_NOTIFICATION_TOKEN,
+                                                        configuredToken))
+                                        .build())
+                        .build();
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(existing);
+
+        service()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials", AuthorizationGrantTypes.CIBA),
+                                "ping",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false));
+
+        Object savedToken =
+                savedClient
+                        .get()
+                        .getClientSettings()
+                        .getSetting(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+        assertThat(savedToken).isInstanceOf(String.class);
+        assertThat(configuredToken.equals(savedToken)).isTrue();
+    }
+
+    @Test
+    void replacesConfiguredCibaNotificationTokenWithoutExposingIt() {
+        AtomicReference<RegisteredClient> savedClient = wireSaveMapper();
+        RegisteredClientEntity entity = new RegisteredClientEntity();
+        String configuredToken = "sensitive-ciba-token";
+        String replacementToken = "replacement-ciba-token";
+        RegisteredClient existing =
+                RegisteredClient.from(registeredClient("client-id", "advanced-client"))
+                        .clientSecret("encoded-secret")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .clientSettings(
+                                org.springframework.security.oauth2.server.authorization.settings
+                                        .ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.CIBA_DELIVERY_MODE,
+                                                        "ping",
+                                                        ClientSecuritySettings
+                                                                .CIBA_NOTIFICATION_ENDPOINT,
+                                                        "https://example.test/ciba",
+                                                        ClientSecuritySettings
+                                                                .CIBA_CLIENT_NOTIFICATION_TOKEN,
+                                                        configuredToken))
+                                        .build())
+                        .build();
+        when(clientRepository.findById("client-id")).thenReturn(Optional.of(entity));
+        when(registeredClientMapper.toObject(entity, mapperSupport)).thenReturn(existing);
+
+        service()
+                .update(
+                        "client-id",
+                        advancedRequest(
+                                Set.of("client_secret_basic"),
+                                Set.of("client_credentials", AuthorizationGrantTypes.CIBA),
+                                "ping",
+                                null,
+                                null,
+                                null,
+                                null,
+                                false,
+                                "https://example.test/ciba",
+                                replacementToken));
+
+        Object savedToken =
+                savedClient
+                        .get()
+                        .getClientSettings()
+                        .getSetting(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+        assertThat(savedToken).isInstanceOf(String.class);
+        assertThat(replacementToken.equals(savedToken)).isTrue();
     }
 
     @Test
@@ -1577,6 +1755,57 @@ class AdminClientServiceTest {
             Duration gracePeriod,
             boolean serviceAccountEnabled,
             String cibaNotificationEndpoint) {
+        return advancedRequest(
+                clientId,
+                methods,
+                grants,
+                cibaMode,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod,
+                serviceAccountEnabled,
+                cibaNotificationEndpoint,
+                null);
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled,
+            String cibaNotificationEndpoint,
+            String cibaClientNotificationToken) {
+        return advancedRequest(
+                "advanced-client",
+                methods,
+                grants,
+                cibaMode,
+                jwkSetUrl,
+                signingAlgorithm,
+                certificateSubjectDn,
+                gracePeriod,
+                serviceAccountEnabled,
+                cibaNotificationEndpoint,
+                cibaClientNotificationToken);
+    }
+
+    private static AdminClientRequestDTO advancedRequest(
+            String clientId,
+            Set<String> methods,
+            Set<String> grants,
+            String cibaMode,
+            String jwkSetUrl,
+            String signingAlgorithm,
+            String certificateSubjectDn,
+            Duration gracePeriod,
+            boolean serviceAccountEnabled,
+            String cibaNotificationEndpoint,
+            String cibaClientNotificationToken) {
         return new AdminClientRequestDTO(
                 clientId,
                 "Advanced client",
@@ -1593,7 +1822,7 @@ class AdminClientServiceTest {
                 Set.of("RS256"),
                 cibaMode,
                 cibaNotificationEndpoint,
-                null,
+                cibaClientNotificationToken,
                 Duration.ofMinutes(5),
                 Duration.ofMinutes(5),
                 Duration.ofHours(1),

@@ -69,11 +69,11 @@ function DownloadLink({
   asset: downloadAsset,
   release,
   unavailableLabel,
-}: {
+}: Readonly<{
   asset: DownloadAsset;
   release: DesktopRelease | null;
   unavailableLabel: string;
-}) {
+}>) {
   const href = findReleaseAssetUrl(release, downloadAsset.matcher);
   if (!href) {
     return (
@@ -101,7 +101,7 @@ function DownloadLink({
   );
 }
 
-export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
+export function DownloadPage({ dictionary }: Readonly<{ dictionary: Dictionary }>) {
   const copy = dictionary.download;
   const [release, setRelease] = useState<DesktopRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
@@ -120,7 +120,7 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
         }
         setReleaseLoading(false);
         setReleaseError(true);
-        console.warn("Unable to resolve the latest desktop release", error);
+        console.warn("Unable to resolve the latest desktop release");
       });
   }, []);
 
@@ -231,19 +231,18 @@ export function DownloadPage({ dictionary }: { dictionary: Dictionary }) {
           <p className="lead text-body-secondary mb-0">{copy.subtitle}</p>
         </Stack>
 
-        {releaseLoading ? (
-          <div
-            className="download-release-loading d-flex flex-column align-items-center justify-content-center gap-3 py-5"
-            role="status"
-          >
+        {releaseLoading && (
+          <output className="download-release-loading d-flex flex-column align-items-center justify-content-center gap-3 py-5">
             <Spinner animation="border" aria-hidden="true" />
             <span>{copy.loading}</span>
-          </div>
-        ) : releaseError ? (
+          </output>
+        )}
+        {!releaseLoading && releaseError && (
           <Alert variant="danger" className="download-release-error text-center mx-auto">
             {copy.loadError}
           </Alert>
-        ) : (
+        )}
+        {!releaseLoading && !releaseError && (
           <Row className="download-platforms g-4 g-lg-5 justify-content-center">
             {visiblePlatforms.map((platform) => (
               <Col key={platform.title} xs={12} md={6} lg={4}>

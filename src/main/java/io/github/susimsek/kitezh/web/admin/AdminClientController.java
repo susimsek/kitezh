@@ -5,6 +5,8 @@ import io.github.susimsek.kitezh.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientMapperDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientMapperRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientScopeAssignmentRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientScopeEvaluationDTO;
@@ -165,6 +167,25 @@ public class AdminClientController {
                     @RequestBody
                     AdminClientRequestDTO request) {
         return adminClientService.update(id, request);
+    }
+
+    @GetMapping("/{id}/native-metadata")
+    @Operation(
+            summary = "Get native-safe client metadata",
+            description = "Returns client identifiers and display name without OAuth policy.")
+    AdminClientNativeMetadataDTO findNativeMetadata(@PathVariable String id) {
+        return adminClientService.findNativeMetadata(id);
+    }
+
+    @PutMapping("/{id}/native-metadata")
+    @Operation(
+            summary = "Update native-safe client metadata",
+            description = "Updates only the client display name; OAuth policy remains unchanged.")
+    @ApiResponse(responseCode = "200", description = "Updated native-safe client metadata.")
+    AdminClientNativeMetadataDTO updateNativeMetadata(
+            @PathVariable String id,
+            @Valid @RequestBody AdminClientNativeMetadataRequestDTO request) {
+        return adminClientService.updateNativeMetadata(id, request);
     }
 
     @DeleteMapping("/{id}")

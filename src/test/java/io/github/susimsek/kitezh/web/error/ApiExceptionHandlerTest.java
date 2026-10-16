@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.github.susimsek.kitezh.dto.error.ApiViolationDTO;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
@@ -15,12 +18,14 @@ import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -239,12 +244,14 @@ class ApiExceptionHandlerTest {
         messages.addMessage(
                 "app.api.problem.internal_error", Locale.ENGLISH, "An unexpected error occurred.");
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/admin/clients");
+        Logger logger = (Logger) LoggerFactory.getLogger(ApiExceptionHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
 
-        var response =
-                handler(messages)
-                        .handleUnhandled(
-                                new IllegalStateException("database connection details"),
-                                new ServletWebRequest(request));
+        var response = handleUnhandled(handler(messages), request);
+        logger.detachAppender(appender);
+        appender.stop();
         var problem = (org.springframework.http.ProblemDetail) response.getBody();
 
         assertThat(problem).isNotNull();
@@ -255,6 +262,22 @@ class ApiExceptionHandlerTest {
         assertThat(problem.getType()).hasToString("urn:problem:internal_error");
         assertThat(problem.getInstance()).hasToString("/api/admin/clients");
         assertThat(problem.getProperties()).containsEntry("errorCode", "internal_error");
+        assertThat(appender.list)
+                .singleElement()
+                .satisfies(
+                        event -> {
+                            assertThat(event.getFormattedMessage())
+                                    .contains("Unhandled API exception (IllegalStateException)")
+                                    .doesNotContain("database connection details");
+                            assertThat(event.getThrowableProxy()).isNull();
+                        });
+    }
+
+    private static ResponseEntity<Object> handleUnhandled(
+            ApiExceptionHandler handler, MockHttpServletRequest request) {
+        return handler.handleUnhandled(
+                new IllegalStateException("database connection details"),
+                new ServletWebRequest(request));
     }
 
     @SuppressWarnings("unused")

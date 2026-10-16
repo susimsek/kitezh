@@ -78,6 +78,15 @@ class AdminGroupEndpointsIT {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].username").value("user"));
 
+            mockMvc.perform(
+                            put("/api/admin/groups/{id}/permissions", groupId)
+                                    .with(user())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"permissions\":[{\"userId\":2,"
+                                                    + "\"permission\":\"MANAGE_MEMBERS\"}]}"))
+                    .andExpect(status().isForbidden());
+
             mockMvc.perform(get("/api/admin/groups").param("q", name).with(user()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].name").value(name));
@@ -88,6 +97,69 @@ class AdminGroupEndpointsIT {
         } finally {
             if (groupId != null) {
                 mockMvc.perform(delete("/api/admin/groups/{id}", groupId).with(admin()))
+                        .andExpect(status().isNoContent());
+            }
+        }
+    }
+
+    @Test
+    void adminCanCreateChildGroupWithExistingParent() throws Exception {
+        String parentName = "it-parent-group-" + UUID.randomUUID();
+        String childName = "it-child-group-" + UUID.randomUUID();
+        Long parentId = null;
+        Long childId = null;
+        try {
+            String parentResponse =
+                    mockMvc.perform(
+                                    post("/api/admin/groups")
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    objectMapper.writeValueAsString(
+                                                            java.util.Map.of(
+                                                                    "name",
+                                                                    parentName,
+                                                                    "attributes",
+                                                                    java.util.Map.of(),
+                                                                    "defaultGroup",
+                                                                    false))))
+                            .andExpect(status().isCreated())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            parentId = objectMapper.readTree(parentResponse).get("id").asLong();
+
+            String childResponse =
+                    mockMvc.perform(
+                                    post("/api/admin/groups")
+                                            .with(admin())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    objectMapper.writeValueAsString(
+                                                            java.util.Map.of(
+                                                                    "name",
+                                                                    childName,
+                                                                    "parentId",
+                                                                    parentId,
+                                                                    "attributes",
+                                                                    java.util.Map.of(),
+                                                                    "defaultGroup",
+                                                                    false))))
+                            .andExpect(status().isCreated())
+                            .andExpect(jsonPath("$.name").value(childName))
+                            .andExpect(jsonPath("$.parentId").value(parentId))
+                            .andExpect(jsonPath("$.path").value(parentName + " / " + childName))
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            childId = objectMapper.readTree(childResponse).get("id").asLong();
+        } finally {
+            if (childId != null) {
+                mockMvc.perform(delete("/api/admin/groups/{id}", childId).with(admin()))
+                        .andExpect(status().isNoContent());
+            }
+            if (parentId != null) {
+                mockMvc.perform(delete("/api/admin/groups/{id}", parentId).with(admin()))
                         .andExpect(status().isNoContent());
             }
         }
@@ -109,9 +181,12 @@ class AdminGroupEndpointsIT {
                                                                     "name",
                                                                     name,
                                                                     "attributes",
-                                                                    java.util.Map.of(),
+                                                                    java.util.Map.of(
+                                                                            "department",
+                                                                            java.util.List.of(
+                                                                                    "finance")),
                                                                     "defaultGroup",
-                                                                    false))))
+                                                                    true))))
                             .andExpect(status().isCreated())
                             .andReturn()
                             .getResponse()
@@ -120,20 +195,23 @@ class AdminGroupEndpointsIT {
 
             String renamed = name + "-renamed";
             mockMvc.perform(
-                            put("/api/admin/groups/{id}", groupId)
+                            put("/api/admin/groups/{id}/name", groupId)
                                     .with(admin())
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(
                                             objectMapper.writeValueAsString(
-                                                    java.util.Map.of(
-                                                            "name",
-                                                            renamed,
-                                                            "attributes",
-                                                            java.util.Map.of(),
-                                                            "defaultGroup",
-                                                            false))))
+                                                    java.util.Map.of("name", renamed))))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.name").value(renamed));
+                    .andExpect(jsonPath("$.name").value(renamed))
+                    .andExpect(jsonPath("$.attributes.department[0]").value("finance"))
+                    .andExpect(jsonPath("$.defaultGroup").value(true));
+
+            mockMvc.perform(
+                            put("/api/admin/groups/{id}/name", groupId)
+                                    .with(admin())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"name\":\" \"}"))
+                    .andExpect(status().isBadRequest());
 
             mockMvc.perform(
                             put("/api/admin/groups/{id}/roles", groupId)

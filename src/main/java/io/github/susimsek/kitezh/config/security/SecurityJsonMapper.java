@@ -38,6 +38,14 @@ import tools.jackson.databind.module.SimpleModule;
 public final class SecurityJsonMapper {
 
     private static final String USER_VERIFICATION = "userVerification";
+    private static final Set<String> JDK_IMMUTABLE_COLLECTION_TYPES =
+            Set.of(
+                    "java.util.ImmutableCollections$List12",
+                    "java.util.ImmutableCollections$ListN",
+                    "java.util.ImmutableCollections$Set12",
+                    "java.util.ImmutableCollections$SetN",
+                    "java.util.ImmutableCollections$Map1",
+                    "java.util.ImmutableCollections$MapN");
 
     private static final byte[] WEBAUTHN_CREATION_OPTIONS_MARKER =
             "spring-security-webauthn-creation-options\n"
@@ -56,7 +64,10 @@ public final class SecurityJsonMapper {
                         .allowIfSubType(ImmutablePublicKeyCredentialUserEntity.class)
                         .allowIfSubType(Number.class)
                         .allowIfSubType(Boolean.class)
-                        .allowIfSubType(String.class);
+                        .allowIfSubType(String.class)
+                        .allowIfSubType(
+                                (context, subtype) ->
+                                        JDK_IMMUTABLE_COLLECTION_TYPES.contains(subtype.getName()));
         this.delegate =
                 JsonMapper.builder()
                         .addModules(SecurityJacksonModules.getModules(classLoader, typeValidator))

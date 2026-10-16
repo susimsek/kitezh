@@ -1,6 +1,6 @@
 import { defineConfig } from "next-i18next";
-import en from "./locales/en/common.json";
-import tr from "./locales/tr/common.json";
+import en from "@kitezh/shared/web-messages/en";
+import tr from "@kitezh/shared/web-messages/tr";
 
 export default defineConfig({
   supportedLngs: ["en", "tr"],

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { adminRequest } from "@/lib/admin-api";
 
 import { OrganizationCreateForm } from "./OrganizationCreateForm";
@@ -99,6 +99,23 @@ describe("OrganizationCreateForm", () => {
     authState.access = { isAdmin: false, manageOrganizations: false };
     fireEvent.click(screen.getByRole("button", { name: dictionary.admin.organizations.create }));
     await waitFor(() => expect(mockAdminRequest).toHaveBeenCalledTimes(2));
+  });
+
+  it("reports unsuccessful creation responses without field violations", async () => {
+    mockAdminRequest.mockResolvedValue({ status: 500, data: {} } as never);
+    render(<OrganizationCreateForm dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(dictionary.admin.organizations.alias), {
+      target: { value: "acme" },
+    });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.organizations.name), {
+      target: { value: "Acme" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.organizations.create }));
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.organizations.operationError),
+    );
   });
 
   it("returns to the organizations list from cancel", () => {

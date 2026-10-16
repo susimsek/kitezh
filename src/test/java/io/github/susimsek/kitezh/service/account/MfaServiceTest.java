@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.account.MfaSetupDTO;
 import io.github.susimsek.kitezh.dto.account.MfaStatusDTO;
@@ -18,6 +19,7 @@ import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.admin.UserAccessInvalidationService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import io.github.susimsek.kitezh.service.security.MfaBruteForceService;
 import io.github.susimsek.kitezh.service.security.TotpService;
 import java.util.Optional;
@@ -37,6 +39,7 @@ class MfaServiceTest {
     private final MfaBruteForceService mfaBruteForceService = mock(MfaBruteForceService.class);
     private final RecoveryCodeRepository recoveryCodeRepository =
             mock(RecoveryCodeRepository.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
 
     @Test
     void enablingMfaInvalidatesUserAccess() {
@@ -60,6 +63,7 @@ class MfaServiceTest {
         assertThat(user.isTotpEnabled()).isTrue();
         verify(invalidationService).invalidate("alice");
         verify(auditEventService).record("account.mfa.enabled", "user", "7");
+        verify(notificationService).publishAccount("alice", NotificationType.ACCOUNT_MFA_ENABLED);
     }
 
     @Test
@@ -316,7 +320,8 @@ class MfaServiceTest {
                         auditEventService,
                         invalidationService,
                         recoveryCodeRepository,
-                        mfaBruteForceService);
+                        mfaBruteForceService,
+                        notificationService);
         fullService.disable("alice", "123456");
 
         assertThat(user.getTotpSecret()).isNull();
@@ -325,6 +330,7 @@ class MfaServiceTest {
         assertThat(user.isMfaPermanentlyLocked()).isFalse();
         verify(recoveryCodeRepository).deleteByUserId(7L);
         verify(auditEventService).record("account.mfa.disabled", "user", "7");
+        verify(notificationService).publishAccount("alice", NotificationType.ACCOUNT_MFA_DISABLED);
     }
 
     @Test
@@ -364,7 +370,8 @@ class MfaServiceTest {
                                 auditEventService,
                                 invalidationService,
                                 recoveryCodeRepository,
-                                mfaBruteForceService))
+                                mfaBruteForceService,
+                                notificationService))
                 .isNotNull();
     }
 
@@ -376,7 +383,8 @@ class MfaServiceTest {
                 auditEventService,
                 invalidationService,
                 null,
-                mfaBruteForceService);
+                mfaBruteForceService,
+                notificationService);
     }
 
     private static UserEntity user(boolean enabled, String secret) {

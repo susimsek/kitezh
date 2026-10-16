@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 
 import { ConsoleAlertsProvider, useConsoleAlerts } from "./ConsoleAlerts";
 

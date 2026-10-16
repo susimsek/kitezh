@@ -22,14 +22,20 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { ThemeMode } from "@kitezh/shared";
 import {
   colors,
-  controlSizes,
-  radii,
-  spacing,
-  typography,
-} from "@kitezh/shared/theme/runtime";
+  desktopIconMetadata,
+  messages,
+  type DesktopSocialLinkCompleteRequest,
+  type DesktopSocialLinkStartRequest,
+  type DesktopSocialLinkStartResponse,
+  type ThemeMode,
+} from "@kitezh/shared";
+import {
+  nativeDialogActionsScript,
+  nativeDialogCss,
+  nativeDialogVariables,
+} from "./ui/native-styles";
 
 import {
   DESKTOP_PROTOCOL,
@@ -44,11 +50,16 @@ import {
   isPendingAuthorizationValid,
   parseAuthCallback,
   parseLogoutCallback,
+  parseSocialLinkCallback,
   sanitizedAuthCallback,
   type DesktopTokens,
   type DesktopConsoleName,
   type PendingAuthorization as PendingAuthorizationData,
 } from "./security/auth-flow";
+import {
+  appendBoundedDiagnosticLine,
+  redactDiagnosticText,
+} from "./security/diagnostics";
 import {
   readPendingAuthorizationStore,
   writePendingAuthorizationStore,
@@ -58,7 +69,6 @@ import {
   isTrustedRendererUrl,
 } from "./security/origin-policy";
 import { registerGlobalShortcutWithFallback } from "./security/global-shortcut";
-import { redactDiagnosticText } from "./security/diagnostics";
 import {
   checkForUpdates,
   configureAutoUpdater,
@@ -68,14 +78,19 @@ import {
   type DesktopUpdateStatus,
 } from "./update";
 import { showDesktopNotification } from "./notifications";
+import { createDesktopApiAdapter } from "./api/desktop-api";
+
+import { createHash, randomBytes } from "node:crypto";
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
 const DESKTOP_LANGUAGE_FILE = "desktop-language.json";
+const DESKTOP_THEME_FILE = "desktop-theme.json";
 const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
 const PENDING_AUTHORIZATIONS_FILE = "desktop-pending-authorizations.bin";
 const DIAGNOSTICS_LOG_FILE = "diagnostics.log";
 const MAX_DIAGNOSTICS_LOG_BYTES = 64 * 1024;
+let diagnosticsWriteQueue: Promise<void> = Promise.resolve();
 const REMIND_LATER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const backgroundE2e = process.env.DESKTOP_E2E_BACKGROUND === "true";
 if (
@@ -119,7 +134,32 @@ function isTurkishDesktop() {
 }
 
 function desktopBackgroundColor() {
-  return colors[nativeTheme.shouldUseDarkColors ? "dark" : "light"].background;
+  return nativeTheme.shouldUseDarkColors
+    ? colors.dark.background
+    : colors.light.background;
+}
+
+function desktopThemePath() {
+  return path.join(app.getPath("userData"), DESKTOP_THEME_FILE);
+}
+
+async function readDesktopTheme(): Promise<DesktopTheme> {
+  try {
+    const value = JSON.parse(await readFile(desktopThemePath(), "utf8"));
+    return value === "light" || value === "dark" || value === "system"
+      ? value
+      : "system";
+  } catch {
+    return "system";
+  }
+}
+
+async function writeDesktopTheme(theme: DesktopTheme) {
+  await mkdir(path.dirname(desktopThemePath()), { recursive: true });
+  await writeFile(desktopThemePath(), JSON.stringify(theme), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 function applyDesktopTheme(value: unknown) {
@@ -132,12 +172,24 @@ function applyDesktopTheme(value: unknown) {
   for (const window of BrowserWindow.getAllWindows()) {
     window.setBackgroundColor(backgroundColor);
     if (!window.isDestroyed()) {
-      window.webContents.send(
-        "desktop:theme-changed",
-        nativeTheme.shouldUseDarkColors ? "dark" : "light",
-      );
+      updateOpenWindowTheme(window);
     }
   }
+}
+
+function updateOpenWindowTheme(window: BrowserWindow) {
+  const dark = nativeTheme.shouldUseDarkColors;
+  window.webContents.send("desktop:theme-changed", dark ? "dark" : "light");
+  void window.webContents
+    .executeJavaScript(
+      `(() => {
+        const values = ${JSON.stringify(nativeDialogVariables(dark))};
+        const root = document.documentElement;
+        root.style.colorScheme = ${JSON.stringify(dark ? "dark" : "light")};
+        for (const [name, value] of Object.entries(values)) root.style.setProperty(name, value);
+      })()`,
+    )
+    .catch(() => undefined);
 }
 
 nativeTheme.on("updated", () => {
@@ -145,10 +197,7 @@ nativeTheme.on("updated", () => {
   for (const window of BrowserWindow.getAllWindows()) {
     if (window.isDestroyed()) continue;
     window.setBackgroundColor(backgroundColor);
-    window.webContents.send(
-      "desktop:theme-changed",
-      nativeTheme.shouldUseDarkColors ? "dark" : "light",
-    );
+    updateOpenWindowTheme(window);
   }
 });
 
@@ -173,6 +222,15 @@ async function applyDesktopLanguage(value: unknown) {
         ? `${DESKTOP_APP_NAME} hakkında`
         : `About ${DESKTOP_APP_NAME}`,
     );
+    void aboutWindow.webContents
+      .executeJavaScript(
+        `(() => {
+      document.documentElement.lang = ${JSON.stringify(desktopLanguage)};
+      document.getElementById("about-description").textContent = ${JSON.stringify(isTurkishDesktop() ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console")};
+      document.getElementById("about-version").textContent = ${JSON.stringify(`${isTurkishDesktop() ? "Sürüm" : "Version"} ${app.getVersion()}`)};
+    })()`,
+      )
+      .catch(() => undefined);
   }
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.setTitle(
@@ -188,6 +246,7 @@ async function applyDesktopLanguage(value: unknown) {
   }
   installApplicationMenu();
   updateTrayMenu();
+  updateOpenUpdateDialogLanguage();
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
       window.webContents.send("desktop:language-changed", desktopLanguage);
@@ -196,50 +255,7 @@ async function applyDesktopLanguage(value: unknown) {
 }
 
 function nativeDialogThemeCss() {
-  const dark = nativeTheme.shouldUseDarkColors;
-  const palette = colors[dark ? "dark" : "light"];
-  return `:root {
-        color-scheme: ${dark ? "dark" : "light"};
-        --dialog-background: ${palette.background};
-        --dialog-foreground: ${palette.text};
-        --dialog-secondary: ${palette.textMuted};
-        --dialog-button: ${palette.surfaceMuted};
-        --dialog-button-hover: ${palette.surfaceHover};
-        --dialog-border: ${palette.border};
-        --dialog-surface: ${palette.surface};
-        --dialog-primary: ${palette.primary};
-        --dialog-primary-hover: ${palette.primaryPressed};
-        --dialog-on-primary: ${palette.onPrimary};
-        --dialog-danger: ${palette.danger};
-        --dialog-control-compact: ${controlSizes.desktopCompact}px;
-        --dialog-control-default: ${controlSizes.desktopDefault}px;
-        --dialog-page-title: ${typography.pageTitle}px;
-        --dialog-space-sm: ${spacing.sm}px;
-        --dialog-space-md: ${spacing.md}px;
-        --dialog-space-lg: ${spacing.lg}px;
-        --dialog-radius-sm: ${radii.sm}px;
-        --dialog-radius-md: ${radii.md}px;
-      }
-      :where(button, input, select, textarea, a, [tabindex]):focus-visible {
-        outline: 2px solid var(--dialog-primary);
-        outline-offset: 2px;
-      }
-      @media (forced-colors: active) {
-        :where(button, input, select, textarea, a, [tabindex]):focus-visible {
-          outline-color: Highlight;
-        }
-        :where(button, input, select, textarea) {
-          border-color: ButtonText;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          scroll-behavior: auto !important;
-          transition-duration: 0.01ms !important;
-        }
-      }`;
+  return nativeDialogCss(nativeTheme.shouldUseDarkColors);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -274,7 +290,9 @@ let latestUpdateStatus: DesktopUpdateStatus | null = null;
 let logoutMenuItem: MenuItem | null = null;
 type ConsoleName = DesktopConsoleName;
 const pendingAuthorizations = new Map<ConsoleName, PendingAuthorizationData>();
-let pendingAuthorizationWrite = Promise.resolve();
+type PendingSocialLink = PendingAuthorizationData & { provider: string };
+const pendingSocialLinks = new Map<string, PendingSocialLink>();
+let pendingAuthorizationWrite: Promise<void> = Promise.resolve();
 let pendingAuthorizationsRestored = false;
 type StoredTokens = DesktopTokens;
 type UpdatePreferences = {
@@ -358,16 +376,24 @@ async function appendDiagnosticEvent(
     ? ` ${JSON.stringify(safeDetails)}`
     : "";
   const line = `${new Date().toISOString()} ${name}${detailText}\n`;
-  try {
+  const write = diagnosticsWriteQueue.then(async () => {
     const current = await readFile(diagnosticsLogPath(), "utf8").catch(
       () => "",
     );
-    const next = `${current}${line}`.slice(-MAX_DIAGNOSTICS_LOG_BYTES);
+    const next = appendBoundedDiagnosticLine(
+      current,
+      line,
+      MAX_DIAGNOSTICS_LOG_BYTES,
+    );
     await mkdir(path.dirname(diagnosticsLogPath()), { recursive: true });
     await writeFile(diagnosticsLogPath(), next, {
       encoding: "utf8",
       mode: 0o600,
     });
+  });
+  diagnosticsWriteQueue = write.catch(() => undefined);
+  try {
+    await write;
   } catch {
     // Diagnostics must never interfere with the desktop application.
   }
@@ -375,6 +401,7 @@ async function appendDiagnosticEvent(
 
 async function readDiagnosticEvents() {
   try {
+    await diagnosticsWriteQueue;
     const content = await readFile(diagnosticsLogPath(), "utf8");
     return content.trim().split("\n").filter(Boolean).slice(-50);
   } catch {
@@ -384,6 +411,29 @@ async function readDiagnosticEvents() {
 
 function rendererRoot() {
   return path.resolve(__dirname, "../renderer");
+}
+
+function nativeRendererRoot() {
+  return path.resolve(__dirname, "native");
+}
+
+async function nativeRendererHtml() {
+  const source = await readFile(
+    path.join(nativeRendererRoot(), "native.html"),
+    "utf8",
+  );
+  const bootstrap = JSON.stringify({
+    apiBaseUrl: getApiBaseUrl(),
+    locale: desktopLanguage,
+    theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+    messages,
+    colors,
+    icons: desktopIconMetadata,
+  }).replaceAll(/</g, String.raw`\u003c`);
+  return source.replace(
+    '<script type="module" src="app://renderer/native/renderer.mjs"></script>',
+    `<script>globalThis.__KITEZH_NATIVE_BOOTSTRAP__=${bootstrap};</script><script type="module" src="app://renderer/native/renderer.mjs"></script>`,
+  );
 }
 
 function rendererFile(requestUrl: string) {
@@ -445,7 +495,6 @@ async function desktopLoginHtml() {
     <title>${DESKTOP_APP_NAME}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; max-width: 560px; padding: 42px 36px 34px; text-align: center; }
@@ -454,7 +503,7 @@ async function desktopLoginHtml() {
       h1 { margin: 12px 0 8px; font-size: var(--dialog-page-title); line-height: 1.15; font-weight: 750; }
       .description { margin: 0 0 26px; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
       .option { margin-top: 14px; }
-      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+      button { width: 100%; min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); border: 1px solid transparent; border-radius: var(--dialog-radius-sm); background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
       button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: wait; opacity: .7; }
       .option p { margin: 8px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.35; }
@@ -556,7 +605,8 @@ function desktopSettingsHtml() {
         checkForUpdates: "Güncellemeleri denetle",
         reset: "Varsayılanlara sıfırla",
         close: "Kapat",
-        diagnosticsHelp: "Sorun giderme için redakte edilmiş tanı bilgileri.",
+        diagnosticsHelp:
+          "Redakte edilmiş kayıtlar yalnızca bu cihazda tutulur (en fazla 64 KB); ekranda son 50 olay gösterilir. Kopyalama yalnızca siz istediğinizde yapılır.",
         copyDiagnostics: "Tanı bilgilerini kopyala",
         copied: "Kopyalandı",
         saving: "Kaydediliyor…",
@@ -600,7 +650,8 @@ function desktopSettingsHtml() {
         checkForUpdates: "Check for updates",
         reset: "Reset to defaults",
         close: "Close",
-        diagnosticsHelp: "Redacted runtime information for troubleshooting.",
+        diagnosticsHelp:
+          "Redacted diagnostics stay on this device (up to 64 KB); only the latest 50 events are shown. Copying happens only when you request it.",
         copyDiagnostics: "Copy diagnostics",
         copied: "Copied",
         saving: "Saving…",
@@ -638,7 +689,6 @@ function desktopSettingsHtml() {
     <title>${labels.title}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; overflow: hidden; background: var(--dialog-background); color: var(--dialog-foreground); }
       header { display: flex; align-items: center; min-height: 64px; padding: 16px 24px; border-bottom: 1px solid var(--dialog-border); }
@@ -647,7 +697,7 @@ function desktopSettingsHtml() {
       nav { min-height: 0; overflow-y: auto; padding: 20px 12px; border-right: 1px solid var(--dialog-border); }
       .search-box { position: relative; margin: 0 4px 20px; }
       .search-box svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--dialog-secondary); pointer-events: none; }
-      nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: 42px; margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: 10px; background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
+      nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: var(--dialog-control-default); margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
       nav input[type="search"]::placeholder { color: var(--dialog-secondary); opacity: .8; }
       nav button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: var(--dialog-control-default); margin: 3px 0; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dialog-secondary); text-align: left; font: inherit; font-size: 14px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
       nav button svg { flex: 0 0 17px; width: 17px; height: 17px; }
@@ -666,20 +716,24 @@ function desktopSettingsHtml() {
       .setting-row span { font-size: 15px; }
       select, input[type="text"] { min-height: var(--dialog-control-compact); padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; }
       input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--dialog-primary); }
-      .theme-options { display: flex; gap: 8px; }
+      .theme-options { display: flex; flex-wrap: wrap; gap: 8px; }
       .theme-options label { display: flex; align-items: center; gap: 6px; }
-      .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
-      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 9px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
+      .actions { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
+      button.action { min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); border: 1px solid transparent; border-radius: var(--dialog-radius-sm); background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
       button.action:hover { background: var(--dialog-primary-hover); }
       button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
       button:disabled { cursor: wait; opacity: .65; }
+      .inline-spinner { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: diagnostics-spin .7s linear infinite; vertical-align: -2px; }
+      @keyframes diagnostics-spin { to { transform: rotate(360deg); } }
       .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
       pre { overflow: auto; max-height: 300px; padding: 14px; border-radius: 8px; background: var(--dialog-button); color: var(--dialog-secondary); white-space: pre-wrap; word-break: break-word; }
       @media (max-width: 760px) {
+        body { overflow: auto; }
         header { padding: 14px 20px; }
-        .layout { grid-template-columns: 1fr; height: calc(100vh - 64px); min-height: 0; }
+        .layout { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 64px); }
         nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--dialog-border); }
         .search-box { grid-column: 1 / -1; }
+        nav button span { white-space: normal; overflow: visible; }
         main { max-width: none; padding: 22px 20px; }
         .setting-row { flex-wrap: wrap; }
       }
@@ -750,6 +804,7 @@ function desktopSettingsHtml() {
       const shortcutStatus = document.getElementById("desktop-shortcut-status");
       const setStatus = (value) => { status.textContent = value; };
       const setBusy = (busy) => { document.querySelectorAll("button, select, input").forEach((control) => { if (control.id !== "desktop-global-shortcut") control.disabled = busy; }); };
+      const setButtonBusy = (button, busy) => { let spinner = button.querySelector(".inline-spinner"); if (busy) { if (!spinner) { spinner = document.createElement("span"); spinner.className = "inline-spinner"; spinner.setAttribute("aria-hidden", "true"); button.prepend(spinner); } button.disabled = true; button.setAttribute("aria-busy", "true"); } else { spinner?.remove(); button.disabled = false; button.removeAttribute("aria-busy"); } };
       const showSection = (name) => { sections.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.section === name))); panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; }); if (name === "diagnostics") void loadDiagnostics(); };
       sections.forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section)));
       search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); const matchingSections = sections.filter((button) => { const panel = panels.find((candidate) => candidate.dataset.panel === button.dataset.section); const content = (button.textContent + " " + (panel?.textContent ?? "")).toLocaleLowerCase(); const matches = !query || content.includes(query); button.hidden = !matches; return matches; }); noResults.hidden = matchingSections.length > 0; if (matchingSections.length === 0) { panels.forEach((panel) => { panel.hidden = true; }); return; } const activeButton = sections.find((button) => button.getAttribute("aria-selected") === "true"); const next = activeButton && !activeButton.hidden ? activeButton : matchingSections[0]; showSection(next.dataset.section); });
@@ -765,9 +820,9 @@ function desktopSettingsHtml() {
       document.getElementById("desktop-automatic-download").addEventListener("change", (event) => void setPreferences({ automaticDownload: event.target.checked }));
       const shortcut = document.getElementById("desktop-global-shortcut"); shortcut.addEventListener("keydown", (event) => { event.preventDefault(); const parts = []; if (event.metaKey) parts.push("Command"); else if (event.ctrlKey) parts.push("CommandOrControl"); if (event.altKey) parts.push("Alt"); if (event.shiftKey) parts.push("Shift"); const key = event.key.length === 1 ? event.key.toUpperCase() : ({ " ": "Space", Escape: "Escape", Enter: "Enter", Tab: "Tab" }[event.key] || event.key); if (parts.length && key) void setPreferences({ globalShortcut: parts.concat(key).join("+") }); });
       document.querySelectorAll("input[name='desktop-theme']").forEach((control) => control.addEventListener("change", async (event) => { setBusy(true); try { await api.theme.set(event.target.value); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } }));
-      document.getElementById("desktop-check-for-updates").addEventListener("click", async () => { setBusy(true); try { await api.updates.check(); } finally { setBusy(false); } });
-      document.getElementById("desktop-copy-diagnostics").addEventListener("click", async () => { try { await navigator.clipboard.writeText(document.getElementById("desktop-diagnostics").textContent); setStatus(labels.copied); } catch { setStatus(labels.unavailable); } });
-      document.getElementById("desktop-reset").addEventListener("click", async () => { setBusy(true); setStatus(labels.saving); try { applyPreferences(await api.preferences.reset()); await api.language.set("system"); await api.theme.set("system"); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } });
+      document.getElementById("desktop-check-for-updates").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); setBusy(true); try { await api.updates.check(); } finally { setBusy(false); setButtonBusy(button, false); } });
+      document.getElementById("desktop-copy-diagnostics").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); try { await navigator.clipboard.writeText(document.getElementById("desktop-diagnostics").textContent); setStatus(labels.copied); } catch { setStatus(labels.unavailable); } finally { setButtonBusy(button, false); } });
+      document.getElementById("desktop-reset").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); setBusy(true); setStatus(labels.saving); try { applyPreferences(await api.preferences.reset()); await api.language.set("system"); await api.theme.set("system"); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); setButtonBusy(button, false); } });
       api.language.onChanged(() => window.location.reload());
       void api.settings.ready();
       void loadPreferences();
@@ -779,6 +834,30 @@ function desktopSettingsHtml() {
 function registerRendererProtocol() {
   protocol.handle(RENDERER_PROTOCOL, async (request) => {
     const requestPath = new URL(request.url).pathname;
+    if (requestPath === "/native" || requestPath === "/native/") {
+      return new Response(await nativeRendererHtml(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+    if (requestPath === "/native/renderer.mjs") {
+      return new Response(
+        await readFile(path.join(nativeRendererRoot(), "renderer.mjs"), "utf8"),
+        { headers: { "content-type": "text/javascript; charset=utf-8" } },
+      );
+    }
+    if (
+      ["/native/brand/logo-light.svg", "/native/brand/logo-dark.svg"].includes(
+        requestPath,
+      )
+    ) {
+      return new Response(
+        await readFile(
+          path.join(nativeRendererRoot(), "brand", path.basename(requestPath)),
+          "utf8",
+        ),
+        { headers: { "content-type": "image/svg+xml" } },
+      );
+    }
     if (requestPath === "/desktop-login" || requestPath === "/desktop-login/") {
       return new Response(await desktopLoginHtml(), {
         headers: { "content-type": "text/html; charset=utf-8" },
@@ -815,6 +894,62 @@ async function sendDeepLink(value: string) {
     }
     return;
   }
+  const socialLinkCallback = parseSocialLinkCallback(value);
+  if (socialLinkCallback) {
+    const pending = pendingSocialLinks.get(socialLinkCallback.state);
+    if (
+      !pending ||
+      !isPendingAuthorizationValid(pending, socialLinkCallback.state)
+    ) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      return;
+    }
+    if (!mainWindow) {
+      pendingDeepLink = value;
+      return;
+    }
+    const sendSocialLinkCallback = (payload: {
+      provider: string;
+      error?: string;
+    }) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("desktop:social-link-callback", payload);
+      }
+    };
+    if (socialLinkCallback.error || !socialLinkCallback.code) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      sendSocialLinkCallback({
+        provider: pending.provider,
+        error: socialLinkCallback.error ?? "authorization_failed",
+      });
+      return;
+    }
+    const response = await desktopApiAdapter.request({
+      console: "account",
+      method: "POST",
+      path: "/api/account/social-links/desktop/complete",
+      body: {
+        code: socialLinkCallback.code,
+        codeVerifier: pending.codeVerifier,
+      } satisfies DesktopSocialLinkCompleteRequest,
+    });
+    if (response.status >= 200 && response.status < 300) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      sendSocialLinkCallback({ provider: pending.provider });
+    } else if (response.status !== 0 && response.status < 500) {
+      pendingSocialLinks.delete(socialLinkCallback.state);
+      sendSocialLinkCallback({
+        provider: pending.provider,
+        error: response.kind ?? "link_failed",
+      });
+    } else {
+      sendSocialLinkCallback({
+        provider: pending.provider,
+        error: response.kind ?? "link_failed",
+      });
+    }
+    return;
+  }
   const callback = parseAuthCallback(value);
   if (!callback) return;
   if (!pendingAuthorizationsRestored) {
@@ -845,7 +980,7 @@ async function sendDeepLink(value: string) {
   if (callback.error || !callback.code) {
     sendAuthCallback({
       console: pending[0],
-      url: value,
+      url: sanitizedAuthCallback(callback.state, DESKTOP_PROTOCOL),
       error: callback.error ?? "authorization_failed",
     });
     return;
@@ -855,7 +990,7 @@ async function sendDeepLink(value: string) {
   } catch {
     sendAuthCallback({
       console: pending[0],
-      url: value,
+      url: sanitizedAuthCallback(callback.state, DESKTOP_PROTOCOL),
       error: "token_exchange_failed",
     });
     return;
@@ -1119,6 +1254,163 @@ async function writeVault(vault: Partial<Record<ConsoleName, StoredTokens>>) {
   await writeFile(file, encrypted, { encoding: "utf8", mode: 0o600 });
 }
 
+const desktopApiAdapter = createDesktopApiAdapter({
+  apiBaseUrl: getApiBaseUrl(),
+  readSession: async (consoleName) => (await readVault())[consoleName] ?? null,
+  writeSession: async (consoleName, tokens) => {
+    const vault = await readVault();
+    vault[consoleName] = tokens;
+    await writeVault(vault);
+    setLogoutMenuVisible(true);
+  },
+  clearSession: async (consoleName) => {
+    const vault = await readVault();
+    delete vault[consoleName];
+    await writeVault(vault);
+    setLogoutMenuVisible(Boolean(vault.admin || vault.account));
+  },
+});
+
+function base64Url(value: Buffer) {
+  return value
+    .toString("base64")
+    .replaceAll(/\+/g, "-")
+    .replaceAll(/\//g, "_")
+    .replaceAll(/=+$/g, "");
+}
+
+function assertSocialProvider(value: unknown): asserts value is string {
+  if (typeof value !== "string" || !/^[a-z0-9][a-z0-9_-]{0,49}$/.test(value)) {
+    throw new Error("Invalid social provider");
+  }
+}
+
+function nativeSocialLinkRequest(provider: string) {
+  const state = base64Url(randomBytes(32));
+  const codeVerifier = base64Url(randomBytes(32));
+  const codeChallenge = base64Url(
+    createHash("sha256").update(codeVerifier).digest(),
+  );
+  return {
+    request: {
+      state,
+      codeChallenge,
+    } satisfies DesktopSocialLinkStartRequest,
+    pending: {
+      state,
+      codeVerifier,
+      clientId: "desktop-account-console",
+      redirectUri: "kitezh://social-link/callback",
+      createdAt: Date.now(),
+      provider,
+    } satisfies PendingSocialLink,
+  };
+}
+
+async function startNativeSocialLink(providerValue: unknown) {
+  assertSocialProvider(providerValue);
+  if (
+    [...pendingSocialLinks.values()].some(
+      (pending) => pending.provider === providerValue,
+    )
+  ) {
+    return { status: 409, kind: "http", body: null };
+  }
+  const nativeRequest = nativeSocialLinkRequest(providerValue);
+  const response = await desktopApiAdapter.request({
+    console: "account",
+    method: "POST",
+    path: `/api/account/social-links/${encodeURIComponent(providerValue)}/desktop/start`,
+    body: nativeRequest.request,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    return { status: response.status, kind: response.kind, body: null };
+  }
+  const body = response.body as Partial<DesktopSocialLinkStartResponse> | null;
+  if (
+    !body ||
+    typeof body.authorizationUrl !== "string" ||
+    body.state !== nativeRequest.pending.state ||
+    typeof body.expiresAt !== "string"
+  ) {
+    return { status: 502, kind: "server", body: null };
+  }
+  const authorizationUrl = new URL(body.authorizationUrl);
+  if (
+    authorizationUrl.origin !== getApiBaseUrl() ||
+    authorizationUrl.pathname !==
+      `/account/social-links/${providerValue}/desktop/authorize` ||
+    !authorizationUrl.searchParams.get("transaction")
+  ) {
+    return { status: 502, kind: "server", body: null };
+  }
+  pendingSocialLinks.set(nativeRequest.pending.state, nativeRequest.pending);
+  try {
+    await shell.openExternal(authorizationUrl.toString());
+  } catch {
+    pendingSocialLinks.delete(nativeRequest.pending.state);
+    return { status: 0, kind: "offline", body: null };
+  }
+  return { status: 202, kind: null, body: null };
+}
+
+function nativeAuthorizationRequest(consoleName: ConsoleName) {
+  const state = base64Url(randomBytes(32));
+  const codeVerifier = base64Url(randomBytes(32));
+  const challenge = base64Url(
+    createHash("sha256").update(codeVerifier).digest(),
+  );
+  const clientId =
+    consoleName === "admin"
+      ? "desktop-admin-console"
+      : "desktop-account-console";
+  const authorizationUrl = new URL("/oauth2/authorize", getApiBaseUrl());
+  authorizationUrl.search = new URLSearchParams({
+    client_id: clientId,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    nonce: base64Url(randomBytes(32)),
+    redirect_uri: "kitezh://oauth/callback",
+    response_mode: "fragment",
+    response_type: "code",
+    scope:
+      consoleName === "admin"
+        ? "openid profile email admin-api"
+        : "openid profile email account-api",
+    state,
+    ui_locales: desktopLanguage,
+  }).toString();
+  return {
+    authorizationUrl,
+    pending: {
+      state,
+      codeVerifier,
+      clientId,
+      redirectUri: "kitezh://oauth/callback",
+      createdAt: Date.now(),
+    } satisfies PendingAuthorizationData,
+  };
+}
+
+async function logoutDesktopSession(consoleName: ConsoleName) {
+  const vault = await readVault();
+  const tokens = vault[consoleName];
+  delete vault[consoleName];
+  await writeVault(vault);
+  setLogoutMenuVisible(Boolean(vault.admin || vault.account));
+  if (!tokens) return;
+  const logoutUrl = new URL("/connect/logout", getApiBaseUrl());
+  logoutUrl.search = new URLSearchParams({
+    client_id:
+      consoleName === "admin"
+        ? "desktop-admin-console"
+        : "desktop-account-console",
+    ...(tokens.idToken ? { id_token_hint: tokens.idToken } : {}),
+    post_logout_redirect_uri: "kitezh://logout/callback",
+  }).toString();
+  await shell.openExternal(logoutUrl.toString());
+}
+
 async function showAboutDialog() {
   if (aboutWindow && !aboutWindow.isDestroyed()) {
     focusWindow(aboutWindow);
@@ -1132,7 +1424,9 @@ async function showAboutDialog() {
     modal: false,
     width: 520,
     height: 520,
-    resizable: false,
+    minWidth: 320,
+    minHeight: 240,
+    resizable: true,
     minimizable: false,
     maximizable: false,
     title: isTurkish
@@ -1144,6 +1438,7 @@ async function showAboutDialog() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   aboutWindow.on("closed", () => {
@@ -1157,7 +1452,6 @@ async function showAboutDialog() {
     <title>${isTurkish ? `${DESKTOP_APP_NAME} hakkında` : `About ${DESKTOP_APP_NAME}`}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; box-sizing: border-box; padding: 2rem 2rem 1.75rem; text-align: center; }
       img { width: 112px; height: 112px; border-radius: 24px; margin-bottom: 1.5rem; }
@@ -1171,10 +1465,11 @@ async function showAboutDialog() {
     <main>
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <h1>${DESKTOP_APP_NAME}</h1>
-      <p>${isTurkish ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console"}</p>
-      <p class="version">${isTurkish ? "Sürüm" : "Version"} ${app.getVersion()}</p>
+      <p id="about-description">${isTurkish ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console"}</p>
+      <p id="about-version" class="version">${isTurkish ? "Sürüm" : "Version"} ${app.getVersion()}</p>
       <footer>© 2026 ${DESKTOP_APP_NAME}</footer>
     </main>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await aboutWindow.loadURL(
@@ -1189,13 +1484,19 @@ async function showSettingsWindow() {
     focusWindow(settingsWindow);
     return;
   }
+  let settingsParent: BrowserWindow | undefined;
+  if (desktopLoginWindow?.isVisible() === true) {
+    settingsParent = desktopLoginWindow;
+  } else if (mainWindow?.isVisible() === true) {
+    settingsParent = mainWindow;
+  }
   settingsWindow = new BrowserWindow({
-    parent: mainWindow ?? undefined,
+    parent: settingsParent,
     modal: false,
     width: 1100,
     height: 720,
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: 480,
+    minHeight: 360,
     title: isTurkishDesktop()
       ? `${DESKTOP_APP_NAME} ayarları`
       : `${DESKTOP_APP_NAME} Settings`,
@@ -1205,6 +1506,7 @@ async function showSettingsWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -1215,10 +1517,14 @@ async function showSettingsWindow() {
   settingsWindow.webContents.on("will-navigate", (event, url) => {
     if (!isTrustedRendererUrl(url)) event.preventDefault();
   });
-  settingsWindow.on("closed", () => {
-    settingsWindow = null;
+  const createdSettingsWindow = settingsWindow;
+  createdSettingsWindow.on("closed", () => {
+    if (settingsWindow === createdSettingsWindow) settingsWindow = null;
+    setTimeout(() => {
+      focusVisibleConsoleWindow();
+    }, 0);
   });
-  await settingsWindow.loadURL(
+  await createdSettingsWindow.loadURL(
     `${RENDERER_PROTOCOL}://${RENDERER_HOST}/desktop-settings`,
   );
 }
@@ -1352,10 +1658,7 @@ async function applyLaunchAtLogin(enabled: boolean) {
   }
   app.setLoginItemSettings({
     openAtLogin: enabled,
-    args:
-      process.defaultApp && process.argv[1]
-        ? [path.resolve(process.argv[1])]
-        : [],
+    args: process.defaultApp ? [app.getAppPath()] : [],
   });
 }
 
@@ -1364,6 +1667,15 @@ function focusMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   showWindow(mainWindow);
   focusWindow(mainWindow);
+}
+
+function focusVisibleConsoleWindow() {
+  const window =
+    desktopLoginWindow?.isVisible() === true ? desktopLoginWindow : mainWindow;
+  if (!window || window.isDestroyed() || !window.isVisible()) return;
+  if (window.isMinimized()) window.restore();
+  showWindow(window);
+  focusWindow(window);
 }
 
 async function desktopCompanionHtml() {
@@ -1393,7 +1705,6 @@ async function desktopCompanionHtml() {
     <title>${DESKTOP_APP_NAME}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
@@ -1403,7 +1714,7 @@ async function desktopCompanionHtml() {
       h1 { font-size: 1.65rem; margin: .6rem 0 .45rem; }
       p { color: var(--dialog-secondary); font-size: .98rem; margin: 0 0 1.5rem; }
       .actions { display: grid; gap: .75rem; }
-      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: 10px; color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
+      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: var(--dialog-radius-sm); color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); width: 100%; }
       button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: default; opacity: .65; }
       .spinner { animation: spin 800ms linear infinite; border: 2px solid color-mix(in srgb, var(--dialog-on-primary) 45%, transparent); border-radius: 50%; border-top-color: var(--dialog-on-primary); height: 16px; width: 16px; }
@@ -1459,9 +1770,9 @@ async function showDesktopLoginWindow() {
     modal: Boolean(mainWindow?.isVisible()),
     width: 580,
     height: 650,
-    minWidth: 500,
-    minHeight: 580,
-    resizable: false,
+    minWidth: 320,
+    minHeight: 360,
+    resizable: true,
     closable: true,
     show: false,
     title: DESKTOP_APP_NAME,
@@ -1470,6 +1781,7 @@ async function showDesktopLoginWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -1482,7 +1794,8 @@ async function showDesktopLoginWindow() {
     if (!isTrustedRendererUrl(url)) event.preventDefault();
   });
   loginWindow.on("closed", () => {
-    if (desktopLoginWindow === loginWindow) desktopLoginWindow = null;
+    if (desktopLoginWindow !== loginWindow) return;
+    desktopLoginWindow = null;
     void readVault()
       .then((vault) => {
         if (!vault.admin && !vault.account) app.quit();
@@ -1499,10 +1812,10 @@ async function showDesktopLoginWindow() {
 }
 
 function closeDesktopLoginWindow() {
-  if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
-    desktopLoginWindow.close();
-  }
+  const loginWindow = desktopLoginWindow;
+  // Clear ownership first: a programmatic transition is not a user dismissal.
   desktopLoginWindow = null;
+  if (loginWindow && !loginWindow.isDestroyed()) loginWindow.close();
 }
 
 async function showCompanionWindow() {
@@ -1528,6 +1841,7 @@ async function showCompanionWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -1640,7 +1954,9 @@ function setTrayVisibility(visible: boolean) {
 function setDockVisibility(visible: boolean) {
   if (process.platform !== "darwin") return;
   if (visible) {
-    app.dock?.show();
+    void app.dock
+      ?.show()
+      .catch(() => appendDiagnosticEvent("dock-visibility-failed"));
   } else {
     app.dock?.hide();
   }
@@ -1649,6 +1965,11 @@ function setDockVisibility(visible: boolean) {
 function updateTrayMenu() {
   if (!tray) return;
   const isTurkish = isTurkishDesktop();
+  tray.setToolTip(
+    isTurkish
+      ? `${DESKTOP_APP_NAME} — güvenli kimlik konsolu`
+      : `${DESKTOP_APP_NAME} — secure identity console`,
+  );
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
@@ -1674,6 +1995,96 @@ function updateTrayMenu() {
       },
     ]),
   );
+}
+
+function updateOpenUpdateDialogLanguage() {
+  const isTurkish = isTurkishDesktop();
+  const updateTitle = isTurkish ? "Yazılım Güncellemesi" : "Software Update";
+  const checkingLabel = isTurkish
+    ? "Güncellemeler denetleniyor…"
+    : "Checking for updates…";
+  updateNativeDialogLanguage(updateCheckWindow, updateTitle, {
+    "update-check-title": checkingLabel,
+    "update-check-cancel": isTurkish ? "İptal" : "Cancel",
+  });
+  updateNativeDialogLanguage(updateResultWindow, updateTitle, {
+    "update-result-title": isTurkish
+      ? `${DESKTOP_APP_NAME} güncel`
+      : `${DESKTOP_APP_NAME} is up to date`,
+    "update-result-detail": isTurkish
+      ? `${DESKTOP_APP_NAME} için kullanılabilir yeni bir sürüm yok. ${app.getVersion()} sürümünü kullanıyorsunuz.`
+      : `There are no new updates available for ${DESKTOP_APP_NAME}. You are using version ${app.getVersion()}.`,
+    "update-result-done": isTurkish ? "Tamam" : "Done",
+  });
+  const confirmationTitle = isTurkish
+    ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`
+    : `Update ${DESKTOP_APP_NAME} now?`;
+  updateNativeDialogLanguage(updateConfirmationWindow, confirmationTitle, {
+    "update-confirm-title": confirmationTitle,
+    "update-confirm-detail": isTurkish
+      ? `${DESKTOP_APP_NAME}, güncellemeyi kurmak için kapanacak. Bu işlem bu makinedeki etkin yerel oturumları keser.`
+      : `${DESKTOP_APP_NAME} will quit to install the update, which will interrupt active local sessions on this machine.`,
+    "update-confirm-cancel": isTurkish ? "İptal" : "Cancel",
+    "update-confirm-install": isTurkish ? "Güncelle" : "Update",
+  });
+  if (!updateAvailableWindow || updateAvailableWindow.isDestroyed()) return;
+  const version = promptedUpdateVersion;
+  const copy = isTurkish
+    ? {
+        title: `Yeni bir ${DESKTOP_APP_NAME} sürümü var!`,
+        detail: `${DESKTOP_APP_NAME} ${version} kullanıma hazır; mevcut sürümünüz ${app.getVersion()}. Şimdi indirmek ister misiniz?`,
+        automatic: "Gelecekteki güncellemeleri otomatik olarak indir ve kur",
+        skip: "Bu sürümü atla",
+        later: "Daha sonra hatırlat",
+        install: "Güncellemeyi kur",
+      }
+    : {
+        title: `A new version of ${DESKTOP_APP_NAME} is available!`,
+        detail: `${DESKTOP_APP_NAME} ${version} is now available—you have ${app.getVersion()}. Would you like to download it now?`,
+        automatic: "Automatically download and install updates in the future",
+        skip: "Skip This Version",
+        later: "Remind Me Later",
+        install: "Install Update",
+      };
+  updateAvailableWindow.setTitle(copy.title);
+  void updateAvailableWindow.webContents
+    .executeJavaScript(
+      `(() => {
+        const copy = ${JSON.stringify(copy)};
+        document.documentElement.lang = ${JSON.stringify(isTurkish ? "tr" : "en")};
+        document.title = copy.title;
+        document.getElementById("update-title").textContent = copy.title;
+        document.getElementById("update-detail").textContent = copy.detail;
+        document.getElementById("automatic-label").textContent = copy.automatic;
+        document.getElementById("skip-update").textContent = copy.skip;
+        document.getElementById("remind-later").textContent = copy.later;
+        document.getElementById("install-update").textContent = copy.install;
+      })()`,
+    )
+    .catch(() => undefined);
+}
+
+function updateNativeDialogLanguage(
+  window: BrowserWindow | null,
+  title: string,
+  copy: Record<string, string>,
+) {
+  if (!window || window.isDestroyed()) return;
+  window.setTitle(title);
+  void window.webContents
+    .executeJavaScript(
+      `(() => {
+    document.documentElement.lang = ${JSON.stringify(desktopLanguage)};
+    document.title = ${JSON.stringify(title)};
+    for (const [id, label] of Object.entries(${JSON.stringify(copy)})) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = label;
+    }
+    const progress = document.querySelector('[role="progressbar"]');
+    if (progress) progress.setAttribute("aria-label", document.getElementById("update-check-title").textContent);
+  })()`,
+    )
+    .catch(() => undefined);
 }
 
 function notifyDesktop(title: string, body: string, onClick?: () => void) {
@@ -1759,7 +2170,9 @@ async function showUpdateCheckWindow() {
     modal: true,
     width: 800,
     height: 300,
-    resizable: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title: windowTitle,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -1767,6 +2180,7 @@ async function showUpdateCheckWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   const checkingWindow = updateCheckWindow;
@@ -1785,28 +2199,22 @@ async function showUpdateCheckWindow() {
     <title>${windowTitle}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
-      img { width: 104px; height: 104px; border-radius: 22px; }
-      h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
-      .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: var(--dialog-border); }
-      .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: var(--dialog-primary); transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
-      @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
-      button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button:hover { background: var(--dialog-button-hover); }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+      .progress { width: 100%; height: 12px; overflow: hidden; border-radius: var(--dialog-radius-sm); background: var(--dialog-border); }
+      .progress::after { content: ""; display: block; width: 25%; height: 100%; background: var(--dialog-primary); animation: slide 1.35s ease-in-out infinite; }
+      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
     </style>
   </head>
   <body>
-    <main>
+    <main class="update-layout">
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
-        <h1>${checkingLabel}</h1>
+        <h1 id="update-check-title">${checkingLabel}</h1>
         <div class="progress" role="progressbar" aria-label="${checkingLabel}" aria-busy="true"></div>
-        <button type="button" onclick="window.close()">${cancelLabel}</button>
+        <button id="update-check-cancel" class="secondary update-check-cancel" type="button" onclick="window.close()">${cancelLabel}</button>
       </section>
     </main>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await checkingWindow.loadURL(
@@ -1846,7 +2254,9 @@ async function showUpdateNotAvailableWindow() {
     modal: true,
     width: 720,
     height: 280,
-    resizable: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title: windowTitle,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -1854,6 +2264,7 @@ async function showUpdateNotAvailableWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   updateResultWindow.on("closed", () => {
@@ -1867,27 +2278,20 @@ async function showUpdateNotAvailableWindow() {
     <title>${windowTitle}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { width: 100%; display: grid; grid-template-columns: 96px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
-      img { width: 88px; height: 88px; border-radius: 20px; }
-      h1 { margin: 0 0 10px; font-size: 25px; line-height: 1.15; font-weight: 700; }
-      p { margin: 0; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
-      footer { grid-column: 2; display: flex; justify-content: flex-end; margin-top: -4px; }
-      button { min-width: 112px; padding: 10px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
-      button:hover { background: var(--dialog-button-hover); }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+
     </style>
   </head>
   <body>
-    <main>
+    <main class="update-layout">
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
-        <h1>${title}</h1>
-        <p>${detail}</p>
+        <h1 id="update-result-title">${title}</h1>
+        <p id="update-result-detail">${detail}</p>
       </section>
-      <footer><button type="button" onclick="window.close()">${doneLabel}</button></footer>
+      <footer class="update-actions"><button id="update-result-done" class="secondary" type="button" onclick="window.close()">${doneLabel}</button></footer>
     </main>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await updateResultWindow.loadURL(
@@ -1929,7 +2333,9 @@ async function showUpdateConfirmation() {
     modal: true,
     width: 560,
     height: 430,
-    resizable: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -1937,6 +2343,7 @@ async function showUpdateConfirmation() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   updateConfirmationWindow.on("closed", () => {
@@ -1965,29 +2372,21 @@ async function showUpdateConfirmation() {
     <title>${title}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { padding: 26px 28px 14px; }
-      .warning { width: 88px; height: 80px; display: grid; place-items: center; padding-top: 12px; margin: 0 0 18px 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #f3c438; color: #fff; font-size: 48px; line-height: 1; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
-      h1 { margin: 0 0 16px; font-size: 25px; line-height: 1.2; font-weight: 700; }
-      p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: var(--dialog-secondary); }
-      footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
-      button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
-      button:hover { filter: brightness(1.12); }
+
     </style>
   </head>
   <body>
-    <main>
-      <div class="warning" aria-hidden="true">!</div>
-      <h1>${title}</h1>
-      <p>${detail}</p>
+    <main class="update-confirmation">
+      <img src="${iconDataUrl}" alt="" aria-hidden="true">
+      <h1 id="update-confirm-title">${title}</h1>
+      <p id="update-confirm-detail">${detail}</p>
     </main>
-    <footer>
-      <button type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/cancel'">${cancelLabel}</button>
-      <button class="primary" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/update'">${updateLabel}</button>
+    <footer class="update-actions">
+      <button id="update-confirm-cancel" class="secondary" type="button" autofocus onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/cancel'">${cancelLabel}</button>
+      <button id="update-confirm-install" class="primary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/update'">${updateLabel}</button>
     </footer>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await updateConfirmationWindow.loadURL(
@@ -2001,9 +2400,15 @@ async function showUpdateConfirmation() {
 }
 
 async function showUpdateDialog(version: string, force = false) {
-  if (updateAvailableWindow && !updateAvailableWindow.isDestroyed()) {
-    focusWindow(updateAvailableWindow);
-    return;
+  const existingWindow = updateAvailableWindow;
+  if (existingWindow && !existingWindow.isDestroyed()) {
+    if (backgroundE2e || existingWindow.isVisible()) {
+      focusWindow(existingWindow);
+      return;
+    }
+    if (updateAvailableWindow === existingWindow) {
+      updateAvailableWindow = null;
+    }
   }
   if (!force && promptedUpdateVersion === version) return;
   promptedUpdateVersion = version;
@@ -2022,12 +2427,14 @@ async function showUpdateDialog(version: string, force = false) {
   const skipLabel = isTurkish ? "Bu sürümü atla" : "Skip This Version";
   const laterLabel = isTurkish ? "Daha sonra hatırlat" : "Remind Me Later";
   const installLabel = isTurkish ? "Güncellemeyi kur" : "Install Update";
-  updateAvailableWindow = new BrowserWindow({
+  const dialogWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
-    width: 1200,
-    height: 360,
-    resizable: false,
+    width: 760,
+    height: 420,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -2035,17 +2442,21 @@ async function showUpdateDialog(version: string, force = false) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
-  updateAvailableWindow.on("closed", () => {
-    updateAvailableWindow = null;
+  updateAvailableWindow = dialogWindow;
+  dialogWindow.on("closed", () => {
+    if (updateAvailableWindow === dialogWindow) {
+      updateAvailableWindow = null;
+    }
   });
-  updateAvailableWindow.webContents.on("will-navigate", (event, url) => {
+  dialogWindow.webContents.on("will-navigate", (event, url) => {
     if (!url.startsWith(`${DESKTOP_PROTOCOL}://update-action/`)) return;
     event.preventDefault();
     const actionUrl = new URL(url);
     const action = actionUrl.pathname.slice(1);
-    closeUpdateAvailableWindow();
+    closeUpdateAvailableWindow(dialogWindow);
     const automaticDownload =
       actionUrl.searchParams.get("automatic") !== "false";
     void readUpdatePreferences()
@@ -2084,49 +2495,43 @@ async function showUpdateDialog(version: string, force = false) {
     <title>${title}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 24px 28px 18px; }
-      img { width: 104px; height: 104px; border-radius: 22px; }
-      h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
-      p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: var(--dialog-secondary); }
-      label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: var(--dialog-foreground); }
-      input { width: 25px; height: 25px; accent-color: var(--dialog-primary); }
-      footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
-      button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
-      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
-      button:hover { filter: brightness(1.12); }
+
     </style>
   </head>
   <body>
-    <main>
+    <main class="update-layout">
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
-        <h1>${title}</h1>
-        <p>${detail}</p>
-        <label><input id="automatic" type="checkbox" checked>${automaticLabel}</label>
+        <h1 id="update-title">${title}</h1>
+        <p id="update-detail">${detail}</p>
+        <label><input id="automatic" type="checkbox" checked><span id="automatic-label">${automaticLabel}</span></label>
       </section>
     </main>
-    <footer>
-      <button type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
-      <button type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
-      <button class="primary" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
+    <footer class="update-actions">
+      <button id="skip-update" class="secondary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
+      <button id="remind-later" class="secondary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
+      <button id="install-update" class="primary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
     </footer>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
-  await updateAvailableWindow.loadURL(
+  await dialogWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
-  updateAvailableWindow.center();
-  showWindow(updateAvailableWindow);
+  dialogWindow.center();
+  showWindow(dialogWindow);
+  focusWindow(dialogWindow);
 }
 
-function closeUpdateAvailableWindow() {
-  if (updateAvailableWindow && !updateAvailableWindow.isDestroyed()) {
-    updateAvailableWindow.close();
+function closeUpdateAvailableWindow(window = updateAvailableWindow) {
+  if (!window) return;
+  if (!window.isDestroyed()) {
+    window.close();
   }
-  updateAvailableWindow = null;
+  if (updateAvailableWindow === window) {
+    updateAvailableWindow = null;
+  }
 }
 
 function setLogoutMenuVisible(visible: boolean) {
@@ -2134,6 +2539,7 @@ function setLogoutMenuVisible(visible: boolean) {
 }
 
 function toggleDeveloperTools() {
+  if (backgroundE2e || app.isPackaged) return;
   const targetWindow =
     BrowserWindow.getFocusedWindow() ??
     BrowserWindow.getAllWindows().find((window) => window.isVisible()) ??
@@ -2206,8 +2612,11 @@ function installApplicationMenu() {
       click: toggleQuickAccess,
     },
     { type: "separator" },
-    { role: "reload" },
-    { role: "forceReload" },
+    { role: "reload", label: isTurkish ? "Yeniden yükle" : "Reload" },
+    {
+      role: "forceReload",
+      label: isTurkish ? "Önbelleği kullanmadan yeniden yükle" : "Force Reload",
+    },
     { type: "separator" },
     ...(process.env.DESKTOP_DEVTOOLS === "true"
       ? [
@@ -2220,18 +2629,52 @@ function installApplicationMenu() {
           { type: "separator" as const },
         ]
       : []),
-    { role: "resetZoom" },
-    { role: "zoomIn" },
-    { role: "zoomOut" },
+    { role: "resetZoom", label: isTurkish ? "Gerçek boyut" : "Actual Size" },
+    { role: "zoomIn", label: isTurkish ? "Yakınlaştır" : "Zoom In" },
+    { role: "zoomOut", label: isTurkish ? "Uzaklaştır" : "Zoom Out" },
     { type: "separator" },
-    { role: "togglefullscreen" },
+    {
+      role: "togglefullscreen",
+      label: isTurkish ? "Tam ekranı aç/kapat" : "Toggle Full Screen",
+    },
   ];
   const template: MenuItemConstructorOptions[] = [
     applicationMenu,
-    { role: "editMenu" },
+    {
+      label: isTurkish ? "Düzenle" : "Edit",
+      submenu: [
+        { role: "undo", label: isTurkish ? "Geri al" : "Undo" },
+        { role: "redo", label: isTurkish ? "Yinele" : "Redo" },
+        { type: "separator" },
+        { role: "cut", label: isTurkish ? "Kes" : "Cut" },
+        { role: "copy", label: isTurkish ? "Kopyala" : "Copy" },
+        { role: "paste", label: isTurkish ? "Yapıştır" : "Paste" },
+        { role: "selectAll", label: isTurkish ? "Tümünü seç" : "Select All" },
+      ],
+    },
     { label: isTurkish ? "Görünüm" : "View", submenu: viewSubmenu },
-    { role: "windowMenu" },
-    { role: "help" },
+    {
+      role: "windowMenu",
+      label: isTurkish ? "Pencere" : "Window",
+      submenu: [
+        {
+          role: "minimize",
+          label: isTurkish ? "Simge durumuna küçült" : "Minimize",
+        },
+        { role: "zoom", label: isTurkish ? "Pencereyi büyüt/küçült" : "Zoom" },
+        { role: "close", label: isTurkish ? "Kapat" : "Close" },
+        ...(process.platform === "darwin"
+          ? [
+              { type: "separator" as const },
+              {
+                role: "front" as const,
+                label: isTurkish ? "Tümünü öne getir" : "Bring All to Front",
+              },
+            ]
+          : []),
+      ],
+    },
+    { role: "help", label: isTurkish ? "Yardım" : "Help" },
   ];
   const menu = Menu.buildFromTemplate(template);
   logoutMenuItem = menu.getMenuItemById("desktop-logout");
@@ -2254,7 +2697,7 @@ async function createWindow() {
     y: state?.y,
     width: state?.width ?? 1440,
     height: state?.height ?? 960,
-    minWidth: 960,
+    minWidth: 640,
     minHeight: 640,
     show: hasStoredSession && !backgroundE2e,
     backgroundColor: desktopBackgroundColor(),
@@ -2262,6 +2705,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload,
     },
   });
@@ -2300,7 +2744,7 @@ async function createWindow() {
       exitCode: details.exitCode,
     });
   });
-  void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/`);
+  void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/native`);
   mainWindow.on("closed", () => {
     if (companionWindow && !companionWindow.isDestroyed()) {
       companionWindow.destroy();
@@ -2386,7 +2830,16 @@ function registerIpc() {
   });
   ipcMain.handle("desktop:theme-set", (event, value: unknown) => {
     assertTrustedSender(event);
-    applyDesktopTheme(value);
+    const theme: DesktopTheme =
+      value === "light" || value === "dark" || value === "system"
+        ? value
+        : "system";
+    applyDesktopTheme(theme);
+    void writeDesktopTheme(theme);
+  });
+  ipcMain.handle("desktop:theme-get", (event) => {
+    assertTrustedSender(event);
+    return nativeTheme.themeSource;
   });
   ipcMain.handle("desktop:language-set", async (event, value: unknown) => {
     assertTrustedSender(event);
@@ -2518,7 +2971,7 @@ function registerIpc() {
       closeCompanionWindow();
       if (!mainWindow || mainWindow.isDestroyed()) return;
       await mainWindow.loadURL(
-        `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value}?desktopSignIn=1`,
+        `${RENDERER_PROTOCOL}://${RENDERER_HOST}/native?console=${value}`,
       );
       focusMainWindow();
     },
@@ -2530,103 +2983,50 @@ function registerIpc() {
       throw new Error("Desktop window is unavailable");
     }
     await mainWindow.loadURL(
-      `${RENDERER_PROTOCOL}://${RENDERER_HOST}/${value === "admin" ? "admin" : "account/personal-info"}?desktopSignIn=1`,
+      `${RENDERER_PROTOCOL}://${RENDERER_HOST}/native?console=${value}`,
     );
-    if (desktopLoginWindow && !desktopLoginWindow.isDestroyed()) {
-      showWindow(desktopLoginWindow);
-      focusWindow(desktopLoginWindow);
-    }
+    showWindow(mainWindow);
+    focusWindow(mainWindow);
+    closeDesktopLoginWindow();
   });
   ipcMain.handle(
     "desktop:auth-start-login",
     async (event, request: unknown) => {
       assertTrustedSender(event);
-      if (!request || typeof request !== "object")
-        throw new Error("Invalid login request");
-      const value = request as Partial<{
-        console: ConsoleName;
-        authorizationUrl: string;
-        state: string;
-        codeVerifier: string;
-        clientId: string;
-        redirectUri: string;
-      }>;
-      assertConsole(value.console);
-      if (
-        typeof value.authorizationUrl !== "string" ||
-        !isAllowedExternalUrl(value.authorizationUrl)
-      ) {
-        throw new Error("Authorization URL is not allowed");
+      if (typeof request !== "string") throw new Error("Invalid login request");
+      assertConsole(request);
+      const existing = pendingAuthorizations.get(request);
+      if (existing && isPendingAuthorizationValid(existing, existing.state)) {
+        throw new Error("Desktop authorization is already in progress");
       }
-      const requestedAuthorizationUrl = new URL(value.authorizationUrl);
-      if (
-        requestedAuthorizationUrl.origin !== getApiBaseUrl() ||
-        requestedAuthorizationUrl.pathname !== "/oauth2/authorize"
-      ) {
-        throw new Error(
-          "Authorization URL must use the configured authorization server",
-        );
-      }
-      const trustedAuthorizationUrl = new URL(
-        "/oauth2/authorize",
-        getApiBaseUrl(),
-      );
-      trustedAuthorizationUrl.search = requestedAuthorizationUrl.search;
-      if (
-        typeof value.state !== "string" ||
-        value.state.length < 16 ||
-        value.state.length > 256
-      ) {
-        throw new Error("Invalid authorization state");
-      }
-      if (
-        typeof value.codeVerifier !== "string" ||
-        value.codeVerifier.length < 43 ||
-        value.codeVerifier.length > 128 ||
-        typeof value.clientId !== "string" ||
-        !["desktop-admin-console", "desktop-account-console"].includes(
-          value.clientId,
-        ) ||
-        value.redirectUri !== "kitezh://oauth/callback"
-      ) {
-        throw new Error("Invalid desktop authorization request");
-      }
-      pendingAuthorizations.set(value.console, {
-        state: value.state,
-        codeVerifier: value.codeVerifier,
-        clientId: value.clientId,
-        redirectUri: value.redirectUri,
-        createdAt: Date.now(),
-      });
+      const nativeRequest = nativeAuthorizationRequest(request);
+      pendingAuthorizations.set(request, nativeRequest.pending);
       try {
         await persistPendingAuthorizations();
-        await shell.openExternal(trustedAuthorizationUrl.toString());
-      } catch (error) {
-        pendingAuthorizations.delete(value.console);
+        await shell.openExternal(nativeRequest.authorizationUrl.toString());
+      } catch {
+        pendingAuthorizations.delete(request);
         await persistPendingAuthorizations();
-        throw error;
+        throw new Error("Desktop authorization browser could not be opened");
       }
     },
   );
   ipcMain.handle(
-    "desktop:auth-get-session",
+    "desktop:auth-cancel-login",
+    async (event, consoleName: unknown) => {
+      assertTrustedSender(event);
+      assertConsole(consoleName);
+      pendingAuthorizations.delete(consoleName);
+      await persistPendingAuthorizations();
+    },
+  );
+  ipcMain.handle(
+    "desktop:auth-has-session",
     async (event, consoleName: unknown) => {
       assertTrustedSender(event);
       assertConsole(consoleName);
       const vault = await readVault();
-      return vault[consoleName] ?? null;
-    },
-  );
-  ipcMain.handle(
-    "desktop:auth-set-session",
-    async (event, consoleName: unknown, tokens: unknown) => {
-      assertTrustedSender(event);
-      assertConsole(consoleName);
-      assertTokens(tokens);
-      const vault = await readVault();
-      vault[consoleName] = tokens;
-      await writeVault(vault);
-      setLogoutMenuVisible(true);
+      return Boolean(vault[consoleName]);
     },
   );
   ipcMain.handle(
@@ -2648,6 +3048,46 @@ function registerIpc() {
   ipcMain.handle("desktop:auth-storage-status", (event) => {
     assertTrustedSender(event);
     return safeStorage.isEncryptionAvailable() ? "available" : "unavailable";
+  });
+  ipcMain.handle("desktop:auth-logout", async (event, consoleName: unknown) => {
+    assertTrustedSender(event);
+    assertConsole(consoleName);
+    await logoutDesktopSession(consoleName);
+  });
+  ipcMain.handle(
+    "desktop:social-link-start",
+    async (event, provider: unknown) => {
+      assertTrustedSender(event);
+      return startNativeSocialLink(provider);
+    },
+  );
+  ipcMain.handle("desktop:api-request", async (event, request: unknown) => {
+    assertTrustedSender(event);
+    if (!request || typeof request !== "object")
+      throw new Error("Invalid native API request");
+    const value = request as Partial<{
+      console: ConsoleName;
+      locale: "en" | "tr";
+      method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+      path: string;
+      body: unknown;
+    }>;
+    assertConsole(value.console);
+    if (
+      typeof value.path !== "string" ||
+      !value.path.startsWith("/") ||
+      value.path.includes("//") ||
+      value.path.includes("..")
+    ) {
+      throw new Error("Invalid native API path");
+    }
+    return desktopApiAdapter.request({
+      console: value.console,
+      locale: value.locale === "tr" ? "tr" : "en",
+      method: value.method,
+      path: value.path,
+      body: value.body,
+    });
   });
   ipcMain.handle("desktop:update-check", (event) => {
     assertTrustedSender(event);
@@ -2685,9 +3125,9 @@ function enforceContentSecurityPolicy() {
 }
 
 function registerDesktopProtocol() {
-  if (process.defaultApp && process.argv[1]) {
+  if (process.defaultApp) {
     app.setAsDefaultProtocolClient(DESKTOP_PROTOCOL, process.execPath, [
-      path.resolve(process.argv[1]),
+      app.getAppPath(),
     ]);
     return;
   }
@@ -2709,121 +3149,137 @@ if (!hasLock) {
     event.preventDefault();
     void sendDeepLink(url);
   });
-  app.whenReady().then(async () => {
-    app.setName(DESKTOP_APP_NAME);
-    desktopLanguageMode = await readDesktopLanguageMode();
-    desktopLanguage = await readDesktopLanguage();
-    if (desktopLanguageMode === "system") {
-      desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
-        ? "tr"
-        : "en";
-    }
-    installApplicationMenu();
-    pendingDeepLink = findDesktopDeepLink();
-    await restorePendingAuthorizations();
-    registerDesktopProtocol();
-    registerIpc();
-    const desktopPreferences = await readDesktopPreferences();
-    void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
-    const shortcutRegistration = registerGlobalShortcutWithFallback(
-      globalShortcut,
-      desktopPreferences.globalShortcut,
-      DEFAULT_GLOBAL_SHORTCUT,
-      toggleQuickAccess,
-    );
-    if (
-      !shortcutRegistration.registered &&
-      shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
-    ) {
-      desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
-      await writeDesktopPreferences(desktopPreferences);
-    }
-    setTrayVisibility(desktopPreferences.showInMenuBar);
-    setDockVisibility(desktopPreferences.showInDock);
-    const updatePreferences = await readUpdatePreferences();
-    setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
-    void updateLogoutMenuVisibility();
-    enforceContentSecurityPolicy();
-    registerRendererProtocol();
-    void createWindow();
-    if (backgroundE2e && process.platform === "darwin") app.hide();
-    configureAutoUpdater(async (status: DesktopUpdateStatus) => {
-      void appendDiagnosticEvent(`update-${status.state}`, {
-        version: "version" in status ? status.version : undefined,
-        message: "message" in status ? status.message : undefined,
-      });
-      if (status.state === "checking") {
-        if (!updateCheckWindowReady) {
-          updateCheckWindowReady = showUpdateCheckWindow().catch(
-            () => undefined,
-          );
+  app
+    .whenReady()
+    .then(async () => {
+      app.setName(DESKTOP_APP_NAME);
+      applyDesktopTheme(await readDesktopTheme());
+      desktopLanguageMode = await readDesktopLanguageMode();
+      desktopLanguage = await readDesktopLanguage();
+      if (desktopLanguageMode === "system") {
+        desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
+          ? "tr"
+          : "en";
+      }
+      installApplicationMenu();
+      pendingDeepLink = findDesktopDeepLink();
+      await restorePendingAuthorizations();
+      registerDesktopProtocol();
+      registerIpc();
+      const desktopPreferences = await readDesktopPreferences();
+      void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
+      const shortcutRegistration = registerGlobalShortcutWithFallback(
+        globalShortcut,
+        desktopPreferences.globalShortcut,
+        DEFAULT_GLOBAL_SHORTCUT,
+        toggleQuickAccess,
+      );
+      if (
+        !shortcutRegistration.registered &&
+        shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
+      ) {
+        desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
+        await writeDesktopPreferences(desktopPreferences);
+      }
+      setTrayVisibility(desktopPreferences.showInMenuBar);
+      setDockVisibility(desktopPreferences.showInDock);
+      const updatePreferences = await readUpdatePreferences();
+      setAutomaticInstallOnAppQuit(
+        updatePreferences.automaticDownload === true,
+      );
+      void readVault()
+        .then((vault) =>
+          setLogoutMenuVisible(Boolean(vault.admin || vault.account)),
+        )
+        .catch(() => setLogoutMenuVisible(false));
+      enforceContentSecurityPolicy();
+      await registerRendererProtocol();
+      void createWindow();
+      if (backgroundE2e && process.platform === "darwin") app.hide();
+      configureAutoUpdater(async (status: DesktopUpdateStatus) => {
+        void appendDiagnosticEvent(`update-${status.state}`, {
+          version: "version" in status ? status.version : undefined,
+        });
+        if (status.state === "checking") {
+          if (!updateCheckWindowReady) {
+            updateCheckWindowReady = showUpdateCheckWindow().catch(
+              () => undefined,
+            );
+          }
+          sendUpdateStatus(status);
+          return;
+        } else {
+          const checkingWindowReady = updateCheckWindowReady;
+          updateCheckWindowReady = null;
+          await checkingWindowReady?.catch(() => undefined);
+          closeUpdateCheckWindow();
+        }
+        if (status.state === "available") {
+          const manualCheck = manualUpdateCheckRequested;
+          if (!manualCheck && isMainWindowInBackground()) {
+            notifyDesktop(
+              isTurkishDesktop()
+                ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
+                : `${DESKTOP_APP_NAME} update available`,
+              isTurkishDesktop()
+                ? `${status.version} sürümü indirilmeye hazır.`
+                : `Version ${status.version} is ready to download.`,
+              () => void showUpdateDialog(status.version, true),
+            );
+          }
+          void handleAvailableUpdate(status.version);
+          return;
+        }
+        if (status.state === "downloaded") {
+          const suppressNotification = suppressNextUpdateNotification;
+          suppressNextUpdateNotification = false;
+          if (!suppressNotification && isMainWindowInBackground()) {
+            notifyDesktop(
+              isTurkishDesktop()
+                ? `${DESKTOP_APP_NAME} güncellemesi hazır`
+                : `${DESKTOP_APP_NAME} update ready`,
+              isTurkishDesktop()
+                ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
+                : `Version ${status.version} will be installed when you restart.`,
+              () => void showUpdateConfirmation(),
+            );
+          }
+        } else if (status.state === "not-available") {
+          const manualCheck = manualUpdateCheckRequested;
+          manualUpdateCheckRequested = false;
+          suppressNextUpdateNotification = false;
+          if (manualCheck) {
+            void showUpdateNotAvailableWindow().catch(() => undefined);
+          }
+        } else if (status.state === "error") {
+          // Keep the retry interactive so a recovered check can reopen the
+          // update dialog without requiring the user to restart the app.
+          manualUpdateCheckRequested = true;
+          suppressNextUpdateNotification = false;
         }
         sendUpdateStatus(status);
-        return;
-      } else {
-        const checkingWindowReady = updateCheckWindowReady;
-        updateCheckWindowReady = null;
-        await checkingWindowReady?.catch(() => undefined);
-        closeUpdateCheckWindow();
-      }
-      if (status.state === "available") {
-        const manualCheck = manualUpdateCheckRequested;
-        if (!manualCheck && isMainWindowInBackground()) {
-          notifyDesktop(
-            isTurkishDesktop()
-              ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
-              : `${DESKTOP_APP_NAME} update available`,
-            isTurkishDesktop()
-              ? `${status.version} sürümü indirilmeye hazır.`
-              : `Version ${status.version} is ready to download.`,
-            () => void showUpdateDialog(status.version, true),
-          );
-        }
-        void handleAvailableUpdate(status.version);
-        return;
-      }
-      if (status.state === "downloaded") {
-        const suppressNotification = suppressNextUpdateNotification;
-        suppressNextUpdateNotification = false;
-        if (!suppressNotification && isMainWindowInBackground()) {
-          notifyDesktop(
-            isTurkishDesktop()
-              ? `${DESKTOP_APP_NAME} güncellemesi hazır`
-              : `${DESKTOP_APP_NAME} update ready`,
-            isTurkishDesktop()
-              ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
-              : `Version ${status.version} will be installed when you restart.`,
-            () => void showUpdateConfirmation(),
-          );
-        }
-      } else if (status.state === "not-available") {
-        const manualCheck = manualUpdateCheckRequested;
-        manualUpdateCheckRequested = false;
-        suppressNextUpdateNotification = false;
-        if (manualCheck) {
-          void showUpdateNotAvailableWindow().catch(() => undefined);
-        }
-      } else if (status.state === "error") {
-        // Keep the retry interactive so a recovered check can reopen the
-        // update dialog without requiring the user to restart the app.
-        manualUpdateCheckRequested = true;
-        suppressNextUpdateNotification = false;
-      }
-      sendUpdateStatus(status);
+      });
+      if (process.platform === "darwin")
+        app.on(
+          "activate",
+          () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
+        );
+    })
+    .catch((error: unknown) => {
+      void appendDiagnosticEvent("app-startup-failed", {
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      app.quit();
     });
-    if (process.platform === "darwin")
-      app.on(
-        "activate",
-        () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
-      );
-  });
   process.on("uncaughtExceptionMonitor", (error) => {
     void appendDiagnosticEvent("uncaught-exception", {
-      message: error.message,
+      errorType: error.name,
     });
   });
   process.on("unhandledRejection", (reason) => {
-    void appendDiagnosticEvent("unhandled-rejection", { reason });
+    void appendDiagnosticEvent("unhandled-rejection", {
+      errorType: reason instanceof Error ? reason.name : typeof reason,
+    });
   });
   app.on("before-quit", () => {
     globalShortcut.unregisterAll();

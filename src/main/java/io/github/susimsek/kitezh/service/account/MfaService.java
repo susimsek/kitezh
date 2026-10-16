@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh.service.account;
 
 import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.account.MfaSetupDTO;
 import io.github.susimsek.kitezh.dto.account.MfaStatusDTO;
@@ -11,6 +12,7 @@ import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.admin.UserAccessInvalidationService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import io.github.susimsek.kitezh.service.security.MfaBruteForceService;
 import io.github.susimsek.kitezh.service.security.TotpService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ public class MfaService {
     private final UserAccessInvalidationService userAccessInvalidationService;
     private final RecoveryCodeRepository recoveryCodeRepository;
     private final MfaBruteForceService mfaBruteForceService;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public MfaStatusDTO status(String username) {
@@ -98,6 +101,7 @@ public class MfaService {
         recordMfaSuccess(username);
         userAccessInvalidationService.invalidate(user.getUsername());
         auditEventService.record("account.mfa.enabled", "user", user.getId().toString());
+        notificationService.publishAccount(username, NotificationType.ACCOUNT_MFA_ENABLED);
     }
 
     @Transactional(noRollbackFor = ApiException.class)
@@ -127,6 +131,7 @@ public class MfaService {
         recordMfaSuccess(username);
         userAccessInvalidationService.invalidate(user.getUsername());
         auditEventService.record("account.mfa.disabled", "user", user.getId().toString());
+        notificationService.publishAccount(username, NotificationType.ACCOUNT_MFA_DISABLED);
     }
 
     @Transactional

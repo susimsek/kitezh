@@ -10,10 +10,9 @@ const releaseDirectory = path.resolve(
 const privateKeyValue = process.env.UPDATE_MANIFEST_SIGNING_KEY;
 
 if (!privateKeyValue) {
-  console.warn(
-    "UPDATE_MANIFEST_SIGNING_KEY is not configured; update manifests will remain unsigned.",
+  throw new Error(
+    "UPDATE_MANIFEST_SIGNING_KEY is required to sign desktop update manifests.",
   );
-  process.exit(0);
 }
 
 const privateKey = createPrivateKey(privateKeyValue);
@@ -29,7 +28,10 @@ if (manifests.length === 0) {
 for (const manifest of manifests) {
   const content = await readFile(path.join(releaseDirectory, manifest));
   const signature = sign(null, content, privateKey).toString("base64");
-  await writeFile(path.join(releaseDirectory, `${manifest}.sig`), `${signature}\n`);
+  await writeFile(
+    path.join(releaseDirectory, `${manifest}.sig`),
+    `${signature}\n`,
+  );
 }
 
 console.log(`Signed ${manifests.length} update manifest(s).`);

@@ -72,6 +72,13 @@ type Settings = {
   recoveryCodeWarningThreshold: number;
 };
 
+type LoginSettingsResponse = Partial<
+  Omit<Settings, "webauthnPolicy" | "webauthnPasswordlessPolicy">
+> & {
+  webauthnPolicy?: Partial<WebAuthnPolicy> | null;
+  webauthnPasswordlessPolicy?: Partial<WebAuthnPolicy> | null;
+};
+
 type CaptchaSettings = {
   enabled: boolean;
   provider: "recaptcha" | "enterprise";
@@ -231,10 +238,10 @@ export type LoginSettingsSection =
 export default function LoginSettingsPage({
   embedded = false,
   focusSection,
-}: {
-  readonly embedded?: boolean;
-  readonly focusSection?: LoginSettingsSection;
-}) {
+}: Readonly<{
+  embedded?: boolean;
+  focusSection?: LoginSettingsSection;
+}>) {
   const dictionary = useDictionary();
   const copy = dictionary.admin.loginSettings;
   const validation = dictionary.admin.common.validation;
@@ -375,10 +382,10 @@ export default function LoginSettingsPage({
 
   useEffect(() => {
     if (!accessToken) return;
-    adminRequest<Settings>(accessToken, { url: "/api/admin/settings/login" })
+    adminRequest<LoginSettingsResponse>(accessToken, { url: "/api/admin/settings/login" })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
-        reset({ ...defaultSettings, ...response.data });
+        if (response.status >= 300) throw new Error("Request failed");
+        reset(normalizeSettings(response.data));
         setLoaded(true);
       })
       .catch(() => setError(true));
@@ -390,7 +397,7 @@ export default function LoginSettingsPage({
       url: "/api/admin/settings/registration-captcha",
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setCaptcha({ ...defaultCaptchaSettings, ...response.data });
         setCaptchaLoaded(true);
       })
@@ -403,10 +410,11 @@ export default function LoginSettingsPage({
       url: "/api/admin/settings/social-providers",
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         resetSocial({
           providers: response.data.map((provider) => ({
             ...provider,
+            clientId: provider.clientId ?? "",
             trustEmail: provider.trustEmail ?? false,
             mfaRequired: provider.mfaRequired ?? false,
             requiredClaims: provider.requiredClaims ?? "sub",
@@ -469,7 +477,7 @@ export default function LoginSettingsPage({
         url: "/api/admin/settings/login",
         data: values,
       });
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       reset({ ...defaultSettings, ...response.data });
       alerts.addAlert(copy.saved);
     } catch {
@@ -521,7 +529,7 @@ export default function LoginSettingsPage({
           },
         },
       );
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       resetSocial({
         providers: response.data.map((provider) => ({
           ...provider,
@@ -566,7 +574,7 @@ export default function LoginSettingsPage({
           },
         },
       );
-      if (response.status >= 300) throw new Error();
+      if (response.status >= 300) throw new Error("Request failed");
       setCaptcha({ ...defaultCaptchaSettings, ...response.data });
       alerts.addAlert(copy.captchaSaved);
     } catch {
@@ -1420,12 +1428,12 @@ function NumberField({
   label,
   error,
   registration,
-}: {
-  readonly id: string;
-  readonly label: string;
-  readonly error?: string;
-  readonly registration: UseFormRegisterReturn;
-}) {
+}: Readonly<{
+  id: string;
+  label: string;
+  error?: string;
+  registration: UseFormRegisterReturn;
+}>) {
   return (
     <Form.Group controlId={id}>
       <Form.Label>{label}</Form.Label>
@@ -1442,13 +1450,13 @@ function WebAuthnPolicyFields({
   register,
   errors,
   labels,
-}: {
-  readonly title: string;
-  readonly help: string;
-  readonly prefix: "webauthnPolicy" | "webauthnPasswordlessPolicy";
-  readonly register: UseFormRegister<Settings>;
-  readonly errors: FieldErrors<Settings>;
-  readonly labels: {
+}: Readonly<{
+  title: string;
+  help: string;
+  prefix: "webauthnPolicy" | "webauthnPasswordlessPolicy";
+  register: UseFormRegister<Settings>;
+  errors: FieldErrors<Settings>;
+  labels: {
     rpName: string;
     rpId: string;
     signatureAlgorithms: string;
@@ -1476,7 +1484,7 @@ function WebAuthnPolicyFields({
     signatureAlgorithmsHelp: string;
     acceptableAaguidsHelp: string;
   };
-}) {
+}>) {
   const policyErrors = errors[prefix] as FieldErrors<WebAuthnPolicy> | undefined;
   const path = (field: keyof WebAuthnPolicy) => `${prefix}.${field}` as Path<Settings>;
   const fieldError = (field: keyof WebAuthnPolicy) => policyErrors?.[field]?.message;
@@ -1571,13 +1579,7 @@ function WebAuthnPolicyFields({
   );
 }
 
-function SaveButton({
-  copy,
-  isSubmitting,
-}: {
-  readonly copy: string;
-  readonly isSubmitting: boolean;
-}) {
+function SaveButton({ copy, isSubmitting }: Readonly<{ copy: string; isSubmitting: boolean }>) {
   return (
     <div className="admin-form-actions mt-4">
       <Button disabled={isSubmitting} type="submit">
@@ -1590,4 +1592,30 @@ function SaveButton({
       </Button>
     </div>
   );
+}
+
+function normalizeSettings(settings: LoginSettingsResponse): Settings {
+  return {
+    ...defaultSettings,
+    ...settings,
+    webauthnPolicy: normalizeWebAuthnPolicy(settings.webauthnPolicy, defaultWebAuthnPolicy),
+    webauthnPasswordlessPolicy: normalizeWebAuthnPolicy(
+      settings.webauthnPasswordlessPolicy,
+      defaultPasswordlessWebAuthnPolicy,
+    ),
+  };
+}
+
+function normalizeWebAuthnPolicy(
+  policy: Partial<WebAuthnPolicy> | null | undefined,
+  fallback: WebAuthnPolicy,
+): WebAuthnPolicy {
+  return {
+    ...fallback,
+    ...policy,
+    rpName: policy?.rpName ?? fallback.rpName,
+    rpId: policy?.rpId ?? fallback.rpId,
+    signatureAlgorithms: policy?.signatureAlgorithms ?? fallback.signatureAlgorithms,
+    acceptableAaguids: policy?.acceptableAaguids ?? fallback.acceptableAaguids,
+  };
 }
