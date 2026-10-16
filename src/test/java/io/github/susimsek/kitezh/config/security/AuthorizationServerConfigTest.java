@@ -134,7 +134,8 @@ class AuthorizationServerConfigTest {
                         "grant_types_supported",
                         List.of(
                                 AuthorizationGrantTypes.CIBA,
-                                AuthorizationGrantTypes.TOKEN_EXCHANGE));
+                                AuthorizationGrantTypes.TOKEN_EXCHANGE,
+                                AuthorizationGrantTypes.UMA_TICKET));
 
         OidcProviderConfiguration.Builder oidcBuilder =
                 OidcProviderConfiguration.builder()
@@ -195,6 +196,7 @@ class AuthorizationServerConfigTest {
                                         org.springframework.security.crypto.password.PasswordEncoder
                                                 .class),
                                 mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                                mock(UmaTicketAuthenticationProvider.class),
                                 mock(TokenExchangeAuthenticationProvider.class),
                                 mock(SocialProviderLogoutSuccessHandler.class),
                                 mock(SecurityContextRepository.class),
@@ -215,6 +217,7 @@ class AuthorizationServerConfigTest {
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
                         mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                        mock(UmaTicketAuthenticationProvider.class),
                         mock(TokenExchangeAuthenticationProvider.class),
                         mock(SocialProviderLogoutSuccessHandler.class),
                         mock(SecurityContextRepository.class),

@@ -73,6 +73,12 @@ public enum ApiErrorCode {
     CLIENT_ROLE_COMPOSITE_CYCLE(
             "client_role_composite_cycle",
             "A client role composite relationship would create a cycle."),
+    AUTHZ_INVALID_REQUEST("authz_invalid_request", "The authorization request is invalid."),
+    AUTHZ_RESOURCE_DUPLICATE("authz_resource_duplicate", "Protected resource already exists."),
+    AUTHZ_SCOPE_ASSIGNED("authz_scope_assigned", "The scope is still used by a permission."),
+    AUTHZ_POLICY_DUPLICATE("authz_policy_duplicate", "Authorization policy already exists."),
+    AUTHZ_PERMISSION_DUPLICATE(
+            "authz_permission_duplicate", "Authorization permission already exists."),
     GROUP_DUPLICATE_NAME("group_duplicate_name", "Group name is already registered."),
     GROUP_HAS_CHILDREN(
             "group_has_children", "Move or delete child groups before deleting this group."),

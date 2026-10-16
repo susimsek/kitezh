@@ -32,13 +32,15 @@ export function validateNativeAuthorizationConfig(
   clientId: string,
   redirectUri: string,
   discovery?: AuthorizationDiscovery | null,
+  allowAndroidEmulatorHttp = false,
 ): boolean {
   try {
     const issuerUrl = new URL(issuer);
     const redirect = new URL(redirectUri);
     const localIssuer =
       issuerUrl.protocol === "http:" &&
-      ["localhost", "127.0.0.1", "::1"].includes(issuerUrl.hostname);
+      (["localhost", "127.0.0.1", "::1"].includes(issuerUrl.hostname) ||
+        (allowAndroidEmulatorHttp && issuerUrl.hostname === "10.0.2.2"));
     const allowedProtocol = (url: URL) =>
       url.protocol === "https:" ||
       (localIssuer &&

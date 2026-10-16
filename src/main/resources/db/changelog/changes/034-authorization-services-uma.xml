@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="001-create-authz-resource" author="susimsek">
+		<createTable tableName="authz_resource">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authz_resource"/></column>
+			<column name="resource_server_client_id" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="resource_type" type="varchar(200)"/>
+			<column name="uri" type="varchar(1000)"/>
+			<column name="owner_subject" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="owner_managed_access" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="authz_resource" columnNames="resource_server_client_id,name" constraintName="uk_authz_resource_client_name"/>
+		<addForeignKeyConstraint baseTableName="authz_resource" baseColumnNames="resource_server_client_id" referencedTableName="oauth2_registered_client" referencedColumnNames="client_id" constraintName="fk_authz_resource_client" onDelete="CASCADE"/>
+		<createIndex tableName="authz_resource" indexName="idx_authz_resource_client"><column name="resource_server_client_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="002-create-authz-resource-scope" author="susimsek">
+		<createTable tableName="authz_resource_scope">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authz_resource_scope"/></column>
+			<column name="resource_id" type="varchar(36)"><constraints nullable="false"/></column>
+			<column name="name" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="description" type="varchar(500)"/>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="authz_resource_scope" columnNames="resource_id,name" constraintName="uk_authz_resource_scope_name"/>
+		<addForeignKeyConstraint baseTableName="authz_resource_scope" baseColumnNames="resource_id" referencedTableName="authz_resource" referencedColumnNames="id" constraintName="fk_authz_scope_resource" onDelete="CASCADE"/>
+		<createIndex tableName="authz_resource_scope" indexName="idx_authz_scope_resource"><column name="resource_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="003-create-authz-policy" author="susimsek">
+		<createTable tableName="authz_policy">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authz_policy"/></column>
+			<column name="resource_server_client_id" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="policy_type" type="varchar(20)"><constraints nullable="false"/></column>
+			<column name="subject_value" type="varchar(200)"/>
+			<column name="effect" type="varchar(10)" defaultValue="ALLOW"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="authz_policy" columnNames="resource_server_client_id,name" constraintName="uk_authz_policy_client_name"/>
+		<addForeignKeyConstraint baseTableName="authz_policy" baseColumnNames="resource_server_client_id" referencedTableName="oauth2_registered_client" referencedColumnNames="client_id" constraintName="fk_authz_policy_client" onDelete="CASCADE"/>
+		<createIndex tableName="authz_policy" indexName="idx_authz_policy_client"><column name="resource_server_client_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="004-create-authz-permission" author="susimsek">
+		<createTable tableName="authz_permission">
+			<column name="id" type="varchar(36)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authz_permission"/></column>
+			<column name="resource_id" type="varchar(36)"><constraints nullable="false"/></column>
+			<column name="name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="scope_name" type="varchar(100)"/>
+			<column name="decision_strategy" type="varchar(20)" defaultValue="AFFIRMATIVE"><constraints nullable="false"/></column>
+			<column name="created_by" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="created_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+			<column name="last_modified_by" type="varchar(100)"/>
+			<column name="updated_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addUniqueConstraint tableName="authz_permission" columnNames="resource_id,name" constraintName="uk_authz_permission_resource_name"/>
+		<addForeignKeyConstraint baseTableName="authz_permission" baseColumnNames="resource_id" referencedTableName="authz_resource" referencedColumnNames="id" constraintName="fk_authz_permission_resource" onDelete="CASCADE"/>
+		<createIndex tableName="authz_permission" indexName="idx_authz_permission_resource"><column name="resource_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="005-create-authz-permission-policy-map" author="susimsek">
+		<createTable tableName="authz_permission_policies">
+			<column name="permission_id" type="varchar(36)"><constraints nullable="false"/></column>
+			<column name="policy_id" type="varchar(36)"><constraints nullable="false"/></column>
+		</createTable>
+		<addPrimaryKey tableName="authz_permission_policies" columnNames="permission_id,policy_id" constraintName="pk_authz_permission_policies"/>
+		<addForeignKeyConstraint baseTableName="authz_permission_policies" baseColumnNames="permission_id" referencedTableName="authz_permission" referencedColumnNames="id" constraintName="fk_authz_permission_policies_permission" onDelete="CASCADE"/>
+		<addForeignKeyConstraint baseTableName="authz_permission_policies" baseColumnNames="policy_id" referencedTableName="authz_policy" referencedColumnNames="id" constraintName="fk_authz_permission_policies_policy" onDelete="CASCADE"/>
+		<createIndex tableName="authz_permission_policies" indexName="idx_authz_permission_policies_policy"><column name="policy_id"/></createIndex>
+	</changeSet>
+
+	<changeSet id="006-create-authz-permission-ticket" author="susimsek">
+		<createTable tableName="authz_permission_ticket">
+			<column name="id" type="varchar(64)"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_authz_permission_ticket"/></column>
+			<column name="resource_server_client_id" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="resource_id" type="varchar(36)"><constraints nullable="false"/></column>
+			<column name="requested_scopes" type="varchar(1000)"><constraints nullable="false"/></column>
+			<column name="expires_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="issued_at" type="timestamp" defaultValueComputed="${now}"><constraints nullable="false"/></column>
+		</createTable>
+		<addForeignKeyConstraint baseTableName="authz_permission_ticket" baseColumnNames="resource_server_client_id" referencedTableName="oauth2_registered_client" referencedColumnNames="client_id" constraintName="fk_authz_ticket_client" onDelete="CASCADE"/>
+		<addForeignKeyConstraint baseTableName="authz_permission_ticket" baseColumnNames="resource_id" referencedTableName="authz_resource" referencedColumnNames="id" constraintName="fk_authz_ticket_resource" onDelete="CASCADE"/>
+		<createIndex tableName="authz_permission_ticket" indexName="idx_authz_ticket_expiry"><column name="expires_at"/></createIndex>
+	</changeSet>
+</databaseChangeLog>

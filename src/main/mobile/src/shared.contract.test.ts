@@ -344,6 +344,31 @@ test("native authorization metadata requires a trusted issuer and endpoints", ()
     ),
     false,
   );
+  const androidFixtureDiscovery = {
+    issuer: "http://10.0.2.2:8080",
+    authorizationEndpoint: "http://10.0.2.2:8080/oauth2/authorize",
+    tokenEndpoint: "http://10.0.2.2:8080/oauth2/token",
+    endSessionEndpoint: "http://10.0.2.2:8080/connect/logout",
+  };
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "http://10.0.2.2:8080",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      androidFixtureDiscovery,
+    ),
+    false,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "http://10.0.2.2:8080",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      androidFixtureDiscovery,
+      true,
+    ),
+    true,
+  );
 });
 
 test("native deep links accept only registered routes", () => {

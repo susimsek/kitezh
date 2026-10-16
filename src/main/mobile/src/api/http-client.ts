@@ -1,10 +1,13 @@
-import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import {
   createApiClient,
   getApiTransportCause,
   readApiResponseData,
 } from "@kitezh/shared/api-client";
-import type { ApiClientRequestOptions } from "@kitezh/shared/api-client";
+import type {
+  ApiClientRequestOptions,
+  ApiClientResponse,
+} from "@kitezh/shared/api-client";
 import { createClientMetadataHeaders } from "@kitezh/shared/client-metadata";
 import { getMobileApiLocale } from "../i18n/api-locale.ts";
 import { authorizationServerIssuer } from "../config.ts";
@@ -27,7 +30,7 @@ export function createMobileApiClient(timeout: number) {
     request<T = unknown>(
       config: AxiosRequestConfig,
       options?: ApiClientRequestOptions,
-    ): Promise<AxiosResponse<T>> {
+    ): Promise<ApiClientResponse<T>> {
       return client.request<T>(
         {
           ...config,

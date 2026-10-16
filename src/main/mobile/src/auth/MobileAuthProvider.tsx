@@ -100,6 +100,7 @@ function hasTrustedDiscovery(
       tokenEndpoint: discovery.tokenEndpoint,
       endSessionEndpoint: discovery.endSessionEndpoint,
     },
+    typeof __DEV__ !== "undefined" && __DEV__ && Platform.OS === "android",
   );
 }
 
@@ -310,7 +311,7 @@ export function MobileAuthProvider({
       return;
     }
     void Linking.getInitialURL()
-      .then((url) => {
+      .then(async (url) => {
         if (!url || !isAllowedNativeRedirect(url, redirectUri)) return;
         const queryParams = ExpoLinking.parse(url).queryParams ?? {};
         const params = Object.fromEntries(
@@ -318,7 +319,10 @@ export function MobileAuthProvider({
             typeof value === "string" ? [[key, value]] : [],
           ),
         );
-        if (!params.state) return;
+        if (!params.state) {
+          await clearOAuthTransaction(consoleConfig.namespace);
+          return;
+        }
         void processAuthorizationResult(
           { type: "success", params } as AuthSessionResult,
           sessionRevision.current,

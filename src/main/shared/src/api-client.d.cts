@@ -1,9 +1,11 @@
-import type {
-  AxiosAdapter,
-  AxiosRequestConfig,
-  AxiosResponse,
-  InternalAxiosRequestConfig,
-} from "axios";
+export type ApiClientResponse<T = unknown> = {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: object;
+  config: object;
+  request?: unknown;
+};
 
 export type ApiTokenHandlers = {
   refresh: () => Promise<string | null>;
@@ -17,13 +19,15 @@ export type ApiClientRequestOptions = {
 
 export type ApiClientOptions = {
   baseURL?: string;
-  headers?: AxiosRequestConfig["headers"];
+  headers?: object;
   timeout?: number;
-  adapter?: AxiosAdapter | AxiosRequestConfig["adapter"];
-  transformResponse?: (response: AxiosResponse) => AxiosResponse;
+  adapter?: object;
+  transformResponse?: (
+    response: ApiClientResponse<unknown>,
+  ) => ApiClientResponse<unknown>;
 };
 
-export type RetriableAxiosRequest = InternalAxiosRequestConfig & {
+export type RetriableAxiosRequest = Record<string, unknown> & {
   _kitezhRetried?: boolean;
   _kitezhRefreshAccessToken?: () => Promise<string | null>;
 };
@@ -32,12 +36,12 @@ export function createApiClient(
   axios: object,
   options?: ApiClientOptions,
 ): {
-  client: import("axios").AxiosInstance;
+  client: object;
   registerTokenHandlers(handlers: ApiTokenHandlers | undefined): void;
   request<T = unknown>(
-    config: AxiosRequestConfig,
+    config: object,
     requestOptions?: ApiClientRequestOptions,
-  ): Promise<AxiosResponse<T>>;
+  ): Promise<ApiClientResponse<T>>;
 };
 
 export function getApiTransportCause(error: unknown): Error;

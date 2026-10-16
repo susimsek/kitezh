@@ -391,8 +391,10 @@ export default function AccountScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={dictionary.applications}
             onPress={() => router.push("/applications")}
             style={styles.settings}
+            testID="account-applications"
           >
             <AppIcon name="globe" size={16} color={palette.primary} />
             <Text style={[styles.secondary, { color: palette.primary }]}>

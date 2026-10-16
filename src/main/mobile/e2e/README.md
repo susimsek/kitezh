@@ -33,7 +33,7 @@ CI. Android device-level CI evidence remains pending until that workflow complet
 The release workflow packages the tagged source after its PR/main CI validation and does not rerun
 the full E2E suite. The flows cover cold start/branding, Turkish/light-dark settings, cold/warm
 email-verification and password-reset deep links, and the fixture-backed system-browser callback,
-profile, and logout. OAuth transaction resume/replay, offline, timeout, refresh, and accessibility
+profile, CIBA approve/deny, MFA setup screen, and logout. OAuth transaction resume/replay, offline, timeout, refresh, and accessibility
 cases remain outstanding, so the broad native E2E gate remains **In progress**.
 
 The API unit suite separately verifies transport-offline classification, request-timeout
@@ -43,10 +43,12 @@ coverage for those states.
 The first device flows are checked in under `e2e/maestro/`:
 
 - `cold-start.yaml` verifies a clean native launch, the public shell, and the sign-in boundary.
-- `settings-locale-theme.yaml` verifies native settings navigation and Turkish/light-dark controls.
+- `settings-locale-theme.yaml` verifies system/English/Turkish locale selection, system/light/dark
+  theme selection, and the selected radio state in native settings.
 - `deep-links.yaml` opens email-verification on cold start and password-reset while the app is open.
 - `authenticated-fixture.yaml` drives the system-browser fixture callback, protected profile load,
-  and sign-out return. It requires the fixture-backed native workflow.
+  CIBA approve/deny, MFA setup screen, and sign-out return. It requires the fixture-backed native
+  workflow.
 
 The authenticated flow conditionally accepts iOS's first-run confirmation when the local fixture
 domain is opened for sign-in and logout; Android has no corresponding prompt. It explicitly taps the
@@ -73,11 +75,13 @@ bash e2e/run-android-background.sh
 ```
 
 These flows deliberately avoid real credentials and token-bearing callbacks. The fixture server
-creates runtime-only credentials and does not print them. The authenticated fixture flow has passed
-on the Android emulator and iPhone 17 Pro simulator, including browser callback, profile load, and
-logout. CI now reruns the same flow set on both platforms. OAuth callback resume/replay, offline,
-timeout, refresh, and accessibility flows still require additional coverage before the broad E2E
-gate is complete.
+creates runtime-only credentials and does not print them. The authenticated fixture flow passed on
+the Android 16 Pixel 7 emulator against the current Metro bundle, including browser callback, profile
+load, CIBA approve/deny, MFA setup screen, and logout; it has also passed on iPhone 17 Pro simulator
+for browser callback, profile load, and logout. The Android run used an installed 2026-10-09
+development build because a clean Windows Gradle/CMake rebuild failed in Ninja. CI reruns the same
+flow set on both platforms. OAuth callback resume/replay, offline, timeout, refresh, and accessibility
+flows still require additional coverage before the broad E2E gate is complete.
 
 OAuth callbacks are validated by the shared native contract before code exchange: the callback must
 contain the original state and use the registered `kitezh://` redirect host/path. A browser result
