@@ -1295,11 +1295,11 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Heap memory: used, committed, max",
-      "description": "Heap memory used, committed, and maximum values.",
+      "title": "Heap memory: used and committed",
+      "description": "Heap usage and committed allocation in bytes. GraalVM Native Image does not report a usable maximum heap value in this deployment, so no heap-cap percentage is shown.",
       "gridPos": {
         "h": 5,
-        "w": 8,
+        "w": 16,
         "x": 0,
         "y": 50
       },
@@ -1317,56 +1317,12 @@
           "expr": "sum(jvm_memory_committed_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "B",
           "legendFormat": "committed"
-        },
-        {
-          "expr": "sum(jvm_memory_max_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
-          "refId": "C",
-          "legendFormat": "max"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
           "decimals": 0
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 9,
-      "type": "timeseries",
-      "title": "Heap utilization",
-      "description": "",
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 50
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "100 * sum(jvm_memory_used_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"}), 1)",
-          "refId": "A",
-          "legendFormat": "heap %"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "decimals": 2
         }
       },
       "options": {
@@ -2224,8 +2180,8 @@
     {
       "id": 68,
       "type": "timeseries",
-      "title": "Heap memory by service",
-      "description": "Heap memory used, committed, and maximum values by service or Kubernetes pod target.",
+      "title": "Heap memory by service: used and committed",
+      "description": "Heap usage and committed allocation by service. A maximum/capacity series is omitted because GraalVM Native Image does not report a usable maximum heap value in this deployment.",
       "gridPos": {
         "h": 5,
         "w": 6,
@@ -2246,11 +2202,6 @@
           "expr": "sum by (service_name) (jvm_memory_committed_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
           "refId": "B",
           "legendFormat": "{{service_name}} committed"
-        },
-        {
-          "expr": "sum by (service_name) (jvm_memory_max_bytes{job=~\"$job\",service_name=~\"$instance\",area=\"heap\"})",
-          "refId": "C",
-          "legendFormat": "{{service_name}} max"
         }
       ],
       "fieldConfig": {
