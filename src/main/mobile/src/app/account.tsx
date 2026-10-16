@@ -26,7 +26,6 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
 import { isValidEmailAddress } from "@/utils/email";
 import { problemFieldErrors } from "../../../shared/src/api.ts";
-import { isValidEmail } from "@/validation/email";
 
 type ProfileField = "firstName" | "lastName" | "email";
 
@@ -90,7 +89,6 @@ export default function AccountScreen() {
     if (!session || !profile || profileSaveInFlight.current) return;
     const trimmedEmail = email.trim();
     if (trimmedEmail && !isValidEmailAddress(trimmedEmail)) {
-    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
       setEmailError(dictionary.invalidEmail);
       return;
     }

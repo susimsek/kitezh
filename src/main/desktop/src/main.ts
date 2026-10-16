@@ -2319,6 +2319,8 @@ async function showUpdateConfirmation() {
     focusWindow(updateConfirmationWindow);
     return false;
   }
+  const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
+  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
   const isTurkish = isTurkishDesktop();
   const title = isTurkish
     ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`

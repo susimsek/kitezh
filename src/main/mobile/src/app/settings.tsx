@@ -257,7 +257,7 @@ function SectionHeading({
   icon: "globe" | "sun" | "reset";
   label: string;
   palette: ReturnType<typeof useTheme>["palette"];
-}>) {
+}) {
   return (
     <View style={styles.sectionHeading}>
       <View

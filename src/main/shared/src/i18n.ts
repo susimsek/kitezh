@@ -2086,7 +2086,6 @@ export const messages = {
     adminRedirectUris: "Yönlendirme URI’leri (satır başına bir tane)",
     adminPostLogoutRedirectUris:
       "Çıkış sonrası URI’leri (satır başına bir tane)",
-    adminProviderRegistrationId: "Kayıt kimliği",
     adminProviderType: "Sağlayıcı türü",
     adminProviderIcon: "İkon anahtarı",
     adminPassword: "İlk parola",
@@ -2094,10 +2093,6 @@ export const messages = {
     adminParentId: "Üst grup kimliği",
     adminCreatedSecret:
       "İstemci sırrı yalnızca bir kez gösterilir; güvenli şekilde saklayın.",
-    adminKeys: "İmzalama anahtarları",
-    adminEvents: "Olaylar",
-    adminSearchKeys: "İmzalama anahtarlarında ara",
-    adminSearchEvents: "Olaylarda ara",
     adminRotateKey: "İmzalama anahtarını döndür",
     adminDeleteEvents: "Tüm olayları sil",
     adminDeleteEventsConfirm: "Tüm denetim olayları kalıcı olarak silinsin mi?",

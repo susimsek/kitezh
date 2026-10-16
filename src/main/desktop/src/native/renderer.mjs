@@ -663,8 +663,6 @@ async function loadClientScopeDetailSections(scopeId) {
   state.data.clientScopeMappers[scopeId] = Array.isArray(mapperPage?.content)
     ? mapperPage.content
     : [];
-  state.data.adminClientScopeRoleMappingsOpenId = scopeId;
-  state.data.clientScopeMappersOpenId = scopeId;
 }
 
 function violations(body) {
@@ -1995,7 +1993,7 @@ function clientScopeRoleMappingPanel(scopeId, readOnly = false) {
         `<option value="${escapeHtml(role.id)}" ${clientRoleDraft.includes(String(role.id)) ? "selected" : ""}>${escapeHtml(role.clientId)} / ${escapeHtml(role.name)}</option>`,
     )
     .join("");
-  return `<section class="card scope-section" data-client-scope-role-mappings-panel="true" data-scope-id="${escapeHtml(scopeId)}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminClientScopeRoleMappings"))}</h2></div><p class="muted">${escapeHtml(text("adminClientScopeRoleMappingsHelp"))}</p><div class="scope-role-mappings-form"><label class="scope-role-field" for="client-scope-application-roles-${escapeHtml(scopeId)}"><span>${escapeHtml(text("adminApplicationRoles"))}</span><select class="scope-role-select" id="client-scope-application-roles-${escapeHtml(scopeId)}" name="applicationRoles" aria-label="${escapeHtml(text("adminApplicationRoles"))}" multiple size="5" ${readOnly ? "disabled" : ""}>${applicationOptions}</select></label><label class="scope-role-field" for="client-scope-client-roles-${escapeHtml(scopeId)}"><span>${escapeHtml(text("adminClientRoles"))}</span><select class="scope-role-select" id="client-scope-client-roles-${escapeHtml(scopeId)}" name="clientRoleIds" aria-label="${escapeHtml(text("adminClientRoles"))}" multiple size="5" ${readOnly ? "disabled" : ""}>${clientOptions}</select></label><div class="scope-role-actions">${button(text("save"), { action: "admin-client-scope-role-mappings-save", id: scopeId, icon: "save", busy: state.busy === `client-scope-role-mappings-save:${scopeId}`, disabled: readOnly || state.offline || Boolean(state.busy) })}</div></div></section>`;
+  return `<section class="card scope-section" data-client-scope-role-mappings-panel="true" data-scope-id="${escapeHtml(scopeId)}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminClientScopeRoleMappings"))}</h2></div><p class="muted">${escapeHtml(text("adminClientScopeRoleMappingsHelp"))}</p><div class="scope-role-mappings-form"><label class="scope-role-field" for="client-scope-application-roles-${escapeHtml(scopeId)}"><span>${escapeHtml(text("adminApplicationRoles"))}</span><select class="scope-role-select" id="client-scope-application-roles-${escapeHtml(scopeId)}" name="applicationRoles" aria-label="${escapeHtml(text("adminApplicationRoles"))}" multiple size="5" ${readOnly ? "disabled" : ""}>${applicationOptions}</select></label><label class="scope-role-field" for="client-scope-client-roles-${escapeHtml(scopeId)}"><span>${escapeHtml(text("adminClientRoles"))}</span><select class="scope-role-select" id="client-scope-client-roles-${escapeHtml(scopeId)}" name="clientRoleIds" aria-label="${escapeHtml(text("adminClientRoles"))}" multiple size="5" ${readOnly ? "disabled" : ""}>${clientOptions}</select></label><div class="scope-role-actions">${readOnly ? "" : `${button(text("save"), { action: "admin-client-scope-role-mappings-save", id: scopeId, icon: "save", busy: state.busy === `client-scope-role-mappings-save:${scopeId}`, disabled: state.offline || Boolean(state.busy) })}${button(text("cancel"), { action: "admin-client-scope-role-mappings-cancel", id: scopeId, variant: "secondary", disabled: Boolean(state.busy) })}`}</div></div></section>`;
 }
 
 function clientScopeMappersPanel(scopeId, readOnly = false) {
@@ -2291,7 +2289,7 @@ function adminClientScopeDetailContent() {
       const consentTextId = `client-scope-consent-text-${scope.id}`;
       const groupClaimId = `client-scope-group-claim-${scope.id}`;
       const readOnly = scope.builtIn || !manage;
-      const editing = true;
+      const editing = !scope.builtIn && manage;
       const metadata = editing
         ? `<form class="scope-edit-form" data-form="admin-client-scope-edit" data-scope-id="${escapeHtml(scope.id)}" data-scope-name="${escapeHtml(scope.name)}" novalidate><div class="field"><label for="${escapeHtml(scopeNameId)}">${escapeHtml(text("adminClientScopeName"))}</label><input id="${escapeHtml(scopeNameId)}" name="name" type="text" value="${escapeHtml(draft.name ?? scope.name)}" maxlength="100" required ${readOnly ? "disabled" : ""}/><div class="field-error">${escapeHtml(scopeErrors.name ?? "")}</div></div><div class="field"><label for="${escapeHtml(displayNameId)}">${escapeHtml(text("adminClientScopeDisplayName"))}</label><input id="${escapeHtml(displayNameId)}" name="displayName" type="text" value="${escapeHtml(draft.displayName ?? scope.displayName ?? "")}" maxlength="200" ${readOnly ? "disabled" : ""}/><div class="field-error">${escapeHtml(scopeErrors.displayName ?? "")}</div></div><div class="field"><label for="${escapeHtml(descriptionId)}">${escapeHtml(text("adminClientScopeDescription"))}</label><textarea id="${escapeHtml(descriptionId)}" name="description" rows="4" maxlength="500" ${readOnly ? "disabled" : ""}>${escapeHtml(draft.description ?? scope.description ?? "")}</textarea><div class="field-error">${escapeHtml(scopeErrors.description ?? "")}</div></div><div class="field"><label for="${escapeHtml(consentTextId)}">${escapeHtml(text("adminScopeConsentScreenText"))}</label><input id="${escapeHtml(consentTextId)}" name="consentScreenText" type="text" value="${escapeHtml(draft.consentScreenText ?? scope.consentScreenText ?? "")}" maxlength="200" ${readOnly ? "disabled" : ""}/><div class="field-error">${escapeHtml(scopeErrors.consentScreenText ?? "")}</div></div><div class="scope-detail-options"><label class="settings-row"><input type="checkbox" name="displayOnConsentScreen" ${(draft.displayOnConsentScreen ?? scope.displayOnConsentScreen) ? "checked" : ""} ${readOnly ? "disabled" : ""}/>${escapeHtml(text("adminScopeDisplayOnConsentScreen"))}</label><label class="settings-row"><input type="checkbox" name="includeInTokenScope" ${(draft.includeInTokenScope ?? scope.includeInTokenScope !== false) ? "checked" : ""} ${readOnly ? "disabled" : ""}/>${escapeHtml(text("adminScopeIncludeInTokenScope"))}</label></div><div class="field"><label for="${escapeHtml(groupClaimId)}">${escapeHtml(text("adminScopeGroupClaimName"))}</label><input id="${escapeHtml(groupClaimId)}" name="groupClaimName" type="text" value="${escapeHtml(draft.groupClaimName ?? scope.groupClaimName ?? "groups")}" maxlength="100" required ${readOnly ? "disabled" : ""}/><div class="field-error">${escapeHtml(scopeErrors.groupClaimName ?? "")}</div></div><div class="scope-detail-options"><label class="settings-row"><input type="checkbox" name="groupMapperEnabled" ${(draft.groupMapperEnabled ?? scope.groupMapperEnabled) ? "checked" : ""} ${readOnly ? "disabled" : ""}/>${escapeHtml(text("adminScopeGroupMapperEnabled"))}</label><label class="settings-row"><input type="checkbox" name="groupMapperFullPath" ${(draft.groupMapperFullPath ?? scope.groupMapperFullPath !== false) ? "checked" : ""} ${readOnly ? "disabled" : ""}/>${escapeHtml(text("adminScopeGroupMapperFullPath"))}</label></div><div class="actions">${button(text("save"), { type: "submit", icon: "save", busy, disabled: readOnly || state.offline || Boolean(state.busy) })}</div></form>`
         : `<dl class="client-facts"><dt>${escapeHtml(text("adminClientScopeName"))}</dt><dd><code>${escapeHtml(scope.name)}</code> <span class="client-badge">${escapeHtml(scope.builtIn ? text("adminBuiltIn") : text("adminCustom"))}</span></dd><dt>${escapeHtml(text("adminClientScopeDisplayName"))}</dt><dd>${escapeHtml(scope.displayName || "—")}</dd><dt>${escapeHtml(text("adminClientScopeDescription"))}</dt><dd>${escapeHtml(scope.description || "—")}</dd></dl>${!scope.builtIn && manage ? button(text("actionEdit"), { action: "client-scope-edit", id: scope.id, icon: "edit", variant: "secondary", disabled: Boolean(state.busy) }) : ""}`;
@@ -2311,12 +2309,24 @@ function adminClientScopeDetailContent() {
             );
       const roleMappingsOpen =
         state.data.adminClientScopeRoleMappingsOpenId === scope.id;
-      const roleMappingControls = "";
+      const roleMappingControls = button(text("adminClientScopeRoleMappings"), {
+        action: "admin-client-scope-role-mappings-toggle",
+        id: scope.id,
+        icon: "edit",
+        variant: "secondary",
+        disabled: state.offline || Boolean(state.busy),
+      });
       const roleMappingPanel = roleMappingsOpen
         ? clientScopeRoleMappingPanel(scope.id, scope.builtIn || !manage)
         : "";
       const mappersOpen = state.data.clientScopeMappersOpenId === scope.id;
-      const mapperControls = "";
+      const mapperControls = button(text("adminClientScopeMappers"), {
+        action: "admin-client-scope-mappers-toggle",
+        id: scope.id,
+        icon: "edit",
+        variant: "secondary",
+        disabled: state.offline || Boolean(state.busy),
+      });
       const mapperPanel = mappersOpen
         ? clientScopeMappersPanel(scope.id, scope.builtIn || !manage)
         : "";
@@ -5934,7 +5944,6 @@ async function cancelSignIn(timedOut = false) {
   state.authCanceling = true;
   render();
   try {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
     await api.auth.cancelLogin(consoleName);
     clearTimeout(authTimeout);
     authTimeout = undefined;
