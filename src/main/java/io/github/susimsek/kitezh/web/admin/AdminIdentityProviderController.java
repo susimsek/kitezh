@@ -2,6 +2,8 @@ package io.github.susimsek.kitezh.web.admin;
 
 import io.github.susimsek.kitezh.config.openapi.OpenApiConfig;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderNativePolicyDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderNativePolicyRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperRequestDTO;
@@ -71,6 +73,25 @@ public class AdminIdentityProviderController {
     AdminIdentityProviderDTO update(
             @PathVariable String id, @Valid @RequestBody AdminIdentityProviderRequestDTO request) {
         return service.update(id, request);
+    }
+
+    @GetMapping("/{id}/native-policy")
+    @Operation(
+            summary = "Get native-safe identity provider policy",
+            description = "Returns bounded policy fields without credentials or endpoints.")
+    AdminIdentityProviderNativePolicyDTO findNativePolicy(@PathVariable String id) {
+        return service.findNativePolicy(id);
+    }
+
+    @PutMapping("/{id}/native-policy")
+    @Operation(
+            summary = "Update native-safe identity provider policy",
+            description = "Updates bounded policy fields without credentials or endpoints.")
+    @ApiResponse(responseCode = "200", description = "Updated native-safe policy returned.")
+    AdminIdentityProviderNativePolicyDTO updateNativePolicy(
+            @PathVariable String id,
+            @Valid @RequestBody AdminIdentityProviderNativePolicyRequestDTO request) {
+        return service.updateNativePolicy(id, request);
     }
 
     @DeleteMapping("/{id}")

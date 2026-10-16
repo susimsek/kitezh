@@ -5,6 +5,8 @@ import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
 import io.github.susimsek.kitezh.dto.account.LoginSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminLoginSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminLoginSettingsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.NativeAdminLoginSettingsDTO;
+import io.github.susimsek.kitezh.dto.admin.NativeAdminLoginSettingsRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.WebAuthnPolicyDTO;
 import io.github.susimsek.kitezh.mapper.LoginSettingsMapper;
 import io.github.susimsek.kitezh.repository.LoginSettingsRepository;
@@ -44,6 +46,11 @@ public class LoginSettingsService {
         return loginSettingsMapper.toAdminDTO(settings);
     }
 
+    @Transactional(readOnly = true)
+    public NativeAdminLoginSettingsDTO nativeAdminLoginSettings() {
+        return loginSettingsMapper.toNativeAdminDTO(settings());
+    }
+
     @Transactional
     @CacheEvict(cacheNames = LoginSettingsRepository.LOGIN_SETTINGS_BY_ID_CACHE, allEntries = true)
     public AdminLoginSettingsDTO update(AdminLoginSettingsRequestDTO request) {
@@ -60,6 +67,41 @@ public class LoginSettingsService {
         }
         auditEventService.record("login.settings.updated", "login-settings", "default");
         return loginSettingsMapper.toAdminDTO(settings);
+    }
+
+    @Transactional
+    @CacheEvict(cacheNames = LoginSettingsRepository.LOGIN_SETTINGS_BY_ID_CACHE, allEntries = true)
+    public NativeAdminLoginSettingsDTO updateNativeAdminSettings(
+            NativeAdminLoginSettingsRequestDTO request) {
+        LoginSettingsEntity settings = settings();
+        if (request.passwordMinimumLength() > settings.getPasswordMaximumLength()) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST,
+                    "Password minimum length cannot exceed the configured maximum");
+        }
+        if (request.otpRequired() && !request.otpEnabled()) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST, "OTP cannot be required when it is disabled");
+        }
+        settings.setUserRegistrationEnabled(request.userRegistration());
+        settings.setForgotPasswordEnabled(request.forgotPassword());
+        settings.setRememberMeEnabled(request.rememberMe());
+        settings.setLoginWithEmail(request.loginWithEmail());
+        settings.setVerifyEmail(request.verifyEmail());
+        settings.setSessionTimeoutMinutes(request.sessionTimeoutMinutes());
+        settings.setPasswordMinimumLength(request.passwordMinimumLength());
+        settings.setBruteForceEnabled(request.bruteForceEnabled());
+        settings.setBruteForceMaxFailures(request.bruteForceMaxFailures());
+        settings.setOtpEnabled(request.otpEnabled());
+        settings.setOtpRequired(request.otpRequired());
+        settings.setPasskeysEnabled(request.passkeys());
+        repository.save(settings);
+        if (sessionRepository != null) {
+            sessionRepository.setDefaultMaxInactiveInterval(
+                    Duration.ofMinutes(settings.getSessionTimeoutMinutes()));
+        }
+        auditEventService.record("login.settings.updated", "login-settings", "default");
+        return loginSettingsMapper.toNativeAdminDTO(settings);
     }
 
     @Transactional(readOnly = true)

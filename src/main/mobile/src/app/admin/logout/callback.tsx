@@ -1,3 +1,1 @@
-import { AdminAuthCallbackScreen } from "@/components/AuthCallbackScreen";
-
-export default AdminAuthCallbackScreen;
+export { AdminAuthCallbackScreen as default } from "@/components/AuthCallbackScreen";

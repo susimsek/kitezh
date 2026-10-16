@@ -80,40 +80,25 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/web/pnpm-lock.yaml
+          cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
 
       - name: Install renderer dependencies
-        working-directory: src/main/web
+        working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
-
-      - name: Cache Next.js renderer build output
-        id: next-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: src/main/web/.next/cache
-          key: next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
-
-      - name: Report renderer cache status
-        env:
-          NEXT_CACHE_HIT: ${{ steps.next-cache.outputs.cache-hit }}
-        run: |
-          node -e "const fs = require('node:fs'); const status = process.env.NEXT_CACHE_HIT === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Desktop renderer cache status\\n- Next.js build cache: ' + status + '\\n');"
 
       - name: Build desktop renderer
         working-directory: src/main/desktop
-        run: pnpm run build:renderer
+        run: pnpm run build:shared && pnpm run build:native
 
       - name: Verify desktop renderer output
-        run: test -s src/main/desktop/renderer/index.html
+        run: test -s src/main/desktop/dist/native/native.html
 
       - name: Upload shared desktop renderer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: renderer-${{ needs.resolve-release.outputs.release_tag }}
-          path: src/main/desktop/renderer/
+          path: src/main/desktop/dist/native/
           if-no-files-found: error
           retention-days: 1
 
@@ -151,18 +136,7 @@ jobs:
       id-token: write
     environment: desktop-release
     env:
-      MAC_SIGNING_MODE: ${{ vars.MAC_SIGNING_MODE || 'unsigned' }}
-      MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK || '' }}
-      MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD || '' }}
-      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 || '' }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID || '' }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER || '' }}
-      WINDOWS_SIGNING_MODE: ${{ vars.WINDOWS_SIGNING_MODE || 'unsigned' }}
-      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK || '' }}
-      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD || '' }}
-      LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY || '' }}
-      LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE || '' }}
-      UPDATE_MANIFEST_SIGNING_KEY: ${{ secrets.UPDATE_MANIFEST_SIGNING_KEY || '' }}
+      DESKTOP_RELEASE_PLATFORM: ${{ matrix.platform }}
 
     steps:
       - name: Check out source
@@ -184,97 +158,34 @@ jobs:
           cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
 
-      - name: Resolve Electron runtime version
-        id: electron-runtime
-        shell: bash
-        run: |
-          version="$(node -p "require('./src/main/desktop/package.json').devDependencies.electron")"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-
-      - name: Prepare Electron runtime download cache
-        shell: bash
-        run: |
-          set -euo pipefail
-          cache_dir="${RUNNER_TEMP}/electron"
-          mkdir -p "${cache_dir}"
-          echo "ELECTRON_CACHE=${cache_dir}" >> "${GITHUB_ENV}"
-
-      - name: Cache Electron runtime download
-        id: electron-runtime-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ${{ runner.temp }}/electron
-          key: electron-runtime-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron-runtime.outputs.version }}
+      - name: Require platform release signing credentials
+        working-directory: src/main/desktop
+        env:
+          MAC_CSC_LINK: ${{ matrix.platform == 'macos' && secrets.MAC_CSC_LINK || '' }}
+          MAC_CSC_KEY_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_API_KEY_BASE64: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_BASE64 || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+          WIN_CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WIN_CSC_LINK || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          LINUX_GPG_PRIVATE_KEY: ${{ matrix.platform == 'linux' && secrets.LINUX_GPG_PRIVATE_KEY || '' }}
+          UPDATE_MANIFEST_SIGNING_KEY: ${{ secrets.UPDATE_MANIFEST_SIGNING_KEY || '' }}
+        run: node scripts/require-release-signing.mjs
 
       - name: Install desktop dependencies
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
 
       - name: Download shared desktop renderer
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: renderer-${{ needs.resolve-release.outputs.release_tag }}
-          path: src/main/desktop/renderer
-
-      - name: Verify shared desktop renderer
-        run: test -s src/main/desktop/renderer/index.html
-
-      - name: Prepare platform signing configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ matrix.platform }}" == "macos" ]]; then
-            case "${MAC_SIGNING_MODE}" in
-              unsigned)
-                echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
-                echo "macOS release signing mode is unsigned."
-                ;;
-              signed)
-                for secret_name in MAC_CSC_LINK MAC_CSC_KEY_PASSWORD; do
-                  if [[ -z "${!secret_name}" ]]; then
-                    echo "${secret_name} is required when MAC_SIGNING_MODE=signed." >&2
-                    exit 1
-                  fi
-                done
-                {
-                  echo "CSC_LINK=${MAC_CSC_LINK}"
-                  echo "CSC_KEY_PASSWORD=${MAC_CSC_KEY_PASSWORD}"
-                } >> "${GITHUB_ENV}"
-                ;;
-              *)
-                echo "MAC_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
-                exit 1
-                ;;
-            esac
-          elif [[ "${{ matrix.platform }}" == "windows" ]]; then
-            case "${WINDOWS_SIGNING_MODE}" in
-              unsigned)
-                echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
-                echo "Windows release signing mode is unsigned."
-                ;;
-              signed)
-                for secret_name in WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
-                  if [[ -z "${!secret_name}" ]]; then
-                    echo "${secret_name} is required when WINDOWS_SIGNING_MODE=signed." >&2
-                    exit 1
-                  fi
-                done
-                {
-                  echo "CSC_LINK=${WIN_CSC_LINK}"
-                  echo "CSC_KEY_PASSWORD=${WIN_CSC_KEY_PASSWORD}"
-                } >> "${GITHUB_ENV}"
-                ;;
-              *)
-                echo "WINDOWS_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
-                exit 1
-                ;;
-            esac
-          else
-            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
-          fi
+          path: src/main/desktop/dist/native/
 
       - name: Prepare update manifest verification key
         shell: bash
+        env:
+          UPDATE_MANIFEST_SIGNING_KEY: ${{ secrets.UPDATE_MANIFEST_SIGNING_KEY || '' }}
         run: node src/main/desktop/scripts/write-update-manifest-public-key.mjs
 
       - name: Prepare electron-builder cache
@@ -316,10 +227,10 @@ jobs:
       - name: Prepare Apple notarization key
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 || '' }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID || '' }}
         run: |
-          if [[ -z "${APPLE_API_KEY_BASE64}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
-            exit 0
-          fi
           key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
           printf '%s' "${APPLE_API_KEY_BASE64}" | base64 --decode > "${key_path}"
           chmod 600 "${key_path}"
@@ -328,6 +239,11 @@ jobs:
       - name: Build desktop package
         shell: bash
         working-directory: src/main/desktop
+        env:
+          CSC_LINK: ${{ (matrix.platform == 'windows' && secrets.WIN_CSC_LINK) || (matrix.platform == 'macos' && secrets.MAC_CSC_LINK) || '' }}
+          CSC_KEY_PASSWORD: ${{ (matrix.platform == 'windows' && secrets.WIN_CSC_KEY_PASSWORD) || (matrix.platform == 'macos' && secrets.MAC_CSC_KEY_PASSWORD) || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
         run: |
           pnpm run build:main
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
@@ -344,64 +260,27 @@ jobs:
             exit 0
           fi
 
-          if [[ -n "${CSC_LINK:-}" && -n "${CSC_KEY_PASSWORD:-}" && -n "${APPLE_API_KEY:-}" && -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER:-}" ]]; then
-            pnpm exec electron-builder --publish never --mac --x64 --arm64 --config.mac.notarize=true
-          else
-            pnpm exec electron-builder --publish never --mac --x64 --arm64
-          fi
-          release_version="${{ needs.resolve-release.outputs.release_tag }}"
-          release_version="${release_version#v}"
-          for architecture in x64 arm64; do
-            for extension in dmg zip; do
-              package="release/kitezh-${release_version}-macos-${architecture}.${extension}"
-              test -s "${package}"
-            done
-          done
-          if find release -maxdepth 1 -type f -name '*macos-universal*' -print -quit | grep -q .; then
-            echo "A universal macOS package was produced unexpectedly." >&2
-            exit 1
-          fi
-
-      - name: Smoke-test packaged desktop app
-        shell: bash
-        working-directory: src/main/desktop
-        run: |
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            xvfb-run -a pnpm run smoke:package
-          else
-            pnpm run smoke:package
-          fi
+          # Build separate packages together so latest-mac.yml includes both architectures.
+          pnpm exec electron-builder --publish never --mac --x64 --arm64 --config.mac.notarize=true
 
       - name: Verify macOS signature and notarization
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
         run: |
-          if [[ "${MAC_SIGNING_MODE}" == "unsigned" ]]; then
-            echo "macOS release is configured as unsigned."
-            exit 0
-          fi
-          mapfile -t app_paths < <(find src/main/desktop/release -type d -name '*.app' -print)
-          test "${#app_paths[@]}" -eq 2
-          for app_path in "${app_paths[@]}"; do
+          set -euo pipefail
+          app_count=0
+          while IFS= read -r -d '' app_path; do
             codesign --verify --deep --strict --verbose=2 "${app_path}"
-            if [[ -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
-              continue
-            fi
             spctl --assess --type exec --verbose "${app_path}"
             xcrun stapler validate "${app_path}"
-          done
-          if [[ -z "${APPLE_API_KEY}" || -z "${APPLE_API_KEY_ID}" || -z "${APPLE_API_ISSUER}" ]]; then
-            echo "macOS app is signed; notarization credentials are not configured."
-          fi
+            app_count=$((app_count + 1))
+          done < <(find src/main/desktop/release -type d -name '*.app' -print0)
+          test "${app_count}" -eq 2
 
       - name: Verify Windows Authenticode signature
         if: ${{ matrix.platform == 'windows' }}
         shell: pwsh
         run: |
-          if ($env:WINDOWS_SIGNING_MODE -eq "unsigned") {
-            Write-Host "Windows release is configured as unsigned."
-            exit 0
-          }
           $installers = Get-ChildItem -Path "src/main/desktop/release" -Filter "*.exe"
           if ($installers.Count -eq 0) { throw "No Windows installer was produced." }
           foreach ($installer in $installers) {
@@ -439,11 +318,16 @@ jobs:
 
       - name: Sign update manifests
         shell: bash
+        env:
+          UPDATE_MANIFEST_SIGNING_KEY: ${{ secrets.UPDATE_MANIFEST_SIGNING_KEY || '' }}
         run: node src/main/desktop/scripts/sign-update-manifests.mjs src/main/desktop/release
 
       - name: Validate Linux package metadata and sign checksums
         if: ${{ matrix.platform == 'linux' }}
         shell: bash
+        env:
+          LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY || '' }}
+          LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE || '' }}
         run: |
           set -euo pipefail
           deb_path="$(find src/main/desktop/release -maxdepth 1 -type f -name '*.deb' -print -quit)"
@@ -470,16 +354,26 @@ jobs:
             test -s "${snap_path}"
             (cd src/main/desktop/release && sha256sum -- *.AppImage *.deb *.rpm *.snap > SHA256SUMS)
           fi
-          if [[ -z "${LINUX_GPG_PRIVATE_KEY}" ]]; then
-            echo "Linux GPG signing key is not configured; publishing unsigned packages with SHA256SUMS."
-            exit 0
+          key_file="${RUNNER_TEMP}/desktop-release-signing-key.asc"
+          import_log="${RUNNER_TEMP}/desktop-release-signing-import.log"
+          passphrase_file="${RUNNER_TEMP}/desktop-release-signing-passphrase"
+          trap 'rm -f "${key_file}" "${import_log}" "${passphrase_file}"' EXIT
+          umask 077
+          printf '%s' "${LINUX_GPG_PRIVATE_KEY}" > "${key_file}"
+          if ! gpg --batch --import "${key_file}" > "${import_log}" 2>&1; then
+            echo "Linux release signing key import failed." >&2
+            exit 1
           fi
-          printf '%s' "${LINUX_GPG_PRIVATE_KEY}" | gpg --batch --import
+          rm -f "${key_file}" "${import_log}"
           gpg_args=(--batch --yes --armor --detach-sign)
           if [[ -n "${LINUX_GPG_PASSPHRASE}" ]]; then
-            gpg_args+=(--pinentry-mode loopback --passphrase "${LINUX_GPG_PASSPHRASE}")
+            printf '%s' "${LINUX_GPG_PASSPHRASE}" > "${passphrase_file}"
+            gpg_args+=(--pinentry-mode loopback --passphrase-file "${passphrase_file}")
           fi
-          gpg "${gpg_args[@]}" --output src/main/desktop/release/SHA256SUMS.asc src/main/desktop/release/SHA256SUMS
+          if ! gpg "${gpg_args[@]}" --output src/main/desktop/release/SHA256SUMS.asc src/main/desktop/release/SHA256SUMS > "${import_log}" 2>&1; then
+            echo "Linux release checksum signing failed." >&2
+            exit 1
+          fi
 
       - name: Collect distributable release assets
         run: node src/main/desktop/scripts/collect-release-assets.mjs src/main/desktop/release "${{ runner.temp }}/desktop-release-assets"

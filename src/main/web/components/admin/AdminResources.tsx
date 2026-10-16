@@ -85,11 +85,11 @@ export function AdminResources({
   resource,
   copy,
   locale,
-}: {
-  readonly resource: Resource;
-  readonly copy: Copy;
-  readonly locale?: Locale;
-}) {
+}: Readonly<{
+  resource: Resource;
+  copy: Copy;
+  locale?: Locale;
+}>) {
   return <AdminResourcesContent copy={copy} key={resource} locale={locale} resource={resource} />;
 }
 
@@ -97,11 +97,11 @@ function AdminResourcesContent({
   resource,
   copy,
   locale,
-}: {
-  readonly resource: Resource;
-  readonly copy: Copy;
-  readonly locale?: Locale;
-}) {
+}: Readonly<{
+  resource: Resource;
+  copy: Copy;
+  locale?: Locale;
+}>) {
   const { access, accessToken, logout, username: currentUsername } = useAdminAuth();
   const alerts = useConsoleAlerts();
   const [items, setItems] = useState<User[] | Session[] | Consent[] | Key[]>([]);
@@ -119,6 +119,11 @@ function AdminResourcesContent({
     null,
   );
   const [rotating, setRotating] = useState(false);
+  let defaultSort = "username,asc";
+  if (resource === "sessions") defaultSort = "lastAccessTime,desc";
+  else if (resource === "consents") defaultSort = "id.principalName,asc";
+  else if (resource === "keys") defaultSort = "createdAt,desc";
+
   const {
     clientId,
     clearFilters,
@@ -140,48 +145,24 @@ function AdminResourcesContent({
   } = useAdminTableState(
     10,
     resource === "users" || resource === "keys" || resource === "sessions",
-    (() => {
-      if (resource === "sessions") {
-        return "lastAccessTime,desc";
-      } else {
-        if (resource === "consents") {
-          return "id.principalName,asc";
-        } else {
-          if (resource === "keys") {
-            return "createdAt,desc";
-          } else {
-            return "username,asc";
-          }
-        }
-      }
-    })(),
+    defaultSort,
   );
 
   useEffect(() => {
     if (!accessToken) return;
+    let resourceFilters = "";
+    if (resource === "users") resourceFilters = `&enabled=${status}`;
+    else if (resource === "keys") resourceFilters = `&active=${status}`;
+    else if (resource === "sessions") {
+      resourceFilters = `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}`;
+    } else if (resource === "consents") {
+      resourceFilters = `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}`;
+    }
     adminRequest<PageResponse<User | Session | Consent | Key>>(accessToken, {
-      url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${(() => {
-        if (resource === "users") {
-          return `&enabled=${status}`;
-        } else {
-          if (resource === "keys") {
-            return `&active=${status}`;
-          } else {
-            if (resource === "sessions") {
-              return `&status=${status || "active"}&clientId=${encodeURIComponent(clientId)}`;
-            } else {
-              if (resource === "consents") {
-                return `&clientId=${encodeURIComponent(clientId)}&username=${encodeURIComponent(username)}&scope=${encodeURIComponent(scope)}`;
-              } else {
-                return "";
-              }
-            }
-          }
-        }
-      })()}`,
+      url: `/api/admin/${resource}?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}${resourceFilters}`,
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setError(false);
         setItems(response.data.content as User[] | Session[] | Consent[] | Key[]);
         setTotalPages(response.data.totalPages);
@@ -204,54 +185,62 @@ function AdminResourcesContent({
     status,
   ]);
 
+  let statusLabel = status;
+  if (status === "true") statusLabel = copy.active;
+  else if (status === "false") statusLabel = copy.passive;
   const activeFilters = [
     query && { label: copy.search, value: query, onRemove: () => setQuery("") },
     status && {
       label: copy.status,
-      value: (() => {
-        if (status === "true") {
-          return copy.active;
-        } else {
-          if (status === "false") {
-            return copy.passive;
-          } else {
-            return status;
-          }
-        }
-      })(),
+      value: statusLabel,
       onRemove: () => setStatus(""),
     },
     clientId && { label: copy.client, value: clientId, onRemove: () => setClientId("") },
     username && { label: copy.user, value: username, onRemove: () => setUsername("") },
     scope && { label: copy.scope, value: scope, onRemove: () => setScope("") },
   ].filter(Boolean) as { label: string; value: string; onRemove: () => void }[];
-  const sortOptions = (() => {
-    if (resource === "sessions") {
-      return [
-        { value: "lastAccessTime,desc", label: copy.newest },
-        { value: "lastAccessTime,asc", label: copy.oldest },
-      ];
-    } else {
-      if (resource === "consents") {
-        return [
-          { value: "id.principalName,asc", label: `${copy.user} · ${copy.ascending}` },
-          { value: "id.principalName,desc", label: `${copy.user} · ${copy.descending}` },
-        ];
-      } else {
-        if (resource === "keys") {
-          return [
-            { value: "createdAt,desc", label: copy.newest },
-            { value: "createdAt,asc", label: copy.oldest },
-          ];
-        } else {
-          return [
-            { value: "username,asc", label: `${copy.username} · ${copy.ascending}` },
-            { value: "username,desc", label: `${copy.username} · ${copy.descending}` },
-          ];
-        }
-      }
-    }
-  })();
+  let sortOptions: { value: string; label: string }[];
+  if (resource === "sessions") {
+    sortOptions = [
+      { value: "lastAccessTime,desc", label: copy.newest },
+      { value: "lastAccessTime,asc", label: copy.oldest },
+    ];
+  } else if (resource === "consents") {
+    sortOptions = [
+      { value: "id.principalName,asc", label: `${copy.user} · ${copy.ascending}` },
+      { value: "id.principalName,desc", label: `${copy.user} · ${copy.descending}` },
+    ];
+  } else if (resource === "keys") {
+    sortOptions = [
+      { value: "createdAt,desc", label: copy.newest },
+      { value: "createdAt,asc", label: copy.oldest },
+    ];
+  } else {
+    sortOptions = [
+      { value: "username,asc", label: `${copy.username} · ${copy.ascending}` },
+      { value: "username,desc", label: `${copy.username} · ${copy.descending}` },
+    ];
+  }
+  const bulkActionDetails = {
+    ENABLE: {
+      label: copy.bulkEnable,
+      action: "enable" as const,
+      variant: "primary" as const,
+      message: copy.bulkEnableConfirm,
+    },
+    DISABLE: {
+      label: copy.bulkDisable,
+      action: "disable" as const,
+      variant: "warning" as const,
+      message: copy.bulkDisableConfirm,
+    },
+    DELETE: {
+      label: copy.bulkDelete,
+      action: "delete" as const,
+      variant: "danger" as const,
+      message: copy.bulkDeleteConfirm,
+    },
+  }[bulkAction ?? "DELETE"];
 
   const request = async <T,>(
     url: string,
@@ -583,51 +572,11 @@ function AdminResourcesContent({
       />
       <ConfirmModal
         cancelLabel={copy.cancel}
-        confirmLabel={(() => {
-          if (bulkAction === "ENABLE") {
-            return copy.bulkEnable;
-          } else {
-            if (bulkAction === "DISABLE") {
-              return copy.bulkDisable;
-            } else {
-              return copy.bulkDelete;
-            }
-          }
-        })()}
-        confirmAction={(() => {
-          if (bulkAction === "ENABLE") {
-            return "enable";
-          } else {
-            if (bulkAction === "DISABLE") {
-              return "disable";
-            } else {
-              return "delete";
-            }
-          }
-        })()}
-        confirmVariant={(() => {
-          if (bulkAction === "ENABLE") {
-            return "primary";
-          } else {
-            if (bulkAction === "DISABLE") {
-              return "warning";
-            } else {
-              return "danger";
-            }
-          }
-        })()}
+        confirmLabel={bulkActionDetails.label}
+        confirmAction={bulkActionDetails.action}
+        confirmVariant={bulkActionDetails.variant}
         busy={bulkBusy}
-        message={(() => {
-          if (bulkAction === "ENABLE") {
-            return copy.bulkEnableConfirm;
-          } else {
-            if (bulkAction === "DISABLE") {
-              return copy.bulkDisableConfirm;
-            } else {
-              return copy.bulkDeleteConfirm;
-            }
-          }
-        })()}
+        message={bulkActionDetails.message}
         onCancel={() => {
           if (!bulkBusy) setBulkAction(null);
         }}
@@ -658,15 +607,15 @@ function UsersTable({
   locale,
   selectedIds,
   onSelectionChange,
-}: {
-  readonly items: User[];
-  readonly request: AdminRequest;
-  readonly copy: Copy;
-  readonly canManage: boolean;
-  readonly locale?: Locale;
-  readonly selectedIds: number[];
-  readonly onSelectionChange: (ids: number[]) => void;
-}) {
+}: Readonly<{
+  items: User[];
+  request: AdminRequest;
+  copy: Copy;
+  canManage: boolean;
+  locale?: Locale;
+  selectedIds: number[];
+  onSelectionChange: (ids: number[]) => void;
+}>) {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const allSelected = items.length > 0 && items.every((user) => selectedIds.includes(user.id));
 
@@ -809,16 +758,16 @@ function SessionsTable({
   currentUsername,
   locale,
   logout,
-}: {
-  readonly items: Session[];
-  readonly request: AdminRequest;
-  readonly copy: Copy;
-  readonly canManage: boolean;
-  readonly accessToken: string | null;
-  readonly currentUsername: string | null;
-  readonly locale?: Locale;
-  readonly logout?: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
-}) {
+}: Readonly<{
+  items: Session[];
+  request: AdminRequest;
+  copy: Copy;
+  canManage: boolean;
+  accessToken: string | null;
+  currentUsername: string | null;
+  locale?: Locale;
+  logout?: (locale: Locale, options?: ConsoleLogoutOptions) => Promise<void>;
+}>) {
   const date = useDateTimeFormatter();
   const [sessionAction, setSessionAction] = useState<{
     url: string;
@@ -1055,13 +1004,13 @@ function ConsentsTable({
   copy,
   canManage,
   locale,
-}: {
-  readonly items: Consent[];
-  readonly request: AdminRequest;
-  readonly copy: Copy;
-  readonly canManage: boolean;
-  readonly locale?: Locale;
-}) {
+}: Readonly<{
+  items: Consent[];
+  request: AdminRequest;
+  copy: Copy;
+  canManage: boolean;
+  locale?: Locale;
+}>) {
   const [consentToRevoke, setConsentToRevoke] = useState<Consent | null>(null);
   const formatDate = useDateTimeFormatter();
   return (
@@ -1159,7 +1108,7 @@ function ConsentsTable({
   );
 }
 
-function KeysTable({ items, copy }: { readonly items: Key[]; readonly copy: Copy }) {
+function KeysTable({ items, copy }: Readonly<{ items: Key[]; copy: Copy }>) {
   const date = useDateTimeFormatter();
   return (
     <>

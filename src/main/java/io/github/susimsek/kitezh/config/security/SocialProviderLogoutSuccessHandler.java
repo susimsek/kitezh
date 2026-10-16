@@ -94,9 +94,6 @@ public class SocialProviderLogoutSuccessHandler implements AuthenticationSuccess
                         ? "/"
                         : logout.getPostLogoutRedirectUri();
         String providerType = provider.providerType().toLowerCase(java.util.Locale.ROOT);
-        if ("google".equals(providerType) && isBlank(provider.issuerUri())) {
-            return appendParameter(endpoint, "continue", redirect);
-        }
         if ("github".equals(providerType)) {
             return appendParameter(endpoint, "return_to", redirect);
         }

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import en from "@/locales/en/common.json";
-import tr from "@/locales/tr/common.json";
+import en from "@kitezh/shared/web-messages/en";
+import tr from "@kitezh/shared/web-messages/tr";
 import { adminRequest } from "@/lib/admin-api";
 import { GroupDetail } from "./GroupDetail";
 

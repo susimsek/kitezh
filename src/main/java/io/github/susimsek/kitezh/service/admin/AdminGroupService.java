@@ -7,6 +7,7 @@ import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminGroupRenameRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRolesRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupUserDTO;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminGroupService {
 
     private static final String GROUP_TARGET = "group";
+    private static final String GROUP_DUPLICATE_NAME_MESSAGE = "Group name is already registered";
 
     private final GroupRepository groupRepository;
     private final AuthorityRepository authorityRepository;
@@ -121,7 +123,7 @@ public class AdminGroupService {
         String name = normalizeName(request.name());
         if (groupRepository.existsByName(name)) {
             throw ApiException.conflict(
-                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, "Group name is already registered");
+                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, GROUP_DUPLICATE_NAME_MESSAGE);
         }
         GroupEntity group =
                 adminGroupMapper.toEntity(request, resolveParent(request.parentId(), null));
@@ -151,12 +153,29 @@ public class AdminGroupService {
         String name = normalizeName(request.name());
         if (!group.getName().equals(name) && groupRepository.existsByName(name)) {
             throw ApiException.conflict(
-                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, "Group name is already registered");
+                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, GROUP_DUPLICATE_NAME_MESSAGE);
         }
         adminGroupMapper.update(request, group);
         group.setParent(resolveParent(request.parentId(), group));
         adminGroupMapper.updateAttributes(normalizeAttributes(request.attributes()), group);
         group.setDefaultGroup(request.defaultGroupValue());
+        invalidateUsersInGroupTree(group);
+        adminAuditEventService.record("group.updated", GROUP_TARGET, group.getId().toString());
+        return groupView(group);
+    }
+
+    @Transactional
+    @CacheEvict(cacheNames = GroupRepository.DEFAULT_GROUPS_CACHE, allEntries = true)
+    public AdminGroupDTO rename(
+            Long id, AdminGroupRenameRequestDTO request, String currentUsername) {
+        GroupEntity group = findGroup(id);
+        assertPermission(group, currentUsername, GroupPermission.MANAGE_GROUP);
+        String name = normalizeName(request.name());
+        if (!group.getName().equals(name) && groupRepository.existsByName(name)) {
+            throw ApiException.conflict(
+                    "name", ApiErrorCode.GROUP_DUPLICATE_NAME, GROUP_DUPLICATE_NAME_MESSAGE);
+        }
+        group.setName(name);
         invalidateUsersInGroupTree(group);
         adminAuditEventService.record("group.updated", GROUP_TARGET, group.getId().toString());
         return groupView(group);

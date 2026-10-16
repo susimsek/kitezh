@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh.service.account;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.domain.AuthorityEntity;
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.UserAction;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.mapper.AccountRegistrationMapper;
@@ -14,6 +15,7 @@ import io.github.susimsek.kitezh.service.LoginSettingsService;
 import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import io.github.susimsek.kitezh.service.security.PasswordService;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class AccountRegistrationService {
     private final LoginSettingsService loginSettingsService;
     private final AccountRegistrationMapper accountRegistrationMapper;
     private final LdapFederationWriteService ldapFederationWriteService;
+    private final NotificationService notificationService;
 
     @Transactional
     @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, allEntries = true)
@@ -89,6 +92,7 @@ public class AccountRegistrationService {
             ldapFederationWriteService.registerUser(saved, password);
         }
         auditEventService.record("user.registered", "user", saved.getId().toString());
+        notificationService.publishAdministrators(NotificationType.ADMIN_USER_REGISTERED);
 
         if (mailEnabled()
                 && (loginSettingsService == null || loginSettingsService.isVerifyEmailEnabled())) {

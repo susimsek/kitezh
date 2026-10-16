@@ -53,7 +53,7 @@ export function EntityRelatedData({
   canManage = false,
   deleteUrl,
   refreshKey = 0,
-}: {
+}: Readonly<{
   resource: RelatedResource;
   url: string;
   locale: Locale;
@@ -61,7 +61,7 @@ export function EntityRelatedData({
   canManage?: boolean;
   deleteUrl?: (id: string) => string;
   refreshKey?: number;
-}) {
+}>) {
   const { accessToken } = useAdminAuth();
   const alerts = useConsoleAlerts();
   const [items, setItems] = useState<Array<Session | Consent | Event>>([]);
@@ -81,7 +81,7 @@ export function EntityRelatedData({
       url: `${url}?page=${page}&size=${size}`,
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setItems(response.data.content);
         setTotalPages(response.data.totalPages);
         setTotalElements(response.data.totalElements);

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.domain.AuthorityEntity;
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.domain.UserAction;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.mapper.AccountRegistrationMapper;
@@ -19,6 +20,7 @@ import io.github.susimsek.kitezh.service.EmailSettingsService;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
 import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import io.github.susimsek.kitezh.service.security.PasswordService;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,6 +43,7 @@ class AccountRegistrationServiceTest {
     @Mock private ApplicationProperties applicationProperties;
     @Mock private EmailSettingsService emailSettingsService;
     @Mock private LoginSettingsService loginSettingsService;
+    @Mock private NotificationService notificationService;
 
     @Test
     void registersAnEnabledUserWithTheDefaultRole() {
@@ -89,6 +92,7 @@ class AccountRegistrationServiceTest {
         assertThat(saved.getPassword()).isEqualTo("encoded-password");
         assertThat(saved.getAuthorities()).containsExactly(userRole);
         verify(auditEventService).record("user.registered", "user", "7");
+        verify(notificationService).publishAdministrators(NotificationType.ADMIN_USER_REGISTERED);
         verify(userActionService, never()).sendForCurrentUser(any(), any(), any());
     }
 
@@ -218,7 +222,8 @@ class AccountRegistrationServiceTest {
                         emailSettingsService,
                         loginSettingsService,
                         Mappers.getMapper(AccountRegistrationMapper.class),
-                        null)
+                        null,
+                        notificationService)
                 .register("carol", "Carol", "", null, "password", "password", Locale.ENGLISH);
 
         verify(userActionService, never()).sendForCurrentUser(any(), any(), any());
@@ -235,6 +240,7 @@ class AccountRegistrationServiceTest {
                 null,
                 null,
                 Mappers.getMapper(AccountRegistrationMapper.class),
-                null);
+                null,
+                notificationService);
     }
 }

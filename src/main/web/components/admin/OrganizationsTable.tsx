@@ -29,7 +29,7 @@ type Organization = {
   groupCount: number;
 };
 
-export function OrganizationsTable({ dictionary }: { dictionary: Dictionary }) {
+export function OrganizationsTable({ dictionary }: Readonly<{ dictionary: Dictionary }>) {
   const { access, accessToken } = useAdminAuth();
   const copy = dictionary.admin.organizations;
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -49,7 +49,7 @@ export function OrganizationsTable({ dictionary }: { dictionary: Dictionary }) {
       url: `/api/admin/organizations?q=${encodeURIComponent(query)}&page=${page}&size=${size}&sort=${encodeURIComponent(sort)}`,
     })
       .then((response) => {
-        if (response.status >= 300) throw new Error();
+        if (response.status >= 300) throw new Error("Request failed");
         setOrganizations(response.data.content);
         setTotalPages(response.data.totalPages);
         setTotalElements(response.data.totalElements);

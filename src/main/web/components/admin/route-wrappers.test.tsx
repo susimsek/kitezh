@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 import { ClientEntityRoute } from "./ClientEntityRoute";
 import { GroupEntityRoute } from "./GroupEntityRoute";
 import { UserEntityRoute } from "./UserEntityRoute";

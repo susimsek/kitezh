@@ -168,14 +168,14 @@ function Field({
   palette,
   secureTextEntry = false,
   keyboardType = "default",
-}: {
+}: Readonly<{
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   palette: ReturnType<typeof useTheme>["palette"];
   secureTextEntry?: boolean;
   keyboardType?: "default" | "number-pad";
-}) {
+}>) {
   return (
     <View>
       <Text style={[styles.label, { color: palette.text }]}>{label}</Text>

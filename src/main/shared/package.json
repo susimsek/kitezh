@@ -4,24 +4,64 @@
   "private": true,
   "license": "Apache-2.0",
   "description": "Platform-neutral Kitezh contracts, design tokens, and API transport",
-  "types": "./src/index.ts",
-  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./theme": "./src/theme.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./theme": {
+      "types": "./dist/theme.d.ts",
+      "default": "./dist/theme.js"
+    },
     "./theme/runtime": "./src/theme-runtime.cjs",
-    "./i18n": "./src/i18n.ts",
-    "./icons": "./src/icons.ts",
-    "./contracts": "./src/contracts.ts",
-    "./api": "./src/api.ts",
+    "./i18n": {
+      "types": "./dist/i18n.d.ts",
+      "default": "./dist/i18n.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "default": "./dist/catalog.js"
+    },
+    "./web-messages/en": {
+      "types": "./dist/web-messages/en.d.ts",
+      "default": "./dist/web-messages/en.js"
+    },
+    "./web-messages/tr": {
+      "types": "./dist/web-messages/tr.d.ts",
+      "default": "./dist/web-messages/tr.js"
+    },
+    "./icons": {
+      "types": "./dist/icons.d.ts",
+      "default": "./dist/icons.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "default": "./dist/contracts.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    },
     "./api-client": "./src/api-client.cjs",
-    "./auth": "./src/auth.ts",
-    "./session": "./src/session.ts",
+    "./api-client": "./src/api-client.cjs",
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "default": "./dist/auth.js"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "default": "./dist/session.js"
+    },
     "./client-metadata": {
       "types": "./src/client-metadata.d.cts",
       "require": "./src/client-metadata.cjs",
       "default": "./src/client-metadata.cjs"
     }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-runtime-assets.mjs"
   }
 }

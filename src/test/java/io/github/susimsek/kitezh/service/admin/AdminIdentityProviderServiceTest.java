@@ -17,6 +17,7 @@ import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderNativePolicyRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperRequestDTO;
 import io.github.susimsek.kitezh.repository.SamlProviderConfigRepository;
@@ -164,6 +165,37 @@ class AdminIdentityProviderServiceTest {
         assertThat(mapper.getProviderAlias()).isEqualTo("acme");
         verify(auditEventService)
                 .record(eq("identity-provider.created"), eq("identity-provider"), anyString());
+    }
+
+    @Test
+    void updatesNativeSafePolicyWithoutChangingProviderCredentialsOrEndpoints() {
+        SocialProviderEntity existing = provider();
+        when(providerRepository.findById("provider-1")).thenReturn(Optional.of(existing));
+        when(providerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminIdentityProviderNativePolicyRequestDTO request =
+                new AdminIdentityProviderNativePolicyRequestDTO(
+                        "Acme Enterprise",
+                        false,
+                        true,
+                        true,
+                        false,
+                        true,
+                        7,
+                        "when-linked",
+                        "read_only");
+
+        var policy = service.updateNativePolicy("provider-1", request);
+
+        assertThat(policy.displayName()).isEqualTo("Acme Enterprise");
+        assertThat(policy.enabled()).isFalse();
+        assertThat(policy.syncMode()).isEqualTo("read_only");
+        assertThat(existing.getClientId()).isEqualTo("client");
+        assertThat(existing.getClientSecretEncrypted()).isEqualTo("encrypted");
+        assertThat(existing.getAuthorizationUri()).isEqualTo("https://acme.example/authorize");
+        assertThat(existing.getTokenUri()).isEqualTo("https://acme.example/token");
+        verify(settingsService).refreshClientRegistrations();
+        verify(auditEventService)
+                .record("identity-provider.updated", "identity-provider", "provider-1");
     }
 
     @Test
@@ -582,6 +614,37 @@ class AdminIdentityProviderServiceTest {
         verify(secretCipher).encrypt("signing-key");
         verify(secretCipher).encrypt("decryption-key");
         verify(samlConfigRepository).save(any(SamlProviderConfigEntity.class));
+    }
+
+    @Test
+    void preservesEncryptedSamlKeysWhenAnUpdateLeavesPrivateKeyFieldsBlank() {
+        SocialProviderEntity provider = provider();
+        provider.setProviderType("saml");
+        when(providerRepository.findById("provider-1")).thenReturn(Optional.of(provider));
+        SamlProviderConfigEntity existingConfig = new SamlProviderConfigEntity();
+        existingConfig.setProviderId("provider-1");
+        existingConfig.setMetadataUri("https://idp.example/metadata");
+        existingConfig.setAssertingPartyEntityId("https://idp.example/entity");
+        existingConfig.setSingleSignOnServiceUrl("https://idp.example/sso");
+        existingConfig.setIdpCertificate("existing-idp-certificate");
+        existingConfig.setSigningPrivateKeyEncrypted("encrypted-signing-key");
+        existingConfig.setDecryptionPrivateKeyEncrypted("encrypted-decryption-key");
+        when(samlConfigRepository.findById("provider-1")).thenReturn(Optional.of(existingConfig));
+        when(samlConfigRepository.findByProviderId("provider-1"))
+                .thenReturn(Optional.of(existingConfig));
+        when(samlConfigRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AdminIdentityProviderDTO result =
+                samlService.update("provider-1", samlRequest(null, false, null));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(SamlProviderConfigEntity.class);
+        verify(samlConfigRepository).save(captor.capture());
+        assertThat(captor.getValue().getSigningPrivateKeyEncrypted())
+                .isEqualTo("encrypted-signing-key");
+        assertThat(captor.getValue().getDecryptionPrivateKeyEncrypted())
+                .isEqualTo("encrypted-decryption-key");
+        assertThat(result.samlSigningPrivateKeyConfigured()).isTrue();
+        assertThat(result.samlDecryptionPrivateKeyConfigured()).isTrue();
     }
 
     @Test

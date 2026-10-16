@@ -5,6 +5,8 @@ import io.github.susimsek.kitezh.domain.ServiceAccountEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminClientNativeMetadataRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.mapper.AdminClientMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
@@ -53,6 +55,14 @@ public class AdminClientService {
     private static final String AUTHORIZATION_GRANT_TYPES_FIELD = "authorizationGrantTypes";
 
     private static final String ADMIN_CONSOLE_CLIENT_ID = "admin-console";
+    private static final Set<String> PLATFORM_CONSOLE_CLIENT_IDS =
+            Set.of(
+                    ADMIN_CONSOLE_CLIENT_ID,
+                    "account-console",
+                    "desktop-admin-console",
+                    "desktop-account-console",
+                    "mobile-admin-console",
+                    "mobile-account-console");
     private static final Duration DEFAULT_AUTHORIZATION_CODE_TTL = Duration.ofMinutes(5);
     private static final Duration DEFAULT_ACCESS_TOKEN_TTL = Duration.ofMinutes(5);
     private static final Duration DEFAULT_REFRESH_TOKEN_TTL = Duration.ofHours(1);
@@ -101,6 +111,28 @@ public class AdminClientService {
                                     client, account != null, serviceAccountUsername(account));
                         })
                 .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminClientNativeMetadataDTO findNativeMetadata(String id) {
+        return nativeMetadata(findRequired(id));
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
+            allEntries = true)
+    public AdminClientNativeMetadataDTO updateNativeMetadata(
+            String id, AdminClientNativeMetadataRequestDTO request) {
+        RegisteredClient existing = findRequired(id);
+        rejectAdminConsoleMutation(existing);
+        RegisteredClient updated =
+                save(
+                        RegisteredClient.from(existing)
+                                .clientName(request.clientName().trim())
+                                .build());
+        adminAuditEventService.record("client.updated", CLIENT_TARGET, id);
+        return nativeMetadata(updated);
     }
 
     @Transactional
@@ -180,7 +212,11 @@ public class AdminClientService {
             cacheNames = ClientRepository.REGISTERED_CLIENT_BY_CLIENT_ID_CACHE,
             allEntries = true)
     public void delete(String id) {
-        rejectAdminConsoleMutation(findRequired(id));
+        RegisteredClient client = findRequired(id);
+        if (PLATFORM_CONSOLE_CLIENT_IDS.contains(client.getClientId())) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.CLIENT_PROTECTED, "Platform console clients cannot be deleted");
+        }
         authorizationRepository.deleteByRegisteredClientId(id);
         authorizationConsentRepository.deleteByIdRegisteredClientId(id);
         removeServiceAccount(id);
@@ -238,6 +274,11 @@ public class AdminClientService {
     private AdminClientDTO clientDTO(RegisteredClient client) {
         ServiceAccountEntity account = serviceAccount(client.getId());
         return adminClientMapper.toDTO(client, account != null, serviceAccountUsername(account));
+    }
+
+    private static AdminClientNativeMetadataDTO nativeMetadata(RegisteredClient client) {
+        return new AdminClientNativeMetadataDTO(
+                client.getId(), client.getClientId(), client.getClientName());
     }
 
     private void updateServiceAccount(RegisteredClient client, boolean enabled) {
@@ -563,7 +604,7 @@ public class AdminClientService {
         applyOptionalUrls(values, request, existing);
         applyOptionalLogoutSettings(values, request);
         applyOptionalAuthenticationSettings(values, request, existing);
-        applyCibaSettings(values, request);
+        applyCibaSettings(values, request, existing);
         applyTokenExchangeSettings(values, request);
     }
 
@@ -637,7 +678,7 @@ public class AdminClientService {
     }
 
     private static void applyCibaSettings(
-            Map<String, Object> values, AdminClientRequestDTO request) {
+            Map<String, Object> values, AdminClientRequestDTO request, RegisteredClient existing) {
         String cibaDeliveryMode = resolveCibaDeliveryMode(request);
         values.put(ClientSecuritySettings.CIBA_DELIVERY_MODE, cibaDeliveryMode);
         if (ClientSecuritySettings.CIBA_POLL.equals(cibaDeliveryMode)) {
@@ -647,7 +688,14 @@ public class AdminClientService {
             values.put(
                     ClientSecuritySettings.CIBA_NOTIFICATION_ENDPOINT,
                     request.cibaNotificationEndpoint());
-            values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+            if (request.cibaClientNotificationToken() != null
+                    && !request.cibaClientNotificationToken().isBlank()) {
+                values.put(
+                        ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN,
+                        request.cibaClientNotificationToken());
+            } else if (existing == null) {
+                values.remove(ClientSecuritySettings.CIBA_CLIENT_NOTIFICATION_TOKEN);
+            }
         }
     }
 

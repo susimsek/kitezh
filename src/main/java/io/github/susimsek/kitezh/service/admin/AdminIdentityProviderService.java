@@ -6,6 +6,8 @@ import io.github.susimsek.kitezh.domain.SamlProviderConfigEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderNativePolicyDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderNativePolicyRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminIdentityProviderRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminProviderMapperRequestDTO;
@@ -217,6 +219,39 @@ public class AdminIdentityProviderService {
         refreshSamlRegistrations();
         auditEventService.record("identity-provider.updated", IDENTITY_PROVIDER_TARGET, id);
         return toDto(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminIdentityProviderNativePolicyDTO findNativePolicy(String id) {
+        SocialProviderEntity entity = findProvider(id);
+        return toNativePolicy(entity);
+    }
+
+    @Transactional
+    @CacheEvict(
+            cacheNames = {
+                SocialProviderRepository.SOCIAL_PROVIDER_BY_REGISTRATION_ID_CACHE,
+                SocialProviderRepository.SOCIAL_PROVIDER_BY_ALIAS_CACHE
+            },
+            allEntries = true)
+    public AdminIdentityProviderNativePolicyDTO updateNativePolicy(
+            String id, AdminIdentityProviderNativePolicyRequestDTO request) {
+        SocialProviderEntity entity = findProvider(id);
+        entity.setDisplayName(request.displayName().trim());
+        entity.setEnabled(request.enabled());
+        entity.setHideOnLogin(request.hideOnLogin());
+        entity.setAccountLinkingOnly(request.accountLinkingOnly());
+        entity.setTrustEmail(request.trustEmail());
+        entity.setMfaRequired(request.mfaRequired());
+        entity.setGuiOrder(request.guiOrder());
+        entity.setShowInAccountConsole(
+                request.showInAccountConsole().trim().toLowerCase(Locale.ROOT));
+        entity.setSyncMode(SocialProviderSyncMode.from(request.syncMode()).value());
+        providerRepository.save(entity);
+        settingsService.refreshClientRegistrations();
+        refreshSamlRegistrations();
+        auditEventService.record("identity-provider.updated", IDENTITY_PROVIDER_TARGET, id);
+        return toNativePolicy(entity);
     }
 
     @Transactional
@@ -570,6 +605,27 @@ public class AdminIdentityProviderService {
 
     private AdminIdentityProviderDTO toDto(SocialProviderEntity e) {
         return toDto(e, mapperRepository.countByProviderAlias(e.getAlias()), samlConfig(e.getId()));
+    }
+
+    private static AdminIdentityProviderNativePolicyDTO toNativePolicy(
+            SocialProviderEntity entity) {
+        return new AdminIdentityProviderNativePolicyDTO(
+                entity.getId(),
+                entity.getDisplayName(),
+                entity.isEnabled(),
+                entity.isHideOnLogin(),
+                entity.isAccountLinkingOnly(),
+                entity.isTrustEmail(),
+                entity.isMfaRequired(),
+                entity.getGuiOrder(),
+                entity.getShowInAccountConsole(),
+                SocialProviderSyncMode.from(entity.getSyncMode()).value());
+    }
+
+    private SocialProviderEntity findProvider(String id) {
+        return providerRepository
+                .findById(id)
+                .orElseThrow(() -> ApiException.notFound(IDENTITY_PROVIDER_NOT_FOUND));
     }
 
     private AdminIdentityProviderDTO toDto(

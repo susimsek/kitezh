@@ -116,9 +116,8 @@ public class SamlRelyingPartyRegistrationRepository implements RelyingPartyRegis
             return java.util.Optional.of(builder.build());
         } catch (RuntimeException exception) {
             log.warn(
-                    "SAML provider {} is not available until its configuration is corrected",
-                    provider.getAlias(),
-                    exception);
+                    "SAML provider is unavailable until its configuration is corrected ({})",
+                    exception.getClass().getSimpleName());
             return java.util.Optional.empty();
         }
     }

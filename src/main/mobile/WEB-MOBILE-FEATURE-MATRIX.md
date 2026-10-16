@@ -27,25 +27,51 @@ Status values:
 
 ## Desktop feature matrix
 
-| Area                           | Desktop target                                                                                        | Desktop status | Acceptance and tests                                                                                                                                                                                         |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Native sign-in surface         | Separate Electron login and console chooser with Kitezh branding; must not render the web login route | Complete       | Native `app://renderer/desktop-login` window, Admin/Account choices, localized error/loading state, duplicate-click prevention                                                                               |
-| Browser authentication handoff | System browser Authorization Code + PKCE; callback returns through `kitezh://`                        | Complete       | Main-process state validation, code exchange, callback error handling, encrypted `safeStorage` token vault, and five-minute PKCE transaction persistence with replay-safe one-time consumption               |
-| Admin and Account consoles     | Native desktop screen components with the same API contracts as web and mobile                        | In progress    | Replace web-only layout/components incrementally; preserve authorization, refresh, logout, and deep-link behavior                                                                                            |
-| Desktop shell                  | Main window, menu bar, dock visibility, companion window, single-instance focus, and native menus     | In progress    | Native menu/tray/companion tests, second-launch focus, keyboard focus, accessible landmarks, minimum action targets, logout, and visibility preferences; authenticated native console migration remains      |
-| Settings                       | Native settings window with General, Notifications, Appearance, Updates, and Diagnostics sections     | Complete       | Separate window, theme/language persistence, reset defaults, keyboard shortcut, diagnostics, and no-login access                                                                                             |
-| Theme                          | System, light, and dark modes applied to Electron windows and dialogs                                 | In progress    | Native dialogs follow `nativeTheme` and receive live system-theme changes; renderer controls and restart persistence remain                                                                                  |
-| Language                       | English and Turkish for menus, native windows, and desktop settings                                   | In progress    | Language change updates open windows and menu/tray labels; full console coverage remains                                                                                                                     |
-| Updates                        | Electron-native checking, available, up-to-date, error, download, install, and rollback dialogs       | In progress    | Manual check, notification click, theme/language variants, update recovery E2E, and signed-manifest verification are covered; cross-platform packaged update evidence remains                                |
-| Linux update boundary          | AppImage updater and Linux package-manager delivery                                                   | In progress    | `supportsAutoUpdate` keeps `.deb`/`.rpm`/`.snap` outside the in-app updater while AppImage remains eligible; packaged AppImage rollback and package-manager smoke evidence remain                            |
-| Secure storage                 | Access, ID, and refresh tokens never exposed to web storage; main process is authoritative            | Complete       | `safeStorage` boundary, renderer bridge allow-list, logout cleanup, and token refresh tests                                                                                                                  |
-| Desktop diagnostics            | Redacted version, runtime, platform, storage, update capability, and event information                | Complete       | Diagnostics screen; unit test verifies access/refresh tokens, OAuth codes, URLs with query secrets, home paths, email addresses, and output bounds are redacted before display/export                        |
-| Packaged release smoke         | CI desktop release workflow and electron-builder metadata                                             | In progress    | `src/main/desktop/test/package-metadata.test.mjs` verifies app identity, protocol, maintainer, desktop entry, and artifact targets; macOS/Windows/Linux packaged startup and signed artifact evidence remain |
+| Area                           | Desktop target                                                                                        | Desktop status | Acceptance and tests                                                                                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Native sign-in surface         | Separate Electron login and console chooser with Kitezh branding; must not render the web login route | Complete       | Native `app://renderer/desktop-login` window, Admin/Account choices, localized error/loading state, duplicate-click prevention |
+| Browser authentication handoff | System browser Authorization Code + PKCE; callback returns through `kitezh://`                        | Complete       | Main-process state validation, code exchange, callback error handling, and secure-vault storage                                |
+| Admin and Account consoles     | Native desktop screen components with the same API contracts as web and mobile                        | In progress    | `src/main/desktop/src/native/renderer.mjs` owns the Account profile, password, sessions, offline sessions, applications, MFA, social-link read/unlink, deletion, and settings surfaces; adapter and native E2E evidence remain |
+| Desktop API/session adapter    | Main-process typed Account API requests with one 401 refresh retry and separate vault namespaces     | In progress    | `src/main/desktop/src/api/desktop-api.ts`, `test/api-adapter.test.mjs`; packaged authenticated E2E, logout callback, and cross-platform evidence remain |
+| Desktop shell                  | Main window, menu bar, dock visibility, companion window, single-instance focus, and native menus     | In progress    | Native `app://renderer/native` chooser and shell replace the default Web route; existing menu/tray/companion and second-launch tests remain; authenticated native E2E remains |
+| Settings                       | Native settings window with General, Notifications, Appearance, Updates, and Diagnostics sections     | Complete       | Separate window, theme/language persistence, reset defaults, keyboard shortcut, diagnostics, and no-login access               |
+| Theme                          | System, light, and dark modes applied to Electron windows and dialogs                                 | In progress    | Native shell consumes shared semantic tokens and receives live `nativeTheme` updates; full open-surface and packaged coverage remains |
+| Language                       | English and Turkish for menus, native windows, and desktop settings                                   | In progress    | Native shell consumes shared English/Turkish messages and live language updates; full open-surface and packaged coverage remains |
+| Updates                        | Electron-native checking, available, up-to-date, error, download, install, and rollback dialogs       | In progress    | Manual check, notification click, theme/language variants, update recovery E2E, and signed-manifest verification are covered; cross-platform packaged update evidence remains |
+| Linux update boundary          | AppImage updater and Linux package-manager delivery                                                    | In progress    | `supportsAutoUpdate` keeps `.deb`/`.rpm`/`.snap` outside the in-app updater while AppImage remains eligible; packaged AppImage rollback and package-manager smoke evidence remain |
+| Secure storage                 | Access, ID, and refresh tokens never exposed to web storage; main process is authoritative            | Complete       | `safeStorage` boundary, renderer bridge allow-list, logout cleanup, and token refresh tests                                    |
+| Desktop diagnostics            | Redacted version, runtime, platform, storage, update capability, and event information                | Complete       | Diagnostics screen and redaction tests                                                                                         |
+| Packaged release smoke         | CI desktop release workflow and electron-builder metadata                         | In progress    | `src/main/desktop/test/package-metadata.test.mjs` verifies app identity, protocol, maintainer, desktop entry, and artifact targets; macOS/Windows/Linux packaged startup and signed artifact evidence remain |
 
 Desktop components must not import React-Bootstrap, browser `localStorage`, or remote web pages.
+
+Windows Google evidence (2026-10-09): `../desktop/e2e/google-authenticated.test.mjs`
+passed using a real system-browser protocol callback, Google-linked Account API
+responses, isolated Admin/Account vaults, and encrypted session restart persistence.
+Google sign-in was completed interactively; repeat runs use the established browser
+SSO session. `../desktop/e2e/README.md` documents opt-in execution and limitations.
+This is source Electron evidence, not a signed-package or macOS/Linux acceptance claim.
+The visible native chooser and authenticated Admin hydration are also covered by
+`../desktop/e2e/electron.test.mjs`: a console transition must not quit the app,
+and callback/reload must not automatically reopen authorization once authenticated.
+Google logout now uses the standard local Kitezh OIDC handler instead of the
+unsupported Google global `/Logout?continue=...` fallback. `SocialLoginLogoutIT`
+passed 8/8 for Desktop Admin/Account in English/Turkish: registered callback delivery,
+local session invalidation, reauthentication, and rejection of unregistered redirects.
+The updated real Google source E2E passed 1/1 through actual Windows logout callback
+delivery, encrypted vault clearing, and signed-out chooser rendering after reload.
+Google browser SSO stays signed in intentionally. Other providers, real-provider
+packaged logout, macOS/Linux, and mobile device logout are not covered by this evidence.
+
 The renderer may reuse typed API/session contracts from `src/main/shared`; visual components and
 platform behavior remain owned by Desktop. The web console remains available for browsers and is
 not loaded as the desktop sign-in surface.
+
+The Account social-link list and unlink operation are native and use the bearer API. Starting a
+provider link now uses a short-lived server transaction and native PKCE handoff through the
+validated `kitezh://social-link/callback` contract. Authenticated packaged native E2E coverage
+remains open; the native client does not put an access token in a browser URL or silently reuse a
+browser cookie.
 
 ## Native transformation rules
 

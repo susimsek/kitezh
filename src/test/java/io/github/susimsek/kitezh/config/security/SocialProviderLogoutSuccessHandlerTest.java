@@ -13,8 +13,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcLogoutAuthenticationToken;
 
 class SocialProviderLogoutSuccessHandlerTest {
@@ -93,89 +100,132 @@ class SocialProviderLogoutSuccessHandlerTest {
     }
 
     @Test
-    void startsGitHubLogoutWithReturnToUri() throws Exception {
+    void githubLogoutEndsLocalSessionWithoutOpeningGlobalProviderLogoutPage() throws Exception {
         SocialProviderSettingsService settings = mock(SocialProviderSettingsService.class);
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        final HttpServletResponse response = mock(HttpServletResponse.class);
-        HttpSession session = mock(HttpSession.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpSession session = new MockHttpSession();
+        request.setSession(session);
+        session.setAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER, "github");
         Authentication principal =
                 UsernamePasswordAuthenticationToken.authenticated("ada", null, java.util.List.of());
+        OidcIdToken idToken =
+                new OidcIdToken(
+                        "test-hint",
+                        java.time.Instant.now(),
+                        java.time.Instant.now().plusSeconds(60),
+                        java.util.Map.of("sub", "test-user"));
         final OidcLogoutAuthenticationToken logout =
                 new OidcLogoutAuthenticationToken(
-                        "id-token-hint",
+                        idToken,
                         principal,
-                        "account-console",
-                        (String) null,
+                        session.getId(),
+                        "desktop-account-console",
                         "http://localhost:9090/account/",
                         null);
-        when(request.getSession(false)).thenReturn(session);
-        when(session.getAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER)).thenReturn("github");
         when(settings.provider("github"))
                 .thenReturn(
                         new SocialProviderSettingsService.ProviderCredentials(
                                 "github", "client", "secret"));
 
-        new SocialProviderLogoutSuccessHandler(settings)
-                .onAuthenticationSuccess(request, response, logout);
+        SecurityContextHolder.getContext().setAuthentication(principal);
+        try {
+            new SocialProviderLogoutSuccessHandler(settings)
+                    .onAuthenticationSuccess(request, response, logout);
 
-        verify(response)
-                .sendRedirect(
-                        "https://github.com/logout?return_to=http%3A%2F%2Flocalhost%3A9090%2Faccount%2F");
+            assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:9090/account/");
+            assertThat(session.isInvalid()).isTrue();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test
-    void startsLinkedInLogoutWithRedirectUri() throws Exception {
+    void linkedInLogoutEndsLocalSessionWithoutOpeningProviderPage() throws Exception {
         SocialProviderSettingsService settings = mock(SocialProviderSettingsService.class);
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        final HttpServletResponse response = mock(HttpServletResponse.class);
-        HttpSession session = mock(HttpSession.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpSession session = new MockHttpSession();
+        request.setSession(session);
+        session.setAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER, "linkedin");
         Authentication principal =
                 UsernamePasswordAuthenticationToken.authenticated("ada", null, java.util.List.of());
-        final OidcLogoutAuthenticationToken logout =
+        OidcIdToken idToken =
+                new OidcIdToken(
+                        "test-hint",
+                        java.time.Instant.now(),
+                        java.time.Instant.now().plusSeconds(60),
+                        java.util.Map.of("sub", "test-user"));
+        OidcLogoutAuthenticationToken logout =
                 new OidcLogoutAuthenticationToken(
-                        "id-token-hint",
+                        idToken,
                         principal,
-                        "account-console",
-                        null,
-                        "http://localhost:9090/account/",
+                        session.getId(),
+                        "desktop-account-console",
+                        "kitezh://logout/callback",
                         null);
-        when(request.getSession(false)).thenReturn(session);
-        when(session.getAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER)).thenReturn("linkedin");
         when(settings.provider("linkedin"))
                 .thenReturn(
                         new SocialProviderSettingsService.ProviderCredentials(
                                 "linkedin", "client", "secret"));
 
-        new SocialProviderLogoutSuccessHandler(settings)
-                .onAuthenticationSuccess(request, response, logout);
+        SecurityContextHolder.getContext().setAuthentication(principal);
+        try {
+            new SocialProviderLogoutSuccessHandler(settings)
+                    .onAuthenticationSuccess(request, response, logout);
 
-        verify(response)
-                .sendRedirect(
-                        "https://www.linkedin.com/m/logout?redirect_uri=http%3A%2F%2Flocalhost%3A9090%2Faccount%2F");
+            assertThat(response.getRedirectedUrl()).isEqualTo("kitezh://logout/callback");
+            assertThat(response.getRedirectedUrl()).doesNotContain("linkedin.com");
+            assertThat(session.isInvalid()).isTrue();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
-    @Test
-    void startsGoogleLogoutWithContinueParameterWhenNoIssuerIsConfigured() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"kitezh://logout/callback", "http://localhost:9090/account/"})
+    void googleLogoutClearsLocalSessionAndUsesValidatedClientCallback(String callback)
+            throws Exception {
         SocialProviderSettingsService settings = mock(SocialProviderSettingsService.class);
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        final HttpServletResponse response = mock(HttpServletResponse.class);
-        HttpSession session = mock(HttpSession.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpSession session = new MockHttpSession();
+        request.setSession(session);
+        session.setAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER, "google");
         Authentication principal =
                 UsernamePasswordAuthenticationToken.authenticated("ada", null, java.util.List.of());
-        final OidcLogoutAuthenticationToken logout =
+        OidcIdToken idToken =
+                new OidcIdToken(
+                        "test-hint",
+                        java.time.Instant.now(),
+                        java.time.Instant.now().plusSeconds(60),
+                        java.util.Map.of("sub", "test-user"));
+        OidcLogoutAuthenticationToken logout =
                 new OidcLogoutAuthenticationToken(
-                        "hint", principal, "account-console", null, "/account", null);
-        when(request.getSession(false)).thenReturn(session);
-        when(session.getAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER)).thenReturn("google");
+                        idToken,
+                        principal,
+                        session.getId(),
+                        "desktop-account-console",
+                        callback,
+                        null);
         when(settings.provider("google"))
                 .thenReturn(
                         new SocialProviderSettingsService.ProviderCredentials(
                                 "google", "id", "secret"));
 
-        new SocialProviderLogoutSuccessHandler(settings)
-                .onAuthenticationSuccess(request, response, logout);
+        SecurityContextHolder.getContext().setAuthentication(principal);
+        try {
+            new SocialProviderLogoutSuccessHandler(settings)
+                    .onAuthenticationSuccess(request, response, logout);
 
-        verify(response).sendRedirect("https://accounts.google.com/Logout?continue=%2Faccount");
+            assertThat(response.getRedirectedUrl()).isEqualTo(callback);
+            assertThat(session.isInvalid()).isTrue();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

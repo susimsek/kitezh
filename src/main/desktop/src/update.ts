@@ -4,6 +4,9 @@ import { spawn } from "node:child_process";
 import { verify } from "node:crypto";
 import { cp, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { load } from "js-yaml";
+import type { UpdateInfo } from "electron-updater";
 import { getApiBaseUrl } from "./config";
 import { hasNewerDesktopRelease } from "./release-metadata";
 
@@ -31,6 +34,7 @@ let configured = false;
 let downloadedVersion: string | null = null;
 let updateRetryScheduled = false;
 let updateRetryAttempted = false;
+let updateMetadataValidated = false;
 
 export function setAutomaticInstallOnAppQuit(enabled: boolean) {
   autoUpdater.autoInstallOnAppQuit = enabled;
@@ -85,10 +89,7 @@ async function verifyPublishedManifest() {
   const manifest = Buffer.from(await manifestResponse.arrayBuffer());
   const signatureResponse = await net.fetch(`${updateManifestUrl()}.sig`);
   if (signatureResponse.status === 404) {
-    if (process.env.DESKTOP_UPDATE_REQUIRE_SIGNATURE === "true") {
-      throw new Error("The update manifest signature is missing.");
-    }
-    return;
+    throw new Error("The update manifest signature is missing.");
   }
   if (!signatureResponse.ok) {
     throw new Error(
@@ -102,6 +103,47 @@ async function verifyPublishedManifest() {
   const publicKey = await readFile(
     path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
   );
+  assertUpdateManifestSignature(manifest, signature, publicKey);
+  return manifest;
+}
+
+function manifestIntegrityFields(
+  value: unknown,
+  ignoredFields: ReadonlySet<string> = new Set(["tag"]),
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Update manifest metadata is invalid.");
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !ignoredFields.has(key)),
+  );
+}
+
+export function assertUpdateInfoMatchesSignedManifest(
+  signedManifest: Buffer,
+  updateInfo: UpdateInfo,
+) {
+  const parsedManifest = load(signedManifest.toString("utf8"));
+  const signedFields = manifestIntegrityFields(parsedManifest);
+  const derivedFields = new Set(["tag"]);
+  if (!Object.hasOwn(signedFields, "releaseName"))
+    derivedFields.add("releaseName");
+  if (!Object.hasOwn(signedFields, "releaseNotes"))
+    derivedFields.add("releaseNotes");
+  const consumedFields = manifestIntegrityFields(updateInfo, derivedFields);
+  if (!isDeepStrictEqual(signedFields, consumedFields)) {
+    throw new Error("Updater metadata does not match the signed manifest.");
+  }
+}
+
+export function assertUpdateManifestSignature(
+  manifest: Buffer,
+  signature: Buffer,
+  publicKey: string | Buffer,
+) {
+  if (signature.length === 0) {
+    throw new Error("The update manifest signature is missing.");
+  }
   if (!verifyUpdateManifestSignature(manifest, signature, publicKey)) {
     throw new Error("The update manifest signature is invalid.");
   }
@@ -165,7 +207,7 @@ async function startRollbackWatchdog() {
   await cp(source, destination, { force: true });
   const child = spawn(
     process.execPath,
-    [destination, updateRecoveryPath(), `${process.pid}`],
+    [destination, `${process.pid}`],
     {
       detached: true,
       stdio: "ignore",
@@ -262,6 +304,12 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
   void initializeUpdateRecovery();
   if (!isSupported()) {
     publish({ state: "unsupported" });
+    if (
+      isUpdatePreviewEnabled() &&
+      process.env.DESKTOP_UPDATE_PREVIEW_AUTOMATIC === "true"
+    ) {
+      setTimeout(() => void checkForUpdates(), 600);
+    }
     return;
   }
 
@@ -269,12 +317,15 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowDowngrade = false;
   autoUpdater.on("checking-for-update", () => publish({ state: "checking" }));
-  autoUpdater.on("update-available", (info) =>
-    publish({ state: "available", version: info.version }),
-  );
+  autoUpdater.on("update-available", (info) => {
+    if (updateMetadataValidated)
+      publish({ state: "available", version: info.version });
+  });
   autoUpdater.on("update-not-available", () => {
-    updateRetryAttempted = false;
-    publish({ state: "not-available" });
+    if (updateMetadataValidated) {
+      updateRetryAttempted = false;
+      publish({ state: "not-available" });
+    }
   });
   autoUpdater.on("download-progress", (progress) =>
     publish({ state: "downloading", percent: progress.percent }),
@@ -285,6 +336,7 @@ export function configureAutoUpdater(nextListener: UpdateListener) {
     publish({ state: "downloaded", version: info.version });
   });
   autoUpdater.on("error", () => {
+    if (!updateMetadataValidated) return;
     publish({
       state: "error",
       message: "Desktop update could not be completed.",
@@ -323,6 +375,7 @@ export async function checkForUpdates() {
     return;
   }
   publish({ state: "checking" });
+  updateMetadataValidated = false;
   try {
     const metadataAvailable = await checkSharedReleaseMetadata();
     if (metadataAvailable === false) {
@@ -330,8 +383,17 @@ export async function checkForUpdates() {
       publish({ state: "not-available" });
       return;
     }
-    await verifyPublishedManifest();
-    await autoUpdater.checkForUpdates();
+    const signedManifest = await verifyPublishedManifest();
+    const result = await autoUpdater.checkForUpdates();
+    if (!result) throw new Error("Updater metadata is unavailable.");
+    assertUpdateInfoMatchesSignedManifest(signedManifest, result.updateInfo);
+    if (result.isUpdateAvailable) {
+      updateMetadataValidated = true;
+      publish({ state: "available", version: result.updateInfo.version });
+    } else {
+      updateRetryAttempted = false;
+      publish({ state: "not-available" });
+    }
   } catch {
     publish({
       state: "error",
@@ -360,7 +422,7 @@ async function checkSharedReleaseMetadata(): Promise<boolean | null> {
 }
 
 export async function downloadUpdate() {
-  if (!isSupported()) return false;
+  if (!isSupported() || !updateMetadataValidated) return false;
   try {
     await autoUpdater.downloadUpdate();
     return true;
@@ -375,7 +437,7 @@ export async function downloadUpdate() {
 }
 
 export function installUpdate() {
-  if (!isSupported() || !downloadedVersion) return;
+  if (!isSupported() || !updateMetadataValidated || !downloadedVersion) return;
   void markUpdatePending(downloadedVersion)
     .then(() => autoUpdater.quitAndInstall(false, true))
     .catch(() => {

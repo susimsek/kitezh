@@ -19,24 +19,37 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "build:renderer": "node scripts/build-renderer.mjs",
+    "build:native": "node scripts/build-native-renderer.mjs",
     "typecheck": "tsc --noEmit",
-    "build:main": "tsc -p tsconfig.json",
-    "test:unit": "pnpm run build:main && node --test --test-concurrency=1 test/**/*.test.mjs",
-    "test:unit:coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
-    "test:sonar-coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs e2e/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
+    "pretypecheck": "pnpm run build:shared",
+    "build:shared": "pnpm --dir ../shared run build",
+    "build:main": "pnpm run build:shared && tsc -p tsconfig.json",
+    "test:unit": "pnpm run build:main && node --test test/**/*.test.mjs",
     "test": "pnpm run test:unit",
-    "test:e2e": "pnpm run build && node --test e2e/**/*.test.mjs",
+    "test:e2e": "pnpm run build && node --test e2e/electron.test.mjs",
+    "test:e2e:clients:live": "pnpm run build && node --test e2e/clients-live.test.mjs",
+    "test:e2e:users:live": "pnpm run build && node --test e2e/users-live.test.mjs",
+    "test:e2e:roles:live": "pnpm run build && node --test e2e/roles-live.test.mjs",
+    "test:e2e:packaged:groups": "node --test e2e/packaged-groups.test.mjs",
+    "test:e2e:packaged": "node --test --test-concurrency=1 e2e/packaged-authenticated.test.mjs e2e/packaged-client-roles.test.mjs",
+    "test:e2e:packaged:roles": "node --test e2e/packaged-client-roles.test.mjs",
+    "test:e2e:google": "node --test e2e/google-authenticated.test.mjs",
+    "test:e2e:providers": "node --test e2e/social-provider-authenticated.test.mjs",
+    "test:unit:coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --include='src/native/**/*.mjs' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
+    "test:sonar-coverage": "pnpm run build:main && c8 --include='dist/**/*.js' --include='src/native/**/*.mjs' --all --reporter=text --reporter=lcov --reports-dir=coverage node --test --test-concurrency=1 test/**/*.test.mjs e2e/**/*.test.mjs && node ../../../scripts/prefix-lcov-paths.mjs coverage/lcov.info src/main/desktop",
     "smoke:package": "node scripts/smoke-packaged-app.mjs",
-    "build": "pnpm run build:renderer && tsc -p tsconfig.json",
+    "build": "pnpm run build:main && pnpm run build:native",
     "start": "node scripts/run-desktop.mjs production",
     "dev": "node scripts/run-desktop.mjs local",
     "package": "pnpm run build && electron-builder --publish never"
   },
   "devDependencies": {
+    "@types/js-yaml": "4.0.9",
     "@types/node": "24.10.1",
     "c8": "10.1.3",
     "electron": "44.5.1",
     "electron-builder": "26.15.3",
+    "jsdom": "30.0.1",
     "playwright-core": "1.63.0",
     "typescript": "5.9.2"
   },
@@ -116,7 +129,8 @@
     "releaseType": "release"
   },
   "dependencies": {
-    "@kitezh/shared": "file:../shared",
-    "electron-updater": "6.8.9"
+    "@kitezh/shared": "link:../shared",
+    "electron-updater": "6.8.9",
+    "js-yaml": "4.1.0"
   }
 }

@@ -22,11 +22,15 @@ import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
+import org.springframework.security.oauth2.client.authentication.OAuth2LoginAuthenticationProvider;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
@@ -39,6 +43,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.saml2.provider.service.web.HttpSessionSaml2AuthenticationRequestRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.webauthn.authentication.PublicKeyCredentialRequestOptionsRepository;
@@ -275,19 +280,36 @@ class SecurityConfigTest {
                         mock(LocalizedAccessDeniedHandler.class),
                         mock(DynamicRememberMeServices.class));
 
-        assertThat(
-                        securityConfig.defaultSecurityFilterChain(
-                                httpSecurity(repository),
-                                new ApplicationProperties(),
-                                browserDependencies(),
-                                new SecurityConfig.SocialSecurityDependencies(
-                                        clientProvider,
-                                        successProvider,
-                                        resolverProvider,
-                                        mock(SocialLoginService.class),
-                                        mock(OAuth2AuthorizedClientRepository.class),
-                                        mock(OAuth2AccessTokenResponseClient.class))))
-                .isNotNull();
+        HttpSecurity http = httpSecurity(repository);
+        SecurityConfig.BrowserSecurityDependencies browser = browserDependencies();
+        SecurityFilterChain chain =
+                securityConfig.defaultSecurityFilterChain(
+                        http,
+                        new ApplicationProperties(),
+                        browser,
+                        new SecurityConfig.SocialSecurityDependencies(
+                                clientProvider,
+                                successProvider,
+                                resolverProvider,
+                                mock(SocialLoginService.class),
+                                mock(OAuth2AuthorizedClientRepository.class),
+                                mock(OAuth2AccessTokenResponseClient.class)));
+        assertThat(chain).isNotNull();
+        ProviderManager manager =
+                (ProviderManager) http.getSharedObject(AuthenticationManager.class);
+        assertThat(manager.getProviders())
+                .anyMatch(OAuth2LoginAuthenticationProvider.class::isInstance)
+                .anyMatch(OidcAuthorizationCodeAuthenticationProvider.class::isInstance);
+        UsernamePasswordAuthenticationFilter formFilter =
+                chain.getFilters().stream()
+                        .filter(UsernamePasswordAuthenticationFilter.class::isInstance)
+                        .map(UsernamePasswordAuthenticationFilter.class::cast)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(ReflectionTestUtils.getField(formFilter, "authenticationManager"))
+                .isSameAs(manager);
+        assertThat(ReflectionTestUtils.getField(manager, "parent"))
+                .isSameAs(browser.formAuthenticationManager());
     }
 
     @Test

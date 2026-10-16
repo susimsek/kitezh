@@ -49,12 +49,12 @@ export function ClientDetail({
   dictionary,
   id,
   tab = "settings",
-}: {
+}: Readonly<{
   locale: Locale;
   dictionary: Dictionary;
   id: string | null;
   tab?: string | null;
-}) {
+}>) {
   const router = useRouter();
   const { access, accessToken } = useAdminAuth();
   const alerts = useConsoleAlerts();
@@ -74,7 +74,7 @@ export function ClientDetail({
     if (!id || !accessToken) return;
     adminRequest<Detail>(accessToken, { url: `/api/admin/clients/${encodeURIComponent(id)}` })
       .then((r) => {
-        if (r.status >= 300) throw new Error();
+        if (r.status >= 300) throw new Error("Request failed");
         setClient(r.data);
       })
       .catch(() => setError(true));

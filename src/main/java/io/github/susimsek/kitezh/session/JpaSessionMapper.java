@@ -3,7 +3,9 @@ package io.github.susimsek.kitezh.session;
 import io.github.susimsek.kitezh.domain.UserSessionEntity;
 import java.time.Duration;
 import java.time.Instant;
+import org.springframework.core.convert.ConversionException;
 import org.springframework.core.convert.ConversionService;
+import org.springframework.security.web.WebAttributes;
 import org.springframework.session.MapSession;
 import org.springframework.session.Session;
 import org.springframework.util.Assert;
@@ -23,11 +25,23 @@ public final class JpaSessionMapper {
         delegate.setCreationTime(Instant.ofEpochMilli(entity.getCreationTime()));
         delegate.setLastAccessedTime(Instant.ofEpochMilli(entity.getLastAccessTime()));
         delegate.setMaxInactiveInterval(Duration.ofSeconds(entity.getMaxInactiveInterval()));
+        JpaSession session = new JpaSession(delegate, entity.getPrimaryId(), repository, false);
         entity.getAttributes()
                 .forEach(
-                        (attributeName, bytes) ->
-                                delegate.setAttribute(attributeName, deserializeAttribute(bytes)));
-        return new JpaSession(delegate, entity.getPrimaryId(), repository, false);
+                        (attributeName, bytes) -> {
+                            try {
+                                session.setLoadedAttribute(
+                                        attributeName, deserializeAttribute(bytes));
+                            } catch (ConversionException exception) {
+                                if (!WebAttributes.AUTHENTICATION_EXCEPTION.equals(attributeName)) {
+                                    throw exception;
+                                }
+                                // An unreadable failure message is disposable; security and
+                                // authorization attributes must still fail closed.
+                                session.removeLoadedAttribute(attributeName);
+                            }
+                        });
+        return session;
     }
 
     void updateEntity(

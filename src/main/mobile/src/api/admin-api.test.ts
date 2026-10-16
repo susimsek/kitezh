@@ -14,6 +14,7 @@ import {
   revokeAdminConsent,
   listAdminRoles,
   deleteAdminUser,
+  unlockAdminUser,
   setAdminUserEnabled,
   createAdminUser,
   updateAdminUser,
@@ -41,6 +42,27 @@ import {
 import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
 
 installAxiosFetchMockCompatibility();
+
+test("unlocks an administrator user through the bounded native endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let request: RequestInfo | URL | undefined;
+  let method: string | undefined;
+  globalThis.fetch = async (input, init) => {
+    request = input;
+    method = init?.method;
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await unlockAdminUser("access-token", 42);
+    assert.equal(
+      request?.toString(),
+      "https://kitezh.onrender.com/api/admin/users/42/unlock",
+    );
+    assert.equal(method, "POST");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
   const originalFetch = globalThis.fetch;

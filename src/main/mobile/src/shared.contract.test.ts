@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
-import { messages, resolveLocale } from "../../shared/src/i18n.ts";
-import { createClientMetadataHeaders } from "../../shared/src/client-metadata.cjs";
+import { messages, resolveLocale } from "@kitezh/shared/i18n";
+import { createClientMetadataHeaders } from "@kitezh/shared/client-metadata";
 import { colors, controlSizes, resolveTheme } from "../../shared/src/theme.ts";
-import { getMobileConsoleConfig } from "./config.ts";
+import {
+  DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+  getMobileConsoleConfig,
+  resolveAuthorizationServerIssuer,
+} from "./config.ts";
 import { sessionStorageKey } from "./auth/session-keys.ts";
 import {
   DEFAULT_NOTICE_DURATION_MS,
@@ -33,6 +40,16 @@ import {
   createSingleFlight,
   NATIVE_REFRESH_EXPIRY_SKEW_MS,
 } from "../../shared/src/session.ts";
+import { isValidEmailAddress } from "./utils/email.ts";
+import * as mobileThemeTokens from "./theme/tokens.ts";
+
+test("native token exports expose the platform-neutral design values", () => {
+  assert.ok(Object.keys(mobileThemeTokens.colors).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.typography).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.controlSizes).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.spacing).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.radii).length > 0);
+});
 
 test("client metadata follows the Kitezh app header contract", () => {
   assert.deepEqual(
@@ -48,6 +65,15 @@ test("client metadata follows the Kitezh app header contract", () => {
       OS: "ios",
     },
   );
+});
+
+test("email shape validation rejects ambiguous and malformed addresses", () => {
+  assert.equal(isValidEmailAddress("person@example.com"), true);
+  assert.equal(isValidEmailAddress("person+tag@example.co.uk"), true);
+  assert.equal(isValidEmailAddress("person@@example.com"), false);
+  assert.equal(isValidEmailAddress("person@.example.com"), false);
+  assert.equal(isValidEmailAddress("person@example."), false);
+  assert.equal(isValidEmailAddress("person name@example.com"), false);
 });
 
 test("system locale resolves to the device language when supported", () => {
@@ -122,6 +148,69 @@ test("mobile console contracts isolate account and admin sessions", () => {
   assert.notEqual(sessionStorageKey("account"), sessionStorageKey("admin"));
 });
 
+test("mobile issuer overrides are limited to the development loopback server", () => {
+  assert.equal(
+    resolveAuthorizationServerIssuer(undefined, false),
+    DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+  );
+  assert.equal(
+    resolveAuthorizationServerIssuer("http://localhost:9090/", true),
+    "http://localhost:9090",
+  );
+  assert.equal(
+    resolveAuthorizationServerIssuer(
+      DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+      false,
+    ),
+    DEFAULT_AUTHORIZATION_SERVER_ISSUER,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("https://unapproved.example", false),
+    /authorization_server_issuer_override_not_allowed/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("https://unapproved.example", true),
+    /authorization_server_issuer_invalid/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("http://localhost:9090/path", true),
+    /authorization_server_issuer_invalid/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("not a URL", true),
+    /authorization_server_issuer_invalid/,
+  );
+});
+
+test("production config fails closed when an unapproved issuer is configured", () => {
+  const mobileRoot = fileURLToPath(new URL("..", import.meta.url));
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--input-type=module",
+      "-e",
+      "await import('./src/config.ts')",
+    ],
+    {
+      cwd: path.resolve(mobileRoot),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER: "https://unapproved.example",
+        NODE_ENV: "production",
+      },
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /authorization_server_issuer_override_not_allowed/,
+  );
+  assert.doesNotMatch(result.stderr, /unapproved\.example/);
+});
+
 test("shared API errors preserve native status semantics without transport details", () => {
   const problem = parseProblemDetail({
     type: "https://kitezh.dev/problems/validation",
@@ -174,6 +263,18 @@ test("native OAuth callbacks require the original state and approved scheme", ()
         "request-state",
       ),
     /authorization_callback_state_mismatch/,
+  );
+  assert.throws(
+    () =>
+      validateAuthorizationCallback(
+        {
+          error: "access_denied",
+          code: "one-time-code",
+          state: "request-state",
+        },
+        "request-state",
+      ),
+    /authorization_callback_error/,
   );
   assert.equal(
     isAllowedNativeRedirect(

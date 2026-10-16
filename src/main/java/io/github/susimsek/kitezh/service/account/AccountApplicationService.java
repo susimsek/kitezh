@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.service.account;
 import io.github.susimsek.kitezh.domain.AuthorizationConsentEntity;
 import io.github.susimsek.kitezh.domain.AuthorizationConsentId;
 import io.github.susimsek.kitezh.domain.AuthorizationEntity;
+import io.github.susimsek.kitezh.domain.NotificationType;
 import io.github.susimsek.kitezh.dto.account.AccountApplicationDTO;
 import io.github.susimsek.kitezh.dto.account.AccountOfflineSessionDTO;
 import io.github.susimsek.kitezh.mapper.AccountApplicationMapper;
@@ -12,6 +13,7 @@ import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.ClientRepository;
 import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import io.github.susimsek.kitezh.service.notification.NotificationService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,7 @@ public class AccountApplicationService {
     private final ClientRepository clientRepository;
     private final AuthorizationServerMapperSupport mapperSupport;
     private final AdminAuditEventService auditEventService;
+    private final NotificationService notificationService;
     private final AccountApplicationMapper accountApplicationMapper;
 
     @Transactional(readOnly = true)
@@ -102,5 +105,7 @@ public class AccountApplicationService {
                         .orElseThrow(() -> ApiException.notFound("Offline session not found"));
         authorizationRepository.delete(authorization);
         auditEventService.record("account.offline-session.revoked", "offline-session", id);
+        notificationService.publishAccount(
+                username, NotificationType.ACCOUNT_OFFLINE_SESSION_REVOKED);
     }
 }

@@ -79,7 +79,9 @@ public class RegistrationCaptchaService {
                     ? verifyEnterprise(config, token, request)
                     : verifyStandard(config, token, request);
         } catch (Exception exception) {
-            log.warn("Registration CAPTCHA verification failed", exception);
+            log.warn(
+                    "Registration CAPTCHA verification failed ({})",
+                    exception.getClass().getSimpleName());
             return false;
         }
     }

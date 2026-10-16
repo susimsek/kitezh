@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.dto.account.MfaStatusDTO;
+import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
 import io.github.susimsek.kitezh.service.SocialAccountLinkRequiredException;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialTokenService;
@@ -129,6 +130,52 @@ class SocialLoginAuthenticationSuccessHandlerTest {
                 .isNull();
         verify(tokenService).store("alice", "google", null);
         verify(socialLoginService).linkExisting("alice", "google", authentication);
+    }
+
+    @Test
+    void completesPendingDesktopLinkWithoutCreatingBrowserSession() throws Exception {
+        SocialLoginService socialLoginService = mock(SocialLoginService.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        SecurityContextRepository securityContextRepository = mock(SecurityContextRepository.class);
+        DesktopSocialLinkTransactionService desktopService =
+                mock(DesktopSocialLinkTransactionService.class);
+        OAuth2AuthenticationToken authentication = mock(OAuth2AuthenticationToken.class);
+        when(authentication.getAuthorizedClientRegistrationId()).thenReturn("google");
+        when(desktopService.completeFromBrowser(any(), any(), any()))
+                .thenReturn(
+                        new DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion(
+                                "google", "native-state", "completion-code"));
+        when(desktopService.callbackUrl("native-state", "completion-code", null))
+                .thenReturn(
+                        "kitezh://social-link/callback?state=native-state&code=completion-code");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession(true)
+                .setAttribute(
+                        DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE,
+                        "authorization-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new SocialLoginAuthenticationSuccessHandler(
+                        socialLoginService,
+                        userDetailsService,
+                        securityContextRepository,
+                        null,
+                        null,
+                        null,
+                        desktopService)
+                .onAuthenticationSuccess(request, response, authentication);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("kitezh://social-link/callback?state=native-state&code=completion-code");
+        assertThat(
+                        request.getSession()
+                                .getAttribute(
+                                        DesktopSocialLinkTransactionService
+                                                .PENDING_SESSION_ATTRIBUTE))
+                .isNull();
+        verify(socialLoginService, never()).findOrCreate(any());
+        verify(securityContextRepository, never()).saveContext(any(), any(), any());
     }
 
     @Test

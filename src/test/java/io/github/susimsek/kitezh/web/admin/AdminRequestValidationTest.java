@@ -6,6 +6,7 @@ import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientScopeAssignmentRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRolesRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminRequiredActionRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminSocialProviderRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminUserBulkAction;
 import io.github.susimsek.kitezh.dto.admin.AdminUserBulkRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminUserRequestDTO;
@@ -83,6 +84,16 @@ class AdminRequestValidationTest {
         assertThat(validator.validate(scopes))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .contains("defaultScopes[].<iterable element>");
+    }
+
+    @Test
+    void permitsAnUnconfiguredSocialProviderClientId() {
+        AdminSocialProviderRequestDTO request =
+                new AdminSocialProviderRequestDTO(
+                        "github", "github", null, null, false, false, false, false, "sub", false,
+                        false, 20, "always");
+
+        assertThat(validator.validate(request)).isEmpty();
     }
 
     @Test

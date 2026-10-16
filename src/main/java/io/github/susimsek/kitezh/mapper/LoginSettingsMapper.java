@@ -4,6 +4,7 @@ import io.github.susimsek.kitezh.domain.LoginSettingsEntity;
 import io.github.susimsek.kitezh.dto.account.LoginSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminLoginSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminLoginSettingsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.NativeAdminLoginSettingsDTO;
 import io.github.susimsek.kitezh.dto.admin.WebAuthnPolicyDTO;
 import java.util.Locale;
 import org.mapstruct.AfterMapping;
@@ -16,6 +17,12 @@ import org.mapstruct.Named;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface LoginSettingsMapper {
+
+    @Mapping(target = "userRegistration", source = "userRegistrationEnabled")
+    @Mapping(target = "forgotPassword", source = "forgotPasswordEnabled")
+    @Mapping(target = "rememberMe", source = "rememberMeEnabled")
+    @Mapping(target = "passkeys", source = "passkeysEnabled")
+    NativeAdminLoginSettingsDTO toNativeAdminDTO(LoginSettingsEntity source);
 
     @Mapping(target = "userRegistration", source = "userRegistrationEnabled")
     @Mapping(target = "forgotPassword", source = "forgotPasswordEnabled")

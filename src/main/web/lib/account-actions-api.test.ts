@@ -1,6 +1,6 @@
 import { accountActionError, submitAccountAction } from "./account-actions-api";
 
-import dictionary from "@/locales/en/common.json";
+import dictionary from "@kitezh/shared/web-messages/en";
 
 describe("account action API", () => {
   beforeEach(() => {

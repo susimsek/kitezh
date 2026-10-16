@@ -9,6 +9,7 @@ import {
   isPendingAuthorizationValid,
   parseAuthCallback,
   parseLogoutCallback,
+  parseSocialLinkCallback,
   parsePendingAuthorizationStore,
   sanitizedAuthCallback,
 } from "../dist/security/auth-flow.js";
@@ -17,6 +18,11 @@ import {
   findDesktopDeepLink,
   isAllowedExternalUrl,
 } from "../dist/config.js";
+import {
+  DEFAULT_API_BASE_URL,
+  LOCAL_API_BASE_URL,
+  getApiBaseUrl as getPublicApiBaseUrl,
+} from "../dist/api-base-url.js";
 import {
   isTrustedRendererFrame,
   isTrustedRendererUrl,
@@ -36,9 +42,10 @@ test("redacts credentials, personal paths, and email addresses from diagnostics"
   assert.doesNotMatch(sanitized, /access-secret|refresh-secret|auth-secret/);
   assert.doesNotMatch(sanitized, /\/Users\/alice|alice@example\.com/);
   assert.match(sanitized, /access_token=\[redacted\]/);
-  assert.match(sanitized, /"refreshToken":"\[redacted\]"/);
-  assert.match(sanitized, /https:\/\/kitezh\.onrender\.com\/callback/);
-  assert.match(sanitized, /\[user-path\] \[email\]/);
+  assert.match(sanitized, /refreshToken.*\[redacted\]/);
+  assert.match(sanitized, /\[redacted-url\]/);
+  assert.doesNotMatch(sanitized, /kitezh\.onrender\.com\/callback/);
+  assert.match(sanitized, /\[user-path\] \[redacted-email\]/);
   assert.equal(redactDiagnosticText("x".repeat(501)).length, 500);
 });
 
@@ -78,6 +85,37 @@ test("accepts only the exact native logout callback", () => {
   assert.equal(
     parseLogoutCallback("https://example.com/logout/callback"),
     false,
+  );
+});
+
+test("accepts only a social-link callback without fragment data", () => {
+  assert.deepEqual(
+    parseSocialLinkCallback(
+      "kitezh://social-link/callback?state=state-1&code=completion-1",
+    ),
+    { state: "state-1", code: "completion-1", error: null },
+  );
+  assert.deepEqual(
+    parseSocialLinkCallback(
+      "kitezh://social-link/callback?state=state-2&error=authorization_failed",
+    ),
+    { state: "state-2", code: null, error: "authorization_failed" },
+  );
+  assert.equal(
+    parseSocialLinkCallback(
+      "kitezh://social-link/callback?state=state-1&code=completion-1#fragment",
+    ),
+    null,
+  );
+  assert.equal(
+    parseSocialLinkCallback("kitezh://oauth/callback?state=state-1"),
+    null,
+  );
+  assert.equal(
+    parseSocialLinkCallback(
+      "https://example.test/social-link/callback?state=state-1",
+    ),
+    null,
   );
 });
 
@@ -223,9 +261,60 @@ test("accepts only configured API and external origins", () => {
     () => getApiBaseUrl("https://example.test"),
     /deployed Render host/,
   );
-  assert.equal(isAllowedExternalUrl("https://github.com/example/oauth"), true);
+  assert.equal(isAllowedExternalUrl("https://github.com/example/oauth"), false);
+  assert.equal(
+    isAllowedExternalUrl("https://github.com/login/oauth/authorize"),
+    true,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://github.com/attacker/redirect"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "https://github.com/login/oauth/authorize?redirect_uri=https%3A%2F%2Fevil.example%2Fcallback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "http://localhost:9090/unrelated?redirect_uri=https://evil.test",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://kitezh.onrender.com/oauth2/authorize"),
+    true,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://kitezh.onrender.com/admin"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://github.com:8443/example/oauth"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl("https://user:pass@github.com/example/oauth"),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "https://github.com/example/oauth#access_token=secret",
+    ),
+    false,
+  );
   assert.equal(isAllowedExternalUrl("https://evil.example/oauth"), false);
   assert.equal(isAllowedExternalUrl("javascript:alert(1)"), false);
+});
+
+test("exports the configured API URL contract from its public adapter", () => {
+  assert.equal(DEFAULT_API_BASE_URL, "https://kitezh.onrender.com");
+  assert.equal(LOCAL_API_BASE_URL, "http://localhost:9090");
+  assert.equal(
+    getPublicApiBaseUrl("http://localhost:9090"),
+    LOCAL_API_BASE_URL,
+  );
 });
 
 test("restores the default quick-access shortcut when a custom shortcut conflicts", () => {
@@ -267,4 +356,59 @@ test("reports when both the requested and fallback shortcuts are unavailable", (
     ),
     { registered: false, accelerator: "CommandOrControl+Shift+K" },
   );
+});
+
+test("global shortcut registration handles success and unavailable accelerators", () => {
+  let unregistered = 0;
+  const callback = () => {};
+  const primary = registerGlobalShortcutWithFallback(
+    {
+      unregisterAll() {
+        unregistered += 1;
+      },
+      register(accelerator, registeredCallback) {
+        assert.equal(registeredCallback, callback);
+        return accelerator === "Ctrl+Shift+K";
+      },
+    },
+    "Ctrl+Shift+K",
+    "Alt+Space",
+    callback,
+  );
+  assert.deepEqual(primary, { registered: true, accelerator: "Ctrl+Shift+K" });
+
+  const fallback = registerGlobalShortcutWithFallback(
+    {
+      unregisterAll() {
+        unregistered += 1;
+      },
+      register(accelerator) {
+        if (accelerator === "Ctrl+Shift+K") throw new Error("shortcut busy");
+        return true;
+      },
+    },
+    "Ctrl+Shift+K",
+    "Alt+Space",
+    callback,
+  );
+  assert.deepEqual(fallback, { registered: false, accelerator: "Alt+Space" });
+
+  const sameAccelerator = registerGlobalShortcutWithFallback(
+    {
+      unregisterAll() {
+        unregistered += 1;
+      },
+      register() {
+        throw new Error("shortcut busy");
+      },
+    },
+    "Alt+Space",
+    "Alt+Space",
+    callback,
+  );
+  assert.deepEqual(sameAccelerator, {
+    registered: false,
+    accelerator: "Alt+Space",
+  });
+  assert.equal(unregistered, 3);
 });

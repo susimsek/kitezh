@@ -30,6 +30,7 @@ const config: Config = {
     "<rootDir>/src/auth/MobileAuthProvider.tsx",
     "<rootDir>/src/updates/MobileUpdateProvider.tsx",
     "<rootDir>/src/updates/install-update.ts",
+    "<rootDir>/src/auth/storage.ts",
     "<rootDir>/src/components/AdminResourceEditor.tsx",
     "<rootDir>/src/components/AuthCallbackScreen.tsx",
   ],

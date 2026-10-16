@@ -1,0 +1,50 @@
+{
+  "content": [
+    {
+      "name": "ROLE_ADMIN",
+      "description": "Full administrative access to the administration console."
+    },
+    {
+      "name": "ROLE_CLIENT_MANAGER",
+      "description": "Manage registered OAuth2 clients."
+    },
+    {
+      "name": "ROLE_CLIENT_QUERY",
+      "description": "Discover and search registered OAuth2 clients."
+    },
+    {
+      "name": "ROLE_CLIENT_VIEWER",
+      "description": "View registered OAuth2 clients."
+    },
+    {
+      "name": "ROLE_EVENT_MANAGER",
+      "description": "Manage administrative event access and configuration."
+    },
+    {
+      "name": "ROLE_EVENT_VIEWER",
+      "description": "View administrative audit events."
+    },
+    {
+      "name": "ROLE_GROUP_MANAGER",
+      "description": "Manage group membership, mappings, and scoped resources."
+    },
+    {
+      "name": "ROLE_GROUP_QUERY",
+      "description": "Discover and search groups."
+    },
+    {
+      "name": "ROLE_GROUP_VIEWER",
+      "description": "View group resources and group-scoped permissions."
+    },
+    {
+      "name": "ROLE_USER",
+      "description": "Basic access for authenticated users."
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 0,
+    "totalElements": 14,
+    "totalPages": 2
+  }
+}

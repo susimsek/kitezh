@@ -15,7 +15,7 @@ const tabs = [
   { icon: "gear", route: "/settings", key: "settings" },
 ] as const;
 
-export function AccountTabBar({ active }: { active: AccountTab }) {
+export function AccountTabBar({ active }: Readonly<{ active: AccountTab }>) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
   const labels: Record<AccountTab, string> = {
@@ -47,9 +47,10 @@ export function AccountTabBar({ active }: { active: AccountTab }) {
             style={({ pressed }) => [
               styles.tab,
               {
-                backgroundColor: selected && Platform.OS === "android"
-                  ? palette.surfaceMuted
-                  : "transparent",
+                backgroundColor:
+                  selected && Platform.OS === "android"
+                    ? palette.surfaceMuted
+                    : "transparent",
                 opacity: pressed ? 0.7 : 1,
               },
             ]}
