@@ -219,6 +219,7 @@ jobs:
       image_digest: ${{ steps.manifests.outputs.image_digest }}
     permissions:
       contents: read
+      id-token: write
     env:
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -258,6 +259,25 @@ jobs:
             exit 1
           fi
           echo "image_digest=${digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        with:
+          cosign-release: v2.6.1
+
+      - name: Sign and verify multi-architecture Docker image
+        env:
+          IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}/kitezh
+          IMAGE_DIGEST: ${{ steps.manifests.outputs.image_digest }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          image_ref="${IMAGE}@${IMAGE_DIGEST}"
+          cosign sign --yes "${image_ref}"
+          cosign verify \
+            --certificate-identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-release.yml@refs/tags/${RELEASE_TAG}" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${image_ref}"
 
       - name: Update Docker Hub description
         env:

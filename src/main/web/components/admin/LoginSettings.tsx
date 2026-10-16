@@ -593,7 +593,9 @@ export default function LoginSettingsPage({
       <Card className="admin-panel-card">
         <Card.Body>
           {!loaded ? (
-            <div role="status">{copy.loading}</div>
+            <output aria-live="polite" className="d-block">
+              {copy.loading}
+            </output>
           ) : (
             <Form noValidate onSubmit={submit}>
               <section hidden={activeSection !== "login"}>

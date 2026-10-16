@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,12 +17,25 @@ import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing, typography } from "@/theme/tokens";
+import { useMobileUpdates } from "@/updates/MobileUpdateProvider";
 
 export default function SettingsScreen() {
   const { dictionary, locale, reset: resetLocale, setLocale } = useLocale();
   const { mode, palette, reset: resetTheme, setMode } = useTheme();
   const { session } = useMobileAuth();
   const [resetting, setResetting] = useState(false);
+  const {
+    checked,
+    checking,
+    checkForUpdates,
+    downloadPercent,
+    error,
+    installOrOpenUpdate,
+    installing,
+    installedVersion,
+    permissionRequired,
+    release,
+  } = useMobileUpdates();
 
   const resetDefaults = async () => {
     if (resetting) return;
@@ -131,6 +145,80 @@ export default function SettingsScreen() {
             />
           </View>
 
+          <SectionHeading
+            icon="reset"
+            label={dictionary.updates}
+            palette={palette}
+          />
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <View style={styles.versionRow}>
+              <Text style={[styles.cardTitle, { color: palette.textMuted }]}>
+                {dictionary.appVersion}
+              </Text>
+              <Text style={[styles.versionValue, { color: palette.text }]}>
+                {installedVersion}
+              </Text>
+            </View>
+            {installing && downloadPercent !== null ? (
+              <Text
+                style={[styles.updateMessage, { color: palette.textMuted }]}
+              >
+                {dictionary.updateDownloadProgress.replace(
+                  "{percent}",
+                  String(downloadPercent),
+                )}
+              </Text>
+            ) : permissionRequired ? (
+              <Text style={[styles.updateMessage, { color: palette.primary }]}>
+                {dictionary.updateInstallPermission}
+              </Text>
+            ) : error === "download" ? (
+              <Text style={[styles.updateMessage, { color: palette.danger }]}>
+                {dictionary.updateDownloadError}
+              </Text>
+            ) : error === "check" ? (
+              <Text style={[styles.updateMessage, { color: palette.danger }]}>
+                {dictionary.updateCheckError}
+              </Text>
+            ) : release ? (
+              <Text style={[styles.updateMessage, { color: palette.primary }]}>
+                {dictionary.updateAvailable.replace(
+                  "{version}",
+                  release.version,
+                )}
+              </Text>
+            ) : checked ? (
+              <Text
+                style={[styles.updateMessage, { color: palette.textMuted }]}
+              >
+                {dictionary.updateUpToDate}
+              </Text>
+            ) : null}
+            <UpdateButton
+              busy={checking}
+              label={dictionary.updateCheck}
+              onPress={() => void checkForUpdates()}
+              palette={palette}
+            />
+            {release ? (
+              <UpdateButton
+                busy={installing}
+                label={
+                  Platform.OS === "android" && release.asset
+                    ? dictionary.updateDownloadInstall
+                    : dictionary.updateOpenRelease
+                }
+                onPress={() => void installOrOpenUpdate()}
+                palette={palette}
+              />
+            ) : null}
+          </View>
+
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ disabled: resetting }}
@@ -165,8 +253,8 @@ function SectionHeading({
   icon,
   label,
   palette,
-}: Readonly<{
-  icon: "globe" | "sun";
+}: {
+  icon: "globe" | "sun" | "reset";
   label: string;
   palette: ReturnType<typeof useTheme>["palette"];
 }>) {
@@ -181,6 +269,38 @@ function SectionHeading({
         {label}
       </Text>
     </View>
+  );
+}
+
+function UpdateButton({
+  busy,
+  label,
+  onPress,
+  palette,
+}: {
+  busy: boolean;
+  label: string;
+  onPress: () => void;
+  palette: ReturnType<typeof useTheme>["palette"];
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: busy, busy }}
+      disabled={busy}
+      onPress={onPress}
+      style={[
+        styles.updateButton,
+        { backgroundColor: palette.primary, opacity: busy ? 0.7 : 1 },
+      ]}
+    >
+      {busy ? (
+        <ActivityIndicator color={palette.onPrimary} size="small" />
+      ) : null}
+      <Text style={[styles.updateButtonText, { color: palette.onPrimary }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -256,6 +376,25 @@ const styles = StyleSheet.create({
     width: 30,
   },
   sectionTitle: { fontSize: 17, fontWeight: "700" },
+  versionRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 48,
+  },
+  versionValue: { fontSize: 15, fontWeight: "600" },
+  updateMessage: { fontSize: 14, lineHeight: 20, marginBottom: spacing.sm },
+  updateButton: {
+    alignItems: "center",
+    borderRadius: radii.md,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "center",
+    marginTop: spacing.sm,
+    minHeight: 46,
+    paddingHorizontal: spacing.md,
+  },
+  updateButtonText: { fontSize: 15, fontWeight: "700" },
   card: {
     borderWidth: 1,
     borderRadius: radii.md,

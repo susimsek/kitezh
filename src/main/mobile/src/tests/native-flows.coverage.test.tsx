@@ -164,6 +164,83 @@ it("validates, updates, and confirms active-account session security actions", a
   expect(await screen.findByText("passwordSaved")).toBeVisible();
 });
 
+it("reports session and account-removal failures and confirms revocation actions", async () => {
+  jest.mocked(accountApi.listAccountSessions).mockResolvedValue({
+    content: [
+      {
+        id: "current-session",
+        createdAt: "not-a-date",
+        lastAccessedAt: "2026-01-02T10:00:00Z",
+        expiresAt: "2026-02-01T10:00:00Z",
+        current: true,
+        clients: [],
+      },
+      {
+        id: "old-session",
+        createdAt: "2026-01-01T10:00:00Z",
+        lastAccessedAt: "2026-01-02T10:00:00Z",
+        expiresAt: "2026-02-01T10:00:00Z",
+        current: false,
+        clients: [{ clientId: "browser", clientName: "Browser" }],
+      },
+    ],
+    totalElements: 2,
+    totalPages: 1,
+    number: 0,
+    size: 20,
+  });
+  jest
+    .mocked(accountApi.signOutOtherAccountSessions)
+    .mockRejectedValueOnce(new Error("offline"));
+  jest
+    .mocked(accountApi.signOutAccountSession)
+    .mockRejectedValueOnce(new Error("offline"));
+  jest
+    .mocked(accountApi.deleteAccount)
+    .mockRejectedValueOnce(new Error("offline"));
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("Browser")).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "signOutOthers" }));
+  expect(await screen.findByText("signOutOthersError")).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "signOutSession" }));
+  const sessionActions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    sessionActions
+      ?.find((action) => action.style === "destructive")
+      ?.onPress?.();
+  });
+  expect(await screen.findByText("signOutSessionError")).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "deleteAccount" }));
+  const emptyDeleteActions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    emptyDeleteActions
+      ?.find((action) => action.style === "destructive")
+      ?.onPress?.();
+  });
+  expect(await screen.findByText("deleteAccountError")).toBeVisible();
+  fireEvent.change(screen.getAllByPlaceholderText("currentPassword").at(-1)!, {
+    target: { value: "confirm-password" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "deleteAccount" }));
+  const deleteActions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    deleteActions
+      ?.find((action) => action.style === "destructive")
+      ?.onPress?.();
+  });
+  expect(await screen.findByText("deleteAccountError")).toBeVisible();
+  expect(accountApi.deleteAccount).toHaveBeenCalledWith(
+    "test-access-token",
+    "confirm-password",
+    expect.any(Object),
+  );
+});
+
 it("sets up mobile MFA and validates the one-time code before enabling", async () => {
   jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
     enabled: false,
@@ -196,6 +273,64 @@ it("sets up mobile MFA and validates the one-time code before enabling", async (
       "test-access-token",
       "enable",
       "123456",
+      expect.any(Object),
+    ),
+  );
+  expect(mockSignOut).toHaveBeenCalledTimes(1);
+});
+
+it("regenerates recovery codes and handles invalid and successful MFA disable codes", async () => {
+  jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
+    enabled: true,
+    available: true,
+    required: false,
+    issuer: "Kitezh",
+    algorithm: "SHA1",
+    digits: 6,
+    periodSeconds: 30,
+  });
+  jest
+    .mocked(accountApi.getRecoveryCodesStatus)
+    .mockResolvedValue({ remaining: 2 });
+  jest.mocked(accountApi.generateRecoveryCodes).mockResolvedValue({
+    codes: ["first-code", "second-code"],
+    remaining: 2,
+  });
+  const invalidCode = new accountApi.AccountApiError();
+  invalidCode.status = 400;
+  jest.mocked(accountApi.mutateMfa).mockRejectedValueOnce(invalidCode);
+  jest.mocked(accountApi.mutateMfa).mockResolvedValue(undefined);
+
+  render(<MfaScreen />);
+  expect(await screen.findByText("recoveryCodesRemaining: 2")).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "recoveryCodesGenerate" }),
+  );
+  expect(await screen.findByText("first-code")).toBeVisible();
+  expect(screen.getByText("second-code")).toBeVisible();
+
+  fireEvent.change(screen.getByLabelText("mfaCode"), {
+    target: { value: "123" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "mfaDisable" }));
+  expect(await screen.findAllByText("mfaCode")).toHaveLength(2);
+
+  fireEvent.change(screen.getByLabelText("mfaCode"), {
+    target: { value: "123456" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "mfaDisable" }));
+  await waitFor(() => expect(accountApi.mutateMfa).toHaveBeenCalledTimes(1));
+  expect(await screen.findAllByText("mfaCode")).toHaveLength(2);
+
+  fireEvent.change(screen.getByLabelText("mfaCode"), {
+    target: { value: "654321" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "mfaDisable" }));
+  await waitFor(() =>
+    expect(accountApi.mutateMfa).toHaveBeenLastCalledWith(
+      "test-access-token",
+      "disable",
+      "654321",
       expect.any(Object),
     ),
   );
@@ -240,6 +375,13 @@ it("validates and completes native account registration", async () => {
   jest
     .mocked(publicApi.getCaptchaSettings)
     .mockResolvedValue({ enabled: false });
+  jest.mocked(publicApi.registerAccount).mockRejectedValueOnce(
+    Object.assign(new Error("validation failed"), {
+      problem: {
+        violations: [{ field: "email", message: "Invalid email address" }],
+      },
+    }),
+  );
   jest.mocked(publicApi.registerAccount).mockResolvedValue(undefined);
 
   render(<RegisterScreen />);
@@ -258,6 +400,12 @@ it("validates and completes native account registration", async () => {
       target: { value },
     });
   }
+  fireEvent.click(create);
+  expect(await screen.findByText("Invalid email address")).toBeVisible();
+  fireEvent.change(screen.getByPlaceholderText("email"), {
+    target: { value: "alice@example.test" },
+  });
+  jest.mocked(publicApi.registerAccount).mockResolvedValueOnce(undefined);
   fireEvent.click(create);
   await waitFor(() =>
     expect(publicApi.registerAccount).toHaveBeenCalledWith(

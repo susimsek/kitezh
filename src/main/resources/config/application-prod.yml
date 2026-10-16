@@ -34,8 +34,6 @@ management:
         http.server.requests: 250ms,1s,5s
 
 app:
-  desktop-release:
-    cache-ttl: PT15M
   social-login:
     encryption-key: demo-static-social-ciba-key-2026-change-me
   cache:
@@ -44,7 +42,7 @@ app:
       initial-capacity: 500
       maximum-size: 1000
       overrides:
-        desktopLatestRelease:
+        latestAppRelease:
           ttl: PT15M
           initial-capacity: 1
           maximum-size: 1

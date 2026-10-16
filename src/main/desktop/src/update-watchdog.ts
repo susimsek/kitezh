@@ -100,7 +100,7 @@ export function isValidRecoveryState(
 const sleep = (milliseconds: number) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function processExited(pid: number) {
+function processExited(pid: number) {
   try {
     process.kill(pid, 0);
     return false;
@@ -114,32 +114,64 @@ export async function restoreInstallation(
   recoveryPath: string,
   launch = true,
 ) {
-  for (let attempt = 0; attempt < MAX_RESTORE_ATTEMPTS; attempt += 1) {
-    try {
-      if (state.targetType === "directory") {
-        const failedPath = `${state.targetPath}.failed-${Date.now()}`;
-        await rename(state.targetPath, failedPath).catch(() => undefined);
-        await cp(state.backupPath, state.targetPath, {
-          recursive: true,
-          force: true,
-        });
-        await rm(failedPath, { recursive: true, force: true });
-      } else {
-        await cp(state.backupPath, state.targetPath, { force: true });
-      }
-      await rm(state.backupPath, { recursive: true, force: true });
-      if (launch) {
-        spawn(state.executablePath, [], {
-          detached: true,
-          stdio: "ignore",
-          windowsHide: true,
-        }).unref();
-      }
-      return;
-    } catch {
-      await sleep(RETRY_DELAY_MS);
+  await restoreInstallationAttempt(state, launch, MAX_RESTORE_ATTEMPTS);
+}
+
+async function restoreInstallationAttempt(
+  state: RecoveryState,
+  launch: boolean,
+  attemptsRemaining: number,
+): Promise<void> {
+  if (attemptsRemaining === 0) return;
+  try {
+    if (state.targetType === "directory") {
+      const failedPath = `${state.targetPath}.failed-${Date.now()}`;
+      await rename(state.targetPath, failedPath).catch(() => undefined);
+      await cp(state.backupPath, state.targetPath, {
+        recursive: true,
+        force: true,
+      });
+      await rm(failedPath, { recursive: true, force: true });
+    } else {
+      await cp(state.backupPath, state.targetPath, { force: true });
     }
+    await rm(state.backupPath, { recursive: true, force: true });
+    if (launch) {
+      spawn(state.executablePath, [], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      }).unref();
+    }
+  } catch {
+    await sleep(RETRY_DELAY_MS);
+    await restoreInstallationAttempt(state, launch, attemptsRemaining - 1);
   }
+}
+
+async function waitForProcessExit(pid: number): Promise<void> {
+  if (processExited(pid)) return;
+  await sleep(RETRY_DELAY_MS);
+  await waitForProcessExit(pid);
+}
+
+async function markerExists(recoveryPath: string): Promise<boolean> {
+  try {
+    await readFile(recoveryPath, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForHealthWindow(
+  recoveryPath: string,
+  deadline: number,
+): Promise<boolean> {
+  if (!(await markerExists(recoveryPath))) return false;
+  if (Date.now() >= deadline) return true;
+  await sleep(RETRY_DELAY_MS);
+  return waitForHealthWindow(recoveryPath, deadline);
 }
 
 async function run() {
@@ -168,22 +200,9 @@ async function run() {
     return;
   }
 
-  while (!(await processExited(parentPid))) await sleep(RETRY_DELAY_MS);
+  await waitForProcessExit(parentPid);
   const deadline = Date.now() + HEALTH_WINDOW_MS;
-  while (Date.now() < deadline) {
-    try {
-      await readFile(recoveryPath, "utf8");
-    } catch {
-      return;
-    }
-    await sleep(RETRY_DELAY_MS);
-  }
-
-  try {
-    await readFile(recoveryPath, "utf8");
-  } catch {
-    return;
-  }
+  if (!(await waitForHealthWindow(recoveryPath, deadline))) return;
   await restoreInstallation(state, recoveryPath);
 }
 

@@ -28,6 +28,8 @@ const config: Config = {
     "<rootDir>/src/app/reset-password.tsx",
     "<rootDir>/src/app/forgot-password.tsx",
     "<rootDir>/src/auth/MobileAuthProvider.tsx",
+    "<rootDir>/src/updates/MobileUpdateProvider.tsx",
+    "<rootDir>/src/updates/install-update.ts",
     "<rootDir>/src/components/AdminResourceEditor.tsx",
     "<rootDir>/src/components/AuthCallbackScreen.tsx",
   ],

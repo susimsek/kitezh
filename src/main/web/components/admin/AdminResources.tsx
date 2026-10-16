@@ -341,7 +341,7 @@ function AdminResourcesContent({
             {resource === "users" && access?.manageUsers && locale && (
               <>
                 {selectedUserIds.length > 0 && (
-                  <div aria-label={copy.bulkActions} className="admin-bulk-actions" role="group">
+                  <fieldset aria-label={copy.bulkActions} className="admin-bulk-actions">
                     <Badge bg="secondary" className="admin-bulk-selection-count">
                       {copy.selectedUsers.replace("{count}", String(selectedUserIds.length))}
                     </Badge>
@@ -372,7 +372,7 @@ function AdminResourcesContent({
                       <AdminActionIcon action="delete" />
                       {copy.bulkDelete}
                     </Button>
-                  </div>
+                  </fieldset>
                 )}
                 <Link className="btn btn-primary" href={`/admin/users/new`}>
                   <AdminActionIcon action="add" />
@@ -922,68 +922,76 @@ function SessionsTable({
           <Modal.Title>{copy.sessionDetails}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {detailLoading && !detail ? (
-            <LoadingState />
-          ) : detail ? (
-            <div className="d-grid gap-4">
-              <dl className="row mb-0">
-                <dt className="col-sm-4">{copy.sessionId}</dt>
-                <dd className="col-sm-8 font-monospace text-break">{detail.session.id}</dd>
-                <dt className="col-sm-4">{copy.user}</dt>
-                <dd className="col-sm-8">{detail.session.username ?? "-"}</dd>
-                <dt className="col-sm-4">{copy.created}</dt>
-                <dd className="col-sm-8">{date(detail.session.createdAt)}</dd>
-                <dt className="col-sm-4">{copy.lastActive}</dt>
-                <dd className="col-sm-8">{date(detail.session.lastAccessedAt)}</dd>
-                <dt className="col-sm-4">{copy.expires}</dt>
-                <dd className="col-sm-8">{date(detail.session.expiresAt)}</dd>
-              </dl>
-              <div>
-                <h3 className="h6">{copy.authorizations}</h3>
-                {detail.authorizations.length === 0 ? (
-                  <div className="text-body-secondary">{copy.noAuthorizations}</div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-sm align-middle mb-0">
-                      <thead>
-                        <tr>
-                          <th>{copy.client}</th>
-                          <th>{copy.grantType}</th>
-                          <th>{copy.grantedScopes}</th>
-                          <th>{copy.accessTokenExpires}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.authorizations.map((authorization) => (
-                          <tr key={authorization.id}>
-                            <td>
-                              <div>{authorization.clientName}</div>
-                              <div className="small text-body-secondary font-monospace">
-                                {authorization.clientId}
-                              </div>
-                            </td>
-                            <td>{authorization.grantType}</td>
-                            <td>
-                              {authorization.scopes.map((scope) => (
-                                <Badge bg="secondary" className="me-1" key={scope}>
-                                  {scope}
-                                </Badge>
+          {(() => {
+            if (detailLoading && !detail) {
+              return <LoadingState />;
+            } else {
+              if (detail) {
+                return (
+                  <div className="d-grid gap-4">
+                    <dl className="row mb-0">
+                      <dt className="col-sm-4">{copy.sessionId}</dt>
+                      <dd className="col-sm-8 font-monospace text-break">{detail.session.id}</dd>
+                      <dt className="col-sm-4">{copy.user}</dt>
+                      <dd className="col-sm-8">{detail.session.username ?? "-"}</dd>
+                      <dt className="col-sm-4">{copy.created}</dt>
+                      <dd className="col-sm-8">{date(detail.session.createdAt)}</dd>
+                      <dt className="col-sm-4">{copy.lastActive}</dt>
+                      <dd className="col-sm-8">{date(detail.session.lastAccessedAt)}</dd>
+                      <dt className="col-sm-4">{copy.expires}</dt>
+                      <dd className="col-sm-8">{date(detail.session.expiresAt)}</dd>
+                    </dl>
+                    <div>
+                      <h3 className="h6">{copy.authorizations}</h3>
+                      {detail.authorizations.length === 0 ? (
+                        <div className="text-body-secondary">{copy.noAuthorizations}</div>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th>{copy.client}</th>
+                                <th>{copy.grantType}</th>
+                                <th>{copy.grantedScopes}</th>
+                                <th>{copy.accessTokenExpires}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {detail.authorizations.map((authorization) => (
+                                <tr key={authorization.id}>
+                                  <td>
+                                    <div>{authorization.clientName}</div>
+                                    <div className="small text-body-secondary font-monospace">
+                                      {authorization.clientId}
+                                    </div>
+                                  </td>
+                                  <td>{authorization.grantType}</td>
+                                  <td>
+                                    {authorization.scopes.map((scope) => (
+                                      <Badge bg="secondary" className="me-1" key={scope}>
+                                        {scope}
+                                      </Badge>
+                                    ))}
+                                  </td>
+                                  <td>
+                                    {authorization.accessTokenExpiresAt
+                                      ? date(authorization.accessTokenExpiresAt)
+                                      : "-"}
+                                  </td>
+                                </tr>
                               ))}
-                            </td>
-                            <td>
-                              {authorization.accessTokenExpiresAt
-                                ? date(authorization.accessTokenExpiresAt)
-                                : "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          ) : null}
+                );
+              } else {
+                return null;
+              }
+            }
+          })()}
         </Modal.Body>
       </Modal>
     </>

@@ -55,7 +55,9 @@ export default function SignInScreen() {
         </Text>
         {error ? (
           <Text style={[styles.error, { color: palette.danger }]}>
-            {dictionary.authError}
+            {error === "authorization-timeout"
+              ? dictionary.authTimeout
+              : dictionary.authError}
           </Text>
         ) : null}
         <Pressable
@@ -124,7 +126,11 @@ const styles = StyleSheet.create({
     left: spacing.md,
     width: 44,
   },
-  title: { fontSize: typography.pageTitle, fontWeight: "800", marginTop: spacing.md },
+  title: {
+    fontSize: typography.pageTitle,
+    fontWeight: "800",
+    marginTop: spacing.md,
+  },
   message: {
     fontSize: 16,
     lineHeight: 24,

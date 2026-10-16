@@ -42,7 +42,7 @@ import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
 import io.github.susimsek.kitezh.repository.UserProfileAttributeDefinitionRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
-import io.github.susimsek.kitezh.service.DesktopReleaseService;
+import io.github.susimsek.kitezh.service.AppReleaseMetadataService;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.OptionalLong;
@@ -129,7 +129,7 @@ public class CacheConfig {
                         .ENABLED_PROFILE_ATTRIBUTE_DEFINITIONS_CACHE,
                 UserProfileAttributeDefinitionRepository.PROFILE_ATTRIBUTE_DEFINITION_BY_NAME_CACHE,
                 UserRepository.USER_BY_USERNAME_CACHE,
-                DesktopReleaseService.LATEST_DESKTOP_RELEASE_CACHE);
+                AppReleaseMetadataService.LATEST_APP_RELEASE_CACHE);
     }
 
     private ApplicationProperties.Caffeine cacheProperties() {

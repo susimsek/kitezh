@@ -1,9 +1,9 @@
 package io.github.susimsek.kitezh.service;
 
-import io.github.susimsek.kitezh.dto.desktop.DesktopReleaseDTO;
-import io.github.susimsek.kitezh.dto.desktop.GitHubReleaseAssetDTO;
-import io.github.susimsek.kitezh.dto.desktop.GitHubReleaseDTO;
-import io.github.susimsek.kitezh.service.client.DesktopReleaseClient;
+import io.github.susimsek.kitezh.dto.release.AppReleaseMetadataDTO;
+import io.github.susimsek.kitezh.dto.release.GitHubReleaseAssetDTO;
+import io.github.susimsek.kitezh.dto.release.GitHubReleaseDTO;
+import io.github.susimsek.kitezh.service.client.GitHubReleaseClient;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,9 +13,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DesktopReleaseService {
+public class AppReleaseMetadataService {
 
-    public static final String LATEST_DESKTOP_RELEASE_CACHE = "desktopLatestRelease";
+    public static final String LATEST_APP_RELEASE_CACHE = "latestAppRelease";
 
     private static final String REPOSITORY = "susimsek/kitezh";
 
@@ -36,13 +36,13 @@ public class DesktopReleaseService {
                     new AssetRule("iosIpa", "-ios.ipa"),
                     new AssetRule("iosUnsignedIpa", "-ios-unsigned.ipa"));
 
-    private final DesktopReleaseClient desktopReleaseClient;
+    private final GitHubReleaseClient gitHubReleaseClient;
 
-    @Cacheable(cacheNames = LATEST_DESKTOP_RELEASE_CACHE, sync = true)
-    public DesktopReleaseDTO getLatestRelease() {
-        GitHubReleaseDTO release = desktopReleaseClient.latest();
+    @Cacheable(cacheNames = LATEST_APP_RELEASE_CACHE, sync = true)
+    public AppReleaseMetadataDTO getLatestReleaseMetadata() {
+        GitHubReleaseDTO release = gitHubReleaseClient.latest();
         if (release == null || release.tagName() == null || release.assets() == null) {
-            throw new IllegalStateException("GitHub returned an incomplete desktop release.");
+            throw new IllegalStateException("GitHub returned an incomplete application release.");
         }
 
         String version = release.tagName().replaceFirst("^v", "");
@@ -57,7 +57,7 @@ public class DesktopReleaseService {
                                 .findFirst()
                                 .ifPresent(name -> assets.put(rule.key(), baseUrl + "/" + name)));
 
-        return new DesktopReleaseDTO(
+        return new AppReleaseMetadataDTO(
                 release.tagName(),
                 version,
                 "https://github.com/" + REPOSITORY + "/releases/tag/" + release.tagName(),

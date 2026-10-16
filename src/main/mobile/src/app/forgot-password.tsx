@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { requestPasswordReset } from "@/api/public-api";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
+import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -46,7 +47,7 @@ export default function ForgotPasswordScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <View style={styles.content}>
+      <MobileFormScrollView contentContainerStyle={styles.content}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={dictionary.back}
@@ -127,7 +128,7 @@ export default function ForgotPasswordScreen() {
             </Pressable>
           </View>
         )}
-      </View>
+      </MobileFormScrollView>
     </SafeAreaView>
   );
 }

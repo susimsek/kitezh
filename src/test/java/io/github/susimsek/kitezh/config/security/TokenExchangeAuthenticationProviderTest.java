@@ -215,8 +215,9 @@ class TokenExchangeAuthenticationProviderTest {
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                         .build();
         TokenExchangeAuthenticationProvider provider = provider();
+        OAuth2TokenExchangeAuthenticationToken request = request(client, null, Set.of());
 
-        assertThatThrownBy(() -> provider.authenticate(request(client, null, Set.of())))
+        assertThatThrownBy(() -> provider.authenticate(request))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .satisfies(
                         exception ->
@@ -333,8 +334,10 @@ class TokenExchangeAuthenticationProviderTest {
                         org.springframework.security.oauth2.server.authorization.OAuth2TokenType
                                 .ACCESS_TOKEN))
                 .thenReturn(authorization);
+        TokenExchangeAuthenticationProvider provider = provider();
+        OAuth2TokenExchangeAuthenticationToken request = request(requestingClient, null, Set.of());
 
-        assertThatThrownBy(() -> provider().authenticate(request(requestingClient, null, Set.of())))
+        assertThatThrownBy(() -> provider.authenticate(request))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .satisfies(
                         exception ->
@@ -368,8 +371,9 @@ class TokenExchangeAuthenticationProviderTest {
                                 .ACCESS_TOKEN))
                 .thenReturn(authorization);
         OAuth2TokenExchangeAuthenticationToken request = requestWithScopes(client, Set.of("admin"));
+        TokenExchangeAuthenticationProvider provider = provider();
 
-        assertThatThrownBy(() -> provider().authenticate(request))
+        assertThatThrownBy(() -> provider.authenticate(request))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .satisfies(
                         exception ->

@@ -22,14 +22,24 @@ import type {
   DesktopLanguageMode,
   SocialProviderAvailability,
 } from "../../shared/src/contracts.ts";
-import { classifyApiError, parseProblemDetail } from "../../shared/src/api.ts";
+import {
+  classifyApiError,
+  parseProblemDetail,
+  parseRetryAfterMs,
+  problemFieldErrors,
+  readRetryAfterHeader,
+} from "../../shared/src/api.ts";
 import {
   isAllowedNativeRedirect,
   parseNativeDeepLink,
   resolveNativeIntentPath,
+  validateNativeAuthorizationConfig,
   validateAuthorizationCallback,
 } from "../../shared/src/auth.ts";
-import { createSingleFlight } from "../../shared/src/session.ts";
+import {
+  createSingleFlight,
+  NATIVE_REFRESH_EXPIRY_SKEW_MS,
+} from "../../shared/src/session.ts";
 import { isValidEmailAddress } from "./utils/email.ts";
 
 test("client metadata follows the Kitezh app header contract", () => {
@@ -61,6 +71,18 @@ test("system locale resolves to the device language when supported", () => {
   assert.equal(resolveLocale("system", "tr-TR"), "tr");
   assert.equal(resolveLocale("system", "en-US"), "en");
   assert.equal(resolveLocale("en", "tr-TR"), "en");
+});
+
+test("English and Turkish native message catalogs remain in sync", () => {
+  const englishKeys = Object.keys(messages.en).sort();
+  const turkishKeys = Object.keys(messages.tr).sort();
+  assert.deepEqual(turkishKeys, englishKeys);
+  assert.ok(
+    englishKeys.every((key) => messages.en[key as keyof typeof messages.en]),
+  );
+  assert.ok(
+    turkishKeys.every((key) => messages.tr[key as keyof typeof messages.tr]),
+  );
 });
 
 test("theme resolver returns semantic palettes for every mode", () => {
@@ -185,13 +207,32 @@ test("shared API errors preserve native status semantics without transport detai
   assert.deepEqual(problem?.violations, [
     { field: "email", message: "Enter a valid email address." },
   ]);
+  assert.deepEqual(problemFieldErrors({ problem }), {
+    email: "Enter a valid email address.",
+  });
   assert.equal(classifyApiError(401), "unauthorized");
   assert.equal(classifyApiError(403), "forbidden");
+  assert.equal(classifyApiError(409), "conflict");
+  assert.equal(classifyApiError(429), "rate-limited");
+  assert.equal(classifyApiError(503), "unavailable");
   assert.equal(
     classifyApiError(0, new DOMException("timeout", "AbortError")),
+    "cancelled",
+  );
+  assert.equal(
+    classifyApiError(0, new DOMException("timeout", "TimeoutError")),
     "timeout",
   );
   assert.equal(classifyApiError(0, new Error("network")), "offline");
+});
+
+test("shared API contract parses Retry-After seconds and HTTP dates", () => {
+  const now = Date.parse("2026-10-12T10:00:00.000Z");
+  assert.equal(parseRetryAfterMs("3", now), 3_000);
+  assert.equal(parseRetryAfterMs("Mon, 12 Oct 2026 10:00:05 GMT", now), 5_000);
+  assert.equal(parseRetryAfterMs("invalid", now), undefined);
+  assert.equal(readRetryAfterHeader({ "Retry-After": "4" }), "4");
+  assert.equal(readRetryAfterHeader(new Headers({ "Retry-After": "6" })), "6");
 });
 
 test("native OAuth callbacks require the original state and approved scheme", () => {
@@ -226,10 +267,69 @@ test("native OAuth callbacks require the original state and approved scheme", ()
   );
 });
 
+test("native authorization metadata requires a trusted issuer and endpoints", () => {
+  const discovery = {
+    issuer: "https://issuer.example.test",
+    authorizationEndpoint: "https://issuer.example.test/oauth2/authorize",
+    tokenEndpoint: "https://issuer.example.test/oauth2/token",
+    endSessionEndpoint: "https://issuer.example.test/connect/logout",
+  };
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      discovery,
+    ),
+    true,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      " ",
+      "kitezh://oauth/callback",
+      discovery,
+    ),
+    false,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "https://attacker.example/callback",
+      discovery,
+    ),
+    false,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      { ...discovery, tokenEndpoint: "http://issuer.example.test/token" },
+    ),
+    false,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      { ...discovery, issuer: "https://other.example.test" },
+    ),
+    false,
+  );
+});
+
 test("native deep links accept only registered routes", () => {
   assert.deepEqual(
-    parseNativeDeepLink("kitezh://verify-email/?token=one-time-token"),
-    { kind: "verify-email", token: "one-time-token" },
+    parseNativeDeepLink(
+      "kitezh://verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    {
+      kind: "verify-email",
+      token: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    },
   );
   assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
     kind: "oauth-callback",
@@ -247,6 +347,7 @@ test("native deep links accept only registered routes", () => {
     null,
   );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
+  assert.equal(parseNativeDeepLink("kitezh://verify-email/?token=short"), null);
 });
 
 test("native intent routes registered callback links without callback parameters", () => {
@@ -268,9 +369,22 @@ test("native intent routes registered callback links without callback parameters
     resolveNativeIntentPath("https://example.com/oauth/callback"),
     null,
   );
+  assert.equal(
+    resolveNativeIntentPath(
+      "kitezh://verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    "/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "kitezh://reset-password/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG&state=private",
+    ),
+    "/reset-password?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+  );
 });
 
 test("session refresh operations are single-flight and recover after completion", async () => {
+  assert.equal(NATIVE_REFRESH_EXPIRY_SKEW_MS, 60_000);
   const coordinator = createSingleFlight<number>();
   let executions = 0;
   let resolveOperation: ((value: number) => void) | undefined;

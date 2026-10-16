@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
 import {
   AdminApiError,
   getAdminDashboard,
@@ -38,6 +37,10 @@ import {
   listAdminEvents,
   deleteAdminEvents,
 } from "./admin-api.ts";
+
+import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
+
+installAxiosFetchMockCompatibility();
 
 test("admin dashboard uses the admin API scope endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -103,17 +106,30 @@ test("admin dashboard preserves forbidden status for the native shell", async ()
   }
 });
 
+test("admin API exposes Retry-After metadata for throttled calls", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(null, { status: 429, headers: { "Retry-After": "9" } });
+  try {
+    await assert.rejects(
+      getAdminDashboard("access-token"),
+      (error: unknown) =>
+        error instanceof AdminApiError &&
+        error.kind === "rate-limited" &&
+        error.retryAfterMs === 9_000,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("admin requests classify timeout and offline failures", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (_input, init) =>
-    new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener(
-        "abort",
-        () =>
-          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
-        { once: true },
-      );
-    });
+  globalThis.fetch = async (_input, init) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(init?.signal?.aborted, true);
+    throw Object.assign(new Error("aborted"), { name: "AbortError" });
+  };
   try {
     await assert.rejects(
       getAdminDashboard("access-token", { timeoutMs: 5 }),
@@ -557,13 +573,12 @@ test("admin consents request encodes all filters and stable sort", async () => {
     );
   };
   try {
-    await listAdminConsents(
-      "access-token",
-      "account",
-      "account-console",
-      "ada",
-      "openid",
-    );
+    await listAdminConsents("access-token", {
+      query: "account",
+      clientId: "account-console",
+      username: "ada",
+      scope: "openid",
+    });
     assert.equal(
       request,
       "https://kitezh.onrender.com/api/admin/consents?q=account&clientId=account-console&username=ada&scope=openid&page=0&size=10&sort=id.principalName%2Casc",

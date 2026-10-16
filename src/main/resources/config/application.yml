@@ -3,7 +3,11 @@ spring:
     import: optional:file:.env[.properties]
   main:
     allow-bean-definition-overriding: true
+    banner-mode: console
     keep-alive: true
+  output:
+    ansi:
+      console-available: true
   threads:
     virtual:
       enabled: true

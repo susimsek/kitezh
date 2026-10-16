@@ -20,19 +20,48 @@ export type ProblemDetail = {
 
 export type ApiErrorKind =
   | "offline"
+  | "cancelled"
   | "timeout"
   | "unauthorized"
   | "forbidden"
   | "validation"
   | "rate-limited"
+  | "conflict"
+  | "unavailable"
+  | "update"
   | "server"
   | "http";
 
 export const DEFAULT_NATIVE_API_TIMEOUT_MS = 15_000;
 
+export function parseRetryAfterMs(
+  value: unknown,
+  now = Date.now(),
+): number | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, Math.round(seconds * 1000));
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - now);
+}
+
+export function readRetryAfterHeader(headers: unknown): string | undefined {
+  if (!headers || typeof headers !== "object") return undefined;
+  const candidate = headers as {
+    get?: (name: string) => unknown;
+    [name: string]: unknown;
+  };
+  const getterValue = candidate.get?.("retry-after");
+  if (typeof getterValue === "string") return getterValue;
+  const key = Object.keys(candidate).find(
+    (name) => name.toLowerCase() === "retry-after",
+  );
+  const value = key ? candidate[key] : undefined;
+  return typeof value === "string" ? value : undefined;
+}
+
 export type NativeRequestSignal = {
   signal: AbortSignal;
-  timedOut: () => boolean;
   dispose: () => void;
 };
 
@@ -41,10 +70,12 @@ export function createNativeRequestSignal(
   parentSignal?: AbortSignal,
 ): NativeRequestSignal {
   const controller = new AbortController();
-  let didTimeout = false;
+  const timeoutError = Object.assign(
+    new Error("Native API request timed out"),
+    { name: "TimeoutError" },
+  );
   const timeout = setTimeout(() => {
-    didTimeout = true;
-    controller.abort();
+    controller.abort(timeoutError);
   }, timeoutMs);
   const abortFromParent = () => controller.abort();
 
@@ -56,7 +87,6 @@ export function createNativeRequestSignal(
 
   return {
     signal: controller.signal,
-    timedOut: () => didTimeout,
     dispose: () => {
       clearTimeout(timeout);
       parentSignal?.removeEventListener("abort", abortFromParent);
@@ -64,17 +94,24 @@ export function createNativeRequestSignal(
   };
 }
 
-export function classifyApiError(status: number, cause?: unknown): ApiErrorKind {
+export function classifyApiError(
+  status: number,
+  cause?: unknown,
+): ApiErrorKind {
   if (status === 0) {
-    return cause instanceof Error &&
-      (cause.name === "AbortError" || cause.name === "TimeoutError")
+    if (cause instanceof Error && cause.name === "AbortError") {
+      return "cancelled";
+    }
+    return cause instanceof Error && cause.name === "TimeoutError"
       ? "timeout"
       : "offline";
   }
   if (status === 401) return "unauthorized";
   if (status === 403) return "forbidden";
   if (status === 400 || status === 422) return "validation";
+  if (status === 409) return "conflict";
   if (status === 429) return "rate-limited";
+  if (status === 502 || status === 503 || status === 504) return "unavailable";
   if (status >= 500) return "server";
   return "http";
 }
@@ -99,6 +136,15 @@ export function parseProblemDetail(value: unknown): ProblemDetail | undefined {
     detail: typeof record.detail === "string" ? record.detail : undefined,
     violations,
   };
+}
+
+export function problemFieldErrors(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") return {};
+  const candidate = value as { problem?: unknown };
+  const problem = parseProblemDetail(candidate.problem);
+  return Object.fromEntries(
+    (problem?.violations ?? []).map(({ field, message }) => [field, message]),
+  );
 }
 
 export type NativeSession = {

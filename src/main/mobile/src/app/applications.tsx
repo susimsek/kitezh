@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,12 +15,15 @@ import { AppIcon } from "@/components/AppIcon";
 import { AccountTabBar } from "@/components/AccountTabBar";
 import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import {
+  decideCibaRequest,
   listAccountApplications,
+  listCibaRequests,
   listOfflineSessions,
   revokeAccountApplication,
   revokeOfflineSession,
   type AccountApplication,
   type AccountOfflineSession,
+  type CibaPendingRequest,
 } from "@/api/account-api";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -42,19 +45,29 @@ export default function ApplicationsScreen() {
   const [offlineSessions, setOfflineSessions] = useState<
     AccountOfflineSession[]
   >([]);
+  const [cibaRequests, setCibaRequests] = useState<CibaPendingRequest[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [offlineLoading, setOfflineLoading] = useState(false);
   const [applicationsError, setApplicationsError] = useState(false);
   const [offlineError, setOfflineError] = useState(false);
+  const [cibaLoading, setCibaLoading] = useState(false);
+  const [cibaError, setCibaError] = useState(false);
+  const [cibaBusy, setCibaBusy] = useState<{
+    authReqId: string;
+    decision: "approve" | "deny";
+  } | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const mutationInFlight = useRef(false);
 
   const loadData = useCallback(
     async (retry = false) => {
       if (!session) return;
       setApplicationsLoading(true);
       setOfflineLoading(true);
+      setCibaLoading(true);
       setApplicationsError(false);
       setOfflineError(false);
+      setCibaError(false);
       try {
         const currentSession = retry
           ? await refreshSession(true)
@@ -62,24 +75,42 @@ export default function ApplicationsScreen() {
         if (!currentSession) {
           setApplicationsError(true);
           setOfflineError(true);
+          setCibaError(true);
           return;
         }
         const tokenOptions = {
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
         };
-        const [applicationPage, offlinePage] = await Promise.all([
-          listAccountApplications(currentSession.accessToken, tokenOptions),
-          listOfflineSessions(currentSession.accessToken, tokenOptions),
-        ]);
-        setApplications(applicationPage.content ?? []);
-        setOfflineSessions(offlinePage.content ?? []);
+        const [applicationResult, offlineResult, cibaResult] =
+          await Promise.allSettled([
+            listAccountApplications(currentSession.accessToken, tokenOptions),
+            listOfflineSessions(currentSession.accessToken, tokenOptions),
+            listCibaRequests(currentSession.accessToken, tokenOptions),
+          ]);
+        if (applicationResult.status === "fulfilled") {
+          setApplications(applicationResult.value.content ?? []);
+        } else {
+          setApplicationsError(true);
+        }
+        if (offlineResult.status === "fulfilled") {
+          setOfflineSessions(offlineResult.value.content ?? []);
+        } else {
+          setOfflineError(true);
+        }
+        if (cibaResult.status === "fulfilled") {
+          setCibaRequests(cibaResult.value.content ?? []);
+        } else {
+          setCibaError(true);
+        }
       } catch {
         setApplicationsError(true);
         setOfflineError(true);
+        setCibaError(true);
       } finally {
         setApplicationsLoading(false);
         setOfflineLoading(false);
+        setCibaLoading(false);
       }
     },
     [refreshSession, session],
@@ -95,12 +126,19 @@ export default function ApplicationsScreen() {
 
   const revokeApplication = useCallback(
     async (application: AccountApplication) => {
-      if (!session || busyKey) return;
+      if (!session || busyKey || mutationInFlight.current) return;
+      mutationInFlight.current = true;
       const key = `application:${application.clientId}`;
       setBusyKey(key);
       try {
         const currentSession = await refreshSession();
-        if (!currentSession) throw new Error();
+        if (!currentSession) {
+          showNotice({
+            kind: "error",
+            message: dictionary.revokeApplicationError,
+          });
+          return;
+        }
         await revokeAccountApplication(
           currentSession.accessToken,
           application.clientId,
@@ -121,6 +159,7 @@ export default function ApplicationsScreen() {
         });
       } finally {
         setBusyKey(null);
+        mutationInFlight.current = false;
       }
     },
     [
@@ -136,12 +175,19 @@ export default function ApplicationsScreen() {
 
   const revokeOffline = useCallback(
     async (offlineSession: AccountOfflineSession) => {
-      if (!session || busyKey) return;
+      if (!session || busyKey || mutationInFlight.current) return;
+      mutationInFlight.current = true;
       const key = `offline:${offlineSession.id}`;
       setBusyKey(key);
       try {
         const currentSession = await refreshSession();
-        if (!currentSession) throw new Error();
+        if (!currentSession) {
+          showNotice({
+            kind: "error",
+            message: dictionary.revokeOfflineSessionError,
+          });
+          return;
+        }
         await revokeOfflineSession(
           currentSession.accessToken,
           offlineSession.id,
@@ -162,6 +208,7 @@ export default function ApplicationsScreen() {
         });
       } finally {
         setBusyKey(null);
+        mutationInFlight.current = false;
       }
     },
     [
@@ -173,6 +220,53 @@ export default function ApplicationsScreen() {
       showNotice,
       session,
     ],
+  );
+
+  const decideCiba = useCallback(
+    async (request: CibaPendingRequest, decision: "approve" | "deny") => {
+      if (!session || busyKey || mutationInFlight.current) return;
+      if (
+        decision === "approve" &&
+        (request.mfaRequired || request.stepUpRequired)
+      ) {
+        return;
+      }
+      mutationInFlight.current = true;
+      const key = `ciba:${request.authReqId}`;
+      setBusyKey(key);
+      setCibaBusy({ authReqId: request.authReqId, decision });
+      try {
+        const currentSession = await refreshSession();
+        if (!currentSession) {
+          showNotice({
+            kind: "error",
+            message: dictionary.cibaDecisionError,
+          });
+          return;
+        }
+        await decideCibaRequest(currentSession.accessToken, request, decision, {
+          refreshAccessToken: async () =>
+            (await refreshSession(true))?.accessToken ?? null,
+        });
+        setCibaRequests((current) =>
+          current.filter((item) => item.authReqId !== request.authReqId),
+        );
+        showNotice({
+          kind: "success",
+          message:
+            decision === "approve"
+              ? dictionary.cibaApproved
+              : dictionary.cibaDenied,
+        });
+      } catch {
+        showNotice({ kind: "error", message: dictionary.cibaDecisionError });
+      } finally {
+        setCibaBusy(null);
+        setBusyKey(null);
+        mutationInFlight.current = false;
+      }
+    },
+    [busyKey, dictionary, refreshSession, session, showNotice],
   );
 
   const confirmApplication = (application: AccountApplication) => {
@@ -245,103 +339,238 @@ export default function ApplicationsScreen() {
             palette={palette}
             title={dictionary.applicationsTitle}
           />
-          {applicationsLoading ? (
-            <ActivityIndicator
-              color={palette.primary}
-              accessibilityLabel={dictionary.loading}
-            />
-          ) : applicationsError ? (
-            <RetryRow
-              label={dictionary.applicationsError}
-              retry={dictionary.sessionsRetry}
-              onPress={() => void loadData(true)}
-              palette={palette}
-            />
-          ) : applications.length === 0 ? (
-            <Text style={[styles.empty, { color: palette.textMuted }]}>
-              {dictionary.applicationsEmpty}
-            </Text>
-          ) : (
-            applications.map((application) => (
-              <View
-                key={application.clientId}
-                style={[styles.card, { borderColor: palette.border }]}
-              >
-                <Text style={[styles.cardTitle, { color: palette.text }]}>
-                  {application.clientName}
-                </Text>
-                <Text style={[styles.meta, { color: palette.textMuted }]}>
-                  {application.clientId}
-                </Text>
-                <Text style={[styles.meta, { color: palette.textMuted }]}>
-                  {application.scopes.join(", ")}
-                </Text>
-                <ActionButton
-                  label={dictionary.revokeApplication}
-                  loading={busyKey === `application:${application.clientId}`}
-                  disabled={Boolean(busyKey)}
-                  onPress={() => confirmApplication(application)}
-                  palette={palette}
+          {(() => {
+            if (applicationsLoading) {
+              return (
+                <ActivityIndicator
+                  color={palette.primary}
+                  accessibilityLabel={dictionary.loading}
                 />
-              </View>
-            ))
-          )}
+              );
+            } else {
+              if (applicationsError) {
+                return (
+                  <RetryRow
+                    label={dictionary.applicationsError}
+                    retry={dictionary.sessionsRetry}
+                    onPress={() => void loadData(true)}
+                    palette={palette}
+                  />
+                );
+              } else {
+                if (applications.length === 0) {
+                  return (
+                    <Text style={[styles.empty, { color: palette.textMuted }]}>
+                      {dictionary.applicationsEmpty}
+                    </Text>
+                  );
+                } else {
+                  return applications.map((application) => (
+                    <View
+                      key={application.clientId}
+                      style={[styles.card, { borderColor: palette.border }]}
+                    >
+                      <Text style={[styles.cardTitle, { color: palette.text }]}>
+                        {application.clientName}
+                      </Text>
+                      <Text style={[styles.meta, { color: palette.textMuted }]}>
+                        {application.clientId}
+                      </Text>
+                      <Text style={[styles.meta, { color: palette.textMuted }]}>
+                        {application.scopes.join(", ")}
+                      </Text>
+                      <ActionButton
+                        label={dictionary.revokeApplication}
+                        loading={
+                          busyKey === `application:${application.clientId}`
+                        }
+                        disabled={Boolean(busyKey)}
+                        onPress={() => confirmApplication(application)}
+                        palette={palette}
+                      />
+                    </View>
+                  ));
+                }
+              }
+            }
+          })()}
 
           <SectionHeader
             palette={palette}
             title={dictionary.offlineSessionsTitle}
             help={dictionary.offlineSessionsHelp}
           />
-          {offlineLoading ? (
-            <ActivityIndicator
-              color={palette.primary}
-              accessibilityLabel={dictionary.loading}
-            />
-          ) : offlineError ? (
-            <RetryRow
-              label={dictionary.offlineSessionsError}
-              retry={dictionary.sessionsRetry}
-              onPress={() => void loadData(true)}
-              palette={palette}
-            />
-          ) : offlineSessions.length === 0 ? (
-            <Text style={[styles.empty, { color: palette.textMuted }]}>
-              {dictionary.offlineSessionsEmpty}
-            </Text>
-          ) : (
-            offlineSessions.map((offlineSession) => (
-              <View
-                key={offlineSession.id}
-                style={[styles.card, { borderColor: palette.border }]}
-              >
-                <Text style={[styles.cardTitle, { color: palette.text }]}>
-                  {offlineSession.clientName}
-                </Text>
-                <Text style={[styles.meta, { color: palette.textMuted }]}>
-                  {offlineSession.clientId}
-                </Text>
-                <Text style={[styles.meta, { color: palette.textMuted }]}>
-                  {dictionary.offlineIssued}:{" "}
-                  {formatDate(offlineSession.issuedAt, resolvedLocale, "—")}
-                </Text>
-                <Text style={[styles.meta, { color: palette.textMuted }]}>
-                  {dictionary.offlineExpires}:{" "}
-                  {formatDate(
-                    offlineSession.expiresAt,
-                    resolvedLocale,
-                    dictionary.offlineNoExpiry,
-                  )}
-                </Text>
-                <ActionButton
-                  label={dictionary.revokeOfflineSession}
-                  loading={busyKey === `offline:${offlineSession.id}`}
-                  disabled={Boolean(busyKey)}
-                  onPress={() => confirmOffline(offlineSession)}
-                  palette={palette}
+          {(() => {
+            if (offlineLoading) {
+              return (
+                <ActivityIndicator
+                  color={palette.primary}
+                  accessibilityLabel={dictionary.loading}
                 />
-              </View>
-            ))
-          )}
+              );
+            } else {
+              if (offlineError) {
+                return (
+                  <RetryRow
+                    label={dictionary.offlineSessionsError}
+                    retry={dictionary.sessionsRetry}
+                    onPress={() => void loadData(true)}
+                    palette={palette}
+                  />
+                );
+              } else {
+                if (offlineSessions.length === 0) {
+                  return (
+                    <Text style={[styles.empty, { color: palette.textMuted }]}>
+                      {dictionary.offlineSessionsEmpty}
+                    </Text>
+                  );
+                } else {
+                  return offlineSessions.map((offlineSession) => (
+                    <View
+                      key={offlineSession.id}
+                      style={[styles.card, { borderColor: palette.border }]}
+                    >
+                      <Text style={[styles.cardTitle, { color: palette.text }]}>
+                        {offlineSession.clientName}
+                      </Text>
+                      <Text style={[styles.meta, { color: palette.textMuted }]}>
+                        {offlineSession.clientId}
+                      </Text>
+                      <Text style={[styles.meta, { color: palette.textMuted }]}>
+                        {dictionary.offlineIssued}:{" "}
+                        {formatDate(
+                          offlineSession.issuedAt,
+                          resolvedLocale,
+                          "—",
+                        )}
+                      </Text>
+                      <Text style={[styles.meta, { color: palette.textMuted }]}>
+                        {dictionary.offlineExpires}:{" "}
+                        {formatDate(
+                          offlineSession.expiresAt,
+                          resolvedLocale,
+                          dictionary.offlineNoExpiry,
+                        )}
+                      </Text>
+                      <ActionButton
+                        label={dictionary.revokeOfflineSession}
+                        loading={busyKey === `offline:${offlineSession.id}`}
+                        disabled={Boolean(busyKey)}
+                        onPress={() => confirmOffline(offlineSession)}
+                        palette={palette}
+                      />
+                    </View>
+                  ));
+                }
+              }
+            }
+          })()}
+
+          <SectionHeader
+            palette={palette}
+            title={dictionary.cibaTitle}
+            help={dictionary.cibaHelp}
+          />
+          {(() => {
+            if (cibaLoading) {
+              return (
+                <ActivityIndicator
+                  color={palette.primary}
+                  accessibilityLabel={dictionary.loading}
+                />
+              );
+            } else {
+              if (cibaError) {
+                return (
+                  <RetryRow
+                    label={dictionary.cibaLoadError}
+                    retry={dictionary.sessionsRetry}
+                    onPress={() => void loadData(true)}
+                    palette={palette}
+                  />
+                );
+              } else {
+                if (cibaRequests.length === 0) {
+                  return (
+                    <Text style={[styles.empty, { color: palette.textMuted }]}>
+                      {dictionary.cibaEmpty}
+                    </Text>
+                  );
+                } else {
+                  return cibaRequests.map((request) => {
+                    const requiresStepUp =
+                      request.mfaRequired || request.stepUpRequired;
+                    let stepUpDescription: string =
+                      dictionary.cibaStepUpRequired;
+                    if (request.mfaRequired && request.stepUpRequired) {
+                      stepUpDescription = dictionary.cibaMfaAndStepUpRequired;
+                    } else if (request.mfaRequired) {
+                      stepUpDescription = dictionary.cibaMfaRequired;
+                    }
+                    return (
+                      <View
+                        key={request.authReqId}
+                        style={[styles.card, { borderColor: palette.border }]}
+                      >
+                        <Text
+                          style={[styles.cardTitle, { color: palette.text }]}
+                        >
+                          {request.bindingMessage ||
+                            dictionary.cibaRequestTitle}
+                        </Text>
+                        <Text
+                          style={[styles.meta, { color: palette.textMuted }]}
+                        >
+                          {dictionary.cibaCode}: {request.userCode}
+                        </Text>
+                        <Text
+                          style={[styles.meta, { color: palette.textMuted }]}
+                        >
+                          {dictionary.cibaScopes}: {request.authorizedScopes}
+                        </Text>
+                        <Text
+                          style={[styles.meta, { color: palette.textMuted }]}
+                        >
+                          {dictionary.cibaExpires}:{" "}
+                          {formatDate(request.expiresAt, resolvedLocale, "—")}
+                        </Text>
+                        {requiresStepUp ? (
+                          <Text
+                            style={[styles.meta, { color: palette.danger }]}
+                          >
+                            {stepUpDescription}
+                          </Text>
+                        ) : null}
+                        <View style={styles.cibaActions}>
+                          <ActionButton
+                            label={dictionary.cibaApprove}
+                            loading={
+                              cibaBusy?.authReqId === request.authReqId &&
+                              cibaBusy.decision === "approve"
+                            }
+                            disabled={Boolean(busyKey) || requiresStepUp}
+                            onPress={() => void decideCiba(request, "approve")}
+                            palette={palette}
+                          />
+                          <ActionButton
+                            label={dictionary.cibaDeny}
+                            loading={
+                              cibaBusy?.authReqId === request.authReqId &&
+                              cibaBusy.decision === "deny"
+                            }
+                            disabled={Boolean(busyKey)}
+                            onPress={() => void decideCiba(request, "deny")}
+                            palette={palette}
+                          />
+                        </View>
+                      </View>
+                    );
+                  });
+                }
+              }
+            }
+          })()}
         </ScrollView>
         <AccountTabBar active="applications" />
       </View>
@@ -354,9 +583,9 @@ function SectionHeader({
   palette,
   title,
 }: {
-  help?: string;
-  palette: ReturnType<typeof useTheme>["palette"];
-  title: string;
+  readonly help?: string;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
+  readonly title: string;
 }) {
   return (
     <View style={styles.sectionHeader}>
@@ -376,10 +605,10 @@ function RetryRow({
   palette,
   retry,
 }: {
-  label: string;
-  onPress: () => void;
-  palette: ReturnType<typeof useTheme>["palette"];
-  retry: string;
+  readonly label: string;
+  readonly onPress: () => void;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
+  readonly retry: string;
 }) {
   return (
     <View style={[styles.retry, { borderColor: palette.danger }]}>
@@ -400,11 +629,11 @@ function ActionButton({
   onPress,
   palette,
 }: {
-  disabled: boolean;
-  label: string;
-  loading: boolean;
-  onPress: () => void;
-  palette: ReturnType<typeof useTheme>["palette"];
+  readonly disabled: boolean;
+  readonly label: string;
+  readonly loading: boolean;
+  readonly onPress: () => void;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
 }) {
   return (
     <Pressable
@@ -460,7 +689,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.md,
-    minHeight: 40,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
   },
+  cibaActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

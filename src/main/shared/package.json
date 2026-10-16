@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Platform-neutral Kitezh contracts and design tokens",
+  "description": "Platform-neutral Kitezh contracts, design tokens, and API transport",
   "types": "./dist/index.d.ts",
   "main": "./dist/index.js",
   "sideEffects": false,
@@ -45,6 +45,8 @@
       "types": "./dist/api.d.ts",
       "default": "./dist/api.js"
     },
+    "./api-client": "./src/api-client.cjs",
+    "./api-client": "./src/api-client.cjs",
     "./auth": {
       "types": "./dist/auth.d.ts",
       "default": "./dist/auth.js"

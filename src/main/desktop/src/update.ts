@@ -7,6 +7,8 @@ import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { load } from "js-yaml";
 import type { UpdateInfo } from "electron-updater";
+import { getApiBaseUrl } from "./config";
+import { hasNewerDesktopRelease } from "./release-metadata";
 
 export type DesktopUpdateStatus =
   | { state: "unsupported" }
@@ -375,6 +377,12 @@ export async function checkForUpdates() {
   publish({ state: "checking" });
   updateMetadataValidated = false;
   try {
+    const metadataAvailable = await checkSharedReleaseMetadata();
+    if (metadataAvailable === false) {
+      updateRetryAttempted = false;
+      publish({ state: "not-available" });
+      return;
+    }
     const signedManifest = await verifyPublishedManifest();
     const result = await autoUpdater.checkForUpdates();
     if (!result) throw new Error("Updater metadata is unavailable.");
@@ -392,6 +400,24 @@ export async function checkForUpdates() {
       message: "Desktop update could not be checked.",
     });
     scheduleUpdateRetry();
+  }
+}
+
+async function checkSharedReleaseMetadata(): Promise<boolean | null> {
+  try {
+    const response = await net.fetch(
+      `${getApiBaseUrl()}/api/public/app-release`,
+    );
+    if (!response.ok) return null;
+    const metadata: unknown = await response.json();
+    return hasNewerDesktopRelease(
+      metadata,
+      app.getVersion(),
+      process.platform,
+      process.arch,
+    );
+  } catch {
+    return null;
   }
 }
 

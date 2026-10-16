@@ -4,7 +4,7 @@ import { expect } from "./fixtures";
 
 test.describe("download page", () => {
   test("renders platform packages and GitHub release links", async ({ page }) => {
-    await page.route("**/api/public/desktop-release", async (route) => {
+    await page.route("**/api/public/app-release", async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -77,7 +77,7 @@ test.describe("download page", () => {
   test("hides mobile platforms when the latest release has no mobile packages", async ({
     page,
   }) => {
-    await page.route("**/api/public/desktop-release", async (route) => {
+    await page.route("**/api/public/app-release", async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -103,7 +103,7 @@ test.describe("download page", () => {
   test("shows only the mobile platform whose package is in the latest release", async ({
     page,
   }) => {
-    await page.route("**/api/public/desktop-release", async (route) => {
+    await page.route("**/api/public/app-release", async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -130,7 +130,7 @@ test.describe("download page", () => {
   test("shows signed iOS installation guidance when the release includes an ad hoc IPA", async ({
     page,
   }) => {
-    await page.route("**/api/public/desktop-release", async (route) => {
+    await page.route("**/api/public/app-release", async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
@@ -158,7 +158,7 @@ test.describe("download page", () => {
   });
 
   test("shows a page error when the release lookup fails", async ({ page }) => {
-    await page.route("**/api/public/desktop-release", async (route) => {
+    await page.route("**/api/public/app-release", async (route) => {
       await route.fulfill({
         status: 500,
         contentType: "application/problem+json",

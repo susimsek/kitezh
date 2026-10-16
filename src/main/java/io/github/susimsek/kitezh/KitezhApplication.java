@@ -6,7 +6,7 @@ import io.github.susimsek.kitezh.config.http.GitHubApiProperties;
 import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.config.security.SocialLoginProperties;
 import io.github.susimsek.kitezh.service.client.CibaNotificationClient;
-import io.github.susimsek.kitezh.service.client.DesktopReleaseClient;
+import io.github.susimsek.kitezh.service.client.GitHubReleaseClient;
 import io.github.susimsek.kitezh.service.client.OidcDiscoveryClient;
 import io.github.susimsek.kitezh.service.client.RegistrationCaptchaClient;
 import org.springframework.boot.SpringApplication;
@@ -25,7 +25,7 @@ import org.springframework.web.service.registry.ImportHttpServices;
 })
 @ImportRuntimeHints(NativeRuntimeHints.class)
 @ImportHttpServices(group = "ciba", types = CibaNotificationClient.class)
-@ImportHttpServices(group = "github-release", types = DesktopReleaseClient.class)
+@ImportHttpServices(group = "github-release", types = GitHubReleaseClient.class)
 @ImportHttpServices(group = "oidc-discovery", types = OidcDiscoveryClient.class)
 @ImportHttpServices(group = "registration-captcha", types = RegistrationCaptchaClient.class)
 @EnableAsync

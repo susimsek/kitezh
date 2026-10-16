@@ -15,6 +15,7 @@
       "bundleIdentifier": "io.github.susimsek.kitezh.mobile"
     },
     "android": {
+      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#0b3b82"
@@ -55,7 +56,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
+      ["expo-secure-store", { "configureAndroidBackup": true }],
       [
         "expo-splash-screen",
         {

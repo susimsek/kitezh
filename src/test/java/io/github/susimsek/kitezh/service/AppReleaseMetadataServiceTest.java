@@ -6,15 +6,15 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.susimsek.kitezh.config.http.HttpServiceClientFactory;
-import io.github.susimsek.kitezh.dto.desktop.DesktopReleaseDTO;
-import io.github.susimsek.kitezh.service.client.DesktopReleaseClient;
+import io.github.susimsek.kitezh.dto.release.AppReleaseMetadataDTO;
+import io.github.susimsek.kitezh.service.client.GitHubReleaseClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-class DesktopReleaseServiceTest {
+class AppReleaseMetadataServiceTest {
 
     @Test
     void mapsAllowlistedAssetsFromLatestGitHubRelease() {
@@ -22,7 +22,7 @@ class DesktopReleaseServiceTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("https://api.github.com/repos/susimsek/kitezh/releases/latest"))
                 .andExpect(header(HttpHeaders.ACCEPT, "application/vnd.github+json"))
-                .andExpect(header(HttpHeaders.USER_AGENT, "kitezh-download-page"))
+                .andExpect(header(HttpHeaders.USER_AGENT, "kitezh-release-metadata"))
                 .andRespond(
                         withSuccess(
                                 """
@@ -42,11 +42,11 @@ class DesktopReleaseServiceTest {
                                 """,
                                 MediaType.APPLICATION_JSON));
 
-        DesktopReleaseDTO release =
-                new DesktopReleaseService(
+        AppReleaseMetadataDTO release =
+                new AppReleaseMetadataService(
                                 HttpServiceClientFactory.create(
-                                        DesktopReleaseClient.class, builder.build()))
-                        .getLatestRelease();
+                                        GitHubReleaseClient.class, builder.build()))
+                        .getLatestReleaseMetadata();
 
         assertThat(release.tag()).isEqualTo("v0.1.0");
         assertThat(release.version()).isEqualTo("0.1.0");

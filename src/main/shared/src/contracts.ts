@@ -8,6 +8,21 @@ export type ConsoleName = "admin" | "account";
 
 export type DesktopLanguageMode = "system" | "en" | "tr";
 
+export type NativeClientCapability =
+  | "passkeys"
+  | "mfa-totp"
+  | "mfa-recovery-codes"
+  | "social-login"
+  | "social-linking"
+  | "ciba-approval"
+  | "native-updates";
+
+export type NativeClientCapabilities = {
+  clientVersion: string;
+  platform: "android" | "ios" | "desktop" | "web";
+  capabilities: NativeClientCapability[];
+};
+
 export type DesktopUpdateStatus =
   | { state: "unsupported" }
   | { state: "checking" }
@@ -17,6 +32,13 @@ export type DesktopUpdateStatus =
   | { state: "downloaded"; version: string }
   | { state: "recovered"; version: string }
   | { state: "error"; message: string };
+
+export type ReleaseMetadata = {
+  tag: string;
+  version: string;
+  releaseUrl: string;
+  assets: Record<string, string>;
+};
 
 export type SocialProviderAvailability = {
   provider: string;

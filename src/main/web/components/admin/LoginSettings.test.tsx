@@ -254,4 +254,92 @@ describe("LoginSettings", () => {
       (await screen.findAllByText(dictionary.admin.common.validation.required)).length,
     ).toBeGreaterThan(0);
   });
+
+  it("configures Enterprise CAPTCHA and saves both registration and login policies", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("social-providers")) {
+        return Promise.resolve({ status: 200, data: [provider] }) as never;
+      }
+      if (request.url?.includes("registration-captcha")) {
+        return Promise.resolve({
+          status: 200,
+          data: {
+            enabled: true,
+            loginEnabled: true,
+            secretConfigured: true,
+            apiKeyConfigured: true,
+          },
+        }) as never;
+      }
+      return Promise.resolve({ status: 200, data: {} }) as never;
+    });
+
+    render(<LoginSettings focusSection="login" />);
+    await screen.findByText(dictionary.admin.loginSettings.captchaTitle);
+
+    fireEvent.change(screen.getByLabelText(dictionary.admin.loginSettings.captchaProvider), {
+      target: { value: "enterprise" },
+    });
+    expect(screen.getByLabelText(dictionary.admin.loginSettings.captchaProjectId)).toBeVisible();
+    fireEvent.change(screen.getByLabelText(dictionary.admin.loginSettings.captchaProjectId), {
+      target: { value: "kitezh-prod" },
+    });
+    const registrationV3 = screen
+      .getByText(dictionary.admin.loginSettings.captchaV3)
+      .parentElement?.querySelector("input");
+    const loginV3 = screen
+      .getByText(dictionary.admin.loginSettings.captchaLoginV3)
+      .parentElement?.querySelector("input");
+    if (!registrationV3 || !loginV3) throw new Error("CAPTCHA switches were not rendered");
+    fireEvent.click(registrationV3);
+    fireEvent.click(loginV3);
+    expect(
+      screen.getByLabelText(dictionary.admin.loginSettings.captchaLoginScoreThreshold),
+    ).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.loginSettings.captchaSave }),
+    );
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "PUT",
+          url: "/api/admin/settings/registration-captcha",
+          data: expect.objectContaining({ provider: "enterprise", projectId: "kitezh-prod" }),
+        }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.loginSettings.captchaSaved);
+  });
+
+  it("reports CAPTCHA save failures", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("social-providers")) {
+        return Promise.resolve({ status: 200, data: [provider] }) as never;
+      }
+      if (request.url?.includes("registration-captcha")) {
+        return Promise.resolve({ status: 200, data: {} }) as never;
+      }
+      return Promise.resolve({ status: 200, data: {} }) as never;
+    });
+    render(<LoginSettings focusSection="login" />);
+    await screen.findByText(dictionary.admin.loginSettings.captchaTitle);
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("registration-captcha") && request.method === "PUT") {
+        return Promise.resolve({ status: 500, data: {} }) as never;
+      }
+      return Promise.resolve({
+        status: 200,
+        data: request.url?.includes("social-providers") ? [provider] : {},
+      }) as never;
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.loginSettings.captchaSave }),
+    );
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.loginSettings.captchaError),
+    );
+  });
 });
