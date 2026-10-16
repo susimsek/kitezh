@@ -282,6 +282,9 @@ jobs:
       - web-quality
       - desktop-quality
       - mobile-quality
+    concurrency:
+      group: sonar-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -290,6 +293,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
@@ -330,7 +335,9 @@ jobs:
           ./mvnw -B -ntp -Psonar initialize sonar:sonar \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=susimsek \
-            -Dsonar.token="${SONAR_TOKEN}"
+            -Dsonar.token="${SONAR_TOKEN}" \
+            -Dsonar.qualitygate.wait=true \
+            -Dsonar.qualitygate.timeout=600
 
   native-image:
     name: Native image verification (${{ matrix.architecture }})
