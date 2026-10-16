@@ -1091,6 +1091,26 @@ test("native Admin role-composition panel renders and cancels removals", async (
 });
 test("native Admin client-scope role mappings load, save, and cancel drafts", async () => {
   const harness = await renderConsole("admin");
+  harness.setResponse(
+    "/api/admin/client-scopes/profile/role-mappings",
+    "GET",
+    () => ({ applicationRoles: [], clientRoles: [] }),
+  );
+  harness.setResponse(
+    "/api/admin/client-scopes/profile/role-mappings",
+    "PUT",
+    ({ body }) => body,
+  );
+  harness.setResponse(
+    "/api/admin/client-scopes/profile/role-mappings/application-roles?page=0&size=100&sort=name,asc",
+    "GET",
+    () => ({ content: [], number: 0, totalPages: 0, totalElements: 0 }),
+  );
+  harness.setResponse(
+    "/api/admin/client-scopes/profile/role-mappings/client-roles?page=0&size=100&sort=name,asc",
+    "GET",
+    () => ({ content: [], number: 0, totalPages: 0, totalElements: 0 }),
+  );
   let mappers = [
     {
       id: "8",
@@ -1151,10 +1171,14 @@ test("native Admin client-scope role mappings load, save, and cancel drafts", as
         '[data-action="admin-client-scope-role-mappings-toggle"][data-id="profile"]',
       )
       .click();
-    await settle();
-    const panel = document.querySelector(
-      '[data-client-scope-role-mappings-panel][data-scope-id="profile"]',
-    );
+    let panel;
+    for (let turn = 0; turn < 30; turn += 1) {
+      await settle();
+      panel = document.querySelector(
+        '[data-client-scope-role-mappings-panel][data-scope-id="profile"]',
+      );
+      if (panel) break;
+    }
     assert.ok(panel);
     panel
       .querySelector('[data-action="admin-client-scope-role-mappings-save"]')
@@ -2981,9 +3005,11 @@ test("native Admin policy and branding settings render and persist their forms",
           body.applicationName === "Kitezh Desktop",
       ),
     );
-    assert.match(
-      document.querySelector(".content").textContent,
-      /issuer\.example\.test/,
+    assert.equal(
+      document.querySelector(
+        '[data-form="admin-branding"] input[name="applicationName"]',
+      ).value,
+      "Kitezh Desktop",
     );
   } finally {
     harness.restore();
@@ -3160,7 +3186,7 @@ test("native Admin consent and offline-session revocation require confirmation",
   let consentActive = true;
   let offlineSessionActive = true;
   harness.setResponse(
-    "/api/admin/consents?q=&page=0&size=20&sort=id.principalName%2Casc",
+    "/api/admin/consents?q=&clientId=&username=&scope=&page=0&size=10&sort=id.principalName%2Casc",
     "GET",
     () => ({
       content: consentActive

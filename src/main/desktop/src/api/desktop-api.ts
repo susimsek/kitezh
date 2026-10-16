@@ -1183,7 +1183,11 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
       body = JSON.stringify(request.body);
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       const response = await fetcher(`${options.apiBaseUrl}${request.path}`, {
         method,
@@ -1204,9 +1208,14 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
         body: await parseJsonBody(response),
       };
     } catch (cause) {
+      const transportError = timedOut
+        ? Object.assign(new Error("Request timed out"), {
+            name: "TimeoutError",
+          })
+        : cause;
       return {
         status: 0,
-        kind: classifyApiError(0, cause),
+        kind: classifyApiError(0, transportError),
         body: null,
       };
     } finally {

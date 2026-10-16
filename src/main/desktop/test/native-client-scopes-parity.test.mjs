@@ -172,12 +172,12 @@ test("read-only viewers see Details only and can open a built-in scope by keyboa
     assert.ok(
       document
         .querySelector('[data-client-scope-detail="account-api"]')
-        .textContent.includes("Grup bildirimi adı"),
+        .textContent.includes("Grup claim adı"),
     );
     assert.ok(
       document
         .querySelector('[data-client-scope-detail="account-api"]')
-        .textContent.includes("Grup bildirimi adı"),
+        .textContent.includes("Grup claim adı"),
     );
     assert.equal(
       document.querySelector('[data-form="admin-client-scope-edit"]'),
@@ -213,7 +213,7 @@ test("read-only viewers see Details only and can open a built-in scope by keyboa
     await settle();
     assert.ok(
       document.querySelector(
-        '[aria-label="İstemci kapsamı protokol eşleyicileri"]',
+        '[aria-label="Protocol mapper’lar"]',
       ),
     );
     assert.equal(

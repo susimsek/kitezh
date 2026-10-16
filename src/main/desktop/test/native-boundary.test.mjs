@@ -284,6 +284,6 @@ test("native Admin selection does not call Account APIs", async () => {
   assert.match(source, /firstAuthorizedAdminRoute\(\)/);
   assert.match(
     source,
-    /filter\(\(\[, , allowed\]\) => allowed\(state\.data\.adminAccess\)\)/,
+    /filter\(\(\[, , , allowed\]\) => allowed\(state\.data\.adminAccess\)\)/,
   );
 });

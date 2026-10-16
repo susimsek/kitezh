@@ -281,7 +281,7 @@ test("fails closed when the signed manifest or updater metadata is unavailable",
   }
 });
 
-test("prepares a reversible Windows update and starts installation only after its watchdog", async () => {
+test("prepares a reversible update for the current install type before starting installation", async () => {
   updateOperations.length = 0;
   quitAndInstallCalls = 0;
   updateHandlers.get("update-downloaded")({ version: "0.1.4" });
@@ -294,8 +294,10 @@ test("prepares a reversible Windows update and starts installation only after it
   assert.ok(recoveryMarker);
   assert.equal(recoveryMarker.version, "0.1.4");
   assert.equal(recoveryMarker.previousVersion, "0.1.3");
-  assert.equal(recoveryMarker.targetType, "directory");
-  assert.equal(recoveryMarker.executablePath, process.execPath);
+  const appImagePath =
+    process.platform === "linux" ? process.env.APPIMAGE : undefined;
+  assert.equal(recoveryMarker.targetType, appImagePath ? "file" : "directory");
+  assert.equal(recoveryMarker.executablePath, appImagePath ?? process.execPath);
   assert.ok(
     updateOperations.findIndex(({ operation }) => operation === "spawn") <
       updateOperations.findIndex(

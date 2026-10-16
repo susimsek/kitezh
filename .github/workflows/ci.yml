@@ -136,7 +136,8 @@ jobs:
         run: pnpm --dir src/main/web install --frozen-lockfile
 
       - name: Web type check
-        run: pnpm --dir src/main/web typecheck
+        working-directory: src/main/web
+        run: pnpm run typecheck
 
       - name: Web lint
         run: pnpm --dir src/main/web lint
@@ -390,7 +391,8 @@ jobs:
         run: pnpm --dir src/main/web install --frozen-lockfile
 
       - name: Build web assets
-        run: pnpm --dir src/main/web build
+        working-directory: src/main/web
+        run: pnpm run build
 
       - name: Install UPX
         run: |
