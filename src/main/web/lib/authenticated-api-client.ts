@@ -1,6 +1,10 @@
-import type { AxiosRequestConfig, AxiosResponse } from "axios";
+import type { AxiosRequestConfig } from "axios";
 import axios from "axios";
-import { createApiClient, type ApiTokenHandlers } from "@kitezh/shared/api-client";
+import {
+  createApiClient,
+  type ApiClientResponse,
+  type ApiTokenHandlers,
+} from "@kitezh/shared/api-client";
 import { apiUrl, assertDesktopOnline } from "./desktop-api";
 import { getClientMetadataHeaders } from "./client-metadata";
 
@@ -27,7 +31,7 @@ export function createAuthenticatedApiClient() {
     registerTokenHandlers(handlers: TokenHandlers | undefined) {
       apiClient.registerTokenHandlers(handlers);
     },
-    request<T>(accessToken: string, config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    request<T>(accessToken: string, config: AxiosRequestConfig): Promise<ApiClientResponse<T>> {
       try {
         assertDesktopOnline(config.method);
       } catch (error) {

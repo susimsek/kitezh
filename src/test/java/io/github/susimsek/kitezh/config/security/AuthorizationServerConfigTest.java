@@ -134,7 +134,8 @@ class AuthorizationServerConfigTest {
                         "grant_types_supported",
                         List.of(
                                 AuthorizationGrantTypes.CIBA,
-                                AuthorizationGrantTypes.TOKEN_EXCHANGE));
+                                AuthorizationGrantTypes.TOKEN_EXCHANGE,
+                                AuthorizationGrantTypes.UMA_TICKET));
 
         OidcProviderConfiguration.Builder oidcBuilder =
                 OidcProviderConfiguration.builder()
