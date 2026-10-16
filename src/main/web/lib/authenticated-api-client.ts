@@ -1,4 +1,4 @@
-import type { AxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import axios from "axios";
 import { createApiClient, type ApiTokenHandlers } from "@kitezh/shared/api-client";
 import { apiUrl, assertDesktopOnline } from "./desktop-api";
@@ -27,7 +27,7 @@ export function createAuthenticatedApiClient() {
     registerTokenHandlers(handlers: TokenHandlers | undefined) {
       apiClient.registerTokenHandlers(handlers);
     },
-    request<T>(accessToken: string, config: AxiosRequestConfig) {
+    request<T>(accessToken: string, config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
       try {
         assertDesktopOnline(config.method);
       } catch (error) {
