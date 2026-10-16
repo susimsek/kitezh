@@ -79,12 +79,37 @@ import {
 } from "./update";
 import { showDesktopNotification } from "./notifications";
 import { createDesktopApiAdapter } from "./api/desktop-api";
+import { registerDesktopLifecycle } from "./startup-lifecycle";
+import { renderDesktopSettingsHtml } from "./settings-window";
+import { renderDesktopLoginHtml } from "./login-window";
+import { renderDesktopCompanionHtml } from "./companion-window";
+import { createApplicationMenuTemplate } from "./application-menu";
+import { createDesktopMainWindow } from "./main-window";
+import { createDesktopSettingsStore } from "./desktop-settings-store";
+import {
+  getUpdateCheckingCopy,
+  getUpdateResultCopy,
+  getUpdateConfirmationCopy,
+  getUpdateAvailableCopy,
+  renderUpdateCheckingHtml,
+  renderUpdateResultHtml,
+  renderUpdateConfirmationHtml,
+  renderUpdateAvailableHtml,
+} from "./update-dialogs";
+import { registerDesktopAuthIpc } from "./auth-ipc";
+import { registerDesktopRuntimeInfoIpc } from "./runtime-info-ipc";
+import { registerDesktopAppearanceIpc } from "./appearance-ipc";
+import { registerNativeApiIpc } from "./native-api-ipc";
+import {
+  registerDesktopPreferencesIpc,
+  type DesktopPreferences,
+  type UpdatePreferences,
+} from "./preferences-ipc";
 
 import { createHash, randomBytes } from "node:crypto";
 
 const DESKTOP_APP_NAME = "Kitezh";
 const UPDATE_PREFERENCES_FILE = "desktop-update-preferences.json";
-const DESKTOP_LANGUAGE_FILE = "desktop-language.json";
 const DESKTOP_THEME_FILE = "desktop-theme.json";
 const COMPANION_WINDOW_STATE_FILE = "desktop-companion-window.json";
 const PENDING_AUTHORIZATIONS_FILE = "desktop-pending-authorizations.bin";
@@ -295,19 +320,18 @@ const pendingSocialLinks = new Map<string, PendingSocialLink>();
 let pendingAuthorizationWrite: Promise<void> = Promise.resolve();
 let pendingAuthorizationsRestored = false;
 type StoredTokens = DesktopTokens;
-type UpdatePreferences = {
-  skippedVersion?: string;
-  remindUntil?: number;
-  automaticDownload?: boolean;
-};
-type DesktopPreferences = {
-  launchAtLogin: boolean;
-  showInMenuBar: boolean;
-  showInDock: boolean;
-  notifications: boolean;
-  globalShortcut: string;
-};
 const DEFAULT_GLOBAL_SHORTCUT = "Alt+Space";
+const desktopSettingsStore = createDesktopSettingsStore({
+  userDataPath: () => app.getPath("userData"),
+  appDataPath: () => app.getPath("appData"),
+  appPath: () => app.getAppPath(),
+  platform: process.platform,
+  appName: DESKTOP_APP_NAME,
+  execPath: process.execPath,
+  defaultApp: process.defaultApp,
+  getLoginItemSettings: () => app.getLoginItemSettings(),
+  setLoginItemSettings: (settings) => app.setLoginItemSettings(settings),
+});
 const GLOBAL_SHORTCUT_MODIFIERS = new Set([
   "Command",
   "CommandOrControl",
@@ -456,379 +480,21 @@ function rendererFile(requestUrl: string) {
 
 async function desktopLoginHtml() {
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
-  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = isTurkishDesktop();
-  const labels = isTurkish
-    ? {
-        eyebrow: "Güvenli şekilde devam edin",
-        title: "Bir konsol seçin",
-        description: "Devam etmek istediğiniz konsolu seçin.",
-        admin: "Admin Console’a giriş yap",
-        adminDescription: "Yönetim ve erişim kontrolü.",
-        account: "Account Console’a giriş yap",
-        accountDescription: "Profil ve hesap ayarları.",
-        browserHint:
-          "Parolanız tarayıcıda kalır ve masaüstü uygulamasında saklanmaz.",
-        unavailable:
-          "Güvenli oturum açma başlatılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
-        starting: "Tarayıcı açılıyor…",
-      }
-    : {
-        eyebrow: "Continue securely",
-        title: "Choose a console",
-        description: "Select where you want to continue.",
-        admin: "Sign in to Admin Console",
-        adminDescription: "Administration and access control.",
-        account: "Sign in to Account Console",
-        accountDescription: "Profile and account settings.",
-        browserHint:
-          "Your password stays in the browser and is never stored by the desktop app.",
-        unavailable:
-          "Secure sign-in could not be started. Check your connection and try again.",
-        starting: "Opening browser…",
-      };
-  return `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${DESKTOP_APP_NAME}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { width: 100%; max-width: 560px; padding: 42px 36px 34px; text-align: center; }
-      img { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 22px; }
-      .eyebrow { color: var(--dialog-primary); font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-      h1 { margin: 12px 0 8px; font-size: var(--dialog-page-title); line-height: 1.15; font-weight: 750; }
-      .description { margin: 0 0 26px; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
-      .option { margin-top: 14px; }
-      button { width: 100%; min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); border: 1px solid transparent; border-radius: var(--dialog-radius-sm); background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
-      button:hover { background: var(--dialog-primary-hover); }
-      button:disabled { cursor: wait; opacity: .7; }
-      .option p { margin: 8px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.35; }
-      .hint { margin: 28px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.45; }
-      .error { display: none; margin: 18px 0 0; padding: 11px 14px; border: 1px solid var(--dialog-danger); border-radius: 8px; color: var(--dialog-danger); font-size: 13px; line-height: 1.4; }
-      .error.visible { display: block; }
-      .status { display: none; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 14px; }
-      .status.visible { display: block; }
-      .spinner { display: inline-block; width: 15px; height: 15px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <main>
-      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
-      <div class="eyebrow">${labels.eyebrow}</div>
-      <h1>${labels.title}</h1>
-      <p class="description">${labels.description}</p>
-      <div class="option">
-        <button type="button" data-console="admin">${labels.admin}</button>
-        <p>${labels.adminDescription}</p>
-      </div>
-      <div class="option">
-        <button type="button" data-console="account">${labels.account}</button>
-        <p>${labels.accountDescription}</p>
-      </div>
-      <p class="hint">${labels.browserHint}</p>
-      <p id="status" class="status"><span class="spinner"></span>${labels.starting}</p>
-      <p id="error" class="error">${labels.unavailable}</p>
-    </main>
-    <script>
-      const buttons = [...document.querySelectorAll("button[data-console]")];
-      const status = document.getElementById("status");
-      const error = document.getElementById("error");
-      function setPending(pending) {
-        buttons.forEach((button) => { button.disabled = pending; });
-        status.classList.toggle("visible", pending);
-      }
-      buttons.forEach((button) => button.addEventListener("click", async () => {
-        setPending(true);
-        error.classList.remove("visible");
-        try {
-          await window.desktopApi.auth.openConsole(button.dataset.console);
-        } catch {
-          setPending(false);
-          error.classList.add("visible");
-        }
-      }));
-      window.desktopApi.onAuthCallback(({ error: callbackError }) => {
-        if (callbackError) {
-          setPending(false);
-          error.classList.add("visible");
-        }
-      });
-      window.desktopApi.language.onChanged(() => window.location.reload());
-    </script>
-  </body>
-</html>`;
+  return renderDesktopLoginHtml({
+    appName: DESKTOP_APP_NAME,
+    iconDataUrl: `data:image/png;base64,${icon.toString("base64")}`,
+    language: desktopLanguage,
+    themeCss: nativeDialogThemeCss(),
+  });
 }
 
 function desktopSettingsHtml() {
-  const isTurkish = isTurkishDesktop();
-  const labels = isTurkish
-    ? {
-        title: "Ayarlar",
-        general: "Genel",
-        notifications: "Bildirimler",
-        appearance: "Görünüm",
-        updates: "Güncellemeler",
-        diagnostics: "Tanı bilgileri",
-        search: "Ara",
-        noResults: "Sonuç bulunamadı",
-        language: "Dil",
-        system: "Sistem",
-        english: "English",
-        turkish: "Türkçe",
-        generalDescription:
-          "Başlangıç, dil ve hızlı erişim ayarlarını yönetin.",
-        notificationsDescription:
-          "Kitezh’in masaüstü bildirimlerini gösterip göstermeyeceğini seçin.",
-        appearanceDescription:
-          "Kitezh’in sistem görünümünü nasıl izleyeceğini seçin.",
-        updatesDescription:
-          "Kitezh’in masaüstü güncellemelerini nasıl alacağını seçin.",
-        diagnosticsDescription:
-          "Sorun giderirken güvenli çalışma zamanı bilgilerini inceleyin.",
-        theme: "Tema",
-        light: "Açık",
-        dark: "Koyu",
-        launchAtLogin: "Oturum açıldığında Kitezh’i başlat",
-        showInMenuBar: "Menü çubuğunda göster",
-        showInDock: "Dock’ta göster",
-        notificationsEnabled: "Masaüstü bildirimlerini göster",
-        globalShortcut: "Hızlı erişim kısayolu",
-        shortcutHelp: "Alanı seçip yeni bir tuş kombinasyonuna basın.",
-        shortcutUnavailable:
-          "Bu kısayol kullanılamıyor. Başka bir kısayol seçin.",
-        automaticDownload: "Güncellemeleri otomatik indir ve kur",
-        checkForUpdates: "Güncellemeleri denetle",
-        reset: "Varsayılanlara sıfırla",
-        close: "Kapat",
-        diagnosticsHelp:
-          "Redakte edilmiş kayıtlar yalnızca bu cihazda tutulur (en fazla 64 KB); ekranda son 50 olay gösterilir. Kopyalama yalnızca siz istediğinizde yapılır.",
-        copyDiagnostics: "Tanı bilgilerini kopyala",
-        copied: "Kopyalandı",
-        saving: "Kaydediliyor…",
-        saved: "Kaydedildi",
-        unavailable: "Kullanılamıyor",
-      }
-    : {
-        title: "Settings",
-        general: "General",
-        notifications: "Notifications",
-        appearance: "Appearance",
-        updates: "Updates",
-        diagnostics: "Diagnostics",
-        search: "Search",
-        noResults: "No results found",
-        language: "Language",
-        system: "System",
-        english: "English",
-        turkish: "Türkçe",
-        generalDescription: "Manage startup, language, and quick access.",
-        notificationsDescription:
-          "Choose whether Kitezh can show desktop notifications.",
-        appearanceDescription:
-          "Choose how Kitezh follows your system appearance.",
-        updatesDescription: "Choose how Kitezh receives desktop updates.",
-        diagnosticsDescription:
-          "Review safe runtime information when troubleshooting.",
-        theme: "Theme",
-        light: "Light",
-        dark: "Dark",
-        launchAtLogin: "Launch Kitezh at login",
-        showInMenuBar: "Show in the menu bar",
-        showInDock: "Show in the Dock",
-        notificationsEnabled: "Show desktop notifications",
-        globalShortcut: "Quick access shortcut",
-        shortcutHelp:
-          "Click the field and press a key combination to change it.",
-        shortcutUnavailable:
-          "This shortcut is unavailable. Choose another shortcut.",
-        automaticDownload: "Automatically download and install updates",
-        checkForUpdates: "Check for updates",
-        reset: "Reset to defaults",
-        close: "Close",
-        diagnosticsHelp:
-          "Redacted diagnostics stay on this device (up to 64 KB); only the latest 50 events are shown. Copying happens only when you request it.",
-        copyDiagnostics: "Copy diagnostics",
-        copied: "Copied",
-        saving: "Saving…",
-        saved: "Saved",
-        unavailable: "Unavailable",
-      };
-  const dockControl =
-    process.platform === "darwin"
-      ? `<label class="setting-row"><span>${labels.showInDock}</span><input id="desktop-show-in-dock" type="checkbox"></label>`
-      : "";
-  const navigationIcons = {
-    general:
-      '<circle cx="12" cy="6" r="2"></circle><path d="M4 6h6m4 0h6M4 12h2m4 0h10M4 18h10m4 0h2"></path><circle cx="8" cy="12" r="2"></circle><circle cx="16" cy="18" r="2"></circle>',
-    notifications:
-      '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path>',
-    appearance:
-      '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path>',
-    updates:
-      '<path d="M20 7v5h-5M4 17v-5h5"></path><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"></path>',
-    diagnostics:
-      '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5m0-8h.01"></path>',
-  };
-  const navigationButton = (
-    section: keyof typeof navigationIcons,
-    label: string,
-    selected: boolean,
-  ) =>
-    `<button type="button" data-section="${section}" aria-selected="${selected}" aria-label="${label}"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${navigationIcons[section]}</svg><span>${label}</span></button>`;
-  const currentTheme = nativeTheme.themeSource;
-  return `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${labels.title}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; overflow: hidden; background: var(--dialog-background); color: var(--dialog-foreground); }
-      header { display: flex; align-items: center; min-height: 64px; padding: 16px 24px; border-bottom: 1px solid var(--dialog-border); }
-      header h1 { margin: 0; font-size: 21px; line-height: 1.25; font-weight: 650; letter-spacing: -.02em; }
-      .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); height: calc(100vh - 64px); min-height: 0; }
-      nav { min-height: 0; overflow-y: auto; padding: 20px 12px; border-right: 1px solid var(--dialog-border); }
-      .search-box { position: relative; margin: 0 4px 20px; }
-      .search-box svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--dialog-secondary); pointer-events: none; }
-      nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: var(--dialog-control-default); margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
-      nav input[type="search"]::placeholder { color: var(--dialog-secondary); opacity: .8; }
-      nav button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: var(--dialog-control-default); margin: 3px 0; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dialog-secondary); text-align: left; font: inherit; font-size: 14px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
-      nav button svg { flex: 0 0 17px; width: 17px; height: 17px; }
-      nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      nav button:hover { background: var(--dialog-button-hover); color: var(--dialog-foreground); }
-      nav button[aria-selected="true"] { background: var(--dialog-button); color: var(--dialog-foreground); font-weight: 600; }
-      nav button[aria-selected="true"] svg { color: var(--dialog-primary); }
-      .no-results { margin: 10px 8px; color: var(--dialog-secondary); font-size: 14px; }
-      main { min-width: 0; overflow-y: auto; padding: 32px clamp(24px, 4vw, 52px) 28px; }
-      section[hidden] { display: none; }
-      h2 { margin: 0 0 8px; font-size: 25px; }
-      .intro { max-width: 58rem; margin: 0 0 24px; color: var(--dialog-secondary); line-height: 1.5; }
-      .card { border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-md); padding: 8px 18px; background: var(--dialog-surface); }
-      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 50px; padding: 7px 0; border-bottom: 1px solid var(--dialog-border); }
-      .setting-row:last-child { border-bottom: 0; }
-      .setting-row span { font-size: 15px; }
-      select, input[type="text"] { min-height: var(--dialog-control-compact); padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; }
-      input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--dialog-primary); }
-      .theme-options { display: flex; flex-wrap: wrap; gap: 8px; }
-      .theme-options label { display: flex; align-items: center; gap: 6px; }
-      .actions { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
-      button.action { min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); border: 1px solid transparent; border-radius: var(--dialog-radius-sm); background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
-      button.action:hover { background: var(--dialog-primary-hover); }
-      button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
-      button:disabled { cursor: wait; opacity: .65; }
-      .inline-spinner { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: diagnostics-spin .7s linear infinite; vertical-align: -2px; }
-      @keyframes diagnostics-spin { to { transform: rotate(360deg); } }
-      .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
-      pre { overflow: auto; max-height: 300px; padding: 14px; border-radius: 8px; background: var(--dialog-button); color: var(--dialog-secondary); white-space: pre-wrap; word-break: break-word; }
-      @media (max-width: 760px) {
-        body { overflow: auto; }
-        header { padding: 14px 20px; }
-        .layout { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 64px); }
-        nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--dialog-border); }
-        .search-box { grid-column: 1 / -1; }
-        nav button span { white-space: normal; overflow: visible; }
-        main { max-width: none; padding: 22px 20px; }
-        .setting-row { flex-wrap: wrap; }
-      }
-    </style>
-  </head>
-  <body>
-    <header><h1>${labels.title}</h1></header>
-    <div class="layout">
-      <nav aria-label="${labels.title}">
-        <div class="search-box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="desktop-settings-search" type="search" placeholder="${labels.search}" aria-label="${labels.search}"></div>
-        ${navigationButton("general", labels.general, true)}
-        ${navigationButton("notifications", labels.notifications, false)}
-        ${navigationButton("appearance", labels.appearance, false)}
-        ${navigationButton("updates", labels.updates, false)}
-        ${navigationButton("diagnostics", labels.diagnostics, false)}
-        <div id="desktop-settings-no-results" class="no-results" hidden>${labels.noResults}</div>
-      </nav>
-      <main aria-label="${labels.title}">
-        <section data-panel="general">
-          <h2>${labels.general}</h2>
-          <p class="intro">${labels.generalDescription}</p>
-          <div class="card">
-            <label class="setting-row"><span>${labels.language}</span><select id="desktop-language"><option value="system">${labels.system}</option><option value="en">${labels.english}</option><option value="tr">${labels.turkish}</option></select></label>
-            <label class="setting-row"><span>${labels.launchAtLogin}</span><input id="desktop-launch-at-login" type="checkbox"></label>
-            <label class="setting-row"><span>${labels.showInMenuBar}</span><input id="desktop-show-in-menu-bar" type="checkbox"></label>
-            ${dockControl}
-            <label class="setting-row"><span>${labels.globalShortcut}</span><input id="desktop-global-shortcut" type="text" readonly aria-describedby="shortcut-help"></label>
-            <p id="shortcut-help" class="status">${labels.shortcutHelp}</p>
-            <p id="desktop-shortcut-status" class="status" role="status" aria-live="polite"></p>
-          </div>
-        </section>
-        <section data-panel="notifications" hidden>
-          <h2>${labels.notifications}</h2>
-          <p class="intro">${labels.notificationsDescription}</p>
-          <div class="card"><label class="setting-row"><span>${labels.notificationsEnabled}</span><input id="desktop-notifications" type="checkbox"></label></div>
-        </section>
-        <section data-panel="appearance" hidden>
-          <h2>${labels.appearance}</h2>
-          <p class="intro">${labels.appearanceDescription}</p>
-          <div class="card theme-options">
-            <label><input type="radio" name="desktop-theme" value="system">${labels.system}</label>
-            <label><input type="radio" name="desktop-theme" value="light">${labels.light}</label>
-            <label><input type="radio" name="desktop-theme" value="dark">${labels.dark}</label>
-          </div>
-        </section>
-        <section data-panel="updates" hidden>
-          <h2>${labels.updates}</h2>
-          <p class="intro">${labels.updatesDescription}</p>
-          <div class="card"><label class="setting-row"><span>${labels.automaticDownload}</span><input id="desktop-automatic-download" type="checkbox"></label></div>
-          <div class="actions"><span></span><button id="desktop-check-for-updates" class="action" type="button">${labels.checkForUpdates}</button></div>
-        </section>
-        <section data-panel="diagnostics" hidden>
-          <h2>${labels.diagnostics}</h2>
-          <p class="intro">${labels.diagnosticsDescription}</p>
-          <div class="card"><pre id="desktop-diagnostics">${labels.unavailable}</pre><div class="actions"><span></span><button id="desktop-copy-diagnostics" class="action secondary" type="button">${labels.copyDiagnostics}</button></div></div>
-        </section>
-        <div class="actions"><span id="desktop-status" class="status"></span><button id="desktop-reset" class="action secondary" type="button">${labels.reset}</button></div>
-      </main>
-    </div>
-    <script>
-      const labels = ${JSON.stringify(labels)};
-      const api = window.desktopApi;
-      const sections = Array.from(document.querySelectorAll("nav button[data-section]"));
-      const panels = Array.from(document.querySelectorAll("section[data-panel]"));
-      const search = document.getElementById("desktop-settings-search");
-      const noResults = document.getElementById("desktop-settings-no-results");
-      const status = document.getElementById("desktop-status");
-      const shortcutStatus = document.getElementById("desktop-shortcut-status");
-      const setStatus = (value) => { status.textContent = value; };
-      const setBusy = (busy) => { document.querySelectorAll("button, select, input").forEach((control) => { if (control.id !== "desktop-global-shortcut") control.disabled = busy; }); };
-      const setButtonBusy = (button, busy) => { let spinner = button.querySelector(".inline-spinner"); if (busy) { if (!spinner) { spinner = document.createElement("span"); spinner.className = "inline-spinner"; spinner.setAttribute("aria-hidden", "true"); button.prepend(spinner); } button.disabled = true; button.setAttribute("aria-busy", "true"); } else { spinner?.remove(); button.disabled = false; button.removeAttribute("aria-busy"); } };
-      const showSection = (name) => { sections.forEach((button) => button.setAttribute("aria-selected", String(button.dataset.section === name))); panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; }); if (name === "diagnostics") void loadDiagnostics(); };
-      sections.forEach((button) => button.addEventListener("click", () => showSection(button.dataset.section)));
-      search.addEventListener("input", () => { const query = search.value.trim().toLocaleLowerCase(); const matchingSections = sections.filter((button) => { const panel = panels.find((candidate) => candidate.dataset.panel === button.dataset.section); const content = (button.textContent + " " + (panel?.textContent ?? "")).toLocaleLowerCase(); const matches = !query || content.includes(query); button.hidden = !matches; return matches; }); noResults.hidden = matchingSections.length > 0; if (matchingSections.length === 0) { panels.forEach((panel) => { panel.hidden = true; }); return; } const activeButton = sections.find((button) => button.getAttribute("aria-selected") === "true"); const next = activeButton && !activeButton.hidden ? activeButton : matchingSections[0]; showSection(next.dataset.section); });
-      const setPreferences = async (value) => { setBusy(true); setStatus(labels.saving); try { const next = await api.preferences.set(value); applyPreferences(next); setStatus(labels.saved); shortcutStatus.textContent = ""; } catch (error) { const unavailable = error instanceof Error && error.message === "Global shortcut is unavailable"; setStatus(unavailable ? labels.shortcutUnavailable : labels.unavailable); if (unavailable) shortcutStatus.textContent = labels.shortcutUnavailable; } finally { setBusy(false); } };
-      const applyPreferences = (value) => { document.getElementById("desktop-launch-at-login").checked = Boolean(value.launchAtLogin); document.getElementById("desktop-show-in-menu-bar").checked = Boolean(value.showInMenuBar); const dock = document.getElementById("desktop-show-in-dock"); if (dock) dock.checked = Boolean(value.showInDock); document.getElementById("desktop-notifications").checked = Boolean(value.notifications); document.getElementById("desktop-automatic-download").checked = Boolean(value.automaticDownload); document.getElementById("desktop-global-shortcut").value = value.globalShortcut || "Alt+Space"; };
-      const loadPreferences = async () => { try { applyPreferences(await api.preferences.get()); const languageMode = await api.language.getMode(); document.getElementById("desktop-language").value = languageMode; document.querySelector("input[name='desktop-theme'][value='${currentTheme}']").checked = true; } catch { setStatus(labels.unavailable); } };
-      const loadDiagnostics = async () => { try { const value = await api.diagnostics.get(); document.getElementById("desktop-diagnostics").textContent = JSON.stringify(value, null, 2); } catch { document.getElementById("desktop-diagnostics").textContent = labels.unavailable; } };
-      document.getElementById("desktop-language").addEventListener("change", async (event) => { const value = event.target.value; setBusy(true); try { await api.language.set(value); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } });
-      document.getElementById("desktop-launch-at-login").addEventListener("change", (event) => void setPreferences({ launchAtLogin: event.target.checked }));
-      document.getElementById("desktop-show-in-menu-bar").addEventListener("change", (event) => void setPreferences({ showInMenuBar: event.target.checked }));
-      const dock = document.getElementById("desktop-show-in-dock"); if (dock) dock.addEventListener("change", (event) => void setPreferences({ showInDock: event.target.checked }));
-      document.getElementById("desktop-notifications").addEventListener("change", (event) => void setPreferences({ notifications: event.target.checked }));
-      document.getElementById("desktop-automatic-download").addEventListener("change", (event) => void setPreferences({ automaticDownload: event.target.checked }));
-      const shortcut = document.getElementById("desktop-global-shortcut"); shortcut.addEventListener("keydown", (event) => { event.preventDefault(); const parts = []; if (event.metaKey) parts.push("Command"); else if (event.ctrlKey) parts.push("CommandOrControl"); if (event.altKey) parts.push("Alt"); if (event.shiftKey) parts.push("Shift"); const key = event.key.length === 1 ? event.key.toUpperCase() : ({ " ": "Space", Escape: "Escape", Enter: "Enter", Tab: "Tab" }[event.key] || event.key); if (parts.length && key) void setPreferences({ globalShortcut: parts.concat(key).join("+") }); });
-      document.querySelectorAll("input[name='desktop-theme']").forEach((control) => control.addEventListener("change", async (event) => { setBusy(true); try { await api.theme.set(event.target.value); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); } }));
-      document.getElementById("desktop-check-for-updates").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); setBusy(true); try { await api.updates.check(); } finally { setBusy(false); setButtonBusy(button, false); } });
-      document.getElementById("desktop-copy-diagnostics").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); try { await navigator.clipboard.writeText(document.getElementById("desktop-diagnostics").textContent); setStatus(labels.copied); } catch { setStatus(labels.unavailable); } finally { setButtonBusy(button, false); } });
-      document.getElementById("desktop-reset").addEventListener("click", async (event) => { const button = event.currentTarget; if (button.disabled) return; setButtonBusy(button, true); setBusy(true); setStatus(labels.saving); try { applyPreferences(await api.preferences.reset()); await api.language.set("system"); await api.theme.set("system"); window.location.reload(); } catch { setStatus(labels.unavailable); setBusy(false); setButtonBusy(button, false); } });
-      api.language.onChanged(() => window.location.reload());
-      void api.settings.ready();
-      void loadPreferences();
-    </script>
-  </body>
-</html>`;
+  return renderDesktopSettingsHtml({
+    language: desktopLanguage,
+    platform: process.platform,
+    themeSource: nativeTheme.themeSource,
+    themeCss: nativeDialogThemeCss(),
+  });
 }
 
 function registerRendererProtocol() {
@@ -1533,134 +1199,25 @@ function updatePreferencesPath() {
   return path.join(app.getPath("userData"), UPDATE_PREFERENCES_FILE);
 }
 
-function desktopPreferencesPath() {
-  return path.join(app.getPath("userData"), "desktop-preferences.json");
-}
-
-function desktopLanguagePath() {
-  return path.join(app.getPath("userData"), DESKTOP_LANGUAGE_FILE);
-}
-
-function desktopLanguageModePath() {
-  return path.join(app.getPath("userData"), "desktop-language-mode.json");
-}
-
-async function readDesktopLanguage(): Promise<DesktopLanguage> {
-  try {
-    const value = await readFile(desktopLanguagePath(), "utf8");
-    return value.trim() === "tr" ? "tr" : "en";
-  } catch {
-    return desktopLanguage;
-  }
-}
-
-async function writeDesktopLanguage(language: DesktopLanguage) {
-  await mkdir(path.dirname(desktopLanguagePath()), { recursive: true });
-  await writeFile(desktopLanguagePath(), language, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
-
-async function readDesktopLanguageMode(): Promise<DesktopLanguageMode> {
-  try {
-    const value = await readFile(desktopLanguageModePath(), "utf8");
-    const normalized = value.trim();
-    return normalized === "tr" || normalized === "en" ? normalized : "system";
-  } catch {
-    return "system";
-  }
-}
-
-async function writeDesktopLanguageMode(mode: DesktopLanguageMode) {
-  await mkdir(path.dirname(desktopLanguageModePath()), { recursive: true });
-  await writeFile(desktopLanguageModePath(), mode, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
-
-function linuxAutostartPath() {
-  return path.join(app.getPath("appData"), "autostart", "kitezh.desktop");
-}
-
-function launchAtLoginEnabled() {
-  if (process.platform === "linux") return existsSync(linuxAutostartPath());
-  return app.getLoginItemSettings().openAtLogin;
-}
-
 function defaultDesktopPreferences(): DesktopPreferences {
-  return {
-    launchAtLogin: launchAtLoginEnabled(),
-    showInMenuBar: true,
-    showInDock: true,
-    notifications: true,
-    globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
-  };
+  return desktopSettingsStore.defaultDesktopPreferences(
+    DEFAULT_GLOBAL_SHORTCUT,
+  );
 }
 
 async function readDesktopPreferences(): Promise<DesktopPreferences> {
-  const defaults = defaultDesktopPreferences();
-  try {
-    const value = JSON.parse(
-      await readFile(desktopPreferencesPath(), "utf8"),
-    ) as Partial<DesktopPreferences>;
-    return {
-      launchAtLogin:
-        typeof value.launchAtLogin === "boolean"
-          ? value.launchAtLogin
-          : defaults.launchAtLogin,
-      showInMenuBar:
-        typeof value.showInMenuBar === "boolean"
-          ? value.showInMenuBar
-          : defaults.showInMenuBar,
-      showInDock:
-        typeof value.showInDock === "boolean"
-          ? value.showInDock
-          : defaults.showInDock,
-      notifications:
-        typeof value.notifications === "boolean"
-          ? value.notifications
-          : defaults.notifications,
-      globalShortcut:
-        typeof value.globalShortcut === "string" &&
-        value.globalShortcut.length > 0
-          ? value.globalShortcut
-          : defaults.globalShortcut,
-    };
-  } catch {
-    return defaults;
-  }
+  return desktopSettingsStore.readDesktopPreferences(
+    defaultDesktopPreferences(),
+  );
 }
 
-async function writeDesktopPreferences(preferences: DesktopPreferences) {
-  await mkdir(path.dirname(desktopPreferencesPath()), { recursive: true });
-  await writeFile(desktopPreferencesPath(), JSON.stringify(preferences), {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
-
-async function applyLaunchAtLogin(enabled: boolean) {
-  if (process.platform === "linux") {
-    const file = linuxAutostartPath();
-    if (!enabled) {
-      await rm(file, { force: true });
-      return;
-    }
-    await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(
-      file,
-      `[Desktop Entry]\nType=Application\nName=${DESKTOP_APP_NAME}\nExec="${process.execPath}"\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n`,
-      { encoding: "utf8", mode: 0o600 },
-    );
-    return;
-  }
-  app.setLoginItemSettings({
-    openAtLogin: enabled,
-    args: process.defaultApp ? [app.getAppPath()] : [],
-  });
-}
+const readDesktopLanguage = () =>
+  desktopSettingsStore.readDesktopLanguage(desktopLanguage);
+const writeDesktopLanguage = desktopSettingsStore.writeDesktopLanguage;
+const readDesktopLanguageMode = desktopSettingsStore.readDesktopLanguageMode;
+const writeDesktopLanguageMode = desktopSettingsStore.writeDesktopLanguageMode;
+const writeDesktopPreferences = desktopSettingsStore.writeDesktopPreferences;
+const applyLaunchAtLogin = desktopSettingsStore.applyLaunchAtLogin;
 
 function focusMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -1680,83 +1237,12 @@ function focusVisibleConsoleWindow() {
 
 async function desktopCompanionHtml() {
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
-  const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = isTurkishDesktop();
-  const labels = isTurkish
-    ? {
-        account: "Hesap Konsolu",
-        admin: "Yönetim Konsolu",
-        description: "Devam etmek istediğiniz konsolu seçin.",
-        eyebrow: "GÜVENLİ ERİŞİM",
-        loading: "Açılıyor…",
-      }
-    : {
-        account: "Account Console",
-        admin: "Admin Console",
-        description: "Choose where you want to continue.",
-        eyebrow: "CONTINUE SECURELY",
-        loading: "Opening…",
-      };
-  return `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${DESKTOP_APP_NAME}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
-      section { width: min(100%, 390px); text-align: center; }
-      img { width: 76px; height: 76px; border-radius: 18px; margin-bottom: 1.25rem; }
-      .eyebrow { color: var(--dialog-primary); font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
-      h1 { font-size: 1.65rem; margin: .6rem 0 .45rem; }
-      p { color: var(--dialog-secondary); font-size: .98rem; margin: 0 0 1.5rem; }
-      .actions { display: grid; gap: .75rem; }
-      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: var(--dialog-radius-sm); color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); width: 100%; }
-      button:hover { background: var(--dialog-primary-hover); }
-      button:disabled { cursor: default; opacity: .65; }
-      .spinner { animation: spin 800ms linear infinite; border: 2px solid color-mix(in srgb, var(--dialog-on-primary) 45%, transparent); border-radius: 50%; border-top-color: var(--dialog-on-primary); height: 16px; width: 16px; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <main aria-label="${labels.eyebrow}">
-      <section aria-labelledby="companion-title">
-        <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
-        <div class="eyebrow">${labels.eyebrow}</div>
-        <h1 id="companion-title">${DESKTOP_APP_NAME}</h1>
-        <p>${labels.description}</p>
-        <div class="actions">
-          <button type="button" data-console="admin">${labels.admin}</button>
-          <button type="button" data-console="account">${labels.account}</button>
-        </div>
-      </section>
-    </main>
-    <script>
-      const labels = ${JSON.stringify(labels)};
-      let pending = false;
-      for (const button of document.querySelectorAll("button[data-console]")) {
-        button.addEventListener("click", async () => {
-          if (pending) return;
-          pending = true;
-          for (const candidate of document.querySelectorAll("button[data-console]")) { candidate.disabled = true; candidate.setAttribute("aria-busy", "true"); }
-          button.innerHTML = '<span class="spinner" aria-hidden="true"></span>' + labels.loading;
-          try {
-            await window.desktopApi.companion.openConsole(button.dataset.console);
-          } finally {
-            pending = false;
-            button.textContent = button.dataset.console === "admin" ? labels.admin : labels.account;
-            for (const candidate of document.querySelectorAll("button[data-console]")) { candidate.disabled = false; candidate.removeAttribute("aria-busy"); }
-          }
-        });
-      }
-      document.addEventListener("keydown", (event) => { if (event.key === "Escape") window.close(); });
-      window.desktopApi.language.onChanged(() => window.location.reload());
-    </script>
-  </body>
-</html>`;
+  return renderDesktopCompanionHtml({
+    appName: DESKTOP_APP_NAME,
+    iconDataUrl: `data:image/png;base64,${icon.toString("base64")}`,
+    language: desktopLanguage,
+    themeCss: nativeDialogThemeCss(),
+  });
 }
 
 async function showDesktopLoginWindow() {
@@ -2028,24 +1514,12 @@ function updateOpenUpdateDialogLanguage() {
     "update-confirm-install": isTurkish ? "Güncelle" : "Update",
   });
   if (!updateAvailableWindow || updateAvailableWindow.isDestroyed()) return;
-  const version = promptedUpdateVersion;
-  const copy = isTurkish
-    ? {
-        title: `Yeni bir ${DESKTOP_APP_NAME} sürümü var!`,
-        detail: `${DESKTOP_APP_NAME} ${version} kullanıma hazır; mevcut sürümünüz ${app.getVersion()}. Şimdi indirmek ister misiniz?`,
-        automatic: "Gelecekteki güncellemeleri otomatik olarak indir ve kur",
-        skip: "Bu sürümü atla",
-        later: "Daha sonra hatırlat",
-        install: "Güncellemeyi kur",
-      }
-    : {
-        title: `A new version of ${DESKTOP_APP_NAME} is available!`,
-        detail: `${DESKTOP_APP_NAME} ${version} is now available—you have ${app.getVersion()}. Would you like to download it now?`,
-        automatic: "Automatically download and install updates in the future",
-        skip: "Skip This Version",
-        later: "Remind Me Later",
-        install: "Install Update",
-      };
+  const copy = getUpdateAvailableCopy(
+    desktopLanguage,
+    DESKTOP_APP_NAME,
+    promptedUpdateVersion,
+    app.getVersion(),
+  );
   updateAvailableWindow.setTitle(copy.title);
   void updateAvailableWindow.webContents
     .executeJavaScript(
@@ -2159,12 +1633,9 @@ async function showUpdateCheckWindow() {
     focusWindow(updateCheckWindow);
     return;
   }
-  const isTurkish = isTurkishDesktop();
-  const checkingLabel = isTurkish
-    ? "Güncellemeler denetleniyor…"
-    : "Checking for updates…";
-  const cancelLabel = isTurkish ? "İptal" : "Cancel";
-  const windowTitle = isTurkish ? "Yazılım Güncellemesi" : "Software Update";
+  const language = desktopLanguage;
+  const copy = getUpdateCheckingCopy(language);
+  const { windowTitle } = copy;
   updateCheckWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
@@ -2191,32 +1662,14 @@ async function showUpdateCheckWindow() {
   if (checkingWindow.isDestroyed() || updateCheckWindow !== checkingWindow)
     return;
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const html = `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${windowTitle}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      .progress { width: 100%; height: 12px; overflow: hidden; border-radius: var(--dialog-radius-sm); background: var(--dialog-border); }
-      .progress::after { content: ""; display: block; width: 25%; height: 100%; background: var(--dialog-primary); animation: slide 1.35s ease-in-out infinite; }
-      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
-    </style>
-  </head>
-  <body>
-    <main class="update-layout">
-      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
-      <section>
-        <h1 id="update-check-title">${checkingLabel}</h1>
-        <div class="progress" role="progressbar" aria-label="${checkingLabel}" aria-busy="true"></div>
-        <button id="update-check-cancel" class="secondary update-check-cancel" type="button" onclick="window.close()">${cancelLabel}</button>
-      </section>
-    </main>
-    ${nativeDialogActionsScript()}
-  </body>
-</html>`;
+  const html = renderUpdateCheckingHtml({
+    ...copy,
+    language,
+    appName: DESKTOP_APP_NAME,
+    iconDataUrl,
+    themeCss: nativeDialogThemeCss(),
+    actionsScript: nativeDialogActionsScript(),
+  });
   await checkingWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
@@ -2240,15 +1693,13 @@ async function showUpdateNotAvailableWindow() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = isTurkishDesktop();
-  const title = isTurkish
-    ? `${DESKTOP_APP_NAME} güncel`
-    : `${DESKTOP_APP_NAME} is up to date`;
-  const detail = isTurkish
-    ? `${DESKTOP_APP_NAME} için kullanılabilir yeni bir sürüm yok. ${app.getVersion()} sürümünü kullanıyorsunuz.`
-    : `There are no new updates available for ${DESKTOP_APP_NAME}. You are using version ${app.getVersion()}.`;
-  const doneLabel = isTurkish ? "Tamam" : "Done";
-  const windowTitle = isTurkish ? "Yazılım Güncellemesi" : "Software Update";
+  const language = desktopLanguage;
+  const copy = getUpdateResultCopy(
+    language,
+    DESKTOP_APP_NAME,
+    app.getVersion(),
+  );
+  const { windowTitle } = copy;
   updateResultWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
@@ -2270,30 +1721,14 @@ async function showUpdateNotAvailableWindow() {
   updateResultWindow.on("closed", () => {
     updateResultWindow = null;
   });
-  const html = `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${windowTitle}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-
-    </style>
-  </head>
-  <body>
-    <main class="update-layout">
-      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
-      <section>
-        <h1 id="update-result-title">${title}</h1>
-        <p id="update-result-detail">${detail}</p>
-      </section>
-      <footer class="update-actions"><button id="update-result-done" class="secondary" type="button" onclick="window.close()">${doneLabel}</button></footer>
-    </main>
-    ${nativeDialogActionsScript()}
-  </body>
-</html>`;
+  const html = renderUpdateResultHtml({
+    ...copy,
+    language,
+    appName: DESKTOP_APP_NAME,
+    iconDataUrl,
+    themeCss: nativeDialogThemeCss(),
+    actionsScript: nativeDialogActionsScript(),
+  });
   await updateResultWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
@@ -2321,15 +1756,9 @@ async function showUpdateConfirmation() {
   }
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = isTurkishDesktop();
-  const title = isTurkish
-    ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`
-    : `Update ${DESKTOP_APP_NAME} now?`;
-  const detail = isTurkish
-    ? `${DESKTOP_APP_NAME}, güncellemeyi kurmak için kapanacak. Bu işlem bu makinedeki etkin yerel oturumları keser.`
-    : `${DESKTOP_APP_NAME} will quit to install the update, which will interrupt active local sessions on this machine.`;
-  const cancelLabel = isTurkish ? "İptal" : "Cancel";
-  const updateLabel = isTurkish ? "Güncelle" : "Update";
+  const language = desktopLanguage;
+  const copy = getUpdateConfirmationCopy(language, DESKTOP_APP_NAME);
+  const { title } = copy;
   updateConfirmationWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
@@ -2366,31 +1795,15 @@ async function showUpdateConfirmation() {
     }
     resolver?.(confirmed);
   });
-  const html = `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${title}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-
-    </style>
-  </head>
-  <body>
-    <main class="update-confirmation">
-      <img src="${iconDataUrl}" alt="" aria-hidden="true">
-      <h1 id="update-confirm-title">${title}</h1>
-      <p id="update-confirm-detail">${detail}</p>
-    </main>
-    <footer class="update-actions">
-      <button id="update-confirm-cancel" class="secondary" type="button" autofocus onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/cancel'">${cancelLabel}</button>
-      <button id="update-confirm-install" class="primary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/update'">${updateLabel}</button>
-    </footer>
-    ${nativeDialogActionsScript()}
-  </body>
-</html>`;
+  const html = renderUpdateConfirmationHtml({
+    ...copy,
+    language,
+    appName: DESKTOP_APP_NAME,
+    iconDataUrl,
+    themeCss: nativeDialogThemeCss(),
+    actionsScript: nativeDialogActionsScript(),
+    desktopProtocol: DESKTOP_PROTOCOL,
+  });
   await updateConfirmationWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
@@ -2416,19 +1829,14 @@ async function showUpdateDialog(version: string, force = false) {
   promptedUpdateVersion = version;
   const icon = await readFile(path.join(app.getAppPath(), "assets/icon.png"));
   const iconDataUrl = `data:image/png;base64,${icon.toString("base64")}`;
-  const isTurkish = isTurkishDesktop();
-  const title = isTurkish
-    ? `Yeni bir ${DESKTOP_APP_NAME} sürümü var!`
-    : `A new version of ${DESKTOP_APP_NAME} is available!`;
-  const detail = isTurkish
-    ? `${DESKTOP_APP_NAME} ${version} kullanıma hazır; mevcut sürümünüz ${app.getVersion()}. Şimdi indirmek ister misiniz?`
-    : `${DESKTOP_APP_NAME} ${version} is now available—you have ${app.getVersion()}. Would you like to download it now?`;
-  const automaticLabel = isTurkish
-    ? "Gelecekteki güncellemeleri otomatik olarak indir ve kur"
-    : "Automatically download and install updates in the future";
-  const skipLabel = isTurkish ? "Bu sürümü atla" : "Skip This Version";
-  const laterLabel = isTurkish ? "Daha sonra hatırlat" : "Remind Me Later";
-  const installLabel = isTurkish ? "Güncellemeyi kur" : "Install Update";
+  const language = desktopLanguage;
+  const copy = getUpdateAvailableCopy(
+    language,
+    DESKTOP_APP_NAME,
+    version,
+    app.getVersion(),
+  );
+  const { title } = copy;
   const dialogWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
@@ -2489,35 +1897,15 @@ async function showUpdateDialog(version: string, force = false) {
       })
       .catch(() => undefined);
   });
-  const html = `<!doctype html>
-<html lang="${isTurkish ? "tr" : "en"}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>${title}</title>
-    <style>
-      ${nativeDialogThemeCss()}
-      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-
-    </style>
-  </head>
-  <body>
-    <main class="update-layout">
-      <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
-      <section>
-        <h1 id="update-title">${title}</h1>
-        <p id="update-detail">${detail}</p>
-        <label><input id="automatic" type="checkbox" checked><span id="automatic-label">${automaticLabel}</span></label>
-      </section>
-    </main>
-    <footer class="update-actions">
-      <button id="skip-update" class="secondary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
-      <button id="remind-later" class="secondary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
-      <button id="install-update" class="primary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
-    </footer>
-    ${nativeDialogActionsScript()}
-  </body>
-</html>`;
+  const html = renderUpdateAvailableHtml({
+    ...copy,
+    language,
+    appName: DESKTOP_APP_NAME,
+    iconDataUrl,
+    themeCss: nativeDialogThemeCss(),
+    actionsScript: nativeDialogActionsScript(),
+    desktopProtocol: DESKTOP_PROTOCOL,
+  });
   await dialogWindow.loadURL(
     `data:text/html;base64,${Buffer.from(html).toString("base64")}`,
   );
@@ -2555,129 +1943,25 @@ function toggleDeveloperTools() {
 }
 
 function installApplicationMenu() {
-  const isTurkish = isTurkishDesktop();
-  const applicationMenu: MenuItemConstructorOptions = {
-    label: DESKTOP_APP_NAME,
-    submenu: [
-      {
-        label: isTurkish
-          ? `${DESKTOP_APP_NAME} hakkında`
-          : `About ${DESKTOP_APP_NAME}`,
-        click: () => void showAboutDialog(),
+  const template = createApplicationMenuTemplate({
+    appName: DESKTOP_APP_NAME,
+    language: desktopLanguage,
+    platform: process.platform,
+    devToolsEnabled: process.env.DESKTOP_DEVTOOLS === "true",
+    actions: {
+      about: () => void showAboutDialog(),
+      settings: () => void showSettingsWindow(),
+      checkForUpdates: () => void requestUpdateCheck(),
+      logout: () => {
+        void writeVault({})
+          .then(() => showDesktopLoginWindow())
+          .catch(() => undefined);
+        mainWindow?.webContents.send("desktop:menu-logout");
       },
-      { type: "separator" },
-      {
-        label: isTurkish ? "Ayarlar…" : "Settings…",
-        click: () => void showSettingsWindow(),
-      },
-      {
-        label: isTurkish ? "Güncellemeleri denetle…" : "Check for Updates…",
-        click: () => void requestUpdateCheck(),
-      },
-      { type: "separator" },
-      {
-        id: "desktop-logout",
-        label: isTurkish ? "Oturumu kapat" : "Log Out",
-        click: () => {
-          void writeVault({})
-            .then(() => showDesktopLoginWindow())
-            .catch(() => undefined);
-          mainWindow?.webContents.send("desktop:menu-logout");
-        },
-      },
-      { type: "separator" },
-      { role: "services", submenu: [] },
-      { type: "separator" },
-      {
-        role: "hide",
-        label: isTurkish
-          ? `${DESKTOP_APP_NAME} uygulamasını gizle`
-          : `Hide ${DESKTOP_APP_NAME}`,
-      },
-      {
-        role: "hideOthers",
-        label: isTurkish ? "Diğerlerini gizle" : "Hide Others",
-      },
-      { role: "unhide", label: isTurkish ? "Tümünü göster" : "Show All" },
-      { type: "separator" },
-      {
-        role: "quit",
-        label: isTurkish
-          ? `${DESKTOP_APP_NAME}'ten çık`
-          : `Quit ${DESKTOP_APP_NAME}`,
-      },
-    ],
-  };
-  const viewSubmenu: MenuItemConstructorOptions[] = [
-    {
-      label: isTurkish ? "Hızlı erişim…" : "Quick Access…",
-      click: toggleQuickAccess,
+      quickAccess: toggleQuickAccess,
+      toggleDeveloperTools,
     },
-    { type: "separator" },
-    { role: "reload", label: isTurkish ? "Yeniden yükle" : "Reload" },
-    {
-      role: "forceReload",
-      label: isTurkish ? "Önbelleği kullanmadan yeniden yükle" : "Force Reload",
-    },
-    { type: "separator" },
-    ...(process.env.DESKTOP_DEVTOOLS === "true"
-      ? [
-          {
-            label: isTurkish
-              ? "Geliştirici araçlarını aç/kapat"
-              : "Toggle Developer Tools",
-            click: toggleDeveloperTools,
-          },
-          { type: "separator" as const },
-        ]
-      : []),
-    { role: "resetZoom", label: isTurkish ? "Gerçek boyut" : "Actual Size" },
-    { role: "zoomIn", label: isTurkish ? "Yakınlaştır" : "Zoom In" },
-    { role: "zoomOut", label: isTurkish ? "Uzaklaştır" : "Zoom Out" },
-    { type: "separator" },
-    {
-      role: "togglefullscreen",
-      label: isTurkish ? "Tam ekranı aç/kapat" : "Toggle Full Screen",
-    },
-  ];
-  const template: MenuItemConstructorOptions[] = [
-    applicationMenu,
-    {
-      label: isTurkish ? "Düzenle" : "Edit",
-      submenu: [
-        { role: "undo", label: isTurkish ? "Geri al" : "Undo" },
-        { role: "redo", label: isTurkish ? "Yinele" : "Redo" },
-        { type: "separator" },
-        { role: "cut", label: isTurkish ? "Kes" : "Cut" },
-        { role: "copy", label: isTurkish ? "Kopyala" : "Copy" },
-        { role: "paste", label: isTurkish ? "Yapıştır" : "Paste" },
-        { role: "selectAll", label: isTurkish ? "Tümünü seç" : "Select All" },
-      ],
-    },
-    { label: isTurkish ? "Görünüm" : "View", submenu: viewSubmenu },
-    {
-      role: "windowMenu",
-      label: isTurkish ? "Pencere" : "Window",
-      submenu: [
-        {
-          role: "minimize",
-          label: isTurkish ? "Simge durumuna küçült" : "Minimize",
-        },
-        { role: "zoom", label: isTurkish ? "Pencereyi büyüt/küçült" : "Zoom" },
-        { role: "close", label: isTurkish ? "Kapat" : "Close" },
-        ...(process.platform === "darwin"
-          ? [
-              { type: "separator" as const },
-              {
-                role: "front" as const,
-                label: isTurkish ? "Tümünü öne getir" : "Bring All to Front",
-              },
-            ]
-          : []),
-      ],
-    },
-    { role: "help", label: isTurkish ? "Yardım" : "Help" },
-  ];
+  });
   const menu = Menu.buildFromTemplate(template);
   logoutMenuItem = menu.getMenuItemById("desktop-logout");
   setLogoutMenuVisible(false);
@@ -2694,265 +1978,96 @@ async function createWindow() {
   } catch {
     hasStoredSession = false;
   }
-  mainWindow = new BrowserWindow({
-    x: state?.x,
-    y: state?.y,
-    width: state?.width ?? 1440,
-    height: state?.height ?? 960,
-    minWidth: 640,
-    minHeight: 640,
-    show: hasStoredSession && !backgroundE2e,
+  const deepLink = pendingDeepLink;
+  pendingDeepLink = null;
+  mainWindow = createDesktopMainWindow({
+    createWindow: (options) => new BrowserWindow(options),
+    preloadPath: path.join(__dirname, "preload.js"),
+    state,
+    hasStoredSession,
+    backgroundE2e,
     backgroundColor: desktopBackgroundColor(),
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      backgroundThrottling: !backgroundE2e,
-      preload,
+    rendererUrl: `${RENDERER_PROTOCOL}://${RENDERER_HOST}/native`,
+    isAllowedExternalUrl,
+    openExternal: (url) => void shell.openExternal(url),
+    isTrustedRendererUrl,
+    saveWindowState,
+    appendDiagnosticEvent,
+    showWindow,
+    openLogin: () => void showDesktopLoginWindow().catch(() => undefined),
+    pendingDeepLink: deepLink,
+    sendDeepLink: (value) => void sendDeepLink(value),
+    onClosed: () => {
+      if (companionWindow && !companionWindow.isDestroyed()) {
+        companionWindow.destroy();
+      }
+      mainWindow = null;
     },
   });
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
-    return { action: "deny" };
-  });
-  mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (!isTrustedRendererUrl(url)) event.preventDefault();
-  });
-  let saveTimer: NodeJS.Timeout | undefined;
-  const scheduleWindowStateSave = () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => void saveWindowState(mainWindow!), 250);
-  };
-  mainWindow.on("resize", scheduleWindowStateSave);
-  mainWindow.on("move", scheduleWindowStateSave);
-  mainWindow.on("maximize", scheduleWindowStateSave);
-  mainWindow.on("unmaximize", scheduleWindowStateSave);
-  mainWindow.on("close", () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    void saveWindowState(mainWindow!);
-  });
-  mainWindow.on(
-    "unresponsive",
-    () => void appendDiagnosticEvent("window-unresponsive"),
-  );
-  mainWindow.on(
-    "responsive",
-    () => void appendDiagnosticEvent("window-responsive"),
-  );
-  mainWindow.webContents.on("render-process-gone", (_event, details) => {
-    void appendDiagnosticEvent("renderer-process-gone", {
-      reason: details.reason,
-      exitCode: details.exitCode,
-    });
-  });
-  void mainWindow.loadURL(`${RENDERER_PROTOCOL}://${RENDERER_HOST}/native`);
-  mainWindow.on("closed", () => {
-    if (companionWindow && !companionWindow.isDestroyed()) {
-      companionWindow.destroy();
-    }
-    mainWindow = null;
-  });
-  if (state?.maximized) mainWindow.maximize();
-  if (hasStoredSession) {
-    mainWindow.webContents.once("did-finish-load", () => {
-      if (mainWindow) showWindow(mainWindow);
-    });
-  }
-  if (!hasStoredSession) void showDesktopLoginWindow().catch(() => undefined);
-  if (pendingDeepLink) {
-    const value = pendingDeepLink;
-    pendingDeepLink = null;
-    mainWindow.webContents.once(
-      "did-finish-load",
-      () => void sendDeepLink(value),
-    );
-  }
 }
 
 function registerIpc() {
-  ipcMain.on("desktop:config-sync", (event) => {
-    if (!isTrustedRendererFrame(event.senderFrame?.url)) {
-      event.returnValue = null;
-      return;
-    }
-    event.returnValue = {
-      apiBaseUrl: getApiBaseUrl(),
-      protocol: DESKTOP_PROTOCOL,
-      appVersion: app.getVersion(),
-      os: desktopOsIdentifier(),
-    };
-  });
-  ipcMain.handle("desktop:config", (event) => {
-    assertTrustedSender(event);
-    return {
-      apiBaseUrl: getApiBaseUrl(),
-      protocol: DESKTOP_PROTOCOL,
-      appVersion: app.getVersion(),
-      os: desktopOsIdentifier(),
-    };
-  });
-  ipcMain.handle("desktop:open-external", async (event, value: unknown) => {
-    assertTrustedSender(event);
-    if (typeof value !== "string" || !isAllowedExternalUrl(value))
-      throw new Error("External URL is not allowed");
-    const externalUrl = new URL(value);
-    await shell.openExternal(externalUrl.toString());
-  });
-  ipcMain.handle("desktop:app-version", (event) => {
-    assertTrustedSender(event);
-    return app.getVersion();
-  });
-  ipcMain.handle("desktop:diagnostics-get", async (event) => {
-    assertTrustedSender(event);
-    let apiHost = "unknown";
-    try {
-      apiHost = new URL(getApiBaseUrl()).host;
-    } catch {
-      // The configured origin is validated elsewhere; keep diagnostics safe if it is unavailable.
-    }
-    return {
-      appVersion: app.getVersion(),
-      electronVersion: process.versions.electron,
-      chromeVersion: process.versions.chrome,
-      nodeVersion: process.versions.node,
+  registerDesktopRuntimeInfoIpc({
+    ipcMain,
+    isTrustedRendererFrame,
+    assertTrustedSender,
+    getApiBaseUrl,
+    protocol: DESKTOP_PROTOCOL,
+    getAppVersion: () => app.getVersion(),
+    getOs: desktopOsIdentifier,
+    getAppStatus: () => ({ isPackaged: app.isPackaged }),
+    getProcessStatus: () => ({
+      versions: process.versions,
       platform: process.platform,
       architecture: process.arch,
-      apiHost,
-      packaged: app.isPackaged,
-      secureStorage: safeStorage.isEncryptionAvailable()
-        ? "available"
-        : "unavailable",
-      autoUpdatesSupported:
-        app.isPackaged &&
-        process.env.DESKTOP_AUTO_UPDATE !== "false" &&
-        (process.platform !== "linux" || Boolean(process.env.APPIMAGE)),
-      events: await readDiagnosticEvents(),
-    };
+      environment: process.env,
+    }),
+    isSecureStorageAvailable: () => safeStorage.isEncryptionAvailable(),
+    readDiagnosticEvents,
+    isAllowedExternalUrl,
+    openExternal: (url) => shell.openExternal(url),
   });
-  ipcMain.handle("desktop:theme-set", (event, value: unknown) => {
-    assertTrustedSender(event);
-    const theme: DesktopTheme =
-      value === "light" || value === "dark" || value === "system"
-        ? value
-        : "system";
-    applyDesktopTheme(theme);
-    void writeDesktopTheme(theme);
+  registerDesktopAuthIpc({
+    ipcMain,
+    assertTrustedSender,
+    assertConsole,
+    pendingAuthorizations,
+    isPendingAuthorizationValid,
+    createAuthorizationRequest: nativeAuthorizationRequest,
+    persistPendingAuthorizations,
+    openExternal: (url) => shell.openExternal(url),
+    readVault,
+    writeVault,
+    setLogoutMenuVisible,
+    isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+    logoutDesktopSession,
+    startNativeSocialLink,
   });
-  ipcMain.handle("desktop:theme-get", (event) => {
-    assertTrustedSender(event);
-    return nativeTheme.themeSource;
+  registerDesktopPreferencesIpc({
+    ipcMain,
+    assertTrustedSender,
+    readDesktopPreferences,
+    writeDesktopPreferences,
+    readUpdatePreferences,
+    writeUpdatePreferences,
+    applyLaunchAtLogin,
+    setTrayVisibility,
+    setDockVisibility,
+    registerGlobalShortcut,
+    isValidGlobalShortcut,
+    setAutomaticInstallOnAppQuit,
+    platform: process.platform,
+    defaultGlobalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   });
-  ipcMain.handle("desktop:language-set", async (event, value: unknown) => {
-    assertTrustedSender(event);
-    await applyDesktopLanguage(value);
-  });
-  ipcMain.handle("desktop:language-get", (event) => {
-    assertTrustedSender(event);
-    return desktopLanguage;
-  });
-  ipcMain.handle("desktop:language-mode-get", (event) => {
-    assertTrustedSender(event);
-    return desktopLanguageMode;
-  });
-  ipcMain.handle("desktop:preferences-get", async (event) => {
-    assertTrustedSender(event);
-    const preferences = await readDesktopPreferences();
-    const updatePreferences = await readUpdatePreferences();
-    return {
-      ...preferences,
-      automaticDownload: updatePreferences.automaticDownload === true,
-    };
-  });
-  ipcMain.handle("desktop:preferences-set", async (event, value: unknown) => {
-    assertTrustedSender(event);
-    if (!value || typeof value !== "object")
-      throw new Error("Invalid desktop preferences");
-    const input = value as Partial<DesktopPreferences> & {
-      automaticDownload?: boolean;
-    };
-    const current = await readDesktopPreferences();
-    if (
-      input.globalShortcut !== undefined &&
-      (typeof input.globalShortcut !== "string" ||
-        !isValidGlobalShortcut(input.globalShortcut))
-    ) {
-      throw new Error("Invalid global shortcut");
-    }
-    const next: DesktopPreferences = {
-      launchAtLogin:
-        typeof input.launchAtLogin === "boolean"
-          ? input.launchAtLogin
-          : current.launchAtLogin,
-      showInMenuBar:
-        typeof input.showInMenuBar === "boolean"
-          ? input.showInMenuBar
-          : current.showInMenuBar,
-      showInDock:
-        typeof input.showInDock === "boolean"
-          ? input.showInDock
-          : current.showInDock,
-      notifications:
-        typeof input.notifications === "boolean"
-          ? input.notifications
-          : current.notifications,
-      globalShortcut:
-        typeof input.globalShortcut === "string" &&
-        input.globalShortcut.length > 0
-          ? input.globalShortcut
-          : current.globalShortcut,
-    };
-    if (
-      process.platform === "darwin" &&
-      !next.showInMenuBar &&
-      !next.showInDock
-    ) {
-      throw new Error("Keep the menu bar or Dock entry visible");
-    }
-    await applyLaunchAtLogin(next.launchAtLogin);
-    setTrayVisibility(next.showInMenuBar);
-    setDockVisibility(next.showInDock);
-    if (
-      next.globalShortcut !== current.globalShortcut &&
-      !registerGlobalShortcut(next.globalShortcut)
-    ) {
-      registerGlobalShortcut(current.globalShortcut);
-      throw new Error("Global shortcut is unavailable");
-    }
-    await writeDesktopPreferences(next);
-    if (typeof input.automaticDownload === "boolean") {
-      const updatePreferences = await readUpdatePreferences();
-      await writeUpdatePreferences({
-        ...updatePreferences,
-        automaticDownload: input.automaticDownload,
-      });
-      setAutomaticInstallOnAppQuit(input.automaticDownload);
-    }
-    const updatePreferences = await readUpdatePreferences();
-    return {
-      ...next,
-      automaticDownload: updatePreferences.automaticDownload === true,
-    };
-  });
-  ipcMain.handle("desktop:preferences-reset", async (event) => {
-    assertTrustedSender(event);
-    const next: DesktopPreferences = {
-      launchAtLogin: false,
-      showInMenuBar: true,
-      showInDock: true,
-      notifications: true,
-      globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
-    };
-    await applyLaunchAtLogin(next.launchAtLogin);
-    setTrayVisibility(next.showInMenuBar);
-    setDockVisibility(next.showInDock);
-    if (!registerGlobalShortcut(next.globalShortcut)) {
-      throw new Error("Global shortcut is unavailable");
-    }
-    await writeDesktopPreferences(next);
-    await writeUpdatePreferences({});
-    setAutomaticInstallOnAppQuit(false);
-    return { ...next, automaticDownload: false };
+  registerDesktopAppearanceIpc({
+    ipcMain,
+    assertTrustedSender,
+    applyTheme: applyDesktopTheme,
+    persistTheme: (theme) => void writeDesktopTheme(theme),
+    getTheme: () => nativeTheme.themeSource,
+    applyLanguage: applyDesktopLanguage,
+    getLanguage: () => desktopLanguage,
+    getLanguageMode: () => desktopLanguageMode,
   });
   ipcMain.handle("desktop:settings-close", (event) => {
     assertTrustedSender(event);
@@ -2991,105 +2106,11 @@ function registerIpc() {
     focusWindow(mainWindow);
     closeDesktopLoginWindow();
   });
-  ipcMain.handle(
-    "desktop:auth-start-login",
-    async (event, request: unknown) => {
-      assertTrustedSender(event);
-      if (typeof request !== "string") throw new Error("Invalid login request");
-      assertConsole(request);
-      const existing = pendingAuthorizations.get(request);
-      if (existing && isPendingAuthorizationValid(existing, existing.state)) {
-        throw new Error("Desktop authorization is already in progress");
-      }
-      const nativeRequest = nativeAuthorizationRequest(request);
-      pendingAuthorizations.set(request, nativeRequest.pending);
-      try {
-        await persistPendingAuthorizations();
-        await shell.openExternal(nativeRequest.authorizationUrl.toString());
-      } catch {
-        pendingAuthorizations.delete(request);
-        await persistPendingAuthorizations();
-        throw new Error("Desktop authorization browser could not be opened");
-      }
-    },
-  );
-  ipcMain.handle(
-    "desktop:auth-cancel-login",
-    async (event, consoleName: unknown) => {
-      assertTrustedSender(event);
-      assertConsole(consoleName);
-      pendingAuthorizations.delete(consoleName);
-      await persistPendingAuthorizations();
-    },
-  );
-  ipcMain.handle(
-    "desktop:auth-has-session",
-    async (event, consoleName: unknown) => {
-      assertTrustedSender(event);
-      assertConsole(consoleName);
-      const vault = await readVault();
-      return Boolean(vault[consoleName]);
-    },
-  );
-  ipcMain.handle(
-    "desktop:auth-clear-session",
-    async (event, consoleName: unknown) => {
-      assertTrustedSender(event);
-      assertConsole(consoleName);
-      const vault = await readVault();
-      delete vault[consoleName];
-      await writeVault(vault);
-      setLogoutMenuVisible(Boolean(vault.admin || vault.account));
-    },
-  );
-  ipcMain.handle("desktop:auth-clear-all-sessions", async (event) => {
-    assertTrustedSender(event);
-    await writeVault({});
-    setLogoutMenuVisible(false);
-  });
-  ipcMain.handle("desktop:auth-storage-status", (event) => {
-    assertTrustedSender(event);
-    return safeStorage.isEncryptionAvailable() ? "available" : "unavailable";
-  });
-  ipcMain.handle("desktop:auth-logout", async (event, consoleName: unknown) => {
-    assertTrustedSender(event);
-    assertConsole(consoleName);
-    await logoutDesktopSession(consoleName);
-  });
-  ipcMain.handle(
-    "desktop:social-link-start",
-    async (event, provider: unknown) => {
-      assertTrustedSender(event);
-      return startNativeSocialLink(provider);
-    },
-  );
-  ipcMain.handle("desktop:api-request", async (event, request: unknown) => {
-    assertTrustedSender(event);
-    if (!request || typeof request !== "object")
-      throw new Error("Invalid native API request");
-    const value = request as Partial<{
-      console: ConsoleName;
-      locale: "en" | "tr";
-      method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-      path: string;
-      body: unknown;
-    }>;
-    assertConsole(value.console);
-    if (
-      typeof value.path !== "string" ||
-      !value.path.startsWith("/") ||
-      value.path.includes("//") ||
-      value.path.includes("..")
-    ) {
-      throw new Error("Invalid native API path");
-    }
-    return desktopApiAdapter.request({
-      console: value.console,
-      locale: value.locale === "tr" ? "tr" : "en",
-      method: value.method,
-      path: value.path,
-      body: value.body,
-    });
+  registerNativeApiIpc({
+    ipcMain,
+    assertTrustedSender,
+    assertConsole,
+    request: (request) => desktopApiAdapter.request(request),
   });
   ipcMain.handle("desktop:update-check", (event) => {
     assertTrustedSender(event);
@@ -3136,159 +2157,152 @@ function registerDesktopProtocol() {
   app.setAsDefaultProtocolClient(DESKTOP_PROTOCOL);
 }
 
-const hasLock = app.requestSingleInstanceLock();
-if (!hasLock) {
-  app.quit();
-} else {
-  app.on("second-instance", (_event, commandLine) => {
+registerDesktopLifecycle(app, process, {
+  onSecondInstance: (_event, commandLine) => {
     focusMainWindow();
     const deepLink = commandLine.find((value) =>
       value.startsWith(`${DESKTOP_PROTOCOL}://`),
     );
     if (deepLink) void sendDeepLink(deepLink);
-  });
-  app.on("open-url", (event, url) => {
+  },
+  onOpenUrl: (event, url) => {
     event.preventDefault();
     void sendDeepLink(url);
-  });
-  app
-    .whenReady()
-    .then(async () => {
-      app.setName(DESKTOP_APP_NAME);
-      applyDesktopTheme(await readDesktopTheme());
-      desktopLanguageMode = await readDesktopLanguageMode();
-      desktopLanguage = await readDesktopLanguage();
-      if (desktopLanguageMode === "system") {
-        desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
-          ? "tr"
-          : "en";
-      }
-      installApplicationMenu();
-      pendingDeepLink = findDesktopDeepLink();
-      await restorePendingAuthorizations();
-      registerDesktopProtocol();
-      registerIpc();
-      const desktopPreferences = await readDesktopPreferences();
-      void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
-      const shortcutRegistration = registerGlobalShortcutWithFallback(
-        globalShortcut,
-        desktopPreferences.globalShortcut,
-        DEFAULT_GLOBAL_SHORTCUT,
-        toggleQuickAccess,
-      );
-      if (
-        !shortcutRegistration.registered &&
-        shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
-      ) {
-        desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
-        await writeDesktopPreferences(desktopPreferences);
-      }
-      setTrayVisibility(desktopPreferences.showInMenuBar);
-      setDockVisibility(desktopPreferences.showInDock);
-      const updatePreferences = await readUpdatePreferences();
-      setAutomaticInstallOnAppQuit(
-        updatePreferences.automaticDownload === true,
-      );
-      void readVault()
-        .then((vault) =>
-          setLogoutMenuVisible(Boolean(vault.admin || vault.account)),
-        )
-        .catch(() => setLogoutMenuVisible(false));
-      enforceContentSecurityPolicy();
-      await registerRendererProtocol();
-      void createWindow();
-      if (backgroundE2e && process.platform === "darwin") app.hide();
-      configureAutoUpdater(async (status: DesktopUpdateStatus) => {
-        void appendDiagnosticEvent(`update-${status.state}`, {
-          version: "version" in status ? status.version : undefined,
-        });
-        if (status.state === "checking") {
-          if (!updateCheckWindowReady) {
-            updateCheckWindowReady = showUpdateCheckWindow().catch(
-              () => undefined,
-            );
-          }
-          sendUpdateStatus(status);
-          return;
-        } else {
-          const checkingWindowReady = updateCheckWindowReady;
-          updateCheckWindowReady = null;
-          await checkingWindowReady?.catch(() => undefined);
-          closeUpdateCheckWindow();
-        }
-        if (status.state === "available") {
-          const manualCheck = manualUpdateCheckRequested;
-          if (!manualCheck && isMainWindowInBackground()) {
-            notifyDesktop(
-              isTurkishDesktop()
-                ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
-                : `${DESKTOP_APP_NAME} update available`,
-              isTurkishDesktop()
-                ? `${status.version} sürümü indirilmeye hazır.`
-                : `Version ${status.version} is ready to download.`,
-              () => void showUpdateDialog(status.version, true),
-            );
-          }
-          void handleAvailableUpdate(status.version);
-          return;
-        }
-        if (status.state === "downloaded") {
-          const suppressNotification = suppressNextUpdateNotification;
-          suppressNextUpdateNotification = false;
-          if (!suppressNotification && isMainWindowInBackground()) {
-            notifyDesktop(
-              isTurkishDesktop()
-                ? `${DESKTOP_APP_NAME} güncellemesi hazır`
-                : `${DESKTOP_APP_NAME} update ready`,
-              isTurkishDesktop()
-                ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
-                : `Version ${status.version} will be installed when you restart.`,
-              () => void showUpdateConfirmation(),
-            );
-          }
-        } else if (status.state === "not-available") {
-          const manualCheck = manualUpdateCheckRequested;
-          manualUpdateCheckRequested = false;
-          suppressNextUpdateNotification = false;
-          if (manualCheck) {
-            void showUpdateNotAvailableWindow().catch(() => undefined);
-          }
-        } else if (status.state === "error") {
-          // Keep the retry interactive so a recovered check can reopen the
-          // update dialog without requiring the user to restart the app.
-          manualUpdateCheckRequested = true;
-          suppressNextUpdateNotification = false;
+  },
+  onReady: async () => {
+    app.setName(DESKTOP_APP_NAME);
+    applyDesktopTheme(await readDesktopTheme());
+    desktopLanguageMode = await readDesktopLanguageMode();
+    desktopLanguage = await readDesktopLanguage();
+    if (desktopLanguageMode === "system") {
+      desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
+        ? "tr"
+        : "en";
+    }
+    installApplicationMenu();
+    pendingDeepLink = findDesktopDeepLink();
+    await restorePendingAuthorizations();
+    registerDesktopProtocol();
+    registerIpc();
+    const desktopPreferences = await readDesktopPreferences();
+    void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
+    const shortcutRegistration = registerGlobalShortcutWithFallback(
+      globalShortcut,
+      desktopPreferences.globalShortcut,
+      DEFAULT_GLOBAL_SHORTCUT,
+      toggleQuickAccess,
+    );
+    if (
+      !shortcutRegistration.registered &&
+      shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
+    ) {
+      desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
+      await writeDesktopPreferences(desktopPreferences);
+    }
+    setTrayVisibility(desktopPreferences.showInMenuBar);
+    setDockVisibility(desktopPreferences.showInDock);
+    const updatePreferences = await readUpdatePreferences();
+    setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
+    void readVault()
+      .then((vault) =>
+        setLogoutMenuVisible(Boolean(vault.admin || vault.account)),
+      )
+      .catch(() => setLogoutMenuVisible(false));
+    enforceContentSecurityPolicy();
+    await registerRendererProtocol();
+    void createWindow();
+    if (backgroundE2e && process.platform === "darwin") app.hide();
+    configureAutoUpdater(async (status: DesktopUpdateStatus) => {
+      void appendDiagnosticEvent(`update-${status.state}`, {
+        version: "version" in status ? status.version : undefined,
+      });
+      if (status.state === "checking") {
+        if (!updateCheckWindowReady) {
+          updateCheckWindowReady = showUpdateCheckWindow().catch(
+            () => undefined,
+          );
         }
         sendUpdateStatus(status);
-      });
-      if (process.platform === "darwin")
-        app.on(
-          "activate",
-          () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
-        );
-    })
-    .catch((error: unknown) => {
-      void appendDiagnosticEvent("app-startup-failed", {
-        errorType: error instanceof Error ? error.name : typeof error,
-      });
-      app.quit();
+        return;
+      } else {
+        const checkingWindowReady = updateCheckWindowReady;
+        updateCheckWindowReady = null;
+        await checkingWindowReady?.catch(() => undefined);
+        closeUpdateCheckWindow();
+      }
+      if (status.state === "available") {
+        const manualCheck = manualUpdateCheckRequested;
+        if (!manualCheck && isMainWindowInBackground()) {
+          notifyDesktop(
+            isTurkishDesktop()
+              ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
+              : `${DESKTOP_APP_NAME} update available`,
+            isTurkishDesktop()
+              ? `${status.version} sürümü indirilmeye hazır.`
+              : `Version ${status.version} is ready to download.`,
+            () => void showUpdateDialog(status.version, true),
+          );
+        }
+        void handleAvailableUpdate(status.version);
+        return;
+      }
+      if (status.state === "downloaded") {
+        const suppressNotification = suppressNextUpdateNotification;
+        suppressNextUpdateNotification = false;
+        if (!suppressNotification && isMainWindowInBackground()) {
+          notifyDesktop(
+            isTurkishDesktop()
+              ? `${DESKTOP_APP_NAME} güncellemesi hazır`
+              : `${DESKTOP_APP_NAME} update ready`,
+            isTurkishDesktop()
+              ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
+              : `Version ${status.version} will be installed when you restart.`,
+            () => void showUpdateConfirmation(),
+          );
+        }
+      } else if (status.state === "not-available") {
+        const manualCheck = manualUpdateCheckRequested;
+        manualUpdateCheckRequested = false;
+        suppressNextUpdateNotification = false;
+        if (manualCheck) {
+          void showUpdateNotAvailableWindow().catch(() => undefined);
+        }
+      } else if (status.state === "error") {
+        // Keep the retry interactive so a recovered check can reopen the
+        // update dialog without requiring the user to restart the app.
+        manualUpdateCheckRequested = true;
+        suppressNextUpdateNotification = false;
+      }
+      sendUpdateStatus(status);
     });
-  process.on("uncaughtExceptionMonitor", (error) => {
+    if (process.platform === "darwin")
+      app.on(
+        "activate",
+        () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
+      );
+  },
+  onStartupFailure: (error) => {
+    void appendDiagnosticEvent("app-startup-failed", {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+    app.quit();
+  },
+  onUncaughtException: (error) => {
     void appendDiagnosticEvent("uncaught-exception", {
       errorType: error.name,
     });
-  });
-  process.on("unhandledRejection", (reason) => {
+  },
+  onUnhandledRejection: (reason) => {
     void appendDiagnosticEvent("unhandled-rejection", {
       errorType: reason instanceof Error ? reason.name : typeof reason,
     });
-  });
-  app.on("before-quit", () => {
+  },
+  onBeforeQuit: () => {
     globalShortcut.unregisterAll();
     tray?.destroy();
     tray = null;
-  });
-  app.on("window-all-closed", () => {
+  },
+  onWindowAllClosed: () => {
     if (process.platform !== "darwin") app.quit();
-  });
-}
+  },
+});

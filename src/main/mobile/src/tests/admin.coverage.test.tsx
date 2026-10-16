@@ -172,6 +172,111 @@ it("loads dashboard and navigates through every mobile administration tab", asyn
   expect(adminApi.getAdminDashboard).toHaveBeenCalled();
 });
 
+it("supplies a forced token refresh callback to every admin resource query", async () => {
+  render(<AdminScreen />);
+  await screen.findByText("2");
+  await expect(
+    refreshTokenFromCall(adminApi.getAdminDashboard.mock.calls.at(-1)),
+  ).resolves.toBe("access");
+
+  const resources = [
+    ["adminUsers", adminApi.listAdminUsers],
+    ["adminClients", adminApi.listAdminClients],
+    ["adminClientScopes", adminApi.listAdminClientScopes],
+    ["adminRoles", adminApi.listAdminRoles],
+    ["adminGroups", adminApi.listAdminGroups],
+    ["adminIdentityProviders", adminApi.listAdminIdentityProviders],
+    ["adminSessions", adminApi.listAdminSessions],
+    ["adminConsents", adminApi.listAdminConsents],
+    ["adminKeys", adminApi.listAdminKeys],
+    ["adminEvents", adminApi.listAdminEvents],
+  ] as const;
+
+  for (const [tab, request] of resources) {
+    fireEvent.click(screen.getByRole("tab", { name: tab }));
+    await waitFor(() => expect(request).toHaveBeenCalled());
+    await expect(refreshTokenFromCall(request.mock.calls.at(-1))).resolves.toBe(
+      "access",
+    );
+  }
+});
+
+it("filters session administration and switches between active and expired pages", async () => {
+  jest.mocked(adminApi.listAdminSessions).mockResolvedValue({
+    ...emptyPage,
+    content: [
+      {
+        id: "session-active",
+        username: "alex",
+        createdAt: "2026-01-01",
+        lastAccessedAt: "2026-01-02",
+        expiresAt: "2026-02-01",
+        authorizationCount: 1,
+        active: true,
+      },
+    ],
+    totalElements: 11,
+    totalPages: 2,
+  });
+
+  render(<AdminScreen />);
+  fireEvent.click(screen.getByRole("tab", { name: "adminSessions" }));
+  expect(await screen.findByText("alex")).toBeVisible();
+
+  fireEvent.change(screen.getByLabelText("adminSearchSessions"), {
+    target: { value: "alex" },
+  });
+  await waitFor(() =>
+    expect(adminApi.listAdminSessions).toHaveBeenCalledWith(
+      "access",
+      "alex",
+      "active",
+      "",
+      0,
+      10,
+      expect.any(Object),
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "adminNext" }));
+  await waitFor(() =>
+    expect(adminApi.listAdminSessions).toHaveBeenCalledWith(
+      "access",
+      "alex",
+      "active",
+      "",
+      1,
+      10,
+      expect.any(Object),
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "adminPrevious" }));
+
+  fireEvent.click(screen.getByRole("button", { name: "adminExpired" }));
+  await waitFor(() =>
+    expect(adminApi.listAdminSessions).toHaveBeenCalledWith(
+      "access",
+      "alex",
+      "expired",
+      "",
+      0,
+      10,
+      expect.any(Object),
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "adminActive" }));
+  await waitFor(() =>
+    expect(adminApi.listAdminSessions).toHaveBeenLastCalledWith(
+      "access",
+      "alex",
+      "active",
+      "",
+      0,
+      10,
+      expect.any(Object),
+    ),
+  );
+});
+
 it("shows loading, signed-out, and authentication-error states", async () => {
   const { mockAuthState } = jest.requireMock("@/auth/MobileAuthProvider");
   mockAuthState.session = null;
@@ -426,6 +531,93 @@ it("renders populated mobile admin resources and supports filtered pagination", 
       expect.any(Object),
     ),
   );
+
+  const paginatedResources = [
+    [
+      "adminUsers",
+      "adminSearchUsers",
+      adminApi.listAdminUsers,
+      "disabled-user",
+    ],
+    [
+      "adminClients",
+      "adminSearchClients",
+      adminApi.listAdminClients,
+      "Orders App",
+    ],
+    [
+      "adminClientScopes",
+      "adminSearchClientScopes",
+      adminApi.listAdminClientScopes,
+      "orders.read",
+    ],
+    ["adminRoles", "adminSearchRoles", adminApi.listAdminRoles, "ROLE_AUDITOR"],
+    ["adminGroups", "adminSearchGroups", adminApi.listAdminGroups, "Operators"],
+    [
+      "adminIdentityProviders",
+      "adminSearchIdentityProviders",
+      adminApi.listAdminIdentityProviders,
+      "GitHub",
+    ],
+    [
+      "adminSessions",
+      "adminSearchSessions",
+      adminApi.listAdminSessions,
+      "riley",
+    ],
+    [
+      "adminConsents",
+      "adminSearchConsents",
+      adminApi.listAdminConsents,
+      "Orders App",
+    ],
+    ["adminKeys", "adminSearchKeys", adminApi.listAdminKeys, "inactive-key"],
+    [
+      "adminEvents",
+      "adminSearchEvents",
+      adminApi.listAdminEvents,
+      "user.updated",
+    ],
+  ] as const;
+  for (const [
+    tab,
+    searchLabel,
+    listRequest,
+    visibleRow,
+  ] of paginatedResources) {
+    fireEvent.click(screen.getByRole("tab", { name: tab }));
+    expect(await screen.findByText(visibleRow)).toBeVisible();
+    const request = listRequest as jest.Mock;
+    const searchCalls = request.mock.calls.length;
+    fireEvent.change(screen.getByLabelText(searchLabel), {
+      target: { value: "filter-term" },
+    });
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(searchCalls + 1));
+    expect(JSON.stringify(request.mock.calls.at(-1))).toContain("filter-term");
+
+    const nextCalls = request.mock.calls.length;
+    request.mockResolvedValueOnce({
+      ...(await request.mock.results.at(-1)?.value),
+      number: 1,
+      totalPages: 2,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "adminNext" }));
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(nextCalls + 1));
+    const nextCall = JSON.stringify(request.mock.calls.at(-1));
+    expect(nextCall.includes('"page":1') || nextCall.includes(",1,")).toBe(
+      true,
+    );
+
+    const previousCalls = request.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "adminPrevious" }));
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledTimes(previousCalls + 1),
+    );
+    const previousCall = JSON.stringify(request.mock.calls.at(-1));
+    expect(
+      previousCall.includes('"page":0') || previousCall.includes(",0,"),
+    ).toBe(true);
+  }
 });
 
 it("creates a mobile admin user after validating the required password", async () => {

@@ -179,17 +179,19 @@ export default function SecurityScreen() {
       setPasswordErrors({});
       setPasswordSaved(true);
     } catch (cause) {
-      setPasswordErrors(
-        cause instanceof AccountApiError
-          ? {
-              ...problemFieldErrors(cause.problem?.violations),
-              ...((cause.problem?.violations?.length ?? 0) === 0 &&
-              Object.keys(apiFieldErrors(cause.data)).length === 0
-                ? { currentPassword: dictionary.passwordSaveError }
-                : {}),
-            }
-          : { currentPassword: dictionary.passwordSaveError },
-      );
+      if (cause instanceof AccountApiError) {
+        const fieldErrors = {
+          ...apiFieldErrors(cause.data),
+          ...problemFieldErrors(cause.problem?.violations),
+        };
+        setPasswordErrors(
+          Object.keys(fieldErrors).length > 0
+            ? fieldErrors
+            : { currentPassword: dictionary.passwordSaveError },
+        );
+      } else {
+        setPasswordErrors({ currentPassword: dictionary.passwordSaveError });
+      }
     } finally {
       setPasswordSaving(false);
     }
@@ -315,300 +317,302 @@ export default function SecurityScreen() {
     >
       <View style={styles.screen}>
         <MobileFormScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
         >
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dictionary.back}
-            onPress={() => router.back()}
-            style={styles.back}
-          >
-            <AppIcon name="arrowLeft" size={18} color={palette.primary} />
-            <Text style={{ color: palette.primary }}>{dictionary.back}</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: palette.text }]}>
-            {dictionary.securityTitle}
-          </Text>
-        </View>
-
-        <View
-          style={[styles.section, { borderColor: palette.border }]}
-          accessible
-        >
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>
-            {dictionary.newPassword}
-          </Text>
-          <Text style={[styles.help, { color: palette.textMuted }]}>
-            {dictionary.passwordPolicy}
-          </Text>
-          {(
-            [
-              ["currentPassword", currentPassword, setCurrentPassword],
-              ["newPassword", newPassword, setNewPassword],
-              ["confirmPassword", confirmPassword, setConfirmPassword],
-            ] as const
-          ).map(([field, value, setter]) => (
-            <View key={field} style={styles.field}>
-              <Text style={[styles.label, { color: palette.text }]}>
-                {dictionary[field]}
-              </Text>
-              <TextInput
-                accessibilityLabel={dictionary[field]}
-                editable={!passwordSaving}
-                onChangeText={(nextValue) => {
-                  setter(nextValue);
-                  setPasswordSaved(false);
-                  setPasswordErrors((current) => ({
-                    ...current,
-                    [field]: undefined,
-                  }));
-                }}
-                placeholder={dictionary[field]}
-                placeholderTextColor={palette.textMuted}
-                secureTextEntry
-                style={[
-                  styles.input,
-                  {
-                    borderColor: passwordErrors[field]
-                      ? palette.danger
-                      : palette.border,
-                    color: palette.text,
-                  },
-                ]}
-                value={value}
-              />
-              {passwordErrors[field] ? (
-                <Text style={[styles.errorText, { color: palette.danger }]}>
-                  {passwordErrors[field]}
-                </Text>
-              ) : null}
-            </View>
-          ))}
-          {passwordSaved ? (
-            <Text style={[styles.successText, { color: palette.success }]}>
-              {dictionary.passwordSaved}
-            </Text>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: passwordSaving }}
-            disabled={passwordSaving}
-            onPress={() => void savePassword()}
-            style={[
-              styles.primaryAction,
-              {
-                backgroundColor: palette.primary,
-                opacity: passwordSaving ? 0.65 : 1,
-              },
-            ]}
-          >
-            {passwordSaving ? (
-              <ActivityIndicator
-                color={palette.onPrimary}
-                accessibilityLabel={dictionary.loading}
-              />
-            ) : null}
-            <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
-              {dictionary.save}
-            </Text>
-          </Pressable>
-        </View>
-
-        <View
-          style={[styles.section, { borderColor: palette.border }]}
-          accessible
-        >
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>
-            {dictionary.sessionsTitle}
-          </Text>
-          {sessionsLoading ? (
-            <ActivityIndicator
-              color={palette.primary}
-              accessibilityLabel={dictionary.loading}
-              style={styles.loading}
-            />
-          ) : sessionsError ? (
+          <View style={styles.header}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => void loadSessions(true)}
-              style={[styles.errorAction, { borderColor: palette.danger }]}
+              accessibilityLabel={dictionary.back}
+              onPress={() => router.back()}
+              style={styles.back}
             >
-              <Text style={{ color: palette.danger }}>
-                {dictionary.sessionsError}
-              </Text>
-              <Text style={{ color: palette.primary }}>
-                {dictionary.sessionsRetry}
-              </Text>
+              <AppIcon name="arrowLeft" size={18} color={palette.primary} />
+              <Text style={{ color: palette.primary }}>{dictionary.back}</Text>
             </Pressable>
-          ) : sessions.length === 0 ? (
-            <Text style={[styles.help, { color: palette.textMuted }]}>
-              {dictionary.sessionsEmpty}
+            <Text style={[styles.title, { color: palette.text }]}>
+              {dictionary.securityTitle}
             </Text>
-          ) : (
-            sessions.map((accountSession) => (
-              <View
-                key={accountSession.id}
-                style={[styles.session, { borderColor: palette.border }]}
-              >
-                <View style={styles.sessionTitleRow}>
-                  <Text style={[styles.sessionTitle, { color: palette.text }]}>
-                    {accountSession.current
-                      ? dictionary.currentSession
-                      : (accountSession.clients[0]?.clientName ??
-                        dictionary.sessions)}
+          </View>
+
+          <View
+            style={[styles.section, { borderColor: palette.border }]}
+            accessible
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              {dictionary.newPassword}
+            </Text>
+            <Text style={[styles.help, { color: palette.textMuted }]}>
+              {dictionary.passwordPolicy}
+            </Text>
+            {(
+              [
+                ["currentPassword", currentPassword, setCurrentPassword],
+                ["newPassword", newPassword, setNewPassword],
+                ["confirmPassword", confirmPassword, setConfirmPassword],
+              ] as const
+            ).map(([field, value, setter]) => (
+              <View key={field} style={styles.field}>
+                <Text style={[styles.label, { color: palette.text }]}>
+                  {dictionary[field]}
+                </Text>
+                <TextInput
+                  accessibilityLabel={dictionary[field]}
+                  editable={!passwordSaving}
+                  onChangeText={(nextValue) => {
+                    setter(nextValue);
+                    setPasswordSaved(false);
+                    setPasswordErrors((current) => ({
+                      ...current,
+                      [field]: undefined,
+                    }));
+                  }}
+                  placeholder={dictionary[field]}
+                  placeholderTextColor={palette.textMuted}
+                  secureTextEntry
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: passwordErrors[field]
+                        ? palette.danger
+                        : palette.border,
+                      color: palette.text,
+                    },
+                  ]}
+                  value={value}
+                />
+                {passwordErrors[field] ? (
+                  <Text style={[styles.errorText, { color: palette.danger }]}>
+                    {passwordErrors[field]}
                   </Text>
-                  {accountSession.current ? (
-                    <AppIcon name="check" size={16} color={palette.success} />
-                  ) : null}
-                </View>
-                <Text
-                  style={[styles.sessionMeta, { color: palette.textMuted }]}
-                >
-                  {dictionary.sessionCreated}:{" "}
-                  {formatDate(accountSession.createdAt, resolvedLocale)}
-                </Text>
-                <Text
-                  style={[styles.sessionMeta, { color: palette.textMuted }]}
-                >
-                  {dictionary.sessionLastUsed}:{" "}
-                  {formatDate(accountSession.lastAccessedAt, resolvedLocale)}
-                </Text>
-                <Text
-                  style={[styles.sessionMeta, { color: palette.textMuted }]}
-                >
-                  {dictionary.sessionExpires}:{" "}
-                  {formatDate(accountSession.expiresAt, resolvedLocale)}
-                </Text>
-                {!accountSession.current ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      disabled: Boolean(signingOutSessionId),
-                    }}
-                    disabled={Boolean(signingOutSessionId)}
-                    onPress={() => confirmRevokeSession(accountSession)}
-                    style={[
-                      styles.sessionAction,
-                      {
-                        borderColor: palette.border,
-                        opacity: signingOutSessionId ? 0.65 : 1,
-                      },
-                    ]}
-                  >
-                    {signingOutSessionId === accountSession.id ? (
-                      <ActivityIndicator
-                        color={palette.text}
-                        accessibilityLabel={dictionary.loading}
-                      />
-                    ) : null}
-                    <Text style={{ color: palette.text, fontWeight: "700" }}>
-                      {dictionary.signOutSession}
-                    </Text>
-                  </Pressable>
                 ) : null}
               </View>
-            ))
-          )}
-          {signOutOthersError ? (
-            <Text style={[styles.errorText, { color: palette.danger }]}>
-              {dictionary.signOutOthersError}
-            </Text>
-          ) : null}
-          {signOutSessionError ? (
-            <Text style={[styles.errorText, { color: palette.danger }]}>
-              {dictionary.signOutSessionError}
-            </Text>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{
-              disabled: signingOutOthers || sessionsLoading,
-            }}
-            disabled={signingOutOthers || sessionsLoading}
-            onPress={() => void signOutOthers()}
-            style={[
-              styles.secondaryAction,
-              {
-                borderColor: palette.border,
-                opacity: signingOutOthers || sessionsLoading ? 0.65 : 1,
-              },
-            ]}
-          >
-            {signingOutOthers ? (
-              <ActivityIndicator
-                color={palette.text}
-                accessibilityLabel={dictionary.loading}
-              />
+            ))}
+            {passwordSaved ? (
+              <Text style={[styles.successText, { color: palette.success }]}>
+                {dictionary.passwordSaved}
+              </Text>
             ) : null}
-            <Text style={{ color: palette.text, fontWeight: "700" }}>
-              {dictionary.signOutOthers}
-            </Text>
-          </Pressable>
-        </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: passwordSaving }}
+              disabled={passwordSaving}
+              onPress={() => void savePassword()}
+              style={[
+                styles.primaryAction,
+                {
+                  backgroundColor: palette.primary,
+                  opacity: passwordSaving ? 0.65 : 1,
+                },
+              ]}
+            >
+              {passwordSaving ? (
+                <ActivityIndicator
+                  color={palette.onPrimary}
+                  accessibilityLabel={dictionary.loading}
+                />
+              ) : null}
+              <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
+                {dictionary.save}
+              </Text>
+            </Pressable>
+          </View>
 
-        <View
-          style={[styles.section, { borderColor: palette.danger }]}
-          accessible
-        >
-          <Text style={[styles.sectionTitle, { color: palette.danger }]}>
-            {dictionary.deleteAccount}
-          </Text>
-          <Text style={[styles.help, { color: palette.textMuted }]}>
-            {dictionary.deleteAccountWarning}
-          </Text>
-          <TextInput
-            accessibilityLabel={dictionary.currentPassword}
-            editable={!deletingAccount}
-            onChangeText={(value) => {
-              setDeletePassword(value);
-              setDeleteAccountError(false);
-            }}
-            placeholder={dictionary.currentPassword}
-            placeholderTextColor={palette.textMuted}
-            secureTextEntry
-            style={[
-              styles.input,
-              {
-                borderColor: deleteAccountError
-                  ? palette.danger
-                  : palette.border,
-                color: palette.text,
-                marginTop: spacing.md,
-              },
-            ]}
-            value={deletePassword}
-          />
-          {deleteAccountError ? (
-            <Text style={[styles.errorText, { color: palette.danger }]}>
-              {dictionary.deleteAccountError}
-            </Text>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: deletingAccount }}
-            disabled={deletingAccount}
-            onPress={confirmDeleteAccount}
-            style={[
-              styles.dangerAction,
-              {
-                borderColor: palette.danger,
-                opacity: deletingAccount ? 0.65 : 1,
-              },
-            ]}
+          <View
+            style={[styles.section, { borderColor: palette.border }]}
+            accessible
           >
-            {deletingAccount ? (
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              {dictionary.sessionsTitle}
+            </Text>
+            {sessionsLoading ? (
               <ActivityIndicator
-                color={palette.danger}
+                color={palette.primary}
                 accessibilityLabel={dictionary.loading}
+                style={styles.loading}
               />
+            ) : sessionsError ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void loadSessions(true)}
+                style={[styles.errorAction, { borderColor: palette.danger }]}
+              >
+                <Text style={{ color: palette.danger }}>
+                  {dictionary.sessionsError}
+                </Text>
+                <Text style={{ color: palette.primary }}>
+                  {dictionary.sessionsRetry}
+                </Text>
+              </Pressable>
+            ) : sessions.length === 0 ? (
+              <Text style={[styles.help, { color: palette.textMuted }]}>
+                {dictionary.sessionsEmpty}
+              </Text>
+            ) : (
+              sessions.map((accountSession) => (
+                <View
+                  key={accountSession.id}
+                  style={[styles.session, { borderColor: palette.border }]}
+                >
+                  <View style={styles.sessionTitleRow}>
+                    <Text
+                      style={[styles.sessionTitle, { color: palette.text }]}
+                    >
+                      {accountSession.current
+                        ? dictionary.currentSession
+                        : (accountSession.clients[0]?.clientName ??
+                          dictionary.sessions)}
+                    </Text>
+                    {accountSession.current ? (
+                      <AppIcon name="check" size={16} color={palette.success} />
+                    ) : null}
+                  </View>
+                  <Text
+                    style={[styles.sessionMeta, { color: palette.textMuted }]}
+                  >
+                    {dictionary.sessionCreated}:{" "}
+                    {formatDate(accountSession.createdAt, resolvedLocale)}
+                  </Text>
+                  <Text
+                    style={[styles.sessionMeta, { color: palette.textMuted }]}
+                  >
+                    {dictionary.sessionLastUsed}:{" "}
+                    {formatDate(accountSession.lastAccessedAt, resolvedLocale)}
+                  </Text>
+                  <Text
+                    style={[styles.sessionMeta, { color: palette.textMuted }]}
+                  >
+                    {dictionary.sessionExpires}:{" "}
+                    {formatDate(accountSession.expiresAt, resolvedLocale)}
+                  </Text>
+                  {!accountSession.current ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        disabled: Boolean(signingOutSessionId),
+                      }}
+                      disabled={Boolean(signingOutSessionId)}
+                      onPress={() => confirmRevokeSession(accountSession)}
+                      style={[
+                        styles.sessionAction,
+                        {
+                          borderColor: palette.border,
+                          opacity: signingOutSessionId ? 0.65 : 1,
+                        },
+                      ]}
+                    >
+                      {signingOutSessionId === accountSession.id ? (
+                        <ActivityIndicator
+                          color={palette.text}
+                          accessibilityLabel={dictionary.loading}
+                        />
+                      ) : null}
+                      <Text style={{ color: palette.text, fontWeight: "700" }}>
+                        {dictionary.signOutSession}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))
+            )}
+            {signOutOthersError ? (
+              <Text style={[styles.errorText, { color: palette.danger }]}>
+                {dictionary.signOutOthersError}
+              </Text>
             ) : null}
-            <Text style={{ color: palette.danger, fontWeight: "700" }}>
+            {signOutSessionError ? (
+              <Text style={[styles.errorText, { color: palette.danger }]}>
+                {dictionary.signOutSessionError}
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{
+                disabled: signingOutOthers || sessionsLoading,
+              }}
+              disabled={signingOutOthers || sessionsLoading}
+              onPress={() => void signOutOthers()}
+              style={[
+                styles.secondaryAction,
+                {
+                  borderColor: palette.border,
+                  opacity: signingOutOthers || sessionsLoading ? 0.65 : 1,
+                },
+              ]}
+            >
+              {signingOutOthers ? (
+                <ActivityIndicator
+                  color={palette.text}
+                  accessibilityLabel={dictionary.loading}
+                />
+              ) : null}
+              <Text style={{ color: palette.text, fontWeight: "700" }}>
+                {dictionary.signOutOthers}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View
+            style={[styles.section, { borderColor: palette.danger }]}
+            accessible
+          >
+            <Text style={[styles.sectionTitle, { color: palette.danger }]}>
               {dictionary.deleteAccount}
             </Text>
-          </Pressable>
-        </View>
+            <Text style={[styles.help, { color: palette.textMuted }]}>
+              {dictionary.deleteAccountWarning}
+            </Text>
+            <TextInput
+              accessibilityLabel={dictionary.currentPassword}
+              editable={!deletingAccount}
+              onChangeText={(value) => {
+                setDeletePassword(value);
+                setDeleteAccountError(false);
+              }}
+              placeholder={dictionary.currentPassword}
+              placeholderTextColor={palette.textMuted}
+              secureTextEntry
+              style={[
+                styles.input,
+                {
+                  borderColor: deleteAccountError
+                    ? palette.danger
+                    : palette.border,
+                  color: palette.text,
+                  marginTop: spacing.md,
+                },
+              ]}
+              value={deletePassword}
+            />
+            {deleteAccountError ? (
+              <Text style={[styles.errorText, { color: palette.danger }]}>
+                {dictionary.deleteAccountError}
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: deletingAccount }}
+              disabled={deletingAccount}
+              onPress={confirmDeleteAccount}
+              style={[
+                styles.dangerAction,
+                {
+                  borderColor: palette.danger,
+                  opacity: deletingAccount ? 0.65 : 1,
+                },
+              ]}
+            >
+              {deletingAccount ? (
+                <ActivityIndicator
+                  color={palette.danger}
+                  accessibilityLabel={dictionary.loading}
+                />
+              ) : null}
+              <Text style={{ color: palette.danger, fontWeight: "700" }}>
+                {dictionary.deleteAccount}
+              </Text>
+            </Pressable>
+          </View>
         </MobileFormScrollView>
         <AccountTabBar active="security" />
       </View>

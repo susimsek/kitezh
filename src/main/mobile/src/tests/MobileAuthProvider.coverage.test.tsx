@@ -1,5 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Linking } from "react-native";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { AppState, Linking, Platform } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import type { ReactNode } from "react";
 import * as storage from "../auth/storage";
 import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
@@ -31,6 +38,13 @@ jest.mock("expo-auth-session", () => {
       return "https://issuer.example.test/authorize";
     }
 
+    parseReturnUrl(url: string) {
+      return {
+        type: "success",
+        params: Object.fromEntries(new URL(url).searchParams.entries()),
+      };
+    }
+
     async promptAsync() {
       const result = await promptAsync();
       if (result.type === "success") {
@@ -59,6 +73,7 @@ jest.mock("expo-auth-session", () => {
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(async () => ({ type: "success" })),
+  openBrowserAsync: jest.fn(async () => ({ type: "opened" })),
 }));
 jest.mock("expo-linking", () => ({
   parse: (url: string) => ({
@@ -138,7 +153,9 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  jest.restoreAllMocks();
   jest.clearAllMocks();
+  Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
   mockSetDiscovery({
     authorizationEndpoint: "https://issuer.example.test/authorize",
     discoveryDocument: { issuer: "https://issuer.example.test" },
@@ -267,6 +284,196 @@ it("refuses an authorization endpoint from mismatched discovery metadata", async
   expect(await screen.findByText("error")).toBeVisible();
   expect(mockPromptAsync).not.toHaveBeenCalled();
   expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
+});
+
+it("reports unavailable discovery without starting an authorization request", async () => {
+  mockSetDiscovery(null);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("Authentication failed")).toBeVisible();
+  expect(mockPromptAsync).not.toHaveBeenCalled();
+  expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
+});
+
+it("times out a browser authorization that never returns", async () => {
+  jest.useFakeTimers();
+  mockPromptAsync.mockReturnValueOnce(new Promise(() => {}));
+  try {
+    renderProvider();
+    await screen.findByText("signed-out");
+
+    fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+    await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5 * 60_000);
+    });
+
+    expect(screen.getByText("authorization-timeout")).toBeVisible();
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("completes Android authorization from the native redirect event", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  let receiveUrl: ((event: { url: string }) => void) | undefined;
+  const removeUrlListener = jest.fn();
+  const removeAppStateListener = jest.fn();
+  jest.spyOn(Linking, "addEventListener").mockImplementation(((
+    event: string,
+    listener: (event: never) => void,
+  ) => {
+    if (event === "url") {
+      receiveUrl = listener as (event: { url: string }) => void;
+      return { remove: removeUrlListener };
+    }
+    return { remove: jest.fn() };
+  }) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation((() => ({
+    remove: removeAppStateListener,
+  })) as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
+  const state = savedOAuthTransaction?.state;
+  expect(state).toBeDefined();
+
+  act(() => {
+    receiveUrl?.({
+      url: `kitezh://account/oauth/callback?code=android-code&state=${state}`,
+    });
+  });
+
+  expect(await screen.findByText("signed-in")).toBeVisible();
+  expect(mockExchangeCode).toHaveBeenCalledWith(
+    expect.objectContaining({ code: "android-code" }),
+    expect.any(Object),
+  );
+  expect(removeUrlListener).toHaveBeenCalled();
+  expect(removeAppStateListener).toHaveBeenCalled();
+});
+
+it("cancels Android authorization when the browser returns without a callback", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  let receiveUrl: ((event: { url: string }) => void) | undefined;
+  let changeAppState: ((state: string) => void) | undefined;
+  jest.spyOn(Linking, "addEventListener").mockImplementation(((
+    event: string,
+    listener: (event: never) => void,
+  ) => {
+    if (event === "url") {
+      receiveUrl = listener as (event: { url: string }) => void;
+    }
+    return { remove: jest.fn() };
+  }) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
+    changeAppState = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
+
+  jest.useFakeTimers();
+  act(() => {
+    receiveUrl?.({ url: "https://untrusted.example.test/callback?code=bad" });
+    changeAppState?.("background");
+    changeAppState?.("active");
+  });
+  try {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(750);
+    });
+    expect(await screen.findByText("signed-out")).toBeVisible();
+    expect(mockExchangeCode).not.toHaveBeenCalled();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("cleans up Android authorization listeners when browser launch fails", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  const removeUrlListener = jest.fn();
+  const removeAppStateListener = jest.fn();
+  jest.spyOn(Linking, "addEventListener").mockImplementation((() => ({
+    remove: removeUrlListener,
+  })) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation((() => ({
+    remove: removeAppStateListener,
+  })) as never);
+  jest
+    .mocked(WebBrowser.openBrowserAsync)
+    .mockRejectedValueOnce(new Error("system browser unavailable"));
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeVisible();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(removeUrlListener).toHaveBeenCalled();
+  expect(removeAppStateListener).toHaveBeenCalled();
+});
+
+it("fails authorization when its PKCE transaction has expired", async () => {
+  jest.mocked(storage.consumeOAuthTransaction).mockResolvedValueOnce(null);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeVisible();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+});
+
+it("rejects an authorization callback whose state differs from the saved transaction", async () => {
+  jest.mocked(storage.consumeOAuthTransaction).mockResolvedValueOnce({
+    clientId: "mobile-account",
+    codeVerifier: "test-verifier",
+    createdAt: Date.now(),
+    redirectUri: "kitezh://account/oauth/callback",
+    state: "another-request-state",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeVisible();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+});
+
+it("continues signed out when secure session restoration fails", async () => {
+  jest
+    .mocked(storage.readSession)
+    .mockRejectedValueOnce(new Error("secure storage unavailable"));
+
+  renderProvider();
+
+  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(storage.clearSession).not.toHaveBeenCalled();
 });
 
 it("creates a fresh OAuth state for every sign-in attempt", async () => {

@@ -11,6 +11,7 @@ const mockRegisterAccountTokenHandlers = registerAccountTokenHandlers as jest.Mo
 const mockBeginAuthorization = jest.fn().mockResolvedValue(undefined);
 const mockRefreshAccessToken = jest.fn().mockResolvedValue("new-token");
 const mockSetUsername = jest.fn();
+const mockRouterReplace = jest.fn();
 let pathname = "/account/applications";
 let auth = {
   accessToken: "token" as string | null,
@@ -30,7 +31,7 @@ jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
   usePathname: () => pathname,
   useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: jest.fn() }),
+  useRouter: () => ({ replace: mockRouterReplace }),
 }));
 jest.mock("./AccountAuthProvider", () => ({ useAccountAuth: () => auth }));
 
@@ -68,5 +69,16 @@ describe("AccountAuthGuard", () => {
       refresh: mockRefreshAccessToken,
       unauthorized: expect.any(Function),
     });
+  });
+
+  it("routes to the localized server error page when profile loading fails", async () => {
+    mockAccountRequest.mockRejectedValueOnce(new Error("service unavailable"));
+
+    render(<AccountAuthGuard locale="en">Account</AccountAuthGuard>);
+
+    await waitFor(() =>
+      expect(mockRouterReplace).toHaveBeenCalledWith("/auth-error?type=server_error"),
+    );
+    expect(screen.queryByText("Account")).not.toBeInTheDocument();
   });
 });

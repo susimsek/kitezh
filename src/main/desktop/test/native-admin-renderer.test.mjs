@@ -3832,6 +3832,7 @@ test("native Admin identity-provider list keeps the display name separate from a
     harness.restore();
   }
 });
+
 test("native Admin client mapper CRUD validates and persists mappings", async () => {
   const harness = await renderConsole("admin");
   const mapperPath = "/api/admin/clients/console-client/mappers";

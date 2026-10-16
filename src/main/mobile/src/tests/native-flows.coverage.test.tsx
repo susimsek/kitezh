@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { Alert } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import * as accountApi from "@/api/account-api";
 import * as publicApi from "@/api/public-api";
 import MfaScreen from "../app/mfa";
@@ -164,6 +165,37 @@ it("validates, updates, and confirms active-account session security actions", a
   expect(await screen.findByText("passwordSaved")).toBeVisible();
 });
 
+it("rejects short, mismatched, and reused passwords before calling the API", async () => {
+  render(<SecurityScreen />);
+  await screen.findByText("currentSession");
+  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+    target: { value: "old-secret" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+    target: { value: "short" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+    target: { value: "different" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordMinLength")).toBeVisible();
+  expect(screen.getByText("passwordMismatch")).toBeVisible();
+
+  const reusedPassword = "same-long-secret";
+  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+    target: { value: reusedPassword },
+  });
+  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+    target: { value: reusedPassword },
+  });
+  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+    target: { value: reusedPassword },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordDifferent")).toBeVisible();
+  expect(accountApi.changeAccountPassword).not.toHaveBeenCalled();
+});
+
 it("reports session and account-removal failures and confirms revocation actions", async () => {
   jest.mocked(accountApi.listAccountSessions).mockResolvedValue({
     content: [
@@ -279,6 +311,33 @@ it("sets up mobile MFA and validates the one-time code before enabling", async (
   expect(mockSignOut).toHaveBeenCalledTimes(1);
 });
 
+it("retries an unavailable MFA status and reports when MFA cannot be enabled", async () => {
+  jest
+    .mocked(accountApi.getMfaStatus)
+    .mockRejectedValueOnce(new Error("temporary network error"))
+    .mockResolvedValueOnce({
+      enabled: false,
+      available: false,
+      required: false,
+      issuer: "Kitezh",
+      algorithm: "SHA1",
+      digits: 6,
+      periodSeconds: 30,
+    });
+
+  render(<MfaScreen />);
+
+  fireEvent.click(await screen.findByText("sessionsRetry"));
+  expect(await screen.findByText("mfaUnavailable")).toBeVisible();
+  expect(accountApi.getMfaStatus).toHaveBeenCalledTimes(2);
+  expect(mockRefreshSession).toHaveBeenNthCalledWith(2, true);
+
+  const options = jest.mocked(accountApi.getMfaStatus).mock.calls[1]?.[1];
+  await expect(options?.refreshAccessToken?.()).resolves.toBe(
+    "test-access-token",
+  );
+});
+
 it("regenerates recovery codes and handles invalid and successful MFA disable codes", async () => {
   jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
     enabled: true,
@@ -371,6 +430,278 @@ it("confirms linked social-provider removal and refreshes native link status", a
   expect(await screen.findByText("socialNotConnected")).toBeVisible();
 });
 
+it("starts an enabled social-provider link flow and reloads its status", async () => {
+  jest
+    .mocked(accountApi.listSocialLinks)
+    .mockResolvedValueOnce([
+      {
+        provider: "github",
+        displayName: "GitHub",
+        iconKey: "github",
+        linked: false,
+        configured: true,
+        enabled: true,
+      },
+    ])
+    .mockResolvedValueOnce([
+      {
+        provider: "github",
+        displayName: "GitHub",
+        iconKey: "github",
+        linked: true,
+        configured: true,
+        enabled: true,
+      },
+    ]);
+
+  render(<SocialLinksScreen />);
+  expect(await screen.findByText("socialNotConnected")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "socialConnect" }));
+
+  await waitFor(() =>
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith(
+      "https://kitezh.onrender.com/account/social-links/github/start",
+    ),
+  );
+  expect(await screen.findByText("socialConnected")).toBeVisible();
+});
+
+it("retries social-link loading and reports browser and unlink failures", async () => {
+  jest
+    .mocked(accountApi.listSocialLinks)
+    .mockRejectedValueOnce(new Error("social links unavailable"))
+    .mockResolvedValueOnce([
+      {
+        provider: "github",
+        displayName: "GitHub",
+        iconKey: "github",
+        linked: false,
+        configured: true,
+        enabled: true,
+      },
+    ]);
+  jest
+    .mocked(WebBrowser.openBrowserAsync)
+    .mockRejectedValueOnce(new Error("browser unavailable"));
+
+  render(<SocialLinksScreen />);
+  expect(await screen.findByText("socialLinksError")).toBeVisible();
+  fireEvent.click(screen.getByText("sessionsRetry"));
+  expect(await screen.findByText("socialNotConnected")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "socialConnect" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "browserError",
+    }),
+  );
+
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValueOnce([
+    {
+      provider: "google",
+      displayName: "Google",
+      iconKey: "google",
+      linked: true,
+      configured: true,
+      enabled: true,
+    },
+  ]);
+  jest
+    .mocked(accountApi.unlinkSocialProvider)
+    .mockRejectedValueOnce(new Error("unlink rejected"));
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(((
+    _title,
+    _message,
+    buttons,
+  ) => {
+    buttons?.find((button) => button.style === "destructive")?.onPress?.();
+  }) as never);
+  fireEvent.click(screen.getByRole("button", { name: "back" }));
+  expect(jest.requireMock("expo-router").router.back).toHaveBeenCalled();
+  // The link flow stays on this screen; refresh the mocked links before removal.
+  fireEvent.click(screen.getByRole("button", { name: "socialConnect" }));
+  await waitFor(() =>
+    expect(accountApi.listSocialLinks).toHaveBeenCalledTimes(3),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "socialRemove" }));
+  const actions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    actions?.find((action) => action.style === "destructive")?.onPress?.();
+  });
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "error",
+    message: "socialRemoveError",
+  });
+});
+
+it("shows server password validation errors in the matching fields", async () => {
+  const validationError = Object.assign(new accountApi.AccountApiError(), {
+    problem: {
+      violations: [
+        { field: "newPassword", message: "passwordPolicyRejected" },
+        { field: "unknownField", message: "ignored" },
+      ],
+    },
+  });
+  jest
+    .mocked(accountApi.changeAccountPassword)
+    .mockRejectedValueOnce(validationError);
+
+  render(<SecurityScreen />);
+  await screen.findByText("sessionsEmpty");
+  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+    target: { value: "old-secret" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "save" }));
+
+  expect(await screen.findByText("passwordPolicyRejected")).toBeVisible();
+  expect(screen.queryByText("passwordSaveError")).toBeNull();
+});
+
+it("maps legacy password validation data to the matching security fields", async () => {
+  const validationError = Object.assign(new accountApi.AccountApiError(), {
+    data: {
+      violations: [
+        { field: "currentPassword", message: "currentPasswordRejected" },
+        { field: "confirmPassword", message: "confirmPasswordRejected" },
+        null,
+        { field: "newPassword", message: 12 },
+      ],
+    },
+  });
+  jest
+    .mocked(accountApi.changeAccountPassword)
+    .mockRejectedValueOnce(validationError);
+
+  render(<SecurityScreen />);
+  await screen.findByText("sessionsEmpty");
+  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+    target: { value: "old-secret" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "save" }));
+
+  expect(await screen.findByText("currentPasswordRejected")).toBeVisible();
+  expect(screen.getByText("confirmPasswordRejected")).toBeVisible();
+  expect(screen.queryByText("passwordSaveError")).toBeNull();
+});
+
+it("keeps security actions safe when the session expires before submission", async () => {
+  jest.mocked(accountApi.listAccountSessions).mockResolvedValue({
+    content: [
+      {
+        id: "other-session",
+        createdAt: "2026-01-01T10:00:00Z",
+        lastAccessedAt: "2026-01-02T10:00:00Z",
+        expiresAt: "2026-02-01T10:00:00Z",
+        current: false,
+        clients: [],
+      },
+    ],
+    totalElements: 1,
+    totalPages: 1,
+    number: 0,
+    size: 20,
+  });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+
+  render(<SecurityScreen />);
+  expect(
+    await screen.findByRole("button", { name: "signOutSession" }),
+  ).toBeVisible();
+  const enterValidPassword = () => {
+    fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+      target: { value: "old-secret" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+      target: { value: "a-long-new-secret" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+      target: { value: "a-long-new-secret" },
+    });
+  };
+  enterValidPassword();
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordSaveError")).toBeVisible();
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "signOutOthers" }));
+  expect(await screen.findByText("signOutOthersError")).toBeVisible();
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "signOutSession" }));
+  const revokeActions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    revokeActions
+      ?.find((action) => action.style === "destructive")
+      ?.onPress?.();
+  });
+  expect(await screen.findByText("signOutSessionError")).toBeVisible();
+
+  fireEvent.change(screen.getAllByPlaceholderText("currentPassword").at(-1)!, {
+    target: { value: "confirm-password" },
+  });
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "deleteAccount" }));
+  const deleteActions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    deleteActions
+      ?.find((action) => action.style === "destructive")
+      ?.onPress?.();
+  });
+  expect(await screen.findByText("deleteAccountError")).toBeVisible();
+  expect(accountApi.changeAccountPassword).not.toHaveBeenCalled();
+  expect(accountApi.signOutOtherAccountSessions).not.toHaveBeenCalled();
+  expect(accountApi.signOutAccountSession).not.toHaveBeenCalled();
+  expect(accountApi.deleteAccount).not.toHaveBeenCalled();
+});
+
+it("retries a failed native session list and supplies a refresh callback", async () => {
+  jest
+    .mocked(accountApi.listAccountSessions)
+    .mockRejectedValueOnce(new Error("session list unavailable"))
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "current-session",
+          createdAt: "2026-01-01T10:00:00Z",
+          lastAccessedAt: "2026-01-02T10:00:00Z",
+          expiresAt: "2026-02-01T10:00:00Z",
+          current: true,
+          clients: [{ clientId: "account", clientName: "Account" }],
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 20,
+    });
+
+  render(<SecurityScreen />);
+  fireEvent.click(await screen.findByText("sessionsRetry"));
+  expect(await screen.findByText("currentSession")).toBeVisible();
+  const options = jest.mocked(accountApi.listAccountSessions).mock
+    .calls[1]?.[1];
+  expect(options).toEqual(
+    expect.objectContaining({ refreshAccessToken: expect.any(Function) }),
+  );
+  await expect(options?.refreshAccessToken?.()).resolves.toBe(
+    "test-access-token",
+  );
+});
+
 it("validates and completes native account registration", async () => {
   jest
     .mocked(publicApi.getCaptchaSettings)
@@ -419,10 +750,36 @@ it("validates and completes native account registration", async () => {
   expect(await screen.findByText("registrationSuccess")).toBeVisible();
 });
 
+it("falls back to browser registration when captcha settings are unavailable", async () => {
+  jest
+    .mocked(publicApi.getCaptchaSettings)
+    .mockRejectedValueOnce(new Error("captcha settings unavailable"));
+  jest
+    .mocked(WebBrowser.openBrowserAsync)
+    .mockRejectedValueOnce(new Error("browser could not open"));
+
+  render(<RegisterScreen />);
+
+  const continueButton = await screen.findByRole("button", {
+    name: "continueInBrowser",
+  });
+  fireEvent.click(continueButton);
+  expect(await screen.findByText("browserError")).toBeVisible();
+
+  fireEvent.click(continueButton);
+  await waitFor(() =>
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledTimes(2),
+  );
+  expect(screen.queryByText("browserError")).not.toBeInTheDocument();
+});
+
 it("validates and completes a deep-link password reset", async () => {
   jest.mocked(publicApi.resetPassword).mockResolvedValue(undefined);
+  const { router } = jest.requireMock("expo-router");
 
   render(<ResetPasswordScreen />);
+  fireEvent.click(screen.getByRole("button", { name: "back" }));
+  expect(router.back).toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "save" }));
   expect(await screen.findByText("resetError")).toBeVisible();
   fireEvent.change(screen.getByPlaceholderText("newPassword"), {
@@ -431,15 +788,25 @@ it("validates and completes a deep-link password reset", async () => {
   fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: "a-long-reset-secret" },
   });
+  fireEvent.change(screen.getByPlaceholderText("mfaCode"), {
+    target: { value: " 123456 " },
+  });
+  jest
+    .mocked(publicApi.resetPassword)
+    .mockRejectedValueOnce(new Error("reset token expired"));
+  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("resetError")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "save" }));
   await waitFor(() =>
     expect(publicApi.resetPassword).toHaveBeenCalledWith({
       token: "reset-token",
       newPassword: "a-long-reset-secret",
-      otpCode: undefined,
+      otpCode: "123456",
     }),
   );
   expect(await screen.findByText("resetSuccess")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "signIn" }));
+  expect(router.replace).toHaveBeenCalledWith("/sign-in");
 });
 
 it("validates password-reset requests, reports failures, and navigates after success", async () => {

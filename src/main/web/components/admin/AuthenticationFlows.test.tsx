@@ -187,6 +187,42 @@ describe("AuthenticationFlows", () => {
     );
   });
 
+  it("shows the load error when any required flow resource cannot be loaded", async () => {
+    mockAdminRequest.mockImplementation(
+      () => Promise.resolve({ status: 503, data: null }) as never,
+    );
+
+    render(<AuthenticationFlows />);
+
+    expect(await screen.findByText(dictionary.admin.authentication.loadError)).toBeVisible();
+  });
+
+  it("reports a detail error when a selected flow cannot be loaded", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("/flows?page=")) {
+        return Promise.resolve({
+          status: 200,
+          data: { content: [flow], number: 0, size: 20, totalElements: 1, totalPages: 1 },
+        }) as never;
+      }
+      if (request.url?.endsWith("/bindings")) {
+        return Promise.resolve({ status: 200, data: bindings }) as never;
+      }
+      if (request.url?.endsWith("/execution-providers")) {
+        return Promise.resolve({ status: 200, data: ["otp-form"] }) as never;
+      }
+      if (request.url?.endsWith("/flows/20")) {
+        return Promise.resolve({ status: 503, data: null }) as never;
+      }
+      return Promise.resolve({ status: 200, data: null }) as never;
+    });
+
+    render(<AuthenticationFlows />);
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+
+    expect(await screen.findByText(dictionary.admin.authentication.loadError)).toBeVisible();
+  });
+
   it("allows clearing a binding and shows the pending spinner", async () => {
     render(<AuthenticationFlows />);
     await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });

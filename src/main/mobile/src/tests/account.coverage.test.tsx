@@ -19,20 +19,22 @@ jest.mock("@/api/account-api", () => {
     revokeOfflineSession: jest.fn(),
   };
 });
-jest.mock("@/auth/MobileAuthProvider", () => ({
-  MobileAuthProvider: ({ children }: { children: React.ReactNode }) => children,
-  useMobileAuth: (() => {
-    const session = { accessToken: "access" };
-    const refreshSession = async () => session;
-    return () => ({
+jest.mock("@/auth/MobileAuthProvider", () => {
+  const session = { accessToken: "access" };
+  const mockRefreshSession = jest.fn(async () => session);
+  return {
+    MobileAuthProvider: ({ children }: { children: React.ReactNode }) =>
+      children,
+    mockRefreshSession,
+    useMobileAuth: () => ({
       session,
       signIn: jest.fn(),
       signOut: jest.fn(),
       status: "signed-in",
-      refreshSession,
-    });
-  })(),
-}));
+      refreshSession: mockRefreshSession,
+    }),
+  };
+});
 jest.mock("@/i18n/LocaleProvider", () => ({
   useLocale: () => ({
     dictionary: new Proxy({}, { get: (_target, key) => String(key) }),
@@ -71,11 +73,13 @@ jest.mock("expo-router", () => ({
 const { mockShowNotice } = jest.requireMock(
   "@/components/MobileNoticeProvider",
 );
+const { mockRefreshSession } = jest.requireMock("@/auth/MobileAuthProvider");
 
 beforeEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
   mockShowNotice.mockClear();
+  mockRefreshSession.mockReset().mockResolvedValue({ accessToken: "access" });
   jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
     content: [],
     number: 0,
@@ -172,6 +176,21 @@ it("renders connected applications and offline sessions", async () => {
   expect(await screen.findByText("Account Console")).toBeVisible();
   expect(screen.getByText("CLI")).toBeVisible();
   expect(screen.getByText("offlineExpires: offlineNoExpiry")).toBeVisible();
+  for (const request of [
+    accountApi.listAccountApplications,
+    accountApi.listOfflineSessions,
+    accountApi.listCibaRequests,
+  ]) {
+    const options = jest.mocked(request).mock.calls[0]?.at(-1);
+    expect(options).toEqual(
+      expect.objectContaining({ refreshAccessToken: expect.any(Function) }),
+    );
+    await expect(
+      (
+        options as { refreshAccessToken: () => Promise<string | null> }
+      ).refreshAccessToken(),
+    ).resolves.toBe("access");
+  }
 });
 
 it("shows CIBA decisions and blocks approval when step-up is required", async () => {
@@ -201,6 +220,30 @@ it("shows CIBA decisions and blocks approval when step-up is required", async ()
         mfaRequired: true,
         stepUpRequired: true,
       },
+      {
+        authReqId: "request-3",
+        userCode: "STEP-1234",
+        bindingMessage: null,
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: false,
+        stepUpRequired: true,
+      },
+      {
+        authReqId: "request-4",
+        userCode: "MFA-5678",
+        bindingMessage: null,
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: true,
+        stepUpRequired: false,
+      },
     ],
     number: 0,
     size: 20,
@@ -214,6 +257,8 @@ it("shows CIBA decisions and blocks approval when step-up is required", async ()
   expect(await screen.findByText("Approve account sign-in")).toBeVisible();
   expect(screen.getByText(/ABCD-1234/)).toBeVisible();
   expect(screen.getByText("cibaMfaAndStepUpRequired")).toBeVisible();
+  expect(screen.getByText("cibaStepUpRequired")).toBeVisible();
+  expect(screen.getByText("cibaMfaRequired")).toBeVisible();
   const approveButtons = screen.getAllByRole("button", { name: "cibaApprove" });
   expect(approveButtons[1]).toBeDisabled();
   fireEvent.click(approveButtons[0]);
@@ -253,6 +298,32 @@ it("loads a profile after retrying a failed profile request", async () => {
   expect(await screen.findByText("profileLoadError")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "profileLoadError" }));
   expect(await screen.findByPlaceholderText("email")).toBeVisible();
+});
+
+it("retries loading the profile after the current session expires", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue({
+    username: "alice",
+    firstName: "Alice",
+    lastName: "Smith",
+    email: "alice@example.test",
+    pendingEmail: null,
+    emailVerified: true,
+    preferredLocale: null,
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
+  });
+  mockRefreshSession
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce({ accessToken: "access" });
+
+  render(<AccountScreen />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "profileLoadError" }),
+  );
+  expect(await screen.findByPlaceholderText("email")).toBeVisible();
+  await waitFor(() =>
+    expect(accountApi.getAccountProfile).toHaveBeenCalledTimes(1),
+  );
 });
 
 it("reports profile save failures and routes to native account sections", async () => {
@@ -365,6 +436,255 @@ it("shows application errors and recovers after retry", async () => {
   fireEvent.click(screen.getAllByRole("button", { name: "sessionsRetry" })[0]);
   expect(await screen.findByText("Account Console")).toBeVisible();
   expect(screen.getByText("offlineSessionsEmpty")).toBeVisible();
+});
+
+it("reports all application sections when refreshing the session fails", async () => {
+  mockRefreshSession.mockRejectedValueOnce(new Error("session refresh failed"));
+
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("applicationsError")).toBeVisible();
+  expect(screen.getByText("offlineSessionsError")).toBeVisible();
+  expect(screen.getByText("cibaLoadError")).toBeVisible();
+});
+
+it("shows independent offline and CIBA loading failures", async () => {
+  jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
+    content: [],
+    number: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  jest
+    .mocked(accountApi.listOfflineSessions)
+    .mockRejectedValueOnce(new Error("offline sessions unavailable"));
+  jest
+    .mocked(accountApi.listCibaRequests)
+    .mockRejectedValueOnce(new Error("pending requests unavailable"));
+
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("applicationsEmpty")).toBeVisible();
+  await waitFor(() => {
+    expect(accountApi.listOfflineSessions).toHaveBeenCalled();
+    expect(accountApi.listCibaRequests).toHaveBeenCalled();
+    expect(screen.getByText("offlineSessionsError")).toBeVisible();
+    expect(screen.getByText("cibaLoadError")).toBeVisible();
+  });
+});
+
+it("shows all application sections as retryable when the session expires", async () => {
+  jest
+    .mocked(accountApi.listAccountApplications)
+    .mockRejectedValueOnce(new Error("application service unavailable"));
+  jest.mocked(accountApi.listOfflineSessions).mockResolvedValue({
+    content: [],
+    number: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  render(<ApplicationsScreen />);
+  expect(await screen.findByText("applicationsError")).toBeVisible();
+  mockRefreshSession.mockResolvedValueOnce(null);
+
+  fireEvent.click(screen.getAllByRole("button", { name: "sessionsRetry" })[0]!);
+
+  expect(await screen.findByText("applicationsError")).toBeVisible();
+  expect(screen.getByText("offlineSessionsError")).toBeVisible();
+  expect(screen.getByText("cibaLoadError")).toBeVisible();
+});
+
+it("reports expired-session failures for application, offline, and CIBA actions", async () => {
+  jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
+    content: [
+      {
+        clientId: "console",
+        clientName: "Account Console",
+        scopes: ["openid"],
+        createdAt: "2025-01-01T00:00:00Z",
+      },
+    ],
+    number: 0,
+    size: 10,
+    totalElements: 1,
+    totalPages: 1,
+  });
+  jest.mocked(accountApi.listOfflineSessions).mockResolvedValue({
+    content: [
+      {
+        id: "offline-1",
+        clientId: "cli",
+        clientName: "CLI",
+        issuedAt: "2025-01-01T00:00:00Z",
+        expiresAt: null,
+      },
+    ],
+    number: 0,
+    size: 10,
+    totalElements: 1,
+    totalPages: 1,
+  });
+  jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
+    content: [
+      {
+        authReqId: "request-1",
+        userCode: "ABCD-1234",
+        bindingMessage: "Approve sign-in",
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: false,
+        stepUpRequired: false,
+      },
+    ],
+    number: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+  });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(((
+    _title,
+    _message,
+    buttons,
+  ) => {
+    buttons?.find((button) => button.style === "destructive")?.onPress?.();
+  }) as never);
+
+  render(<ApplicationsScreen />);
+  expect(await screen.findByText("Account Console")).toBeVisible();
+  const { mockRefreshSession } = jest.requireMock("@/auth/MobileAuthProvider");
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "revokeApplication" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "revokeApplicationError",
+    }),
+  );
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "revokeOfflineSession" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "revokeOfflineSessionError",
+    }),
+  );
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByRole("button", { name: "cibaDeny" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "cibaDecisionError",
+    }),
+  );
+  expect(accountApi.revokeAccountApplication).not.toHaveBeenCalled();
+  expect(accountApi.revokeOfflineSession).not.toHaveBeenCalled();
+  expect(accountApi.decideCibaRequest).not.toHaveBeenCalled();
+  expect(alert).toHaveBeenCalledTimes(2);
+});
+
+it("reports API failures for application, offline-session, and CIBA actions", async () => {
+  jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
+    content: [
+      {
+        clientId: "console",
+        clientName: "Account Console",
+        scopes: ["openid"],
+        createdAt: "2025-01-01T00:00:00Z",
+      },
+    ],
+    number: 0,
+    size: 10,
+    totalElements: 1,
+    totalPages: 1,
+  });
+  jest.mocked(accountApi.listOfflineSessions).mockResolvedValue({
+    content: [
+      {
+        id: "offline-1",
+        clientId: "cli",
+        clientName: "CLI",
+        issuedAt: "2025-01-01T00:00:00Z",
+        expiresAt: null,
+      },
+    ],
+    number: 0,
+    size: 10,
+    totalElements: 1,
+    totalPages: 1,
+  });
+  jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
+    content: [
+      {
+        authReqId: "request-1",
+        userCode: "ABCD-1234",
+        bindingMessage: "Approve sign-in",
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: false,
+        stepUpRequired: false,
+      },
+    ],
+    number: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+  });
+  jest
+    .mocked(accountApi.revokeAccountApplication)
+    .mockRejectedValueOnce(new Error("application revoke rejected"));
+  jest
+    .mocked(accountApi.revokeOfflineSession)
+    .mockRejectedValueOnce(new Error("offline revoke rejected"));
+  jest
+    .mocked(accountApi.decideCibaRequest)
+    .mockRejectedValueOnce(new Error("CIBA decision rejected"));
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(((
+    _title,
+    _message,
+    buttons,
+  ) => {
+    buttons?.find((button) => button.style === "destructive")?.onPress?.();
+  }) as never);
+
+  render(<ApplicationsScreen />);
+  expect(await screen.findByText("Account Console")).toBeVisible();
+
+  fireEvent.click(screen.getByRole("button", { name: "revokeApplication" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "revokeApplicationError",
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "revokeOfflineSession" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "revokeOfflineSessionError",
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "cibaDeny" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "cibaDecisionError",
+    }),
+  );
+  expect(accountApi.revokeAccountApplication).toHaveBeenCalledTimes(1);
+  expect(accountApi.revokeOfflineSession).toHaveBeenCalledTimes(1);
+  expect(accountApi.decideCibaRequest).toHaveBeenCalledTimes(1);
+  expect(alert).toHaveBeenCalledTimes(2);
 });
 
 it("confirms, serializes, and reports application and offline-session revocations", async () => {

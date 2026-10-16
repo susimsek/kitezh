@@ -98,7 +98,13 @@ export function isValidRecoveryState(
 }
 
 const sleep = (milliseconds: number) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
+type WatchdogDependencies = {
+  isProcessExited: (pid: number) => boolean;
+  now: () => number;
+  sleep: (milliseconds: number) => Promise<void>;
+};
 
 function processExited(pid: number) {
   try {
@@ -149,10 +155,13 @@ async function restoreInstallationAttempt(
   }
 }
 
-async function waitForProcessExit(pid: number): Promise<void> {
-  if (processExited(pid)) return;
-  await sleep(RETRY_DELAY_MS);
-  await waitForProcessExit(pid);
+async function waitForProcessExit(
+  pid: number,
+  dependencies: WatchdogDependencies,
+): Promise<void> {
+  if (dependencies.isProcessExited(pid)) return;
+  await dependencies.sleep(RETRY_DELAY_MS);
+  await waitForProcessExit(pid, dependencies);
 }
 
 async function markerExists(recoveryPath: string): Promise<boolean> {
@@ -167,20 +176,29 @@ async function markerExists(recoveryPath: string): Promise<boolean> {
 async function waitForHealthWindow(
   recoveryPath: string,
   deadline: number,
+  dependencies: WatchdogDependencies,
 ): Promise<boolean> {
   if (!(await markerExists(recoveryPath))) return false;
-  if (Date.now() >= deadline) return true;
-  await sleep(RETRY_DELAY_MS);
-  return waitForHealthWindow(recoveryPath, deadline);
+  if (dependencies.now() >= deadline) return true;
+  await dependencies.sleep(RETRY_DELAY_MS);
+  return waitForHealthWindow(recoveryPath, deadline, dependencies);
 }
 
-async function run() {
-  const watchdogPath = __filename;
+export async function runRecoveryWatchdog(
+  watchdogPath: string,
+  parentPid: number,
+  context: RecoveryContext,
+  dependencies: WatchdogDependencies = {
+    isProcessExited: processExited,
+    now: Date.now,
+    sleep,
+  },
+  launch = true,
+) {
   const recoveryPath = path.join(
     path.dirname(watchdogPath),
     RECOVERY_FILE_NAME,
   );
-  const parentPid = Number(process.argv[2]);
   if (!Number.isSafeInteger(parentPid) || parentPid <= 0) return;
 
   let state: unknown;
@@ -189,21 +207,23 @@ async function run() {
   } catch {
     return;
   }
-  if (
-    !isValidRecoveryState(state, {
-      userDataPath: path.dirname(watchdogPath),
-      platform: process.platform,
-      executablePath: process.execPath,
-      appImage: process.env.APPIMAGE,
-    })
-  ) {
-    return;
-  }
+  if (!isValidRecoveryState(state, context)) return;
 
-  await waitForProcessExit(parentPid);
-  const deadline = Date.now() + HEALTH_WINDOW_MS;
-  if (!(await waitForHealthWindow(recoveryPath, deadline))) return;
-  await restoreInstallation(state, recoveryPath);
+  await waitForProcessExit(parentPid, dependencies);
+  const deadline = dependencies.now() + HEALTH_WINDOW_MS;
+  if (!(await waitForHealthWindow(recoveryPath, deadline, dependencies))) return;
+  await restoreInstallation(state, recoveryPath, launch);
+}
+
+async function run() {
+  const watchdogPath = __filename;
+  const parentPid = Number(process.argv[2]);
+  await runRecoveryWatchdog(watchdogPath, parentPid, {
+    userDataPath: path.dirname(watchdogPath),
+    platform: process.platform,
+    executablePath: process.execPath,
+    appImage: process.env.APPIMAGE,
+  });
 }
 
 if (require.main === module) void run();

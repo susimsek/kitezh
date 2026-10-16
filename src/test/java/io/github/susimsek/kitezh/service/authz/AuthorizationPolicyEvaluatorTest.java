@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 class AuthorizationPolicyEvaluatorTest {
 
@@ -82,6 +84,119 @@ class AuthorizationPolicyEvaluatorTest {
                                 resource("alice"),
                                 user("bob")))
                 .isTrue();
+    }
+
+    @Test
+    void rejectsMissingPoliciesAndUnauthenticatedSubjects() {
+        Authentication unauthenticated =
+                UsernamePasswordAuthenticationToken.unauthenticated("alice", null);
+
+        assertThat(evaluator.isGranted(null, "AFFIRMATIVE", resource("alice"), user("alice")))
+                .isFalse();
+        assertThat(evaluator.isGranted(List.of(), "AFFIRMATIVE", resource("alice"), user("alice")))
+                .isFalse();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("PUBLIC", null, "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("alice"),
+                                unauthenticated))
+                .isFalse();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("PUBLIC", null, "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("alice"),
+                                null))
+                .isFalse();
+    }
+
+    @Test
+    void matchesClientAndGroupPoliciesFromJwtClaims() {
+        Jwt jwt =
+                Jwt.withTokenValue("access-token")
+                        .header("alg", "none")
+                        .subject("service-account")
+                        .claim("client_id", "orders-api")
+                        .claim("groups", List.of("engineering"))
+                        .build();
+        Authentication subject = new JwtAuthenticationToken(jwt, List.of());
+
+        assertThat(subject.isAuthenticated()).isTrue();
+        assertThat(((JwtAuthenticationToken) subject).getToken().getClaimAsString("client_id"))
+                .isEqualTo("orders-api");
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("CLIENT", "orders-api", "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("owner"),
+                                subject))
+                .isTrue();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("GROUP", "engineering", "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("owner"),
+                                subject))
+                .isTrue();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("CLIENT", "another-api", "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("owner"),
+                                subject))
+                .isFalse();
+    }
+
+    @Test
+    void fallsBackToAuthenticationNameAndGroupAuthoritiesWithoutJwtClaims() {
+        Authentication subject = user("legacy-client", "GROUP_support");
+
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("CLIENT", "legacy-client", "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("owner"),
+                                subject))
+                .isTrue();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("GROUP", "support", "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("owner"),
+                                subject))
+                .isTrue();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(policy("UNSUPPORTED", "support", "ALLOW")),
+                                "AFFIRMATIVE",
+                                resource("owner"),
+                                subject))
+                .isFalse();
+    }
+
+    @Test
+    void requiresEveryPolicyForUnanimousAndUsesAffirmativeAsDefaultStrategy() {
+        List<AuthorizationPolicyEntity> mixedPolicies =
+                List.of(policy("USER", "alice", "ALLOW"), policy("USER", "bob", "ALLOW"));
+
+        assertThat(
+                        evaluator.isGranted(
+                                mixedPolicies, "UNANIMOUS", resource("owner"), user("alice")))
+                .isFalse();
+        assertThat(
+                        evaluator.isGranted(
+                                mixedPolicies, "unexpected", resource("owner"), user("alice")))
+                .isTrue();
+        assertThat(
+                        evaluator.isGranted(
+                                List.of(
+                                        policy("USER", "alice", "ALLOW"),
+                                        policy("USER", "alice", "DENY")),
+                                "CONSENSUS",
+                                resource("owner"),
+                                user("alice")))
+                .isFalse();
     }
 
     private static AuthorizationPolicyEntity policy(String type, String value, String effect) {

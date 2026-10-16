@@ -1,5 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Platform } from "react-native";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { Alert, AppState, Platform } from "react-native";
 
 import { getLatestReleaseMetadata } from "@/api/public-api";
 import {
@@ -81,6 +87,10 @@ const release = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  Object.defineProperty(globalThis, "__DEV__", {
+    configurable: true,
+    value: true,
+  });
   Object.defineProperty(Platform, "OS", {
     configurable: true,
     value: "android",
@@ -110,6 +120,41 @@ it("checks for a release and installs its Android asset", async () => {
     expect.objectContaining({ name: "kitezh-1.3.0-android.apk" }),
     expect.any(Function),
   );
+});
+
+it("checks on app activation in production and prompts only once per version", async () => {
+  const { router } = jest.requireMock("expo-router");
+  let onAppStateChange: ((state: string) => void) | undefined;
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
+    onAppStateChange = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  let now = 1_800_000_000_000;
+  jest.spyOn(Date, "now").mockImplementation(() => now);
+  Object.defineProperty(globalThis, "__DEV__", {
+    configurable: true,
+    value: false,
+  });
+  jest.mocked(getLatestReleaseMetadata).mockResolvedValue(release);
+
+  renderUpdates();
+  await waitFor(() => expect(alert).toHaveBeenCalledTimes(1));
+  const actions = alert.mock.calls[0]?.[2];
+  actions?.find((action) => action.text === "updateView")?.onPress?.();
+  expect(router.push).toHaveBeenCalledWith("/settings");
+
+  await act(async () => {
+    now += 6 * 60 * 60 * 1000;
+    onAppStateChange?.("active");
+  });
+  await waitFor(() =>
+    expect(getLatestReleaseMetadata).toHaveBeenCalledTimes(2),
+  );
+  expect(alert).toHaveBeenCalledTimes(1);
 });
 
 it("reports check and download failures and exposes installer permission state", async () => {
