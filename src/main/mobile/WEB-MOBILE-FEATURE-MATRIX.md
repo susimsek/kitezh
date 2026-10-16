@@ -44,6 +44,25 @@ Status values:
 | Packaged release smoke         | CI desktop release workflow and electron-builder metadata                         | In progress    | `src/main/desktop/test/package-metadata.test.mjs` verifies app identity, protocol, maintainer, desktop entry, and artifact targets; macOS/Windows/Linux packaged startup and signed artifact evidence remain |
 
 Desktop components must not import React-Bootstrap, browser `localStorage`, or remote web pages.
+
+Windows Google evidence (2026-10-09): `../desktop/e2e/google-authenticated.test.mjs`
+passed using a real system-browser protocol callback, Google-linked Account API
+responses, isolated Admin/Account vaults, and encrypted session restart persistence.
+Google sign-in was completed interactively; repeat runs use the established browser
+SSO session. `../desktop/e2e/README.md` documents opt-in execution and limitations.
+This is source Electron evidence, not a signed-package or macOS/Linux acceptance claim.
+The visible native chooser and authenticated Admin hydration are also covered by
+`../desktop/e2e/electron.test.mjs`: a console transition must not quit the app,
+and callback/reload must not automatically reopen authorization once authenticated.
+Google logout now uses the standard local Kitezh OIDC handler instead of the
+unsupported Google global `/Logout?continue=...` fallback. `SocialLoginLogoutIT`
+passed 8/8 for Desktop Admin/Account in English/Turkish: registered callback delivery,
+local session invalidation, reauthentication, and rejection of unregistered redirects.
+The updated real Google source E2E passed 1/1 through actual Windows logout callback
+delivery, encrypted vault clearing, and signed-out chooser rendering after reload.
+Google browser SSO stays signed in intentionally. Other providers, real-provider
+packaged logout, macOS/Linux, and mobile device logout are not covered by this evidence.
+
 The renderer may reuse typed API/session contracts from `src/main/shared`; visual components and
 platform behavior remain owned by Desktop. The web console remains available for browsers and is
 not loaded as the desktop sign-in surface.

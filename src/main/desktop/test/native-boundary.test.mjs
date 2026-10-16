@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { messages } from "../../shared/dist/catalog.js";
 import { iconMetadata } from "../../shared/dist/icons.js";
+import { userMessages } from "../src/native/user-messages.mjs";
 
 const desktopDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -122,7 +123,7 @@ function placeholders(message) {
     .sort();
 }
 
-test("native renderer static message references exist in both shared catalogs", async () => {
+test("native renderer static messages exist in both shared or Desktop catalogs", async () => {
   const source = await readFile(
     path.join(desktopDirectory, "src", "native", "renderer.mjs"),
     "utf8",
@@ -140,10 +141,24 @@ test("native renderer static message references exist in both shared catalogs", 
   ];
 
   assert.ok(keys.length > 0, "native renderer should use shared message keys");
+  assert.deepEqual(
+    Object.keys(userMessages.en).sort(),
+    Object.keys(userMessages.tr).sort(),
+  );
+  for (const locale of ["en", "tr"]) {
+    assert.ok(
+      Object.values(userMessages[locale]).every(
+        (value) => typeof value === "string" && value.trim(),
+      ),
+    );
+  }
+  const catalogs = {
+    en: { ...messages.en.native, ...userMessages.en },
+    tr: { ...messages.tr.native, ...userMessages.tr },
+  };
   const missingKeys = [...new Set(keys)].filter(
     (key) =>
-      !Object.hasOwn(messages.en.native, key) ||
-      !Object.hasOwn(messages.tr.native, key),
+      !Object.hasOwn(catalogs.en, key) || !Object.hasOwn(catalogs.tr, key),
   );
   assert.deepEqual(
     missingKeys,

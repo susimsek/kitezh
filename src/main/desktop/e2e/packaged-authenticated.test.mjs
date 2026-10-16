@@ -149,6 +149,7 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
       args: [`--user-data-dir=${userDataDirectory}`],
       env: {
         ...process.env,
+        DESKTOP_E2E_BACKGROUND: "true",
         DESKTOP_API_BASE_URL:
           process.env.DESKTOP_API_BASE_URL ?? "http://localhost:9090",
         DESKTOP_AUTO_UPDATE: "false",
@@ -274,13 +275,14 @@ test("recovers from canceled PKCE and completes login in the packaged app", asyn
     const browserWindowPromise = application.waitForEvent("window");
     await application.evaluate(({ BrowserWindow }, url) => {
       const browserWindow = new BrowserWindow({
-        show: true,
+        show: false,
         width: 1000,
         height: 800,
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,
+          backgroundThrottling: false,
         },
       });
       browserWindow.loadURL(url);
@@ -573,6 +575,7 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     args: [`--user-data-dir=${userDataDirectory}`],
     env: {
       ...process.env,
+      DESKTOP_E2E_BACKGROUND: "true",
       DESKTOP_API_BASE_URL:
         process.env.DESKTOP_API_BASE_URL ?? "http://localhost:9090",
       DESKTOP_AUTO_UPDATE: "false",
@@ -597,13 +600,14 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     const browserWindowPromise = application.waitForEvent("window");
     await application.evaluate(({ BrowserWindow }, url) => {
       const browserWindow = new BrowserWindow({
-        show: true,
+        show: false,
         width: 1000,
         height: 800,
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,
+          backgroundThrottling: false,
         },
       });
       browserWindow.loadURL(url);
@@ -1151,9 +1155,12 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     );
     await demoClientRow.waitFor();
     await demoClientRow
-      .getByRole("button", { name: "Manage assigned scopes", exact: true })
+      .locator('.client-name [data-action="client-open"]')
       .click();
-    const assignmentsPanel = demoClientRow.getByRole("region", {
+    await mainWindow
+      .locator('[data-action="client-tab"][data-id="scopes"]')
+      .click();
+    const assignmentsPanel = mainWindow.getByRole("region", {
       name: "Client scope assignments",
     });
     await assignmentsPanel.waitFor();
@@ -1219,10 +1226,10 @@ test("keeps packaged Admin authentication in its isolated session namespace", as
     assert.equal(restoredAssignments.status, 200);
     assert.ok(!restoredAssignments.body.optionalScopes.includes(scopeName));
 
-    await demoClientRow
-      .getByRole("button", { name: "Manage protocol mappers", exact: true })
+    await mainWindow
+      .locator('[data-action="client-tab"][data-id="mappers"]')
       .click();
-    const clientMappers = demoClientRow.getByRole("region", {
+    const clientMappers = mainWindow.getByRole("region", {
       name: "Client protocol mappers",
     });
     await clientMappers.waitFor();

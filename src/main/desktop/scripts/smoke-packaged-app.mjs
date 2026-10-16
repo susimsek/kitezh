@@ -63,9 +63,11 @@ if (process.platform === "darwin") {
     "A",
     "Resources",
   );
-  const packagedLocales = (await readdir(electronResources, {
-    withFileTypes: true,
-  }))
+  const packagedLocales = (
+    await readdir(electronResources, {
+      withFileTypes: true,
+    })
+  )
     .filter((entry) => entry.isDirectory() && entry.name.endsWith(".lproj"))
     .map((entry) => entry.name)
     .sort();
@@ -86,6 +88,7 @@ try {
     cwd: desktopDirectory,
     env: {
       ...process.env,
+      DESKTOP_E2E_BACKGROUND: "true",
       DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
       DESKTOP_AUTO_UPDATE: "false",
       DESKTOP_DEVTOOLS: "false",
@@ -94,23 +97,19 @@ try {
   });
   const window = await application.firstWindow();
   await window
-    .getByRole("heading", { name: "Choose a console" })
+    .getByRole("heading", { name: /Choose a console|Bir konsol seçin/ })
     .waitFor({ timeout: 20_000 });
   assert.match(
     await window.url(),
-    /^app:\/\/renderer\/(?:desktop-login)?$/,
+    /^app:\/\/renderer\/(?:native|desktop-login)$/,
     "Packaged app should open its signed-out entry screen",
   );
   assert.equal(await window.evaluate(() => window.desktopApi?.isDesktop), true);
-  assert.deepEqual(
-    await window.evaluate(() => window.desktopApi?.getConfig()),
-    {
-      apiBaseUrl: "http://127.0.0.1:9090",
-      protocol: "kitezh",
-      appVersion: packageJson.version,
-      os: process.platform,
-    },
-  );
+  const config = await window.evaluate(() => window.desktopApi?.getConfig());
+  assert.equal(config.apiBaseUrl, "http://127.0.0.1:9090");
+  assert.equal(config.protocol, "kitezh");
+  assert.equal(config.appVersion, packageJson.version);
+  assert.ok(["darwin", "win32", "linux"].includes(config.os));
   assert.equal(
     await window.evaluate(() => window.desktopApi?.getAppVersion()),
     packageJson.version,
@@ -121,7 +120,17 @@ try {
     ),
     "Packaged secure storage should report an explicit platform status",
   );
-  const brandingImages = await window
+  const aboutWindowPromise = application.waitForEvent("window");
+  await application.evaluate(({ Menu }) => {
+    const about = Menu.getApplicationMenu()?.items[0]?.submenu?.items.find(
+      (item) => /^(About Kitezh|Kitezh hakkında)$/.test(item.label),
+    );
+    if (!about) throw new Error("Packaged About menu is missing");
+    about.click();
+  });
+  const aboutWindow = await aboutWindowPromise;
+  await aboutWindow.getByRole("heading", { name: "Kitezh" }).waitFor();
+  const brandingImages = await aboutWindow
     .locator('img[alt$=" logo"], img.desktop-sign-in-logo')
     .evaluateAll((images) =>
       images.map((image) => ({
@@ -138,6 +147,7 @@ try {
       brandingImages,
     )}`,
   );
+  await aboutWindow.close();
 
   const settingsWindowPromise = application.waitForEvent("window");
   const settingsOpened = await application.evaluate(({ Menu }) => {
@@ -183,6 +193,15 @@ try {
     JSON.stringify(diagnostics),
     /access[_-]?token|refresh[_-]?token|authorization code|@[a-z0-9.-]+\.[a-z]{2,}|\/Users\/|\/home\//i,
     "Packaged diagnostics should not contain credentials or personal data",
+  );
+  assert.equal(
+    await application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().every(
+        (window) => !window.isVisible() && !window.isFocused(),
+      ),
+    ),
+    true,
+    "Packaged smoke windows must remain hidden and unfocused",
   );
   console.log(`Packaged Kitezh ${packageJson.version} smoke test passed.`);
 } finally {

@@ -107,6 +107,15 @@ const detail = {
       priority: 1,
       builtIn: false,
     },
+    {
+      nodeType: "EXECUTION" as const,
+      id: 32,
+      name: "Disabled option",
+      providerId: "unused-authenticator",
+      requirement: "DISABLED" as const,
+      priority: 2,
+      builtIn: false,
+    },
   ],
 };
 

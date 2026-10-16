@@ -24,7 +24,7 @@ import { pathToFileURL } from "node:url";
 
 import {
   colors,
-  iconMetadata,
+  desktopIconMetadata,
   messages,
   type DesktopSocialLinkCompleteRequest,
   type DesktopSocialLinkStartRequest,
@@ -32,11 +32,10 @@ import {
   type ThemeMode,
 } from "@kitezh/shared";
 import {
-  controlSizes,
-  radii,
-  spacing,
-  typography,
-} from "@kitezh/shared/theme/runtime";
+  nativeDialogActionsScript,
+  nativeDialogCss,
+  nativeDialogVariables,
+} from "./ui/native-styles";
 
 import {
   DESKTOP_PROTOCOL,
@@ -180,27 +179,14 @@ function applyDesktopTheme(value: unknown) {
 
 function updateOpenWindowTheme(window: BrowserWindow) {
   const dark = nativeTheme.shouldUseDarkColors;
-  const palette = dark ? colors.dark : colors.light;
   window.webContents.send("desktop:theme-changed", dark ? "dark" : "light");
   void window.webContents
     .executeJavaScript(
       `(() => {
-        const values = ${JSON.stringify({
-          background: palette.background,
-          foreground: palette.text,
-          secondary: palette.textMuted,
-          button: palette.surfaceMuted,
-          buttonHover: palette.border,
-          border: palette.border,
-        })};
+        const values = ${JSON.stringify(nativeDialogVariables(dark))};
         const root = document.documentElement;
         root.style.colorScheme = ${JSON.stringify(dark ? "dark" : "light")};
-        root.style.setProperty("--dialog-background", values.background);
-        root.style.setProperty("--dialog-foreground", values.foreground);
-        root.style.setProperty("--dialog-secondary", values.secondary);
-        root.style.setProperty("--dialog-button", values.button);
-        root.style.setProperty("--dialog-button-hover", values.buttonHover);
-        root.style.setProperty("--dialog-border", values.border);
+        for (const [name, value] of Object.entries(values)) root.style.setProperty(name, value);
       })()`,
     )
     .catch(() => undefined);
@@ -236,6 +222,15 @@ async function applyDesktopLanguage(value: unknown) {
         ? `${DESKTOP_APP_NAME} hakkında`
         : `About ${DESKTOP_APP_NAME}`,
     );
+    void aboutWindow.webContents
+      .executeJavaScript(
+        `(() => {
+      document.documentElement.lang = ${JSON.stringify(desktopLanguage)};
+      document.getElementById("about-description").textContent = ${JSON.stringify(isTurkishDesktop() ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console")};
+      document.getElementById("about-version").textContent = ${JSON.stringify(`${isTurkishDesktop() ? "Sürüm" : "Version"} ${app.getVersion()}`)};
+    })()`,
+      )
+      .catch(() => undefined);
   }
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.setTitle(
@@ -260,50 +255,7 @@ async function applyDesktopLanguage(value: unknown) {
 }
 
 function nativeDialogThemeCss() {
-  const dark = nativeTheme.shouldUseDarkColors;
-  const palette = dark ? colors.dark : colors.light;
-  return `:root {
-        color-scheme: ${dark ? "dark" : "light"};
-        --dialog-background: ${palette.background};
-        --dialog-foreground: ${palette.text};
-        --dialog-secondary: ${palette.textMuted};
-        --dialog-button: ${palette.surfaceMuted};
-        --dialog-button-hover: ${palette.surfaceHover};
-        --dialog-border: ${palette.border};
-        --dialog-surface: ${palette.surface};
-        --dialog-primary: ${palette.primary};
-        --dialog-primary-hover: ${palette.primaryPressed};
-        --dialog-on-primary: ${palette.onPrimary};
-        --dialog-danger: ${palette.danger};
-        --dialog-control-compact: ${controlSizes.desktopCompact}px;
-        --dialog-control-default: ${controlSizes.desktopDefault}px;
-        --dialog-page-title: ${typography.pageTitle}px;
-        --dialog-space-sm: ${spacing.sm}px;
-        --dialog-space-md: ${spacing.md}px;
-        --dialog-space-lg: ${spacing.lg}px;
-        --dialog-radius-sm: ${radii.sm}px;
-        --dialog-radius-md: ${radii.md}px;
-      }
-      :where(button, input, select, textarea, a, [tabindex]):focus-visible {
-        outline: 2px solid var(--dialog-primary);
-        outline-offset: 2px;
-      }
-      @media (forced-colors: active) {
-        :where(button, input, select, textarea, a, [tabindex]):focus-visible {
-          outline-color: Highlight;
-        }
-        :where(button, input, select, textarea) {
-          border-color: ButtonText;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          scroll-behavior: auto !important;
-          transition-duration: 0.01ms !important;
-        }
-      }`;
+  return nativeDialogCss(nativeTheme.shouldUseDarkColors);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -476,7 +428,7 @@ async function nativeRendererHtml() {
     theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
     messages,
     colors,
-    icons: iconMetadata,
+    icons: desktopIconMetadata,
   }).replaceAll(/</g, String.raw`\u003c`);
   return source.replace(
     '<script type="module" src="app://renderer/native/renderer.mjs"></script>',
@@ -543,7 +495,6 @@ async function desktopLoginHtml() {
     <title>${DESKTOP_APP_NAME}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; max-width: 560px; padding: 42px 36px 34px; text-align: center; }
@@ -552,7 +503,7 @@ async function desktopLoginHtml() {
       h1 { margin: 12px 0 8px; font-size: var(--dialog-page-title); line-height: 1.15; font-weight: 750; }
       .description { margin: 0 0 26px; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
       .option { margin-top: 14px; }
-      button { width: 100%; min-height: 52px; padding: 13px 18px; border: 0; border-radius: 10px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+      button { width: 100%; min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); border: 1px solid transparent; border-radius: var(--dialog-radius-sm); background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
       button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: wait; opacity: .7; }
       .option p { margin: 8px 0 0; color: var(--dialog-secondary); font-size: 13px; line-height: 1.35; }
@@ -738,7 +689,6 @@ function desktopSettingsHtml() {
     <title>${labels.title}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; overflow: hidden; background: var(--dialog-background); color: var(--dialog-foreground); }
       header { display: flex; align-items: center; min-height: 64px; padding: 16px 24px; border-bottom: 1px solid var(--dialog-border); }
@@ -747,7 +697,7 @@ function desktopSettingsHtml() {
       nav { min-height: 0; overflow-y: auto; padding: 20px 12px; border-right: 1px solid var(--dialog-border); }
       .search-box { position: relative; margin: 0 4px 20px; }
       .search-box svg { position: absolute; top: 13px; left: 12px; width: 16px; height: 16px; color: var(--dialog-secondary); pointer-events: none; }
-      nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: 42px; margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: 10px; background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
+      nav input[type="search"] { appearance: none; display: block; width: 100%; min-height: var(--dialog-control-default); margin: 0; padding: 9px 12px 9px 36px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; font-size: 14px; }
       nav input[type="search"]::placeholder { color: var(--dialog-secondary); opacity: .8; }
       nav button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: var(--dialog-control-default); margin: 3px 0; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--dialog-secondary); text-align: left; font: inherit; font-size: 14px; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
       nav button svg { flex: 0 0 17px; width: 17px; height: 17px; }
@@ -766,10 +716,10 @@ function desktopSettingsHtml() {
       .setting-row span { font-size: 15px; }
       select, input[type="text"] { min-height: var(--dialog-control-compact); padding: 7px 10px; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius-sm); background: var(--dialog-surface); color: var(--dialog-foreground); font: inherit; }
       input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--dialog-primary); }
-      .theme-options { display: flex; gap: 8px; }
+      .theme-options { display: flex; flex-wrap: wrap; gap: 8px; }
       .theme-options label { display: flex; align-items: center; gap: 6px; }
-      .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
-      button.action { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 9px; background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
+      .actions { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
+      button.action { min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); border: 1px solid transparent; border-radius: var(--dialog-radius-sm); background: var(--dialog-primary); color: var(--dialog-on-primary); font: inherit; font-weight: 600; cursor: pointer; transition: background-color .15s ease; }
       button.action:hover { background: var(--dialog-primary-hover); }
       button.secondary { background: var(--dialog-button); color: var(--dialog-foreground); }
       button:disabled { cursor: wait; opacity: .65; }
@@ -778,10 +728,12 @@ function desktopSettingsHtml() {
       .status { min-height: 20px; margin: 18px 0 0; color: var(--dialog-secondary); font-size: 13px; }
       pre { overflow: auto; max-height: 300px; padding: 14px; border-radius: 8px; background: var(--dialog-button); color: var(--dialog-secondary); white-space: pre-wrap; word-break: break-word; }
       @media (max-width: 760px) {
+        body { overflow: auto; }
         header { padding: 14px 20px; }
-        .layout { grid-template-columns: 1fr; height: calc(100vh - 64px); min-height: 0; }
+        .layout { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 64px); }
         nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--dialog-border); }
         .search-box { grid-column: 1 / -1; }
+        nav button span { white-space: normal; overflow: visible; }
         main { max-width: none; padding: 22px 20px; }
         .setting-row { flex-wrap: wrap; }
       }
@@ -891,6 +843,19 @@ function registerRendererProtocol() {
       return new Response(
         await readFile(path.join(nativeRendererRoot(), "renderer.mjs"), "utf8"),
         { headers: { "content-type": "text/javascript; charset=utf-8" } },
+      );
+    }
+    if (
+      ["/native/brand/logo-light.svg", "/native/brand/logo-dark.svg"].includes(
+        requestPath,
+      )
+    ) {
+      return new Response(
+        await readFile(
+          path.join(nativeRendererRoot(), "brand", path.basename(requestPath)),
+          "utf8",
+        ),
+        { headers: { "content-type": "image/svg+xml" } },
       );
     }
     if (requestPath === "/desktop-login" || requestPath === "/desktop-login/") {
@@ -1459,7 +1424,9 @@ async function showAboutDialog() {
     modal: false,
     width: 520,
     height: 520,
-    resizable: false,
+    minWidth: 320,
+    minHeight: 240,
+    resizable: true,
     minimizable: false,
     maximizable: false,
     title: isTurkish
@@ -1471,6 +1438,7 @@ async function showAboutDialog() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   aboutWindow.on("closed", () => {
@@ -1484,7 +1452,6 @@ async function showAboutDialog() {
     <title>${isTurkish ? `${DESKTOP_APP_NAME} hakkında` : `About ${DESKTOP_APP_NAME}`}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { width: 100%; box-sizing: border-box; padding: 2rem 2rem 1.75rem; text-align: center; }
       img { width: 112px; height: 112px; border-radius: 24px; margin-bottom: 1.5rem; }
@@ -1498,10 +1465,11 @@ async function showAboutDialog() {
     <main>
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <h1>${DESKTOP_APP_NAME}</h1>
-      <p>${isTurkish ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console"}</p>
-      <p class="version">${isTurkish ? "Sürüm" : "Version"} ${app.getVersion()}</p>
+      <p id="about-description">${isTurkish ? "Güvenli kimlik ve erişim konsolu" : "Secure identity and access console"}</p>
+      <p id="about-version" class="version">${isTurkish ? "Sürüm" : "Version"} ${app.getVersion()}</p>
       <footer>© 2026 ${DESKTOP_APP_NAME}</footer>
     </main>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await aboutWindow.loadURL(
@@ -1527,8 +1495,8 @@ async function showSettingsWindow() {
     modal: false,
     width: 1100,
     height: 720,
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: 480,
+    minHeight: 360,
     title: isTurkishDesktop()
       ? `${DESKTOP_APP_NAME} ayarları`
       : `${DESKTOP_APP_NAME} Settings`,
@@ -1538,6 +1506,7 @@ async function showSettingsWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -1705,8 +1674,8 @@ function focusVisibleConsoleWindow() {
     desktopLoginWindow?.isVisible() === true ? desktopLoginWindow : mainWindow;
   if (!window || window.isDestroyed() || !window.isVisible()) return;
   if (window.isMinimized()) window.restore();
-  window.show();
-  window.focus();
+  showWindow(window);
+  focusWindow(window);
 }
 
 async function desktopCompanionHtml() {
@@ -1736,7 +1705,6 @@ async function desktopCompanionHtml() {
     <title>${DESKTOP_APP_NAME}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
       main { display: grid; min-height: 100vh; place-items: center; padding: 2rem; }
@@ -1746,7 +1714,7 @@ async function desktopCompanionHtml() {
       h1 { font-size: 1.65rem; margin: .6rem 0 .45rem; }
       p { color: var(--dialog-secondary); font-size: .98rem; margin: 0 0 1.5rem; }
       .actions { display: grid; gap: .75rem; }
-      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: 10px; color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: 48px; padding: .7rem 1rem; width: 100%; }
+      button { align-items: center; background: var(--dialog-primary); border: 0; border-radius: var(--dialog-radius-sm); color: var(--dialog-on-primary); cursor: pointer; display: flex; font: inherit; font-weight: 700; gap: .6rem; justify-content: center; min-height: var(--dialog-control-default); padding: var(--dialog-space-sm) var(--dialog-space-md); width: 100%; }
       button:hover { background: var(--dialog-primary-hover); }
       button:disabled { cursor: default; opacity: .65; }
       .spinner { animation: spin 800ms linear infinite; border: 2px solid color-mix(in srgb, var(--dialog-on-primary) 45%, transparent); border-radius: 50%; border-top-color: var(--dialog-on-primary); height: 16px; width: 16px; }
@@ -1802,9 +1770,9 @@ async function showDesktopLoginWindow() {
     modal: Boolean(mainWindow?.isVisible()),
     width: 580,
     height: 650,
-    minWidth: 500,
-    minHeight: 580,
-    resizable: false,
+    minWidth: 320,
+    minHeight: 360,
+    resizable: true,
     closable: true,
     show: false,
     title: DESKTOP_APP_NAME,
@@ -1813,6 +1781,7 @@ async function showDesktopLoginWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -1872,6 +1841,7 @@ async function showCompanionWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -2028,8 +1998,36 @@ function updateTrayMenu() {
 }
 
 function updateOpenUpdateDialogLanguage() {
-  if (!updateAvailableWindow || updateAvailableWindow.isDestroyed()) return;
   const isTurkish = isTurkishDesktop();
+  const updateTitle = isTurkish ? "Yazılım Güncellemesi" : "Software Update";
+  const checkingLabel = isTurkish
+    ? "Güncellemeler denetleniyor…"
+    : "Checking for updates…";
+  updateNativeDialogLanguage(updateCheckWindow, updateTitle, {
+    "update-check-title": checkingLabel,
+    "update-check-cancel": isTurkish ? "İptal" : "Cancel",
+  });
+  updateNativeDialogLanguage(updateResultWindow, updateTitle, {
+    "update-result-title": isTurkish
+      ? `${DESKTOP_APP_NAME} güncel`
+      : `${DESKTOP_APP_NAME} is up to date`,
+    "update-result-detail": isTurkish
+      ? `${DESKTOP_APP_NAME} için kullanılabilir yeni bir sürüm yok. ${app.getVersion()} sürümünü kullanıyorsunuz.`
+      : `There are no new updates available for ${DESKTOP_APP_NAME}. You are using version ${app.getVersion()}.`,
+    "update-result-done": isTurkish ? "Tamam" : "Done",
+  });
+  const confirmationTitle = isTurkish
+    ? `${DESKTOP_APP_NAME} şimdi güncellensin mi?`
+    : `Update ${DESKTOP_APP_NAME} now?`;
+  updateNativeDialogLanguage(updateConfirmationWindow, confirmationTitle, {
+    "update-confirm-title": confirmationTitle,
+    "update-confirm-detail": isTurkish
+      ? `${DESKTOP_APP_NAME}, güncellemeyi kurmak için kapanacak. Bu işlem bu makinedeki etkin yerel oturumları keser.`
+      : `${DESKTOP_APP_NAME} will quit to install the update, which will interrupt active local sessions on this machine.`,
+    "update-confirm-cancel": isTurkish ? "İptal" : "Cancel",
+    "update-confirm-install": isTurkish ? "Güncelle" : "Update",
+  });
+  if (!updateAvailableWindow || updateAvailableWindow.isDestroyed()) return;
   const version = promptedUpdateVersion;
   const copy = isTurkish
     ? {
@@ -2062,6 +2060,29 @@ function updateOpenUpdateDialogLanguage() {
         document.getElementById("remind-later").textContent = copy.later;
         document.getElementById("install-update").textContent = copy.install;
       })()`,
+    )
+    .catch(() => undefined);
+}
+
+function updateNativeDialogLanguage(
+  window: BrowserWindow | null,
+  title: string,
+  copy: Record<string, string>,
+) {
+  if (!window || window.isDestroyed()) return;
+  window.setTitle(title);
+  void window.webContents
+    .executeJavaScript(
+      `(() => {
+    document.documentElement.lang = ${JSON.stringify(desktopLanguage)};
+    document.title = ${JSON.stringify(title)};
+    for (const [id, label] of Object.entries(${JSON.stringify(copy)})) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = label;
+    }
+    const progress = document.querySelector('[role="progressbar"]');
+    if (progress) progress.setAttribute("aria-label", document.getElementById("update-check-title").textContent);
+  })()`,
     )
     .catch(() => undefined);
 }
@@ -2149,7 +2170,9 @@ async function showUpdateCheckWindow() {
     modal: true,
     width: 800,
     height: 300,
-    resizable: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title: windowTitle,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -2157,6 +2180,7 @@ async function showUpdateCheckWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   const checkingWindow = updateCheckWindow;
@@ -2175,28 +2199,22 @@ async function showUpdateCheckWindow() {
     <title>${windowTitle}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { width: 100%; display: grid; grid-template-columns: 110px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
-      img { width: 104px; height: 104px; border-radius: 22px; }
-      h1 { margin: 0 0 26px; font-size: 26px; line-height: 1.15; font-weight: 700; }
-      .progress { width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: var(--dialog-border); }
-      .progress::after { content: ""; display: block; width: 72px; height: 100%; border-radius: inherit; background: var(--dialog-primary); transform: translateX(-80px); animation: slide 1.35s ease-in-out infinite; }
-      @keyframes slide { 0% { transform: translateX(-80px); } 50% { transform: translateX(280px); } 100% { transform: translateX(680px); } }
-      button { display: block; margin: 24px 0 0 auto; min-width: 180px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button:hover { background: var(--dialog-button-hover); }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+      .progress { width: 100%; height: 12px; overflow: hidden; border-radius: var(--dialog-radius-sm); background: var(--dialog-border); }
+      .progress::after { content: ""; display: block; width: 25%; height: 100%; background: var(--dialog-primary); animation: slide 1.35s ease-in-out infinite; }
+      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
     </style>
   </head>
   <body>
-    <main>
+    <main class="update-layout">
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
-        <h1>${checkingLabel}</h1>
+        <h1 id="update-check-title">${checkingLabel}</h1>
         <div class="progress" role="progressbar" aria-label="${checkingLabel}" aria-busy="true"></div>
-        <button type="button" onclick="window.close()">${cancelLabel}</button>
+        <button id="update-check-cancel" class="secondary update-check-cancel" type="button" onclick="window.close()">${cancelLabel}</button>
       </section>
     </main>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await checkingWindow.loadURL(
@@ -2236,7 +2254,9 @@ async function showUpdateNotAvailableWindow() {
     modal: true,
     width: 720,
     height: 280,
-    resizable: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title: windowTitle,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -2244,6 +2264,7 @@ async function showUpdateNotAvailableWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   updateResultWindow.on("closed", () => {
@@ -2257,27 +2278,20 @@ async function showUpdateNotAvailableWindow() {
     <title>${windowTitle}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { width: 100%; display: grid; grid-template-columns: 96px 1fr; gap: 24px; align-items: center; padding: 24px 28px 20px; }
-      img { width: 88px; height: 88px; border-radius: 20px; }
-      h1 { margin: 0 0 10px; font-size: 25px; line-height: 1.15; font-weight: 700; }
-      p { margin: 0; color: var(--dialog-secondary); font-size: 16px; line-height: 1.45; }
-      footer { grid-column: 2; display: flex; justify-content: flex-end; margin-top: -4px; }
-      button { min-width: 112px; padding: 10px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
-      button:hover { background: var(--dialog-button-hover); }
+      body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
+
     </style>
   </head>
   <body>
-    <main>
+    <main class="update-layout">
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
-        <h1>${title}</h1>
-        <p>${detail}</p>
+        <h1 id="update-result-title">${title}</h1>
+        <p id="update-result-detail">${detail}</p>
       </section>
-      <footer><button type="button" onclick="window.close()">${doneLabel}</button></footer>
+      <footer class="update-actions"><button id="update-result-done" class="secondary" type="button" onclick="window.close()">${doneLabel}</button></footer>
     </main>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await updateResultWindow.loadURL(
@@ -2319,7 +2333,9 @@ async function showUpdateConfirmation() {
     modal: true,
     width: 560,
     height: 430,
-    resizable: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -2327,6 +2343,7 @@ async function showUpdateConfirmation() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   updateConfirmationWindow.on("closed", () => {
@@ -2355,29 +2372,21 @@ async function showUpdateConfirmation() {
     <title>${title}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { padding: 26px 28px 14px; }
-      .warning { width: 88px; height: 80px; display: grid; place-items: center; padding-top: 12px; margin: 0 0 18px 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: #f3c438; color: #fff; font-size: 48px; line-height: 1; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
-      h1 { margin: 0 0 16px; font-size: 25px; line-height: 1.2; font-weight: 700; }
-      p { margin: 0; max-width: 465px; font-size: 18px; line-height: 1.35; color: var(--dialog-secondary); }
-      footer { display: flex; justify-content: flex-end; gap: 12px; padding: 0 28px 24px; }
-      button { min-width: 140px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
-      button:hover { filter: brightness(1.12); }
+
     </style>
   </head>
   <body>
-    <main>
-      <div class="warning" aria-hidden="true">!</div>
-      <h1>${title}</h1>
-      <p>${detail}</p>
+    <main class="update-confirmation">
+      <img src="${iconDataUrl}" alt="" aria-hidden="true">
+      <h1 id="update-confirm-title">${title}</h1>
+      <p id="update-confirm-detail">${detail}</p>
     </main>
-    <footer>
-      <button type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/cancel'">${cancelLabel}</button>
-      <button class="primary" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/update'">${updateLabel}</button>
+    <footer class="update-actions">
+      <button id="update-confirm-cancel" class="secondary" type="button" autofocus onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/cancel'">${cancelLabel}</button>
+      <button id="update-confirm-install" class="primary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-confirm/update'">${updateLabel}</button>
     </footer>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await updateConfirmationWindow.loadURL(
@@ -2393,8 +2402,8 @@ async function showUpdateConfirmation() {
 async function showUpdateDialog(version: string, force = false) {
   const existingWindow = updateAvailableWindow;
   if (existingWindow && !existingWindow.isDestroyed()) {
-    if (existingWindow.isVisible()) {
-      existingWindow.focus();
+    if (backgroundE2e || existingWindow.isVisible()) {
+      focusWindow(existingWindow);
       return;
     }
     if (updateAvailableWindow === existingWindow) {
@@ -2421,9 +2430,11 @@ async function showUpdateDialog(version: string, force = false) {
   const dialogWindow = new BrowserWindow({
     parent: mainWindow ?? undefined,
     modal: true,
-    width: 1200,
-    height: 360,
-    resizable: false,
+    width: 760,
+    height: 420,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 240,
     title,
     backgroundColor: desktopBackgroundColor(),
     show: false,
@@ -2431,6 +2442,7 @@ async function showUpdateDialog(version: string, force = false) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
     },
   });
   updateAvailableWindow = dialogWindow;
@@ -2483,23 +2495,12 @@ async function showUpdateDialog(version: string, force = false) {
     <title>${title}</title>
     <style>
       ${nativeDialogThemeCss()}
-      :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-      * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; background: var(--dialog-background); color: var(--dialog-foreground); }
-      main { display: grid; grid-template-columns: 112px 1fr; gap: 24px; padding: 24px 28px 18px; }
-      img { width: 104px; height: 104px; border-radius: 22px; }
-      h1 { margin: 4px 0 12px; font-size: 27px; line-height: 1.15; font-weight: 700; }
-      p { margin: 0; max-width: 940px; font-size: 21px; line-height: 1.35; color: var(--dialog-secondary); }
-      label { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; font-weight: 600; color: var(--dialog-foreground); }
-      input { width: 25px; height: 25px; accent-color: var(--dialog-primary); }
-      footer { display: flex; justify-content: flex-end; gap: 14px; padding: 0 28px 24px; }
-      button { min-width: 220px; padding: 13px 24px; border: 0; border-radius: 999px; background: var(--dialog-button); color: var(--dialog-foreground); font: inherit; font-size: 19px; font-weight: 600; cursor: pointer; }
-      button.primary { background: var(--dialog-primary); color: var(--dialog-on-primary); }
-      button:hover { filter: brightness(1.12); }
+
     </style>
   </head>
   <body>
-    <main>
+    <main class="update-layout">
       <img src="${iconDataUrl}" alt="${DESKTOP_APP_NAME} logo">
       <section>
         <h1 id="update-title">${title}</h1>
@@ -2507,11 +2508,12 @@ async function showUpdateDialog(version: string, force = false) {
         <label><input id="automatic" type="checkbox" checked><span id="automatic-label">${automaticLabel}</span></label>
       </section>
     </main>
-    <footer>
-      <button id="skip-update" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
-      <button id="remind-later" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
-      <button id="install-update" class="primary" type="button" onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
+    <footer class="update-actions">
+      <button id="skip-update" class="secondary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/skip?automatic=' + document.getElementById('automatic').checked">${skipLabel}</button>
+      <button id="remind-later" class="secondary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/later?automatic=' + document.getElementById('automatic').checked">${laterLabel}</button>
+      <button id="install-update" class="primary" type="button" data-async onclick="window.location.href='${DESKTOP_PROTOCOL}://update-action/download?automatic=' + document.getElementById('automatic').checked">${installLabel}</button>
     </footer>
+    ${nativeDialogActionsScript()}
   </body>
 </html>`;
   await dialogWindow.loadURL(
@@ -2537,6 +2539,7 @@ function setLogoutMenuVisible(visible: boolean) {
 }
 
 function toggleDeveloperTools() {
+  if (backgroundE2e || app.isPackaged) return;
   const targetWindow =
     BrowserWindow.getFocusedWindow() ??
     BrowserWindow.getAllWindows().find((window) => window.isVisible()) ??
@@ -2609,8 +2612,11 @@ function installApplicationMenu() {
       click: toggleQuickAccess,
     },
     { type: "separator" },
-    { role: "reload" },
-    { role: "forceReload" },
+    { role: "reload", label: isTurkish ? "Yeniden yükle" : "Reload" },
+    {
+      role: "forceReload",
+      label: isTurkish ? "Önbelleği kullanmadan yeniden yükle" : "Force Reload",
+    },
     { type: "separator" },
     ...(process.env.DESKTOP_DEVTOOLS === "true"
       ? [
@@ -2623,18 +2629,52 @@ function installApplicationMenu() {
           { type: "separator" as const },
         ]
       : []),
-    { role: "resetZoom" },
-    { role: "zoomIn" },
-    { role: "zoomOut" },
+    { role: "resetZoom", label: isTurkish ? "Gerçek boyut" : "Actual Size" },
+    { role: "zoomIn", label: isTurkish ? "Yakınlaştır" : "Zoom In" },
+    { role: "zoomOut", label: isTurkish ? "Uzaklaştır" : "Zoom Out" },
     { type: "separator" },
-    { role: "togglefullscreen" },
+    {
+      role: "togglefullscreen",
+      label: isTurkish ? "Tam ekranı aç/kapat" : "Toggle Full Screen",
+    },
   ];
   const template: MenuItemConstructorOptions[] = [
     applicationMenu,
-    { role: "editMenu" },
+    {
+      label: isTurkish ? "Düzenle" : "Edit",
+      submenu: [
+        { role: "undo", label: isTurkish ? "Geri al" : "Undo" },
+        { role: "redo", label: isTurkish ? "Yinele" : "Redo" },
+        { type: "separator" },
+        { role: "cut", label: isTurkish ? "Kes" : "Cut" },
+        { role: "copy", label: isTurkish ? "Kopyala" : "Copy" },
+        { role: "paste", label: isTurkish ? "Yapıştır" : "Paste" },
+        { role: "selectAll", label: isTurkish ? "Tümünü seç" : "Select All" },
+      ],
+    },
     { label: isTurkish ? "Görünüm" : "View", submenu: viewSubmenu },
-    { role: "windowMenu" },
-    { role: "help" },
+    {
+      role: "windowMenu",
+      label: isTurkish ? "Pencere" : "Window",
+      submenu: [
+        {
+          role: "minimize",
+          label: isTurkish ? "Simge durumuna küçült" : "Minimize",
+        },
+        { role: "zoom", label: isTurkish ? "Pencereyi büyüt/küçült" : "Zoom" },
+        { role: "close", label: isTurkish ? "Kapat" : "Close" },
+        ...(process.platform === "darwin"
+          ? [
+              { type: "separator" as const },
+              {
+                role: "front" as const,
+                label: isTurkish ? "Tümünü öne getir" : "Bring All to Front",
+              },
+            ]
+          : []),
+      ],
+    },
+    { role: "help", label: isTurkish ? "Yardım" : "Help" },
   ];
   const menu = Menu.buildFromTemplate(template);
   logoutMenuItem = menu.getMenuItemById("desktop-logout");
@@ -2657,7 +2697,7 @@ async function createWindow() {
     y: state?.y,
     width: state?.width ?? 1440,
     height: state?.height ?? 960,
-    minWidth: 960,
+    minWidth: 640,
     minHeight: 640,
     show: hasStoredSession && !backgroundE2e,
     backgroundColor: desktopBackgroundColor(),
@@ -2665,6 +2705,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !backgroundE2e,
       preload,
     },
   });
@@ -3108,119 +3149,128 @@ if (!hasLock) {
     event.preventDefault();
     void sendDeepLink(url);
   });
-  app.whenReady().then(async () => {
-    app.setName(DESKTOP_APP_NAME);
-    applyDesktopTheme(await readDesktopTheme());
-    desktopLanguageMode = await readDesktopLanguageMode();
-    desktopLanguage = await readDesktopLanguage();
-    if (desktopLanguageMode === "system") {
-      desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
-        ? "tr"
-        : "en";
-    }
-    installApplicationMenu();
-    pendingDeepLink = findDesktopDeepLink();
-    await restorePendingAuthorizations();
-    registerDesktopProtocol();
-    registerIpc();
-    const desktopPreferences = await readDesktopPreferences();
-    void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
-    const shortcutRegistration = registerGlobalShortcutWithFallback(
-      globalShortcut,
-      desktopPreferences.globalShortcut,
-      DEFAULT_GLOBAL_SHORTCUT,
-      toggleQuickAccess,
-    );
-    if (
-      !shortcutRegistration.registered &&
-      shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
-    ) {
-      desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
-      await writeDesktopPreferences(desktopPreferences);
-    }
-    setTrayVisibility(desktopPreferences.showInMenuBar);
-    setDockVisibility(desktopPreferences.showInDock);
-    const updatePreferences = await readUpdatePreferences();
-    setAutomaticInstallOnAppQuit(updatePreferences.automaticDownload === true);
-    void updateLogoutMenuVisibility();
-    enforceContentSecurityPolicy();
-    registerRendererProtocol();
-    void createWindow();
-    if (backgroundE2e && process.platform === "darwin") app.hide();
-    configureAutoUpdater(async (status: DesktopUpdateStatus) => {
-      void appendDiagnosticEvent(`update-${status.state}`, {
-        version: "version" in status ? status.version : undefined,
-      });
-      if (status.state === "checking") {
-        if (!updateCheckWindowReady) {
-          updateCheckWindowReady = showUpdateCheckWindow().catch(
-            () => undefined,
-          );
+  app
+    .whenReady()
+    .then(async () => {
+      app.setName(DESKTOP_APP_NAME);
+      applyDesktopTheme(await readDesktopTheme());
+      desktopLanguageMode = await readDesktopLanguageMode();
+      desktopLanguage = await readDesktopLanguage();
+      if (desktopLanguageMode === "system") {
+        desktopLanguage = app.getLocale().toLowerCase().startsWith("tr")
+          ? "tr"
+          : "en";
+      }
+      installApplicationMenu();
+      pendingDeepLink = findDesktopDeepLink();
+      await restorePendingAuthorizations();
+      registerDesktopProtocol();
+      registerIpc();
+      const desktopPreferences = await readDesktopPreferences();
+      void applyLaunchAtLogin(desktopPreferences.launchAtLogin);
+      const shortcutRegistration = registerGlobalShortcutWithFallback(
+        globalShortcut,
+        desktopPreferences.globalShortcut,
+        DEFAULT_GLOBAL_SHORTCUT,
+        toggleQuickAccess,
+      );
+      if (
+        !shortcutRegistration.registered &&
+        shortcutRegistration.accelerator !== desktopPreferences.globalShortcut
+      ) {
+        desktopPreferences.globalShortcut = shortcutRegistration.accelerator;
+        await writeDesktopPreferences(desktopPreferences);
+      }
+      setTrayVisibility(desktopPreferences.showInMenuBar);
+      setDockVisibility(desktopPreferences.showInDock);
+      const updatePreferences = await readUpdatePreferences();
+      setAutomaticInstallOnAppQuit(
+        updatePreferences.automaticDownload === true,
+      );
+      void readVault()
+        .then((vault) =>
+          setLogoutMenuVisible(Boolean(vault.admin || vault.account)),
+        )
+        .catch(() => setLogoutMenuVisible(false));
+      enforceContentSecurityPolicy();
+      await registerRendererProtocol();
+      void createWindow();
+      if (backgroundE2e && process.platform === "darwin") app.hide();
+      configureAutoUpdater(async (status: DesktopUpdateStatus) => {
+        void appendDiagnosticEvent(`update-${status.state}`, {
+          version: "version" in status ? status.version : undefined,
+        });
+        if (status.state === "checking") {
+          if (!updateCheckWindowReady) {
+            updateCheckWindowReady = showUpdateCheckWindow().catch(
+              () => undefined,
+            );
+          }
+          sendUpdateStatus(status);
+          return;
+        } else {
+          const checkingWindowReady = updateCheckWindowReady;
+          updateCheckWindowReady = null;
+          await checkingWindowReady?.catch(() => undefined);
+          closeUpdateCheckWindow();
+        }
+        if (status.state === "available") {
+          const manualCheck = manualUpdateCheckRequested;
+          if (!manualCheck && isMainWindowInBackground()) {
+            notifyDesktop(
+              isTurkishDesktop()
+                ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
+                : `${DESKTOP_APP_NAME} update available`,
+              isTurkishDesktop()
+                ? `${status.version} sürümü indirilmeye hazır.`
+                : `Version ${status.version} is ready to download.`,
+              () => void showUpdateDialog(status.version, true),
+            );
+          }
+          void handleAvailableUpdate(status.version);
+          return;
+        }
+        if (status.state === "downloaded") {
+          const suppressNotification = suppressNextUpdateNotification;
+          suppressNextUpdateNotification = false;
+          if (!suppressNotification && isMainWindowInBackground()) {
+            notifyDesktop(
+              isTurkishDesktop()
+                ? `${DESKTOP_APP_NAME} güncellemesi hazır`
+                : `${DESKTOP_APP_NAME} update ready`,
+              isTurkishDesktop()
+                ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
+                : `Version ${status.version} will be installed when you restart.`,
+              () => void showUpdateConfirmation(),
+            );
+          }
+        } else if (status.state === "not-available") {
+          const manualCheck = manualUpdateCheckRequested;
+          manualUpdateCheckRequested = false;
+          suppressNextUpdateNotification = false;
+          if (manualCheck) {
+            void showUpdateNotAvailableWindow().catch(() => undefined);
+          }
+        } else if (status.state === "error") {
+          // Keep the retry interactive so a recovered check can reopen the
+          // update dialog without requiring the user to restart the app.
+          manualUpdateCheckRequested = true;
+          suppressNextUpdateNotification = false;
         }
         sendUpdateStatus(status);
-        return;
-      } else {
-        const checkingWindowReady = updateCheckWindowReady;
-        updateCheckWindowReady = null;
-        await checkingWindowReady?.catch(() => undefined);
-        closeUpdateCheckWindow();
-      }
-      if (status.state === "available") {
-        const manualCheck = manualUpdateCheckRequested;
-        if (!manualCheck && isMainWindowInBackground()) {
-          notifyDesktop(
-            isTurkishDesktop()
-              ? `${DESKTOP_APP_NAME} güncellemesi kullanıma hazır`
-              : `${DESKTOP_APP_NAME} update available`,
-            isTurkishDesktop()
-              ? `${status.version} sürümü indirilmeye hazır.`
-              : `Version ${status.version} is ready to download.`,
-            () => void showUpdateDialog(status.version, true),
-          );
-        }
-        void handleAvailableUpdate(status.version);
-        return;
-      }
-      if (status.state === "downloaded") {
-        const suppressNotification = suppressNextUpdateNotification;
-        suppressNextUpdateNotification = false;
-        if (!suppressNotification && isMainWindowInBackground()) {
-          notifyDesktop(
-            isTurkishDesktop()
-              ? `${DESKTOP_APP_NAME} güncellemesi hazır`
-              : `${DESKTOP_APP_NAME} update ready`,
-            isTurkishDesktop()
-              ? `${status.version} sürümü yeniden başlattığınızda kurulacak.`
-              : `Version ${status.version} will be installed when you restart.`,
-            () => void showUpdateConfirmation(),
-          );
-        }
-      } else if (status.state === "not-available") {
-        const manualCheck = manualUpdateCheckRequested;
-        manualUpdateCheckRequested = false;
-        suppressNextUpdateNotification = false;
-        if (manualCheck) {
-          void showUpdateNotAvailableWindow().catch(() => undefined);
-        }
-      } else if (status.state === "error") {
-        // Keep the retry interactive so a recovered check can reopen the
-        // update dialog without requiring the user to restart the app.
-        manualUpdateCheckRequested = true;
-        suppressNextUpdateNotification = false;
-      }
-      sendUpdateStatus(status);
+      });
+      if (process.platform === "darwin")
+        app.on(
+          "activate",
+          () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
+        );
+    })
+    .catch((error: unknown) => {
+      void appendDiagnosticEvent("app-startup-failed", {
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      app.quit();
     });
-    if (process.platform === "darwin")
-      app.on(
-        "activate",
-        () => BrowserWindow.getAllWindows()[0] ?? createWindow(),
-      );
-  }).catch((error: unknown) => {
-    void appendDiagnosticEvent("app-startup-failed", {
-      errorType: error instanceof Error ? error.name : typeof error,
-    });
-    app.quit();
-  });
   process.on("uncaughtExceptionMonitor", (error) => {
     void appendDiagnosticEvent("uncaught-exception", {
       errorType: error.name,

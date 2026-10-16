@@ -1,7 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const forbidden = [
@@ -22,29 +21,36 @@ const forbidden = [
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (entry.name === "node_modules" || entry.name === "dist") continue;
-    const filePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...(await sourceFiles(filePath)));
-    else if (/\.(?:js|jsx|mjs|ts|tsx)$/.test(entry.name)) files.push(filePath);
-  }
-  return files;
+  const nestedDirectories = entries
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        entry.name !== "node_modules" &&
+        entry.name !== "dist",
+    )
+    .map((entry) => sourceFiles(path.join(directory, entry.name)));
+  const localFiles = entries
+    .filter(
+      (entry) => entry.isFile() && /\.(?:js|jsx|mjs|ts|tsx)$/.test(entry.name),
+    )
+    .map((entry) => path.join(directory, entry.name));
+  return [...localFiles, ...(await Promise.all(nestedDirectories)).flat()];
 }
 
-const violations = [];
-for (const filePath of await sourceFiles(path.join(root, "src"))) {
-  const contents = await readFile(filePath, "utf8");
-  for (const rule of forbidden) {
-    const match = contents.match(rule.pattern);
-    if (match) {
-      const line = contents.slice(0, match.index).split("\n").length;
-      violations.push(
-        `${path.relative(root, filePath)}:${line} uses ${rule.label}`,
-      );
-    }
-  }
-}
+const files = await sourceFiles(path.join(root, "src"));
+const violations = (
+  await Promise.all(
+    files.map(async (filePath) => {
+      const contents = await readFile(filePath, "utf8");
+      return forbidden.flatMap((rule) => {
+        const match = rule.pattern.exec(contents);
+        if (match?.index === undefined) return [];
+        const line = contents.slice(0, match.index).split("\n").length;
+        return [`${path.relative(root, filePath)}:${line} uses ${rule.label}`];
+      });
+    }),
+  )
+).flat();
 
 if (violations.length > 0) {
   console.error("Native security violations detected:");

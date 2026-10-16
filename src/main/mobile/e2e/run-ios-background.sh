@@ -72,7 +72,7 @@ for attempt in $(seq 1 30); do
   fi
   sleep 1
 done
-test "$fixture_ready" = true
+[[ "$fixture_ready" == true ]]
 
 metro_ready=false
 for attempt in $(seq 1 60); do
@@ -82,7 +82,7 @@ for attempt in $(seq 1 60); do
   fi
   sleep 1
 done
-test "$metro_ready" = true
+[[ "$metro_ready" == true ]]
 
 if [[ "${SKIP_IOS_BUILD:-false}" != "true" ]]; then
   CI=1 pnpm exec expo prebuild --platform ios

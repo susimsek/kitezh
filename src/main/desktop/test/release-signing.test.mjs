@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -19,6 +20,8 @@ const releaseWorkflow = await readFile(
   path.join(repositoryRoot, ".github", "workflows", "desktop-release.yml"),
   "utf8",
 );
+const require = createRequire(import.meta.url);
+const { load } = require("js-yaml");
 
 function runSigningCheck(platform, variables = {}) {
   return spawnSync(process.execPath, [signingCheckPath], {
@@ -113,7 +116,7 @@ test("desktop release workflow checks signing credentials before packaging", () 
     /^    env:\r?\n([\s\S]*?)^\r?\n    steps:/m,
   )?.[1];
   const dependencyInstall = releaseWorkflow.indexOf(
-    "- name: Install web dependencies",
+    "- name: Install desktop dependencies",
   );
 
   assert.notEqual(signingGate, -1);
@@ -138,4 +141,32 @@ test("desktop release workflow checks signing credentials before packaging", () 
   assert.match(releaseWorkflow, /config\.mac\.notarize=true/);
   assert.match(releaseWorkflow, /Verify Windows Authenticode signature/);
   assert.match(releaseWorkflow, /LINUX_GPG_PRIVATE_KEY/);
+});
+
+test("release packages consume one native renderer artifact and separate Mac architectures", () => {
+  const workflow = load(releaseWorkflow);
+  const rendererSteps = workflow.jobs.renderer.steps;
+  const packageSteps = workflow.jobs.package.steps;
+  const upload = rendererSteps.find((step) =>
+    step.uses?.startsWith("actions/upload-artifact@"),
+  );
+  const downloadIndex = packageSteps.findIndex((step) =>
+    step.uses?.startsWith("actions/download-artifact@"),
+  );
+  const packageIndex = packageSteps.findIndex(
+    (step) => step.name === "Build desktop package",
+  );
+  const download = packageSteps[downloadIndex];
+  assert.ok(downloadIndex >= 0 && downloadIndex < packageIndex);
+  assert.equal(upload.with.path, download.with.path);
+  assert.equal(upload.with.name, download.with.name);
+  assert.equal(upload.with["retention-days"], 1);
+  assert.match(upload.with.path, /dist\/native\/$/);
+  const packageCommands = packageSteps.map((step) => step.run ?? "").join("\n");
+  assert.doesNotMatch(
+    packageCommands,
+    /pnpm run build(?:\s|$)|build:native|build:renderer|--universal/,
+  );
+  assert.match(packageCommands, /--mac --x64 --arm64/);
+  assert.match(packageCommands, /pnpm run build:main/);
 });

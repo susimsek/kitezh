@@ -101,6 +101,23 @@ describe("OrganizationCreateForm", () => {
     await waitFor(() => expect(mockAdminRequest).toHaveBeenCalledTimes(2));
   });
 
+  it("reports unsuccessful creation responses without field violations", async () => {
+    mockAdminRequest.mockResolvedValue({ status: 500, data: {} } as never);
+    render(<OrganizationCreateForm dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(dictionary.admin.organizations.alias), {
+      target: { value: "acme" },
+    });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.organizations.name), {
+      target: { value: "Acme" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.organizations.create }));
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.organizations.operationError),
+    );
+  });
+
   it("returns to the organizations list from cancel", () => {
     render(<OrganizationCreateForm dictionary={dictionary} />);
 

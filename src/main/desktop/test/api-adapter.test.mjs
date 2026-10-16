@@ -11,6 +11,185 @@ const session = {
   version: 1,
 };
 
+test("client detail bridge permits exact scoped contracts and rejects widened variants", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    [
+      "GET",
+      "/api/admin/clients/account-console/scope-evaluation?scopes=openid+profile&subject=user",
+    ],
+    ["POST", "/api/admin/clients/example/secret"],
+    ["GET", "/api/admin/clients/account-console/sessions?page=0&size=10"],
+    ["GET", "/api/admin/clients/account-console/consents?page=1&size=50"],
+    ["GET", "/api/admin/clients/account-console/events?page=0&size=100"],
+    ["DELETE", "/api/admin/clients/account-console/sessions"],
+    ["DELETE", "/api/admin/clients/account-console/sessions/session-1"],
+    ["GET", "/api/admin/clients?sort=clientName,asc&page=0&size=10"],
+    ["GET", "/api/admin/clients?sort=clientName,desc&page=0&size=10"],
+  ])
+    assert.equal(
+      (await adapter.request({ console: "admin", method, path })).status,
+      200,
+      path,
+    );
+  for (const [method, path] of [
+    ["GET", "/api/admin/clients/example/secret"],
+    ["POST", "/api/admin/clients/example/secret?extra=1"],
+    ["POST", "/api/admin/clients/example/secret/nested"],
+    ["GET", "/api/admin/clients/example/sessions?page=0&page=1"],
+    ["GET", "/api/admin/clients/example/sessions?size=101"],
+    ["GET", "/api/admin/clients/example/events?sort=password,asc"],
+    ["GET", "/api/admin/clients/example/consents?page=-1"],
+    ["GET", "/api/admin/clients/example/sessions/session-1"],
+    ["DELETE", "/api/admin/clients/example/sessions/session-1?extra=1"],
+    ["GET", "/api/admin/clients/example/scope-evaluation?subject=a&subject=b"],
+    [
+      "GET",
+      "/api/admin/clients/example/scope-evaluation?scopes=" + "a".repeat(2001),
+    ],
+    ["GET", "/api/admin/clients/example/scope-evaluation#fragment"],
+  ])
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path }),
+      /not allowed/,
+      path,
+    );
+  await assert.rejects(
+    adapter.request({
+      console: "account",
+      method: "POST",
+      path: "/api/admin/clients/example/secret",
+    }),
+    /not allowed/,
+  );
+});
+
+test("group bridge accepts detail, settings, permissions, roles and bounded members only", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path, body] of [
+    ["GET", "/api/admin/groups/7"],
+    [
+      "PUT",
+      "/api/admin/groups/7",
+      { name: "Finance", parentId: null, attributes: {}, defaultGroup: true },
+    ],
+    ["GET", "/api/admin/groups?q=fin&page=1&size=50&sort=name,desc"],
+    ["GET", "/api/admin/groups/7/permissions"],
+    ["PUT", "/api/admin/groups/7/permissions", { permissions: [] }],
+    ["PUT", "/api/admin/groups/7/roles", { roles: ["ROLE_USER"] }],
+    [
+      "GET",
+      "/api/admin/groups/7/users?q=ada&page=0&size=10&sort=username,desc",
+    ],
+    ["GET", "/api/admin/groups/7/available-users?q=ad&page=0&size=10"],
+    ["POST", "/api/admin/groups/7/users", { userId: 8 }],
+    ["DELETE", "/api/admin/groups/7/users/8"],
+    ["DELETE", "/api/admin/groups/7"],
+  ])
+    assert.equal(
+      (
+        await adapter.request({
+          console: "admin",
+          method,
+          path,
+          ...(body ? { body } : {}),
+        })
+      ).status,
+      200,
+      path,
+    );
+  for (const path of [
+    "/api/admin/groups/0",
+    "/api/admin/groups/07",
+    "/api/admin/groups/-7",
+    "/api/admin/groups/9007199254740992",
+    "/api/admin/groups/7?extra=1",
+    "/api/admin/groups/7/nested",
+    "/api/admin/groups/7#hash",
+    "/api/admin/groups?page=0&page=1",
+    "/api/admin/groups?size=101",
+    "/api/admin/groups?sort=username,asc",
+    "/api/admin/groups/7/users?sort=name,asc",
+    "/api/admin/groups/7/users?page=-1",
+    "/api/admin/groups/7/users?q=a&q=b",
+    "/api/admin/groups/7/available-users?size=0",
+    "/api/admin/groups/9007199254740992/users?page=0",
+  ])
+    await assert.rejects(
+      adapter.request({ console: "admin", path }),
+      /not allowed/,
+      path,
+    );
+  await assert.rejects(
+    adapter.request({ console: "account", path: "/api/admin/groups/7" }),
+    /not allowed/,
+  );
+});
+
+test("role membership bridge accepts exact bounded contracts and rejects malformed paths, parameters and bodies", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, options) => {
+    requests.push({ url, options });
+    return new Response("{}", { status: 200 });
+  });
+  const base = "/api/admin/roles/ROLE_AUDITOR";
+  for (const [method, suffix, body] of [
+    ["GET", ""],
+    ["GET", "?q=ada&enabled=false&page=1&size=100&sort=email,desc"],
+    ["GET", "/available-users?q=ada&page=0&size=10&sort=username,asc"],
+    ["POST", "/users", { userId: 7 }],
+    ["DELETE", "/users/7"],
+  ]) {
+    const response = await adapter.request({
+      console: "admin",
+      method,
+      path: base + suffix,
+      ...(body ? { body } : {}),
+    });
+    assert.equal(response.status, 200);
+  }
+  assert.equal(requests.length, 5);
+  for (const [method, path, body] of [
+    ["GET", base + "?page=-1"],
+    ["GET", base + "?page=1000001"],
+    ["GET", base + "?size=101"],
+    ["GET", base + "?page=01"],
+    ["GET", base + "?size=0"],
+    ["GET", base + "?q=a&q=b"],
+    ["GET", base + "?sort=password,asc"],
+    ["GET", base + "?enabled=yes"],
+    ["GET", base + "?extra=1"],
+    ["GET", base + "#fragment"],
+    ["GET", base + "?q=" + "a".repeat(201)],
+    ["GET", base + "/available-users?enabled=true"],
+    ["GET", base + "/available-users/1"],
+    ["DELETE", base + "/users/0"],
+    ["DELETE", base + "/users/9007199254740992"],
+    ["DELETE", base + "/users/7/nested"],
+    ["DELETE", base + "/users/7?q=a"],
+    ["POST", base + "/users", { userId: "7" }],
+    ["POST", base + "/users", { userId: -1 }],
+    ["POST", base + "/users", { userId: 9007199254740992 }],
+    ["POST", base + "/users", { userId: 7, role: "ROLE_ADMIN" }],
+    ["POST", base + "/users", [7]],
+    ["POST", base + "/users", null],
+    ["GET", "/api/admin/roles/ROLE_lower?size=10"],
+    ["GET", "/api/admin/roles/ROLE_" + "A".repeat(46)],
+    ["GET", "/api/admin/roles/ROLE_AUDITOR%2Fusers"],
+    ["POST", base + "/available-users"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path, body }),
+      /not allowed|Invalid role user assignment/,
+    );
+  }
+  await assert.rejects(
+    adapter.request({ console: "account", method: "GET", path: base }),
+    /not allowed/,
+  );
+  assert.equal(requests.length, 5, "Rejected requests must never reach fetch");
+});
+
 function harness(fetcher) {
   let current = { ...session };
   const cleared = [];
@@ -82,6 +261,40 @@ test("keeps forbidden responses authoritative and rejects unapproved API paths",
     adapter.request({ console: "account", path: "/oauth2/token" }),
     /not allowed/,
   );
+});
+
+test("allows bounded user required-action reads and mutations", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url, init) => {
+    requests.push([new URL(url).pathname, init.method]);
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  for (const [method, path] of [
+    ["GET", "/api/admin/required-actions/users/1"],
+    ["POST", "/api/admin/required-actions/users/1/UPDATE_PASSWORD"],
+    ["DELETE", "/api/admin/required-actions/users/1/UPDATE_PASSWORD"],
+  ]) {
+    const response = await adapter.request({ console: "admin", method, path });
+    assert.equal(response.status, 200);
+  }
+  assert.equal(requests.length, 3);
+  for (const [method, path] of [
+    ["PUT", "/api/admin/required-actions/users/1/UPDATE_PASSWORD"],
+    ["GET", "/api/admin/required-actions/users/1/UPDATE_PASSWORD"],
+    ["POST", "/api/admin/required-actions/users/1"],
+    ["GET", "/api/admin/required-actions/users/1?all=true"],
+    ["GET", "/api/admin/required-actions/users/01"],
+    ["POST", "/api/admin/required-actions/users/1/../UPDATE_PASSWORD"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path }),
+      /not allowed/,
+    );
+  }
+  assert.equal(requests.length, 3);
 });
 
 test("allows only the read-only readiness probe for the Admin dashboard", async () => {
@@ -263,7 +476,7 @@ test("allows bounded native realm-role composite reads and mutations only", asyn
   }
   assert.equal(requests.length, 7);
   for (const [method, path] of [
-    ["GET", "/api/admin/roles/ROLE_ADMIN?size=100"],
+    ["GET", "/api/admin/roles/ROLE_ADMIN?size=101"],
     [
       "GET",
       "/api/admin/roles/ROLE_ADMIN/available-composites?q=V&page=0&size=10&sort=name,asc",
@@ -570,6 +783,39 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/users?q=alice&page=1&size=20&sort=username,asc",
   });
   assert.equal(users.status, 200);
+  const filteredUsers = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users?q=alice&page=0&size=20&sort=username,asc&enabled=true",
+  });
+  assert.equal(filteredUsers.status, 200);
+  const userDetail = await adapter.request({
+    console: "admin",
+    path: "/api/admin/users/2",
+  });
+  assert.equal(userDetail.status, 200);
+  for (const path of [
+    "/api/admin/users/2/groups?q=platform&page=0&size=10&sort=name,asc",
+    "/api/admin/users/2/sessions?page=0&size=10&sort=lastAccessTime,desc",
+    "/api/admin/users/2/consents?page=0&size=10&sort=id.registeredClientId,asc",
+    "/api/admin/users/2/events?page=0&size=10&sort=occurredAt,desc",
+  ]) {
+    const response = await adapter.request({ console: "admin", path });
+    assert.equal(response.status, 200);
+  }
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users/2/events?include=secrets",
+    }),
+    /not allowed/,
+  );
+  await assert.rejects(
+    adapter.request({
+      console: "admin",
+      path: "/api/admin/users?q=alice&page=0&size=20&sort=username,asc&enabled=yes",
+    }),
+    /not allowed/,
+  );
   const createdUser = await adapter.request({
     console: "admin",
     path: "/api/admin/users",
@@ -901,7 +1147,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   assert.equal(revokedOfflineSession.status, 200);
   const revokedConsent = await adapter.request({
     console: "admin",
-    path: "/api/admin/consents/consents/account-console/alice",
+    path: "/api/admin/consents/account-console/alice",
     method: "DELETE",
   });
   assert.equal(revokedConsent.status, 200);
@@ -987,7 +1233,6 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     { path: "/api/admin/clients/client-1?includeSecrets=true", method: "PUT" },
     { path: "/api/admin/clients/client-1/nested", method: "PUT" },
     { path: "/api/admin/clients/client-1/secret", method: "DELETE" },
-    { path: "/api/admin/clients/client-1/secret", method: "POST" },
     {
       path: "/api/admin/clients/client-1/native-metadata/secret",
       method: "PUT",
@@ -1376,7 +1621,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/roles/ROLE_NATIVE_VIEWER/users/1",
+      path: "/api/admin/roles/ROLE_NATIVE_VIEWER/users/0",
       method: "DELETE",
     }),
     /not allowed/,
@@ -1456,7 +1701,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/consents/consents/client%2Fother/alice",
+      path: "/api/admin/consents/client%2Fother/alice",
       method: "DELETE",
     }),
     /not allowed/,
@@ -1612,7 +1857,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     /not allowed/,
   );
   await assert.rejects(
-    adapter.request({ console: "admin", path: "/api/admin/users/2" }),
+    adapter.request({ console: "admin", path: "/api/admin/users/2/nested" }),
     /not allowed/,
   );
   await assert.rejects(

@@ -69,6 +69,21 @@ function makeResponse(path, method, body) {
       number: 0,
     };
   }
+  if (/^\/api\/admin\/roles\/ROLE_[A-Z0-9_]+(?:\?|$)/.test(path)) {
+    const name = path.split("?")[0].split("/").at(-1);
+    return {
+      name,
+      description: "Standard user",
+      userCount: 0,
+      protectedRole: ["ROLE_USER", "ROLE_ADMIN"].includes(name),
+      users: {
+        content: [],
+        page: { number: 0, size: 10, totalElements: 0, totalPages: 0 },
+      },
+      compositeRoles: [],
+      compositeClientRoles: [],
+    };
+  }
   if (path.startsWith("/api/admin/roles?")) {
     return {
       content: [
@@ -94,6 +109,21 @@ function makeResponse(path, method, body) {
       number: 0,
     };
   }
+  if (path === "/api/admin/clients/console-client") {
+    return {
+      id: "console-client",
+      clientId: "console-client",
+      clientName: "Console Client",
+      enabled: true,
+      clientAuthenticationMethods: ["none"],
+      authorizationGrantTypes: ["authorization_code", "refresh_token"],
+      scopes: ["openid"],
+      redirectUris: ["https://client.example.test/callback"],
+      postLogoutRedirectUris: [],
+      dpopSigningAlgorithms: ["RS256", "ES256"],
+      ...(method === "PUT" ? body : {}),
+    };
+  }
   if (path.startsWith("/api/admin/clients?")) {
     return {
       content: [
@@ -111,6 +141,9 @@ function makeResponse(path, method, body) {
       totalPages: 1,
       number: 0,
     };
+  }
+  if (path === "/api/admin/client-scopes/profile" && method === "GET") {
+    return { id: "profile", name: "profile", description: "Profile scope", builtIn: false };
   }
   if (path.startsWith("/api/admin/client-scopes?")) {
     return {
@@ -293,7 +326,7 @@ function makeResponse(path, method, body) {
 
 async function renderConsole(consoleName = "account", options = {}) {
   const dom = new JSDOM('<div id="app"></div>', {
-    url: `https://renderer.invalid/native?console=${consoleName}`,
+    url: `https://renderer.invalid/native?console=${consoleName}${options.hash ?? ""}`,
     pretendToBeVisual: true,
   });
   const calls = [];
@@ -315,7 +348,10 @@ async function renderConsole(consoleName = "account", options = {}) {
               method: requestMethod,
               body,
             })
-          : makeResponse(requestPath, requestMethod, body);
+          : options.response
+            ? ((await options.response(requestPath, requestMethod, body)) ??
+              makeResponse(requestPath, requestMethod, body))
+            : makeResponse(requestPath, requestMethod, body);
         if (
           responseBody &&
           typeof responseBody === "object" &&
@@ -394,12 +430,38 @@ async function renderConsole(consoleName = "account", options = {}) {
     cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
     desktopApi: api,
     __KITEZH_NATIVE_BOOTSTRAP__: {
-      locale: "en",
-      theme: "light",
+      locale: options.locale ?? "en",
+      theme: options.theme ?? "light",
+      icons: options.icons ?? {},
       messages: {
-        en: { accountTitle: "Account", settings: "Settings" },
-        tr: { accountTitle: "Hesap", settings: "Ayarlar" },
+        en: {
+          accountTitle: "Account",
+          settings: "Settings",
+          adminUserActionError: "The user action could not be completed.",
+          adminPasskeyCreated: "Added",
+          adminPasskeyLastUsed: "Last used",
+          adminPasskeySignatureCount: "Signature counter",
+          adminPasskeyUserVerification: "User verification",
+          adminYes: "Yes",
+          adminNo: "No",
+          adminUserTemporaryPasswordHelp:
+            "Require the user to choose a new password the next time they sign in.",
+        },
+        tr: {
+          accountTitle: "Hesap",
+          settings: "Ayarlar",
+          adminUserActionError: "Kullanıcı işlemi tamamlanamadı.",
+          adminPasskeyCreated: "Eklenme",
+          adminPasskeyLastUsed: "Son kullanım",
+          adminPasskeySignatureCount: "İmza sayacı",
+          adminPasskeyUserVerification: "Kullanıcı doğrulaması",
+          adminYes: "Evet",
+          adminNo: "Hayır",
+          adminUserTemporaryPasswordHelp:
+            "Kullanıcının sonraki girişinde yeni bir parola seçmesini zorunlu tutun.",
+        },
       },
+      ...(options.messages ? { messages: options.messages } : {}),
     },
   };
   const previousGlobals = new Map();

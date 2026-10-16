@@ -58,7 +58,7 @@ for attempt in $(seq 1 30); do
   fi
   sleep 1
 done
-test "$fixture_ready" = true
+[[ "$fixture_ready" == true ]]
 
 metro_ready=false
 for attempt in $(seq 1 60); do
@@ -68,7 +68,7 @@ for attempt in $(seq 1 60); do
   fi
   sleep 1
 done
-test "$metro_ready" = true
+[[ "$metro_ready" == true ]]
 
 CI=1 pnpm exec expo prebuild --clean --platform android
 if ! (cd android && ./gradlew --no-daemon --stacktrace assembleDebug) > "$run_dir/gradle.log" 2>&1; then
@@ -77,7 +77,7 @@ if ! (cd android && ./gradlew --no-daemon --stacktrace assembleDebug) > "$run_di
 fi
 
 apk_path="android/app/build/outputs/apk/debug/app-debug.apk"
-test -f "$apk_path"
+[[ -f "$apk_path" ]]
 adb -s "$android_serial" install -r "$apk_path"
 adb -s "$android_serial" shell monkey -p io.github.susimsek.kitezh.mobile 1 >/dev/null
 

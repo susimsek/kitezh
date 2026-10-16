@@ -97,7 +97,6 @@ function onePixelPng() {
 
 async function launchDesktop({
   devTools = false,
-  background = false,
   autoUpdate = "false",
   recoveryState,
   updatePreviewState,
@@ -122,10 +121,10 @@ async function launchDesktop({
     cwd: desktopDirectory,
     env: {
       ...process.env,
+      DESKTOP_E2E_BACKGROUND: "true",
       DESKTOP_API_BASE_URL: "http://127.0.0.1:9090",
       DESKTOP_AUTO_UPDATE: autoUpdate,
       DESKTOP_DEVTOOLS: devTools ? "true" : "false",
-      ...(background ? { DESKTOP_E2E_BACKGROUND: "true" } : {}),
       ...(updatePreviewState
         ? {
             DESKTOP_UPDATE_PREVIEW: "true",
@@ -320,6 +319,409 @@ test("opens the native console chooser and exposes the narrow desktop bridge", a
         isDesktop: true,
         version: packageVersion,
       },
+    );
+  } finally {
+    await application.close();
+  }
+});
+
+test("translates native application, edit, view, window, and help menus to Turkish", async () => {
+  const application = await launchDesktop();
+  try {
+    const window = await nativeMainWindow(application);
+    await window.waitForLoadState("domcontentloaded");
+    await window.evaluate(() => window.desktopApi.language.set("tr"));
+    const labels = await application.evaluate(({ Menu }) => {
+      const menu = Menu.getApplicationMenu();
+      return {
+        top: menu.items.map((item) => item.label),
+        app: menu.items[0].submenu.items.map((item) => item.label),
+        edit: menu.items[1].submenu.items.map((item) => item.label),
+        view: menu.items[2].submenu.items.map((item) => item.label),
+        window: menu.items[3].submenu.items.map((item) => item.label),
+      };
+    });
+    assert.deepEqual(labels.top.slice(1), [
+      "Düzenle",
+      "Görünüm",
+      "Pencere",
+      "Yardım",
+    ]);
+    assert.ok(labels.app.includes("Kitezh hakkında"));
+    assert.ok(labels.app.includes("Oturumu kapat"));
+    assert.ok(labels.edit.includes("Geri al"));
+    assert.ok(labels.edit.includes("Tümünü seç"));
+    assert.ok(labels.view.includes("Yakınlaştır"));
+    assert.ok(labels.view.includes("Tam ekranı aç/kapat"));
+    assert.ok(labels.window.includes("Simge durumuna küçült"));
+    assert.ok(labels.window.includes("Kapat"));
+  } finally {
+    await application.close();
+  }
+});
+
+test("matches the web user-detail sections in a hidden native Admin window", async () => {
+  const application = await launchDesktop();
+  try {
+    await application.evaluate(({ shell }) => {
+      shell.openExternal = async (url) => {
+        globalThis.__pendingAuthorizationUrl = url;
+      };
+      const json = (value) =>
+        new Response(JSON.stringify(value), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      globalThis.fetch = async (url, init) => {
+        const requestUrl = new URL(String(url));
+        const path = requestUrl.pathname;
+        const method = String(init?.method ?? "GET").toUpperCase();
+        if (path === "/oauth2/token")
+          return json({
+            access_token: "user-detail-test-token",
+            expires_in: 3600,
+          });
+        if (path === "/api/admin/whoami")
+          return json({
+            access: {
+              isAdmin: true,
+              viewUsers: true,
+              queryUsers: true,
+              manageUsers: true,
+              viewRoles: true,
+              manageRoles: true,
+              queryGroups: true,
+              viewGroups: true,
+              manageGroups: true,
+              queryClients: true,
+              viewClients: true,
+              manageClients: true,
+              viewSessions: true,
+              manageSessions: true,
+              viewConsents: true,
+              manageConsents: true,
+              viewEvents: true,
+              manageEvents: true,
+              viewKeys: true,
+              manageKeys: true,
+            },
+          });
+        if (path === "/api/admin/dashboard")
+          return json({ clients: 1, users: 1, sessions: 1, consents: 0 });
+        if (path === "/actuator/health/readiness")
+          return json({ status: "UP" });
+        if (
+          path === "/api/admin/events" &&
+          requestUrl.searchParams.get("size") === "6"
+        )
+          return json({ content: [], number: 0, totalPages: 0 });
+        if (path === "/api/admin/users")
+          return json({
+            content: [
+              {
+                id: 1,
+                username: "admin",
+                firstName: "Yami",
+                lastName: "Yugi",
+                email: "admin@example.test",
+                enabled: true,
+                emailVerified: false,
+                authorities: ["ROLE_USER", "ROLE_ADMIN"],
+              },
+            ],
+            number: 0,
+            totalPages: 1,
+            totalElements: 1,
+          });
+        if (path === "/api/admin/users/1")
+          return json({
+            id: 1,
+            username: "admin",
+            firstName: "Yami",
+            lastName: "Yugi",
+            email: "admin@example.test",
+            enabled: true,
+            emailVerified: false,
+            createdAt: "2026-10-13T14:11:42Z",
+            updatedAt: "2026-10-13T14:11:42Z",
+            failedLoginCount: 0,
+            totpEnabled: false,
+            authorities: ["ROLE_USER", "ROLE_ADMIN"],
+            assignedRoles: ["ROLE_USER", "ROLE_ADMIN"],
+            effectiveRoles: ["ROLE_USER", "ROLE_ADMIN"],
+            groupMappings: [
+              {
+                groupId: 3,
+                groupPath: "/platform-administrators",
+                roles: ["ROLE_ADMIN"],
+              },
+            ],
+          });
+        if (path === "/api/admin/users/1/profile-attributes")
+          return json({
+            definitions: [
+              {
+                name: "username",
+                builtIn: true,
+                enabled: true,
+                description: "The user's username.",
+              },
+              {
+                name: "email",
+                builtIn: true,
+                enabled: true,
+                description: "The user's email address.",
+              },
+              {
+                name: "department",
+                builtIn: false,
+                enabled: true,
+                displayName: "Department",
+                type: "STRING",
+                description: "The user's department.",
+              },
+            ],
+            attributes: { department: ["Platform"] },
+          });
+        if (path === "/api/admin/required-actions/users/1") {
+          globalThis.__detailRequiredReads =
+            (globalThis.__detailRequiredReads ?? 0) + 1;
+          return json([
+            {
+              key: "UPDATE_PASSWORD",
+              displayName: "Update password",
+              assigned: true,
+              enabled: true,
+              globalPolicy: true,
+            },
+            {
+              key: "CONFIGURE_RECOVERY_CODES",
+              displayName: "Set up recovery codes",
+              assigned: Boolean(globalThis.__recoveryAssigned),
+              enabled: true,
+              globalPolicy: false,
+            },
+          ]);
+        }
+        if (
+          path ===
+            "/api/admin/required-actions/users/1/CONFIGURE_RECOVERY_CODES" &&
+          ["POST", "DELETE"].includes(method)
+        ) {
+          globalThis.__recoveryAssigned = method === "POST";
+          return new Response(null, { status: 204 });
+        }
+        if (path === "/api/admin/users/1/webauthn/credentials")
+          return json({
+            content: [],
+            number: 0,
+            totalPages: 0,
+            totalElements: 0,
+          });
+        if (path === "/api/admin/roles")
+          return json({
+            content: [{ name: "ROLE_ADMIN" }, { name: "ROLE_USER" }],
+            number: 0,
+            totalPages: 1,
+          });
+        if (path === "/api/admin/users/1/groups")
+          return json({
+            content: [
+              {
+                id: 3,
+                name: "platform-administrators",
+                path: "/platform-administrators",
+                roles: ["ROLE_ADMIN"],
+              },
+            ],
+            number: 0,
+            totalPages: 1,
+          });
+        if (path === "/api/admin/groups") return json({ content: [] });
+        if (path === "/api/admin/users/1/sessions")
+          return json({
+            content: [
+              {
+                id: "session-1",
+                username: "admin",
+                createdAt: "2026-10-13T18:34:36Z",
+                lastAccessedAt: "2026-10-13T19:14:08Z",
+                expiresAt: "2026-10-13T19:44:08Z",
+                authorizationCount: 2,
+              },
+            ],
+            number: 0,
+            totalPages: 1,
+            totalElements: 1,
+          });
+        if (
+          ["/api/admin/users/1/consents", "/api/admin/users/1/events"].includes(
+            path,
+          )
+        )
+          return json({
+            content: [],
+            number: 0,
+            totalPages: 0,
+            totalElements: 0,
+          });
+        throw new Error(
+          `Unexpected user-detail E2E request: ${method} ${path}`,
+        );
+      };
+    });
+    const window = await nativeMainWindow(application);
+    let chooser;
+    for (let attempt = 0; attempt < 100 && !chooser; attempt += 1) {
+      chooser = application
+        .windows()
+        .find((page) => page.url() === "app://renderer/desktop-login");
+      if (!chooser) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(chooser);
+    await chooser
+      .getByRole("button", { name: "Sign in to Admin Console" })
+      .click();
+    await window
+      .getByRole("button", { name: "Sign in", exact: true })
+      .waitFor();
+    await application.evaluate(({ app }) => {
+      const state = new URL(
+        globalThis.__pendingAuthorizationUrl,
+      ).searchParams.get("state");
+      app.emit(
+        "open-url",
+        { preventDefault() {} },
+        `kitezh://oauth/callback?state=${state}&code=detail-test-code`,
+      );
+    });
+    await window
+      .getByRole("heading", { name: "Dashboard", exact: true })
+      .waitFor();
+    await window.getByRole("button", { name: "Users", exact: true }).click();
+    await window
+      .locator('[data-action="admin-user-detail-open"][data-id="1"]')
+      .click();
+    await window.locator(".admin-user-detail-overview").waitFor();
+    assert.equal(await window.locator(".topbar h1").count(), 0);
+    assert.equal(
+      await window.locator(".admin-user-detail-heading h2").innerText(),
+      "admin",
+    );
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Log in as user" })
+        .getAttribute("class"),
+      "info-button",
+    );
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Disable user" })
+        .getAttribute("class"),
+      "warning-button",
+    );
+    assert.equal(
+      await window
+        .getByRole("button", { name: "Log in as user" })
+        .locator(".button-icon svg")
+        .count(),
+      1,
+    );
+    assert.equal(
+      await window
+        .locator(".admin-user-detail-switches input[type=checkbox]")
+        .count(),
+      2,
+    );
+    assert.equal(
+      await window.locator(".admin-user-profile-fields .field").count(),
+      5,
+    );
+    await captureBackgroundWindow(
+      application,
+      window,
+      path.join(os.tmpdir(), `kitezh-user-details-${process.pid}.png`),
+    );
+    await window.locator('[data-tab="credentials"]').click();
+    await window.getByRole("heading", { name: "Required actions" }).waitFor();
+    assert.equal(
+      await window.locator(".admin-user-credentials-grid > .card").count(),
+      5,
+    );
+    assert.equal(
+      await window
+        .locator('[data-action="admin-user-detail-required-action"]')
+        .count(),
+      2,
+    );
+    assert.equal(await window.locator('[name="temporary"]').isChecked(), true);
+    assert.equal(
+      await window
+        .locator('.admin-user-detail-form-actions button[type="submit"]')
+        .getAttribute("form"),
+      "admin-user-detail-password-form",
+    );
+    assert.ok(
+      (await application.evaluate(() => globalThis.__detailRequiredReads)) >= 1,
+    );
+    await window
+      .locator(".admin-user-detail-switch", {
+        hasText: "Set up recovery codes",
+      })
+      .click();
+    assert.equal(
+      await window
+        .getByRole("checkbox", { name: "Set up recovery codes" })
+        .isChecked(),
+      true,
+    );
+    assert.equal(
+      await application.evaluate(() => globalThis.__recoveryAssigned),
+      true,
+    );
+    await captureBackgroundWindow(
+      application,
+      window,
+      path.join(os.tmpdir(), `kitezh-user-credentials-${process.pid}.png`),
+    );
+    await window.locator('[data-tab="roles"]').click();
+    await window.getByRole("heading", { name: "Roles", exact: true }).waitFor();
+    assert.equal(await window.locator(".admin-role-option").count(), 2);
+    await window.locator('[data-tab="groups"]').click();
+    await window.getByRole("heading", { name: "Group memberships" }).waitFor();
+    assert.equal(
+      await window.locator("#admin-user-detail-group-search").count(),
+      1,
+    );
+    assert.match(
+      await window.locator(".admin-user-group-table").innerText(),
+      /platform-administrators/,
+    );
+    await window.locator('[data-tab="sessions"]').click();
+    await window.locator(".admin-user-session-table").waitFor();
+    assert.match(
+      await window.locator(".admin-user-session-table").innerText(),
+      /admin/,
+    );
+    await window.locator('[data-tab="consents"]').click();
+    await window.locator(".admin-user-related-card .empty").waitFor();
+    assert.equal(
+      await window.locator(".admin-user-related-card h2").count(),
+      0,
+    );
+    await window.locator('[data-tab="events"]').click();
+    await window.locator(".admin-user-related-card .empty").waitFor();
+    assert.equal(
+      await window.locator(".admin-user-related-card h2").count(),
+      0,
+    );
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every(
+          (item) => !item.isVisible() && !item.isFocused(),
+        ),
+      ),
+      true,
     );
   } finally {
     await application.close();
@@ -2866,6 +3268,32 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(
             requestUrl.pathname,
           ) &&
+          requestMethod === "GET"
+        ) {
+          const name = requestUrl.pathname.split("/").at(-1);
+          const role = globalThis.__updatedRoles?.[name] ??
+            (globalThis.__createdRoles ?? []).find(
+              (role) => role.name === name,
+            ) ?? { name, description: "Scoped authorization role" };
+          return new Response(
+            JSON.stringify({
+              ...role,
+              userCount: 0,
+              protectedRole: ["ROLE_ADMIN", "ROLE_USER"].includes(name),
+              users: {
+                content: [],
+                page: { number: 0, size: 10, totalElements: 0, totalPages: 0 },
+              },
+              compositeRoles: [],
+              compositeClientRoles: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}$/.test(
+            requestUrl.pathname,
+          ) &&
           requestMethod === "PUT"
         ) {
           const roleName = requestUrl.pathname.split("/").at(-1);
@@ -2986,7 +3414,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           );
         }
         if (
-          /^\/api\/admin\/groups\/[1-9]\d*\/name$/.test(requestUrl.pathname) &&
+          /^\/api\/admin\/groups\/[1-9]\d*$/.test(requestUrl.pathname) &&
           requestMethod === "PUT"
         ) {
           const groupId = Number(requestUrl.pathname.split("/")[4]);
@@ -3002,7 +3430,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             group.path = `Organization / ${body.name}`;
           }
           return new Response(
-            JSON.stringify({ id: groupId, name: body.name }),
+            JSON.stringify({ ...group, ...body, id: groupId }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
@@ -3021,7 +3449,13 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
           globalThis.__groupRoleUpdates ??= {};
           globalThis.__groupRoleUpdates[groupId] = body.roles;
           return new Response(
-            JSON.stringify({ id: groupId, roles: body.roles }),
+            JSON.stringify({
+              ...(globalThis.__createdGroups ?? []).find(
+                (group) => group.id === groupId,
+              ),
+              id: groupId,
+              roles: body.roles,
+            }),
             {
               status: 200,
               headers: { "Content-Type": "application/json" },
@@ -3141,6 +3575,28 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
                 { userId: 2, username: "user", permission: "VIEW" },
               ],
             ),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (
+          /^\/api\/admin\/groups\/[1-9]\d*$/.test(requestUrl.pathname) &&
+          requestMethod === "GET"
+        ) {
+          const id = Number(requestUrl.pathname.split("/").at(-1));
+          return new Response(
+            JSON.stringify({
+              id,
+              name: "finance",
+              path: "Organization / finance",
+              roles: globalThis.__groupRoleUpdates?.[id] ?? [],
+              userCount: 0,
+              attributes: {},
+              defaultGroup: false,
+              parentId: null,
+              ...(globalThis.__createdGroups ?? []).find(
+                (group) => group.id === id,
+              ),
+            }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
         }
@@ -3475,6 +3931,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
         ) {
           globalThis.__adminClientDeleteRequests ??= [];
           globalThis.__adminClientDeleteRequests.push(requestUrl.pathname);
+          globalThis.__adminClientDeleted = true;
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(null, { status: 204 });
         }
@@ -3516,15 +3973,17 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
             (query ? "Admin Console" : "Account Console");
           return new Response(
             JSON.stringify({
-              content: [
-                {
-                  id: "client-1",
-                  clientId,
-                  clientName,
-                  scopes: ["openid", "admin-api"],
-                  requireProofKey: true,
-                },
-              ],
+              content: globalThis.__adminClientDeleted
+                ? []
+                : [
+                    {
+                      id: "client-1",
+                      clientId,
+                      clientName,
+                      scopes: ["openid", "admin-api"],
+                      requireProofKey: true,
+                    },
+                  ],
               number: 0,
               totalPages: 1,
               totalElements: 1,
@@ -4689,7 +5148,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       name: "Sign out",
       exact: true,
     });
-    assert.equal(await signOut.locator(".button-icon").textContent(), "↪");
+    assert.equal(await signOut.locator(".button-icon svg").count(), 1);
     assert.equal(
       await signOut.locator(".button-icon").getAttribute("aria-hidden"),
       "true",
@@ -5395,10 +5854,11 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     await window.getByText("ROLE_ADMIN").waitFor();
     const roleQuery = window.getByRole("searchbox", { name: "Search roles" });
     await roleQuery.fill("AUDITOR");
-    await window.getByRole("button", { name: "Search roles" }).click();
-    assert.equal(
-      await window.getByRole("button", { name: "Search roles" }).isDisabled(),
-      true,
+    await window.waitForFunction(
+      () =>
+        document
+          .querySelector("#admin-role-search")
+          ?.getAttribute("aria-busy") === "true",
     );
     await window.getByText("ROLE_AUDITOR").waitFor();
     const roleRequests = await application.evaluate(
@@ -5563,7 +6023,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       exact: true,
     });
     await rolesNav.click();
-    await window.getByRole("button", { name: "Search roles" }).waitFor();
+    await window.getByRole("searchbox", { name: "Search roles" }).waitFor();
     await window
       .locator(".topbar")
       .getByRole("button", { name: "Create role", exact: true })
@@ -5621,7 +6081,10 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .getByRole("button", { name: "Rol oluştur", exact: true })
       .click();
     await window.getByText("Rol oluşturuldu.", { exact: true }).waitFor();
-    await window.getByText("ROLE_NATIVE_VIEWER", { exact: true }).waitFor();
+    await window
+      .getByRole("heading", { name: "ROLE_NATIVE_VIEWER", exact: true })
+      .first()
+      .waitFor();
     assert.deepEqual(
       await application.evaluate(() => globalThis.__adminRoleCreateRequests),
       [
@@ -5637,7 +6100,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       .locator('[name="description"]')
       .fill("Rejected description");
     const roleUpdateSubmit = roleEditForm.getByRole("button", {
-      name: "Kaydet",
+      name: "Açıklamayı kaydet",
       exact: true,
     });
     await roleUpdateSubmit.click();
@@ -5670,7 +6133,10 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ],
     );
     await window.getByRole("button", { name: "İngilizce" }).click();
-    await window.getByRole("button", { name: "Search roles" }).waitFor();
+    await window.locator('[data-action="role-back"]').click();
+    await window.getByRole("searchbox", { name: "Search roles" }).waitFor();
+    if (await window.locator('[data-action="role-clear"]').count())
+      await window.locator('[data-action="role-clear"]').click();
     await application.evaluate(({ Tray }) => {
       globalThis.__trayTooltips = [];
       const originalSetToolTip = Tray.prototype.setToolTip;
@@ -5680,7 +6146,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       };
     });
     await window.getByRole("button", { name: "Turkish" }).click();
-    await window.getByRole("button", { name: "Rol ara" }).waitFor();
+    await window.getByRole("searchbox", { name: "Rol ara" }).waitFor();
     await application.evaluate(async () => {
       const expected = "Kitezh — güvenli kimlik konsolu";
       const deadline = Date.now() + 1000;
@@ -5696,7 +6162,7 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       "Kitezh — güvenli kimlik konsolu",
     );
     await window.getByRole("button", { name: "İngilizce" }).click();
-    await window.getByRole("button", { name: "Search roles" }).waitFor();
+    await window.getByRole("searchbox", { name: "Search roles" }).waitFor();
     await application.evaluate(async () => {
       const expected = "Kitezh — secure identity console";
       const deadline = Date.now() + 1000;
@@ -5713,8 +6179,9 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     const createdRoleRow = window.locator(
       '[data-role-name="ROLE_NATIVE_VIEWER"]',
     );
+    await createdRoleRow.locator("summary").click();
     await createdRoleRow
-      .getByRole("button", { name: "Delete role", exact: true })
+      .locator('[data-action="admin-role-delete-request"]')
       .click();
     await createdRoleRow
       .getByText(
@@ -5731,8 +6198,9 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       ),
       [],
     );
+    await createdRoleRow.locator("summary").click();
     await createdRoleRow
-      .getByRole("button", { name: "Delete role", exact: true })
+      .locator('[data-action="admin-role-delete-request"]')
       .click();
     const confirmRoleDelete = createdRoleRow.getByRole("button", {
       name: "Delete role",
@@ -5752,406 +6220,104 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       exact: true,
     });
     await groupsNavigation.click();
-    assert.equal(await groupsNavigation.isDisabled(), true);
-    assert.equal(await groupsNavigation.locator(".spinner").count(), 1);
-    await window.getByText("Organization / finance").waitFor();
-    const groupQuery = window.getByRole("searchbox", { name: "Search groups" });
-    await groupQuery.fill("audit");
-    await window.getByRole("button", { name: "Search groups" }).click();
-    assert.equal(
-      await window.getByRole("button", { name: "Search groups" }).isDisabled(),
-      true,
-    );
+    await window.locator(".group-table").waitFor();
+    await window.locator("#group-query").fill("audit");
     await window.getByText("Organization / finance-audit").waitFor();
-    const groupRequests = await application.evaluate(
-      () => globalThis.__adminGroupRequests,
-    );
-    assert.deepEqual(
-      groupRequests.map((query) => new URLSearchParams(query).get("page")),
-      ["0", "0"],
-    );
-    assert.equal(new URLSearchParams(groupRequests[1]).get("q"), "audit");
-    await window
-      .locator(".topbar")
-      .getByRole("button", { name: "Create group", exact: true })
-      .click();
-    await window
-      .getByRole("heading", { name: "Create group", exact: true })
-      .waitFor();
+    assert.equal(await window.locator(".group-table th").count(), 4);
+    assert.equal(await window.locator(".admin-pagination-control").count(), 4);
+    await window.locator('[data-action="create-group"]').click();
     const groupCreateForm = window.locator(
-      'form[data-form="admin-group-create"]',
+      'form[data-form="native-group-settings"]',
     );
     await groupCreateForm.locator('[name="name"]').fill("finance");
-    const groupCreateSubmit = groupCreateForm.getByRole("button", {
-      name: "Create group",
-      exact: true,
-    });
-    await groupCreateSubmit.click();
-    assert.equal(await groupCreateSubmit.isDisabled(), true);
-    assert.equal(await groupCreateSubmit.locator(".spinner").count(), 1);
+    await groupCreateForm.locator('button[type="submit"]').click();
     await window
+      .locator("#group-name-error")
       .getByText("Group name is already registered.", { exact: true })
       .waitFor();
     await groupCreateForm.locator('[name="name"]').fill("native-operators");
-    await window.getByRole("button", { name: "Turkish" }).click();
+    await window.getByRole("button", { name: "Turkish", exact: true }).click();
     await window
       .getByRole("heading", { name: "Grup oluştur", exact: true })
       .waitFor();
-    await window.waitForFunction(() => {
-      const localeButton = document.querySelector(
-        '.sidebar-footer button[data-action="toggle-locale"]',
-      );
-      return localeButton && !localeButton.disabled;
-    });
     assert.equal(
       await groupCreateForm.locator('[name="name"]').inputValue(),
       "native-operators",
     );
-    await groupCreateForm
-      .getByRole("button", { name: "Grup oluştur", exact: true })
-      .click();
+    await groupCreateForm.locator('button[type="submit"]').click();
     await window.getByText("Grup oluşturuldu.", { exact: true }).waitFor();
-    await window.getByText("Organization / native-operators").waitFor();
-    assert.deepEqual(
-      await application.evaluate(() => globalThis.__adminGroupCreateRequests),
-      [
-        {
-          name: "finance",
-          parentId: null,
-          attributes: {},
-          defaultGroup: false,
-        },
-        {
-          name: "native-operators",
-          parentId: null,
-          attributes: {},
-          defaultGroup: false,
-        },
-      ],
-    );
-    await window.getByRole("button", { name: "İngilizce" }).click();
-    await window.getByRole("button", { name: "Search groups" }).waitFor();
-    const parentGroupRow = window.locator('[data-group-id="1"]');
-    await parentGroupRow
-      .getByRole("button", { name: "Create child group", exact: true })
-      .click();
-    const childGroupForm = parentGroupRow.locator(
-      'form[data-form="admin-group-child-create"]',
-    );
-    await childGroupForm.locator('[name="name"]').fill("regional");
-    await window.getByRole("button", { name: "Turkish" }).click();
-    await childGroupForm
-      .getByRole("heading", { name: /Alt grup oluştur/ })
-      .waitFor();
-    assert.equal(
-      await childGroupForm.locator('[name="name"]').inputValue(),
-      "regional",
-    );
-    const createChildGroup = childGroupForm.getByRole("button", {
-      name: "Alt grup oluştur",
-      exact: true,
-    });
-    await createChildGroup.click();
-    assert.equal(await createChildGroup.isDisabled(), true);
-    assert.equal(await createChildGroup.locator(".spinner").count(), 1);
-    await window.getByText("Alt grup oluşturuldu.", { exact: true }).waitFor();
-    await window.getByRole("button", { name: "İngilizce" }).click();
-    await window.getByRole("button", { name: "Search groups" }).waitFor();
-    await window
-      .getByText("Organization / finance / regional", { exact: true })
-      .waitFor();
-    assert.deepEqual(
-      await application.evaluate(() => globalThis.__adminGroupCreateRequests),
-      [
-        {
-          name: "finance",
-          parentId: null,
-          attributes: {},
-          defaultGroup: false,
-        },
-        {
-          name: "native-operators",
-          parentId: null,
-          attributes: {},
-          defaultGroup: false,
-        },
-        {
-          name: "regional",
-          parentId: 1,
-          attributes: {},
-          defaultGroup: false,
-        },
-      ],
-    );
-    const groupPermissionsToggle = parentGroupRow.getByRole("button", {
-      name: "Manage permissions",
-      exact: true,
-    });
-    await groupPermissionsToggle.click();
-    assert.equal(await groupPermissionsToggle.isDisabled(), true);
-    assert.equal(await groupPermissionsToggle.locator(".spinner").count(), 1);
-    const groupPermissionsForm = parentGroupRow.locator(
-      'form[data-form="admin-group-permissions"]',
-    );
-    await groupPermissionsForm
-      .getByRole("heading", { name: "Group permissions", exact: true })
-      .waitFor();
-    await groupPermissionsForm
-      .locator('[data-group-permission-index="0"] [name="permission"]')
-      .selectOption("MANAGE_MEMBERS");
-    await groupPermissionsForm.locator('[name="newUserId"]').selectOption("1");
-    await groupPermissionsForm
-      .locator('[name="newPermission"]')
-      .selectOption("MANAGE_GROUP");
-    await groupPermissionsForm
-      .getByRole("button", { name: "Add permission", exact: true })
-      .click();
-    assert.equal(
-      await groupPermissionsForm
-        .locator("[data-group-permission-index]")
-        .count(),
-      2,
-    );
-    await window.getByRole("button", { name: "Turkish", exact: true }).click();
-    await groupPermissionsForm
-      .getByRole("heading", { name: "Grup izinleri", exact: true })
-      .waitFor();
-    assert.equal(
-      await groupPermissionsForm
-        .locator('[data-group-permission-index="0"] [name="permission"]')
-        .inputValue(),
-      "MANAGE_MEMBERS",
-    );
-    const saveGroupPermissions = groupPermissionsForm.getByRole("button", {
-      name: "Kaydet",
-      exact: true,
-    });
-    await saveGroupPermissions.click();
-    assert.equal(await saveGroupPermissions.isDisabled(), true);
-    assert.equal(await saveGroupPermissions.locator(".spinner").count(), 1);
-    await window
-      .getByText("Grup izinleri güncellendi.", { exact: true })
-      .waitFor();
-    assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__adminGroupPermissionRequests,
-      ),
-      [
-        {
-          id: 1,
-          body: {
-            permissions: [
-              { userId: 2, permission: "MANAGE_MEMBERS" },
-              { userId: 1, permission: "MANAGE_GROUP" },
-            ],
-          },
-        },
-      ],
-    );
     await window
       .getByRole("button", { name: "İngilizce", exact: true })
       .click();
-    await window.getByRole("button", { name: "Search groups" }).waitFor();
-    await groupPermissionsForm
-      .locator('[data-group-permission-index="1"]')
-      .getByRole("button", { name: "Remove permission", exact: true })
+    await window.locator("#group-tab-details").waitFor();
+    await window.locator("#group-name").fill("native-operators-renamed");
+    await window
+      .locator('[data-form="native-group-settings"] button[type="submit"]')
       .click();
-    assert.equal(
-      await groupPermissionsForm
-        .locator("[data-group-permission-index]")
-        .count(),
-      1,
-    );
-    const saveGroupPermissionsEnglish = groupPermissionsForm.getByRole(
-      "button",
-      { name: "Save", exact: true },
-    );
-    await saveGroupPermissionsEnglish.click();
-    assert.equal(await saveGroupPermissionsEnglish.isDisabled(), true);
-    assert.equal(
-      await saveGroupPermissionsEnglish.locator(".spinner").count(),
-      1,
-    );
+    await window.getByText("Group updated.", { exact: true }).waitFor();
+    await window.locator("#group-tab-roles").click();
+    await window
+      .locator('input[name="roles"][value="ROLE_USER_VIEWER"]')
+      .check();
+    await window
+      .locator('[data-form="native-group-roles"] button[type="submit"]')
+      .click();
+    await window.getByText("Group roles updated.", { exact: true }).waitFor();
+    await window.locator("#group-tab-permissions").click();
+    await window
+      .locator("#group-permission-value-0")
+      .selectOption("MANAGE_MEMBERS");
+    await window.locator('[data-action="group-permission-add"]').click();
+    await window.locator("#group-permission-user-1").selectOption("1");
+    await window
+      .locator("#group-permission-value-1")
+      .selectOption("MANAGE_GROUP");
+    await window
+      .locator('[data-form="native-group-permissions"] button[type="submit"]')
+      .click();
     await window
       .getByText("Group permissions updated.", { exact: true })
       .waitFor();
-    assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__adminGroupPermissionRequests,
-      ),
-      [
-        {
-          id: 1,
-          body: {
-            permissions: [
-              { userId: 2, permission: "MANAGE_MEMBERS" },
-              { userId: 1, permission: "MANAGE_GROUP" },
-            ],
-          },
-        },
-        {
-          id: 1,
-          body: {
-            permissions: [{ userId: 2, permission: "MANAGE_MEMBERS" }],
-          },
-        },
-      ],
-    );
-    const createdGroupRow = window.locator('[data-group-id="99"]');
-    await createdGroupRow
-      .getByRole("button", { name: "Edit group name", exact: true })
+    await window
+      .locator('[data-action="group-permission-remove"][data-index="1"]')
       .click();
-    const groupNameForm = createdGroupRow.locator(
-      'form[data-form="admin-group-rename"]',
-    );
-    await groupNameForm
-      .locator('[name="name"]')
-      .fill("native-operators-renamed");
-    const saveGroupName = groupNameForm.getByRole("button", {
-      name: "Save",
-      exact: true,
-    });
-    await saveGroupName.click();
-    assert.equal(await saveGroupName.isDisabled(), true);
-    assert.equal(await saveGroupName.locator(".spinner").count(), 1);
-    await window.getByText("Group name updated.", { exact: true }).waitFor();
-    assert.deepEqual(
-      await application.evaluate(() => globalThis.__adminGroupRenameRequests),
-      [{ id: 99, body: { name: "native-operators-renamed" } }],
-    );
-    await createdGroupRow
-      .getByRole("button", { name: "Edit group roles", exact: true })
+    await window
+      .locator('[data-form="native-group-permissions"] button[type="submit"]')
       .click();
-    const groupRolesForm = createdGroupRow.locator(
-      'form[data-form="admin-group-roles"]',
-    );
-    await groupRolesForm
-      .locator('[name="roles"][value="ROLE_USER_VIEWER"]')
-      .check();
-    const saveGroupRoles = groupRolesForm.getByRole("button", {
-      name: "Save",
-      exact: true,
-    });
-    await saveGroupRoles.click();
-    assert.equal(await saveGroupRoles.isDisabled(), true);
-    assert.equal(await saveGroupRoles.locator(".spinner").count(), 1);
-    await window.getByText("Group roles updated.", { exact: true }).waitFor();
-    assert.deepEqual(
-      await application.evaluate(() => globalThis.__adminGroupRoleRequests),
-      [{ id: 99, body: { roles: ["ROLE_USER_VIEWER"] } }],
-    );
-    await createdGroupRow
-      .getByRole("button", { name: "Manage members", exact: true })
+    await window
+      .getByText("Group permissions updated.", { exact: true })
+      .waitFor();
+    await window.locator("#group-tab-members").click();
+    await window.locator("#group-candidate-query").fill("native");
+    await window
+      .locator('[data-action="group-candidate-select"]')
+      .first()
       .click();
-    await createdGroupRow.getByText("native-member", { exact: true }).waitFor();
-    const addGroupMember = createdGroupRow.getByRole("button", {
-      name: "Add to group",
-      exact: true,
-    });
-    assert.equal(
-      await addGroupMember.locator(".button-icon").textContent(),
-      "+",
-    );
-    assert.equal(
-      await addGroupMember.locator(".button-icon").getAttribute("aria-hidden"),
-      "true",
-    );
-    await addGroupMember.click();
-    assert.equal(await addGroupMember.isDisabled(), true);
-    assert.equal(await addGroupMember.locator(".spinner").count(), 1);
+    await window.locator('[data-action="group-member-add"]').click();
     await window.getByText("User added to group.", { exact: true }).waitFor();
-    await window.getByRole("button", { name: "Turkish", exact: true }).click();
+    await window.locator('[data-action="group-member-remove"]').click();
     await window
-      .getByRole("button", { name: "Gruptan çıkar", exact: true })
+      .getByText("User removed from group.", { exact: true })
       .waitFor();
-    const requestRemoveMember = createdGroupRow.getByRole("button", {
-      name: "Gruptan çıkar",
-      exact: true,
-    });
-    assert.equal(
-      await requestRemoveMember.locator(".button-icon").textContent(),
-      "×",
-    );
-    assert.equal(
-      await requestRemoveMember
-        .locator(".button-icon")
-        .getAttribute("aria-hidden"),
-      "true",
-    );
-    await requestRemoveMember.click();
+    await window.locator('[data-action="group-back"]').click();
+    await window.locator('[data-action="group-clear"]').click();
+    const createdGroupRow = window.locator('[data-group-id="99"]');
+    await createdGroupRow.locator("summary").click();
     await createdGroupRow
-      .getByText("Bu kullanıcı gruptan çıkarılsın mı? Erişimi güncellenecek.", {
-        exact: true,
-      })
-      .waitFor();
-    await createdGroupRow
-      .getByRole("button", { name: "Vazgeç", exact: true })
-      .click();
-    assert.equal(
-      (
-        await application.evaluate(() => globalThis.__adminGroupMemberRequests)
-      ).filter((item) => item.method === "DELETE").length,
-      0,
-    );
-    await createdGroupRow
-      .getByRole("button", { name: "Gruptan çıkar", exact: true })
-      .click();
-    const confirmRemoveMember = createdGroupRow.getByRole("button", {
-      name: "Gruptan çıkar",
-      exact: true,
-    });
-    await confirmRemoveMember.click();
-    assert.equal(await confirmRemoveMember.isDisabled(), true);
-    assert.equal(await confirmRemoveMember.locator(".spinner").count(), 1);
-    await window
-      .getByText("Kullanıcı gruptan çıkarıldı.", { exact: true })
-      .waitFor();
-    assert.equal(
-      (
-        await application.evaluate(() => globalThis.__adminGroupMemberRequests)
-      ).filter((item) => item.method === "DELETE").length,
-      1,
-    );
-    await window
-      .getByRole("button", { name: "İngilizce", exact: true })
-      .click();
-    await window
-      .getByRole("button", { name: "Search groups", exact: true })
-      .waitFor();
-    await createdGroupRow
-      .getByRole("button", { name: "Delete group", exact: true })
+      .locator('[data-action="group-delete-request"]')
       .click();
     await createdGroupRow
-      .getByText(
-        "Delete this group? Its members will be removed and their access revoked. Groups with child groups cannot be deleted.",
-        { exact: true },
-      )
-      .waitFor();
-    await createdGroupRow
-      .getByRole("button", { name: "Cancel", exact: true })
+      .locator('[data-action="group-delete-cancel"]')
       .click();
-    assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__adminGroupDeleteRequests ?? [],
-      ),
-      [],
-    );
+    await createdGroupRow.locator("summary").click();
     await createdGroupRow
-      .getByRole("button", { name: "Delete group", exact: true })
+      .locator('[data-action="group-delete-request"]')
       .click();
-    const confirmGroupDelete = createdGroupRow.getByRole("button", {
-      name: "Delete group",
-      exact: true,
-    });
-    await confirmGroupDelete.click();
-    assert.equal(await confirmGroupDelete.isDisabled(), true);
-    assert.equal(await confirmGroupDelete.locator(".spinner").count(), 1);
+    await createdGroupRow
+      .locator('[data-action="group-delete-confirm"]')
+      .click();
     await window.getByText("Group deleted.", { exact: true }).waitFor();
     assert.equal(await createdGroupRow.count(), 0);
-    assert.deepEqual(
-      await application.evaluate(() => globalThis.__adminGroupDeleteRequests),
-      [99],
-    );
     const clientScopesNavigation = window.getByRole("button", {
       name: "Client scopes",
       exact: true,
@@ -6628,15 +6794,14 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
     );
     assert.equal(new URLSearchParams(clientRequests[1]).get("q"), "admin");
     const clientRow = window.locator('[data-client-id="client-1"]');
-    const editClientConfiguration = clientRow.getByRole("button", {
-      name: "Edit client configuration",
-      exact: true,
-    });
+    const editClientConfiguration = clientRow.locator(
+      '.client-name [data-action="client-open"]',
+    );
     await editClientConfiguration.click();
     assert.equal(await editClientConfiguration.isDisabled(), true);
     assert.equal(await editClientConfiguration.locator(".spinner").count(), 1);
     await editClientConfiguration.dispatchEvent("click");
-    const clientConfigurationForm = clientRow.locator(
+    const clientConfigurationForm = window.locator(
       'form[data-form="admin-client-configuration"]',
     );
     await clientConfigurationForm.waitFor();
@@ -6784,41 +6949,14 @@ test("native login chooser stays alive and authenticated Admin does not reopen t
       false,
     );
     assert.equal(
-      await window.locator('[name="cibaClientNotificationToken"]').count(),
-      0,
+      await clientConfigurationForm
+        .locator('[name="cibaClientNotificationToken"]')
+        .inputValue(),
+      "",
     );
-    await clientRow
-      .getByRole("button", { name: "Edit client name", exact: true })
-      .click();
-    const clientMetadataForm = clientRow.locator(
-      'form[data-form="admin-client-native-metadata"]',
-    );
-    await clientMetadataForm.waitFor();
-    const clientName = clientMetadataForm.locator('[name="clientName"]');
-    const saveClientName = clientMetadataForm.getByRole("button", {
-      name: "Save",
-      exact: true,
-    });
-    await clientName.fill("Rejected client");
-    await saveClientName.click();
-    assert.equal(await saveClientName.isDisabled(), true);
-    assert.equal(await saveClientName.locator(".spinner").count(), 1);
-    await window
-      .getByText("Choose another client name.", { exact: true })
-      .waitFor();
-    assert.equal(await clientName.inputValue(), "Rejected client");
-    await clientName.fill("Reporting Client");
-    await saveClientName.click();
-    assert.equal(await saveClientName.isDisabled(), true);
-    assert.equal(await saveClientName.locator(".spinner").count(), 1);
-    await window.getByText("Client name updated.", { exact: true }).waitFor();
-    assert.equal(await window.getByText("Reporting Client").count(), 1);
-    assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__clientNativeMetadataRequests,
-      ),
-      [{ clientName: "Rejected client" }, { clientName: "Reporting Client" }],
-    );
+    await window.locator('[data-action="client-back"]').click();
+    await clientRow.waitFor();
+    await clientRow.locator(".client-menu summary").click();
     const deleteClient = clientRow.getByRole("button", {
       name: "Delete client",
       exact: true,
@@ -8644,6 +8782,12 @@ test("manages native realm-role composites through bounded Admin contracts", asy
           await new Promise((resolve) => setTimeout(resolve, 350));
           return new Response(
             JSON.stringify({
+              name: "ROLE_ADMIN",
+              userCount: 0,
+              users: {
+                content: [],
+                page: { size: 10, number: 0, totalElements: 0, totalPages: 0 },
+              },
               compositeRoles: globalThis.__compositeRoleNames,
               compositeClientRoles: globalThis.__compositeClientRoles,
             }),
@@ -8770,208 +8914,109 @@ test("manages native realm-role composites through bounded Admin contracts", asy
       );
     }, authorizationUrl);
     await window.getByRole("heading", { name: "Roles", exact: true }).waitFor();
-    const roleRow = window.locator('[data-role-name="ROLE_ADMIN"]');
-    const manageComposites = roleRow.getByRole("button", {
-      name: "Manage composite roles",
-    });
-    await manageComposites.click();
-    assert.equal(await manageComposites.isDisabled(), true);
-    assert.equal(await manageComposites.locator(".spinner").count(), 1);
-    const composition = roleRow.locator('[data-role-composition="ROLE_ADMIN"]');
-    await composition
-      .getByRole("heading", { name: "Included roles" })
+    await window
+      .locator('[data-action="role-open"][data-id="ROLE_ADMIN"]')
+      .first()
+      .click();
+    const panel = window.locator("#role-tab-panel");
+    await panel
+      .getByRole("heading", { name: "Included roles", exact: true })
       .waitFor();
-    await composition
-      .getByText("No included roles.", { exact: true })
-      .waitFor();
-    const search = composition.getByRole("searchbox", {
-      name: "Search available roles",
-    });
-    const searchButton = composition.getByRole("button", {
-      name: "Search available roles",
-    });
-    await window.evaluate(() => {
-      Object.defineProperty(navigator, "onLine", {
-        configurable: true,
-        value: false,
-      });
-      window.dispatchEvent(new Event("offline"));
-    });
-    assert.equal(await searchButton.isDisabled(), true);
-    await window.evaluate(() => {
-      Object.defineProperty(navigator, "onLine", {
-        configurable: true,
-        value: true,
-      });
-      window.dispatchEvent(new Event("online"));
-    });
-    await search.fill("VIEW");
-    await searchButton.click();
-    assert.equal(
-      await searchButton.isDisabled(),
-      true,
-      JSON.stringify(
-        await application.evaluate(
-          () => globalThis.__compositeRoleSearchRequests,
-        ),
-      ),
-    );
-    assert.equal(await searchButton.locator(".spinner").count(), 1);
-    await searchButton.dispatchEvent("click");
-    await composition.getByText("ROLE_VIEWER", { exact: true }).waitFor();
-    const addRole = composition.getByRole("button", {
-      name: "Add role",
-      exact: true,
-    });
-    await addRole.click();
-    assert.equal(await addRole.isDisabled(), true);
-    assert.equal(await addRole.locator(".spinner").count(), 1);
-    await addRole.dispatchEvent("click");
-    await window.getByText("Included role added.", { exact: true }).waitFor();
+    await panel.getByText("No included roles.", { exact: true }).waitFor();
+    for (const [kind, query, value, action, notice] of [
+      [
+        "realm",
+        "VIEW",
+        "ROLE_VIEWER",
+        "admin-role-composite-add",
+        "Included role added.",
+      ],
+      [
+        "client",
+        "invoice",
+        "42",
+        "admin-role-client-composite-add",
+        "Included client role added.",
+      ],
+    ]) {
+      await window.locator("#role-candidate-" + kind).fill(query);
+      await window
+        .locator(
+          "#role-candidate-select-" + kind + ' option[value="' + value + '"]',
+        )
+        .waitFor({ state: "attached" });
+      assert.equal(
+        await window.locator('[data-action="' + action + '"]').isDisabled(),
+        true,
+      );
+      await window
+        .locator("#role-candidate-select-" + kind)
+        .selectOption(value);
+      const add = window.locator('[data-action="' + action + '"]');
+      await add.click();
+      assert.equal(await add.isDisabled(), true);
+      assert.equal(await add.locator(".spinner").count(), 1);
+      await add.dispatchEvent("click");
+      await window.getByText(notice, { exact: true }).waitFor();
+    }
     assert.deepEqual(
       await application.evaluate(() => globalThis.__compositeRoleNames),
       ["ROLE_VIEWER"],
     );
-    await window.getByRole("button", { name: "Turkish" }).click();
-    await window.getByText("Bileşik rolleri yönet", { exact: true }).waitFor();
-    await composition
-      .getByRole("button", { name: "Rolü kaldır", exact: true })
-      .click();
-    await composition
-      .getByText("Bu içerilen rol kaldırılsın mı?", { exact: true })
-      .waitFor();
-    await composition
-      .locator('[data-action="admin-role-composite-remove-cancel"]')
-      .click();
     assert.equal(
-      await application.evaluate(
-        () => globalThis.__compositeRoleRequests.length,
-      ),
+      (await application.evaluate(() => globalThis.__compositeClientRoles))
+        .length,
       1,
     );
-    await window.getByRole("button", { name: "İngilizce" }).click();
-    const removeRole = composition.getByRole("button", {
-      name: "Remove role",
-      exact: true,
-    });
-    await removeRole.click();
-    const confirmRemove = composition.getByRole("button", {
-      name: "Remove role",
-      exact: true,
-    });
-    await confirmRemove.click();
-    assert.equal(await confirmRemove.isDisabled(), true);
-    assert.equal(await confirmRemove.locator(".spinner").count(), 1);
-    await confirmRemove.dispatchEvent("click");
-    await window.getByText("Included role removed.", { exact: true }).waitFor();
+    for (const [prefix, notice] of [
+      ["admin-role-composite-remove", "Included role removed."],
+      ["admin-role-client-composite-remove", "Included client role removed."],
+    ]) {
+      await window.locator('[data-action="' + prefix + '-request"]').click();
+      await window.locator('[data-action="' + prefix + '-cancel"]').click();
+      assert.equal(
+        await window.locator('[data-action="' + prefix + '-confirm"]').count(),
+        0,
+      );
+      await window.locator('[data-action="' + prefix + '-request"]').click();
+      const remove = window.locator('[data-action="' + prefix + '-confirm"]');
+      await remove.click();
+      assert.equal(await remove.isDisabled(), true);
+      assert.equal(await remove.locator(".spinner").count(), 1);
+      await remove.dispatchEvent("click");
+      await window.getByText(notice, { exact: true }).waitFor();
+    }
     assert.deepEqual(
       await application.evaluate(() => globalThis.__compositeRoleNames),
       [],
     );
     assert.deepEqual(
-      await application.evaluate(() => globalThis.__compositeRoleRequests),
-      [
-        {
-          method: "POST",
-          path: "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER",
-          query: "?page=0&size=20&sort=username,asc",
-          body: undefined,
-        },
-        {
-          method: "DELETE",
-          path: "/api/admin/roles/ROLE_ADMIN/composites/ROLE_VIEWER",
-          query: "?page=0&size=20&sort=username,asc",
-          body: undefined,
-        },
-      ],
-    );
-    const clientRoleSearch = composition.getByRole("searchbox", {
-      name: "Search available client roles",
-    });
-    const clientRoleSearchButton = composition.getByRole("button", {
-      name: "Search available client roles",
-    });
-    await clientRoleSearch.fill("invoice");
-    await clientRoleSearchButton.click();
-    assert.equal(await clientRoleSearchButton.isDisabled(), true);
-    assert.equal(await clientRoleSearchButton.locator(".spinner").count(), 1);
-    await clientRoleSearchButton.dispatchEvent("click");
-    await composition
-      .getByText("billing-api / invoice.read", { exact: true })
-      .waitFor();
-    const addClientRole = composition.getByRole("button", {
-      name: "Add client role",
-      exact: true,
-    });
-    await addClientRole.click();
-    assert.equal(await addClientRole.isDisabled(), true);
-    assert.equal(await addClientRole.locator(".spinner").count(), 1);
-    await addClientRole.dispatchEvent("click");
-    await window
-      .getByText("Included client role added.", { exact: true })
-      .waitFor();
-    await window.getByRole("button", { name: "Turkish" }).click();
-    await composition
-      .getByRole("button", { name: "İstemci rolünü kaldır", exact: true })
-      .click();
-    await composition
-      .getByText("Bu içerilen istemci rolü kaldırılsın mı?", { exact: true })
-      .waitFor();
-    await composition
-      .locator('[data-action="admin-role-client-composite-remove-cancel"]')
-      .click();
-    assert.equal(
-      await application.evaluate(
-        () => globalThis.__compositeClientRoleRequests.length,
-      ),
-      1,
-    );
-    await window.getByRole("button", { name: "İngilizce" }).click();
-    const removeClientRole = composition.getByRole("button", {
-      name: "Remove client role",
-      exact: true,
-    });
-    await removeClientRole.click();
-    const confirmRemoveClientRole = composition.getByRole("button", {
-      name: "Remove client role",
-      exact: true,
-    });
-    await confirmRemoveClientRole.click();
-    assert.equal(await confirmRemoveClientRole.isDisabled(), true);
-    assert.equal(await confirmRemoveClientRole.locator(".spinner").count(), 1);
-    await confirmRemoveClientRole.dispatchEvent("click");
-    await window
-      .getByText("Included client role removed.", { exact: true })
-      .waitFor();
-    assert.deepEqual(
       await application.evaluate(() => globalThis.__compositeClientRoles),
       [],
     );
-    assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__compositeClientRoleSearchRequests,
-      ),
-      ["?q=invoice&page=0&size=10&sort=name,asc"],
-    );
-    assert.deepEqual(
-      await application.evaluate(
-        () => globalThis.__compositeClientRoleRequests,
-      ),
-      [
-        {
-          method: "POST",
-          path: "/api/admin/roles/ROLE_ADMIN/client-composites/42",
-          query: "?page=0&size=20&sort=username,asc",
-          body: undefined,
-        },
-        {
-          method: "DELETE",
-          path: "/api/admin/roles/ROLE_ADMIN/client-composites/42",
-          query: "?page=0&size=20&sort=username,asc",
-          body: undefined,
-        },
-      ],
-    );
+    for (const key of [
+      "__compositeRoleRequests",
+      "__compositeClientRoleRequests",
+    ]) {
+      const requests = await application.evaluate(
+        (_, key) => globalThis[key],
+        key,
+      );
+      assert.equal(requests.length, 2);
+      assert.deepEqual(
+        requests.map((item) => item.method),
+        ["POST", "DELETE"],
+      );
+      assert.ok(
+        requests.every(
+          (item) => item.query === "?page=0&size=20&sort=username,asc",
+        ),
+      );
+    }
+    await window.getByRole("button", { name: "Turkish" }).click();
+    await window
+      .getByRole("tab", { name: "Ayrıntılar", exact: true })
+      .waitFor();
   } finally {
     await application.close();
   }
@@ -9028,12 +9073,28 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
             JSON.stringify({ access: globalThis.__adminAccessFlags }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           );
+        if (
+          requestUrl.pathname === "/api/admin/clients/billing-api" &&
+          method === "GET"
+        )
+          return new Response(
+            JSON.stringify({
+              id: "billing-api",
+              clientId: "billing-api",
+              clientName: "Billing API",
+              clientAuthenticationMethods: ["none"],
+              authorizationGrantTypes: ["authorization_code"],
+              scopes: ["openid"],
+              dpopSigningAlgorithms: ["RS256", "ES256"],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
         if (requestUrl.pathname === "/api/admin/clients" && method === "GET")
           return new Response(
             JSON.stringify({
               content: [
                 {
-                  id: "client-row-1",
+                  id: "billing-api",
                   clientId: "billing-api",
                   clientName: "Billing API",
                   scopes: ["openid"],
@@ -9111,6 +9172,11 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
             path: requestUrl.pathname,
             memberId,
           });
+          if (userAssignment && method === "POST") {
+            await new Promise((resolve) => {
+              globalThis.__releaseClientRoleAssignment = resolve;
+            });
+          }
           await new Promise((resolve) => setTimeout(resolve, 250));
           if (userAssignment) {
             globalThis.__clientRoleAssignedUsers =
@@ -9195,13 +9261,9 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
     await window
       .getByRole("heading", { name: "Clients", exact: true })
       .waitFor();
-    const clientRow = window.locator('[data-client-id="client-row-1"]');
-    const manageRoles = clientRow.getByRole("button", {
-      name: "Manage client roles",
-    });
-    await manageRoles.click();
-    await manageRoles.locator(".spinner").waitFor();
-    assert.equal(await manageRoles.isDisabled(), true);
+    const clientRow = window.locator('[data-client-id="billing-api"]');
+    await clientRow.locator('.client-name [data-action="client-open"]').click();
+    await window.locator('[data-action="client-tab"][data-id="roles"]').click();
     const rolesPanel = window.locator(
       '[data-client-roles-panel="billing-api"]',
     );
@@ -9334,6 +9396,9 @@ test("manages client-scoped roles with authorized bounded CRUD", async () => {
     await assignUser.click();
     await assignUser.locator(".spinner").waitFor();
     await assignUser.dispatchEvent("click");
+    await application.evaluate(() =>
+      globalThis.__releaseClientRoleAssignment(),
+    );
     await window.getByText("Kullanıcı role atandı.", { exact: true }).waitFor();
     await assignmentPanel
       .getByRole("button", { name: "Kullanıcıyı kaldır" })
@@ -9574,11 +9639,27 @@ test("manages client-role composites with Windows session invalidation recovery"
           });
         if (requestUrl.pathname === "/api/admin/whoami")
           return json({ access: globalThis.__adminAccessFlags });
+        if (
+          requestUrl.pathname === "/api/admin/clients/billing-api" &&
+          method === "GET"
+        )
+          return new Response(
+            JSON.stringify({
+              id: "billing-api",
+              clientId: "billing-api",
+              clientName: "Billing API",
+              clientAuthenticationMethods: ["none"],
+              authorizationGrantTypes: ["authorization_code"],
+              scopes: ["openid"],
+              dpopSigningAlgorithms: ["RS256", "ES256"],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
         if (requestUrl.pathname === "/api/admin/clients" && method === "GET")
           return json({
             content: [
               {
-                id: "client-row-1",
+                id: "billing-api",
                 clientId: "billing-api",
                 clientName: "Billing API",
                 scopes: ["openid"],
@@ -9703,15 +9784,23 @@ test("manages client-role composites with Windows session invalidation recovery"
         );
       }, authorizationUrl);
       await window
-        .getByRole("heading", { name: /Clients|İstemciler/, exact: true })
+        .getByRole("heading", {
+          name: /Clients|İstemciler|Billing API/,
+          exact: true,
+        })
         .waitFor();
+      if (await window.locator("[data-client-detail]").count()) {
+        await window.locator('[data-action="client-back"]').click();
+        await window
+          .locator('.client-name [data-action="client-open"]')
+          .waitFor();
+      }
     };
     await window.getByRole("heading", { name: "Choose a console" }).waitFor();
     await signIn();
-    const clientRow = window.locator('[data-client-id="client-row-1"]');
-    await clientRow
-      .locator('[data-action="admin-client-roles-toggle"]')
-      .click();
+    const clientRow = window.locator('[data-client-id="billing-api"]');
+    await clientRow.locator('.client-name [data-action="client-open"]').click();
+    await window.locator('[data-action="client-tab"][data-id="roles"]').click();
     const rolesPanel = window.locator(
       '[data-client-roles-panel="billing-api"]',
     );
@@ -9801,9 +9890,11 @@ test("manages client-role composites with Windows session invalidation recovery"
     );
     await signIn();
     await window
-      .locator('[data-client-id="client-row-1"]')
-      .locator('[data-action="admin-client-roles-toggle"]')
+      .locator(
+        '[data-client-id="billing-api"] .client-name [data-action="client-open"]',
+      )
       .click();
+    await window.locator('[data-action="client-tab"][data-id="roles"]').click();
     await rolesPanel
       .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
       .waitFor();
@@ -9851,9 +9942,11 @@ test("manages client-role composites with Windows session invalidation recovery"
     );
     await signIn();
     await window
-      .locator('[data-client-id="client-row-1"]')
-      .locator('[data-action="admin-client-roles-toggle"]')
+      .locator(
+        '[data-client-id="billing-api"] .client-name [data-action="client-open"]',
+      )
       .click();
+    await window.locator('[data-action="client-tab"][data-id="roles"]').click();
     await rolesPanel
       .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
       .waitFor();
@@ -9916,9 +10009,11 @@ test("manages client-role composites with Windows session invalidation recovery"
     );
     await signIn();
     await window
-      .locator('[data-client-id="client-row-1"]')
-      .locator('[data-action="admin-client-roles-toggle"]')
+      .locator(
+        '[data-client-id="billing-api"] .client-name [data-action="client-open"]',
+      )
       .click();
+    await window.locator('[data-action="client-tab"][data-id="roles"]').click();
     await rolesPanel
       .getByRole("heading", { name: /Client roles|İstemci rolleri/ })
       .waitFor();
@@ -10017,8 +10112,8 @@ test("opens settings in a separate window without requiring login", async () => 
             ?.isVisible(),
         settingsWindow.url(),
       ),
-      true,
-      "settings should be visible without showing the unauthenticated console",
+      false,
+      "settings must remain hidden in background E2E",
     );
     const screenshotDirectory =
       process.env.KITEZH_E2E_ARTIFACTS_DIR ?? os.tmpdir();
@@ -10281,31 +10376,15 @@ test("opens settings in a separate window without requiring login", async () => 
     const settingsClosed = settingsWindow.waitForEvent("close");
     await closeNativeSettings(application);
     await settingsClosed;
-    let consoleWindowFocused = false;
-    for (let attempt = 0; attempt < 20 && !consoleWindowFocused; attempt += 1) {
-      consoleWindowFocused = await application.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((window) => {
-            const route = new URL(window.webContents.getURL()).pathname;
-            return (
-              window.isVisible() &&
-              (route === "/native" || route === "/desktop-login")
-            );
-          })
-          ?.isFocused(),
-      );
-      if (!consoleWindowFocused)
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    const windowFocusState = await application.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows().map((window) => ({
-        route: new URL(window.webContents.getURL()).pathname,
-        visible: window.isVisible(),
-        focused: window.isFocused(),
-        minimized: window.isMinimized(),
-      })),
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every(
+          (window) => !window.isVisible() && !window.isFocused(),
+        ),
+      ),
+      true,
+      "closing Settings must not raise or focus any background test window",
     );
-    assert.equal(consoleWindowFocused, true, JSON.stringify(windowFocusState));
   } finally {
     await application.close();
   }
@@ -10385,6 +10464,49 @@ test("keeps native windows isolated, sandboxed, and without Node integration", a
       },
     );
     assert.ok(nativeWindowCount >= 5);
+    await mainWindow.evaluate(() => window.desktopApi.language.set("tr"));
+    await aboutWindow
+      .getByText("Güvenli kimlik ve erişim konsolu", { exact: true })
+      .waitFor();
+    for (const [name, page] of [
+      ["chooser", mainWindow],
+      ["about", aboutWindow],
+      ["settings", settingsWindow],
+      ["companion", companionWindow],
+      ["update", availableWindow],
+    ]) {
+      await application.evaluate(({ BrowserWindow }, targetUrl) => {
+        const window = BrowserWindow.getAllWindows().find(
+          (window) => window.webContents.getURL() === targetUrl,
+        );
+        window.setContentSize(720, 640);
+        window.webContents.setZoomFactor(2);
+      }, page.url());
+      await page.waitForFunction(() => window.innerWidth <= 360);
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+        true,
+      );
+      assert.equal(await page.getByRole("main").count(), 1);
+      await captureBackgroundWindow(
+        application,
+        page,
+        path.join(
+          process.env.KITEZH_E2E_ARTIFACTS_DIR ?? os.tmpdir(),
+          `${name}-turkish-zoom.png`,
+        ),
+      );
+    }
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every(
+          (window) => !window.isVisible() && !window.isFocused(),
+        ),
+      ),
+      true,
+    );
   } finally {
     await application.close();
   }
@@ -10529,7 +10651,7 @@ test("handles a second launch while the E2E app stays hidden", async () => {
           )
           ?.isVisible(),
       ),
-      true,
+      false,
     );
     await mainWindow
       .getByRole("heading", { name: "Choose a console" })
@@ -11248,3 +11370,154 @@ test(
     }
   },
 );
+
+test("native update windows reflow at 200% zoom and keep all theme roles synchronized", async () => {
+  const application = await launchDesktop({ updatePreviewState: "available" });
+  try {
+    const mainWindow = await nativeMainWindow(application);
+    await mainWindow
+      .getByRole("heading", { name: "Choose a console" })
+      .waitFor();
+    const { nextWindowPromise } = await openManualUpdateCheck(application);
+    const availableWindow = await nextWindowPromise;
+    await availableWindow
+      .getByRole("heading", { name: "A new version of Kitezh is available!" })
+      .waitFor();
+    for (const [theme, primary, surface] of [
+      ["dark", "#6ea8fe", "#2b3035"],
+      ["light", "#0d6efd", "#ffffff"],
+    ]) {
+      await mainWindow.evaluate(
+        (mode) => window.desktopApi.theme.set(mode),
+        theme,
+      );
+      await availableWindow.waitForFunction(
+        ({ primary, surface }) => {
+          const style = getComputedStyle(document.documentElement);
+          return (
+            style.getPropertyValue("--dialog-primary").trim() === primary &&
+            style.getPropertyValue("--dialog-surface").trim() === surface
+          );
+        },
+        { primary, surface },
+      );
+    }
+    await mainWindow.evaluate(() => window.desktopApi.language.set("tr"));
+    await availableWindow
+      .getByRole("heading", { name: "Yeni bir Kitezh sürümü var!" })
+      .waitFor();
+    await application.evaluate(({ BrowserWindow }, targetUrl) => {
+      const window = BrowserWindow.getAllWindows().find(
+        (window) => window.webContents.getURL() === targetUrl,
+      );
+      window.setContentSize(640, 480);
+      window.webContents.setZoomFactor(2);
+    }, availableWindow.url());
+    await availableWindow.waitForFunction(() => window.innerWidth <= 320);
+    assert.equal(
+      await availableWindow.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      true,
+    );
+    for (const button of await availableWindow.getByRole("button").all()) {
+      assert.equal(
+        await button.evaluate((button) => {
+          button.scrollIntoView();
+          const bounds = button.getBoundingClientRect();
+          return (
+            bounds.left >= 0 &&
+            bounds.right <= window.innerWidth &&
+            getComputedStyle(button).minHeight === "44px"
+          );
+        }),
+        true,
+      );
+    }
+    await availableWindow.emulateMedia({
+      forcedColors: "active",
+      reducedMotion: "reduce",
+    });
+    assert.equal(
+      await availableWindow.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--dialog-primary")
+          .trim(),
+      ),
+      "Highlight",
+    );
+    await availableWindow.emulateMedia({
+      forcedColors: "none",
+      reducedMotion: "no-preference",
+    });
+    await availableWindow.keyboard.press("Tab");
+    assert.equal(
+      await availableWindow.evaluate(() => {
+        const focused = document.activeElement;
+        return (
+          focused.matches(":focus-visible") &&
+          getComputedStyle(focused).outlineStyle === "solid"
+        );
+      }),
+      true,
+    );
+    await captureBackgroundWindow(
+      application,
+      availableWindow,
+      path.join(
+        process.env.KITEZH_E2E_ARTIFACTS_DIR ?? os.tmpdir(),
+        "update-turkish-zoom.png",
+      ),
+    );
+    const confirmationPromise = application.waitForEvent("window");
+    await availableWindow
+      .getByRole("button", { name: "Güncellemeyi kur" })
+      .click();
+    const confirmation = await confirmationPromise;
+    await confirmation
+      .getByRole("heading", { name: "Kitezh şimdi güncellensin mi?" })
+      .waitFor();
+    await mainWindow.evaluate(() => window.desktopApi.language.set("en"));
+    await confirmation
+      .getByRole("heading", { name: "Update Kitezh now?" })
+      .waitFor();
+    assert.equal(
+      await confirmation
+        .getByRole("button", { name: "Cancel", exact: true })
+        .count(),
+      1,
+    );
+    await application.evaluate(({ BrowserWindow }, targetUrl) => {
+      const window = BrowserWindow.getAllWindows().find(
+        (window) => window.webContents.getURL() === targetUrl,
+      );
+      window.setContentSize(640, 480);
+      window.webContents.setZoomFactor(2);
+    }, confirmation.url());
+    await confirmation.waitForFunction(() => window.innerWidth <= 320);
+    assert.equal(
+      await confirmation.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      true,
+    );
+    const closed = confirmation.waitForEvent("close");
+    await Promise.all([
+      closed,
+      confirmation.keyboard.press("Escape").catch((error) => {
+        // Escape can close the window before Chromium acknowledges the key.
+        assert.equal(confirmation.isClosed(), true, error.message);
+      }),
+    ]);
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().every(
+          (window) => !window.isVisible() && !window.isFocused(),
+        ),
+      ),
+      true,
+    );
+  } finally {
+    await application.close();
+  }
+});

@@ -191,6 +191,26 @@ describe("AdminResources", () => {
     );
   });
 
+  it.each(["true", "false"])("renders the active status filter for enabled=%s", async (status) => {
+    window.history.replaceState({}, "", `/admin/users?status=${status}`);
+    act(() => window.dispatchEvent(new Event("admin-table-state")));
+    mockAdminRequest.mockResolvedValue({ status: 200, data: page([]) } as never);
+
+    render(<AdminResources copy={dictionary.admin.resources} resource="users" />);
+
+    const label =
+      status === "true" ? dictionary.admin.resources.active : dictionary.admin.resources.passive;
+    expect(
+      await screen.findByRole("button", {
+        name: `${dictionary.admin.resources.status}: ${label}`,
+      }),
+    ).toBeVisible();
+    expect(mockAdminRequest).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ url: expect.stringContaining(`enabled=${status}`) }),
+    );
+  });
+
   it("revokes every active application session after confirmation", async () => {
     mockAdminRequest.mockImplementation(async (_token, config) => {
       if (!config.method) {

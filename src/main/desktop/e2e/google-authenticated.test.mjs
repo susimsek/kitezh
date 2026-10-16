@@ -35,6 +35,7 @@ test(
         cwd: desktopDirectory,
         env: {
           ...process.env,
+          DESKTOP_E2E_BACKGROUND: "true",
           DESKTOP_API_BASE_URL: "http://localhost:9090",
           DESKTOP_AUTO_UPDATE: "false",
         },

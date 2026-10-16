@@ -136,6 +136,34 @@ describe("LoginSettings", () => {
     );
   });
 
+  it("reports an unsuccessful CAPTCHA save response", async () => {
+    mockSuccessfulLoads();
+    render(<LoginSettings />);
+    await screen.findByText("Registration and login CAPTCHA");
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.method === "PUT") return Promise.resolve({ status: 500, data: {} }) as never;
+      return Promise.resolve({ status: 200, data: {} }) as never;
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save captcha settings/i }));
+
+    await waitFor(() => expect(mockAddError).toHaveBeenCalled());
+  });
+
+  it("reports unsuccessful HTTP responses when saving CAPTCHA settings", async () => {
+    mockSuccessfulLoads();
+    render(<LoginSettings />);
+    await screen.findByText("Registration and login CAPTCHA");
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.method === "PUT") return Promise.resolve({ status: 500, data: {} }) as never;
+      return Promise.resolve({ status: 200, data: {} }) as never;
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save captcha settings/i }));
+
+    await waitFor(() => expect(mockAddError).toHaveBeenCalled());
+  });
+
   it("normalizes nullable WebAuthn values before saving login settings", async () => {
     mockAdminRequest.mockImplementation((_token, request) => {
       if (request.method === "PUT") return Promise.resolve({ status: 200, data: {} }) as never;

@@ -93,10 +93,63 @@ function isAllowedApiPath(
     }
   }
   if (namespace === "admin") {
+    // Client detail contracts are exact and bounded independently of global resources.
+    const clientDetailRoute =
+      /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/(scope-evaluation|secret|sessions(?:\/[A-Za-z0-9_-]{1,100})?|consents|events)(?:\?|#|$)/.exec(
+        path,
+      );
+    if (clientDetailRoute) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        if (url.origin !== "https://desktop.invalid" || url.hash) return false;
+        const suffix = clientDetailRoute[1];
+        const expected = `/api/admin/clients/${url.pathname.split("/")[4]}/${suffix}`;
+        if (url.pathname !== expected) return false;
+        const keys = [...url.searchParams.keys()];
+        if (keys.some((key) => url.searchParams.getAll(key).length !== 1))
+          return false;
+        if (suffix === "secret") return method === "POST" && keys.length === 0;
+        if (suffix === "scope-evaluation")
+          return (
+            method === "GET" &&
+            keys.every((key) => ["scopes", "subject"].includes(key)) &&
+            (url.searchParams.get("scopes") ?? "").length <= 2000 &&
+            (url.searchParams.get("subject") ?? "").length <= 100
+          );
+        if (suffix.startsWith("sessions") && method === "DELETE")
+          return keys.length === 0;
+        if (
+          !["sessions", "consents", "events"].includes(suffix) ||
+          method !== "GET"
+        )
+          return false;
+        const page = url.searchParams.get("page");
+        const size = url.searchParams.get("size");
+        return (
+          keys.every((key) => ["page", "size"].includes(key)) &&
+          (page === null || /^(0|[1-9]\d{0,6})$/.test(page)) &&
+          (size === null ||
+            (/^[1-9]\d{0,2}$/.test(size) && Number(size) <= 100))
+        );
+      } catch {
+        return false;
+      }
+    }
     if (method === "GET" && path === "/api/admin/whoami") return true;
     if (method === "POST" && path === "/api/admin/keys/rotate") return true;
     if (method === "GET" && path === "/api/admin/profile-attributes")
       return true;
+    const userRequiredActionMatch =
+      /^\/api\/admin\/required-actions\/users\/([1-9]\d*)(?:\/([A-Z][A-Z0-9_]{0,99}))?$/.exec(
+        path,
+      );
+    if (
+      userRequiredActionMatch &&
+      Number.isSafeInteger(Number(userRequiredActionMatch[1]))
+    )
+      return userRequiredActionMatch[2] === undefined
+        ? method === "GET"
+        : method === "POST" || method === "DELETE";
     if (method === "POST" && path === "/api/admin/users") return true;
     const userAvatarMatch = /^\/api\/admin\/users\/([1-9]\d*)\/avatar$/.exec(
       path,
@@ -108,6 +161,56 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/users/bulk") return true;
+    const userDetailMatch = /^\/api\/admin\/users\/([1-9]\d*)$/.exec(path);
+    if (
+      method === "GET" &&
+      userDetailMatch &&
+      Number.isSafeInteger(Number(userDetailMatch[1]))
+    )
+      return true;
+    const userRelatedListMatch =
+      /^\/api\/admin\/users\/([1-9]\d*)\/(groups|sessions|consents|events)$/.exec(
+        path.split("?", 1)[0],
+      );
+    if (
+      method === "GET" &&
+      userRelatedListMatch &&
+      Number.isSafeInteger(Number(userRelatedListMatch[1]))
+    ) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        const [, , resource] = userRelatedListMatch;
+        const allowedParameters = new Set([
+          "page",
+          "size",
+          "sort",
+          ...(resource === "groups" ? ["q"] : []),
+        ]);
+        const sortValues: Record<string, string[]> = {
+          groups: ["name,asc", "name,desc"],
+          sessions: ["lastAccessTime,asc", "lastAccessTime,desc"],
+          consents: ["id.registeredClientId,asc", "id.registeredClientId,desc"],
+          events: ["occurredAt,asc", "occurredAt,desc"],
+        };
+        const params = url.searchParams;
+        const keys = [...params.keys()];
+        return (
+          url.origin === "https://desktop.invalid" &&
+          !url.hash &&
+          keys.every((key) => allowedParameters.has(key)) &&
+          [...new Set(keys)].every((key) => params.getAll(key).length === 1) &&
+          /^(0|[1-9]\d{0,6})$/.test(params.get("page") ?? "0") &&
+          Number(params.get("page") ?? 0) <= 1_000_000 &&
+          /^(?:[1-9]\d?|100)$/.test(params.get("size") ?? "20") &&
+          sortValues[resource].includes(
+            params.get("sort") ?? sortValues[resource][0],
+          ) &&
+          (params.get("q")?.length ?? 0) <= 200
+        );
+      } catch {
+        return false;
+      }
+    }
     const userUpdateMatch = /^\/api\/admin\/users\/([1-9]\d*)$/.exec(path);
     if (
       method === "PUT" &&
@@ -199,6 +302,56 @@ function isAllowedApiPath(
     )
       return true;
     if (method === "POST" && path === "/api/admin/roles") return true;
+    const roleMembershipMatch =
+      /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})(?:\/(available-users|users)(?:\/([1-9]\d*))?)?$/.exec(
+        path.split("?", 1)[0],
+      );
+    if (roleMembershipMatch) {
+      const [, , resource, userId] = roleMembershipMatch;
+      if (!resource && method !== "GET") {
+        // Description PUT and role DELETE retain their exact query-free rules below.
+      } else {
+        try {
+          const url = new URL(path, "https://desktop.invalid");
+          const params = url.searchParams;
+          const keys = [...params.keys()];
+          const sorts = [
+            "username,asc",
+            "username,desc",
+            "email,asc",
+            "email,desc",
+          ];
+          if (
+            url.origin !== "https://desktop.invalid" ||
+            url.hash ||
+            keys.some(
+              (key) => !["q", "enabled", "page", "size", "sort"].includes(key),
+            ) ||
+            [...new Set(keys)].some((key) => params.getAll(key).length !== 1) ||
+            !/^(0|[1-9]\d{0,6})$/.test(params.get("page") ?? "0") ||
+            Number(params.get("page") ?? 0) > 1_000_000 ||
+            !/^(?:[1-9]\d?|100)$/.test(params.get("size") ?? "20") ||
+            !sorts.includes(params.get("sort") ?? "username,asc") ||
+            (params.get("q")?.length ?? 0) > 200 ||
+            (params.has("enabled") &&
+              !["true", "false"].includes(params.get("enabled") ?? ""))
+          )
+            return false;
+          if (!resource) return method === "GET";
+          if (resource === "available-users")
+            return method === "GET" && !userId && !params.has("enabled");
+          if (keys.some((key) => ["q", "enabled"].includes(key))) return false;
+          return (
+            (!userId && method === "POST") ||
+            (Boolean(userId) &&
+              method === "DELETE" &&
+              Number.isSafeInteger(Number(userId)))
+          );
+        } catch {
+          return false;
+        }
+      }
+    }
     const roleCompositeMutationMatch =
       /^\/api\/admin\/roles\/(ROLE_[A-Z0-9_]{1,45})\/composites\/(ROLE_[A-Z0-9_]{1,45})(?:\?|$)/.exec(
         path,
@@ -356,6 +509,13 @@ function isAllowedApiPath(
       }
     }
     if (method === "POST" && path === "/api/admin/groups") return true;
+    const groupDetailMatch = /^\/api\/admin\/groups\/([1-9]\d*)$/.exec(path);
+    if (
+      groupDetailMatch &&
+      Number.isSafeInteger(Number(groupDetailMatch[1])) &&
+      ["GET", "PUT"].includes(method)
+    )
+      return true;
     const groupPermissionsMatch =
       /^\/api\/admin\/groups\/([1-9]\d*)\/permissions$/.exec(path);
     if (
@@ -505,9 +665,7 @@ function isAllowedApiPath(
     )
       return true;
     const consentRevokeMatch =
-      /^\/api\/admin\/consents\/consents\/([^/]{1,300})\/([^/]{1,300})$/.exec(
-        path,
-      );
+      /^\/api\/admin\/consents\/([^/]{1,300})\/([^/]{1,300})$/.exec(path);
     if (method === "DELETE" && consentRevokeMatch) {
       try {
         const clientId = decodeURIComponent(consentRevokeMatch[1]);
@@ -527,6 +685,11 @@ function isAllowedApiPath(
     }
     if (
       method === "PUT" &&
+      /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    )
+      return true;
+    if (
+      method === "GET" &&
       /^\/api\/admin\/client-scopes\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
@@ -570,7 +733,13 @@ function isAllowedApiPath(
       /^\/api\/admin\/sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
+    if (method === "DELETE" && path === "/api/admin/events") return true;
     if (method !== "GET") return false;
+    if (
+      /^\/(?:[^?#]+\/)?\.well-known\/openid-configuration$/.test(path) ||
+      /^\/(?:[^?#]+\/)?oauth2\/jwks$/.test(path)
+    )
+      return true;
     if (path === "/api/admin/dashboard") return true;
     if (path === "/actuator/health/readiness") return true;
     if (
@@ -697,8 +866,11 @@ function isAllowedApiPath(
         "page",
         "size",
         "sort",
+        ...(isUsers ? ["enabled"] : []),
         ...(isLocalizationMessages ? ["locale", "bundle"] : []),
         ...(isSessions ? ["status"] : []),
+        ...(isConsents ? ["clientId", "username", "scope"] : []),
+        ...(isEvents ? ["action", "targetType", "targetId", "from", "to"] : []),
         ...(isKeys ? ["active"] : []),
       ]);
       const sortConfigurations = [
@@ -709,7 +881,12 @@ function isAllowedApiPath(
         },
         {
           matches: isClients,
-          fields: ["clientId,asc", "clientId,desc"],
+          fields: [
+            "clientId,asc",
+            "clientId,desc",
+            "clientName,asc",
+            "clientName,desc",
+          ],
           defaultSort: "clientId,asc",
         },
         {
@@ -765,7 +942,7 @@ function isAllowedApiPath(
         {
           matches: isGroupMemberSearch,
           fields: ["username,asc", "username,desc"],
-          defaultSort: "name,asc",
+          defaultSort: "username,asc",
         },
       ];
       const sortConfiguration = sortConfigurations.find(
@@ -822,6 +999,30 @@ function isAllowedApiPath(
           (key) => url.searchParams.getAll(key).length <= 1,
         ) &&
         (url.searchParams.get("q")?.length ?? 0) <= 200 &&
+        (!isConsents ||
+          ["clientId", "username", "scope"].every(
+            (key) => (url.searchParams.get(key)?.length ?? 0) <= 100,
+          )) &&
+        (!isEvents ||
+          ((url.searchParams.get("action")?.length ?? 0) <= 100 &&
+            (url.searchParams.get("targetId")?.length ?? 0) <= 100 &&
+            ["", "client", "user", "session", "consent", "key", "role", "client-scope"].includes(
+              url.searchParams.get("targetType") ?? "",
+            ) &&
+            ["from", "to"].every((key) => {
+              const value = url.searchParams.get(key);
+              return (
+                value === null ||
+                (value.length <= 64 &&
+                  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(
+                    value,
+                  ) &&
+                  Number.isFinite(Date.parse(value)))
+              );
+            }))) &&
+        (!isUsers ||
+          !url.searchParams.has("enabled") ||
+          ["true", "false"].includes(url.searchParams.get("enabled") ?? "")) &&
         (!isLocalizationMessages ||
           (/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(
             url.searchParams.get("locale") ?? "en",
@@ -840,7 +1041,10 @@ function isAllowedApiPath(
         ["active", "expired"].includes(
           url.searchParams.get("status") ?? "active",
         ) &&
-        ["true", "false"].includes(url.searchParams.get("active") ?? "true")
+        (!isKeys ||
+          ["", "true", "false"].includes(
+            url.searchParams.get("active") ?? "true",
+          ))
       );
     } catch {
       return false;
@@ -1012,6 +1216,25 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
 
   return {
     async request(request: NativeApiRequest): Promise<NativeApiResponse> {
+      if (
+        request.console === "admin" &&
+        request.method === "POST" &&
+        /^\/api\/admin\/roles\/ROLE_[A-Z0-9_]{1,45}\/users(?:\?|$)/.test(
+          request.path,
+        )
+      ) {
+        const body = request.body as Record<string, unknown> | null;
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          Object.keys(body).length !== 1 ||
+          typeof body.userId !== "number" ||
+          !Number.isSafeInteger(body.userId) ||
+          body.userId <= 0
+        )
+          throw new Error("Invalid role user assignment");
+      }
       if (
         !request.path.startsWith("/") ||
         !isAllowedApiPath(

@@ -85,14 +85,14 @@ export function validateAuthorizationCallback(
   params: AuthorizationCallbackParams,
   expectedState: string | undefined,
 ): ValidAuthorizationCallback {
-  if (typeof params.error === "string") {
+  if (params.error !== undefined) {
     throw new Error("authorization_callback_error");
   }
   if (typeof params.code !== "string" || params.code.length === 0) {
-    throw new Error("authorization_callback_code_missing");
+    throw new TypeError("authorization_callback_code_missing");
   }
   if (typeof params.state !== "string" || params.state.length === 0) {
-    throw new Error("authorization_callback_state_missing");
+    throw new TypeError("authorization_callback_state_missing");
   }
   if (!expectedState || params.state !== expectedState) {
     throw new Error("authorization_callback_state_mismatch");
@@ -129,33 +129,32 @@ export type NativeDeepLink = {
   token?: string;
 };
 
+const CALLBACK_LINK_KINDS = new Map<string, NativeDeepLink["kind"]>([
+  ["oauth/callback", "oauth-callback"],
+  ["admin/oauth/callback", "admin-oauth-callback"],
+  ["logout/callback", "logout-callback"],
+  ["admin/logout/callback", "admin-logout-callback"],
+]);
+
+const TOKEN_LINK_KINDS = new Map<string, "verify-email" | "reset-password">([
+  ["verify-email", "verify-email"],
+  ["reset-password", "reset-password"],
+]);
+
 export function parseNativeDeepLink(value: string): NativeDeepLink | null {
   try {
     const url = new URL(value);
     if (url.protocol !== "kitezh:") return null;
-    if (url.hostname === "oauth" && url.pathname === "/callback") {
-      return { kind: "oauth-callback" };
-    }
-    if (url.hostname === "admin" && url.pathname === "/oauth/callback") {
-      return { kind: "admin-oauth-callback" };
-    }
-    if (url.hostname === "logout" && url.pathname === "/callback") {
-      return { kind: "logout-callback" };
-    }
-    if (url.hostname === "admin" && url.pathname === "/logout/callback") {
-      return { kind: "admin-logout-callback" };
-    }
-    if (
-      (url.hostname === "verify-email" || url.hostname === "reset-password") &&
-      url.pathname === "/"
-    ) {
-      const token = url.searchParams.get("token")?.trim();
-      if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
-      const kind =
-        url.hostname === "verify-email" ? "verify-email" : "reset-password";
-      return { kind, token };
-    }
-    return null;
+    const callbackKind = CALLBACK_LINK_KINDS.get(
+      `${url.hostname}${url.pathname}`,
+    );
+    if (callbackKind) return { kind: callbackKind };
+
+    const tokenKind = TOKEN_LINK_KINDS.get(url.hostname);
+    if (!tokenKind || url.pathname !== "/") return null;
+    const token = url.searchParams.get("token")?.trim();
+    if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+    return { kind: tokenKind, token };
   } catch {
     return null;
   }

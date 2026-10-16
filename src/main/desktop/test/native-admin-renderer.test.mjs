@@ -5,7 +5,20 @@ import {
   renderConsole,
   settle,
 } from "./native-renderer-harness.mjs";
-
+async function openClientTab(document, tab) {
+  document
+    .querySelector(
+      '.client-name [data-action="client-open"][data-id="console-client"]',
+    )
+    .click();
+  await settle();
+  if (tab !== "settings") {
+    document
+      .querySelector(`[data-action="client-tab"][data-id="${tab}"]`)
+      .click();
+    await settle();
+  }
+}
 test("native Admin renderer covers every authorized primary route", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/whoami", "GET", () => ({
@@ -84,11 +97,11 @@ test("native Admin renderer covers every authorized primary route", async () => 
       );
       if (route === "users") {
         assert.ok(document.getElementById("admin-user-search"));
-        assert.match(
-          document.querySelector(".content").textContent,
-          /adminSearchUsers/,
+        assert.ok(
+          document
+            .getElementById("admin-user-query")
+            .getAttribute("aria-label"),
         );
-
         const editButton = document.querySelector(
           '[data-action="admin-user-edit-toggle"][data-id="1"]',
         );
@@ -128,7 +141,6 @@ test("native Admin renderer covers every authorized primary route", async () => 
           document.querySelector('[data-form="admin-user-edit"]'),
           null,
         );
-
         document
           .querySelector(
             '[data-action="admin-user-action-email-toggle"][data-id="1"]',
@@ -163,7 +175,6 @@ test("native Admin renderer covers every authorized primary route", async () => 
           )
           ?.click();
         await settle();
-
         document
           .querySelector(
             '[data-action="admin-user-password-reset-toggle"][data-id="1"]',
@@ -198,7 +209,6 @@ test("native Admin renderer covers every authorized primary route", async () => 
     assert.ok(
       calls.some(({ path }) => path.startsWith("/api/admin/notifications")),
     );
-
     document.querySelector('[data-route="users"]').click();
     await settle();
     document.querySelector('[data-action="create-user"]').click();
@@ -229,7 +239,569 @@ test("native Admin renderer covers every authorized primary route", async () => 
     harness.restore();
   }
 });
-
+test("native Admin user details load profile, credential, role, and session actions", async () => {
+  const harness = await renderConsole("admin");
+  const { calls, document, setResponse } = harness;
+  setResponse("/api/admin/users/1", "GET", () => ({
+    id: 1,
+    username: "ada",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    email: "ada@example.test",
+    enabled: true,
+    emailVerified: true,
+    totpEnabled: true,
+    authorities: ["ROLE_USER"],
+    assignedRoles: ["ROLE_USER"],
+  }));
+  setResponse("/api/admin/required-actions/users/1", "GET", () => [
+    {
+      key: "VERIFY_EMAIL",
+      displayName: "Verify email",
+      enabled: true,
+      globalPolicy: false,
+      assigned: false,
+    },
+  ]);
+  setResponse(
+    "/api/admin/users/1/webauthn/credentials?page=0&size=20",
+    "GET",
+    () => ({
+      content: [
+        {
+          credentialId: "ada-key",
+          label: "Work laptop",
+          credentialType: "public-key",
+          createdAt: "2026-01-01T00:00:00Z",
+          lastUsedAt: "2026-01-02T00:00:00Z",
+          signatureCount: 4,
+          uvInitialized: true,
+        },
+      ],
+      number: 0,
+      totalPages: 1,
+      totalElements: 1,
+    }),
+  );
+  setResponse("/api/admin/users/1/password", "PUT", () => ({ status: 204 }));
+  setResponse(
+    "/api/admin/users/1/execute-actions-email?lifespan=3600",
+    "PUT",
+    () => ({ status: 204 }),
+  );
+  setResponse("/api/admin/users/1/totp", "DELETE", () => ({ status: 204 }));
+  setResponse("/api/admin/users/1/profile-attributes", "GET", () => ({
+    definitions: [
+      {
+        name: "department",
+        displayName: "Department",
+        type: "STRING",
+        enabled: true,
+        builtIn: false,
+      },
+    ],
+    attributes: { department: ["Research"] },
+  }));
+  setResponse("/api/admin/roles?page=0&size=100&sort=name,asc", "GET", () => ({
+    content: [{ name: "ROLE_ADMIN" }, { name: "ROLE_USER" }],
+  }));
+  setResponse(
+    "/api/admin/users/1/sessions?page=0&size=10&sort=lastAccessTime,desc",
+    "GET",
+    () => ({
+      content: [
+        {
+          id: "session-1",
+          username: "ada",
+          createdAt: "2026-01-01T00:00:00Z",
+          lastAccessedAt: "2026-01-01T01:00:00Z",
+          expiresAt: "2026-01-01T02:00:00Z",
+          authorizationCount: 2,
+          active: true,
+        },
+      ],
+      number: 0,
+      totalPages: 2,
+      totalElements: 15,
+    }),
+  );
+  setResponse(
+    "/api/admin/users/1/sessions?page=0&size=20&sort=lastAccessTime,desc",
+    "GET",
+    () => ({
+      content: [{ username: "ada", id: "session-1", authorizationCount: 2 }],
+      number: 0,
+      totalPages: 1,
+      totalElements: 1,
+    }),
+  );
+  setResponse(
+    "/api/admin/users/1/consents?page=0&size=10&sort=id.registeredClientId,asc",
+    "GET",
+    () => ({
+      content: [
+        {
+          clientId: "console-client",
+          clientName: "Console",
+          principalName: "ada",
+          authorities: ["openid", "admin-api"],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+      number: 0,
+      totalPages: 1,
+    }),
+  );
+  setResponse(
+    "/api/admin/users/1/events?page=0&size=10&sort=occurredAt,desc",
+    "GET",
+    () => ({
+      content: [
+        {
+          id: "event-1",
+          action: "user.updated",
+          actor: "admin",
+          targetType: "user",
+          targetId: "1",
+          details: "enabled=true",
+          occurredAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+      number: 0,
+      totalPages: 1,
+    }),
+  );
+  setResponse("/api/admin/users/1/groups?page=0&size=100", "GET", () => ({
+    content: [
+      { id: 3, name: "Platform", path: "/Platform", roles: ["ROLE_ADMIN"] },
+    ],
+    number: 0,
+    totalPages: 1,
+  }));
+  setResponse(
+    "/api/admin/groups?page=0&size=100&sort=name%2Casc",
+    "GET",
+    () => ({ content: [{ id: 3, name: "Platform", path: "/Platform" }] }),
+  );
+  setResponse(
+    "/api/admin/groups?q=Eng&page=0&size=10&sort=name%2Casc",
+    "GET",
+    () => ({ content: [{ id: 4, name: "Engineering", path: "/Engineering" }] }),
+  );
+  try {
+    await settle();
+    document.querySelector('[data-route="users"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-open"][data-id="1"]')
+      .click();
+    await settle();
+    assert.ok(document.querySelector('[data-form="admin-user-detail-save"]'));
+    const detailSwitches = document.querySelectorAll(
+      '[data-form="admin-user-detail-save"] .admin-user-detail-switch input[type="checkbox"]',
+    );
+    assert.equal(detailSwitches.length, 2);
+    assert.deepEqual(
+      Array.from(detailSwitches, (input) => input.name),
+      ["emailVerified", "enabled"],
+    );
+    assert.ok(
+      Array.from(detailSwitches).every((input) =>
+        input.nextElementSibling?.classList.contains(
+          "admin-user-detail-switch-control",
+        ),
+      ),
+    );
+    assert.equal(
+      document.querySelector('[data-profile-attribute="department"]').value,
+      "Research",
+    );
+    const department = document.querySelector(
+      '[data-profile-attribute="department"]',
+    );
+    department.value = "Security";
+    document
+      .querySelector('[data-form="admin-user-detail-save"]')
+      .dispatchEvent(
+        new document.defaultView.Event("submit", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method, body }) =>
+          path === "/api/admin/users/1/profile-attributes" &&
+          method === "PUT" &&
+          body.attributes.department[0] === "Security",
+      ),
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-tab"][data-tab="roles"]')
+      .click();
+    await settle();
+    const adminRole = document.querySelector(
+      '[data-form="admin-user-detail-roles"] input[value="ROLE_ADMIN"]',
+    );
+    const userRole = document.querySelector(
+      '[data-form="admin-user-detail-roles"] input[value="ROLE_USER"]',
+    );
+    assert.equal(
+      adminRole.closest(".admin-role-option").classList.contains("selected"),
+      false,
+    );
+    assert.equal(
+      userRole.closest(".admin-role-option").classList.contains("selected"),
+      true,
+    );
+    adminRole.checked = true;
+    adminRole.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
+    assert.equal(
+      adminRole.closest(".admin-role-option").classList.contains("selected"),
+      true,
+    );
+    document
+      .querySelector('[data-form="admin-user-detail-roles"]')
+      .dispatchEvent(
+        new document.defaultView.Event("submit", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method, body }) =>
+          path === "/api/admin/users/1" &&
+          method === "PUT" &&
+          body.roles.includes("ROLE_ADMIN"),
+      ),
+    );
+    document.querySelector('[data-action="admin-user-detail-back"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-open"][data-id="1"]')
+      .click();
+    await settle();
+    document
+      .querySelector(
+        '[data-action="admin-user-detail-tab"][data-tab="credentials"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector('[data-form="admin-user-detail-password"]'),
+    );
+    assert.ok(document.querySelector(".admin-user-credentials-grid"));
+    const passwordForm = document.querySelector(
+      '[data-form="admin-user-detail-password"]',
+    );
+    assert.equal(passwordForm.elements.namedItem("temporary").checked, true);
+    assert.ok(document.querySelector('[data-form="admin-user-action-email"]'));
+    assert.equal(
+      document.querySelector(
+        '[data-action="admin-user-detail-required-action"]',
+      ).nextElementSibling.className,
+      "admin-user-detail-switch-control",
+    );
+    assert.match(
+      document.querySelector('[data-passkey-index="0"]').textContent,
+      /Signature counter: 4/,
+    );
+    passwordForm.elements.namedItem("password").value =
+      "Strong-Test-Password-42";
+    passwordForm.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method, body }) =>
+          path === "/api/admin/users/1/password" &&
+          method === "PUT" &&
+          body.password === "Strong-Test-Password-42" &&
+          body.temporary === true,
+      ),
+    );
+    const actionEmailForm = document.querySelector(
+      '[data-form="admin-user-action-email"]',
+    );
+    actionEmailForm.elements.namedItem("action").value = "VERIFY_EMAIL";
+    actionEmailForm.elements.namedItem("lifespan").value = "3600";
+    actionEmailForm.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method, body }) =>
+          path === "/api/admin/users/1/execute-actions-email?lifespan=3600" &&
+          method === "PUT" &&
+          body[0] === "VERIFY_EMAIL",
+      ),
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-required-action"]')
+      .click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/required-actions/users/1/VERIFY_EMAIL" &&
+          method === "POST",
+      ),
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-totp-request"]')
+      .click();
+    document
+      .querySelector('[data-action="admin-user-detail-totp-confirm"]')
+      .click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/users/1/totp" && method === "DELETE",
+      ),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-user-detail-tab"][data-tab="sessions"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path ===
+          "/api/admin/users/1/sessions?page=0&size=10&sort=lastAccessTime,desc",
+      ),
+    );
+    assert.match(
+      document.querySelector(".admin-user-detail-data-table").textContent,
+      /ada/,
+    );
+    assert.match(
+      document.querySelector(".admin-user-detail-data-table").textContent,
+      /2/,
+    );
+    assert.ok(
+      document.querySelector(".admin-user-session-table.is-manageable"),
+    );
+    assert.ok(
+      document.querySelector(".admin-user-session-action .danger-button"),
+    );
+    assert.equal(
+      document.querySelectorAll(".admin-user-detail-data-table thead th")
+        .length,
+      6,
+    );
+    assert.equal(
+      document
+        .querySelector(".admin-user-detail-data-table thead th:last-child")
+        .textContent.trim(),
+      "Actions",
+    );
+    assert.match(
+      document.querySelector(".admin-pagination-summary").textContent,
+      /1–10\s*\/\s*15/,
+    );
+    assert.equal(
+      document.querySelector('[aria-label="First page"]').disabled,
+      true,
+    );
+    const pageSize = document.querySelector(
+      '[data-action="admin-user-detail-page-size"][data-tab="sessions"]',
+    );
+    pageSize.value = "20";
+    pageSize.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path ===
+          "/api/admin/users/1/sessions?page=0&size=20&sort=lastAccessTime,desc",
+      ),
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-revoke-all-sessions"]')
+      .click();
+    await settle();
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/users/ada/sessions" && method === "DELETE",
+      ),
+      false,
+    );
+    document
+      .querySelector(
+        '[data-action="admin-user-detail-revoke-all-sessions-confirm"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/users/ada/sessions" && method === "DELETE",
+      ),
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-tab"][data-tab="groups"]')
+      .click();
+    await settle();
+    assert.match(
+      document.querySelector(".admin-user-detail-data-table").textContent,
+      /Platform/,
+    );
+    const groupTable = document.querySelector(".admin-user-group-table");
+    assert.ok(groupTable.classList.contains("is-manageable"));
+    assert.equal(
+      groupTable.querySelector("th:last-child .sr-only").textContent.trim(),
+      "Actions",
+    );
+    assert.ok(
+      groupTable.querySelector(".admin-user-group-action-cell .danger-button"),
+    );
+    const groupSearch = document.querySelector(
+      "#admin-user-detail-group-search",
+    );
+    groupSearch.value = "Eng";
+    groupSearch.dispatchEvent(
+      new document.defaultView.Event("input", { bubbles: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path === "/api/admin/groups?q=Eng&page=0&size=10&sort=name%2Casc",
+      ),
+    );
+    assert.equal(
+      document.querySelector("#admin-user-detail-group-options option")?.value,
+      "/Engineering",
+    );
+    groupSearch.value = "/Engineering";
+    groupSearch.dispatchEvent(
+      new document.defaultView.Event("input", { bubbles: true }),
+    );
+    assert.equal(
+      document.querySelector('[data-action="admin-user-detail-add-group"]')
+        .disabled,
+      false,
+    );
+    document
+      .querySelector(
+        '[data-action="admin-user-detail-tab"][data-tab="consents"]',
+      )
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-consent-details"]')
+      .click();
+    await settle();
+    assert.match(
+      document.querySelector(".admin-user-detail-expand-row").textContent,
+      /admin-api/,
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-revoke-consent"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-revoke-consent-confirm"]')
+      .click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/consents/console-client/ada" &&
+          method === "DELETE",
+      ),
+    );
+    document
+      .querySelector('[data-action="admin-user-detail-tab"][data-tab="events"]')
+      .click();
+    await settle();
+    assert.match(
+      document.querySelector(".admin-user-detail-data-table").textContent,
+      /user.updated/,
+    );
+  } finally {
+    harness.restore();
+  }
+});
+test("native Admin credentials keep other panels available when passkeys fail to load", async () => {
+  const harness = await renderConsole("admin");
+  const { document, setResponse } = harness;
+  setResponse("/api/admin/users/1", "GET", () => ({
+    id: 1,
+    username: "ada",
+    email: "ada@example.test",
+    enabled: true,
+    emailVerified: true,
+    authorities: ["ROLE_USER"],
+    assignedRoles: ["ROLE_USER"],
+  }));
+  setResponse("/api/admin/required-actions/users/1", "GET", () => [
+    {
+      key: "VERIFY_EMAIL",
+      displayName: "Verify email",
+      enabled: true,
+      globalPolicy: false,
+      assigned: false,
+    },
+  ]);
+  setResponse(
+    "/api/admin/users/1/webauthn/credentials?page=0&size=20",
+    "GET",
+    () => ({ status: 503, body: {} }),
+  );
+  try {
+    await settle();
+    document.querySelector('[data-route="users"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-open"][data-id="1"]')
+      .click();
+    await settle();
+    document
+      .querySelector(
+        '[data-action="admin-user-detail-tab"][data-tab="credentials"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector('[data-form="admin-user-detail-password"]'),
+    );
+    assert.ok(
+      document.querySelector(
+        '[data-action="admin-user-detail-required-action"]',
+      ),
+    );
+    assert.match(
+      document.querySelector(".admin-user-passkeys-card [role=alert]")
+        .textContent,
+      /could not be completed/i,
+    );
+    assert.equal(document.querySelector(".content > .notice.error"), null);
+  } finally {
+    harness.restore();
+  }
+});
 test("native Admin user creation persists profile attributes and retries a failed profile save", async () => {
   const harness = await renderConsole("admin");
   let profileSaveAttempts = 0;
@@ -274,24 +846,14 @@ test("native Admin user creation persists profile attributes and retries a faile
       builtIn: false,
       multivalued: true,
     },
-    {
-      name: "invalid name!",
-      type: "STRING",
-      enabled: true,
-      builtIn: false,
-    },
+    { name: "invalid name!", type: "STRING", enabled: true, builtIn: false },
     {
       name: "disabledAttribute",
       type: "STRING",
       enabled: false,
       builtIn: false,
     },
-    {
-      name: "builtInAttribute",
-      type: "STRING",
-      enabled: true,
-      builtIn: true,
-    },
+    { name: "builtInAttribute", type: "STRING", enabled: true, builtIn: true },
   ]);
   harness.setResponse(
     "/api/admin/users/9/profile-attributes",
@@ -302,7 +864,6 @@ test("native Admin user creation persists profile attributes and retries a faile
       return body;
     },
   );
-
   try {
     const { calls, document } = harness;
     for (let turn = 0; turn < 40; turn += 1) {
@@ -339,7 +900,6 @@ test("native Admin user creation persists profile attributes and retries a faile
       createForm.querySelector('[name="attribute-builtInAttribute"]'),
       null,
     );
-
     createForm.elements.namedItem("username").value = "grace-profile";
     createForm.elements.namedItem("password").value = "Strong-Test-Password-42";
     createForm.querySelector('[name="attribute-department"]').value =
@@ -358,7 +918,6 @@ test("native Admin user creation persists profile attributes and retries a faile
       }),
     );
     await settle();
-
     const retryForm = document.querySelector('[data-form="admin-user-create"]');
     assert.equal(retryForm.dataset.createdUserId, "9");
     assert.equal(
@@ -373,7 +932,6 @@ test("native Admin user creation persists profile attributes and retries a faile
       }),
     );
     await settle();
-
     const profileRequests = calls.filter(
       ({ path, method }) =>
         path === "/api/admin/users/9/profile-attributes" && method === "PUT",
@@ -397,155 +955,24 @@ test("native Admin user creation persists profile attributes and retries a faile
     harness.restore();
   }
 });
-
-test("native Admin group permissions validates, edits, and persists assignments", async () => {
-  const harness = await renderConsole("admin");
-  harness.setResponse("/api/admin/groups/3/permissions", "GET", () => []);
-  harness.setResponse("/api/admin/groups/3/permissions", "PUT", () => []);
-
-  try {
-    const { calls, document } = harness;
-    document.querySelector('[data-route="groups"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="groups"]').disabled) break;
-    }
-
-    document
-      .querySelector(
-        '[data-action="admin-group-permissions-toggle"][data-id="3"]',
-      )
-      .click();
-    await settle();
-    const form = document.querySelector(
-      '[data-form="admin-group-permissions"]',
-    );
-    assert.ok(form, "authorized group permissions should load an editor");
-    assert.ok(form.elements.namedItem("newUserId").options.length > 0);
-
-    form.querySelector('[data-action="admin-group-permission-add"]').click();
-    await settle();
-    const updatedForm = document.querySelector(
-      '[data-form="admin-group-permissions"]',
-    );
-    updatedForm.dispatchEvent(
-      new document.defaultView.Event("submit", {
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method, body }) =>
-          path === "/api/admin/groups/3/permissions" &&
-          method === "PUT" &&
-          body.permissions.length === 1 &&
-          body.permissions[0].userId === 1,
-      ),
-      "a valid permission assignment should be persisted once",
-    );
-  } finally {
-    harness.restore();
-  }
-});
-
-test("native Admin group editor covers role, name, and child-group flows", async () => {
-  const harness = await renderConsole("admin");
-  try {
-    const { calls, document } = harness;
-    document.querySelector('[data-route="groups"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="groups"]').disabled) break;
-    }
-
-    document
-      .querySelector('[data-action="admin-group-roles-toggle"][data-id="3"]')
-      .click();
-    await settle();
-    const roleForm = document.querySelector('[data-form="admin-group-roles"]');
-    assert.ok(roleForm);
-    roleForm.querySelector('input[name="roles"]').checked = true;
-    roleForm.dispatchEvent(
-      new document.defaultView.Event("submit", {
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method, body }) =>
-          path === "/api/admin/groups/3/roles" &&
-          method === "PUT" &&
-          body.roles.includes("ROLE_USER"),
-      ),
-    );
-
-    document
-      .querySelector('[data-action="admin-group-name-toggle"][data-id="3"]')
-      .click();
-    await settle();
-    const nameForm = document.querySelector('[data-form="admin-group-rename"]');
-    assert.ok(nameForm);
-    nameForm.elements.namedItem("name").value = "Platform Engineering";
-    nameForm.dispatchEvent(
-      new document.defaultView.Event("submit", {
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method, body }) =>
-          path === "/api/admin/groups/3/name" &&
-          method === "PUT" &&
-          body.name === "Platform Engineering",
-      ),
-    );
-
-    document
-      .querySelector(
-        '[data-action="admin-group-child-create-toggle"][data-id="3"]',
-      )
-      .click();
-    await settle();
-    const childForm = document.querySelector(
-      '[data-form="admin-group-child-create"]',
-    );
-    assert.ok(childForm);
-    childForm.elements.namedItem("name").value = "Runtime";
-    childForm.dispatchEvent(
-      new document.defaultView.Event("submit", {
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method, body }) =>
-          path === "/api/admin/groups" &&
-          method === "POST" &&
-          body.parentId === 3 &&
-          body.name === "Runtime",
-      ),
-    );
-  } finally {
-    harness.restore();
-  }
-});
-
 test("native Admin role-composition panel renders and cancels removals", async () => {
   const harness = await renderConsole("admin");
-  harness.setResponse("/api/admin/roles/ROLE_USER", "GET", () => ({
-    compositeRoles: ["ROLE_ADMIN"],
-    compositeClientRoles: [
-      { id: 12, clientId: "console-client", name: "read" },
-    ],
-  }));
+  harness.setResponse(
+    "/api/admin/roles/ROLE_USER?q=&page=0&size=10&sort=username%2Casc",
+    "GET",
+    () => ({
+      name: "ROLE_USER",
+      userCount: 0,
+      users: {
+        content: [],
+        page: { number: 0, size: 10, totalElements: 0, totalPages: 0 },
+      },
+      compositeRoles: ["ROLE_ADMIN"],
+      compositeClientRoles: [
+        { id: 12, clientId: "console-client", name: "read" },
+      ],
+    }),
+  );
   harness.setResponse(
     "/api/admin/roles/ROLE_USER/available-composites?q=EDIT&page=0&size=10&sort=name,asc",
     "GET",
@@ -568,7 +995,6 @@ test("native Admin role-composition panel renders and cancels removals", async (
       ],
     }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="roles"]').click();
@@ -577,18 +1003,26 @@ test("native Admin role-composition panel renders and cancels removals", async (
       if (!document.querySelector('[data-route="roles"]').disabled) break;
     }
     document
-      .querySelector('[data-action="admin-role-compositions-toggle"]')
+      .querySelector('[data-action="role-open"][data-id="ROLE_USER"]')
       .click();
     await settle();
-
     const panel = document.querySelector('[data-role-composition="ROLE_USER"]');
     assert.ok(panel);
     assert.match(panel.textContent, /ROLE_ADMIN/);
-    assert.match(panel.textContent, /console-client \/ read/);
-    assert.ok(calls.some(({ path }) => path === "/api/admin/roles/ROLE_USER"));
-
+    assert.match(
+      document.querySelector("#role-tab-panel").textContent,
+      /console-client \/ read/,
+    );
+    assert.ok(
+      calls.some(({ path }) => path.startsWith("/api/admin/roles/ROLE_USER?")),
+    );
     panel.querySelector('input[name="q"]').value = "EDIT";
-    panel.querySelector('[data-action="admin-role-composite-search"]').click();
+    panel
+      .querySelector('input[name="q"]')
+      .dispatchEvent(
+        new document.defaultView.Event("input", { bubbles: true }),
+      );
+    await new Promise((resolve) => setTimeout(resolve, 350));
     await settle();
     const roleSearchPanel = document.querySelector(
       '[data-role-composition="ROLE_USER"]',
@@ -602,15 +1036,14 @@ test("native Admin role-composition panel renders and cancels removals", async (
           "/api/admin/roles/ROLE_USER/available-composites?q=EDIT&page=0&size=10&sort=name,asc",
       ),
     );
-
-    roleSearchPanel.querySelector('input[name="client-q"]').value = "core";
-    roleSearchPanel
-      .querySelector('[data-action="admin-role-client-composite-search"]')
-      .click();
-    await settle();
-    const clientSearchPanel = document.querySelector(
-      '[data-role-composition="ROLE_USER"]',
+    const clientInput = document.querySelector('input[name="client-q"]');
+    clientInput.value = "core";
+    clientInput.dispatchEvent(
+      new document.defaultView.Event("input", { bubbles: true }),
     );
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await settle();
+    const clientSearchPanel = document.querySelector("#role-tab-panel");
     assert.match(clientSearchPanel.textContent, /desktop-core \/ read/);
     assert.equal(
       clientSearchPanel.textContent.includes("unsafe client"),
@@ -623,7 +1056,6 @@ test("native Admin role-composition panel renders and cancels removals", async (
           "/api/admin/roles/ROLE_USER/available-client-composites?q=core&page=0&size=10&sort=name,asc",
       ),
     );
-
     clientSearchPanel
       .querySelector('[data-action="admin-role-composite-remove-request"]')
       .click();
@@ -637,7 +1069,6 @@ test("native Admin role-composition panel renders and cancels removals", async (
       .querySelector('[data-action="admin-role-composite-remove-cancel"]')
       .click();
     await settle();
-
     document
       .querySelector(
         '[data-action="admin-role-client-composite-remove-request"]',
@@ -658,7 +1089,6 @@ test("native Admin role-composition panel renders and cancels removals", async (
     harness.restore();
   }
 });
-
 test("native Admin client-scope role mappings load, save, and cancel drafts", async () => {
   const harness = await renderConsole("admin");
   let mappers = [
@@ -712,7 +1142,10 @@ test("native Admin client-scope role mappings load, save, and cancel drafts", as
       if (!document.querySelector('[data-route="client-scopes"]').disabled)
         break;
     }
-
+    document
+      .querySelector('[data-action="client-scope-open"][data-id="profile"]')
+      .click();
+    await settle();
     document
       .querySelector(
         '[data-action="admin-client-scope-role-mappings-toggle"][data-id="profile"]',
@@ -723,7 +1156,6 @@ test("native Admin client-scope role mappings load, save, and cancel drafts", as
       '[data-client-scope-role-mappings-panel][data-scope-id="profile"]',
     );
     assert.ok(panel);
-
     panel
       .querySelector('[data-action="admin-client-scope-role-mappings-save"]')
       .click();
@@ -737,7 +1169,6 @@ test("native Admin client-scope role mappings load, save, and cancel drafts", as
           Array.isArray(body.clientRoleIds),
       ),
     );
-
     document
       .querySelector('[data-action="admin-client-scope-role-mappings-cancel"]')
       .click();
@@ -746,7 +1177,6 @@ test("native Admin client-scope role mappings load, save, and cancel drafts", as
       document.querySelector("[data-client-scope-role-mappings-panel]"),
       null,
     );
-
     document
       .querySelector(
         '[data-action="admin-client-scope-mappers-toggle"][data-id="profile"]',
@@ -831,13 +1261,11 @@ test("native Admin client-scope role mappings load, save, and cancel drafts", as
     harness.restore();
   }
 });
-
 test("native Admin client-scope deletion requires confirmation", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/client-scopes/profile", "DELETE", () => ({
     status: 204,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="client-scopes"]').click();
@@ -885,7 +1313,6 @@ test("native Admin client-scope deletion requires confirmation", async () => {
     harness.restore();
   }
 });
-
 test("native Admin client-scope assignments edit and persist scope choices", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse(
@@ -908,7 +1335,6 @@ test("native Admin client-scope assignments edit and persist scope choices", asy
     "PUT",
     ({ body }) => body,
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -916,13 +1342,8 @@ test("native Admin client-scope assignments edit and persist scope choices", asy
       await settle();
       if (!document.querySelector('[data-route="clients"]').disabled) break;
     }
-    document
-      .querySelector(
-        '[data-action="admin-client-scope-assignments-toggle"][data-id="console-client"]',
-      )
-      .click();
+    await openClientTab(document, "scopes");
     await settle();
-
     const panel = document.querySelector(
       '[data-client-scope-assignments-panel][data-client-id="console-client"]',
     );
@@ -949,60 +1370,6 @@ test("native Admin client-scope assignments edit and persist scope choices", asy
     harness.restore();
   }
 });
-
-test("native Admin client metadata loads, updates, and avoids secret fields", async () => {
-  const harness = await renderConsole("admin");
-  harness.setResponse(
-    "/api/admin/clients/console-client/native-metadata",
-    "GET",
-    () => ({ clientName: "Console Client" }),
-  );
-  harness.setResponse(
-    "/api/admin/clients/console-client/native-metadata",
-    "PUT",
-    ({ body }) => body,
-  );
-
-  try {
-    const { calls, document } = harness;
-    document.querySelector('[data-route="clients"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="clients"]').disabled) break;
-    }
-    document
-      .querySelector(
-        '[data-action="admin-client-metadata-edit"][data-id="console-client"]',
-      )
-      .click();
-    await settle();
-
-    let form = document.querySelector(
-      '[data-form="admin-client-native-metadata"]',
-    );
-    assert.ok(form);
-    assert.equal(form.querySelector('[type="password"]'), null);
-    form.elements.namedItem("clientName").value = "Native Console";
-    form.dispatchEvent(
-      new document.defaultView.Event("submit", {
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method, body }) =>
-          path === "/api/admin/clients/console-client/native-metadata" &&
-          method === "PUT" &&
-          body.clientName === "Native Console",
-      ),
-    );
-  } finally {
-    harness.restore();
-  }
-});
-
 test("native Admin localization settings save asynchronously without duplicate submissions", async () => {
   const harness = await renderConsole("admin");
   let finishSave;
@@ -1029,7 +1396,6 @@ test("native Admin localization settings save asynchronously without duplicate s
           });
       }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="localization"]').click();
@@ -1038,7 +1404,6 @@ test("native Admin localization settings save asynchronously without duplicate s
       if (!document.querySelector('[data-route="localization"]').disabled)
         break;
     }
-
     const form = document.querySelector(
       '[data-form="admin-localization-settings"]',
     );
@@ -1051,7 +1416,6 @@ test("native Admin localization settings save asynchronously without duplicate s
       }),
     );
     await settle();
-
     const busyButton = document.querySelector(
       '[data-form="admin-localization-settings"] button[type="submit"]',
     );
@@ -1067,7 +1431,6 @@ test("native Admin localization settings save asynchronously without duplicate s
         }),
       );
     await settle();
-
     const saves = calls.filter(
       ({ path, method }) =>
         path === "/api/admin/settings/localization" && method === "PUT",
@@ -1075,7 +1438,6 @@ test("native Admin localization settings save asynchronously without duplicate s
     assert.equal(saves.length, 1);
     assert.equal(saves[0].body.defaultLocale, "tr");
     assert.deepEqual(saves[0].body.supportedLocales, ["en", "tr"]);
-
     finishSave();
     await settle();
     const completedButton = document.querySelector(
@@ -1089,7 +1451,6 @@ test("native Admin localization settings save asynchronously without duplicate s
     harness.restore();
   }
 });
-
 test("native Admin login policy requires OTP before it can be mandatory", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/settings/login/native", "GET", () => ({
@@ -1106,7 +1467,6 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
     host: "smtp.example.test",
     port: 587,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="login-email"]').click();
@@ -1127,7 +1487,6 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
       }),
     );
     await settle();
-
     assert.equal(
       calls.some(
         ({ path, method }) =>
@@ -1137,7 +1496,6 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
       "mandatory OTP must not be sent while OTP is disabled",
     );
     assert.match(document.querySelector('[role="alert"]').textContent, /OTP/i);
-
     const updatedForm = document.querySelector(
       '[data-form="admin-login-settings"]',
     );
@@ -1161,7 +1519,6 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
     harness.restore();
   }
 });
-
 test("native Admin email settings preserve the configured username and clear the secret draft", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/settings/login/native", "GET", () => ({}));
@@ -1181,7 +1538,6 @@ test("native Admin email settings preserve the configured username and clear the
     username: body.username,
     password: undefined,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="login-email"]').click();
@@ -1204,7 +1560,6 @@ test("native Admin email settings preserve the configured username and clear the
       }),
     );
     await settle();
-
     const save = calls.find(
       ({ path, method }) =>
         path === "/api/admin/settings/email" && method === "PUT",
@@ -1227,14 +1582,12 @@ test("native Admin email settings preserve the configured username and clear the
     harness.restore();
   }
 });
-
 test("native Admin client-scope creation validates and normalizes the draft", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/client-scopes", "POST", ({ body }) => ({
     id: "claims",
     ...body,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="client-scopes"]').click();
@@ -1266,7 +1619,6 @@ test("native Admin client-scope creation validates and normalizes the draft", as
       "an empty normalized scope name must not reach the API",
     );
     assert.ok(document.querySelector('[role="alert"]'));
-
     form = document.querySelector('[data-form="admin-client-scope-create"]');
     form.elements.namedItem("name").value = "  claims  ";
     form.elements.namedItem("displayName").value = " User Claims ";
@@ -1293,18 +1645,13 @@ test("native Admin client-scope creation validates and normalizes the draft", as
     harness.restore();
   }
 });
-
 test("native Admin forbidden response returns to an authorized Admin route", async () => {
   const harness = await renderConsole("admin");
   let forbidden = true;
   harness.setResponse("/api/admin/settings/localization", "GET", () => {
     if (forbidden) {
       forbidden = false;
-      return {
-        status: 403,
-        kind: "forbidden",
-        body: { detail: "Forbidden" },
-      };
+      return { status: 403, kind: "forbidden", body: { detail: "Forbidden" } };
     }
     return {
       internationalizationEnabled: true,
@@ -1312,7 +1659,6 @@ test("native Admin forbidden response returns to an authorized Admin route", asy
       supportedLocales: ["en", "tr"],
     };
   });
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="localization"]').click();
@@ -1353,14 +1699,12 @@ test("native Admin forbidden response returns to an authorized Admin route", asy
     harness.restore();
   }
 });
-
 test("native Admin role creation rejects malformed names and submits normalized data", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/roles", "POST", ({ body }) => ({
     id: 44,
     ...body,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="roles"]').click();
@@ -1388,7 +1732,6 @@ test("native Admin role creation rejects malformed names and submits normalized 
       "role identifiers outside ROLE_* format must not reach the API",
     );
     assert.ok(document.querySelector('[role="alert"]'));
-
     form = document.querySelector('[data-form="admin-role-create"]');
     form.elements.namedItem("name").value = "  ROLE_AUDITOR  ";
     form.elements.namedItem("description").value = " Audit access ";
@@ -1408,14 +1751,16 @@ test("native Admin role creation rejects malformed names and submits normalized 
           body.description === "Audit access",
       ),
     );
+    assert.ok(
+      document.querySelector("#role-tab-details"),
+      "Creation opens the new native detail screen",
+    );
   } finally {
     harness.restore();
   }
 });
-
 test("native Admin user deletion requires confirmation and can be canceled", async () => {
   const harness = await renderConsole("admin");
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -1423,7 +1768,6 @@ test("native Admin user deletion requires confirmation and can be canceled", asy
       await settle();
       if (!document.querySelector('[data-route="users"]').disabled) break;
     }
-
     document
       .querySelector('[data-action="admin-user-unlock"][data-id="1"]')
       .click();
@@ -1434,7 +1778,6 @@ test("native Admin user deletion requires confirmation and can be canceled", asy
           path === "/api/admin/users/1/unlock" && method === "POST",
       ),
     );
-
     document
       .querySelector('[data-action="admin-user-toggle-enabled"][data-id="1"]')
       .click();
@@ -1452,7 +1795,6 @@ test("native Admin user deletion requires confirmation and can be canceled", asy
           body.enabled === false,
       ),
     );
-
     document
       .querySelector('[data-action="admin-user-delete-request"][data-id="1"]')
       .click();
@@ -1472,7 +1814,6 @@ test("native Admin user deletion requires confirmation and can be canceled", asy
       false,
       "canceling confirmation must leave the user intact",
     );
-
     document
       .querySelector('[data-action="admin-user-delete-request"][data-id="1"]')
       .click();
@@ -1492,11 +1833,9 @@ test("native Admin user deletion requires confirmation and can be canceled", asy
     harness.restore();
   }
 });
-
 test("native Admin user editor requires a role and clears email verification without email", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/users/1", "PUT", ({ body }) => body);
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -1550,7 +1889,6 @@ test("native Admin user editor requires a role and clears email verification wit
     harness.restore();
   }
 });
-
 test("native Admin user access controls confirm disable, reset MFA, unlock, and send action email", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/users/1/enabled", "PUT", ({ body }) => body);
@@ -1565,7 +1903,6 @@ test("native Admin user access controls confirm disable, reset MFA, unlock, and 
     "PUT",
     () => ({ status: 204 }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -1594,7 +1931,6 @@ test("native Admin user access controls confirm disable, reset MFA, unlock, and 
           body.enabled === false,
       ),
     );
-
     document
       .querySelector(
         '[data-action="admin-user-totp-reset-request"][data-id="1"]',
@@ -1613,7 +1949,6 @@ test("native Admin user access controls confirm disable, reset MFA, unlock, and 
           path === "/api/admin/users/1/totp" && method === "DELETE",
       ),
     );
-
     document
       .querySelector('[data-action="admin-user-unlock"][data-id="1"]')
       .click();
@@ -1624,7 +1959,6 @@ test("native Admin user access controls confirm disable, reset MFA, unlock, and 
           path === "/api/admin/users/1/unlock" && method === "POST",
       ),
     );
-
     document
       .querySelector(
         '[data-action="admin-user-action-email-toggle"][data-id="1"]',
@@ -1656,13 +1990,11 @@ test("native Admin user access controls confirm disable, reset MFA, unlock, and 
     harness.restore();
   }
 });
-
 test("native Admin password reset validates strength and never keeps the submitted value", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/users/1/password", "PUT", () => ({
     status: 204,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -1695,7 +2027,6 @@ test("native Admin password reset validates strength and never keeps the submitt
       ),
       false,
     );
-
     form = document.querySelector('[data-form="admin-user-password-reset"]');
     const submittedPassword = "desktop-test-password-42";
     form.elements.namedItem("password").value = submittedPassword;
@@ -1723,9 +2054,20 @@ test("native Admin password reset validates strength and never keeps the submitt
     harness.restore();
   }
 });
-
 test("native Admin OIDC provider creation validates endpoints and clears the client secret", async () => {
   const harness = await renderConsole("admin");
+  harness.setResponse(
+    "/api/admin/identity-providers/example-oidc",
+    "GET",
+    () => ({
+      id: "example-oidc",
+      providerType: "oidc",
+      displayName: "Example Identity Provider",
+      alias: "example-oidc",
+      registrationId: "example-oidc",
+      clientSecretConfigured: true,
+    }),
+  );
   harness.setResponse("/api/admin/identity-providers", "POST", ({ body }) => ({
     id: "example-oidc",
     providerType: "oidc",
@@ -1734,7 +2076,6 @@ test("native Admin OIDC provider creation validates endpoints and clears the cli
       Object.entries(body).filter(([key]) => key !== "clientSecret"),
     ),
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="identity-providers"]').click();
@@ -1743,9 +2084,7 @@ test("native Admin OIDC provider creation validates endpoints and clears the cli
       if (!document.querySelector('[data-route="identity-providers"]').disabled)
         break;
     }
-    document
-      .querySelector('[data-action="admin-oidc-provider-create"]')
-      .click();
+    document.querySelector('[data-action="admin-provider-create"]').click();
     await settle();
     const form = document.querySelector(
       '[data-form="admin-identity-provider-connection"]',
@@ -1770,7 +2109,6 @@ test("native Admin OIDC provider creation validates endpoints and clears the cli
       }),
     );
     await settle();
-
     const save = calls.find(
       ({ path, method }) =>
         path === "/api/admin/identity-providers" && method === "POST",
@@ -1783,11 +2121,16 @@ test("native Admin OIDC provider creation validates endpoints and clears the cli
     );
     assert.equal(save.body.providerType, "oidc");
     assert.equal(save.body.registrationId, "example-oidc");
-    assert.equal(
+    assert.ok(
       document.querySelector(
         '[data-form="admin-identity-provider-connection"]',
       ),
-      null,
+    );
+    assert.equal(
+      document
+        .querySelector('[data-form="admin-identity-provider-connection"]')
+        .elements.namedItem("clientSecret").value,
+      "",
     );
     assert.equal(
       document
@@ -1800,9 +2143,19 @@ test("native Admin OIDC provider creation validates endpoints and clears the cli
     harness.restore();
   }
 });
-
 test("native Admin SAML provider creation validates metadata and clears private keys", async () => {
   const harness = await renderConsole("admin");
+  harness.setResponse(
+    "/api/admin/identity-providers/example-saml",
+    "GET",
+    () => ({
+      id: "example-saml",
+      providerType: "saml",
+      displayName: "Example SAML",
+      alias: "example-saml",
+      registrationId: "example-saml",
+    }),
+  );
   let finishSave;
   harness.setResponse(
     "/api/admin/identity-providers",
@@ -1812,7 +2165,6 @@ test("native Admin SAML provider creation validates metadata and clears private 
         finishSave = () => resolve({ id: "example-saml", ...body });
       }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="identity-providers"]').click();
@@ -1821,15 +2173,17 @@ test("native Admin SAML provider creation validates metadata and clears private 
       if (!document.querySelector('[data-route="identity-providers"]').disabled)
         break;
     }
-    document
-      .querySelector('[data-action="admin-saml-provider-create"]')
-      .click();
+    document.querySelector('[data-action="admin-provider-create"]').click();
+    const providerType = document.querySelector("[data-provider-create-type]");
+    providerType.value = "saml";
+    providerType.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
     await settle();
     let form = document.querySelector(
       '[data-form="admin-saml-identity-provider-connection"]',
     );
     assert.ok(form);
-
     const setField = (name, value) => {
       form.elements.namedItem(name).value = value;
     };
@@ -1852,7 +2206,6 @@ test("native Admin SAML provider creation validates metadata and clears private 
       false,
       "SAML requires a metadata URI or complete manual configuration",
     );
-
     form = document.querySelector(
       '[data-form="admin-saml-identity-provider-connection"]',
     );
@@ -1870,7 +2223,6 @@ test("native Admin SAML provider creation validates metadata and clears private 
       }),
     );
     await settle();
-
     form = document.querySelector(
       '[data-form="admin-saml-identity-provider-connection"]',
     );
@@ -1892,7 +2244,6 @@ test("native Admin SAML provider creation validates metadata and clears private 
       1,
       "a pending SAML save must ignore duplicate submissions",
     );
-
     const save = calls.find(
       ({ path, method }) =>
         path === "/api/admin/identity-providers" && method === "POST",
@@ -1910,7 +2261,6 @@ test("native Admin SAML provider creation validates metadata and clears private 
       save.body.samlDecryptionPrivateKey.includes("DECRYPTION_SENTINEL"),
       true,
     );
-
     finishSave();
     await settle();
     assert.equal(
@@ -1924,12 +2274,11 @@ test("native Admin SAML provider creation validates metadata and clears private 
     harness.restore();
   }
 });
-
-test("native Admin identity-provider policy edits and persists safe display settings", async () => {
+test("native Admin OIDC details match the Web form and save policy options together", async () => {
   const harness = await renderConsole("admin");
   const providerPath = "/api/admin/identity-providers/example/native-policy";
   harness.setResponse(
-    "/api/admin/identity-providers?q=&page=0&size=20&sort=guiOrder%2Casc",
+    "/api/admin/identity-providers?q=&page=0&size=10&sort=guiOrder%2Casc",
     "GET",
     () => ({
       content: [
@@ -1962,8 +2311,36 @@ test("native Admin identity-provider policy edits and persists safe display sett
       syncMode: "import",
     }),
   );
-  harness.setResponse(providerPath, "PUT", ({ body }) => body);
-
+  harness.setResponse("/api/admin/identity-providers/example", "GET", () => ({
+    id: "example",
+    providerType: "oidc",
+    alias: "example",
+    displayName: "Example",
+    registrationId: "example",
+    clientId: "example-client",
+    clientSecretConfigured: true,
+    authorizationUri: "https://issuer.example.test/authorize",
+    tokenUri: "https://issuer.example.test/token",
+    userInfoUri: "",
+    jwkSetUri: "",
+    issuerUri: "",
+    scopes: "openid profile email",
+    userNameAttribute: "sub",
+    clientAuthenticationMethod: "client_secret_basic",
+    requiredClaims: "sub,email",
+    guiOrder: 1,
+    syncMode: "import",
+    showInAccountConsole: "always",
+    shortStateParameter: false,
+    caseSensitiveUsername: false,
+    storeTokens: false,
+    storedTokensReadable: false,
+  }));
+  harness.setResponse(
+    "/api/admin/identity-providers/example",
+    "PUT",
+    ({ body }) => body,
+  );
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="identity-providers"]').click();
@@ -1973,18 +2350,28 @@ test("native Admin identity-provider policy edits and persists safe display sett
         break;
     }
     document
-      .querySelector(
-        '[data-action="admin-identity-provider-policy-toggle"][data-id="example"]',
-      )
+      .querySelector('a[data-action="admin-provider-open"][data-id="example"]')
       .click();
     await settle();
     const form = document.querySelector(
-      '[data-form="admin-identity-provider-policy"]',
+      '[data-form="admin-identity-provider-connection"]',
     );
     assert.ok(form);
-    form.elements.namedItem("displayName").value = " Example OIDC ";
+    assert.equal(form.elements.namedItem("displayName").value, "Example");
+    assert.equal(
+      document.querySelectorAll('[data-form="admin-identity-provider-policy"]')
+        .length,
+      0,
+    );
+    assert.equal(
+      document.querySelectorAll(".identity-provider-checkbox").length,
+      9,
+    );
+    form.elements.namedItem("enabled").checked = false;
     form.elements.namedItem("hideOnLogin").checked = true;
     form.elements.namedItem("mfaRequired").checked = true;
+    form.elements.namedItem("shortStateParameter").checked = true;
+    form.elements.namedItem("guiOrder").value = "7";
     form.dispatchEvent(
       new document.defaultView.Event("submit", {
         bubbles: true,
@@ -1995,22 +2382,20 @@ test("native Admin identity-provider policy edits and persists safe display sett
     assert.ok(
       calls.some(
         ({ path, method, body }) =>
-          path === providerPath &&
+          path === "/api/admin/identity-providers/example" &&
           method === "PUT" &&
-          body.displayName === "Example OIDC" &&
+          body.displayName === "Example" &&
+          body.enabled === false &&
           body.hideOnLogin === true &&
-          body.mfaRequired === true,
+          body.mfaRequired === true &&
+          body.shortStateParameter === true &&
+          body.guiOrder === 7,
       ),
-    );
-    assert.equal(
-      document.querySelector('[data-form="admin-identity-provider-policy"]'),
-      null,
     );
   } finally {
     harness.restore();
   }
 });
-
 test("native Admin passkey management renames and confirms credential deletion", async () => {
   const harness = await renderConsole("admin");
   const credentialPath = "/api/admin/users/1/webauthn/credentials/credential_1";
@@ -2032,7 +2417,6 @@ test("native Admin passkey management renames and confirms credential deletion",
   );
   harness.setResponse(credentialPath, "PUT", ({ body }) => body);
   harness.setResponse(credentialPath, "DELETE", () => ({ status: 204 }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -2070,7 +2454,6 @@ test("native Admin passkey management renames and confirms credential deletion",
           body.label === "Updated laptop",
       ),
     );
-
     document
       .querySelector('[data-action="admin-user-passkey-delete-request"]')
       .click();
@@ -2090,7 +2473,6 @@ test("native Admin passkey management renames and confirms credential deletion",
       ),
       false,
     );
-
     document
       .querySelector('[data-action="admin-user-passkey-delete-request"]')
       .click();
@@ -2109,7 +2491,6 @@ test("native Admin passkey management renames and confirms credential deletion",
     harness.restore();
   }
 });
-
 test("native Admin passkey pagination loads and returns to bounded pages", async () => {
   const harness = await renderConsole("admin");
   const firstPagePath =
@@ -2132,7 +2513,6 @@ test("native Admin passkey pagination loads and returns to bounded pages", async
     totalPages: 2,
     number: 1,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -2145,7 +2525,6 @@ test("native Admin passkey pagination loads and returns to bounded pages", async
       .click();
     await settle();
     assert.ok(document.querySelector('[data-passkey-index="0"]'));
-
     document
       .querySelector('[data-action="admin-user-passkey-page"][data-index="1"]')
       .click();
@@ -2155,7 +2534,6 @@ test("native Admin passkey pagination loads and returns to bounded pages", async
       "Security key",
     );
     assert.ok(calls.some(({ path }) => path === secondPagePath));
-
     document
       .querySelector('[data-action="admin-user-passkey-page"][data-index="0"]')
       .click();
@@ -2173,7 +2551,6 @@ test("native Admin passkey pagination loads and returns to bounded pages", async
     harness.restore();
   }
 });
-
 test("native Admin user profile attributes normalize multi-value and boolean fields", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/users/1/profile-attributes", "GET", () => ({
@@ -2236,7 +2613,6 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
     "PUT",
     ({ body }) => ({ attributes: body.attributes }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -2292,7 +2668,6 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
       }),
     );
     await settle();
-
     assert.ok(
       calls.some(
         ({ path, method, body }) =>
@@ -2309,7 +2684,6 @@ test("native Admin user profile attributes normalize multi-value and boolean fie
     harness.restore();
   }
 });
-
 test("native Admin user avatar validates, uploads, and confirms removal", async () => {
   const harness = await renderConsole("admin");
   globalThis.__KITEZH_NATIVE_BOOTSTRAP__.apiBaseUrl =
@@ -2329,7 +2703,6 @@ test("native Admin user avatar validates, uploads, and confirms removal", async 
   harness.setResponse("/api/admin/users/1/avatar", "DELETE", () => ({
     status: 204,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -2338,7 +2711,6 @@ test("native Admin user avatar validates, uploads, and confirms removal", async 
       .querySelector('[data-action="admin-user-avatar-toggle"][data-id="1"]')
       .click();
     await settle();
-
     const upload = document.querySelector(
       '[data-action="admin-user-avatar-upload"]',
     );
@@ -2351,7 +2723,6 @@ test("native Admin user avatar validates, uploads, and confirms removal", async 
       ),
       false,
     );
-
     const fileInput = document.querySelector('[data-admin-avatar-file="1"]');
     Object.defineProperty(fileInput, "files", {
       configurable: true,
@@ -2379,7 +2750,6 @@ test("native Admin user avatar validates, uploads, and confirms removal", async 
           body.dataBase64 === "aGVsbG8=",
       ),
     );
-
     document
       .querySelector('[data-action="admin-user-avatar-delete-request"]')
       .click();
@@ -2418,7 +2788,6 @@ test("native Admin user avatar validates, uploads, and confirms removal", async 
     }
   }
 });
-
 test("native Admin confidential client validates redirects and reveals its secret once", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/clients", "POST", ({ body }) => ({
@@ -2430,7 +2799,6 @@ test("native Admin confidential client validates redirects and reveals its secre
     },
     clientSecret: "one-time-client-secret",
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -2461,7 +2829,6 @@ test("native Admin confidential client validates redirects and reveals its secre
       "unsafe redirect destinations must not reach the API",
     );
     assert.ok(document.querySelector('[role="alert"]'));
-
     form = document.querySelector('[data-form="admin-client-create"]');
     form.elements.namedItem("redirectUris").value =
       "https://console.example.test/callback";
@@ -2505,7 +2872,6 @@ test("native Admin confidential client validates redirects and reveals its secre
     harness.restore();
   }
 });
-
 test("native Admin policy and branding settings render and persist their forms", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/settings/ciba-policy", "GET", () => ({
@@ -2553,7 +2919,6 @@ test("native Admin policy and branding settings render and persist their forms",
     "PUT",
     (request) => request.body,
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="policies"]').click();
@@ -2576,7 +2941,6 @@ test("native Admin policy and branding settings render and persist their forms",
           body.stepUpRequired,
       ),
     );
-
     const offline = document.querySelector(
       '[data-form="admin-offline-access-policy"]',
     );
@@ -2597,7 +2961,6 @@ test("native Admin policy and branding settings render and persist their forms",
           body.maxLimited === false,
       ),
     );
-
     document.querySelector('[data-route="configuration"]').click();
     await settle();
     const branding = document.querySelector('[data-form="admin-branding"]');
@@ -2626,7 +2989,6 @@ test("native Admin policy and branding settings render and persist their forms",
     harness.restore();
   }
 });
-
 test("native Admin dashboard shows healthy server, signing key, and recent events", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/dashboard", "GET", () => ({
@@ -2658,7 +3020,6 @@ test("native Admin dashboard shows healthy server, signing key, and recent event
     status: 200,
     body: { status: "UP" },
   }));
-
   try {
     const { document } = harness;
     document.querySelector('[data-route="dashboard"]').click();
@@ -2678,7 +3039,6 @@ test("native Admin dashboard shows healthy server, signing key, and recent event
     harness.restore();
   }
 });
-
 test("native Admin LDAP overview displays configured provider status", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/settings/ldap", "GET", () => [
@@ -2692,7 +3052,6 @@ test("native Admin LDAP overview displays configured provider status", async () 
       lastSyncImported: 4,
     },
   ]);
-
   try {
     const { document } = harness;
     document.querySelector('[data-route="ldap"]').click();
@@ -2710,7 +3069,6 @@ test("native Admin LDAP overview displays configured provider status", async () 
     harness.restore();
   }
 });
-
 test("native Admin sessions search and revocation controls use bounded contracts", async () => {
   const harness = await renderConsole("admin");
   let active = true;
@@ -2742,7 +3100,6 @@ test("native Admin sessions search and revocation controls use bounded contracts
     "GET",
     sessionPage,
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="sessions"]').click();
@@ -2762,7 +3119,6 @@ test("native Admin sessions search and revocation controls use bounded contracts
         ({ path }) => path.includes("q=ada") && path.includes("status=expired"),
       ),
     );
-
     document
       .querySelector('[data-action="admin-session-delete-request"]')
       .click();
@@ -2777,7 +3133,6 @@ test("native Admin sessions search and revocation controls use bounded contracts
     assert.ok(
       document.querySelector('[data-action="admin-session-delete-request"]'),
     );
-
     document
       .querySelector('[data-action="admin-session-delete-request"]')
       .click();
@@ -2800,7 +3155,6 @@ test("native Admin sessions search and revocation controls use bounded contracts
     harness.restore();
   }
 });
-
 test("native Admin consent and offline-session revocation require confirmation", async () => {
   const harness = await renderConsole("admin");
   let consentActive = true;
@@ -2857,7 +3211,6 @@ test("native Admin consent and offline-session revocation require confirmation",
       return { status: 204 };
     },
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="consents"]').click();
@@ -2892,7 +3245,6 @@ test("native Admin consent and offline-session revocation require confirmation",
       document.querySelector('[data-action="admin-consent-revoke-request"]'),
       null,
     );
-
     document.querySelector('[data-route="offline-sessions"]').click();
     await settle();
     document
@@ -2933,13 +3285,11 @@ test("native Admin consent and offline-session revocation require confirmation",
     harness.restore();
   }
 });
-
 test("native Admin signing-key rotation requires a second confirmation", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/keys/rotate", "POST", () => ({
     kid: "signing-key-2",
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="keys"]').click();
@@ -2962,7 +3312,6 @@ test("native Admin signing-key rotation requires a second confirmation", async (
       ),
       false,
     );
-
     document.querySelector('[data-action="admin-key-rotate-request"]').click();
     await settle();
     document.querySelector('[data-action="admin-key-rotate-confirm"]').click();
@@ -2977,11 +3326,9 @@ test("native Admin signing-key rotation requires a second confirmation", async (
     harness.restore();
   }
 });
-
 test("native Admin bulk user updates validate selection and confirm before submit", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/users/bulk", "POST", ({ body }) => body);
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="users"]').click();
@@ -3008,7 +3355,6 @@ test("native Admin bulk user updates validate selection and confirm before submi
       ),
       false,
     );
-
     document.querySelector('[data-action="admin-user-bulk-confirm"]').click();
     await settle();
     assert.ok(
@@ -3024,7 +3370,6 @@ test("native Admin bulk user updates validate selection and confirm before submi
     harness.restore();
   }
 });
-
 test("native Admin identity-provider mapper CRUD validates and persists mappings", async () => {
   const harness = await renderConsole("admin");
   const mapperPath = "/api/admin/identity-providers/github/mappers";
@@ -3041,7 +3386,7 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
     },
   ];
   harness.setResponse(
-    "/api/admin/identity-providers?q=&page=0&size=20&sort=guiOrder%2Casc",
+    "/api/admin/identity-providers?q=&page=0&size=10&sort=guiOrder%2Casc",
     "GET",
     () => ({
       content: [
@@ -3061,13 +3406,47 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
     }),
   );
   harness.setResponse(
-    `${mapperPath}?page=0&size=20&sort=name,asc`,
+    `${mapperPath}?q=&page=0&size=10&sort=name%2Casc`,
     "GET",
     () => ({
       content: mappers,
       totalElements: mappers.length,
       totalPages: 1,
       number: 0,
+    }),
+  );
+  harness.setResponse(
+    `${mapperPath}?q=email&page=0&size=10&sort=name%2Casc`,
+    "GET",
+    () => ({
+      content: mappers,
+      totalElements: mappers.length,
+      totalPages: 1,
+      number: 0,
+    }),
+  );
+  harness.setResponse("/api/admin/identity-providers/github", "GET", () => ({
+    id: "github",
+    alias: "github",
+    providerType: "oidc",
+    displayName: "GitHub",
+    registrationId: "github",
+    clientId: "github-client",
+    clientSecretConfigured: true,
+  }));
+  harness.setResponse(
+    "/api/admin/identity-providers/github/native-policy",
+    "GET",
+    () => ({
+      displayName: "GitHub",
+      enabled: true,
+      hideOnLogin: false,
+      accountLinkingOnly: false,
+      trustEmail: false,
+      mfaRequired: false,
+      guiOrder: 1,
+      showInAccountConsole: "always",
+      syncMode: "import",
     }),
   );
   harness.setResponse(`${mapperPath}/email-mapper`, "PUT", ({ body }) => ({
@@ -3083,22 +3462,44 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
     mappers = [];
     return { status: 204 };
   });
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="identity-providers"]').click();
     await settle();
     document
-      .querySelector(
-        '[data-action="admin-provider-mappers-toggle"][data-id="github"]',
-      )
+      .querySelector('a[data-action="admin-provider-open"][data-id="github"]')
       .click();
     await settle();
+    document
+      .querySelector('[data-action="admin-provider-tab"][data-tab="mappers"]')
+      .click();
+    await settle();
+    assert.ok(document.querySelector(".provider-mappers-card .admin-detail-heading h2"));
+    assert.ok(document.querySelector(".provider-mappers-table-surface"));
+    assert.ok(document.querySelector(".provider-mapper-search-input .provider-search-icon svg"));
+    assert.equal(document.querySelectorAll("#admin-provider-mapper-search button[type=submit]").length, 0);
+    assert.match(document.querySelector(".provider-mapper-result-count").textContent, /1\s+records?/);
+    assert.equal(document.querySelectorAll(".provider-mapper-pagination .provider-page-button").length, 4);
+    assert.equal(document.querySelector("#admin-provider-mapper-size").value, "10");
+    const searchInput = document.querySelector(
+      "#admin-provider-mapper-search input[name=q]",
+    );
+    searchInput.value = "email";
+    searchInput.dispatchEvent(
+      new document.defaultView.Event("input", { bubbles: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path === `${mapperPath}?q=email&page=0&size=10&sort=name%2Casc`,
+      ),
+    );
     assert.ok(
       document.querySelector('[data-provider-mapper-id="email-mapper"]'),
       JSON.stringify(calls.map(({ path }) => path)),
     );
-
     document
       .querySelector('[data-action="admin-provider-mapper-edit"]')
       .click();
@@ -3121,7 +3522,6 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
           body.target === "primaryEmail",
       ),
     );
-
     document
       .querySelector('[data-action="admin-provider-mapper-delete-request"]')
       .click();
@@ -3149,7 +3549,6 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
           path === `${mapperPath}/email-mapper` && method === "DELETE",
       ),
     );
-
     document
       .querySelector('[data-action="admin-provider-mapper-create"]')
       .click();
@@ -3179,7 +3578,6 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
     harness.restore();
   }
 });
-
 test("native Admin OIDC connection updates preserve configured secrets", async () => {
   const harness = await renderConsole("admin");
   const provider = {
@@ -3200,7 +3598,7 @@ test("native Admin OIDC connection updates preserve configured secrets", async (
     userNameAttribute: "login",
   };
   harness.setResponse(
-    "/api/admin/identity-providers?q=&page=0&size=20&sort=guiOrder%2Casc",
+    "/api/admin/identity-providers?q=&page=0&size=10&sort=guiOrder%2Casc",
     "GET",
     () => ({ content: [provider], totalElements: 1, totalPages: 1, number: 0 }),
   );
@@ -3212,21 +3610,14 @@ test("native Admin OIDC connection updates preserve configured secrets", async (
   harness.setResponse(
     "/api/admin/identity-providers/github",
     "PUT",
-    ({ body }) => ({
-      ...provider,
-      ...body,
-      clientSecretConfigured: true,
-    }),
+    ({ body }) => ({ ...provider, ...body, clientSecretConfigured: true }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="identity-providers"]').click();
     await settle();
     document
-      .querySelector(
-        '[data-action="admin-identity-provider-config-edit"][data-id="github"]',
-      )
+      .querySelector('a[data-action="admin-provider-open"][data-id="github"]')
       .click();
     await settle();
     const form = document.querySelector(
@@ -3249,21 +3640,25 @@ test("native Admin OIDC connection updates preserve configured secrets", async (
     assert.ok(update);
     assert.equal(update.body.clientSecret, "");
     assert.equal(update.body.displayName, "GitHub Enterprise");
-    assert.equal(
+    assert.ok(
       document.querySelector(
         '[data-form="admin-identity-provider-connection"]',
       ),
-      null,
+    );
+    assert.equal(
+      document
+        .querySelector('[data-form="admin-identity-provider-connection"]')
+        .elements.namedItem("clientSecret").value,
+      "",
     );
   } finally {
     harness.restore();
   }
 });
-
 test("native Admin identity-provider deletion requires confirmation", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse(
-    "/api/admin/identity-providers?q=&page=0&size=20&sort=guiOrder%2Casc",
+    "/api/admin/identity-providers?q=&page=0&size=10&sort=guiOrder%2Casc",
     "GET",
     () => ({
       content: [
@@ -3285,7 +3680,6 @@ test("native Admin identity-provider deletion requires confirmation", async () =
   harness.setResponse("/api/admin/identity-providers/github", "DELETE", () => ({
     status: 204,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="identity-providers"]').click();
@@ -3331,7 +3725,87 @@ test("native Admin identity-provider deletion requires confirmation", async () =
     harness.restore();
   }
 });
-
+test("native Admin identity-provider list keeps the display name separate from a distinct alias", async () => {
+  const harness = await renderConsole("admin");
+  harness.setResponse(
+    "/api/admin/identity-providers?q=&page=0&size=10&sort=guiOrder%2Casc",
+    "GET",
+    () => ({
+      content: [
+        {
+          id: "google",
+          alias: "google",
+          registrationId: "google",
+          providerType: "oidc",
+          displayName: "Google",
+          iconKey: "google",
+          enabled: true,
+          configured: true,
+        },
+        {
+          id: "workforce",
+          alias: "workforce-sso",
+          registrationId: "workforce-sso",
+          providerType: "saml",
+          displayName: "Workforce SSO",
+          iconKey: "microsoft",
+          enabled: true,
+          configured: false,
+        },
+      ],
+      totalElements: 2,
+      totalPages: 1,
+      number: 0,
+    }),
+  );
+  try {
+    const { document } = harness;
+    document.querySelector('[data-route="identity-providers"]').click();
+    await settle();
+    const googleLabel = document.querySelector(
+      '[data-action="admin-provider-open"][data-id="google"] .provider-label',
+    );
+    assert.equal(googleLabel.querySelector("strong").textContent, "Google");
+    assert.equal(googleLabel.querySelector("small"), null);
+    assert.ok(
+      document.querySelector(
+        '[data-action="admin-provider-open"][data-id="google"] .provider-icon svg path',
+      ),
+    );
+    const workforceLabel = document.querySelector(
+      '[data-action="admin-provider-open"][data-id="workforce"] .provider-label',
+    );
+    assert.equal(
+      workforceLabel.querySelector("strong").textContent,
+      "Workforce SSO",
+    );
+    assert.equal(
+      workforceLabel.querySelector("small").textContent,
+      "workforce-sso",
+    );
+    assert.equal(
+      document.querySelectorAll(
+        "#admin-identity-provider-search button[type=submit]",
+      ).length,
+      0,
+    );
+    assert.ok(document.querySelector(".provider-search-icon svg"));
+    assert.equal(
+      document.querySelectorAll(
+        ".provider-pagination-controls .provider-page-button",
+      ).length,
+      4,
+    );
+    assert.equal(
+      document.querySelectorAll(
+        ".identity-provider-page .admin-data-table tbody tr",
+      ).length,
+      2,
+    );
+  } finally {
+    harness.restore();
+  }
+});
 test("native Admin client mapper CRUD validates and persists mappings", async () => {
   const harness = await renderConsole("admin");
   const mapperPath = "/api/admin/clients/console-client/mappers";
@@ -3348,7 +3822,7 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
     },
   ];
   harness.setResponse(
-    mapperPath + "?page=0&size=20&sort=name,asc",
+    mapperPath + "?page=0&size=10&sort=name,asc",
     "GET",
     () => ({
       content: mappers,
@@ -3373,7 +3847,6 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
   harness.setResponse("/api/admin/clients/console-client", "DELETE", () => ({
     status: 204,
   }));
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -3381,14 +3854,9 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
       await settle();
       if (!document.querySelector('[data-route="clients"]').disabled) break;
     }
-    document
-      .querySelector(
-        '[data-action="admin-client-mappers-toggle"][data-id="console-client"]',
-      )
-      .click();
+    await openClientTab(document, "mappers");
     await settle();
     assert.ok(document.querySelector('[data-client-mapper-id="17"]'));
-
     document.querySelector('[data-action="admin-client-mapper-edit"]').click();
     await settle();
     let form = document.querySelector('[data-form="admin-client-mapper"]');
@@ -3409,7 +3877,6 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
           body.claimName === "primary_email",
       ),
     );
-
     document
       .querySelector('[data-action="admin-client-mapper-delete-request"]')
       .click();
@@ -3432,7 +3899,6 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
           path === `${mapperPath}/17` && method === "DELETE",
       ),
     );
-
     document
       .querySelector('[data-action="admin-client-mapper-create"]')
       .click();
@@ -3456,7 +3922,6 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
           body.mapperType === "email",
       ),
     );
-
     document
       .querySelector(
         '[data-action="admin-client-delete-request"][data-id="console-client"]',
@@ -3491,102 +3956,6 @@ test("native Admin client mapper CRUD validates and persists mappings", async ()
     harness.restore();
   }
 });
-
-test("native Admin group membership adds and confirms member removal", async () => {
-  const harness = await renderConsole("admin");
-  let members = [{ id: 1, username: "ada", enabled: true }];
-  let available = [{ id: 4, username: "grace", enabled: true }];
-  const page = (items) => ({
-    content: items,
-    totalElements: items.length,
-    totalPages: 1,
-    number: 0,
-  });
-  harness.setResponse(
-    "/api/admin/groups/3/users?q=&page=0&size=10&sort=username%2Casc",
-    "GET",
-    () => page(members),
-  );
-  harness.setResponse(
-    "/api/admin/groups/3/available-users?q=&page=0&size=10&sort=username%2Casc",
-    "GET",
-    () => page(available),
-  );
-  harness.setResponse("/api/admin/groups/3/users", "POST", ({ body }) => {
-    members = [
-      ...members,
-      { id: body.userId, username: "grace", enabled: true },
-    ];
-    available = available.filter((user) => user.id !== body.userId);
-    return { status: 204 };
-  });
-  harness.setResponse("/api/admin/groups/3/users/1", "DELETE", () => {
-    members = members.filter((user) => user.id !== 1);
-    available = [...available, { id: 1, username: "ada", enabled: true }];
-    return { status: 204 };
-  });
-
-  try {
-    const { calls, document } = harness;
-    document.querySelector('[data-route="groups"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="groups"]').disabled) break;
-    }
-    document
-      .querySelector('[data-action="admin-group-members-toggle"][data-id="3"]')
-      .click();
-    await settle();
-    assert.ok(
-      calls.some(({ path }) => path.startsWith("/api/admin/groups/3/users?")),
-    );
-
-    document
-      .querySelector('[data-action="admin-group-member-add"][data-id="4"]')
-      .click();
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method, body }) =>
-          path === "/api/admin/groups/3/users" &&
-          method === "POST" &&
-          body.userId === 4,
-      ),
-    );
-
-    document
-      .querySelector(
-        '[data-action="admin-group-member-remove-request"][data-id="1"]',
-      )
-      .click();
-    await settle();
-    document
-      .querySelector('[data-action="admin-group-member-remove-cancel"]')
-      .click();
-    await settle();
-    document
-      .querySelector(
-        '[data-action="admin-group-member-remove-request"][data-id="1"]',
-      )
-      .click();
-    await settle();
-    document
-      .querySelector(
-        '[data-action="admin-group-member-remove-confirm"][data-id="1"]',
-      )
-      .click();
-    await settle();
-    assert.ok(
-      calls.some(
-        ({ path, method }) =>
-          path === "/api/admin/groups/3/users/1" && method === "DELETE",
-      ),
-    );
-  } finally {
-    harness.restore();
-  }
-});
-
 test("native Admin client configuration validates, saves, and excludes the service username", async () => {
   const harness = await renderConsole("admin");
   const client = {
@@ -3607,7 +3976,6 @@ test("native Admin client configuration validates, saves, and excludes the servi
     "PUT",
     ({ body }) => body,
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -3615,11 +3983,7 @@ test("native Admin client configuration validates, saves, and excludes the servi
       await settle();
       if (!document.querySelector('[data-route="clients"]').disabled) break;
     }
-    document
-      .querySelector(
-        '[data-action="admin-client-configuration-edit"][data-id="console-client"]',
-      )
-      .click();
+    await openClientTab(document, "settings");
     await settle();
     let form = document.querySelector(
       '[data-form="admin-client-configuration"]',
@@ -3642,7 +4006,6 @@ test("native Admin client configuration validates, saves, and excludes the servi
       false,
       "invalid redirect URIs must not reach the API",
     );
-
     form = document.querySelector('[data-form="admin-client-configuration"]');
     form.elements.namedItem("redirectUris").value =
       "https://client.example.test/callback";
@@ -3667,7 +4030,6 @@ test("native Admin client configuration validates, saves, and excludes the servi
     harness.restore();
   }
 });
-
 test("native Admin client role assignment and composite panels load bounded candidates", async () => {
   const harness = await renderConsole("admin");
   const rolePath = "/api/admin/clients/console-client/roles/23";
@@ -3730,7 +4092,6 @@ test("native Admin client role assignment and composite panels load bounded cand
     "POST",
     () => ({ compositeRealmRoles: [{ name: "ROLE_EDITOR" }] }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -3738,14 +4099,9 @@ test("native Admin client role assignment and composite panels load bounded cand
       await settle();
       if (!document.querySelector('[data-route="clients"]').disabled) break;
     }
-    document
-      .querySelector(
-        '[data-action="admin-client-roles-toggle"][data-id="console-client"]',
-      )
-      .click();
+    await openClientTab(document, "roles");
     await settle();
     assert.ok(document.querySelector('[data-client-role-id="23"]'));
-
     document
       .querySelector(
         '[data-action="admin-client-role-assignments-toggle"][data-client-role-id="23"]',
@@ -3801,7 +4157,6 @@ test("native Admin client role assignment and composite panels load bounded cand
           body.userId === 4,
       ),
     );
-
     document
       .querySelector(
         '[data-action="admin-client-role-composites-toggle"][data-client-role-id="23"]',
@@ -3824,7 +4179,6 @@ test("native Admin client role assignment and composite panels load bounded cand
     );
     assert.ok(updatedComposites.textContent.includes("ROLE_EDITOR"));
     assert.equal(updatedComposites.textContent.includes("bad role"), false);
-
     updatedComposites
       .querySelector('[data-action="admin-client-role-composite-add-request"]')
       .click();
@@ -3854,7 +4208,6 @@ test("native Admin client role assignment and composite panels load bounded cand
     harness.restore();
   }
 });
-
 test("native Admin client roles validate edits and require confirmed deletion", async () => {
   const harness = await renderConsole("admin");
   let finishDelete;
@@ -3881,7 +4234,6 @@ test("native Admin client roles validate edits and require confirmed deletion", 
         finishDelete = () => resolve({ status: 204 });
       }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -3889,13 +4241,8 @@ test("native Admin client roles validate edits and require confirmed deletion", 
       await settle();
       if (!document.querySelector('[data-route="clients"]').disabled) break;
     }
-    document
-      .querySelector(
-        '[data-action="admin-client-roles-toggle"][data-id="console-client"]',
-      )
-      .click();
+    await openClientTab(document, "roles");
     await settle();
-
     document
       .querySelector(
         '[data-action="admin-client-role-edit"][data-client-role-id="23"]',
@@ -3921,7 +4268,6 @@ test("native Admin client roles validate edits and require confirmed deletion", 
       false,
       "invalid client role names must not reach the API",
     );
-
     form = document.querySelector('[data-form="admin-client-role-update"]');
     form.elements.namedItem("name").value = "REPORT_READER";
     form.elements.namedItem("description").value = "Read-only reports";
@@ -3941,7 +4287,6 @@ test("native Admin client roles validate edits and require confirmed deletion", 
           body.description === "Read-only reports",
       ),
     );
-
     document
       .querySelector(
         '[data-action="admin-client-role-delete-request"][data-client-role-id="23"]',
@@ -3968,7 +4313,6 @@ test("native Admin client roles validate edits and require confirmed deletion", 
       false,
       "canceling role deletion must preserve the role",
     );
-
     document
       .querySelector(
         '[data-action="admin-client-role-delete-request"][data-client-role-id="23"]',
@@ -3996,7 +4340,6 @@ test("native Admin client roles validate edits and require confirmed deletion", 
       ).length,
       1,
     );
-
     finishDelete();
     await settle();
     assert.equal(document.querySelector('[data-client-role-id="23"]'), null);
@@ -4004,7 +4347,6 @@ test("native Admin client roles validate edits and require confirmed deletion", 
     harness.restore();
   }
 });
-
 test("native Admin client-role composite removal confirms before invalidating sessions", async () => {
   const harness = await renderConsole("admin");
   const rolePath = "/api/admin/clients/console-client/roles/23";
@@ -4033,7 +4375,6 @@ test("native Admin client-role composite removal confirms before invalidating se
     "DELETE",
     () => ({ compositeRealmRoles: [], compositeRoles: [] }),
   );
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="clients"]').click();
@@ -4041,11 +4382,7 @@ test("native Admin client-role composite removal confirms before invalidating se
       await settle();
       if (!document.querySelector('[data-route="clients"]').disabled) break;
     }
-    document
-      .querySelector(
-        '[data-action="admin-client-roles-toggle"][data-id="console-client"]',
-      )
-      .click();
+    await openClientTab(document, "roles");
     await settle();
     document
       .querySelector(
@@ -4097,7 +4434,6 @@ test("native Admin client-role composite removal confirms before invalidating se
     harness.restore();
   }
 });
-
 test("native Admin message overrides edit, create, and delete localized messages", async () => {
   const harness = await renderConsole("admin");
   let overrides = [
@@ -4142,7 +4478,6 @@ test("native Admin message overrides edit, create, and delete localized messages
     overrides = [...overrides, { id: 13, ...body }];
     return { id: 13, ...body };
   });
-
   try {
     const { calls, document } = harness;
     document.querySelector('[data-route="localization"]').click();
@@ -4171,7 +4506,6 @@ test("native Admin message overrides edit, create, and delete localized messages
           body.messageValue === "Merhaba",
       ),
     );
-
     document
       .querySelector('[data-action="admin-message-delete-request"]')
       .click();
@@ -4194,7 +4528,6 @@ test("native Admin message overrides edit, create, and delete localized messages
           path === `${messagePath}/12` && method === "DELETE",
       ),
     );
-
     const create = document.querySelector(
       '[data-form="admin-localization-message-create"]',
     );

@@ -80,40 +80,25 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
           runtime: node@${{ env.NODE_VERSION }}
           cache: true
-          cache-dependency-path: src/main/web/pnpm-lock.yaml
+          cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
 
       - name: Install renderer dependencies
-        working-directory: src/main/web
+        working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
-
-      - name: Cache Next.js renderer build output
-        id: next-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: src/main/web/.next/cache
-          key: next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-renderer-${{ hashFiles('src/main/web/pnpm-lock.yaml') }}-
-
-      - name: Report renderer cache status
-        env:
-          NEXT_CACHE_HIT: ${{ steps.next-cache.outputs.cache-hit }}
-        run: |
-          node -e "const fs = require('node:fs'); const status = process.env.NEXT_CACHE_HIT === 'true' ? 'exact cache hit' : 'no exact hit (restore-key match or cache miss)'; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Desktop renderer cache status\\n- Next.js build cache: ' + status + '\\n');"
 
       - name: Build desktop renderer
         working-directory: src/main/desktop
-        run: pnpm run build:renderer
+        run: pnpm run build:shared && pnpm run build:native
 
       - name: Verify desktop renderer output
-        run: test -s src/main/desktop/renderer/index.html
+        run: test -s src/main/desktop/dist/native/native.html
 
       - name: Upload shared desktop renderer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: renderer-${{ needs.resolve-release.outputs.release_tag }}
-          path: src/main/desktop/renderer/
+          path: src/main/desktop/dist/native/
           if-no-files-found: error
           retention-days: 1
 
@@ -187,13 +172,15 @@ jobs:
           UPDATE_MANIFEST_SIGNING_KEY: ${{ secrets.UPDATE_MANIFEST_SIGNING_KEY || '' }}
         run: node scripts/require-release-signing.mjs
 
-      - name: Install web dependencies
-        working-directory: src/main/web
-        run: pnpm install --frozen-lockfile
-
       - name: Install desktop dependencies
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
+
+      - name: Download shared desktop renderer
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: renderer-${{ needs.resolve-release.outputs.release_tag }}
+          path: src/main/desktop/dist/native/
 
       - name: Prepare update manifest verification key
         shell: bash
@@ -273,19 +260,22 @@ jobs:
             exit 0
           fi
 
-          pnpm run build
-          pnpm exec electron-builder --publish never --mac --x64 --config.mac.notarize=true
-          pnpm exec electron-builder --publish never --mac --universal --config.mac.notarize=true
+          # Build separate packages together so latest-mac.yml includes both architectures.
+          pnpm exec electron-builder --publish never --mac --x64 --arm64 --config.mac.notarize=true
 
       - name: Verify macOS signature and notarization
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
         run: |
-          app_path="$(find src/main/desktop/release -type d -name '*.app' -print -quit)"
-          test -n "${app_path}"
-          codesign --verify --deep --strict --verbose=2 "${app_path}"
-          spctl --assess --type exec --verbose "${app_path}"
-          xcrun stapler validate "${app_path}"
+          set -euo pipefail
+          app_count=0
+          while IFS= read -r -d '' app_path; do
+            codesign --verify --deep --strict --verbose=2 "${app_path}"
+            spctl --assess --type exec --verbose "${app_path}"
+            xcrun stapler validate "${app_path}"
+            app_count=$((app_count + 1))
+          done < <(find src/main/desktop/release -type d -name '*.app' -print0)
+          test "${app_count}" -eq 2
 
       - name: Verify Windows Authenticode signature
         if: ${{ matrix.platform == 'windows' }}

@@ -21,7 +21,9 @@ async function waitForBackend() {
     }
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
-  throw new Error("Backend readiness did not become UP before the real provider E2E.");
+  throw new Error(
+    "Backend readiness did not become UP before the real provider E2E.",
+  );
 }
 
 for (const provider of providers) {
@@ -39,6 +41,7 @@ for (const provider of providers) {
           cwd: desktopDirectory,
           env: {
             ...process.env,
+            DESKTOP_E2E_BACKGROUND: "true",
             DESKTOP_API_BASE_URL: "http://localhost:9090",
             DESKTOP_AUTO_UPDATE: "false",
           },

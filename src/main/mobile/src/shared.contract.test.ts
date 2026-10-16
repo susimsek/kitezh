@@ -41,6 +41,15 @@ import {
   NATIVE_REFRESH_EXPIRY_SKEW_MS,
 } from "../../shared/src/session.ts";
 import { isValidEmailAddress } from "./utils/email.ts";
+import * as mobileThemeTokens from "./theme/tokens.ts";
+
+test("native token exports expose the platform-neutral design values", () => {
+  assert.ok(Object.keys(mobileThemeTokens.colors).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.typography).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.controlSizes).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.spacing).length > 0);
+  assert.ok(Object.keys(mobileThemeTokens.radii).length > 0);
+});
 
 test("client metadata follows the Kitezh app header contract", () => {
   assert.deepEqual(
@@ -167,6 +176,10 @@ test("mobile issuer overrides are limited to the development loopback server", (
     () => resolveAuthorizationServerIssuer("http://localhost:9090/path", true),
     /authorization_server_issuer_invalid/,
   );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("not a URL", true),
+    /authorization_server_issuer_invalid/,
+  );
 });
 
 test("production config fails closed when an unapproved issuer is configured", () => {
@@ -250,6 +263,18 @@ test("native OAuth callbacks require the original state and approved scheme", ()
         "request-state",
       ),
     /authorization_callback_state_mismatch/,
+  );
+  assert.throws(
+    () =>
+      validateAuthorizationCallback(
+        {
+          error: "access_denied",
+          code: "one-time-code",
+          state: "request-state",
+        },
+        "request-state",
+      ),
+    /authorization_callback_error/,
   );
   assert.equal(
     isAllowedNativeRedirect(

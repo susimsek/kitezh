@@ -20,11 +20,12 @@ async function signIn(application) {
   await application.evaluate(({ app, BrowserWindow, shell }) => {
     shell.openExternal = async (url) => {
       const login = new BrowserWindow({
-        show: true,
+        show: false,
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,
+          backgroundThrottling: false,
         },
       });
       const deliverCallback = (event, target) => {
@@ -109,6 +110,7 @@ test(
       args: [`--user-data-dir=${profile}`],
       env: {
         ...process.env,
+        DESKTOP_E2E_BACKGROUND: "true",
         DESKTOP_API_BASE_URL: "http://localhost:9090",
         DESKTOP_AUTO_UPDATE: "false",
       },
@@ -196,10 +198,13 @@ test(
       await search.locator('[name="q"]').fill("demo-client");
       await search.locator('button[type="submit"]').click();
       const clientRow = window
-        .locator("article[data-client-id]")
+        .locator("tr[data-client-id]")
         .filter({ hasText: "demo-client" });
       await clientRow
-        .getByRole("button", { name: "Manage client roles", exact: true })
+        .locator('.client-name [data-action="client-open"]')
+        .click();
+      await window
+        .locator('[data-action="client-tab"][data-id="roles"]')
         .click();
       const roles = window.locator('[data-client-roles-panel="demo-client"]');
       const create = roles.locator('[data-form="admin-client-role-create"]');
