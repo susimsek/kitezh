@@ -84,15 +84,15 @@ jobs:
             runtime_image: gcr.io/distroless/base-debian12:nonroot
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    environment: mcp-release
+    environment: backend-release
     permissions:
       actions: read
       contents: read
     env:
       NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
       NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
-      MCP_DOCKERHUB_USERNAME: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
-      MCP_DOCKERHUB_TOKEN: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       MCP_IMAGE: docker.io/suayb/kitezh-mcp
       RELEASE_TAG: ${{ needs.verify-ci.outputs.release_tag }}
       RELEASE_SHA: ${{ needs.verify-ci.outputs.release_sha }}
@@ -106,10 +106,10 @@ jobs:
       - name: Verify MCP release configuration
         run: |
           set -euo pipefail
-          test -n "${MCP_DOCKERHUB_USERNAME}"
-          test -n "${MCP_DOCKERHUB_TOKEN}"
+          test -n "${DOCKERHUB_USERNAME}"
+          test -n "${DOCKERHUB_TOKEN}"
           test -n "${CI_RUN_ID}"
-          [[ "${MCP_DOCKERHUB_USERNAME}" == "suayb" ]]
+          [[ "${DOCKERHUB_USERNAME}" == "suayb" ]]
 
       - name: Download compressed MCP native executable
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -138,8 +138,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
-          username: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
-          password: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Publish architecture image with Jib Native Image extension
         shell: bash
@@ -153,8 +153,8 @@ jobs:
             -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
             jib:build \
             -Djib.to.image="${MCP_IMAGE}:${VERSION}-${NATIVE_ARCHITECTURE}" \
-            -Djib.to.auth.username="${MCP_DOCKERHUB_USERNAME}" \
-            -Djib.to.auth.password="${MCP_DOCKERHUB_TOKEN}"
+            -Djib.to.auth.username="${DOCKERHUB_USERNAME}" \
+            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
 
   publish-image-manifests:
     name: Publish multi-architecture MCP tags
@@ -163,15 +163,15 @@ jobs:
       - publish-image-architecture
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    environment: mcp-release
+    environment: backend-release
     permissions:
       contents: read
       id-token: write
     outputs:
       image_digest: ${{ steps.manifests.outputs.image_digest }}
     env:
-      MCP_DOCKERHUB_USERNAME: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
-      MCP_DOCKERHUB_TOKEN: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       MCP_IMAGE: docker.io/suayb/kitezh-mcp
       RELEASE_TAG: ${{ needs.verify-ci.outputs.release_tag }}
     steps:
@@ -183,8 +183,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
-          username: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
-          password: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Create and verify release and latest manifests
         id: manifests
@@ -238,8 +238,8 @@ jobs:
           }
           TOKEN="$(
             jq -n \
-              --arg identifier "${MCP_DOCKERHUB_USERNAME}" \
-              --arg secret "${MCP_DOCKERHUB_TOKEN}" \
+              --arg identifier "${DOCKERHUB_USERNAME}" \
+              --arg secret "${DOCKERHUB_TOKEN}" \
               '{identifier: $identifier, secret: $secret}' \
             | curl -fsS -X POST \
               -H 'Content-Type: application/json' \
@@ -251,7 +251,7 @@ jobs:
               -H "Authorization: Bearer ${TOKEN}" \
               -H 'Content-Type: application/json' \
               --data-binary @- \
-              "https://hub.docker.com/v2/repositories/${MCP_DOCKERHUB_USERNAME}/kitezh-mcp"
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/kitezh-mcp"
 
   deploy-render:
     name: Deploy versioned MCP image to Render
