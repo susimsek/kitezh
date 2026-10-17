@@ -26,7 +26,7 @@ class KitezhTokenExchangeClientTest {
                 new KitezhTokenExchangeClient(
                         builder,
                         new SimpleMeterRegistry(),
-                        "https://kitezh.test",
+                        "https://kitezh.test/oauth2/token",
                         "mcp-server",
                         "local-secret");
         server.expect(method(HttpMethod.POST))
@@ -77,7 +77,11 @@ class KitezhTokenExchangeClientTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhTokenExchangeClient client =
                 new KitezhTokenExchangeClient(
-                        RestClient.builder(), registry, "https://kitezh.test", "mcp", "");
+                        RestClient.builder(),
+                        registry,
+                        "https://kitezh.test/oauth2/token",
+                        "mcp",
+                        "");
         Jwt subject =
                 Jwt.withTokenValue("subject-token").header("alg", "none").subject("alice").build();
 
@@ -98,7 +102,11 @@ class KitezhTokenExchangeClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KitezhTokenExchangeClient client =
                 new KitezhTokenExchangeClient(
-                        builder, new SimpleMeterRegistry(), "https://kitezh.test", "mcp", "secret");
+                        builder,
+                        new SimpleMeterRegistry(),
+                        "https://kitezh.test/oauth2/token",
+                        "mcp",
+                        "secret");
         server.expect(requestTo("https://kitezh.test/oauth2/token"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
         Jwt subject =

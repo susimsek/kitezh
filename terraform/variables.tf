@@ -34,6 +34,12 @@ variable "ingress_host" {
   default     = "kitezh.127.0.0.1.nip.io"
 }
 
+variable "mcp_ingress_host" {
+  description = "Hostname exposed through ingress-nginx for the standalone MCP server."
+  type        = string
+  default     = "mcp.kitezh.127.0.0.1.nip.io"
+}
+
 variable "ingress_nginx_chart_version" {
   description = "Pinned ingress-nginx Helm chart version for local infrastructure."
   type        = string
@@ -68,4 +74,22 @@ variable "spring_profile" {
   description = "Spring profile passed to the Helm release."
   type        = string
   default     = "prod"
+}
+
+variable "mcp_image_repository" {
+  description = "Container image repository for the standalone MCP server."
+  type        = string
+  default     = "docker.io/suayb/kitezh-mcp"
+}
+
+variable "mcp_image_tag" {
+  description = "Container image tag for the standalone MCP server."
+  type        = string
+  default     = "0.1.5"
+}
+
+variable "mcp_client_secret_name" {
+  description = "Name of the pre-created Kubernetes Secret containing the MCP OAuth client secret."
+  type        = string
+  default     = "kitezh-mcp-client-secret"
 }

@@ -144,6 +144,9 @@ resource "helm_release" "kitezh" {
         authorizationServer = {
           issuer = "http://${var.ingress_host}:${var.ingress_http_host_port}"
         }
+        mcp = {
+          resourceAudience = "http://${var.mcp_ingress_host}:${var.ingress_http_host_port}/mcp"
+        }
       }
     })
   ]
@@ -166,5 +169,64 @@ resource "helm_release" "kitezh" {
   depends_on = [
     kind_cluster.local,
     helm_release.ingress_nginx
+  ]
+}
+
+resource "helm_release" "kitezh_mcp" {
+  name      = "kitezh-mcp"
+  chart     = "${path.module}/../helm/kitezh-mcp"
+  namespace = kubernetes_namespace_v1.app.metadata[0].name
+  # The OAuth client secret is supplied out-of-band after the local cluster exists.
+  wait    = false
+  timeout = 600
+
+  values = [
+    yamlencode({
+      image = {
+        repository = var.mcp_image_repository
+        tag        = var.mcp_image_tag
+      }
+      existingSecret = {
+        name = var.mcp_client_secret_name
+      }
+      ingress = {
+        enabled   = true
+        className = var.ingress_class_name
+        annotations = {
+          "nginx.ingress.kubernetes.io/ssl-redirect" = "false"
+        }
+        hosts = [
+          {
+            host = var.mcp_ingress_host
+            paths = [
+              {
+                path     = "/"
+                pathType = "Prefix"
+              }
+            ]
+          }
+        ]
+      }
+      app = {
+        security = {
+          issuerUri = "http://${var.ingress_host}:${var.ingress_http_host_port}"
+          jwkSetUri = "http://kitezh.${var.namespace}.svc.cluster.local:9090/oauth2/jwks"
+          tokenUri  = "http://kitezh.${var.namespace}.svc.cluster.local:9090/oauth2/token"
+          audience  = "http://${var.mcp_ingress_host}:${var.ingress_http_host_port}/mcp"
+        }
+        api = {
+          baseUrl = "http://kitezh.${var.namespace}.svc.cluster.local:9090"
+        }
+        mcp = {
+          publicUrl = "http://${var.mcp_ingress_host}:${var.ingress_http_host_port}/mcp"
+        }
+      }
+    })
+  ]
+
+  depends_on = [
+    kind_cluster.local,
+    helm_release.ingress_nginx,
+    helm_release.kitezh
   ]
 }

@@ -26,6 +26,8 @@ spring:
 kitezh:
   security:
     issuer-uri: ${KITEZH_SECURITY_ISSUER_URI:https://kitezh.onrender.com}
+    jwk-set-uri: ${KITEZH_SECURITY_JWK_SET_URI:${KITEZH_SECURITY_ISSUER_URI:https://kitezh.onrender.com}/oauth2/jwks}
+    token-uri: ${KITEZH_SECURITY_TOKEN_URI:${KITEZH_SECURITY_ISSUER_URI:https://kitezh.onrender.com}/oauth2/token}
     audience: ${KITEZH_SECURITY_AUDIENCE:https://kitezh-mcp.onrender.com/mcp}
   api:
     base-url: ${KITEZH_API_BASE_URL:http://localhost:9090}

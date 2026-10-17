@@ -74,3 +74,32 @@ The build uses the repository Checkstyle rules, Google Java Format AOSP, and a 9
 `render.yaml` defines a separate Kitezh MCP Web Service with its own image, readiness check, URL, deployment hook, environment and secrets. Set the MCP service's public URL and audience to the same exact HTTPS URI (for example `https://kitezh-mcp.onrender.com/mcp`). Set `KITEZH_API_BASE_URL` to the private Kitezh service URL where Render private networking is available. Configure the separate `mcp-release` GitHub environment with `MCP_DOCKERHUB_USERNAME`, `MCP_DOCKERHUB_TOKEN`, `MCP_RENDER_RELEASE_DEPLOY_HOOK_URL`, and `MCP_RENDER_API_KEY` to enable tagged releases. The release workflow checks the fixed public readiness URL after deploying the image digest.
 
 OTLP export follows the main Kitezh service environment variables and uses `OTEL_SERVICE_NAME=kitezh-mcp`. The dashboard and Prometheus alert rules are in `observability/`; metric labels contain tool names and outcome only, never user IDs, tokens, query text, or resource IDs.
+
+## Docker Compose
+
+The standalone MCP container is a separate Compose service. Start it with the backend and local PostgreSQL dependencies:
+
+```bash
+KITEZH_MCP_CLIENT_SECRET='<service-client-secret>' \
+docker compose -f src/main/docker/app.yml up -d
+```
+
+The MCP endpoint is `http://localhost:10000/mcp`; its health endpoint is available on the internal management port `10001`. The API calls and OAuth token exchange use the backend container network. The MCP OAuth secret is supplied through the environment and is not stored in Compose files.
+
+## Helm and Terraform
+
+MCP is installed from the independent `helm/kitezh-mcp` chart, in the same namespace as the backend release. Configure its public host and resource audience to match, and create the client secret in Kubernetes before relying on the MCP pod:
+
+```bash
+kubectl -n apps create secret generic kitezh-mcp-client-secret \
+  --from-literal=client-secret="$KITEZH_MCP_CLIENT_SECRET"
+helm upgrade --install kitezh-mcp helm/kitezh-mcp \
+  --namespace apps --create-namespace \
+  --set ingress.enabled=true \
+  --set 'ingress.hosts[0].host=mcp.kitezh.example.com' \
+  --set app.security.issuerUri=https://kitezh.example.com \
+  --set app.security.audience=https://mcp.kitezh.example.com/mcp \
+  --set app.mcp.publicUrl=https://mcp.kitezh.example.com/mcp
+```
+
+The chart expects `existingSecret.name` (default `kitezh-mcp-client-secret`) with key `client-secret`. Do not pass the secret as a Helm value. Local Terraform deploys backend and MCP as separate Helm releases; set the ingress hosts and image tags in `terraform/terraform.tfvars`. Terraform does not create or store the OAuth client secret. The example local service endpoints are documented in [`terraform/README.md`](../terraform/README.md).

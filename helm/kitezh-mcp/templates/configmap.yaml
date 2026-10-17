@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kitezh-mcp.fullname" . }}
+  labels:
+    {{ include "kitezh-mcp.labels" . | nindent 4 }}
+data:
+  application.yml: |
+    spring:
+      profiles:
+        active: {{ .Values.spring.profiles.active | quote }}
+    kitezh:
+      security:
+        issuer-uri: {{ .Values.app.security.issuerUri | quote }}
+        jwk-set-uri: {{ .Values.app.security.jwkSetUri | quote }}
+        token-uri: {{ .Values.app.security.tokenUri | quote }}
+        audience: {{ .Values.app.security.audience | quote }}
+      api:
+        base-url: {{ .Values.app.api.baseUrl | quote }}
+      mcp:
+        public-url: {{ .Values.app.mcp.publicUrl | quote }}
+        client-id: {{ .Values.app.mcp.clientId | quote }}
+        read-only: {{ .Values.app.mcp.readOnly }}

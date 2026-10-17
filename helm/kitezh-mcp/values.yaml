@@ -1,0 +1,135 @@
+replicaCount: 2
+revisionHistoryLimit: 10
+terminationGracePeriodSeconds: 30
+
+image:
+  repository: docker.io/suayb/kitezh-mcp
+  pullPolicy: IfNotPresent
+  tag: "0.1.5"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+containerPort: 10000
+management:
+  port: 10001
+
+spring:
+  profiles:
+    active: prod
+
+app:
+  security:
+    issuerUri: http://kitezh.apps.svc.cluster.local:9090
+    jwkSetUri: http://kitezh.apps.svc.cluster.local:9090/oauth2/jwks
+    tokenUri: http://kitezh.apps.svc.cluster.local:9090/oauth2/token
+    audience: https://mcp.kitezh.local/mcp
+  api:
+    baseUrl: http://kitezh.apps.svc.cluster.local:9090
+  mcp:
+    publicUrl: https://mcp.kitezh.local/mcp
+    clientId: mcp-server
+    readOnly: true
+
+existingSecret:
+  name: kitezh-mcp-client-secret
+  key: client-secret
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 10000
+  managementPort: 10001
+
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  annotations: {}
+
+probes:
+  startup:
+    enabled: true
+    path: /actuator/health/liveness
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 60
+  liveness:
+    enabled: true
+    path: /actuator/health/liveness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /actuator/health/readiness
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+ingress:
+  enabled: false
+  className: ""
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: mcp.kitezh.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -18,6 +18,11 @@ output "authorization_server_ingress_url" {
   value       = "http://${var.ingress_host}:${var.ingress_http_host_port}"
 }
 
+output "mcp_server_ingress_url" {
+  description = "Ingress endpoint for the standalone MCP server."
+  value       = "http://${var.mcp_ingress_host}:${var.ingress_http_host_port}/mcp"
+}
+
 output "openid_configuration_url" {
   description = "OpenID Provider metadata URL."
   value       = "http://${var.ingress_host}:${var.ingress_http_host_port}/.well-known/openid-configuration"

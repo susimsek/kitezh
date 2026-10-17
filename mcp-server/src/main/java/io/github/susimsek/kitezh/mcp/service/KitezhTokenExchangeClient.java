@@ -18,19 +18,19 @@ public class KitezhTokenExchangeClient {
 
     private final RestClient restClient;
     private final MeterRegistry meterRegistry;
-    private final String issuerUri;
+    private final String tokenUri;
     private final String clientId;
     private final String clientSecret;
 
     public KitezhTokenExchangeClient(
             RestClient.Builder restClientBuilder,
             MeterRegistry meterRegistry,
-            @Value("${kitezh.security.issuer-uri}") String issuerUri,
+            @Value("${kitezh.security.token-uri}") String tokenUri,
             @Value("${kitezh.mcp.client-id}") String clientId,
             @Value("${kitezh.mcp.client-secret}") String clientSecret) {
         this.restClient = restClientBuilder.build();
         this.meterRegistry = meterRegistry;
-        this.issuerUri = issuerUri;
+        this.tokenUri = tokenUri;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
     }
@@ -69,7 +69,7 @@ public class KitezhTokenExchangeClient {
         Map<?, ?> response =
                 restClient
                         .post()
-                        .uri(issuerUri + "/oauth2/token")
+                        .uri(tokenUri)
                         .headers(headers -> headers.setBasicAuth(clientId, clientSecret))
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .body(form)
@@ -89,7 +89,7 @@ public class KitezhTokenExchangeClient {
         Map<?, ?> response =
                 restClient
                         .post()
-                        .uri(issuerUri + "/oauth2/token")
+                        .uri(tokenUri)
                         .headers(headers -> headers.setBasicAuth(clientId, clientSecret))
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .body(form)

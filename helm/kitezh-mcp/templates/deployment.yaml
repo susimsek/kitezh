@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kitezh-mcp.fullname" . }}
+  labels:
+    {{ include "kitezh-mcp.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{ include "kitezh-mcp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{ toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{ include "kitezh-mcp.selectorLabels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kitezh-mcp.serviceAccountName" . }}
+      securityContext:
+        {{ toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{ toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+            - name: management
+              containerPort: {{ .Values.management.port }}
+              protocol: TCP
+          env:
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: optional:file:/opt/config/
+            - name: SERVER_PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: MANAGEMENT_SERVER_PORT
+              value: {{ .Values.management.port | quote }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.spring.profiles.active | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: kitezh-mcp
+            - name: KITEZH_SECURITY_ISSUER_URI
+              value: {{ .Values.app.security.issuerUri | quote }}
+            - name: KITEZH_SECURITY_JWK_SET_URI
+              value: {{ .Values.app.security.jwkSetUri | quote }}
+            - name: KITEZH_SECURITY_TOKEN_URI
+              value: {{ .Values.app.security.tokenUri | quote }}
+            - name: KITEZH_SECURITY_AUDIENCE
+              value: {{ .Values.app.security.audience | quote }}
+            - name: KITEZH_API_BASE_URL
+              value: {{ .Values.app.api.baseUrl | quote }}
+            - name: KITEZH_MCP_PUBLIC_URL
+              value: {{ .Values.app.mcp.publicUrl | quote }}
+            - name: KITEZH_MCP_CLIENT_ID
+              value: {{ .Values.app.mcp.clientId | quote }}
+            - name: KITEZH_MCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kitezh-mcp.clientSecretName" . }}
+                  key: {{ .Values.existingSecret.key | quote }}
+            - name: KITEZH_READ_ONLY
+              value: {{ .Values.app.mcp.readOnly | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /opt/config/application.yml
+              subPath: application.yml
+            - name: tmp
+              mountPath: /tmp
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: management
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: management
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: management
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{ toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "kitezh-mcp.fullname" . }}
+            items:
+              - key: application.yml
+                path: application.yml
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{ toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}

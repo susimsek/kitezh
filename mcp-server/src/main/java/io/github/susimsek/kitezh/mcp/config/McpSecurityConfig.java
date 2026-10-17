@@ -83,8 +83,9 @@ public class McpSecurityConfig {
     @Bean
     JwtDecoder jwtDecoder(
             @Value("${kitezh.security.issuer-uri}") String issuer,
+            @Value("${kitezh.security.jwk-set-uri}") String jwkSetUri,
             @Value("${kitezh.security.audience}") String audience) {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(issuer + "/oauth2/jwks").build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         OAuth2TokenValidator<Jwt> audienceValidator =
                 jwt ->
                         jwt.getAudience().contains(audience)
