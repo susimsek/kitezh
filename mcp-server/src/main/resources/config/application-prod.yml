@@ -1,6 +1,11 @@
 server:
   shutdown: graceful
 
+kitezh:
+  mcp:
+    allowed-origins: ${KITEZH_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
+    allow-local-hosts: ${KITEZH_MCP_ALLOW_LOCAL_HOSTS:false}
+
 management:
   metrics:
     distribution:

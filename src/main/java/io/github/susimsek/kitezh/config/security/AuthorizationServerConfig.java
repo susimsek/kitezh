@@ -23,6 +23,7 @@ import io.github.susimsek.kitezh.repository.SocialIdentityRepository;
 import io.github.susimsek.kitezh.repository.UserAvatarRepository;
 import io.github.susimsek.kitezh.repository.UserProfileAttributeRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
+import io.github.susimsek.kitezh.security.AuthoritiesConstants;
 import io.github.susimsek.kitezh.security.AuthorizationEndpointErrorResponseHandler;
 import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
 import io.github.susimsek.kitezh.security.ClientSecuritySettings;
@@ -100,6 +101,25 @@ public class AuthorizationServerConfig {
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
     private static final String MCP_READ_SCOPE = "mcp.read";
+    private static final Set<String> MCP_ROLE_CLAIMS =
+            Set.of(
+                    AuthoritiesConstants.ADMIN,
+                    AuthoritiesConstants.USER,
+                    AuthoritiesConstants.USER_VIEWER,
+                    AuthoritiesConstants.USER_QUERY,
+                    AuthoritiesConstants.USER_MANAGER,
+                    AuthoritiesConstants.USER_IMPERSONATOR,
+                    AuthoritiesConstants.GROUP_VIEWER,
+                    AuthoritiesConstants.GROUP_QUERY,
+                    AuthoritiesConstants.GROUP_MANAGER,
+                    AuthoritiesConstants.ORGANIZATION_VIEWER,
+                    AuthoritiesConstants.ORGANIZATION_QUERY,
+                    AuthoritiesConstants.ORGANIZATION_MANAGER,
+                    AuthoritiesConstants.CLIENT_VIEWER,
+                    AuthoritiesConstants.CLIENT_QUERY,
+                    AuthoritiesConstants.CLIENT_MANAGER,
+                    AuthoritiesConstants.EVENT_VIEWER,
+                    AuthoritiesConstants.EVENT_MANAGER);
     private static final String MCP_RESOURCE_AUDIENCE = "https://kitezh-mcp.onrender.com/mcp";
     private static final String MCP_SERVER_CLIENT_ID = "mcp-server";
     private static final String MCP_ADMIN_API_AUDIENCE = "admin-api";
@@ -578,6 +598,7 @@ public class AuthorizationServerConfig {
                     context, tokenUser, dependencies.legacyAdminGroups(), adminAccessToken);
             RoleScopeMappings roleScopeMappings =
                     roleScopeMappings(context, dependencies.clientScopeRepository());
+            appendMcpRoleClaims(context, tokenUser);
             appendRealmRoleClaims(context, tokenUser, roleScopeMappings);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
             appendClientRoleClaims(context, tokenUser, roleScopeMappings);
@@ -1169,6 +1190,23 @@ public class AuthorizationServerConfig {
                         EffectiveRoleService.effectiveRoleNames(tokenUser.get()));
         if (!roles.isEmpty()) {
             context.getClaims().claim("realm_access", Map.of(ROLES_SCOPE, new ArrayList<>(roles)));
+        }
+    }
+
+    private static void appendMcpRoleClaims(
+            JwtEncodingContext context, Optional<UserEntity> tokenUser) {
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                || !context.getAuthorizedScopes().contains(MCP_READ_SCOPE)
+                || tokenUser.isEmpty()) {
+            return;
+        }
+        List<String> roles =
+                EffectiveRoleService.effectiveRoleNames(tokenUser.get()).stream()
+                        .filter(MCP_ROLE_CLAIMS::contains)
+                        .sorted()
+                        .toList();
+        if (!roles.isEmpty()) {
+            context.getClaims().claim("roles", roles);
         }
     }
 

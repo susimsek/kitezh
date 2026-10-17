@@ -1,6 +1,13 @@
 server:
   port: ${SERVER_PORT:10000}
-  forward-headers-strategy: framework
+  forward-headers-strategy: none
+  tomcat:
+    max-http-request-header-size: 16KB
+    threads:
+      max: 50
+      min-spare: 10
+    max-connections: 100
+    accept-count: 50
 
 spring:
   application:
@@ -33,9 +40,14 @@ kitezh:
     base-url: ${KITEZH_API_BASE_URL:http://localhost:9090}
   mcp:
     public-url: ${KITEZH_MCP_PUBLIC_URL:https://kitezh-mcp.onrender.com/mcp}
+    allowed-origins: ${KITEZH_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
+    allow-local-hosts: ${KITEZH_MCP_ALLOW_LOCAL_HOSTS:true}
     client-id: ${KITEZH_MCP_CLIENT_ID:mcp-server}
     client-secret: ${KITEZH_MCP_CLIENT_SECRET:}
     read-only: ${KITEZH_READ_ONLY:true}
+    tools:
+      toolsets: ${KITEZH_MCP_TOOLSETS:all}
+      allowlist: ${KITEZH_MCP_TOOL_ALLOWLIST:*}
 
 management:
   opentelemetry:

@@ -2,8 +2,10 @@ package io.github.susimsek.kitezh.mcp.service;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,6 +16,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
 public class KitezhAdminApiClient {
+
+    private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
+            new ParameterizedTypeReference<>() {};
 
     private final RestClient restClient;
     private final KitezhTokenExchangeClient tokenExchangeClient;
@@ -60,6 +65,56 @@ public class KitezhAdminApiClient {
                                 throw new KitezhApiException("Kitezh API request failed");
                             })
                     .body(Map.class);
+        } catch (RuntimeException exception) {
+            outcome = "error";
+            throw exception instanceof KitezhApiException
+                    ? exception
+                    : new KitezhApiException("Kitezh API is unavailable", exception);
+        } finally {
+            meterRegistry
+                    .counter(
+                            "kitezh_mcp_kitezh_api_requests_total",
+                            "tool",
+                            tool,
+                            "outcome",
+                            outcome)
+                    .increment();
+            sample.stop(
+                    Timer.builder("kitezh_mcp_kitezh_api_request_duration_seconds")
+                            .tag("tool", tool)
+                            .register(meterRegistry));
+        }
+    }
+
+    public List<Map<String, Object>> getList(String tool, String path, Map<String, ?> parameters) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "success";
+        try {
+            String token = tokenExchangeClient.exchange(currentJwt());
+            UriComponentsBuilder uriBuilder =
+                    UriComponentsBuilder.fromUriString(baseUrl).path(path);
+            parameters.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(
+                            entry -> {
+                                String name = entry.getKey();
+                                Object value = entry.getValue();
+                                if (value != null) {
+                                    uriBuilder.queryParam(name, value);
+                                }
+                            });
+            String uri = uriBuilder.build().encode().toUriString();
+            return restClient
+                    .get()
+                    .uri(uri)
+                    .headers(headers -> headers.setBearerAuth(token))
+                    .retrieve()
+                    .onStatus(
+                            HttpStatusCode::isError,
+                            (request, response) -> {
+                                throw new KitezhApiException("Kitezh API request failed");
+                            })
+                    .body(MAP_LIST_TYPE);
         } catch (RuntimeException exception) {
             outcome = "error";
             throw exception instanceof KitezhApiException

@@ -43,6 +43,14 @@ class KitezhTokenExchangeClientTest {
                                 .string(
                                         org.hamcrest.Matchers.containsString(
                                                 "grant_type=client_credentials")))
+                .andExpect(
+                        content().string(org.hamcrest.Matchers.containsString("scope=admin-api")))
+                .andExpect(
+                        content()
+                                .string(
+                                        org.hamcrest.Matchers.not(
+                                                org.hamcrest.Matchers.containsString(
+                                                        "scope=admin-api+roles"))))
                 .andRespond(
                         withSuccess(
                                 "{\"access_token\":\"actor-token\"}", MediaType.APPLICATION_JSON));
@@ -61,6 +69,11 @@ class KitezhTokenExchangeClientTest {
                                 .string(
                                         org.hamcrest.Matchers.containsString(
                                                 "actor_token=actor-token")))
+                .andExpect(
+                        content()
+                                .string(
+                                        org.hamcrest.Matchers.containsString(
+                                                "scope=admin-api+roles")))
                 .andRespond(
                         withSuccess(
                                 "{\"access_token\":\"delegated-token\"}",

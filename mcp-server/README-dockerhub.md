@@ -111,6 +111,8 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `KITEZH_MCP_PUBLIC_URL` | `https://kitezh-mcp.onrender.com/mcp` | Public MCP resource identifier |
 | `KITEZH_MCP_CLIENT_ID` | `mcp-server` | Confidential OAuth client used for token exchange |
 | `KITEZH_MCP_CLIENT_SECRET` | empty | Runtime secret for the confidential MCP client |
+| `KITEZH_MCP_TOOLSETS` | `all` | Enabled server-side toolsets: `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, `signing-keys`; comma-separated, or `all` |
+| `KITEZH_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets and caller roles; `*` allows all names |
 | `KITEZH_READ_ONLY` | `true` | Keep all MCP operations read-only |
 | `MANAGEMENT_OPENTELEMETRY_ENABLED` | `false` | Enable OpenTelemetry resource/export configuration |
 | `MANAGEMENT_TRACING_EXPORT_ENABLED` | `false` | Enable trace export |
@@ -122,6 +124,8 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `MANAGEMENT_OTLP_METRICS_EXPORT_URL` | empty | OTLP metrics endpoint |
 
 Keep the OAuth client secret, OTLP authorization headers, and deployment credentials in the platform's secret manager. Never put them in source control, the image, or a shared desktop MCP configuration.
+
+Toolset and allowlist values are operator-controlled deployment settings. The effective catalog is the selected toolset union intersected with `KITEZH_MCP_TOOL_ALLOWLIST` and the caller's role permissions. Client headers and tool arguments cannot widen these server-side limits. An empty allowlist disables all tools.
 
 ## Deploy
 

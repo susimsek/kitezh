@@ -59,6 +59,21 @@ For local protocol checks, configure the seeded `mcp-client` client in MCP Inspe
 
 All tools are read-only and require the `mcp.read` scope. They expose Kitezh context, users, groups, OAuth clients, sessions, and audit events. The MCP service exchanges the user token for a narrowly scoped token before requesting the Administration API; it never accepts a caller-supplied Kitezh API token.
 
+#### Server-side toolsets and allowlist
+
+Operators can limit the catalog for a deployment with `KITEZH_MCP_TOOLSETS` and `KITEZH_MCP_TOOL_ALLOWLIST`. `KITEZH_MCP_TOOLSETS` defaults to `all`; `KITEZH_MCP_TOOL_ALLOWLIST` defaults to `*`, preserving the complete catalog. Supported toolset IDs are `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, and `signing-keys`. Set the toolset variable to a comma-separated selection and the allowlist to the exact comma-separated MCP tool names allowed by that deployment. An empty allowlist disables every tool.
+
+The effective catalog is the union of the configured toolsets, intersected with the server allowlist and the tools authorized for the caller's roles. These are deployment-side settings. MCP client headers, tool arguments, or client preferences cannot expand the configured catalog; the same authorization policy applies to `tools/list` and direct `tools/call` requests. Tool authorization in the Kitezh Administration API remains authoritative.
+
+Example deployment settings:
+
+```bash
+KITEZH_MCP_TOOLSETS=users,groups
+KITEZH_MCP_TOOL_ALLOWLIST=kitezh_search_users,kitezh_get_user,kitezh_search_groups,kitezh_get_group
+```
+
+Use `all` and `*` to keep the full catalog enabled. Toolset names and tool names are validated by the server at startup so configuration mistakes fail visibly.
+
 These examples follow the remote HTTP setup model used by the [Grafana MCP documentation](https://grafana.com/docs/grafana/latest/developer-resources/mcp/configure/) and the [GitHub MCP server's host integration guidance](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md). The GitHub server also documents that remote OAuth requires host-specific OAuth client support and does not provide DCR itself. For client command syntax, see [Claude Code MCP setup](https://code.claude.com/docs/en/mcp) and [Codex MCP setup](https://developers.openai.com/codex/mcp).
 
 ## Verify

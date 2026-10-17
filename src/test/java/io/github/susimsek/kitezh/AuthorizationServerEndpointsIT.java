@@ -156,6 +156,75 @@ class AuthorizationServerEndpointsIT {
     }
 
     @Test
+    void mcpAuthorizationCodeTokenContainsOnlyMcpClientScopes() throws Exception {
+        String codeVerifier = "mcp-code-verifier-012345678901234567890123456789012";
+        String redirectUri = "http://localhost:6274/oauth/callback";
+        MvcResult authorizationStart =
+                mockMvc.perform(
+                                consoleAuthorizationRequest(
+                                        "mcp-client",
+                                        "openid mcp.read",
+                                        redirectUri,
+                                        codeVerifier,
+                                        "mcp-scope-state",
+                                        "mcp-scope-nonce"))
+                        .andExpect(status().is3xxRedirection())
+                        .andReturn();
+        Cookie browserSession = authorizationStart.getResponse().getCookie("SESSION");
+        assertThat(browserSession).isNotNull();
+
+        MvcResult login =
+                mockMvc.perform(
+                                post("/login")
+                                        .cookie(browserSession)
+                                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                        .param("username", "admin")
+                                        .param("password", "admin"))
+                        .andExpect(status().is3xxRedirection())
+                        .andReturn();
+        Cookie authenticatedSession = login.getResponse().getCookie("SESSION");
+        assertThat(authenticatedSession).isNotNull();
+
+        MvcResult authorization =
+                mockMvc.perform(
+                                get(URI.create(login.getResponse().getRedirectedUrl()))
+                                        .cookie(authenticatedSession))
+                        .andExpect(status().is3xxRedirection())
+                        .andReturn();
+        String authorizationCode =
+                UriComponentsBuilder.fromUriString(authorization.getResponse().getRedirectedUrl())
+                        .build()
+                        .getQueryParams()
+                        .getFirst("code");
+
+        MvcResult tokenResponse =
+                mockMvc.perform(
+                                post("/oauth2/token")
+                                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                        .param("grant_type", "authorization_code")
+                                        .param("client_id", "mcp-client")
+                                        .param("code", authorizationCode)
+                                        .param("redirect_uri", redirectUri)
+                                        .param("code_verifier", codeVerifier))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.scope").value("openid mcp.read"))
+                        .andReturn();
+
+        String accessToken =
+                JSON_MAPPER
+                        .readTree(tokenResponse.getResponse().getContentAsString())
+                        .get("access_token")
+                        .asText();
+        JsonNode claims = jwtClaims(accessToken);
+        assertThat(claims.get("scope").asText()).isEqualTo("openid mcp.read");
+        assertThat(claims.get("scope").asText())
+                .doesNotContain("admin-api")
+                .doesNotContain("roles");
+        assertThat(claims.get("roles").toString()).contains("ROLE_ADMIN");
+        assertThat(claims.has("realm_access")).isFalse();
+    }
+
+    @Test
     void tokenEndpointRejectsInvalidClientCredentials() throws Exception {
         mockMvc.perform(
                         post("/oauth2/token")
