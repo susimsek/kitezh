@@ -29,6 +29,10 @@ services:
         sync: false
       - key: KITEZH_READ_ONLY
         value: "true"
+      - key: MANAGEMENT_OPENTELEMETRY_ENABLED
+        value: "false"
+      - key: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+        value: http://localhost:4318/v1/traces
       - key: MANAGEMENT_TRACING_EXPORT_ENABLED
         value: "false"
       - key: MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED
