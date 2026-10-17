@@ -378,6 +378,10 @@ test("skips the signed manifest when shared metadata says the release is current
       releaseUrl: `https://github.com/susimsek/kitezh/releases/tag/v${runtime.version}`,
       assets: {
         windowsInstaller: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh.exe`,
+        macosAppleSilicon: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-macos-arm64.dmg`,
+        macosIntel: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-macos-x64.dmg`,
+        linuxX64AppImage: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-linux-x64.AppImage`,
+        linuxArm64AppImage: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-linux-arm64.AppImage`,
       },
     }),
   };
@@ -612,7 +616,10 @@ test("macOS updater selects its manifest and backs up the application bundle", a
   );
   const originalNetFetch = runtime.netFetch;
   let manifestUrl = "";
-  Object.defineProperty(process, "platform", { ...platformDescriptor, value: "darwin" });
+  Object.defineProperty(process, "platform", {
+    ...platformDescriptor,
+    value: "darwin",
+  });
   runtime.netFetch = async (url) => {
     manifestUrl = url;
     return successfulManifestFetch(url);
@@ -630,7 +637,11 @@ test("macOS updater selects its manifest and backs up the application bundle", a
     updateOperations.length = 0;
     const installedBefore = quitAndInstallCalls;
     update.installUpdate();
-    for (let turn = 0; turn < 20 && quitAndInstallCalls === installedBefore; turn += 1)
+    for (
+      let turn = 0;
+      turn < 20 && quitAndInstallCalls === installedBefore;
+      turn += 1
+    )
       await new Promise((resolve) => setTimeout(resolve, 0));
     assert.ok(
       updateOperations.some(
