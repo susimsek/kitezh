@@ -132,8 +132,6 @@ jobs:
     name: Publish Docker image (${{ matrix.architecture }})
     needs:
       - prepare-release
-      - desktop
-      - mobile
     strategy:
       fail-fast: false
       matrix:
