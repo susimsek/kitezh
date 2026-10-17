@@ -12,6 +12,7 @@ import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.repository.PersonalAccessTokenRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
+import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,8 +21,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +38,12 @@ class AccountPersonalAccessTokenEndpointsIT {
     @Autowired private AuthorizationRepository authorizationRepository;
     @Autowired private PersonalAccessTokenRepository personalAccessTokenRepository;
     @Autowired private JwtDecoder jwtDecoder;
+    @Autowired private OAuth2AuthorizationService authorizationService;
     @Autowired private UserRepository userRepository;
 
     @Test
     void createsMcpReadTokenListsMetadataOnlyAndRevokesAuthorization() throws Exception {
-        String username = "pat-it-" + UUID.randomUUID();
-        userRepository.save(
-                new UserEntity(null, username, "{noop}Pat-test12!", true, java.util.Set.of()));
+        String username = "admin";
         String response =
                 mockMvc.perform(
                                 post("/api/account/personal-access-tokens")
@@ -70,6 +73,14 @@ class AccountPersonalAccessTokenEndpointsIT {
                         Instant.now().plus(Duration.ofDays(29)),
                         Instant.now().plus(Duration.ofDays(31)));
         assertThat(authorizationRepository.findByAccessTokenValue(token)).isPresent();
+        Authentication authorizationPrincipal =
+                authorizationService
+                        .findByToken(token, OAuth2TokenType.ACCESS_TOKEN)
+                        .getAttribute(Principal.class.getName());
+        assertThat(authorizationPrincipal.getName()).isEqualTo("admin");
+        assertThat(authorizationPrincipal.getAuthorities())
+                .extracting(Object::toString)
+                .contains("ROLE_ADMIN");
 
         mockMvc.perform(get("/api/account/personal-access-tokens").with(account(username)))
                 .andExpect(status().isOk())

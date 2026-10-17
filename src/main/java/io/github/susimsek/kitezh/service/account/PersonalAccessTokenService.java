@@ -11,6 +11,7 @@ import io.github.susimsek.kitezh.repository.UserRepository;
 import io.github.susimsek.kitezh.service.admin.AdminAuditEventService;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -142,6 +143,7 @@ public class PersonalAccessTokenService {
                 OAuth2Authorization.withRegisteredClient(client)
                         .id(authorizationId)
                         .principalName(username)
+                        .attribute(Principal.class.getName(), principal)
                         .authorizationGrantType(GRANT_TYPE)
                         .authorizedScopes(Set.of(SCOPE))
                         .attribute("personal_access_token_id", tokenId)
