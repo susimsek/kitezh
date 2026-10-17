@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import Module from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -383,10 +384,24 @@ try {
 }
 
 test("desktop main startup registers trusted IPC, CSP, and renderer protocol", async (t) => {
+  const rendererIndexPath = path.join(
+    desktopDirectory,
+    "renderer",
+    "index.html",
+  );
+  const createdRendererFixture = !existsSync(rendererIndexPath);
+  if (createdRendererFixture) {
+    await mkdir(path.dirname(rendererIndexPath), { recursive: true });
+    await writeFile(
+      rendererIndexPath,
+      "<!doctype html><title>Renderer fixture</title>",
+    );
+  }
   t.after(async () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
     await runtimeDependencies.readDiagnosticEvents();
     await rm(userDataDirectory, { recursive: true, force: true });
+    if (createdRendererFixture) await rm(rendererIndexPath, { force: true });
   });
   await writeFile(
     path.join(userDataDirectory, "desktop-window.json"),
