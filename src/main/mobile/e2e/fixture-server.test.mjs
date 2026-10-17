@@ -110,6 +110,34 @@ test("fixture exposes discovery, authorization, protected account, and failure s
       Authorization: `Bearer ${token.access_token}`,
       "Content-Type": "application/json",
     };
+    const patList = await fetch(
+      `${bound.issuer}/api/account/personal-access-tokens`,
+      { headers: accountHeaders },
+    );
+    assert.equal(patList.status, 200);
+    assert.deepEqual(await patList.json(), []);
+    const patResponse = await fetch(
+      `${bound.issuer}/api/account/personal-access-tokens`,
+      {
+        method: "POST",
+        headers: accountHeaders,
+        body: JSON.stringify({
+          name: "Fixture MCP",
+          description: null,
+          expiration: "never",
+        }),
+      },
+    );
+    assert.equal(patResponse.status, 201);
+    const createdPat = await patResponse.json();
+    assert.equal(createdPat.expiresAt, null);
+    assert.equal(createdPat.scope, "mcp.read");
+    assert.equal(typeof createdPat.token, "string");
+    const patDelete = await fetch(
+      `${bound.issuer}/api/account/personal-access-tokens/${createdPat.id}`,
+      { method: "DELETE", headers: accountHeaders },
+    );
+    assert.equal(patDelete.status, 204);
     const profileAttributesResponse = await fetch(
       `${bound.issuer}/api/account/profile/attributes`,
       { headers: accountHeaders },

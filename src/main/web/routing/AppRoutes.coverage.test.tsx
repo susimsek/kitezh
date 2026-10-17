@@ -34,6 +34,9 @@ jest.mock("@/components/account/AccountPasswordForm", () => ({
 jest.mock("@/components/account/SocialAccountLinks", () => ({
   SocialAccountLinks: () => <div>account-social-links</div>,
 }));
+jest.mock("@/components/account/PersonalAccessTokens", () => ({
+  PersonalAccessTokens: () => <div>account-personal-access-tokens</div>,
+}));
 jest.mock("@/components/account/CibaApprovalPanel", () => ({
   CibaApprovalPanel: () => <div>account-ciba-approvals</div>,
 }));
@@ -64,7 +67,7 @@ beforeEach(() => jest.clearAllMocks());
 
 it.each([
   ["/account", "account-profile-form", "account-delete-form"],
-  ["/account/security", "account-password-form", "account-mfa-settings"],
+  ["/account/security", "account-password-form", "account-personal-access-tokens"],
   ["/account/sessions", "account-sessions", null],
   ["/account/applications", "account-applications", null],
 ])("renders the account layout and requested section at %s", (path, first, second) => {

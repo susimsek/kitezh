@@ -32,6 +32,7 @@ import io.github.susimsek.kitezh.security.OidcSessionIdentifier;
 import io.github.susimsek.kitezh.security.ProtocolMapperTypes;
 import io.github.susimsek.kitezh.security.RotatingClientSecretAuthenticationProvider;
 import io.github.susimsek.kitezh.service.OAuth2KeyService;
+import io.github.susimsek.kitezh.service.account.PersonalAccessTokenGrant;
 import io.github.susimsek.kitezh.service.admin.OfflineAccessPolicyService;
 import io.github.susimsek.kitezh.service.security.EffectiveRoleService;
 import io.github.susimsek.kitezh.service.security.OAuth2ObservabilityMetrics;
@@ -531,6 +532,13 @@ public class AuthorizationServerConfig {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 context.getClaims().claim("client_id", context.getRegisteredClient().getClientId());
+            }
+            if (context.getAuthorizationGrant() instanceof PersonalAccessTokenGrant personalToken) {
+                if (personalToken.expiresAt() == null) {
+                    context.getClaims().claims(claims -> claims.remove("exp"));
+                } else {
+                    context.getClaims().expiresAt(personalToken.expiresAt());
+                }
             }
             appendMcpResourceAudience(context, mcpResourceAudience);
             boolean adminAccessToken = isAdminAccessToken(context);

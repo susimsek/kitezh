@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -10,19 +11,26 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
 
 import { AppIcon } from "@/components/AppIcon";
 import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { AccountTabBar } from "@/components/AccountTabBar";
 import { AccountPagination } from "@/components/AccountPagination";
+import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import {
   AccountApiError,
   changeAccountPassword,
+  createPersonalAccessToken,
   deleteAccount,
+  listPersonalAccessTokens,
   listAccountSessions,
+  revokePersonalAccessToken,
   signOutAccountSession,
   signOutOtherAccountSessions,
   type AccountSession,
+  type CreatedPersonalAccessToken,
+  type PersonalAccessToken,
 } from "@/api/account-api";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -36,6 +44,20 @@ type PasswordErrors = Partial<Record<PasswordField, string>>;
 function formatDate(value: string, locale: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale);
+}
+
+function isValidCustomExpirationDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    return false;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const earliest = new Date(`${today}T00:00:00.000Z`);
+  earliest.setUTCDate(earliest.getUTCDate() + 1);
+  const latest = new Date(`${today}T00:00:00.000Z`);
+  latest.setUTCFullYear(latest.getUTCFullYear() + 1);
+  return value >= earliest.toISOString().slice(0, 10) && value <= latest.toISOString().slice(0, 10);
 }
 
 function apiFieldErrors(data: unknown): PasswordErrors {
@@ -77,6 +99,7 @@ function problemFieldErrors(
 
 export default function SecurityScreen() {
   const { dictionary, resolvedLocale } = useLocale();
+  const { showNotice } = useMobileNotice();
   const { palette } = useTheme();
   const { session, signOut, status, refreshSession } = useMobileAuth();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -86,6 +109,20 @@ export default function SecurityScreen() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [sessions, setSessions] = useState<AccountSession[]>([]);
+  const [personalAccessTokens, setPersonalAccessTokens] = useState<PersonalAccessToken[]>([]);
+  const [personalAccessTokensLoading, setPersonalAccessTokensLoading] = useState(true);
+  const [personalAccessTokensError, setPersonalAccessTokensError] = useState(false);
+  const [personalAccessTokenName, setPersonalAccessTokenName] = useState("");
+  const [personalAccessTokenDescription, setPersonalAccessTokenDescription] = useState("");
+  const [personalAccessTokenExpiration, setPersonalAccessTokenExpiration] = useState<"7" | "30" | "60" | "90" | "custom" | "never">("90");
+  const [personalAccessTokenCustomDate, setPersonalAccessTokenCustomDate] = useState("");
+  const [personalAccessTokenFormError, setPersonalAccessTokenFormError] = useState("");
+  const [creatingPersonalAccessToken, setCreatingPersonalAccessToken] = useState(false);
+  const [createdPersonalAccessToken, setCreatedPersonalAccessToken] = useState<CreatedPersonalAccessToken | null>(null);
+  const [createdPersonalAccessTokenVisible, setCreatedPersonalAccessTokenVisible] = useState(true);
+  const [copyingPersonalAccessToken, setCopyingPersonalAccessToken] = useState(false);
+  const [revokingPersonalAccessTokenId, setRevokingPersonalAccessTokenId] = useState<string | null>(null);
+  const [personalAccessTokenActionError, setPersonalAccessTokenActionError] = useState("");
   const [sessionsPage, setSessionsPage] = useState<{
     number: number;
     totalPages: number;
@@ -106,6 +143,29 @@ export default function SecurityScreen() {
   const [deleteAccountError, setDeleteAccountError] = useState(false);
   const sessionsLoadInFlight = useRef(false);
   const sessionsPageRef = useRef(0);
+
+  const loadPersonalAccessTokens = useCallback(async (retry = false) => {
+    if (!session) return;
+    setPersonalAccessTokensLoading(true);
+    setPersonalAccessTokensError(false);
+    try {
+      const currentSession = retry
+        ? await refreshSession(true)
+        : await refreshSession();
+      if (!currentSession) {
+        setPersonalAccessTokensError(true);
+        return;
+      }
+      const tokens = await listPersonalAccessTokens(currentSession.accessToken, {
+        refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+      });
+      setPersonalAccessTokens(tokens);
+    } catch {
+      setPersonalAccessTokensError(true);
+    } finally {
+      setPersonalAccessTokensLoading(false);
+    }
+  }, [refreshSession, session]);
 
   const loadSessions = useCallback(
     async (
@@ -160,6 +220,114 @@ export default function SecurityScreen() {
   useEffect(() => {
     if (session) queueMicrotask(() => void loadSessions());
   }, [loadSessions, session]);
+
+  useEffect(() => {
+    if (session) queueMicrotask(() => void loadPersonalAccessTokens());
+  }, [loadPersonalAccessTokens, session]);
+
+  const createPersonalToken = useCallback(async () => {
+    if (!session || creatingPersonalAccessToken) return;
+    const name = personalAccessTokenName.trim();
+    const description = personalAccessTokenDescription.trim();
+    if (!name) {
+      setPersonalAccessTokenFormError(dictionary.personalAccessTokenNameRequired);
+      return;
+    }
+    if (name.length > 100) {
+      setPersonalAccessTokenFormError(dictionary.personalAccessTokenNameTooLong);
+      return;
+    }
+    if (description.length > 500) {
+      setPersonalAccessTokenFormError(dictionary.personalAccessTokenDescriptionTooLong);
+      return;
+    }
+    if (personalAccessTokenExpiration === "custom" && !personalAccessTokenCustomDate) {
+      setPersonalAccessTokenFormError(dictionary.personalAccessTokenCustomDateRequired);
+      return;
+    }
+    if (personalAccessTokenExpiration === "custom" && !isValidCustomExpirationDate(personalAccessTokenCustomDate)) {
+      setPersonalAccessTokenFormError(dictionary.personalAccessTokenCustomDateInvalid);
+      return;
+    }
+    setCreatingPersonalAccessToken(true);
+    setPersonalAccessTokenFormError("");
+    setPersonalAccessTokenActionError("");
+    try {
+      const currentSession = await refreshSession();
+      if (!currentSession) throw new Error("Session unavailable");
+      const result = await createPersonalAccessToken(
+        currentSession.accessToken,
+        {
+          name,
+          description: description || null,
+          expiration: personalAccessTokenExpiration,
+          ...(personalAccessTokenExpiration === "custom"
+            ? { customExpirationDate: personalAccessTokenCustomDate }
+            : {}),
+        },
+        { refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null },
+      );
+      setCreatedPersonalAccessToken(result);
+      setCreatedPersonalAccessTokenVisible(true);
+      setPersonalAccessTokenName("");
+      setPersonalAccessTokenDescription("");
+      setPersonalAccessTokenCustomDate("");
+      await loadPersonalAccessTokens(true);
+      showNotice({ kind: "success", message: dictionary.personalAccessTokenCreated });
+    } catch {
+      setPersonalAccessTokenActionError(dictionary.personalAccessTokenCreateError);
+      showNotice({ kind: "error", message: dictionary.personalAccessTokenCreateError });
+    } finally {
+      setCreatingPersonalAccessToken(false);
+    }
+  }, [creatingPersonalAccessToken, dictionary.personalAccessTokenCreateError, dictionary.personalAccessTokenCreated, dictionary.personalAccessTokenCustomDateInvalid, dictionary.personalAccessTokenCustomDateRequired, dictionary.personalAccessTokenDescriptionTooLong, dictionary.personalAccessTokenNameRequired, dictionary.personalAccessTokenNameTooLong, loadPersonalAccessTokens, personalAccessTokenCustomDate, personalAccessTokenDescription, personalAccessTokenExpiration, personalAccessTokenName, refreshSession, session, showNotice]);
+
+  const copyPersonalAccessToken = useCallback(async () => {
+    if (!createdPersonalAccessToken || copyingPersonalAccessToken) return;
+    setCopyingPersonalAccessToken(true);
+    setPersonalAccessTokenActionError("");
+    try {
+      await Clipboard.setStringAsync(createdPersonalAccessToken.token);
+      showNotice({ kind: "success", message: dictionary.personalAccessTokenCopied });
+    } catch {
+      setPersonalAccessTokenActionError(dictionary.personalAccessTokenCopyError);
+      showNotice({ kind: "error", message: dictionary.personalAccessTokenCopyError });
+    } finally {
+      setCopyingPersonalAccessToken(false);
+    }
+  }, [copyingPersonalAccessToken, createdPersonalAccessToken, dictionary.personalAccessTokenCopied, dictionary.personalAccessTokenCopyError, showNotice]);
+
+  const revokePersonalToken = useCallback(async (token: PersonalAccessToken) => {
+    if (!session || revokingPersonalAccessTokenId) return;
+    setRevokingPersonalAccessTokenId(token.id);
+    setPersonalAccessTokenActionError("");
+    try {
+      const currentSession = await refreshSession();
+      if (!currentSession) throw new Error("Session unavailable");
+      await revokePersonalAccessToken(currentSession.accessToken, token.id, {
+        refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+      });
+      if (createdPersonalAccessToken?.id === token.id) setCreatedPersonalAccessToken(null);
+      await loadPersonalAccessTokens(true);
+      showNotice({ kind: "success", message: dictionary.personalAccessTokenRevoked });
+    } catch {
+      setPersonalAccessTokenActionError(dictionary.personalAccessTokenRevokeError);
+      showNotice({ kind: "error", message: dictionary.personalAccessTokenRevokeError });
+    } finally {
+      setRevokingPersonalAccessTokenId(null);
+    }
+  }, [createdPersonalAccessToken, dictionary.personalAccessTokenRevokeError, dictionary.personalAccessTokenRevoked, loadPersonalAccessTokens, refreshSession, revokingPersonalAccessTokenId, session, showNotice]);
+
+  const confirmRevokePersonalToken = (token: PersonalAccessToken) => {
+    Alert.alert(dictionary.personalAccessTokenRevoke, dictionary.personalAccessTokenRevokeConfirm, [
+      { text: dictionary.cancel, style: "cancel" },
+      {
+        onPress: () => void revokePersonalToken(token),
+        text: dictionary.personalAccessTokenRevoke,
+        style: "destructive",
+      },
+    ]);
+  };
 
   const validatePassword = useCallback(() => {
     const errors: PasswordErrors = {};
@@ -346,6 +514,7 @@ export default function SecurityScreen() {
     >
       <View style={styles.screen}>
         <MobileFormScrollView
+          testID="security-content"
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -362,6 +531,251 @@ export default function SecurityScreen() {
             <Text style={[styles.title, { color: palette.text }]}>
               {dictionary.securityTitle}
             </Text>
+          </View>
+
+          <View
+            style={[styles.section, { borderColor: palette.border }]}
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              {dictionary.personalAccessTokensTitle}
+            </Text>
+            <Text style={[styles.help, { color: palette.textMuted }]}>
+              {dictionary.personalAccessTokensHelp}
+            </Text>
+            {personalAccessTokensLoading ? (
+              <ActivityIndicator
+                color={palette.primary}
+                accessibilityLabel={dictionary.loading}
+                style={styles.loading}
+              />
+            ) : personalAccessTokensError ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void loadPersonalAccessTokens(true)}
+                style={[styles.errorAction, { borderColor: palette.danger }]}
+              >
+                <Text style={{ color: palette.danger }}>
+                  {dictionary.personalAccessTokensError}
+                </Text>
+                <Text style={{ color: palette.primary }}>
+                  {dictionary.sessionsRetry}
+                </Text>
+              </Pressable>
+            ) : personalAccessTokens.length === 0 ? (
+              <Text style={[styles.help, { color: palette.textMuted }]}>
+                {dictionary.personalAccessTokensEmpty}
+              </Text>
+            ) : (
+              personalAccessTokens.map((token) => (
+                <View
+                  key={token.id}
+                  style={[styles.session, { borderColor: palette.border }]}
+                >
+                  <Text style={[styles.sessionTitle, { color: palette.text }]}>
+                    {token.name}
+                  </Text>
+                  {token.description ? (
+                    <Text style={[styles.sessionMeta, { color: palette.textMuted }]}>
+                      {token.description}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.sessionMeta, { color: palette.textMuted }]}>
+                    mcp.read · {dictionary.personalAccessTokenExpiresAt}: {token.expiresAt ? formatDate(token.expiresAt, resolvedLocale) : dictionary.personalAccessTokenNever}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="pat-revoke"
+                    accessibilityState={{ disabled: Boolean(revokingPersonalAccessTokenId) }}
+                    disabled={Boolean(revokingPersonalAccessTokenId)}
+                    onPress={() => confirmRevokePersonalToken(token)}
+                    style={[styles.sessionAction, { borderColor: palette.danger, opacity: revokingPersonalAccessTokenId ? 0.65 : 1 }]}
+                  >
+                    {revokingPersonalAccessTokenId === token.id ? (
+                      <ActivityIndicator color={palette.danger} accessibilityLabel={dictionary.loading} />
+                    ) : null}
+                    <Text style={{ color: palette.danger, fontWeight: "700" }}>
+                      {dictionary.personalAccessTokenRevoke}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
+            {createdPersonalAccessToken ? (
+              <View style={[styles.tokenReveal, { borderColor: palette.danger, backgroundColor: palette.surface }]}>
+                <Text style={[styles.sessionTitle, { color: palette.text }]}>
+                  {dictionary.personalAccessTokenCreatedTitle}
+                </Text>
+                <Text style={[styles.help, { color: palette.textMuted }]}>
+                  {dictionary.personalAccessTokenCreatedHelp}
+                </Text>
+                <Text selectable style={[styles.tokenValue, { color: palette.text, borderColor: palette.border }]}>
+                  {createdPersonalAccessTokenVisible ? createdPersonalAccessToken.token : "••••••••••••••••••••••••••••••••"}
+                </Text>
+                <View style={styles.tokenActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="pat-copy"
+                    accessibilityState={{ disabled: copyingPersonalAccessToken }}
+                    disabled={copyingPersonalAccessToken}
+                    onPress={() => void copyPersonalAccessToken()}
+                    style={[styles.sessionAction, { borderColor: palette.border, opacity: copyingPersonalAccessToken ? 0.65 : 1 }]}
+                  >
+                    {copyingPersonalAccessToken ? <ActivityIndicator color={palette.text} accessibilityLabel={dictionary.loading} /> : null}
+                    <Text style={{ color: palette.text, fontWeight: "700" }}>
+                      {dictionary.personalAccessTokenCopy}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="pat-hide"
+                    onPress={() => setCreatedPersonalAccessTokenVisible((visible) => !visible)}
+                    style={[styles.sessionAction, { borderColor: palette.border }]}
+                  >
+                    <Text style={{ color: palette.text, fontWeight: "700" }}>
+                      {createdPersonalAccessTokenVisible ? dictionary.personalAccessTokenHide : dictionary.personalAccessTokenShow}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="pat-dismiss"
+                    onPress={() => setCreatedPersonalAccessToken(null)}
+                    style={[styles.sessionAction, { borderColor: palette.border }]}
+                  >
+                    <Text style={{ color: palette.text, fontWeight: "700" }}>
+                      {dictionary.personalAccessTokenDismiss}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: palette.text }]}>
+                {dictionary.personalAccessTokenName}
+              </Text>
+              <TextInput
+                accessibilityLabel={dictionary.personalAccessTokenName}
+                autoCapitalize="sentences"
+                editable={!creatingPersonalAccessToken}
+                maxLength={100}
+                onSubmitEditing={Keyboard.dismiss}
+                testID="personalAccessTokenName"
+                onChangeText={(value) => {
+                  setPersonalAccessTokenName(value);
+                  setPersonalAccessTokenFormError("");
+                }}
+                placeholder={dictionary.personalAccessTokenName}
+                placeholderTextColor={palette.textMuted}
+                returnKeyType="done"
+                style={[styles.input, { borderColor: personalAccessTokenFormError ? palette.danger : palette.border, color: palette.text }]}
+                value={personalAccessTokenName}
+              />
+              {personalAccessTokenFormError === dictionary.personalAccessTokenNameRequired || personalAccessTokenFormError === dictionary.personalAccessTokenNameTooLong ? (
+                <Text accessibilityRole="alert" style={[styles.errorText, { color: palette.danger }]}>
+                  {personalAccessTokenFormError}
+                </Text>
+              ) : null}
+              <Text style={[styles.label, { color: palette.text, marginTop: spacing.md }]}>
+                {dictionary.personalAccessTokenDescription}
+              </Text>
+              <TextInput
+                accessibilityLabel={dictionary.personalAccessTokenDescription}
+                editable={!creatingPersonalAccessToken}
+                maxLength={500}
+                multiline
+                onChangeText={(value) => {
+                  setPersonalAccessTokenDescription(value);
+                  setPersonalAccessTokenFormError("");
+                }}
+                placeholder={dictionary.personalAccessTokenDescription}
+                placeholderTextColor={palette.textMuted}
+                testID="personalAccessTokenDescription"
+                style={[styles.input, styles.multilineInput, { borderColor: palette.border, color: palette.text }]}
+                textAlignVertical="top"
+                value={personalAccessTokenDescription}
+              />
+              {personalAccessTokenFormError === dictionary.personalAccessTokenDescriptionTooLong ? (
+                <Text accessibilityRole="alert" style={[styles.errorText, { color: palette.danger }]}>
+                  {personalAccessTokenFormError}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={[styles.label, { color: palette.text }]}>
+              {dictionary.personalAccessTokenExpiry}
+            </Text>
+            <View style={styles.expiryOptions}>
+              {(["7", "30", "60", "90", "custom", "never"] as const).map((choice) => {
+                const label = choice === "custom"
+                  ? dictionary.personalAccessTokenCustom
+                  : choice === "never"
+                    ? dictionary.personalAccessTokenNever
+                    : dictionary.personalAccessTokenExpiresIn.replace("{{count}}", choice);
+                const selected = personalAccessTokenExpiration === choice;
+                return (
+                  <Pressable
+                    key={choice}
+                    testID={`pat-expiration-${choice}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected, disabled: creatingPersonalAccessToken }}
+                    disabled={creatingPersonalAccessToken}
+                    onPress={() => {
+                      setPersonalAccessTokenExpiration(choice);
+                      setPersonalAccessTokenFormError("");
+                    }}
+                    style={[styles.expiryChoice, { backgroundColor: selected ? palette.primary : palette.surface, borderColor: selected ? palette.primary : palette.border }]}
+                  >
+                    <Text style={{ color: selected ? palette.onPrimary : palette.text, fontWeight: "600" }}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {personalAccessTokenExpiration === "custom" ? (
+              <>
+                <TextInput
+                  accessibilityLabel={dictionary.personalAccessTokenCustom}
+                  editable={!creatingPersonalAccessToken}
+                  onChangeText={(value) => {
+                    setPersonalAccessTokenCustomDate(value);
+                    setPersonalAccessTokenFormError("");
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={palette.textMuted}
+                  testID="personalAccessTokenCustomDate"
+                  style={[styles.input, { borderColor: personalAccessTokenFormError ? palette.danger : palette.border, color: palette.text }]}
+                  value={personalAccessTokenCustomDate}
+                />
+                {personalAccessTokenFormError === dictionary.personalAccessTokenCustomDateRequired || personalAccessTokenFormError === dictionary.personalAccessTokenCustomDateInvalid ? (
+                  <Text accessibilityRole="alert" style={[styles.errorText, { color: palette.danger }]}>
+                    {personalAccessTokenFormError}
+                  </Text>
+                ) : null}
+                <Text style={[styles.help, { color: palette.textMuted }]}>
+                  {dictionary.personalAccessTokenCustomDateHelp}
+                </Text>
+              </>
+            ) : null}
+            {personalAccessTokenExpiration === "never" ? (
+              <Text style={[styles.warningText, { color: palette.danger }]}>
+                {dictionary.personalAccessTokenNeverWarning}
+              </Text>
+            ) : null}
+            {personalAccessTokenActionError ? (
+              <Text accessibilityRole="alert" style={[styles.errorText, { color: palette.danger }]}>
+                {personalAccessTokenActionError}
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: creatingPersonalAccessToken }}
+              disabled={creatingPersonalAccessToken}
+              onPress={() => void createPersonalToken()}
+              testID="pat-create"
+              style={[styles.primaryAction, { backgroundColor: palette.primary, opacity: creatingPersonalAccessToken ? 0.65 : 1 }]}
+            >
+              {creatingPersonalAccessToken ? <ActivityIndicator color={palette.onPrimary} accessibilityLabel={dictionary.loading} /> : null}
+              <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
+                {dictionary.personalAccessTokenCreate}
+              </Text>
+            </Pressable>
           </View>
 
           <View
@@ -669,7 +1083,11 @@ export default function SecurityScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   screen: { flex: 1 },
-  content: { gap: spacing.lg, padding: spacing.xl },
+  content: {
+    gap: spacing.lg,
+    padding: spacing.xl,
+    paddingBottom: spacing.xl * 4,
+  },
   header: { alignSelf: "stretch", gap: spacing.md },
   back: { alignItems: "center", flexDirection: "row", gap: spacing.xs },
   title: { fontSize: 28, fontWeight: "800" },
@@ -723,6 +1141,32 @@ const styles = StyleSheet.create({
   },
   sessionTitle: { fontSize: 16, fontWeight: "700" },
   sessionMeta: { fontSize: 13, marginTop: spacing.xs },
+  tokenReveal: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    padding: spacing.md,
+  },
+  tokenValue: {
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    fontFamily: "monospace",
+    fontSize: 13,
+    marginTop: spacing.md,
+    padding: spacing.md,
+  },
+  tokenActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  expiryOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  expiryChoice: {
+    alignItems: "center",
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  multilineInput: { minHeight: 88, paddingVertical: spacing.md },
+  warningText: { fontSize: 14, lineHeight: 20, marginTop: spacing.sm },
   sessionAction: {
     alignItems: "center",
     alignSelf: "flex-start",
@@ -732,7 +1176,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.md,
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
   },
   secondaryAction: {

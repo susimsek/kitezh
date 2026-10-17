@@ -437,6 +437,7 @@ async function renderConsole(consoleName = "account", options = {}) {
     requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
     cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
     desktopApi: api,
+    confirm: options.confirm ?? (() => true),
     __KITEZH_NATIVE_BOOTSTRAP__: {
       locale: options.locale ?? "en",
       theme: options.theme ?? "light",

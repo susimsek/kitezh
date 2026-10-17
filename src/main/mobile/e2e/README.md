@@ -23,6 +23,8 @@ Run the fixture contract tests with `pnpm run test:fixture`.
   MFA setup, state- and PKCE-bound social-account linking through the system browser, and sign-out.
 - `account-profile.yaml`: edit a dynamic profile attribute and verify persistence after process
   restart.
+- `account-personal-access-tokens.yaml`: create a no-expiration MCP token, verify one-time reveal,
+  clipboard confirmation, hide, and confirmed revocation on the native Account security screen.
 - `account-notifications.yaml`: load notifications, mark one read, and verify the unread count.
 - `admin-policy-save.yaml`: edit CIBA and offline-access policy values and verify API read-back.
 - `admin-settings-groups.yaml`: verify native server information, add a group member, save/read back

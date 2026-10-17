@@ -102,6 +102,24 @@ export type AccountNotification = {
   read: boolean;
 };
 
+export type PersonalAccessToken = {
+  id: string;
+  name: string;
+  description: string | null;
+  scope: string;
+  createdAt: string;
+  expiresAt: string | null;
+};
+
+export type CreatedPersonalAccessToken = PersonalAccessToken & { token: string };
+
+export type CreatePersonalAccessTokenRequest = {
+  name: string;
+  description: string | null;
+  expiration: "7" | "30" | "60" | "90" | "custom" | "never";
+  customExpirationDate?: string;
+};
+
 export type CibaPendingRequest = {
   authReqId: string;
   userCode: string;
@@ -408,6 +426,51 @@ export function signOutAccountSession(
     { method: "DELETE" },
     options,
     "Account session request failed",
+  );
+}
+
+export function listPersonalAccessTokens(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<PersonalAccessToken[]>(
+    accessToken,
+    "/api/account/personal-access-tokens",
+    { method: "GET" },
+    options,
+    "Personal access tokens request failed",
+  );
+}
+
+export function createPersonalAccessToken(
+  accessToken: string,
+  request: CreatePersonalAccessTokenRequest,
+  options: RequestOptions = {},
+) {
+  return requestAccount<CreatedPersonalAccessToken>(
+    accessToken,
+    "/api/account/personal-access-tokens",
+    {
+      body: JSON.stringify(request),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+    options,
+    "Personal access token could not be created",
+  );
+}
+
+export function revokePersonalAccessToken(
+  accessToken: string,
+  tokenId: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    `/api/account/personal-access-tokens/${encodeURIComponent(tokenId)}`,
+    { method: "DELETE" },
+    options,
+    "Personal access token could not be revoked",
   );
 }
 

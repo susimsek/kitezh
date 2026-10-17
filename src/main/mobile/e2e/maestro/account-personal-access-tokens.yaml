@@ -1,0 +1,75 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: false
+- assertVisible: "Kitezh logo"
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
+      - tapOn:
+          id: settings-locale-english
+      - tapOn: "Back|Geri"
+      - tapOn: "Continue|Devam et"
+      - tapOn: "Sign in|Giriş yap"
+      - tapOn:
+          text: "^Continue$"
+          optional: true
+      - tapOn:
+          text: "Stay signed out"
+          optional: true
+      - tapOn: "Continue with fixture account|Test hesabıyla devam et"
+- extendedWaitUntil:
+    visible: "Account Console|Hesap Konsolu"
+    timeout: 180000
+- tapOn:
+    id: account-tab-security
+- extendedWaitUntil:
+    visible: "Personal access tokens"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: personalAccessTokenName
+    direction: DOWN
+- tapOn:
+    id: personalAccessTokenName
+- inputText: "Maestro MCP"
+- pressKey: ENTER
+- scrollUntilVisible:
+    element:
+      id: pat-expiration-never
+    direction: DOWN
+- tapOn:
+    id: pat-expiration-never
+- scrollUntilVisible:
+    element:
+      id: pat-create
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: pat-create
+- scrollUntilVisible:
+    element:
+      text: "Token created"
+    direction: UP
+- assertVisible: "Token created"
+- assertVisible: "fixture-one-time-pat-value"
+- tapOn:
+    id: pat-copy
+- assertVisible: "Token copied."
+- tapOn:
+    id: pat-hide
+- assertNotVisible: "fixture-one-time-pat-value"
+- scrollUntilVisible:
+    element:
+      text: "Revoke token"
+    direction: DOWN
+- tapOn:
+    id: pat-revoke
+- tapOn:
+    text: "Revoke token"
+    index: 2
+- assertVisible: "You have not created any personal access tokens."

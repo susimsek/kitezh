@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   AccountApiError,
   changeAccountPassword,
+  createPersonalAccessToken,
   completeNativeSocialLink,
   decideCibaRequest,
   deleteAccount,
@@ -15,6 +16,7 @@ import {
   listAccountApplications,
   listAccountNotifications,
   listAccountSessions,
+  listPersonalAccessTokens,
   listCibaRequests,
   listOfflineSessions,
   listSocialLinks,
@@ -23,6 +25,7 @@ import {
   mutateMfa,
   revokeAccountApplication,
   revokeOfflineSession,
+  revokePersonalAccessToken,
   signOutAccountSession,
   signOutOtherAccountSessions,
   startMfaSetup,
@@ -72,6 +75,59 @@ test("profile attributes use the authenticated account contract", async () => {
         path: "/api/account/profile/attributes",
         method: "PUT",
         body: JSON.stringify({ attributes: { department: ["Platform"] } }),
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("personal access tokens use the authenticated account API contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: { path: string; method?: string; body?: string }[] = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      path: new URL(input.toString()).pathname,
+      method: init?.method,
+      body: typeof init?.body === "string" ? init.body : undefined,
+    });
+    return new Response(
+      JSON.stringify(
+        init?.method === "POST"
+          ? { id: "pat-1", name: "Codex", token: "one-time-secret" }
+          : [],
+      ),
+      { status: 200 },
+    );
+  };
+
+  try {
+    await listPersonalAccessTokens("access-token");
+    await createPersonalAccessToken("access-token", {
+      name: "Codex",
+      description: null,
+      expiration: "never",
+    });
+    await revokePersonalAccessToken("access-token", "pat/one");
+    assert.deepEqual(requests, [
+      {
+        path: "/api/account/personal-access-tokens",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        path: "/api/account/personal-access-tokens",
+        method: "POST",
+        body: JSON.stringify({
+          name: "Codex",
+          description: null,
+          expiration: "never",
+        }),
+      },
+      {
+        path: "/api/account/personal-access-tokens/pat%2Fone",
+        method: "DELETE",
+        body: undefined,
       },
     ]);
   } finally {

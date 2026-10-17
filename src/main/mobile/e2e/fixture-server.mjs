@@ -185,6 +185,7 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
   ];
   const fixtureSocialTransactions = new Map();
   const fixtureSocialCodes = new Map();
+  const fixturePersonalAccessTokens = [];
   const routes = new Map([
     [
       "GET /health",
@@ -565,6 +566,52 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       }
       link.linked = true;
       writeJson(response, 200, { provider: transaction.provider, linked: true });
+      return;
+    }
+    if (url.pathname === "/api/account/personal-access-tokens") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      if (request.method === "GET") {
+        writeJson(response, 200, fixturePersonalAccessTokens);
+        return;
+      }
+      if (request.method === "POST") {
+        const chunks = [];
+        for await (const chunk of request) chunks.push(chunk);
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        const token = {
+          id: `fixture-pat-${fixturePersonalAccessTokens.length + 1}`,
+          name: body.name,
+          description: body.description ?? null,
+          scope: "mcp.read",
+          createdAt: new Date().toISOString(),
+          expiresAt: body.expiration === "never" ? null : new Date(Date.now() + 90 * 86_400_000).toISOString(),
+        };
+        fixturePersonalAccessTokens.push(token);
+        writeJson(response, 201, { ...token, token: "fixture-one-time-pat-value" });
+        return;
+      }
+    }
+    const personalAccessTokenId = url.pathname.match(
+      /^\/api\/account\/personal-access-tokens\/([^/]+)$/,
+    );
+    if (personalAccessTokenId && request.method === "DELETE") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const index = fixturePersonalAccessTokens.findIndex(
+        (token) => token.id === decodeURIComponent(personalAccessTokenId[1]),
+      );
+      if (index < 0) {
+        writeJson(response, 404, { title: "Not Found", status: 404 });
+        return;
+      }
+      fixturePersonalAccessTokens.splice(index, 1);
+      response.writeHead(204);
+      response.end();
       return;
     }
     const socialLinkDelete = url.pathname.match(

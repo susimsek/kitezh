@@ -4748,6 +4748,8 @@ function profileContent() {
 function securityContent() {
   const mfa = state.data.mfa ?? {};
   const social = state.data.social ?? [];
+  const personalAccessTokens = state.data.personalAccessTokens ?? [];
+  const createdPersonalAccessToken = state.data.createdPersonalAccessToken;
   const passwordErrors = violations(state.error?.body);
   return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("passwordPolicy"))}</h2><p>${escapeHtml(text("securityTitle"))}</p><form data-form="password" novalidate>${field("currentPassword", text("currentPassword"), "", passwordErrors.currentPassword, "password")}${field("newPassword", text("newPassword"), "", passwordErrors.newPassword, "password")}${field("confirmPassword", text("confirmPassword"), "", passwordErrors.confirmPassword, "password")}<div class="actions">${button(text("save"), { action: "save-password", type: "submit", busy: state.busy === "password", mutation: true })}</div></form></section><section class="card"><h2>${escapeHtml(text("mfaTitle"))}</h2><p>${escapeHtml(text("mfaHelp"))}</p>${
     mfa.available === false
@@ -4848,7 +4850,7 @@ function securityContent() {
           )
           .join("")
       : '<div class="empty">' + escapeHtml(text("socialLinksEmpty")) + "</div>"
-  }</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
+  }</div></section><section class="card"><h2>${escapeHtml(text("personalAccessTokensTitle"))}</h2><p>${escapeHtml(text("personalAccessTokensHelp"))}</p>${createdPersonalAccessToken ? `<div class="notice warning" role="status"><strong>${escapeHtml(text("personalAccessTokenCreated"))}</strong><p>${escapeHtml(text("personalAccessTokenOneTimeWarning"))}</p><label class="field"><span>${escapeHtml(text("personalAccessTokenValue"))}</span><input id="personal-access-token-value" type="${state.data.personalAccessTokenVisible ? "text" : "password"}" readonly value="${escapeHtml(createdPersonalAccessToken.token)}" autocomplete="off" spellcheck="false"/></label><div class="actions">${button(text("personalAccessTokenCopy"), { action: "personal-access-token-copy", variant: "secondary", busy: state.busy === "personal-access-token-copy" })}${button(text(state.data.personalAccessTokenVisible ? "personalAccessTokenHide" : "personalAccessTokenShow"), { action: "personal-access-token-toggle" })}${button(text("personalAccessTokenDismiss"), { action: "personal-access-token-dismiss", variant: "secondary" })}</div></div>` : ""}<form data-form="personal-access-token" novalidate><div class="form-grid">${field("name", text("personalAccessTokenName"), "", "", "text", 'maxlength="100" required autocomplete="off"')}${field("description", text("personalAccessTokenDescription"), "", "", "text", 'maxlength="500" autocomplete="off"')}<div class="field"><label for="personalAccessTokenExpiration">${escapeHtml(text("personalAccessTokenExpiration"))}</label><select id="personalAccessTokenExpiration" name="expiration"><option value="7">${escapeHtml(text("personalAccessTokenDays7"))}</option><option value="30" selected>${escapeHtml(text("personalAccessTokenDays30"))}</option><option value="60">${escapeHtml(text("personalAccessTokenDays60"))}</option><option value="90">${escapeHtml(text("personalAccessTokenDays90"))}</option><option value="custom">${escapeHtml(text("personalAccessTokenCustom"))}</option><option value="never">${escapeHtml(text("personalAccessTokenNever"))}</option></select></div><div class="field" data-pat-custom-date hidden><label for="customExpirationDate">${escapeHtml(text("personalAccessTokenCustomDate"))}</label><input id="customExpirationDate" name="customExpirationDate" type="date" autocomplete="off"/><div class="field-error"></div></div></div><p class="muted">${escapeHtml(text("personalAccessTokenScopeHelp"))}</p><div class="actions">${button(text("personalAccessTokenCreate"), { type: "submit", busy: state.busy === "personal-access-token-create", mutation: true })}</div></form><div class="list">${personalAccessTokens.length ? personalAccessTokens.map((token) => `<div class="list-item" data-id="${escapeHtml(token.id)}"><div><strong>${escapeHtml(token.name)}</strong><span class="muted">${escapeHtml(token.description ?? "")}${token.description ? " · " : ""}${escapeHtml(token.createdAt ?? "")} · ${escapeHtml(token.expiresAt ? new Date(token.expiresAt).toLocaleDateString(state.locale === "tr" ? "tr-TR" : "en-US") : text("personalAccessTokenNever"))} · ${escapeHtml(token.scope ?? "mcp.read")}</span></div>${button(text("personalAccessTokenRevoke"), { action: "personal-access-token-revoke", danger: true, busy: state.busy === "personal-access-token-revoke", mutation: true })}</div>`).join("") : '<div class="empty">' + escapeHtml(text("personalAccessTokensEmpty")) + "</div>"}</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
 }
 
 function pageItems(items, emptyText, renderItem) {
@@ -5399,6 +5401,9 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         "/api/account/mfa/recovery-codes",
       );
       state.data.social = await request("/api/account/social-links");
+      state.data.personalAccessTokens = await request(
+        "/api/account/personal-access-tokens",
+      );
     }
     state.error = null;
     state.loading = false;
@@ -8170,6 +8175,42 @@ async function submitForm(form) {
       state.notice = text("passwordSaved");
     } catch {
       /* request rendered the sanitized error */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "personal-access-token") {
+    const expiration = form.elements.namedItem("expiration").value;
+    const customExpirationDate = form.elements.namedItem("customExpirationDate").value;
+    if (!String(values.name ?? "").trim() || (expiration === "custom" && !customExpirationDate)) {
+      form.reportValidity();
+      return;
+    }
+    state.busy = "personal-access-token-create";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.createdPersonalAccessToken = await request(
+        "/api/account/personal-access-tokens",
+        {
+          method: "POST",
+          body: {
+            name: String(values.name).trim(),
+            description: String(values.description ?? "").trim() || null,
+            expiration,
+            ...(expiration === "custom" ? { customExpirationDate } : {}),
+          },
+        },
+      );
+      state.data.personalAccessTokenVisible = false;
+      state.data.personalAccessTokens = await request(
+        "/api/account/personal-access-tokens",
+      );
+      state.notice = text("personalAccessTokenCreated");
+    } catch {
+      /* request rendered the localized API error. */
     }
     state.busy = null;
     render();
@@ -11698,6 +11739,55 @@ async function action(action, element) {
     }
     return;
   }
+  if (action === "personal-access-token-toggle") {
+    if (state.busy || !state.data.createdPersonalAccessToken) return;
+    state.data.personalAccessTokenVisible = !state.data.personalAccessTokenVisible;
+    render();
+    return;
+  }
+  if (action === "personal-access-token-dismiss") {
+    if (state.busy) return;
+    state.data.createdPersonalAccessToken = null;
+    state.data.personalAccessTokenVisible = false;
+    render();
+    return;
+  }
+  if (action === "personal-access-token-copy") {
+    if (state.busy || !state.data.createdPersonalAccessToken?.token) return;
+    state.busy = "personal-access-token-copy";
+    render();
+    try {
+      await navigator.clipboard.writeText(state.data.createdPersonalAccessToken.token);
+      state.notice = text("personalAccessTokenCopy");
+    } catch {
+      state.error = { message: text("personalAccessTokenCopyFailed") };
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "personal-access-token-revoke") {
+    const tokenId = element.closest(".list-item")?.dataset.id;
+    if (!tokenId || !confirm(text("personalAccessTokenRevokeConfirm"))) return;
+    state.busy = "personal-access-token-revoke";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/account/personal-access-tokens/${encodeURIComponent(tokenId)}`, {
+        method: "DELETE",
+      });
+      state.data.personalAccessTokens = state.data.personalAccessTokens.filter(
+        (token) => token.id !== tokenId,
+      );
+      state.notice = text("personalAccessTokenRevoked");
+    } catch {
+      /* request rendered the localized API error. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "social-remove") {
     if (!confirm(text("socialRemoveConfirm"))) return;
     const item = element.closest(".list-item");
@@ -12492,6 +12582,22 @@ function bind() {
       });
     }),
   );
+  const patExpiration = document.getElementById("personalAccessTokenExpiration");
+  if (patExpiration) {
+    const customDate = document.querySelector("[data-pat-custom-date]");
+    const selected = patExpiration.value === "custom";
+    if (customDate) {
+      customDate.hidden = !selected;
+      customDate.querySelector("input").required = selected;
+    }
+  }
+  patExpiration?.addEventListener("change", (event) => {
+    const customDate = document.querySelector("[data-pat-custom-date]");
+    if (!customDate) return;
+    const selected = event.currentTarget.value === "custom";
+    customDate.hidden = !selected;
+    customDate.querySelector("input").required = selected;
+  });
   document.querySelectorAll("[data-action]").forEach((element) =>
     element.addEventListener("click", (event) => {
       if (element.tagName === "A") event.preventDefault();

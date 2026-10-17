@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from "@/testing/native-testing-library";
-import { Alert } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as accountApi from "@/api/account-api";
 import * as publicApi from "@/api/public-api";
@@ -29,20 +29,24 @@ jest.mock("@/api/account-api", () => ({
     problem: undefined;
   },
   changeAccountPassword: jest.fn(),
+  createPersonalAccessToken: jest.fn(),
   deleteAccount: jest.fn(),
   generateRecoveryCodes: jest.fn(),
   getMfaStatus: jest.fn(),
   getRecoveryCodesStatus: jest.fn(),
   listAccountSessions: jest.fn(),
+  listPersonalAccessTokens: jest.fn(),
   listSocialLinks: jest.fn(),
   startNativeSocialLink: jest.fn(),
   completeNativeSocialLink: jest.fn(),
   mutateMfa: jest.fn(),
   signOutAccountSession: jest.fn(),
+  revokePersonalAccessToken: jest.fn(),
   signOutOtherAccountSessions: jest.fn(),
   startMfaSetup: jest.fn(),
   unlinkSocialProvider: jest.fn(),
 }));
+jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn() }));
 jest.mock("@/auth/storage", () => ({
   clearOAuthTransaction: jest.fn(),
   consumeOAuthTransaction: jest.fn(),
@@ -97,7 +101,7 @@ jest.mock("@/theme/ThemeProvider", () => ({
 }));
 jest.mock("@/theme/tokens", () => ({
   radii: { sm: 4, md: 8, lg: 12 },
-  spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
+  spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 48 },
 }));
 jest.mock("@/components/MobileNoticeProvider", () => {
   const mockShowNotice = jest.fn();
@@ -138,6 +142,7 @@ beforeEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
   mockRefreshSession.mockResolvedValue({ accessToken: "test-access-token" });
+  jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([]);
   mockMobileAuthStatus = "signed-in";
 });
 
@@ -185,6 +190,230 @@ it("validates, updates, and confirms active-account session security actions", a
     ),
   );
   expect(await screen.findByText("passwordSaved")).toBeTruthy();
+});
+
+it("creates, reveals, copies, hides, and revokes personal access tokens", async () => {
+  const token = {
+    id: "pat-1",
+    name: "Codex",
+    description: "Workstation",
+    scope: "mcp.read",
+    createdAt: "2026-10-17T10:00:00Z",
+    expiresAt: null,
+  };
+  jest
+    .mocked(accountApi.listPersonalAccessTokens)
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([token])
+    .mockResolvedValueOnce([]);
+  jest.mocked(accountApi.createPersonalAccessToken).mockResolvedValue({
+    ...token,
+    token: "secret-pat-value",
+  });
+  jest.mocked(accountApi.revokePersonalAccessToken).mockResolvedValue(undefined);
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  const clipboard = jest.requireMock("expo-clipboard") as {
+    setStringAsync: jest.Mock;
+  };
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
+  fireEvent.press(screen.getByRole("radio", { name: "personalAccessTokenNever" }));
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenName"), {
+    target: { value: "Codex" },
+  });
+  fireEvent.changeText(
+    screen.getByLabelText("personalAccessTokenDescription"),
+    { target: { value: "Workstation" } },
+  );
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+  expect(await screen.findByText("secret-pat-value")).toBeTruthy();
+  expect(accountApi.createPersonalAccessToken).toHaveBeenCalledWith(
+    "test-access-token",
+    { name: "Codex", description: "Workstation", expiration: "never" },
+    expect.any(Object),
+  );
+
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCopy" }));
+  await waitFor(() =>
+    expect(clipboard.setStringAsync).toHaveBeenCalledWith("secret-pat-value"),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenHide" }));
+  expect(screen.queryByText("secret-pat-value")).toBeNull();
+
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenRevoke" }));
+  const revokeActions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    revokeActions?.find((action) => action.style === "destructive")?.onPress?.();
+  });
+  await waitFor(() =>
+    expect(accountApi.revokePersonalAccessToken).toHaveBeenCalledWith(
+      "test-access-token",
+      "pat-1",
+      expect.any(Object),
+    ),
+  );
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "success",
+    message: "personalAccessTokenRevoked",
+  });
+});
+
+it("keeps the final security form action clear of the persistent tab bar", async () => {
+  render(<SecurityScreen />);
+
+  const scrollView = screen.getByTestId("security-content");
+  const contentStyle = StyleSheet.flatten(
+    scrollView.props.contentContainerStyle,
+  );
+
+  expect(contentStyle.paddingBottom).toBeGreaterThanOrEqual(96);
+});
+
+it("validates a required token name and custom expiration date", async () => {
+  render(<SecurityScreen />);
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+  expect(await screen.findByText("personalAccessTokenNameRequired")).toBeTruthy();
+
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenName"), {
+    target: { value: "Automation" },
+  });
+  fireEvent.press(screen.getByTestId("pat-expiration-custom"));
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+  expect(await screen.findByText("personalAccessTokenCustomDateRequired")).toBeTruthy();
+
+  fireEvent.changeText(screen.getByTestId("personalAccessTokenCustomDate"), {
+    target: { value: "2026-02-31" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+  expect(await screen.findByText("personalAccessTokenCustomDateInvalid")).toBeTruthy();
+  expect(accountApi.createPersonalAccessToken).not.toHaveBeenCalled();
+});
+
+it("retries token loading and validates size limits before reporting create failures", async () => {
+  jest
+    .mocked(accountApi.listPersonalAccessTokens)
+    .mockRejectedValueOnce(new Error("temporarily unavailable"))
+    .mockResolvedValueOnce([]);
+  jest
+    .mocked(accountApi.createPersonalAccessToken)
+    .mockRejectedValueOnce(new Error("create failed"));
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("personalAccessTokensError")).toBeTruthy();
+  fireEvent.press(screen.getByText("sessionsRetry"));
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
+
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenName"), {
+    target: { value: "n".repeat(101) },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+  expect(await screen.findByText("personalAccessTokenNameTooLong")).toBeTruthy();
+
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenName"), {
+    target: { value: "Automation" },
+  });
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenDescription"), {
+    target: { value: "d".repeat(501) },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+  expect(await screen.findByText("personalAccessTokenDescriptionTooLong")).toBeTruthy();
+
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenDescription"), {
+    target: { value: "" },
+  });
+  fireEvent.press(screen.getByTestId("pat-expiration-custom"));
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const customDate = tomorrow.toISOString().slice(0, 10);
+  fireEvent.changeText(screen.getByTestId("personalAccessTokenCustomDate"), {
+    target: { value: customDate },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+
+  expect(await screen.findByText("personalAccessTokenCreateError")).toBeTruthy();
+  expect(accountApi.createPersonalAccessToken).toHaveBeenCalledWith(
+    "test-access-token",
+    {
+      name: "Automation",
+      description: null,
+      expiration: "custom",
+      customExpirationDate: customDate,
+    },
+    expect.any(Object),
+  );
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "error",
+    message: "personalAccessTokenCreateError",
+  });
+});
+
+it("shows a newly created token only in its reveal panel and reports clipboard failures", async () => {
+  const createdToken = {
+    id: "pat-copy-error",
+    name: "Automation",
+    description: null,
+    scope: "mcp.read",
+    createdAt: "2026-10-17T10:00:00Z",
+    expiresAt: null,
+    token: "one-time-secret",
+  };
+  jest.mocked(accountApi.createPersonalAccessToken).mockResolvedValue(createdToken);
+  const clipboard = jest.requireMock("expo-clipboard") as {
+    setStringAsync: jest.Mock;
+  };
+  clipboard.setStringAsync.mockRejectedValueOnce(new Error("clipboard unavailable"));
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
+  fireEvent.changeText(screen.getByLabelText("personalAccessTokenName"), {
+    target: { value: "Automation" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+
+  expect(await screen.findByText("one-time-secret")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCopy" }));
+  expect(await screen.findByText("personalAccessTokenCopyError")).toBeTruthy();
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "error",
+    message: "personalAccessTokenCopyError",
+  });
+
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenDismiss" }));
+  expect(screen.queryByText("one-time-secret")).toBeNull();
+});
+
+it("shows a recoverable error when a personal access token cannot be revoked", async () => {
+  const token = {
+    id: "pat-revoke-error",
+    name: "Automation",
+    description: null,
+    scope: "mcp.read",
+    createdAt: "2026-10-17T10:00:00Z",
+    expiresAt: null,
+  };
+  jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([token]);
+  jest
+    .mocked(accountApi.revokePersonalAccessToken)
+    .mockRejectedValueOnce(new Error("revoke failed"));
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("Automation")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenRevoke" }));
+  const actions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    actions?.find((action) => action.style === "destructive")?.onPress?.();
+  });
+
+  expect(await screen.findByText("personalAccessTokenRevokeError")).toBeTruthy();
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "error",
+    message: "personalAccessTokenRevokeError",
+  });
 });
 
 it("rejects short, mismatched, and reused passwords before calling the API", async () => {
@@ -821,6 +1050,30 @@ it("retries a failed native session list and supplies a refresh callback", async
   await expect(options?.refreshAccessToken?.()).resolves.toBe(
     "test-access-token",
   );
+});
+
+it("retries token and session reads after the session refresh is unavailable", async () => {
+  jest.mocked(accountApi.listAccountSessions).mockResolvedValue({
+    content: [],
+    number: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  mockRefreshSession
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(null);
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("personalAccessTokensError")).toBeTruthy();
+  expect(await screen.findByText("sessionsError")).toBeTruthy();
+
+  fireEvent.press(screen.getAllByRole("button", { name: "sessionsRetry" })[0]!);
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "sessionsRetry" }));
+  expect(await screen.findByText("sessionsEmpty")).toBeTruthy();
+  expect(accountApi.listPersonalAccessTokens).toHaveBeenCalledTimes(1);
+  expect(accountApi.listAccountSessions).toHaveBeenCalledTimes(1);
 });
 
 it("pages active sessions with a single in-flight request", async () => {
