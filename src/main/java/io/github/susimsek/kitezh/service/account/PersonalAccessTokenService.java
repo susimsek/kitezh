@@ -102,7 +102,6 @@ public class PersonalAccessTokenService {
                     ApiErrorCode.INVALID_REQUEST, "The account has reached its token limit");
         }
 
-        UserEntity user = findUser(username);
         RegisteredClient client = registeredClientRepository.findByClientId(CLIENT_ID);
         if (client == null) {
             throw new IllegalStateException("Personal access token client is not configured");
@@ -152,6 +151,7 @@ public class PersonalAccessTokenService {
                         .build();
         authorizationService.save(authorization);
 
+        UserEntity user = findUser(username);
         PersonalAccessTokenEntity entity = new PersonalAccessTokenEntity();
         entity.setId(tokenId);
         entity.setUser(user);
