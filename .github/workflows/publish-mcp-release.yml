@@ -263,7 +263,7 @@ jobs:
     concurrency:
       group: mcp-render-production-deploy
       cancel-in-progress: false
-    environment: mcp-release
+    environment: backend-release
     permissions:
       contents: read
     env:
