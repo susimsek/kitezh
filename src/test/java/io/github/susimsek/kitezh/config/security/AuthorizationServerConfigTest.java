@@ -77,7 +77,9 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationServerMetadata;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeActor;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeCompositeAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
@@ -570,16 +572,29 @@ class AuthorizationServerConfigTest {
                         Set.of("admin-api", "roles"),
                         Map.of());
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        UsernamePasswordAuthenticationToken subjectPrincipal =
+                new UsernamePasswordAuthenticationToken(
+                        "admin",
+                        "n/a",
+                        List.of(
+                                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                                new SimpleGrantedAuthority("ROLE_USER")));
+        OAuth2TokenExchangeCompositeAuthenticationToken compositePrincipal =
+                new OAuth2TokenExchangeCompositeAuthenticationToken(
+                        subjectPrincipal,
+                        List.of(
+                                new OAuth2TokenExchangeActor(
+                                        Map.of(
+                                                "sub",
+                                                "mcp-server",
+                                                "iat",
+                                                Instant.now(),
+                                                "exp",
+                                                Instant.now().plusSeconds(120)))));
         JwtEncodingContext context =
                 JwtEncodingContext.with(JwsHeader.with(SignatureAlgorithm.RS256), claims)
                         .registeredClient(client)
-                        .principal(
-                                new UsernamePasswordAuthenticationToken(
-                                        "admin",
-                                        "n/a",
-                                        List.of(
-                                                new SimpleGrantedAuthority("ROLE_ADMIN"),
-                                                new SimpleGrantedAuthority("ROLE_USER"))))
+                        .principal(compositePrincipal)
                         .authorizedScopes(Set.of("admin-api", "roles"))
                         .tokenType(OAuth2TokenType.ACCESS_TOKEN)
                         .authorizationGrantType(
@@ -596,7 +611,8 @@ class AuthorizationServerConfigTest {
                 .customize(context);
 
         assertThat(claims.build().getClaims())
-                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"))
+                .containsEntry("act", Map.of("sub", "mcp-server"));
         verify(userRepository).findByUsername("admin");
     }
 

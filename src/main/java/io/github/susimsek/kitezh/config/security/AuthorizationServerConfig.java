@@ -88,6 +88,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -1310,7 +1311,9 @@ public class AuthorizationServerConfig {
                         composite) {
             composite.getActors().stream()
                     .findFirst()
-                    .map(actor -> new java.util.LinkedHashMap<String, Object>(actor.getClaims()))
+                    .map(actor -> actor.getSubject())
+                    .filter(StringUtils::hasText)
+                    .map(subject -> Map.<String, Object>of("sub", subject))
                     .ifPresent(actor -> context.getClaims().claim("act", actor));
         }
     }
