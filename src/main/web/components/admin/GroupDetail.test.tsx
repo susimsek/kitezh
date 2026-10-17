@@ -142,6 +142,43 @@ it("shows permission actions on the permissions tab", async () => {
   expect(screen.getByRole("button", { name: en.admin.groups.addPermission })).toBeVisible();
 });
 
+it("shows group permissions without edit actions for a non-admin", async () => {
+  mockGroupIsAdmin = false;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 0,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url === "/api/admin/groups/7/permissions") {
+      return {
+        status: 200,
+        data: [{ userId: 1, username: "admin", permission: "VIEW" }],
+      } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} tab="permissions" />);
+
+  expect(await screen.findByText("admin: VIEW")).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: en.admin.groups.addPermission }),
+  ).not.toBeInTheDocument();
+});
+
 it("sorts group members by username", async () => {
   mockGroupIsAdmin = true;
   const request = jest.mocked(adminRequest);

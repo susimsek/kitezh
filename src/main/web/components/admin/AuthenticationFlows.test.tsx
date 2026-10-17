@@ -55,7 +55,30 @@ jest.mock("./DetailTabs", () => ({
     </div>
   ),
 }));
-jest.mock("./ConfirmModal", () => ({ ConfirmModal: () => null }));
+jest.mock("./ConfirmModal", () => ({
+  ConfirmModal: ({
+    show,
+    message,
+    cancelLabel,
+    confirmLabel,
+    onCancel,
+    onConfirm,
+  }: {
+    show: boolean;
+    message: string;
+    cancelLabel: string;
+    confirmLabel: string;
+    onCancel: () => void;
+    onConfirm: () => void;
+  }) =>
+    show ? (
+      <div role="dialog">
+        <p>{message}</p>
+        <button onClick={onCancel}>{cancelLabel}</button>
+        <button onClick={onConfirm}>{confirmLabel}</button>
+      </div>
+    ) : null,
+}));
 jest.mock("./AsyncState", () => ({
   DetailLoadingState: () => <div>loading</div>,
   ErrorState: ({ message }: { message: string }) => <div>{message}</div>,
@@ -158,6 +181,17 @@ function mockRequests() {
     if (request.method === "DELETE" && request.url?.endsWith("/bindings/BROWSER")) {
       return new Promise((resolve) => {
         deleteBinding = () => resolve({ status: 200, data: { ...bindings[0], flowId: null } });
+      }) as never;
+    }
+    if (request.method === "PUT" && request.url?.endsWith("/bindings/REGISTRATION")) {
+      return Promise.resolve({
+        status: 200,
+        data: {
+          bindingType: "REGISTRATION",
+          flowId: 20,
+          flowAlias: flow.alias,
+          flowName: flow.name,
+        },
       }) as never;
     }
     return Promise.resolve({ status: 200, data: null }) as never;
@@ -303,6 +337,64 @@ describe("AuthenticationFlows", () => {
     expect(screen.queryByLabelText(dictionary.admin.authentication.alias)).toBeNull();
   });
 
+  it("creates a top-level flow and selects the returned flow", async () => {
+    const createdFlow = { ...flow, id: 21, alias: "new-flow", name: "New flow" };
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("/flows?page=")) {
+        return Promise.resolve({
+          status: 200,
+          data: {
+            content: [flow, createdFlow],
+            number: 0,
+            size: 20,
+            totalElements: 2,
+            totalPages: 1,
+          },
+        }) as never;
+      }
+      if (request.url?.endsWith("/bindings")) {
+        return Promise.resolve({ status: 200, data: bindings }) as never;
+      }
+      if (request.url?.endsWith("/execution-providers")) {
+        return Promise.resolve({ status: 200, data: ["otp-form"] }) as never;
+      }
+      if (request.url === "/api/admin/authentication/flows" && request.method === "POST") {
+        return Promise.resolve({ status: 201, data: createdFlow }) as never;
+      }
+      if (request.url?.endsWith("/flows/21")) {
+        return Promise.resolve({ status: 200, data: { ...detail, flow: createdFlow } }) as never;
+      }
+      return Promise.resolve({ status: 200, data: null }) as never;
+    });
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: dictionary.admin.authentication.createFlow }).at(-1)!,
+    );
+    fireEvent.change(screen.getByLabelText(dictionary.admin.authentication.alias), {
+      target: { value: createdFlow.alias },
+    });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.authentication.name), {
+      target: { value: createdFlow.name },
+    });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: dictionary.admin.authentication.createFlow }).at(-1)!,
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "POST",
+          url: "/api/admin/authentication/flows",
+          data: expect.objectContaining({ alias: "new-flow", requirement: null }),
+        }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.authentication.saveSuccess);
+    expect(await screen.findByText(createdFlow.name)).toBeVisible();
+  });
+
   it("opens and submits the execution form from the executions tab", async () => {
     render(<AuthenticationFlows />);
     await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
@@ -361,6 +453,52 @@ describe("AuthenticationFlows", () => {
       ),
     );
     expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.authentication.saveSuccess);
+  });
+
+  it("shows an error when creating an authentication flow fails", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.method === "POST" && request.url === "/api/admin/authentication/flows") {
+        return Promise.resolve({ status: 503, data: null }) as never;
+      }
+      if (request.url?.includes("/flows?page=")) {
+        return Promise.resolve({
+          status: 200,
+          data: { content: [flow], number: 0, size: 20, totalElements: 1, totalPages: 1 },
+        }) as never;
+      }
+      if (request.url?.endsWith("/bindings")) {
+        return Promise.resolve({ status: 200, data: bindings }) as never;
+      }
+      if (request.url?.endsWith("/execution-providers")) {
+        return Promise.resolve({ status: 200, data: ["otp-form"] }) as never;
+      }
+      if (request.url?.endsWith("/flows/20")) {
+        return Promise.resolve({ status: 200, data: detail }) as never;
+      }
+      return Promise.resolve({ status: 200, data: null }) as never;
+    });
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: dictionary.admin.authentication.createFlow }).at(-1)!,
+    );
+    fireEvent.change(screen.getByLabelText(dictionary.admin.authentication.alias), {
+      target: { value: "rejected-flow" },
+    });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.authentication.name), {
+      target: { value: "Rejected flow" },
+    });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: dictionary.admin.authentication.createFlow }).at(-1)!,
+    );
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.authentication.saveError),
+    );
+    expect(mockAdminRequest).toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({ method: "POST", url: "/api/admin/authentication/flows" }),
+    );
   });
 
   it("creates a sub-flow with its default alternative requirement", async () => {
@@ -470,5 +608,187 @@ describe("AuthenticationFlows", () => {
       ),
     );
     expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.authentication.saveError);
+  });
+
+  it("moves a graph node successfully and reloads the updated flow detail", async () => {
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+    const node = await screen.findByRole("button", { name: /One-time code/ });
+    const nodeRow = node.closest(".border.rounded");
+    if (!(nodeRow instanceof HTMLElement)) throw new Error("Execution graph node was not rendered");
+    fireEvent.click(
+      within(nodeRow).getByRole("button", { name: dictionary.admin.authentication.moveDown }),
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "PUT",
+          url: "/api/admin/authentication/flows/20/nodes/EXECUTION/30/position",
+          data: { direction: "DOWN" },
+        }),
+      ),
+    );
+    expect(mockAddError).not.toHaveBeenCalledWith(dictionary.admin.authentication.saveError);
+  });
+
+  it("opens a sub-flow from the execution graph", async () => {
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /Conditional checks/ }));
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({ url: "/api/admin/authentication/flows/31" }),
+      ),
+    );
+  });
+
+  it("assigns a flow binding and shows the successful save message", async () => {
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: dictionary.admin.authentication.bindings }),
+    );
+    const browserBinding = await screen.findByLabelText("REGISTRATION");
+    const row = browserBinding.closest("tr");
+    if (!row) throw new Error("Registration binding row was not rendered");
+    fireEvent.change(browserBinding, { target: { value: "20" } });
+    fireEvent.click(
+      within(row).getByRole("button", { name: dictionary.admin.authentication.saveFlow }),
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "PUT",
+          url: "/api/admin/authentication/bindings/REGISTRATION",
+          data: { flowId: 20 },
+        }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.authentication.bindingSaved);
+  });
+
+  it("shows a binding error when removing a flow binding fails", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("/flows?page=")) {
+        return Promise.resolve({
+          status: 200,
+          data: { content: [flow], number: 0, size: 20, totalElements: 1, totalPages: 1 },
+        }) as never;
+      }
+      if (request.url?.endsWith("/bindings")) {
+        return Promise.resolve({ status: 200, data: bindings }) as never;
+      }
+      if (request.url?.endsWith("/execution-providers")) {
+        return Promise.resolve({ status: 200, data: ["otp-form"] }) as never;
+      }
+      if (request.url?.endsWith("/flows/20")) {
+        return Promise.resolve({ status: 200, data: detail }) as never;
+      }
+      if (request.url?.endsWith("/bindings/BROWSER") && request.method === "DELETE") {
+        return Promise.resolve({ status: 503, data: null }) as never;
+      }
+      return Promise.resolve({ status: 200, data: null }) as never;
+    });
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: dictionary.admin.authentication.bindings }),
+    );
+
+    const binding = await screen.findByLabelText("BROWSER");
+    const row = binding.closest("tr");
+    if (!row) throw new Error("Browser binding row was not rendered");
+    fireEvent.change(binding, { target: { value: "" } });
+    fireEvent.click(
+      within(row).getByRole("button", { name: dictionary.admin.authentication.removeBinding }),
+    );
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.authentication.bindingError),
+    );
+  });
+
+  it("deletes a flow after confirmation and reports a rejected delete", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.method === "DELETE") {
+        return Promise.resolve({ status: 500, data: null }) as never;
+      }
+      if (request.url?.includes("/flows?page=")) {
+        return Promise.resolve({
+          status: 200,
+          data: { content: [flow], number: 0, size: 20, totalElements: 1, totalPages: 1 },
+        }) as never;
+      }
+      if (request.url?.endsWith("/bindings")) {
+        return Promise.resolve({ status: 200, data: bindings }) as never;
+      }
+      if (request.url?.endsWith("/execution-providers")) {
+        return Promise.resolve({ status: 200, data: ["otp-form"] }) as never;
+      }
+      if (request.url?.endsWith("/flows/20")) {
+        return Promise.resolve({ status: 200, data: detail }) as never;
+      }
+      return Promise.resolve({ status: 200, data: null }) as never;
+    });
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.authentication.deleteFlow }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.authentication.deleteFlow,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({ method: "DELETE", url: "/api/admin/authentication/flows/20" }),
+      ),
+    );
+    expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.authentication.deleteError);
+  });
+
+  it("deletes an execution after confirmation", async () => {
+    render(<AuthenticationFlows />);
+    await screen.findByRole("heading", { name: dictionary.admin.authentication.flowsTitle });
+    fireEvent.click(await screen.findByRole("button", { name: /Custom browser custom-browser/ }));
+    const node = await screen.findByRole("button", { name: /One-time code/ });
+    const nodeRow = node.closest(".border.rounded");
+    if (!(nodeRow instanceof HTMLElement)) throw new Error("Execution graph node was not rendered");
+    fireEvent.click(
+      within(nodeRow).getByRole("button", {
+        name: dictionary.admin.authentication.deleteExecution,
+      }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.authentication.deleteExecution,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "DELETE",
+          url: "/api/admin/authentication/flows/20/executions/30",
+        }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.authentication.deleteSuccess);
   });
 });

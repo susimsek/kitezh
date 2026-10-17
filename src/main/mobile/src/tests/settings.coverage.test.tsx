@@ -1,10 +1,12 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
 } from "@/testing/native-testing-library";
-import { StyleSheet } from "react-native";
+import { AppState, StyleSheet } from "react-native";
+import * as Localization from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 
@@ -110,4 +112,52 @@ it("updates locale and theme immediately, exposes native radio state, and restor
     StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
       .backgroundColor,
   ).toBe(colors.dark.background);
+});
+
+it("resets the saved locale and theme back to system preferences", async () => {
+  mockStoredPreferences.set("kitezh.mobile.locale", "tr");
+  mockStoredPreferences.set("kitezh.mobile.theme", "dark");
+  renderSettings();
+
+  expect(await screen.findByText("Ayarlar")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "Varsayılanlara dön" }));
+
+  expect(await screen.findByText("Settings")).toBeTruthy();
+  await waitFor(() => {
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("kitezh.mobile.locale");
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("kitezh.mobile.theme");
+  });
+  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual({ selected: true });
+});
+
+it("falls back to system preferences when secure storage cannot be read", async () => {
+  jest.mocked(SecureStore.getItemAsync)
+    .mockRejectedValueOnce(new Error("locale storage unavailable"))
+    .mockRejectedValueOnce(new Error("theme storage unavailable"));
+  renderSettings();
+
+  expect(await screen.findByText("Settings")).toBeTruthy();
+  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual({ selected: true });
+});
+
+it("refreshes the system language when the app becomes active", async () => {
+  const originalLocale = Localization.getLocales()[0];
+  const getLocales = jest.spyOn(Localization, "getLocales").mockReturnValue([
+    { ...originalLocale, languageCode: "tr", languageTag: "tr-TR", regionCode: "TR" },
+  ]);
+  let onChange: ((state: "active" | "background" | "inactive") => void) | undefined;
+  const addListener = jest.spyOn(AppState, "addEventListener").mockImplementation((_event, listener) => {
+    onChange = listener;
+    return { remove: jest.fn() };
+  });
+  renderSettings();
+  expect(await screen.findByText("Settings")).toBeTruthy();
+
+  act(() => onChange?.("active"));
+  expect(await screen.findByText("Ayarlar")).toBeTruthy();
+
+  addListener.mockRestore();
+  getLocales.mockRestore();
 });

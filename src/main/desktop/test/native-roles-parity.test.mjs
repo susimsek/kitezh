@@ -120,6 +120,49 @@ test("native role list is compact, protects built-in roles and sends bounded pag
   }
 });
 
+test("role detail corrects an out-of-range backend page and reloads the last valid page", async () => {
+  const h = await renderConsole("admin");
+  try {
+    h.setResponse(listPath, "GET", () => wirePage);
+    h.setResponse(detailPath, "GET", () => ({
+      ...detail,
+      users: {
+        content: [],
+        page: { size: 10, number: 4, totalElements: 15, totalPages: 2 },
+      },
+    }));
+    const lastPagePath =
+      "/api/admin/roles/ROLE_USER?q=&page=1&size=10&sort=username%2Casc";
+    h.setResponse(lastPagePath, "GET", () => ({
+      ...detail,
+      users: {
+        content: [],
+        page: { size: 10, number: 1, totalElements: 15, totalPages: 2 },
+      },
+    }));
+    await settle();
+    h.document.querySelector('[data-route="roles"]').click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-open"][data-id="ROLE_USER"]')
+      .click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-tab"][data-id="users"]')
+      .click();
+    await settle();
+
+    assert.ok(h.calls.some(({ path }) => path === detailPath));
+    assert.ok(h.calls.some(({ path }) => path === lastPagePath));
+    assert.match(
+      h.document.querySelector(".admin-pagination-controls").textContent,
+      /2\s*\/\s*2/,
+    );
+  } finally {
+    h.restore();
+  }
+});
+
 test("role detail tabs support ArrowRight, Home, and End keyboard navigation", async () => {
   const h = await renderConsole("admin");
   try {
@@ -531,6 +574,54 @@ test("role loading failures and missing roles do not masquerade as empty members
     } finally {
       h.restore();
     }
+  }
+});
+
+test("role member candidate failures can be retried and empty results stay explicit", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    h.document
+      .querySelector('[data-action="role-tab"][data-id="users"]')
+      .click();
+    await settle();
+    const query = h.document.getElementById("role-candidate-user");
+    const retryPath =
+      "/api/admin/roles/ROLE_USER/available-users?q=ada&page=0&size=10&sort=username,asc";
+    h.setResponse(retryPath, "GET", () => ({
+      status: 503,
+      kind: "server",
+      body: null,
+    }));
+    query.value = "ada";
+    emit(h.document, query);
+    await delay();
+    await settle();
+    assert.match(
+      h.document.querySelector('[data-role-candidate="user"]').textContent,
+      /could not be loaded/i,
+    );
+    const retry = h.document.querySelector(
+      '[data-action="role-candidate-retry"][data-id="user"]',
+    );
+    assert.ok(retry);
+    retry.click();
+    await settle();
+    h.setResponse(retryPath, "GET", () => ({ content: [] }));
+    h.document
+      .querySelector('[data-action="role-candidate-retry"][data-id="user"]')
+      .click();
+    await settle();
+    assert.match(
+      h.document.querySelector('[data-role-candidate="user"]').textContent,
+      /no matching candidates found/i,
+    );
+    assert.equal(
+      h.document.querySelector('[data-action="role-candidate-retry"]'),
+      null,
+    );
+  } finally {
+    h.restore();
   }
 });
 

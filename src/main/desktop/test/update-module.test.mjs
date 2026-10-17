@@ -657,3 +657,76 @@ test("macOS updater selects its manifest and backs up the application bundle", a
     Object.defineProperty(process, "platform", platformDescriptor);
   }
 });
+
+test("Windows updater selects its manifest and backs up the install directory", async () => {
+  const platformDescriptor = Object.getOwnPropertyDescriptor(
+    process,
+    "platform",
+  );
+  const originalNetFetch = runtime.netFetch;
+  const originalReleaseMetadata = runtime.releaseMetadataResponse;
+  const originalUpdateCheck = runtime.updateCheck;
+  const requests = [];
+  Object.defineProperty(process, "platform", {
+    ...platformDescriptor,
+    value: "win32",
+  });
+  runtime.releaseMetadataResponse = {
+    status: 200,
+    ok: true,
+    json: async () => ({
+      tag: "v0.1.5",
+      version: "0.1.5",
+      releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v0.1.5",
+      assets: {
+        windowsInstaller:
+          "https://github.com/susimsek/kitezh/releases/download/v0.1.5/kitezh.exe",
+      },
+    }),
+  };
+  runtime.netFetch = async (url) => {
+    requests.push(url);
+    if (url.endsWith("/api/public/app-release"))
+      return runtime.releaseMetadataResponse;
+    return originalNetFetch(url);
+  };
+  runtime.updateCheck = async () => ({
+    isUpdateAvailable: true,
+    updateInfo: { version: "0.1.4" },
+  });
+
+  try {
+    const before = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(before), [
+      { state: "checking" },
+      { state: "available", version: "0.1.4" },
+    ]);
+    assert.ok(requests.some((url) => url.endsWith("/latest.yml")));
+
+    updateHandlers.get("update-downloaded")({ version: "0.1.4" });
+    updateOperations.length = 0;
+    const installedBefore = quitAndInstallCalls;
+    update.installUpdate();
+    for (
+      let turn = 0;
+      turn < 20 && quitAndInstallCalls === installedBefore;
+      turn += 1
+    )
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(
+      updateOperations.some(
+        ({ operation, args }) =>
+          operation === "cp" &&
+          args[1].includes("desktop-update-backup-") &&
+          args[2]?.recursive === true,
+      ),
+    );
+    assert.equal(quitAndInstallCalls, installedBefore + 1);
+  } finally {
+    runtime.netFetch = originalNetFetch;
+    runtime.releaseMetadataResponse = originalReleaseMetadata;
+    runtime.updateCheck = originalUpdateCheck;
+    Object.defineProperty(process, "platform", platformDescriptor);
+  }
+});

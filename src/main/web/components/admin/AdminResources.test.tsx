@@ -253,6 +253,29 @@ describe("AdminResources", () => {
     expect(mockLogout).toHaveBeenCalledWith("en", { sessionAlreadyRevoked: true });
   });
 
+  it("reports an error when global session revocation fails", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return { status: 200, data: page([]) } as never;
+      }
+      return { status: 503, data: null } as never;
+    });
+
+    render(<AdminResources copy={dictionary.admin.resources} locale="en" resource="sessions" />);
+    await screen.findByText(dictionary.admin.resources.empty);
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.resources.revokeAllSessions }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.revokeAllSessions,
+      }),
+    );
+
+    expect(await screen.findByText(dictionary.admin.resources.operationError)).toBeVisible();
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
   it("logs out the current user after deleting all of their sessions", async () => {
     mockAdminRequest.mockImplementation(async (_token, config) => {
       if (!config.method) {

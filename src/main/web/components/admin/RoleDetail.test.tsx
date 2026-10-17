@@ -130,6 +130,26 @@ describe("RoleDetail", () => {
     expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.roles.descriptionSaved);
   });
 
+  it("reports a failed role description update", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.method === "PUT") {
+        return Promise.resolve({ status: 500, data: null }) as never;
+      }
+      return Promise.resolve({ status: 200, data: detail }) as never;
+    });
+    render(<RoleDetail locale="en" dictionary={dictionary} name="ROLE_EDITOR" />);
+
+    await screen.findByRole("heading", { name: "ROLE_EDITOR" });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.roles.description), {
+      target: { value: "Rejected description" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.roles.saveDescription }));
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.roles.descriptionSaveError),
+    );
+  });
+
   it("searches, assigns, navigates to, and removes role users", async () => {
     render(<RoleDetail locale="en" dictionary={dictionary} name="ROLE_EDITOR" tab="users" />);
     expect(await screen.findByText("ada")).toBeVisible();

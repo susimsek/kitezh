@@ -1994,6 +1994,10 @@ test("allows only bounded Account and Admin notification feed and read paths", a
     });
     await adapter.request({
       console: consoleName,
+      path: `${base}?page=1000000&size=100&sort=createdAt,desc`,
+    });
+    await adapter.request({
+      console: consoleName,
       path: `${base}/unread-count`,
     });
     await adapter.request({
@@ -2004,10 +2008,15 @@ test("allows only bounded Account and Admin notification feed and read paths", a
     for (const [path, method] of [
       [`${base}?size=101`, "GET"],
       [`${base}?page=-1`, "GET"],
+      [`${base}?size=01`, "GET"],
+      [`${base}?sort=createdAt,asc`, "GET"],
+      [`${base}?page=0&page=1`, "GET"],
       [`${base}?includePrivate=true`, "GET"],
       [`${base}/unread-count?userId=2`, "GET"],
+      [`${base}/unread-count`, "POST"],
       [`${base}/not-a-uuid/read`, "PUT"],
       [`${base}/9a418c80-2b43-4afe-977f-17ea426e8c80/read`, "DELETE"],
+      [`${base}/9a418c80-2b43-4afe-977f-17ea426e8c80/read?read=true`, "PUT"],
     ]) {
       await assert.rejects(
         adapter.request({ console: consoleName, path, method }),
@@ -2016,5 +2025,5 @@ test("allows only bounded Account and Admin notification feed and read paths", a
       );
     }
   }
-  assert.equal(requests.length, 6);
+  assert.equal(requests.length, 8);
 });

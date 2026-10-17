@@ -274,6 +274,111 @@ it("hydrates backend capabilities before showing only authorized admin tabs and 
   expect(screen.queryByRole("button", { name: "adminUserDelete" })).toBeNull();
 });
 
+it("keeps management actions hidden for read-only resource viewers", async () => {
+  const viewOnlyAccess = { ...adminAccessAll, isAdmin: false };
+  for (const key of Object.keys(viewOnlyAccess) as (keyof typeof viewOnlyAccess)[]) {
+    if (key.startsWith("manage")) viewOnlyAccess[key] = false;
+  }
+  viewOnlyAccess.viewClients = true;
+  viewOnlyAccess.viewRoles = true;
+  viewOnlyAccess.viewGroups = true;
+  viewOnlyAccess.viewSessions = true;
+  viewOnlyAccess.viewConsents = true;
+  viewOnlyAccess.viewEvents = true;
+  jest.mocked(adminApi.getAdminWhoAmI).mockResolvedValueOnce({
+    username: "viewer",
+    avatarUrl: null,
+    authorities: ["ROLE_RESOURCE_VIEWER"],
+    access: viewOnlyAccess,
+  });
+  const page = <T,>(content: T[]) => ({
+    ...emptyPage,
+    content,
+    totalElements: content.length,
+    totalPages: 1,
+  });
+  jest.mocked(adminApi.listAdminClients).mockResolvedValue(
+    page([
+      {
+        id: "client-view",
+        clientId: "viewer-app",
+        clientName: "Viewer App",
+        scopes: [],
+        enabled: true,
+        serviceAccountEnabled: false,
+      },
+    ]),
+  );
+  jest.mocked(adminApi.listAdminRoles).mockResolvedValue(
+    page([{ name: "ROLE_VIEWER", description: "Read only" }]),
+  );
+  jest.mocked(adminApi.listAdminGroups).mockResolvedValue(
+    page([
+      {
+        id: 9,
+        name: "ReadOnly",
+        path: "/ReadOnly",
+        parentId: null,
+        roles: [],
+        effectiveRoles: [],
+        defaultGroup: false,
+        userCount: 0,
+      },
+    ]),
+  );
+  jest.mocked(adminApi.listAdminSessions).mockResolvedValue(
+    page([
+      {
+        id: "session-view",
+        username: "viewer-user",
+        createdAt: "2026-01-01",
+        lastAccessedAt: "2026-01-02",
+        expiresAt: "2026-01-03",
+        authorizationCount: 1,
+        active: true,
+      },
+    ]),
+  );
+  jest.mocked(adminApi.listAdminConsents).mockResolvedValue(
+    page([
+      {
+        clientId: "viewer-app",
+        clientName: "Viewer App",
+        principalName: "viewer-user",
+        userId: 10,
+        authorities: ["openid"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-02",
+      },
+    ]),
+  );
+
+  render(<AdminScreen />);
+  expect(await screen.findByRole("tab", { name: "adminClients" })).toBeTruthy();
+  expect(screen.queryByTestId("admin-tab-dashboard")).toBeNull();
+
+  const readOnlyResources = [
+    ["adminClients", "Viewer App"],
+    ["adminRoles", "ROLE_VIEWER"],
+    ["adminGroups", "ReadOnly"],
+    ["adminSessions", "viewer-user"],
+    ["adminConsents", "Viewer App"],
+  ];
+  for (const [tab, row] of readOnlyResources) {
+    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    expect(await screen.findByText(row)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "adminCreate" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "adminEdit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "adminDelete" })).toBeNull();
+  }
+  expect(screen.queryByTestId("admin-tab-keys")).toBeNull();
+  await act(async () => {
+    fireEvent.press(screen.getByRole("tab", { name: "adminEvents" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(screen.queryByRole("button", { name: "adminDeleteEvents" })).toBeNull();
+});
+
 it("keeps Admin navigation hidden while whoami capabilities are loading", async () => {
   let resolveIdentity!: (identity: Awaited<ReturnType<typeof adminApi.getAdminWhoAmI>>) => void;
   jest.mocked(adminApi.getAdminWhoAmI).mockImplementationOnce(
@@ -305,6 +410,50 @@ it.each([
   expect(await screen.findByText(message)).toBeTruthy();
   fireEvent.press(screen.getByTestId("admin-access-retry"));
   expect(await screen.findByTestId("admin-tab-dashboard")).toBeTruthy();
+});
+
+it.each([
+  ["offline", Object.assign(new adminApi.AdminApiError(0), { kind: "offline" }), "adminApiOfflineError"],
+  ["timeout", Object.assign(new adminApi.AdminApiError(0), { kind: "timeout" }), "adminApiTimeoutError"],
+  ["unexpected", new Error("whoami failed"), "adminLoadError"],
+] as const)("shows a retryable %s whoami error", async (_kind, failure, message) => {
+  jest.mocked(adminApi.getAdminWhoAmI).mockRejectedValueOnce(failure);
+
+  render(<AdminScreen />);
+  expect(await screen.findByText(message)).toBeTruthy();
+  fireEvent.press(screen.getByTestId("admin-access-retry"));
+  expect(await screen.findByTestId("admin-tab-dashboard")).toBeTruthy();
+  expect(adminApi.getAdminWhoAmI).toHaveBeenCalledTimes(2);
+});
+
+it("fails closed when admin capabilities are missing and supports query-only users", async () => {
+  jest.mocked(adminApi.getAdminWhoAmI).mockResolvedValueOnce({
+    username: "unconfigured",
+    avatarUrl: null,
+    authorities: [],
+    access: null as never,
+  });
+  const view = render(<AdminScreen />);
+  expect(await screen.findByText("adminForbidden")).toBeTruthy();
+  expect(screen.queryByTestId("admin-tab-dashboard")).toBeNull();
+
+  const queryOnlyAccess = {
+    ...adminAccessAll,
+    isAdmin: false,
+    viewUsers: false,
+    queryUsers: true,
+  };
+  jest.mocked(adminApi.getAdminWhoAmI).mockResolvedValueOnce({
+    username: "query-only",
+    avatarUrl: null,
+    authorities: ["ROLE_USER_QUERY"],
+    access: queryOnlyAccess,
+  });
+  view.unmount();
+  render(<AdminScreen />);
+  expect(await screen.findByTestId("admin-tab-users")).toBeTruthy();
+  expect(screen.queryByTestId("admin-tab-dashboard")).toBeNull();
+  expect(adminApi.listAdminUsers).toHaveBeenCalled();
 });
 
 it("loads and saves localized native audit event settings with validation", async () => {
@@ -445,6 +594,21 @@ it("keeps server information fail-closed and offers a retry after 403", async ()
   expect(screen.getByTestId("admin-server-info-retry")).toBeTruthy();
   fireEvent.press(screen.getByTestId("admin-server-info-retry"));
   expect(await screen.findByTestId("admin-server-info-content")).toBeTruthy();
+});
+
+it.each([
+  [new adminApi.AdminApiError(403), "adminForbidden"],
+  [new Error("dashboard unavailable"), "adminLoadError"],
+])("shows a recoverable dashboard error for %s", async (failure, message) => {
+  jest.mocked(adminApi.getAdminDashboard).mockRejectedValueOnce(failure);
+
+  render(<AdminScreen />);
+  await screen.findByTestId("admin-tab-dashboard");
+  expect(await screen.findByText(message)).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: "adminRetry" }));
+
+  expect(await screen.findByText("2")).toBeTruthy();
 });
 
 it("manages role membership through the paged native admin API", async () => {
@@ -848,6 +1012,16 @@ it("renders populated mobile admin resources and supports filtered pagination", 
         locked: true,
         effectiveRoles: [],
       },
+      {
+        id: 18,
+        username: "minimal-user",
+        firstName: null,
+        lastName: null,
+        email: null,
+        enabled: true,
+        locked: false,
+        effectiveRoles: ["ROLE_USER"],
+      },
     ]),
   );
   jest.mocked(adminApi.listAdminClients).mockResolvedValue(
@@ -873,6 +1047,15 @@ it("renders populated mobile admin resources and supports filtered pagination", 
         displayOnConsentScreen: true,
         includeInTokenScope: true,
       },
+      {
+        id: "scope-2",
+        name: "profile",
+        displayName: "Profile",
+        description: null,
+        builtIn: true,
+        displayOnConsentScreen: false,
+        includeInTokenScope: false,
+      },
     ]),
   );
   jest
@@ -890,6 +1073,16 @@ it("renders populated mobile admin resources and supports filtered pagination", 
         defaultGroup: false,
         userCount: 0,
       },
+      {
+        id: 4,
+        name: "Support",
+        path: "/Support",
+        parentId: null,
+        roles: [],
+        effectiveRoles: ["ROLE_SUPPORT"],
+        defaultGroup: true,
+        userCount: 2,
+      },
     ]),
   );
   jest.mocked(adminApi.listAdminIdentityProviders).mockResolvedValue(
@@ -904,6 +1097,17 @@ it("renders populated mobile admin resources and supports filtered pagination", 
         configured: false,
         hideOnLogin: true,
         mapperCount: 0,
+      },
+      {
+        id: "provider-2",
+        registrationId: "empty-display",
+        providerType: "saml",
+        displayName: "",
+        alias: "empty-display-alias",
+        enabled: true,
+        configured: true,
+        hideOnLogin: false,
+        mapperCount: 2,
       },
     ]),
   );
@@ -954,7 +1158,7 @@ it("renders populated mobile admin resources and supports filtered pagination", 
         action: "user.updated",
         targetType: "user",
         targetId: "17",
-        details: null,
+        details: "Updated profile fields",
         occurredAt: "2026-01-02",
       },
     ]),
@@ -979,6 +1183,16 @@ it("renders populated mobile admin resources and supports filtered pagination", 
     fireEvent.press(screen.getByRole("tab", { name: tab }));
     expect(await screen.findByText(content)).toBeTruthy();
   }
+  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  expect(await screen.findByText("minimal-user")).toBeTruthy();
+  fireEvent.press(screen.getByRole("tab", { name: "adminClientScopes" }));
+  expect(await screen.findByText("adminBuiltIn")).toBeTruthy();
+  fireEvent.press(screen.getByRole("tab", { name: "adminGroups" }));
+  expect(await screen.findByText("ROLE_SUPPORT")).toBeTruthy();
+  fireEvent.press(screen.getByRole("tab", { name: "adminIdentityProviders" }));
+  expect(await screen.findByText("empty-display-alias")).toBeTruthy();
+  fireEvent.press(screen.getByRole("tab", { name: "adminEvents" }));
+  expect(await screen.findByText("Updated profile fields")).toBeTruthy();
 
   fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
   fireEvent.changeText(screen.getByLabelText("adminSearchUsers"), {
@@ -1806,5 +2020,73 @@ it("reports forbidden and unexpected failures from destructive admin actions", a
       kind: "error",
       message: "adminForbidden",
     }),
+  );
+});
+
+it("shows a loading state while each admin table is waiting for its first page", async () => {
+  const tables = [
+    ["users", adminApi.listAdminUsers, "adminNoUsers"],
+    ["clients", adminApi.listAdminClients, "adminNoClients"],
+    ["scopes", adminApi.listAdminClientScopes, "adminNoClientScopes"],
+    ["roles", adminApi.listAdminRoles, "adminNoRoles"],
+    ["groups", adminApi.listAdminGroups, "adminNoGroups"],
+    [
+      "identity-providers",
+      adminApi.listAdminIdentityProviders,
+      "adminNoIdentityProviders",
+    ],
+    ["keys", adminApi.listAdminKeys, "adminNoKeys"],
+    ["events", adminApi.listAdminEvents, "adminNoEvents"],
+    ["sessions", adminApi.listAdminSessions, "adminNoSessions"],
+    ["consents", adminApi.listAdminConsents, "adminNoConsents"],
+  ] as const;
+
+  render(<AdminScreen />);
+  await screen.findByTestId("admin-tab-dashboard");
+
+  for (const [section, listRequest, emptyMessage] of tables) {
+    let finishRequest!: (page: typeof emptyPage) => void;
+    const pendingPage = new Promise<typeof emptyPage>((resolve) => {
+      finishRequest = resolve;
+    });
+    const request = listRequest as jest.Mock;
+    request.mockImplementationOnce(() => pendingPage);
+
+    fireEvent.press(screen.getByTestId(`admin-tab-${section}`));
+    await waitFor(() => expect(request).toHaveBeenCalled());
+    expect(screen.getByLabelText("loading")).toBeTruthy();
+
+    await act(async () => finishRequest(emptyPage));
+    expect(await screen.findByText(emptyMessage)).toBeTruthy();
+  }
+});
+
+it("shows and clears a field-level validation error returned by the admin API", async () => {
+  const serverError = Object.assign(new adminApi.AdminApiError(400), {
+    problem: {
+      violations: [{ field: "username", message: "username already exists" }],
+    },
+  });
+  jest.mocked(adminApi.createAdminUser).mockRejectedValueOnce(serverError);
+
+  render(<AdminScreen />);
+  await screen.findByTestId("admin-tab-dashboard");
+  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await waitFor(() => expect(adminApi.listAdminUsers).toHaveBeenCalled());
+  fireEvent.press(screen.getByRole("button", { name: "adminCreate" }));
+  fireEvent.changeText(screen.getByPlaceholderText("adminUsername"), {
+    target: { value: "existing-user" },
+  });
+  fireEvent.changeText(screen.getByPlaceholderText("adminPassword"), {
+    target: { value: "a-valid-password" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
+
+  expect(await screen.findByText("username already exists")).toBeTruthy();
+  fireEvent.changeText(screen.getByPlaceholderText("adminUsername"), {
+    target: { value: "new-user" },
+  });
+  await waitFor(() =>
+    expect(screen.queryByText("username already exists")).toBeNull(),
   );
 });

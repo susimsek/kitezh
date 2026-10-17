@@ -490,6 +490,99 @@ class TokenExchangeAuthenticationProviderTest {
     }
 
     @Test
+    void rejectsDisabledAudienceTargets() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .TOKEN_EXCHANGE_ALLOWED_AUDIENCES,
+                                                        Set.of("reports-api")))
+                                        .build())
+                        .build();
+        RegisteredClient target =
+                RegisteredClient.withId("reports-id")
+                        .clientId("reports-api")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings.CLIENT_ENABLED,
+                                                        false))
+                                        .build())
+                        .build();
+        OAuth2Authorization authorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("admin")
+                        .build();
+        when(authorizationService.findByToken(
+                        "subject",
+                        org.springframework.security.oauth2.server.authorization.OAuth2TokenType
+                                .ACCESS_TOKEN))
+                .thenReturn(authorization);
+        when(clientRepository.findByClientId("reports-api")).thenReturn(target);
+
+        assertThatThrownBy(
+                        () -> provider().authenticate(request(client, null, Set.of("reports-api"))))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("invalid_target"));
+    }
+
+    @Test
+    void rejectsEnabledTokenExchangeTargetsOutsideTheClientAllowlist() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .TOKEN_EXCHANGE_ALLOWED_AUDIENCES,
+                                                        Set.of("reports-api")))
+                                        .build())
+                        .build();
+        RegisteredClient target =
+                RegisteredClient.withId("analytics-id")
+                        .clientId("analytics-api")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .build();
+        OAuth2Authorization authorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("admin")
+                        .build();
+        when(authorizationService.findByToken(
+                        "subject",
+                        org.springframework.security.oauth2.server.authorization.OAuth2TokenType
+                                .ACCESS_TOKEN))
+                .thenReturn(authorization);
+        when(clientRepository.findByClientId("analytics-api")).thenReturn(target);
+
+        assertThatThrownBy(
+                        () ->
+                                provider()
+                                        .authenticate(
+                                                request(client, null, Set.of("analytics-api"))))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("invalid_target"));
+    }
+
+    @Test
     void requiresConsentForUserAuthorizationExchange() {
         RegisteredClient client =
                 RegisteredClient.from(
@@ -522,6 +615,42 @@ class TokenExchangeAuthenticationProviderTest {
                                 assertThat(((OAuth2AuthenticationException) exception).getError())
                                         .extracting(OAuth2Error::getErrorCode)
                                         .isEqualTo("access_denied"));
+    }
+
+    @Test
+    void requiresConsentForCibaSubjectAuthorizations() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .clientSettings(
+                                ClientSettings.builder().requireAuthorizationConsent(true).build())
+                        .build();
+        OAuth2Authorization authorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.CIBA))
+                        .principalName("admin")
+                        .authorizedScopes(Set.of("openid"))
+                        .build();
+        when(authorizationService.findByToken(
+                        "subject",
+                        org.springframework.security.oauth2.server.authorization.OAuth2TokenType
+                                .ACCESS_TOKEN))
+                .thenReturn(authorization);
+        OAuth2AuthorizationConsentService consentService =
+                mock(OAuth2AuthorizationConsentService.class);
+        TokenExchangeAuthenticationProvider provider =
+                new TokenExchangeAuthenticationProvider(
+                        authorizationService, clientRepository, consentService, tokenGenerator);
+
+        assertThatThrownBy(() -> provider.authenticate(request(client, null, Set.of())))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("access_denied"));
+        verify(consentService).findById(client.getId(), "admin");
     }
 
     private TokenExchangeAuthenticationProvider provider() {

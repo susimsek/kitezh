@@ -189,6 +189,81 @@ class OutgoingHttpLoggingInterceptorTest {
     }
 
     @Test
+    void skipsExcludedPathsWithoutLogging() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        properties.setExcludePaths(List.of(" /health ", ""));
+        OutgoingHttpLoggingInterceptor interceptor = new OutgoingHttpLoggingInterceptor(properties);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(
+                        HttpMethod.GET, URI.create("https://idp.example/health/live"));
+
+        MockClientHttpResponse response = new MockClientHttpResponse(new byte[0], 200);
+        interceptor.intercept(request, new byte[0], (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    @Test
+    void omitsNonTextAndUnknownLengthResponseBodies() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        OutgoingHttpLoggingInterceptor interceptor = new OutgoingHttpLoggingInterceptor(properties);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(HttpMethod.GET, URI.create("https://idp.example/"));
+        MockClientHttpResponse binaryResponse =
+                new MockClientHttpResponse("binary".getBytes(StandardCharsets.UTF_8), 200);
+        binaryResponse.getHeaders().setContentType(MediaType.APPLICATION_OCTET_STREAM);
+
+        interceptor.intercept(
+                request, new byte[0], (ignoredRequest, ignoredBody) -> binaryResponse);
+
+        assertThat(appender.list.get(1).getFormattedMessage()).contains("body=[omitted]");
+        assertThat(binaryResponse.getBody().readAllBytes())
+                .isEqualTo("binary".getBytes(StandardCharsets.UTF_8));
+
+        appender.list.clear();
+        MockClientHttpResponse unknownLengthResponse =
+                new MockClientHttpResponse(
+                        "{\"name\":\"value\"}".getBytes(StandardCharsets.UTF_8), 200);
+        unknownLengthResponse.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+
+        interceptor.intercept(
+                request, new byte[0], (ignoredRequest, ignoredBody) -> unknownLengthResponse);
+
+        assertThat(appender.list.get(1).getFormattedMessage())
+                .contains("body=[omitted: unknown-size]");
+        assertThat(unknownLengthResponse.getBody().readAllBytes())
+                .isEqualTo("{\"name\":\"value\"}".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void omitsFullBodiesWhenBodyLimitIsZero() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        OutgoingHttpLoggingInterceptor interceptor =
+                new OutgoingHttpLoggingInterceptor(
+                        properties, new LoggingProperties.Obfuscate(), 0);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(HttpMethod.POST, URI.create("https://idp.example/token"));
+        MockClientHttpResponse response =
+                new MockClientHttpResponse("{}".getBytes(StandardCharsets.UTF_8), 200);
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        response.getHeaders().setContentLength(2);
+
+        var returned =
+                interceptor.intercept(
+                        request,
+                        "payload".getBytes(StandardCharsets.UTF_8),
+                        (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(appender.list.get(0).getFormattedMessage()).contains("body=[omitted]");
+        assertThat(appender.list.get(1).getFormattedMessage()).contains("body=[omitted]");
+        assertThat(returned.getBody().readAllBytes())
+                .isEqualTo("{}".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
     void onlyAddsInterceptorWhenEnabled() {
         RestClient.Builder disabledBuilder = mock(RestClient.Builder.class);
         new OutgoingHttpLoggingConfiguration()

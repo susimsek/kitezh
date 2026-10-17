@@ -135,3 +135,51 @@ test("prevents a duplicate save while the first request is pending", async () =>
     finishSave?.(emailSettings);
   });
 });
+
+test.each([
+  [new adminApi.AdminApiError(403), "adminForbidden"],
+  [new adminApi.AdminApiError(0, "offline"), "adminApiOfflineError"],
+  [new adminApi.AdminApiError(0, "timeout"), "adminApiTimeoutError"],
+  [new Error("unexpected"), "adminEmailSettingsError"],
+])("shows a recoverable load error for %s", async (error, message) => {
+  jest.mocked(adminApi.getAdminEmailSettings).mockRejectedValueOnce(error);
+  render(<AdminEmailSettings accessToken="access-token" canManage />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  fireEvent.press(screen.getByTestId("admin-email-retry"));
+  expect(await screen.findByText("adminEmailSettingsTitle")).toBeTruthy();
+  expect(adminApi.getAdminEmailSettings).toHaveBeenCalledTimes(2);
+});
+
+test("maps a rejected save to field validation and always clears the pending state", async () => {
+  jest
+    .mocked(adminApi.updateAdminEmailSettings)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(400));
+  render(<AdminEmailSettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-email-save"));
+
+  expect(await screen.findByText("apiValidation")).toBeTruthy();
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "error",
+    message: "adminEmailSettingsError",
+  });
+  expect(screen.getByTestId("admin-email-save").props.accessibilityState.disabled).toBe(false);
+});
+
+test("reports a connection test timeout without changing saved settings", async () => {
+  jest
+    .mocked(adminApi.testAdminEmailConnection)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(0, "timeout"));
+  render(<AdminEmailSettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-email-test"));
+
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "adminApiTimeoutError",
+    });
+  });
+  expect(adminApi.updateAdminEmailSettings).not.toHaveBeenCalled();
+});

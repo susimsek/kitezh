@@ -30,12 +30,20 @@ class AppReleaseMetadataServiceTest {
                                   "tag_name": "v0.1.0",
                                   "assets": [
                                     {"name": "kitezh-0.1.0-win-x64-setup.exe"},
+                                    {"name": "kitezh-0.1.0-win-x64-portable.exe"},
+                                    {"name": "kitezh-0.1.0-win-x64-appx.appx"},
                                     {"name": "kitezh-0.1.0-linux-x86_64.AppImage"},
+                                    {"name": "kitezh-0.1.0-linux-amd64.deb"},
+                                    {"name": "kitezh-0.1.0-linux-x86_64.rpm"},
+                                    {"name": "kitezh-0.1.0-linux-amd64.snap"},
+                                    {"name": "kitezh-0.1.0-linux-arm64.AppImage"},
                                     {"name": "kitezh-0.1.0-linux-arm64.deb"},
                                     {"name": "kitezh-0.1.0-macos-arm64.dmg"},
+                                    {"name": "kitezh-0.1.0-macos-x64.dmg"},
                                     {"name": "kitezh-0.1.0-android.apk"},
                                     {"name": "kitezh-0.1.0-ios.ipa"},
                                     {"name": "kitezh-0.1.0-ios-unsigned.ipa"},
+                                    {"name": null},
                                     {"name": "kitezh-0.1.0-SHA256SUMS"}
                                   ]
                                 }
@@ -58,9 +66,33 @@ class AppReleaseMetadataServiceTest {
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
                                 + "kitezh-0.1.0-win-x64-setup.exe")
                 .containsEntry(
+                        "windowsPortable",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-win-x64-portable.exe")
+                .containsEntry(
+                        "windowsAppx",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-win-x64-appx.appx")
+                .containsEntry(
                         "linuxX64AppImage",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
                                 + "kitezh-0.1.0-linux-x86_64.AppImage")
+                .containsEntry(
+                        "linuxX64Deb",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-linux-amd64.deb")
+                .containsEntry(
+                        "linuxX64Rpm",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-linux-x86_64.rpm")
+                .containsEntry(
+                        "linuxX64Snap",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-linux-amd64.snap")
+                .containsEntry(
+                        "linuxArm64AppImage",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-linux-arm64.AppImage")
                 .containsEntry(
                         "linuxArm64Deb",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
@@ -69,6 +101,10 @@ class AppReleaseMetadataServiceTest {
                         "macosAppleSilicon",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
                                 + "kitezh-0.1.0-macos-arm64.dmg")
+                .containsEntry(
+                        "macosIntel",
+                        "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
+                                + "kitezh-0.1.0-macos-x64.dmg")
                 .containsEntry(
                         "androidApk",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
@@ -81,7 +117,7 @@ class AppReleaseMetadataServiceTest {
                         "iosUnsignedIpa",
                         "https://github.com/susimsek/kitezh/releases/download/v0.1.0/"
                                 + "kitezh-0.1.0-ios-unsigned.ipa")
-                .doesNotContainKey("linuxX64Snap");
+                .hasSize(14);
         server.verify();
     }
 }

@@ -22,6 +22,7 @@ jest.mock("expo-auth-session", () => {
   const exchangeCode = jest.fn();
   const refresh = jest.fn();
   let requestSequence = 0;
+  let requestHasCodeVerifier = true;
   class MockAuthRequest {
     codeVerifier: string | null = null;
     redirectUri: string;
@@ -34,7 +35,9 @@ jest.mock("expo-auth-session", () => {
     }
 
     async makeAuthUrlAsync() {
-      this.codeVerifier = `test-verifier-${requestSequence}`;
+      this.codeVerifier = requestHasCodeVerifier
+        ? `test-verifier-${requestSequence}`
+        : null;
       return "https://issuer.example.test/authorize";
     }
 
@@ -61,6 +64,9 @@ jest.mock("expo-auth-session", () => {
     __exchangeCode: exchangeCode,
     __promptAsync: promptAsync,
     __refresh: refresh,
+    __setRequestHasCodeVerifier: (hasCodeVerifier: boolean) => {
+      requestHasCodeVerifier = hasCodeVerifier;
+    },
     __setDiscovery: (discovery: unknown) => {
       authDiscovery = discovery;
     },
@@ -113,6 +119,7 @@ const {
   __exchangeCode: mockExchangeCode,
   __promptAsync: mockPromptAsync,
   __refresh: mockRefresh,
+  __setRequestHasCodeVerifier: mockSetRequestHasCodeVerifier,
   __setDiscovery: mockSetDiscovery,
 } = jest.requireMock("expo-auth-session");
 
@@ -163,6 +170,7 @@ beforeEach(() => {
     endSessionEndpoint: "https://issuer.example.test/logout",
     tokenEndpoint: "https://issuer.example.test/token",
   });
+  mockSetRequestHasCodeVerifier(true);
   jest.mocked(storage.readSession).mockResolvedValue(null);
   jest.mocked(storage.writeSession).mockResolvedValue(undefined);
   jest.mocked(storage.clearSession).mockResolvedValue(undefined);
@@ -271,6 +279,45 @@ it("keeps a cancelled authorization signed out and reports unavailable discovery
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
   expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.writeSession).not.toHaveBeenCalled();
+});
+
+it("rejects an authorization request without a PKCE verifier", async () => {
+  mockSetRequestHasCodeVerifier(false);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
+  expect(mockPromptAsync).not.toHaveBeenCalled();
+});
+
+it("reports a provider authorization error without exchanging a code", async () => {
+  mockPromptAsync.mockResolvedValueOnce({
+    type: "error",
+    params: { error: "access_denied" },
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+});
+
+it("clears the pending transaction when the browser dismisses authorization", async () => {
+  mockPromptAsync.mockResolvedValueOnce({ type: "dismiss" });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(mockExchangeCode).not.toHaveBeenCalled();
 });
 
 it("refuses an authorization endpoint from mismatched discovery metadata", async () => {
@@ -475,6 +522,86 @@ it("continues signed out when secure session restoration fails", async () => {
 
   expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.clearSession).not.toHaveBeenCalled();
+});
+
+it("reports a cold-start callback lookup failure", async () => {
+  jest
+    .spyOn(Linking, "getInitialURL")
+    .mockRejectedValueOnce(new Error("initial URL unavailable"));
+
+  renderProvider();
+
+  expect(await screen.findByText("Authentication failed")).toBeTruthy();
+  expect(screen.getByText("error")).toBeTruthy();
+});
+
+it("keeps the restored session when it has no refresh token", async () => {
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "stored-access-token",
+    refreshToken: null,
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
+
+  await waitFor(() => expect(mockRefresh).not.toHaveBeenCalled());
+  expect(screen.getByText("stored-access-token")).toBeTruthy();
+});
+
+it("retains stored refresh and ID tokens when refresh omits rotated values", async () => {
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+  mockRefresh.mockResolvedValueOnce({
+    accessToken: "refreshed-access-token",
+    refreshToken: undefined,
+    idToken: undefined,
+    expiresIn: 300,
+    issuedAt: Math.floor(Date.now() / 1000),
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
+
+  await waitFor(() =>
+    expect(storage.writeSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: "refreshed-access-token",
+        refreshToken: "stored-refresh-token",
+        idToken: "stored-id-token",
+      }),
+      "account",
+    ),
+  );
+});
+
+it("refreshes an expired session when the app becomes active", async () => {
+  let changeAppState: ((state: string) => void) | undefined;
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((_event, listener) => {
+    changeAppState = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+
+  act(() => changeAppState?.("active"));
+
+  await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
 });
 
 it("creates a fresh OAuth state for every sign-in attempt", async () => {

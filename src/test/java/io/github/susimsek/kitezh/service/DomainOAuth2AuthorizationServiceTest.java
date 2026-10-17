@@ -11,6 +11,8 @@ import io.github.susimsek.kitezh.domain.AuthorizationEntity;
 import io.github.susimsek.kitezh.mapper.AuthorizationMapper;
 import io.github.susimsek.kitezh.mapper.AuthorizationServerMapperSupport;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
+import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
+import io.github.susimsek.kitezh.security.ClientSecuritySettings;
 import io.github.susimsek.kitezh.security.OfflineAccessSettings;
 import io.github.susimsek.kitezh.service.admin.OfflineAccessPolicyService;
 import java.time.Instant;
@@ -124,6 +126,34 @@ class DomainOAuth2AuthorizationServiceTest {
         service.save(authorization);
 
         assertThat(entity.getSessionId()).isEqualTo("existing-session");
+    }
+
+    @Test
+    void copiesSourceSessionForTokenExchangeAuthorization() {
+        OAuth2Authorization authorization =
+                OAuth2Authorization.withRegisteredClient(registeredClient())
+                        .id("exchange-1")
+                        .principalName("admin")
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .build();
+        AuthorizationEntity entity = new AuthorizationEntity();
+        entity.setAttributes("exchange-attributes");
+        AuthorizationEntity source = new AuthorizationEntity();
+        source.setSessionId("source-session");
+        when(authorizationMapper.toEntity(authorization, mapperSupport)).thenReturn(entity);
+        when(mapperSupport.readMap("exchange-attributes"))
+                .thenReturn(
+                        Map.of(
+                                ClientSecuritySettings.TOKEN_EXCHANGE_SOURCE_AUTHORIZATION_ID,
+                                "source-authorization"));
+        when(authorizationRepository.findById("source-authorization"))
+                .thenReturn(Optional.of(source));
+
+        service.save(authorization);
+
+        assertThat(entity.getSessionId()).isEqualTo("source-session");
+        verify(authorizationRepository).save(entity);
     }
 
     @Test

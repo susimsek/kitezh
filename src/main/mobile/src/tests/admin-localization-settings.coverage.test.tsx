@@ -118,3 +118,34 @@ test("prevents duplicate saves while a request is pending", async () => {
     finishSave?.(settings);
   });
 });
+
+test("rejects an unsupported default locale and accepts a valid choice after correction", async () => {
+  const unsupported = { ...settings, defaultLocale: "fr" };
+  jest.mocked(adminApi.getAdminLocalizationSettings).mockResolvedValueOnce(unsupported);
+  render(<AdminLocalizationSettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-localization-save"));
+  expect(await screen.findByText("adminLocalizationDefaultLocaleRequired")).toBeTruthy();
+  expect(adminApi.updateAdminLocalizationSettings).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByTestId("admin-localization-default-en"));
+  fireEvent.press(screen.getByTestId("admin-localization-save"));
+  await waitFor(() => expect(adminApi.updateAdminLocalizationSettings).toHaveBeenCalled());
+});
+
+test("maps a server validation failure to the shared localized validation message", async () => {
+  jest
+    .mocked(adminApi.updateAdminLocalizationSettings)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(400));
+  render(<AdminLocalizationSettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-localization-save"));
+
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "apiValidation",
+    });
+  });
+  expect(screen.getByTestId("admin-localization-save").props.accessibilityState.disabled).toBe(false);
+});

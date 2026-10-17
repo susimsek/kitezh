@@ -188,3 +188,101 @@ test("read-only administrators cannot submit policy mutations", async () => {
   expect(screen.queryByTestId("admin-offline-policy-save")).toBeNull();
   expect(screen.queryByTestId("admin-offline-revoke-all")).toBeNull();
 });
+
+test("shows policy-specific load errors and retries only the failed policy", async () => {
+  jest
+    .mocked(adminApi.getAdminCibaPolicy)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(0, "timeout"))
+    .mockResolvedValueOnce(cibaPolicy);
+  render(<AdminPolicySettings accessToken="access-token" canManage />);
+
+  expect(await screen.findByText("adminEventSettingsTimeoutError")).toBeTruthy();
+  const cibaRetry = screen.getAllByRole("button", { name: "adminRetry" })[0];
+  fireEvent.press(cibaRetry);
+  await screen.findByText("adminOfflineAccessPolicy");
+
+  await waitFor(() => expect(adminApi.getAdminCibaPolicy).toHaveBeenCalledTimes(2));
+  expect(adminApi.getAdminOfflineAccessPolicy).toHaveBeenCalledTimes(1);
+});
+
+test("maps a CIBA authorization failure to the forbidden notice", async () => {
+  jest
+    .mocked(adminApi.updateAdminCibaPolicy)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(403));
+  render(<AdminPolicySettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-ciba-policy-save"));
+
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "adminForbidden",
+    });
+  });
+});
+
+test("reports offline access save errors and allows another attempt", async () => {
+  jest
+    .mocked(adminApi.updateAdminOfflineAccessPolicy)
+    .mockRejectedValueOnce(new Error("unexpected"));
+  render(<AdminPolicySettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-offline-policy-save"));
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "adminOfflinePolicySaveError",
+    });
+  });
+
+  fireEvent.press(screen.getByTestId("admin-offline-policy-save"));
+  await waitFor(() => expect(adminApi.updateAdminOfflineAccessPolicy).toHaveBeenCalledTimes(2));
+});
+
+test("shows an authorization error if revoking offline access is rejected", async () => {
+  jest
+    .mocked(adminApi.revokeAllAdminOfflineAccess)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(403));
+  const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+    buttons?.find((button) => button.style === "destructive")?.onPress?.();
+  });
+  render(<AdminPolicySettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-offline-revoke-all"));
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "adminForbidden",
+    });
+  });
+  alert.mockRestore();
+});
+
+test("edits CIBA delivery, verification, numeric and MFA options before saving", async () => {
+  render(<AdminPolicySettings accessToken="access-token" canManage />);
+  await screen.findByText("adminOfflineAccessPolicy");
+
+  fireEvent.changeText(screen.getByTestId("admin-ciba-request-lifetime"), "600");
+  fireEvent.changeText(screen.getByLabelText("adminPollingInterval"), "10");
+  fireEvent.press(screen.getByText("adminCibaDeliveryPoll"));
+  fireEvent.press(screen.getByText("adminCibaVerificationRequired"));
+  fireEvent.valueChange(screen.getByRole("switch", { name: "adminMfaRequired" }), true);
+  fireEvent.changeText(screen.getByLabelText("adminStepUpAcr"), "  urn:example:loa:2  ");
+  fireEvent.press(screen.getByTestId("admin-ciba-policy-save"));
+
+  await waitFor(() => {
+    expect(adminApi.updateAdminCibaPolicy).toHaveBeenCalledWith(
+      "access-token",
+      {
+        ...cibaPolicy,
+        requestLifespanSeconds: 600,
+        pollingIntervalSeconds: 10,
+        deliveryMode: "poll",
+        userVerification: "required",
+        mfaRequired: true,
+        stepUpAcr: "urn:example:loa:2",
+      },
+      { refreshAccessToken: undefined },
+    );
+  });
+});

@@ -15,6 +15,7 @@ import ResetPasswordScreen from "../app/reset-password";
 import VerifyEmailScreen from "../app/verify-email";
 
 let mockAuthStatus = "signed-out";
+let mockVerificationToken: string | undefined = "verify-token";
 const mockSignIn = jest.fn();
 
 jest.mock("@/api/public-api", () => ({
@@ -47,7 +48,7 @@ jest.mock("@/components/AppIcon", () => ({ AppIcon: () => null }));
 jest.mock("@/components/BrandMark", () => ({ BrandMark: () => null }));
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
-  useLocalSearchParams: () => ({ token: "verify-token" }),
+  useLocalSearchParams: () => ({ token: mockVerificationToken }),
 }));
 jest.mock("expo-web-browser", () => ({
   openBrowserAsync: jest.fn(async () => ({ type: "opened" })),
@@ -60,6 +61,7 @@ jest.mock("react-native-safe-area-context", () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockAuthStatus = "signed-out";
+  mockVerificationToken = "verify-token";
   jest.mocked(publicApi.getCaptchaSettings).mockResolvedValue({ enabled: false });
   jest.mocked(publicApi.verifyEmail).mockResolvedValue(undefined);
 });
@@ -152,6 +154,24 @@ it("keeps email-verification retry progress inline", async () => {
   await screen.findByText("verifyEmailSuccess");
 });
 
+it("requires a verification token and does not send an empty value", async () => {
+  mockVerificationToken = "  ";
+  render(<VerifyEmailScreen />);
+
+  expect(await screen.findByText("verifyEmailError")).toBeTruthy();
+  expect(publicApi.verifyEmail).not.toHaveBeenCalled();
+});
+
+it("normalizes the verification token and returns to sign-in after success", async () => {
+  mockVerificationToken = "  token-with-space  ";
+  render(<VerifyEmailScreen />);
+
+  expect(await screen.findByText("verifyEmailSuccess")).toBeTruthy();
+  expect(publicApi.verifyEmail).toHaveBeenCalledWith("token-with-space");
+  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
+  expect(router.replace).toHaveBeenCalledWith("/sign-in");
+});
+
 it("keeps the notice dismiss target at the native minimum", async () => {
   const { MobileNoticeProvider, useMobileNotice } = await import(
     "@/components/MobileNoticeProvider"
@@ -173,4 +193,58 @@ it("keeps the notice dismiss target at the native minimum", async () => {
   const style = StyleSheet.flatten(close.props.style);
   expect(style.minHeight).toBeGreaterThanOrEqual(44);
   expect(style.minWidth).toBeGreaterThanOrEqual(44);
+});
+
+it("ignores blank notices, replaces active notices, and dismisses explicitly", async () => {
+  const { MobileNoticeProvider, useMobileNotice } = await import(
+    "@/components/MobileNoticeProvider"
+  );
+  const { Text } = await import("react-native");
+  function NoticeActions() {
+    const { showNotice } = useMobileNotice();
+    return (
+      <>
+        <Text onPress={() => showNotice({ kind: "info", message: "   " })}>blank</Text>
+        <Text onPress={() => showNotice({ kind: "error", message: "first notice" })}>first</Text>
+        <Text onPress={() => showNotice({ kind: "success", message: "second notice" })}>second</Text>
+      </>
+    );
+  }
+
+  render(<MobileNoticeProvider><NoticeActions /></MobileNoticeProvider>);
+  act(() => screen.getByText("blank").props.onPress());
+  expect(screen.queryByRole("alert")).toBeNull();
+  act(() => screen.getByText("first").props.onPress());
+  expect(screen.getByText("first notice")).toBeTruthy();
+  act(() => screen.getByText("second").props.onPress());
+  expect(screen.queryByText("first notice")).toBeNull();
+  expect(screen.getByText("second notice")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "close" }));
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("automatically dismisses a success notice after its requested duration", async () => {
+  const { MobileNoticeProvider, useMobileNotice } = await import(
+    "@/components/MobileNoticeProvider"
+  );
+  const { Text } = await import("react-native");
+  function SuccessNoticeTrigger() {
+    const { showNotice } = useMobileNotice();
+    return (
+      <Text onPress={() => showNotice({ kind: "success", message: "Saved", durationMs: 1_000 })}>
+        show success
+      </Text>
+    );
+  }
+
+  jest.useFakeTimers();
+  try {
+    render(<MobileNoticeProvider><SuccessNoticeTrigger /></MobileNoticeProvider>);
+    act(() => screen.getByText("show success").props.onPress());
+    expect(screen.getByText("Saved")).toBeTruthy();
+    act(() => jest.advanceTimersByTime(1_000));
+    expect(screen.queryByText("Saved")).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
 });

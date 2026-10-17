@@ -10,6 +10,7 @@ const handlers = {};
 const ipcHandlers = new Map();
 const protocolHandlers = new Map();
 const menuActions = {};
+const appListeners = new Map();
 let trayMenuItems = [];
 const windows = [];
 const runtimeDependencies = {};
@@ -20,11 +21,17 @@ const apiDependencies = {};
 const settingsStoreDependencies = {};
 const mainWindowDependencies = {};
 const nativeApiDependencies = {};
+let restoredTransactions = {};
 const apiRequests = [];
 const externalUrls = [];
+const writtenDesktopPreferences = [];
 let headersHandler;
 let updateStatusHandler;
 let notificationCount = 0;
+let desktopLocale = "en-US";
+let shortcutRegistration = { registered: true, accelerator: "Alt+Space" };
+let themeUpdatedListener;
+let socialCompleteResponse = { status: 201, body: null };
 const menuLogoutItem = { visible: true };
 const desktopDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -40,6 +47,7 @@ class FakeWindow {
     this.visible = options.show === true;
     this.title = options.title;
     this.minimized = false;
+    this.destroyed = false;
     this.loadedUrls = [];
     this.listeners = new Map();
     this.messages = [];
@@ -61,7 +69,7 @@ class FakeWindow {
     this.listeners.set(name, listener);
   }
   isDestroyed() {
-    return false;
+    return this.destroyed;
   }
   isVisible() {
     return this.visible;
@@ -82,7 +90,7 @@ class FakeWindow {
     this.loadedUrls.push(url);
     return Promise.resolve();
   }
-  setBackgroundColor() {}
+  setBackgroundColor(color) { this.backgroundColor = color; }
   setTitle(title) {
     this.title = title;
   }
@@ -114,7 +122,8 @@ class FakeTray {
 const app = {
   isPackaged: false,
   setName() {},
-  getLocale: () => "en-US",
+  on: (name, listener) => appListeners.set(name, listener),
+  getLocale: () => desktopLocale,
   getPath: () => userDataDirectory,
   getAppPath: () => desktopDirectory,
   getVersion: () => "1.0.0",
@@ -140,7 +149,9 @@ const electron = {
   nativeTheme: {
     themeSource: "system",
     shouldUseDarkColors: false,
-    on() {},
+    on: (name, listener) => {
+      if (name === "updated") themeUpdatedListener = listener;
+    },
   },
   nativeImage: { createFromPath: () => ({ isEmpty: () => false }) },
   Notification: Object.assign(class {}, { isSupported: () => true }),
@@ -148,7 +159,7 @@ const electron = {
     handle: (name, handler) => ipcHandlers.set(name, handler),
     on: (name, handler) => ipcHandlers.set(name, handler),
   },
-  net: {},
+  net: { fetch: async (url) => new Response(url) },
   protocol: {
     registerSchemesAsPrivileged() {},
     handle: (name, handler) => protocolHandlers.set(name, handler),
@@ -242,7 +253,7 @@ const imports = {
     redactDiagnosticText: (value) => value,
   },
   "./security/auth-transaction-vault": {
-    readPendingAuthorizationStore: async () => ({}),
+    readPendingAuthorizationStore: async () => restoredTransactions,
     writePendingAuthorizationStore: async () => {},
   },
   "./security/origin-policy": {
@@ -250,10 +261,7 @@ const imports = {
     isTrustedRendererUrl: (url) => url?.startsWith("app://renderer"),
   },
   "./security/global-shortcut": {
-    registerGlobalShortcutWithFallback: (_shortcut, requested) => ({
-      registered: true,
-      accelerator: requested,
-    }),
+    registerGlobalShortcutWithFallback: () => shortcutRegistration,
   },
   "./update": {
     configureAutoUpdater: (handler) => {
@@ -287,7 +295,7 @@ const imports = {
             };
           }
           if (request.path.endsWith("/desktop/complete"))
-            return { status: 201, body: null };
+            return socialCompleteResponse;
           return { status: 200, body: null };
         },
       };
@@ -322,7 +330,9 @@ const imports = {
         writeDesktopLanguage: async () => {},
         writeDesktopLanguageMode: async () => {},
         readDesktopPreferences: async () => preferences,
-        writeDesktopPreferences: async () => {},
+        writeDesktopPreferences: async (value) => {
+          writtenDesktopPreferences.push({ ...value });
+        },
         applyLaunchAtLogin: async () => {},
       };
     },
@@ -382,6 +392,17 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
     path.join(userDataDirectory, "desktop-window.json"),
     JSON.stringify({ x: 100, y: 120, width: 1280, height: 800, maximized: true }),
   );
+  restoredTransactions = {
+    admin: { state: "restored-transaction-state", createdAt: Date.now() },
+  };
+  await writeFile(
+    path.join(userDataDirectory, "desktop-pending-authorizations.bin"),
+    "test-only encrypted transaction marker",
+  );
+  shortcutRegistration = {
+    registered: false,
+    accelerator: "Control+Space",
+  };
   await handlers.onReady();
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -389,7 +410,61 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   }
 
   assert.ok(ipcHandlers.has("desktop:update-status-get"));
+  assert.ok(
+    authDependencies.pendingAuthorizations.has("admin"),
+    "a stored desktop authorization should be restored during startup",
+  );
   assert.ok(protocolHandlers.has("app"));
+  const serveRenderer = protocolHandlers.get("app");
+  const nativePage = await serveRenderer({ url: "app://renderer/native" });
+  assert.equal(nativePage.status, 200);
+  assert.match(await nativePage.text(), /__KITEZH_NATIVE_BOOTSTRAP__/);
+  const nativeScript = await serveRenderer({
+    url: "app://renderer/native/renderer.mjs",
+  });
+  assert.match(nativeScript.headers.get("content-type"), /javascript/);
+  assert.match(await nativeScript.text(), /globalThis\.desktopApi/);
+  const brandAsset = await serveRenderer({
+    url: "app://renderer/native/brand/logo-light.svg",
+  });
+  assert.match(brandAsset.headers.get("content-type"), /image\/svg\+xml/);
+  const loginPage = await serveRenderer({ url: "app://renderer/desktop-login" });
+  assert.equal(loginPage.status, 200);
+  const settingsPage = await serveRenderer({
+    url: "app://renderer/desktop-settings/",
+  });
+  assert.equal(settingsPage.status, 200);
+  const companionPage = await serveRenderer({
+    url: "app://renderer/desktop-companion/",
+  });
+  assert.equal(companionPage.status, 200);
+  const unknownPage = await serveRenderer({
+    url: "app://untrusted/unknown.html",
+  });
+  assert.equal(unknownPage.status, 404);
+  const extensionlessPage = await serveRenderer({
+    url: "app://renderer/missing-route",
+  });
+  assert.equal(extensionlessPage.status, 200);
+  const rendererIndex = await serveRenderer({ url: "app://renderer/" });
+  assert.equal(rendererIndex.status, 200);
+  const trailingSlashPage = await serveRenderer({
+    url: "app://renderer/missing-route/",
+  });
+  assert.equal(trailingSlashPage.status, 200);
+  const directoryFallback = await serveRenderer({ url: "app://renderer/404/" });
+  assert.equal(directoryFallback.status, 200);
+  const traversalPage = await serveRenderer({
+    url: "app://renderer/%2e%2e%2f..%2foutside.html",
+  });
+  assert.equal(traversalPage.status, 404);
+  assert.ok(
+    writtenDesktopPreferences.some(
+      ({ globalShortcut }) => globalShortcut === "Control+Space",
+    ),
+    "an unavailable requested shortcut should persist its fallback",
+  );
+  shortcutRegistration = { registered: true, accelerator: "Alt+Space" };
   assert.equal(menuLogoutItem.visible, false);
   assert.equal(runtimeDependencies.getOs(), process.platform);
   assert.deepEqual(mainWindowDependencies.state, {
@@ -430,6 +505,22 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   assert.equal(appearanceDependencies.getLanguageMode(), "tr");
   appearanceDependencies.applyTheme("dark");
   assert.equal(appearanceDependencies.getTheme(), "dark");
+  desktopLocale = "tr-TR";
+  await appearanceDependencies.applyLanguage("system");
+  assert.equal(appearanceDependencies.getLanguage(), "tr");
+  desktopLocale = "en-US";
+  await appearanceDependencies.applyLanguage("system");
+  assert.equal(appearanceDependencies.getLanguage(), "en");
+  appearanceDependencies.applyTheme("system");
+  assert.equal(appearanceDependencies.getTheme(), "system");
+  await appearanceDependencies.applyLanguage("tr");
+  const destroyedWindow = new FakeWindow();
+  windows.push(destroyedWindow);
+  destroyedWindow.destroyed = true;
+  electron.nativeTheme.shouldUseDarkColors = true;
+  themeUpdatedListener();
+  assert.equal(windowMock.backgroundColor, "#000");
+  destroyedWindow.destroyed = false;
   appearanceDependencies.persistTheme("light");
   await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(
@@ -482,6 +573,29 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   assert.deepEqual(await apiDependencies.readSession("admin"), validTokens);
   await apiDependencies.clearSession("admin");
   assert.equal(await apiDependencies.readSession("admin"), null);
+  const completeTokens = {
+    ...validTokens,
+    idToken: "stored-id-token",
+    refreshToken: "stored-refresh-token",
+  };
+  await apiDependencies.writeSession("account", completeTokens);
+  assert.deepEqual(await apiDependencies.readSession("account"), completeTokens);
+  await apiDependencies.clearSession("account");
+  await apiDependencies.writeSession("admin", { ...validTokens, idToken: 7 });
+  await assert.rejects(apiDependencies.readSession("admin"), /Invalid session/);
+  await authDependencies.writeVault({});
+  await apiDependencies.writeSession("admin", validTokens);
+  await apiDependencies.writeSession("admin", {
+    ...validTokens,
+    refreshToken: 7,
+  });
+  await assert.rejects(apiDependencies.readSession("admin"), /Invalid session/);
+  await authDependencies.writeVault({});
+  const originalEncryptionAvailability = electron.safeStorage.isEncryptionAvailable;
+  electron.safeStorage.isEncryptionAvailable = () => false;
+  assert.equal(runtimeDependencies.isSecureStorageAvailable(), false);
+  await assert.rejects(apiDependencies.readSession("admin"), /Secure desktop storage/);
+  electron.safeStorage.isEncryptionAvailable = originalEncryptionAvailability;
   await assert.rejects(
     authDependencies.startNativeSocialLink("GitHub"),
     /Invalid social provider/,
@@ -490,6 +604,16 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   const githubStart = apiRequests.at(-1);
   assert.equal(githubStart.path, "/api/account/social-links/github/desktop/start");
   assert.ok(externalUrls.at(-1).includes("/account/social-links/github/desktop/authorize"));
+  handlers.onOpenUrl(
+    { preventDefault() {} },
+    `kitezh://social-link/callback?state=${githubStart.body.state}&code=github-link-code`,
+  );
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (windowMock.messages.some(([channel, payload]) =>
+      channel === "desktop:social-link-callback" && payload.provider === "github",
+    )) break;
+  }
 
   await handlers.onSecondInstance({}, ["kitezh://oauth/callback"]);
   let prevented = false;
@@ -498,6 +622,17 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   const socialStart = await authDependencies.startNativeSocialLink("google");
   assert.equal(socialStart.status, 202);
   const googleState = apiRequests.at(-1).body.state;
+  handlers.onOpenUrl({ preventDefault() {} }, "https://example.test/not-a-callback");
+  handlers.onOpenUrl(
+    { preventDefault() {} },
+    "kitezh://social-link/callback?state=unknown-state&code=ignored-code",
+  );
+  assert.equal(
+    windowMock.messages.some(([channel, payload]) =>
+      channel === "desktop:social-link-callback" && payload.provider === "google",
+    ),
+    false,
+  );
   handlers.onOpenUrl(
     { preventDefault() {} },
     `kitezh://social-link/callback?state=${googleState}&code=link-code`,
@@ -510,6 +645,45 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
     channel === "desktop:social-link-callback" && payload.provider === "google" && !payload.error,
   ));
   assert.ok(apiRequests.some(({ path }) => path === "/api/account/social-links/desktop/complete"));
+  socialCompleteResponse = { status: 403, kind: null, body: null };
+  const rejectedSocialStart = await authDependencies.startNativeSocialLink("github");
+  const rejectedSocialState = apiRequests.at(-1).body.state;
+  handlers.onOpenUrl(
+    { preventDefault() {} },
+    `kitezh://social-link/callback?state=${rejectedSocialState}&code=denied-code`,
+  );
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (windowMock.messages.some(([channel, payload]) =>
+      channel === "desktop:social-link-callback" && payload.provider === "github",
+    )) break;
+  }
+  assert.equal(rejectedSocialStart.status, 202);
+  assert.ok(windowMock.messages.some(([channel, payload]) =>
+    channel === "desktop:social-link-callback" &&
+    payload.provider === "github" &&
+    payload.error === "link_failed",
+  ));
+  socialCompleteResponse = { status: 503, kind: "upstream_timeout", body: null };
+  const delayedSocialStart = await authDependencies.startNativeSocialLink("linkedin");
+  const delayedSocialState = apiRequests.at(-1).body.state;
+  handlers.onOpenUrl(
+    { preventDefault() {} },
+    `kitezh://social-link/callback?state=${delayedSocialState}&code=delayed-code`,
+  );
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (windowMock.messages.some(([channel, payload]) =>
+      channel === "desktop:social-link-callback" && payload.provider === "linkedin",
+    )) break;
+  }
+  assert.equal(delayedSocialStart.status, 202);
+  assert.ok(windowMock.messages.some(([channel, payload]) =>
+    channel === "desktop:social-link-callback" &&
+    payload.provider === "linkedin" &&
+    payload.error === "upstream_timeout",
+  ));
+  socialCompleteResponse = { status: 201, body: null };
   const failedSocialStart = await authDependencies.startNativeSocialLink("microsoft");
   const failedSocialState = apiRequests.at(-1).body.state;
   handlers.onOpenUrl(
@@ -539,6 +713,26 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
     channel === "desktop:auth-callback" &&
       payload.console === "account" &&
       payload.error === "access_denied",
+  ));
+  const missingCodeAuthorization = authDependencies.createAuthorizationRequest("account");
+  authDependencies.pendingAuthorizations.set("account", missingCodeAuthorization.pending);
+  await authDependencies.persistPendingAuthorizations();
+  handlers.onOpenUrl(
+    { preventDefault() {} },
+    `kitezh://oauth/callback?state=${missingCodeAuthorization.pending.state}`,
+  );
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (windowMock.messages.some(([channel, payload]) =>
+      channel === "desktop:auth-callback" &&
+      payload.console === "account" &&
+      payload.error === "authorization_failed",
+    )) break;
+  }
+  assert.ok(windowMock.messages.some(([channel, payload]) =>
+    channel === "desktop:auth-callback" &&
+    payload.console === "account" &&
+    payload.error === "authorization_failed",
   ));
 
   const originalExchange = imports["./security/auth-flow"].exchangeAuthorizationCode;
@@ -703,6 +897,10 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   }
   assert.ok(companion);
   assert.equal(companion.options.x, 100);
+  await appearanceDependencies.applyLanguage("tr");
+  assert.equal(companion.title, "Hızlı erişim");
+  await appearanceDependencies.applyLanguage("en");
+  assert.equal(companion.title, "Quick access");
   menuActions.quickAccess();
   assert.equal(companion.visible, false);
   menuActions.quickAccess();

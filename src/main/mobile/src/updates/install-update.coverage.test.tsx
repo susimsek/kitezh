@@ -20,13 +20,12 @@ const asset = {
   name: "kitezh-1.3.0-android.apk",
   url: "https://github.com/susimsek/kitezh/releases/download/v1.3.0/kitezh.apk",
 };
-const mockFileSystem = jest.requireMock("expo-file-system/legacy") as {
-  cacheDirectory: string | null;
-};
-
 beforeEach(() => {
   jest.clearAllMocks();
-  mockFileSystem.cacheDirectory = "/cache/";
+  Object.defineProperty(FileSystem, "cacheDirectory", {
+    configurable: true,
+    value: "/cache/",
+  });
   jest.mocked(FileSystem.getContentUriAsync).mockResolvedValue("content://apk");
   jest.mocked(startActivityAsync).mockResolvedValue(undefined);
 });
@@ -51,6 +50,18 @@ it("opens a non-empty cached APK without downloading it again", async () => {
       type: "application/vnd.android.package-archive",
     }),
   );
+});
+
+it("fails clearly when the platform does not provide a cache directory", async () => {
+  Object.defineProperty(FileSystem, "cacheDirectory", {
+    configurable: true,
+    value: null,
+  });
+
+  await expect(downloadAndOpenAndroidUpdate(asset, jest.fn())).rejects.toThrow(
+    "App cache directory is unavailable",
+  );
+  expect(FileSystem.getInfoAsync).not.toHaveBeenCalled();
 });
 
 it("downloads the APK, reports bounded progress, and moves it into the cache", async () => {
@@ -136,4 +147,57 @@ it("opens Android settings when the package installer requires permission", asyn
     ActivityAction.MANAGE_UNKNOWN_APP_SOURCES,
     { data: "package:io.github.susimsek.kitezh.mobile" },
   );
+});
+
+it("deletes an empty cached artifact before downloading a fresh APK", async () => {
+  jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+    exists: true,
+    size: 0,
+    isDirectory: false,
+    uri: "/cache/kitezh-1.3.0-android.apk",
+    modificationTime: 0,
+  });
+  jest.mocked(FileSystem.createDownloadResumable).mockImplementation((
+    (_url, _path, _options, _progress) => ({
+      downloadAsync: async () => ({ status: 200, uri: "/cache/fresh.apk" }),
+    }) as never
+  ) as typeof FileSystem.createDownloadResumable);
+
+  await expect(downloadAndOpenAndroidUpdate(asset, jest.fn())).resolves.toBe(
+    "installer-opened",
+  );
+  expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+    "/cache/kitezh-1.3.0-android.apk",
+    { idempotent: true },
+  );
+  expect(FileSystem.moveAsync).toHaveBeenCalledWith({
+    from: "/cache/fresh.apk",
+    to: "/cache/kitezh-1.3.0-android.apk",
+  });
+});
+
+it("re-downloads a cached artifact whose size cannot be verified", async () => {
+  jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+    exists: true,
+    isDirectory: false,
+    uri: "/cache/kitezh-1.3.0-android.apk",
+    modificationTime: 0,
+  });
+  jest.mocked(FileSystem.createDownloadResumable).mockImplementation((
+    (_url, _path, _options, _progress) => ({
+      downloadAsync: async () => ({ status: 200, uri: "/cache/verified.apk" }),
+    }) as never
+  ) as typeof FileSystem.createDownloadResumable);
+
+  await expect(downloadAndOpenAndroidUpdate(asset, jest.fn())).resolves.toBe(
+    "installer-opened",
+  );
+  expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+    "/cache/kitezh-1.3.0-android.apk",
+    { idempotent: true },
+  );
+  expect(FileSystem.moveAsync).toHaveBeenCalledWith({
+    from: "/cache/verified.apk",
+    to: "/cache/kitezh-1.3.0-android.apk",
+  });
 });

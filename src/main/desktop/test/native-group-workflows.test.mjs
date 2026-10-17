@@ -114,6 +114,78 @@ test("native group detail saves roles and validates then saves permissions", asy
   }
 });
 
+test("native group permission loading retries either failed dependency", async () => {
+  const harness = await renderConsole("admin");
+  let permissionFailures = 1;
+  let userFailures = 0;
+  try {
+    const { calls, document } = harness;
+    harness.setResponse("/api/admin/groups/3", "GET", () => ({
+      id: 3,
+      name: "Engineering",
+      path: "/Engineering",
+      roles: [],
+    }));
+    harness.setResponse("/api/admin/groups/3/permissions", "GET", () => {
+      if (permissionFailures-- > 0)
+        return { status: 503, body: { detail: "temporary permission failure" } };
+      return [{ userId: 1, username: "ada", permission: "VIEW" }];
+    });
+    harness.setResponse(
+      "/api/admin/users?page=0&size=100&sort=username,asc",
+      "GET",
+      () => {
+        if (userFailures-- > 0)
+          return { status: 503, body: { detail: "temporary user lookup failure" } };
+        return { content: [{ id: 1, username: "ada" }] };
+      },
+    );
+
+    await openAdminGroups(harness);
+    document.querySelector('[data-action="group-open"][data-id="3"]').click();
+    await settle();
+    const permissionsTab = () =>
+      document.querySelector('[data-action="group-tab"][data-id="permissions"]');
+    permissionsTab().click();
+    await settle();
+    assert.ok(
+      document.querySelector('.notice.error [data-action="retry"]'),
+      "permission lookup failure should expose retry",
+    );
+    assert.equal(
+      calls.filter(({ path }) => path === "/api/admin/groups/3/permissions").length,
+      1,
+    );
+
+    document.querySelector('[data-action="retry"]').click();
+    await settle();
+    assert.ok(document.querySelector('[data-permission-index="0"]'));
+    assert.equal(
+      calls.filter(({ path }) => path === "/api/admin/groups/3/permissions").length,
+      2,
+    );
+
+    document.querySelector('[data-action="group-tab"][data-id="roles"]').click();
+    await settle();
+    userFailures = 1;
+    permissionsTab().click();
+    await settle();
+    assert.ok(document.querySelector('.notice.error [data-action="retry"]'));
+    document.querySelector('[data-action="retry"]').click();
+    await settle();
+    assert.ok(document.querySelector('[data-permission-index="0"]'));
+    assert.equal(
+      calls.filter(
+        ({ path }) =>
+          path === "/api/admin/users?page=0&size=100&sort=username,asc",
+      ).length,
+      4,
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native group creation rejects invalid attributes and submits valid group data", async () => {
   const harness = await renderConsole("admin");
   try {

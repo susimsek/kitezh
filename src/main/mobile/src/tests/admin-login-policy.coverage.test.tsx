@@ -148,3 +148,35 @@ test("shows forbidden state and allows retry after a failed load", async () => {
   expect(await screen.findByText("adminLoginPolicy")).toBeTruthy();
   expect(adminApi.getNativeAdminLoginSettings).toHaveBeenCalledTimes(2);
 });
+
+test.each([
+  [new adminApi.AdminApiError(401), "apiUnauthorized"],
+  [new adminApi.AdminApiError(0, "offline"), "apiOffline"],
+  [new adminApi.AdminApiError(0, "timeout"), "apiTimeout"],
+  [new Error("unexpected"), "adminLoadError"],
+])("renders a localized load failure for %s", async (error, message) => {
+  jest.mocked(adminApi.getNativeAdminLoginSettings).mockRejectedValueOnce(error);
+  render(<AdminLoginPolicySettings accessToken="access-token" canManage />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  fireEvent.press(screen.getByTestId("admin-login-policy-retry"));
+  expect(await screen.findByText("adminLoginPolicy")).toBeTruthy();
+});
+
+test("reports forbidden save failures and permits a subsequent save", async () => {
+  jest
+    .mocked(adminApi.updateNativeAdminLoginSettings)
+    .mockRejectedValueOnce(new adminApi.AdminApiError(403));
+  render(<AdminLoginPolicySettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-login-policy-save"));
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "adminForbidden",
+    });
+  });
+
+  fireEvent.press(screen.getByTestId("admin-login-policy-save"));
+  await waitFor(() => expect(adminApi.updateNativeAdminLoginSettings).toHaveBeenCalledTimes(2));
+});

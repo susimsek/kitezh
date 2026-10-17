@@ -413,6 +413,32 @@ test("permissions add validates a blank row, save and remove sends complete assi
   }
 });
 
+test("group permissions recover when the user directory is temporarily unavailable", async () => {
+  let unavailable = true;
+  const h = await harness({
+    response: (path) =>
+      path.startsWith("/api/admin/users?") && unavailable
+        ? { status: 503, kind: "server", body: null }
+        : undefined,
+  });
+  try {
+    await open(h, "permissions");
+    assert.ok(h.document.querySelector('[data-action="retry"]'));
+    assert.match(
+      h.document.querySelector(".content").textContent,
+      /operation could not be completed/i,
+    );
+    unavailable = false;
+    await click(h, '[data-action="retry"]');
+    assert.ok(
+      h.document.querySelector('[data-form="native-group-permissions"]'),
+    );
+    assert.ok(h.calls.some(({ path }) => path.startsWith("/api/admin/users?")));
+  } finally {
+    h.restore();
+  }
+});
+
 test("role mappings load sorted realm roles and save group response", async () => {
   const h = await harness();
   try {

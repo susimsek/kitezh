@@ -5,12 +5,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.kitezh.domain.AuthorityEntity;
+import io.github.susimsek.kitezh.domain.GroupEntity;
+import io.github.susimsek.kitezh.domain.SocialIdentityEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderMapperEntity;
 import io.github.susimsek.kitezh.domain.UserEntity;
+import io.github.susimsek.kitezh.repository.AuthorityRepository;
+import io.github.susimsek.kitezh.repository.GroupRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderMapperRepository;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +27,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class SocialIdentityMapperServiceTest {
 
+    @Mock private AuthorityRepository authorityRepository;
+    @Mock private GroupRepository groupRepository;
     @Mock private SocialProviderMapperRepository mapperRepository;
     @Mock private UserProfileService userProfileService;
 
@@ -281,6 +290,60 @@ class SocialIdentityMapperServiceTest {
     }
 
     @Test
+    void replacesOnlyPreviouslySyncedRolesAndGroupsForLinkedUser() {
+        SocialProviderMapperEntity role = mapper("role", "ROLE_ADMIN", "force");
+        role.setMapperType("role");
+        SocialProviderMapperEntity group = mapper("team", "Support", "force");
+        group.setMapperType("group");
+        SocialProviderMapperEntity missingRole = mapper("missingRole", "ROLE_MISSING", "force");
+        missingRole.setMapperType("role");
+        SocialProviderMapperEntity unmatchedGroup = mapper("team", "Operations", "force");
+        unmatchedGroup.setMapperType("group");
+        when(mapperRepository.findAllByProviderAliasIgnoreCase("google"))
+                .thenReturn(List.of(role, group, missingRole, unmatchedGroup));
+
+        AuthorityEntity mappedRole = new AuthorityEntity(3L, "ROLE_ADMIN");
+        when(authorityRepository.findByName("ROLE_ADMIN")).thenReturn(Optional.of(mappedRole));
+        when(authorityRepository.findByName("ROLE_MISSING")).thenReturn(Optional.empty());
+        GroupEntity previousGroup = new GroupEntity();
+        previousGroup.setName("OldGroup");
+        GroupEntity manualGroup = new GroupEntity();
+        manualGroup.setName("ManualGroup");
+        GroupEntity mappedGroup = new GroupEntity();
+        mappedGroup.setName("Support");
+        when(groupRepository.findByNameIgnoreCase("Support")).thenReturn(Optional.of(mappedGroup));
+
+        AuthorityEntity previousRole = new AuthorityEntity(1L, "ROLE_OLD");
+        AuthorityEntity manualRole = new AuthorityEntity(2L, "ROLE_MANUAL");
+        UserEntity user = new UserEntity();
+        user.getAuthorities().addAll(Set.of(previousRole, manualRole));
+        user.getGroups().addAll(Set.of(previousGroup, manualGroup));
+        SocialIdentityEntity identity = new SocialIdentityEntity("google", "subject", user);
+        identity.setSyncedRoleNames(new HashSet<>(Set.of("role_old")));
+        identity.setSyncedGroupNames(new HashSet<>(Set.of("oldgroup")));
+
+        serviceWithAuthorizationRepositories()
+                .apply(
+                        "google",
+                        Map.of(
+                                "role", "ROLE_ADMIN",
+                                "team", "Support",
+                                "missingRole", "ROLE_MISSING"),
+                        user,
+                        false,
+                        false,
+                        "force",
+                        identity);
+
+        assertThat(user.getAuthorities()).containsExactlyInAnyOrder(manualRole, mappedRole);
+        assertThat(user.getGroups()).containsExactlyInAnyOrder(manualGroup, mappedGroup);
+        assertThat(identity.getSyncedRoleNames()).containsExactly("ROLE_ADMIN");
+        assertThat(identity.getSyncedGroupNames()).containsExactly("Support");
+        verify(groupRepository, never()).findByNameIgnoreCase("Operations");
+        verify(userProfileService, never()).saveMappedUser(user, false);
+    }
+
+    @Test
     void coversMapperValueAndBuiltInValidationBoundaries() {
         SocialProviderMapperEntity blankSource = mapper(" ", "department", "force");
         SocialProviderMapperEntity scalarNested = mapper("profile.roles", "roles", "force");
@@ -322,6 +385,11 @@ class SocialIdentityMapperServiceTest {
 
     private SocialIdentityMapperService service() {
         return new SocialIdentityMapperService(mapperRepository, userProfileService);
+    }
+
+    private SocialIdentityMapperService serviceWithAuthorizationRepositories() {
+        return new SocialIdentityMapperService(
+                mapperRepository, userProfileService, authorityRepository, groupRepository);
     }
 
     private static SocialProviderMapperEntity mapper(

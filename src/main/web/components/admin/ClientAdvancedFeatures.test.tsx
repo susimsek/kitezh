@@ -128,6 +128,43 @@ it("uses the standard audience claim for an audience mapper", async () => {
   );
 });
 
+it("validates mapper source, claim name, and token target before saving", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockResolvedValue({
+    status: 200,
+    data: { content: [], totalPages: 0, totalElements: 0 },
+  } as never);
+
+  render(<ClientMappers clientId="client-1" dictionary={en} />);
+  await screen.findByText(en.admin.clients.mappers.empty);
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.type), {
+    target: { value: "user-attribute" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.name), {
+    target: { value: "Invalid mapper" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.source), {
+    target: { value: "" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.claimName), {
+    target: { value: "" },
+  });
+  const accessTokenSwitch = screen
+    .getByText(en.admin.clients.mappers.accessToken)
+    .parentElement?.querySelector("input");
+  if (!accessTokenSwitch) throw new Error("Access-token switch was not rendered");
+  fireEvent.click(accessTokenSwitch);
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  expect(await screen.findByText(en.admin.clients.mappers.sourceRequired)).toBeVisible();
+  expect(screen.getByText(en.admin.common.validation.required)).toBeVisible();
+  expect(screen.getByText(en.admin.clients.mappers.targetRequired)).toBeVisible();
+  expect(request).not.toHaveBeenCalledWith(
+    "admin-token",
+    expect.objectContaining({ method: "POST" }),
+  );
+});
+
 it("evaluates requested scopes and renders the preview", async () => {
   const request = jest.mocked(adminRequest);
   request.mockResolvedValue({

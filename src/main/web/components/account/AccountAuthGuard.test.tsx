@@ -13,6 +13,7 @@ const mockRefreshAccessToken = jest.fn().mockResolvedValue("new-token");
 const mockSetUsername = jest.fn();
 const mockRouterReplace = jest.fn();
 let pathname = "/account/applications";
+let searchParams = new URLSearchParams();
 let auth = {
   accessToken: "token" as string | null,
   beginAuthorization: mockBeginAuthorization,
@@ -30,7 +31,7 @@ jest.mock("@/lib/account-api", () => ({
 jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
   usePathname: () => pathname,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
   useRouter: () => ({ replace: mockRouterReplace }),
 }));
 jest.mock("./AccountAuthProvider", () => ({ useAccountAuth: () => auth }));
@@ -39,6 +40,7 @@ describe("AccountAuthGuard", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     pathname = "/account/applications";
+    searchParams = new URLSearchParams();
     auth = {
       accessToken: "token",
       beginAuthorization: mockBeginAuthorization,
@@ -80,5 +82,29 @@ describe("AccountAuthGuard", () => {
       expect(mockRouterReplace).toHaveBeenCalledWith("/auth-error?type=server_error"),
     );
     expect(screen.queryByText("Account")).not.toBeInTheDocument();
+  });
+
+  it("does not authorize a profile response that requires reauthentication", async () => {
+    mockAccountRequest.mockResolvedValueOnce({ status: 401, data: null } as never);
+
+    render(<AccountAuthGuard locale="en">Account</AccountAuthGuard>);
+
+    await waitFor(() => expect(mockAccountRequest).toHaveBeenCalled());
+    expect(screen.queryByText("Account")).not.toBeInTheDocument();
+    expect(mockSetUsername).not.toHaveBeenCalled();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
+  it("renders callback content without making a profile request", () => {
+    pathname = "/en/account/callback/";
+
+    render(
+      <AccountAuthGuard locale="en" callbackContent={<div>Callback complete</div>}>
+        Account
+      </AccountAuthGuard>,
+    );
+
+    expect(screen.getByText("Callback complete")).toBeVisible();
+    expect(mockAccountRequest).not.toHaveBeenCalled();
   });
 });

@@ -74,17 +74,22 @@ jest.mock("@/auth/MobileAuthProvider", () => {
   const session = { accessToken: "test-access-token" };
   const mockSignOut = jest.fn();
   const mockRefreshSession = jest.fn(async () => session);
+  const mockAuthState = {
+    session,
+    signIn: jest.fn(),
+    signOut: mockSignOut,
+    status: mockMobileAuthStatus,
+    refreshSession: mockRefreshSession,
+  };
   return {
     MobileAuthProvider: ({ children }: { children: React.ReactNode }) =>
       children,
     mockSignOut,
     mockRefreshSession,
+    mockAuthState,
     useMobileAuth: jest.fn(() => ({
-      session,
-      signIn: jest.fn(),
-      signOut: mockSignOut,
+      ...mockAuthState,
       status: mockMobileAuthStatus,
-      refreshSession: mockRefreshSession,
     })),
   };
 });
@@ -131,7 +136,7 @@ jest.mock("expo-web-browser", () => ({
   })),
 }));
 
-const { mockRefreshSession, mockSignOut } = jest.requireMock(
+const { mockAuthState, mockRefreshSession, mockSignOut } = jest.requireMock(
   "@/auth/MobileAuthProvider",
 );
 const { mockShowNotice } = jest.requireMock(
@@ -142,11 +147,29 @@ beforeEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
   mockRefreshSession.mockResolvedValue({ accessToken: "test-access-token" });
+  mockAuthState.session = { accessToken: "test-access-token" };
   jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([]);
   mockMobileAuthStatus = "signed-in";
 });
 
 afterEach(() => jest.useRealTimers());
+
+it("waits for auth restoration before redirecting a signed-out security screen", async () => {
+  const { router } = jest.requireMock("expo-router");
+  mockAuthState.session = null;
+  mockMobileAuthStatus = "loading";
+
+  const screenResult = render(<SecurityScreen />);
+  expect(await screen.findByLabelText("loading")).toBeTruthy();
+  expect(router.replace).not.toHaveBeenCalled();
+
+  mockMobileAuthStatus = "signed-out";
+  screenResult.rerender(<SecurityScreen />);
+
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/sign-in"));
+  expect(accountApi.listAccountSessions).not.toHaveBeenCalled();
+  expect(accountApi.listPersonalAccessTokens).not.toHaveBeenCalled();
+});
 
 it("validates, updates, and confirms active-account session security actions", async () => {
   jest.mocked(accountApi.listAccountSessions).mockResolvedValue({
@@ -290,6 +313,16 @@ it("validates a required token name and custom expiration date", async () => {
   });
   fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
   expect(await screen.findByText("personalAccessTokenCustomDateInvalid")).toBeTruthy();
+
+  const customDate = screen.getByTestId("personalAccessTokenCustomDate");
+  const today = new Date().toISOString().slice(0, 10);
+  const outsideMaximum = new Date(`${today}T00:00:00.000Z`);
+  outsideMaximum.setUTCFullYear(outsideMaximum.getUTCFullYear() + 2);
+  for (const invalidDate of ["not-a-date", today, outsideMaximum.toISOString().slice(0, 10)]) {
+    fireEvent.changeText(customDate, { target: { value: invalidDate } });
+    fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenCreate" }));
+    expect(await screen.findByText("personalAccessTokenCustomDateInvalid")).toBeTruthy();
+  }
   expect(accountApi.createPersonalAccessToken).not.toHaveBeenCalled();
 });
 
@@ -395,7 +428,9 @@ it("shows a recoverable error when a personal access token cannot be revoked", a
     createdAt: "2026-10-17T10:00:00Z",
     expiresAt: null,
   };
-  jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([token]);
+  jest
+    .mocked(accountApi.listPersonalAccessTokens)
+    .mockResolvedValueOnce([token]);
   jest
     .mocked(accountApi.revokePersonalAccessToken)
     .mockRejectedValueOnce(new Error("revoke failed"));
@@ -414,6 +449,41 @@ it("shows a recoverable error when a personal access token cannot be revoked", a
     kind: "error",
     message: "personalAccessTokenRevokeError",
   });
+});
+
+it("shows the in-progress state while a personal access token is being revoked", async () => {
+  const token = {
+    id: "pat-revoke-pending",
+    name: "Pending revoke",
+    description: null,
+    scope: "mcp.read",
+    createdAt: "2026-10-17T10:00:00Z",
+    expiresAt: "2027-01-01T00:00:00Z",
+  };
+  let finishRevoke!: () => void;
+  jest
+    .mocked(accountApi.listPersonalAccessTokens)
+    .mockResolvedValueOnce([token])
+    .mockResolvedValueOnce([]);
+  jest.mocked(accountApi.revokePersonalAccessToken).mockReturnValue(
+    new Promise<void>((resolve) => {
+      finishRevoke = resolve;
+    }),
+  );
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("Pending revoke")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "personalAccessTokenRevoke" }));
+  const actions = alert.mock.calls.at(-1)?.[2];
+  await act(async () => {
+    actions?.find((action) => action.style === "destructive")?.onPress?.();
+  });
+
+  expect(await screen.findByLabelText("loading")).toBeTruthy();
+  expect(screen.getByTestId("pat-revoke").props.accessibilityState.disabled).toBe(true);
+  await act(async () => finishRevoke());
+  expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
 });
 
 it("rejects short, mismatched, and reused passwords before calling the API", async () => {
@@ -941,6 +1011,30 @@ it("maps legacy password validation data to the matching security fields", async
   expect(screen.queryByText("passwordSaveError")).toBeNull();
 });
 
+it("falls back to a generic password error for malformed validation data", async () => {
+  const malformedError = Object.assign(new accountApi.AccountApiError(), {
+    data: { violations: "unexpected-server-shape" },
+  });
+  jest
+    .mocked(accountApi.changeAccountPassword)
+    .mockRejectedValueOnce(malformedError);
+
+  render(<SecurityScreen />);
+  await screen.findByText("sessionsEmpty");
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+    target: { value: "old-secret" },
+  });
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+
+  expect(await screen.findByText("passwordSaveError")).toBeTruthy();
+});
+
 it("keeps security actions safe when the session expires before submission", async () => {
   jest.mocked(accountApi.listAccountSessions).mockResolvedValue({
     content: [
@@ -1145,6 +1239,64 @@ it("pages active sessions with a single in-flight request", async () => {
   expect(accountApi.listAccountSessions.mock.calls[1]?.[1]).toEqual(
     expect.objectContaining({ page: 1 }),
   );
+});
+
+it("returns to the last valid page when the account session list shrinks", async () => {
+  jest
+    .mocked(accountApi.listAccountSessions)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "session-page-one",
+          createdAt: "2026-01-01T10:00:00Z",
+          lastAccessedAt: "2026-01-02T10:00:00Z",
+          expiresAt: "2026-02-01T10:00:00Z",
+          current: false,
+          clients: [{ clientId: "web", clientName: "Last valid session" }],
+        },
+      ],
+      totalElements: 21,
+      totalPages: 2,
+      number: 0,
+      size: 20,
+    })
+    .mockResolvedValueOnce({
+      content: [],
+      totalElements: 0,
+      totalPages: 1,
+      number: 1,
+      size: 20,
+    })
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "session-page-one",
+          createdAt: "2026-01-01T10:00:00Z",
+          lastAccessedAt: "2026-01-02T10:00:00Z",
+          expiresAt: "2026-02-01T10:00:00Z",
+          current: false,
+          clients: [{ clientId: "web", clientName: "Last valid session" }],
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 20,
+    });
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("Last valid session")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "accountNextPage" }));
+
+  await waitFor(() =>
+    expect(accountApi.listAccountSessions).toHaveBeenCalledTimes(3),
+  );
+  expect(accountApi.listAccountSessions.mock.calls.map((call) => call[1]?.page)).toEqual([
+    0,
+    1,
+    0,
+  ]);
+  expect(await screen.findByText("Last valid session")).toBeTruthy();
 });
 
 it("validates and completes native account registration", async () => {

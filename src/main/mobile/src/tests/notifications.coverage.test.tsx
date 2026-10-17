@@ -118,3 +118,58 @@ it("renders localized retry after a notification request fails", async () => {
   fireEvent.press(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("You have no notifications.")).toBeTruthy();
 });
+
+it("moves between notification pages and keeps navigation synchronized", async () => {
+  jest.mocked(listAccountNotifications).mockImplementation(async (_token, options) => ({
+    content: [{
+      id: `notice-${options?.page ?? 0}`,
+      messageKey: "notificationAccountPasswordChanged",
+      createdAt: "2026-10-17T10:00:00Z",
+      read: true,
+    }],
+    totalElements: 2,
+    totalPages: 2,
+    number: options?.page ?? 0,
+    size: 1,
+  }));
+
+  renderNotifications();
+  expect(await screen.findByText("1 / 2")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "Next" }));
+  expect(await screen.findByText("2 / 2")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "Previous" }));
+  expect(await screen.findByText("1 / 2")).toBeTruthy();
+  await waitFor(() => expect(listAccountNotifications).toHaveBeenLastCalledWith(
+    "access-token",
+    expect.objectContaining({ page: 0 }),
+  ));
+});
+
+it("reloads the last valid page if the server reports fewer pages", async () => {
+  jest.mocked(listAccountNotifications).mockImplementation(async (_token, options) => {
+    const requestedPage = options?.page ?? 0;
+    return {
+      content: [],
+      totalElements: 0,
+      totalPages: requestedPage === 1 ? 1 : 2,
+      number: requestedPage,
+      size: 20,
+    };
+  });
+  renderNotifications();
+  expect(await screen.findByText("1 / 2")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "Next" }));
+  await waitFor(() => expect(listAccountNotifications).toHaveBeenCalledTimes(3));
+  expect(listAccountNotifications.mock.calls.map(([, options]) => options?.page)).toEqual([0, 1, 0]);
+  expect(await screen.findByText("You have no notifications.")).toBeTruthy();
+});
+
+it("shows a retry state when marking a notification read fails", async () => {
+  jest.mocked(markAccountNotificationRead).mockRejectedValueOnce(new Error("offline"));
+  renderNotifications();
+
+  fireEvent.press(await screen.findByRole("button", { name: "Mark as read" }));
+  expect(await screen.findByText("We could not load notifications. Try again.")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("Unread notifications: 1")).toBeTruthy();
+});

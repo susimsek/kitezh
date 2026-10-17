@@ -3,11 +3,14 @@ import axios from "axios";
 
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useConsoleAuth } from "./console-auth";
+import { codeChallenge } from "./console-auth-crypto";
+import { isDesktopRuntime } from "./desktop-api";
 import {
   readAndRemoveTransaction,
   readPersistedTokens,
   removePersistedTokens,
   persistTokens,
+  storeTransaction,
 } from "./console-auth-storage";
 
 jest.mock("axios", () => ({
@@ -39,7 +42,7 @@ jest.mock("./console-auth-crypto", () => ({
 }));
 jest.mock("./desktop-api", () => ({
   apiUrl: (path: string) => path,
-  isDesktopRuntime: () => false,
+  isDesktopRuntime: jest.fn(() => false),
 }));
 jest.mock("./client-metadata", () => ({ getClientMetadataHeaders: () => ({}) }));
 
@@ -85,9 +88,25 @@ function storedTokens(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function useDesktopRuntime() {
+  const api = {
+    apiBaseUrl: "https://kitezh.example",
+    auth: {
+      getStorageStatus: jest.fn().mockResolvedValue("available"),
+      startLogin: jest.fn().mockResolvedValue(undefined),
+    },
+    onAuthCallback: jest.fn().mockReturnValue(jest.fn()),
+  };
+  Object.defineProperty(window, "desktopApi", { configurable: true, value: api });
+  (isDesktopRuntime as jest.Mock).mockReturnValue(true);
+  return api;
+}
+
 describe("useConsoleAuth token lifecycle", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Reflect.deleteProperty(window, "desktopApi");
+    (isDesktopRuntime as jest.Mock).mockReturnValue(false);
     (persistTokens as jest.MockedFunction<typeof persistTokens>).mockResolvedValue(undefined);
     (removePersistedTokens as jest.MockedFunction<typeof removePersistedTokens>).mockResolvedValue(
       undefined,
@@ -194,6 +213,15 @@ describe("useConsoleAuth token lifecycle", () => {
     );
   });
 
+  it("does not refresh when the restored session has no refresh token", async () => {
+    mockReadTokens.mockResolvedValueOnce(storedTokens({ refreshToken: null }));
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(persistTokens).toHaveBeenCalled());
+
+    await expect(result.current.refreshAccessToken(-1)).resolves.toBeNull();
+    expect(mockAxios.post).not.toHaveBeenCalled();
+  });
+
   it("exchanges a valid callback once and rejects missing or mismatched transactions", async () => {
     mockTransaction.mockReturnValueOnce({
       codeVerifier: "verifier",
@@ -224,5 +252,147 @@ describe("useConsoleAuth token lifecycle", () => {
     await expect(result.current.completeAuthorization("bad-code", "missing")).rejects.toThrow(
       "Missing authorization transaction",
     );
+  });
+
+  it("clears the local session when an authorization callback has the wrong nonce", async () => {
+    mockTransaction.mockReturnValueOnce({
+      codeVerifier: "verifier",
+      expires: Date.now() + 1000,
+      nonce: "expected-nonce",
+      redirectUri: "https://kitezh.example/en/callback",
+      returnTo: "/admin/users",
+      state: "state-1",
+    });
+    mockAxios.post.mockResolvedValueOnce({
+      data: tokenResponse({ id_token: jwt({ nonce: "unexpected-nonce", sub: "user-1" }) }),
+    } as never);
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+
+    await expect(result.current.completeAuthorization("auth-code", "state-1")).rejects.toThrow(
+      "Invalid nonce",
+    );
+    expect(removePersistedTokens).toHaveBeenCalledWith("admin");
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "auth/clearConsoleAuth",
+      payload: { console: "admin", loggingOut: false },
+    });
+  });
+
+  it("releases callback transaction state when the authorization-code exchange fails", async () => {
+    mockTransaction.mockReturnValueOnce({
+      codeVerifier: "verifier",
+      expires: Date.now() + 1000,
+      nonce: "nonce-1",
+      redirectUri: "https://kitezh.example/en/callback",
+      returnTo: "/admin/users",
+      state: "state-1",
+    });
+    mockAxios.post.mockRejectedValueOnce(new Error("token endpoint unavailable"));
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+
+    await expect(result.current.completeAuthorization("auth-code", "state-1")).rejects.toThrow(
+      "token endpoint unavailable",
+    );
+    expect(mockTransaction).toHaveBeenCalledWith(config, "state-1");
+  });
+
+  it("starts one PKCE authorization and stores the localized return path", async () => {
+    const desktopApi = useDesktopRuntime();
+    const authConfig = {
+      ...config,
+      desktopClientId: "desktop-client",
+      postLoginReturnToKey: "admin-return-to",
+    };
+    const { result } = renderHook(() => useConsoleAuth(authConfig, "admin"));
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.all([
+        result.current.beginAuthorization("tr", "/admin/users"),
+        result.current.beginAuthorization("tr", "/admin/users"),
+      ]);
+    });
+
+    expect(desktopApi.auth.startLogin).toHaveBeenCalledTimes(1);
+    expect(storeTransaction).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem("admin-return-to")).toBe("/admin/users");
+    const authorizationUrl = new URL(desktopApi.auth.startLogin.mock.calls[0][0].authorizationUrl);
+    expect(authorizationUrl.pathname).toBe("/oauth2/authorize");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("desktop-client");
+    expect(authorizationUrl.searchParams.get("scope")).toBe("openid profile");
+    expect(authorizationUrl.searchParams.get("ui_locales")).toBe("tr");
+    expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("removes the saved authorization transaction when PKCE setup fails", async () => {
+    useDesktopRuntime();
+    (codeChallenge as jest.MockedFunction<typeof codeChallenge>).mockRejectedValueOnce(
+      new Error("crypto unavailable"),
+    );
+    const authConfig = { ...config, postLoginReturnToKey: "admin-return-to" };
+    const { result } = renderHook(() => useConsoleAuth(authConfig, "admin"));
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+    await expect(result.current.beginAuthorization("en", "/admin/users")).rejects.toThrow(
+      "crypto unavailable",
+    );
+    expect(mockTransaction).toHaveBeenCalledWith(authConfig, "random-value");
+    expect(sessionStorage.getItem("admin-return-to")).toBeNull();
+  });
+
+  it("rejects desktop authorization when secure token storage is unavailable", async () => {
+    const desktopApi = useDesktopRuntime();
+    desktopApi.auth.getStorageStatus.mockResolvedValueOnce("unavailable");
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+
+    await expect(result.current.beginAuthorization("en", "/admin/users")).rejects.toThrow(
+      "Secure desktop storage is unavailable",
+    );
+    expect(storeTransaction).not.toHaveBeenCalled();
+    expect(desktopApi.auth.startLogin).not.toHaveBeenCalled();
+  });
+
+  it("completes a desktop callback from the persisted token set", async () => {
+    useDesktopRuntime();
+    mockReadTokens.mockResolvedValue(storedTokens());
+    mockTransaction.mockReturnValueOnce({
+      codeVerifier: "verifier",
+      expires: Date.now() + 1000,
+      nonce: "nonce-1",
+      redirectUri: "kitezh://oauth/callback",
+      returnTo: "/admin/users",
+      state: "desktop-state",
+    });
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+
+    await expect(result.current.completeAuthorization("", "desktop-state")).resolves.toBe(
+      "/admin/users",
+    );
+    expect(mockAxios.post).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledWith(config, "desktop-state");
+  });
+
+  it("rejects a desktop callback when its persisted token set is missing", async () => {
+    useDesktopRuntime();
+    mockReadTokens.mockResolvedValue(null);
+    mockTransaction.mockReturnValueOnce({
+      codeVerifier: "verifier",
+      expires: Date.now() + 1000,
+      nonce: "nonce-1",
+      redirectUri: "kitezh://oauth/callback",
+      returnTo: "/admin/users",
+      state: "desktop-state",
+    });
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+
+    await expect(result.current.completeAuthorization("", "desktop-state")).rejects.toThrow(
+      "Missing desktop session",
+    );
+    expect(mockTransaction).toHaveBeenCalledWith(config, "desktop-state");
   });
 });

@@ -492,8 +492,67 @@ test("native Admin user details load profile, credential, role, and session acti
         enabled: true,
         builtIn: false,
       },
+      {
+        name: "contactEmail",
+        displayName: "Contact email",
+        type: "EMAIL",
+        enabled: true,
+        required: true,
+        minLength: 5,
+        maxLength: 120,
+        description: "Preferred work email",
+        builtIn: false,
+      },
+      {
+        name: "teamTags",
+        displayName: "Team tags",
+        type: "STRING",
+        enabled: true,
+        multivalued: true,
+        builtIn: false,
+      },
+      {
+        name: "activeEmployee",
+        displayName: "Active employee",
+        type: "BOOLEAN",
+        enabled: true,
+        builtIn: false,
+      },
+      {
+        name: "employeeNumber",
+        displayName: "Employee number",
+        type: "INTEGER",
+        enabled: true,
+        pattern: "[0-9]+",
+        builtIn: false,
+      },
+      {
+        name: "internalId",
+        type: "STRING",
+        enabled: true,
+        builtIn: true,
+      },
+      {
+        name: "disabledField",
+        type: "STRING",
+        enabled: false,
+        builtIn: false,
+      },
+      {
+        name: "legacyLabel",
+        displayName: "Legacy label",
+        type: "UNKNOWN",
+        enabled: true,
+        builtIn: false,
+      },
     ],
-    attributes: { department: ["Research"] },
+    attributes: {
+      department: ["Research"],
+      contactEmail: ["ada@example.test"],
+      teamTags: ["platform", "security"],
+      activeEmployee: ["true"],
+      employeeNumber: ["17"],
+    },
   }));
   setResponse("/api/admin/roles?page=0&size=100&sort=name,asc", "GET", () => ({
     content: [{ name: "ROLE_ADMIN" }, { name: "ROLE_USER" }],
@@ -663,6 +722,28 @@ test("native Admin user details load profile, credential, role, and session acti
     assert.equal(
       document.querySelector('[data-profile-attribute="department"]').value,
       "Research",
+    );
+    assert.equal(
+      document.querySelector('[data-profile-attribute="contactEmail"]').type,
+      "email",
+    );
+    assert.equal(
+      document.querySelector('[data-profile-attribute="teamTags"]').value,
+      "platform\nsecurity",
+    );
+    assert.equal(
+      document.querySelector('[data-profile-attribute="activeEmployee"]').value,
+      "true",
+    );
+    assert.equal(
+      document.querySelector('[data-profile-attribute="employeeNumber"]').type,
+      "number",
+    );
+    assert.equal(document.querySelector('[data-profile-attribute="internalId"]'), null);
+    assert.equal(document.querySelector('[data-profile-attribute="disabledField"]'), null);
+    assert.equal(
+      document.querySelector('[data-profile-attribute="legacyLabel"]').type,
+      "text",
     );
     const department = document.querySelector(
       '[data-profile-attribute="department"]',
@@ -1151,6 +1232,120 @@ test("native Admin user details load profile, credential, role, and session acti
     harness.restore();
   }
 });
+test("native Admin user detail remains read-only for a viewer across related tabs", async () => {
+  const access = {
+    isAdmin: false,
+    queryUsers: true,
+    viewUsers: true,
+    manageUsers: false,
+    viewRoles: true,
+    manageRoles: false,
+    queryGroups: true,
+    viewGroups: true,
+    manageGroups: false,
+    queryClients: false,
+    viewClients: false,
+    manageClients: false,
+    viewSessions: true,
+    manageSessions: false,
+    viewConsents: true,
+    manageConsents: false,
+    viewEvents: true,
+    manageEvents: false,
+    viewKeys: false,
+    manageKeys: false,
+  };
+  const user = {
+    id: 1,
+    username: "ada",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    email: "ada@example.test",
+    enabled: true,
+    locked: false,
+    emailVerified: true,
+    totpEnabled: false,
+    authorities: ["ROLE_USER"],
+    assignedRoles: ["ROLE_USER"],
+  };
+  const harness = await renderConsole("admin", {
+    response: async (path) => {
+      if (path === "/api/admin/whoami") return { access };
+      if (path === "/api/admin/users/1") return user;
+      if (path.startsWith("/api/admin/users/1/sessions"))
+        return {
+          content: [{ id: "session-1", username: "ada", active: true }],
+          number: 0,
+          totalPages: 1,
+          totalElements: 1,
+        };
+      if (path.startsWith("/api/admin/users/1/consents"))
+        return {
+          content: [{ clientId: "console-client", principalName: "ada", authorities: ["openid"] }],
+          number: 0,
+          totalPages: 1,
+          totalElements: 1,
+        };
+      return null;
+    },
+  });
+  const { document } = harness;
+  try {
+    await settle();
+    document.querySelector('[data-route="users"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-open"][data-id="1"]')
+      .click();
+    await settle();
+    assert.equal(
+      document.querySelector('[data-action="admin-user-detail-delete"]'),
+      null,
+    );
+    assert.equal(
+      document.querySelector('[data-action="admin-user-detail-toggle-enabled"]'),
+      null,
+    );
+
+    for (const tab of ["roles", "groups", "sessions", "consents", "events"]) {
+      document
+        .querySelector(`[data-action="admin-user-detail-tab"][data-tab="${tab}"]`)
+        .click();
+      await settle();
+      assert.equal(
+        document
+          .querySelector(
+            `[data-action="admin-user-detail-tab"][data-tab="${tab}"]`,
+          )
+          .classList.contains("is-active"),
+        true,
+      );
+      if (tab === "groups") {
+        assert.equal(document.querySelector("#admin-user-detail-group-search"), null);
+        assert.equal(document.querySelector(".admin-user-group-action-cell"), null);
+      } else if (tab === "sessions") {
+        assert.ok(document.querySelector(".admin-user-session-table.is-readonly"));
+        assert.equal(
+          document.querySelector('[data-action="admin-user-detail-revoke-all-sessions"]'),
+          null,
+        );
+      } else if (tab === "consents") {
+        assert.equal(
+          document.querySelector('[data-action="admin-user-detail-revoke-consent"]'),
+          null,
+        );
+      } else if (tab === "events") {
+        assert.equal(
+          document.querySelector('[data-action="admin-event-clear-request"]'),
+          null,
+        );
+      }
+    }
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native Admin credentials keep other panels available when passkeys fail to load", async () => {
   const harness = await renderConsole("admin");
   const { document, setResponse } = harness;
@@ -4398,6 +4593,120 @@ test("native Admin consent and offline-session revocation require confirmation",
     harness.restore();
   }
 });
+
+test("native Admin session collections preserve bounded pagination across list views", async () => {
+  const harness = await renderConsole("admin", {
+    response: async (path) => {
+      const url = new URL(path, "http://local");
+      const collection = [
+        "/api/admin/sessions",
+        "/api/admin/consents",
+        "/api/admin/offline-sessions",
+      ].find((candidate) => path.startsWith(`${candidate}?`));
+      if (!collection) return null;
+      const page = Number(url.searchParams.get("page") ?? 0);
+      const content =
+        collection === "/api/admin/sessions"
+          ? [{ id: `session-${page}`, username: "ada", active: true }]
+          : collection === "/api/admin/consents"
+            ? [{ clientId: "console-client", principalName: "ada", authorities: ["openid"] }]
+            : [{ id: `offline-session-${page}`, clientId: "console-client", username: "ada" }];
+      return { content, number: page, totalElements: 30, totalPages: 3 };
+    },
+  });
+  try {
+    const { calls, document } = harness;
+    const collections = [
+      {
+        route: "sessions",
+        selector: "[data-admin-session-page]",
+        size: "admin-session-size",
+        expectedSize: "50",
+      },
+      {
+        route: "consents",
+        selector: "[data-admin-consent-page]",
+        size: "admin-consent-size",
+        expectedSize: "50",
+      },
+      {
+        route: "offline-sessions",
+        selector: "[data-admin-offline-session-page]",
+      },
+    ];
+
+    for (const collection of collections) {
+      document.querySelector(`[data-route="${collection.route}"]`).click();
+      await settle();
+      const pageAttribute = collection.selector.slice(1, -1);
+      const nextPage = document.querySelector(
+        `[${pageAttribute}="1"]`,
+      );
+      assert.ok(nextPage, `${collection.route} should expose a next page`);
+      nextPage.click();
+      await settle();
+      assert.ok(
+        calls.some(
+          ({ path }) =>
+            path.startsWith(`/api/admin/${collection.route}?`) &&
+            new URL(path, "http://local").searchParams.get("page") === "1",
+        ),
+        `${collection.route} should request the selected page`,
+      );
+
+      if (collection.size) {
+        const size = document.getElementById(collection.size);
+        size.value = collection.expectedSize;
+        size.dispatchEvent(
+          new document.defaultView.Event("change", { bubbles: true }),
+        );
+        await settle();
+        assert.ok(
+          calls.some(
+            ({ path }) =>
+              path.startsWith(`/api/admin/${collection.route}?`) &&
+              new URL(path, "http://local").searchParams.get("size") ===
+                collection.expectedSize,
+          ),
+          `${collection.route} should request the selected page size`,
+        );
+      }
+
+      const pageTwo = document.querySelector(
+        `[${pageAttribute}="2"]`,
+      );
+      assert.ok(pageTwo, `${collection.route} should expose the last page`);
+      pageTwo.click();
+      await settle();
+      assert.ok(
+        calls.some(
+          ({ path }) =>
+            path.startsWith(`/api/admin/${collection.route}?`) &&
+            new URL(path, "http://local").searchParams.get("page") === "2",
+        ),
+        `${collection.route} should request the last page`,
+      );
+
+      for (const page of ["1", "0"]) {
+        const button = document.querySelector(`[${pageAttribute}="${page}"]`);
+        assert.ok(button, `${collection.route} should expose page ${page}`);
+        button.click();
+        await settle();
+        assert.ok(
+          calls.some(
+            ({ path }) =>
+              path.startsWith(`/api/admin/${collection.route}?`) &&
+              new URL(path, "http://local").searchParams.get("page") === page,
+          ),
+          `${collection.route} should request page ${page}`,
+        );
+      }
+    }
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native Admin signing-key rotation requires a second confirmation", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/keys/rotate", "POST", () => ({
