@@ -42,13 +42,12 @@ jobs:
             echo "release_sha=${RELEASE_SHA}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Verify main CI run for the tagged commit
+      - name: Find successful main CI run for the tagged commit
         id: ci
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
-          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
         run: |
           set -euo pipefail
           runs="$(curl --fail --silent --show-error \
@@ -56,44 +55,21 @@ jobs:
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
             "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${RELEASE_SHA}&per_page=100")"
-          completed_run="$(jq -er --arg sha "${RELEASE_SHA}" '
+          successful_run="$(jq -er --arg sha "${RELEASE_SHA}" '
             [.workflow_runs[] | select(
               .head_sha == $sha and
               .head_branch == "main" and
               .event == "push" and
-              .status == "completed"
+              .status == "completed" and
+              .conclusion == "success"
             )] | first // empty
           ' <<< "${runs}")" || {
-            echo "No completed main CI run exists for ${RELEASE_SHA}; refusing to publish the MCP image." >&2
+            echo "No successful main CI run exists for ${RELEASE_SHA}; refusing to publish the MCP image." >&2
             exit 1
           }
-          ci_run_id="$(jq -r '.id' <<< "${completed_run}")"
-          ci_conclusion="$(jq -r '.conclusion' <<< "${completed_run}")"
-
-          if [[ "${ci_conclusion}" == "success" ]]; then
-            echo "Verified successful CI run ${ci_run_id} for ${RELEASE_SHA}."
-          elif [[ "${RELEASE_TAG}" == "v0.1.5" && "${ci_conclusion}" == "failure" ]]; then
-            jobs="$(curl --fail --silent --show-error \
-              -H 'Accept: application/vnd.github+json' \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${ci_run_id}/jobs?per_page=100")"
-            jq -e '
-              ([.jobs[] | select(.status != "completed")] | length == 0) and
-              ([.jobs[] | select(.conclusion == "failure")] | length == 1) and
-              ([.jobs[] | select(.conclusion == "failure") | .name] == ["SonarCloud analysis"]) and
-              ([.jobs[] | select(.conclusion != "success" and .conclusion != "failure")] | length == 0)
-            ' <<< "${jobs}" >/dev/null || {
-              echo "The v0.1.5 exception applies only when SonarCloud analysis is the sole failed CI job; refusing to publish." >&2
-              exit 1
-            }
-            echo "Applying the one-time v0.1.5 exception: SonarCloud analysis is the only failed CI job in run ${ci_run_id}."
-          else
-            echo "Main CI run ${ci_run_id} concluded '${ci_conclusion}' for ${RELEASE_SHA}; refusing to publish the MCP image." >&2
-            exit 1
-          fi
-
+          ci_run_id="$(jq -r '.id' <<< "${successful_run}")"
           echo "ci_run_id=${ci_run_id}" >> "${GITHUB_OUTPUT}"
+          echo "Verified successful CI run ${ci_run_id} for ${RELEASE_SHA}."
 
   publish-image-architecture:
     name: Publish MCP image (${{ matrix.architecture }})
