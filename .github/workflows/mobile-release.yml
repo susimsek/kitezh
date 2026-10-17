@@ -109,6 +109,12 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared mobile modules
+        working-directory: src/main/mobile
+        run: |
+          pnpm exec tsc -p ../shared/tsconfig.json
+          node ../shared/scripts/copy-runtime-assets.mjs
+
       - name: Set mobile release version
         working-directory: src/main/mobile
         env:
@@ -258,6 +264,12 @@ jobs:
       - name: Install mobile dependencies
         working-directory: src/main/mobile
         run: pnpm install --frozen-lockfile
+
+      - name: Build shared mobile modules
+        working-directory: src/main/mobile
+        run: |
+          pnpm exec tsc -p ../shared/tsconfig.json
+          node ../shared/scripts/copy-runtime-assets.mjs
 
       - name: Set mobile release version
         working-directory: src/main/mobile
