@@ -1,6 +1,7 @@
 import * as WebBrowser from "expo-web-browser";
+import { AuthRequest as ExpoAuthRequest } from "expo-auth-session";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,13 +15,28 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
 import { useMobileNotice } from "@/components/MobileNoticeProvider";
-import { authorizationServerIssuer } from "@/config";
 import {
+  authorizationServerIssuer,
+  mobileClientId,
+} from "@/config";
+import {
+  completeNativeSocialLink,
   listSocialLinks,
+  startNativeSocialLink,
   unlinkSocialProvider,
   type SocialLink,
 } from "@/api/account-api";
+import {
+  consumeOAuthTransaction,
+  saveOAuthTransaction,
+  clearOAuthTransaction,
+} from "@/auth/storage";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
+import {
+  isTrustedSocialLinkAuthorizationUrl,
+  NATIVE_SOCIAL_LINK_REDIRECT_URI,
+  parseNativeSocialLinkCallback,
+} from "@/auth/native-social-link";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -34,6 +50,7 @@ export default function SocialLinksScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
+  const actionInFlight = useRef(false);
 
   const load = useCallback(
     async (retry = false) => {
@@ -70,7 +87,8 @@ export default function SocialLinksScreen() {
 
   const remove = useCallback(
     async (link: SocialLink) => {
-      if (!session || busyProvider) return;
+      if (!session || actionInFlight.current) return;
+      actionInFlight.current = true;
       setBusyProvider(link.provider);
       try {
         const currentSession = await refreshSession();
@@ -91,11 +109,11 @@ export default function SocialLinksScreen() {
       } catch {
         showNotice({ kind: "error", message: dictionary.socialRemoveError });
       } finally {
+        actionInFlight.current = false;
         setBusyProvider(null);
       }
     },
     [
-      busyProvider,
       dictionary.socialRemoveError,
       dictionary.socialRemoveSuccess,
       refreshSession,
@@ -106,19 +124,98 @@ export default function SocialLinksScreen() {
 
   const openLinkFlow = useCallback(
     async (provider: string) => {
-      if (busyProvider) return;
+      if (!session || actionInFlight.current) return;
+      actionInFlight.current = true;
       setBusyProvider(provider);
       try {
-        const url = `${authorizationServerIssuer.replace(/\/$/, "")}/account/social-links/${encodeURIComponent(provider)}/start`;
-        await WebBrowser.openBrowserAsync(url);
+        const currentSession = await refreshSession();
+        if (!currentSession) throw new Error("session_unavailable");
+        const request = new ExpoAuthRequest({
+          clientId: mobileClientId,
+          redirectUri: NATIVE_SOCIAL_LINK_REDIRECT_URI,
+          responseType: "code",
+          usePKCE: true,
+        });
+        const requestConfig = await request.getAuthRequestConfigAsync();
+        if (
+          !requestConfig.state ||
+          !requestConfig.codeChallenge ||
+          !request.codeVerifier
+        ) {
+          throw new Error("social_link_request_invalid");
+        }
+        await clearOAuthTransaction("account");
+        await saveOAuthTransaction("account", {
+          clientId: mobileClientId,
+          codeVerifier: request.codeVerifier,
+          createdAt: Date.now(),
+          redirectUri: NATIVE_SOCIAL_LINK_REDIRECT_URI,
+          state: requestConfig.state,
+        });
+        const refreshAccessToken = async () =>
+          (await refreshSession(true))?.accessToken ?? null;
+        const start = await startNativeSocialLink(
+          currentSession.accessToken,
+          provider,
+          {
+            state: requestConfig.state,
+            codeChallenge: requestConfig.codeChallenge,
+          },
+          { refreshAccessToken },
+        );
+        if (
+          start.state !== requestConfig.state ||
+          !isTrustedSocialLinkAuthorizationUrl(
+            start.authorizationUrl,
+            authorizationServerIssuer,
+          )
+        ) {
+          throw new Error("social_link_start_invalid");
+        }
+        const browserResult = await WebBrowser.openAuthSessionAsync(
+          start.authorizationUrl,
+          NATIVE_SOCIAL_LINK_REDIRECT_URI,
+        );
+        if (browserResult.type !== "success") {
+          await clearOAuthTransaction("account");
+          return;
+        }
+        const callback = parseNativeSocialLinkCallback(
+          browserResult.url,
+          requestConfig.state,
+        );
+        const transaction = await consumeOAuthTransaction("account", {
+          clientId: mobileClientId,
+          redirectUri: NATIVE_SOCIAL_LINK_REDIRECT_URI,
+        });
+        if (
+          !callback ||
+          !transaction ||
+          transaction.state !== callback.state ||
+          callback.error ||
+          !callback.code
+        ) {
+          throw new Error("social_link_callback_invalid");
+        }
+        const completion = await completeNativeSocialLink(
+          currentSession.accessToken,
+          { code: callback.code, codeVerifier: transaction.codeVerifier },
+          { refreshAccessToken },
+        );
+        if (completion.provider !== provider || !completion.linked) {
+          throw new Error("social_link_completion_invalid");
+        }
         await load(true);
+        showNotice({ kind: "success", message: dictionary.socialLinkSuccess });
       } catch {
-        showNotice({ kind: "error", message: dictionary.browserError });
+        await clearOAuthTransaction("account");
+        showNotice({ kind: "error", message: dictionary.socialLinkError });
       } finally {
+        actionInFlight.current = false;
         setBusyProvider(null);
       }
     },
-    [busyProvider, dictionary.browserError, load, showNotice],
+    [dictionary.socialLinkError, dictionary.socialLinkSuccess, load, refreshSession, session, showNotice],
   );
 
   const confirmRemove = (link: SocialLink) => {

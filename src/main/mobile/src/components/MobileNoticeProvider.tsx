@@ -103,7 +103,6 @@ export function MobileNoticeProvider({ children }: PropsWithChildren) {
           <Pressable
             accessibilityLabel={dictionary.close}
             accessibilityRole="button"
-            hitSlop={spacing.sm}
             onPress={dismiss}
             style={styles.close}
           >
@@ -155,8 +154,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: spacing.sm,
-    minHeight: 36,
-    minWidth: 36,
+    minHeight: 44,
+    minWidth: 44,
   },
   closeText: { fontSize: 24, lineHeight: 28 },
 });

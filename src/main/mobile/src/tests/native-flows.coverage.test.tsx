@@ -4,7 +4,7 @@ import {
   render,
   screen,
   waitFor,
-} from "@testing-library/react";
+} from "@/testing/native-testing-library";
 import { Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as accountApi from "@/api/account-api";
@@ -35,13 +35,32 @@ jest.mock("@/api/account-api", () => ({
   getRecoveryCodesStatus: jest.fn(),
   listAccountSessions: jest.fn(),
   listSocialLinks: jest.fn(),
+  startNativeSocialLink: jest.fn(),
+  completeNativeSocialLink: jest.fn(),
   mutateMfa: jest.fn(),
   signOutAccountSession: jest.fn(),
   signOutOtherAccountSessions: jest.fn(),
   startMfaSetup: jest.fn(),
   unlinkSocialProvider: jest.fn(),
 }));
+jest.mock("@/auth/storage", () => ({
+  clearOAuthTransaction: jest.fn(),
+  consumeOAuthTransaction: jest.fn(),
+  saveOAuthTransaction: jest.fn(),
+}));
+jest.mock("expo-auth-session", () => ({
+  AuthRequest: class {
+    codeVerifier = "v".repeat(43);
+
+    async getAuthRequestConfigAsync() {
+      return { codeChallenge: "c".repeat(43), state: "s".repeat(32) };
+    }
+  },
+}));
 jest.mock("@/api/public-api", () => ({
+  PublicApiError: class PublicApiError extends Error {
+    kind = "unknown";
+  },
   getCaptchaSettings: jest.fn(),
   registerAccount: jest.fn(),
   requestPasswordReset: jest.fn(),
@@ -93,8 +112,7 @@ jest.mock("@/components/BrandMark", () => ({ BrandMark: () => null }));
 jest.mock("react-native-safe-area-context", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   return {
-    SafeAreaView: ({ children }: { children: React.ReactNode }) =>
-      React.createElement("div", null, children),
+    SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
   };
 });
 jest.mock("expo-router", () => ({
@@ -103,6 +121,10 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("expo-web-browser", () => ({
   openBrowserAsync: jest.fn(async () => ({ type: "opened" })),
+  openAuthSessionAsync: jest.fn(async () => ({
+    type: "success",
+    url: `kitezh://social-link/callback?state=${"s".repeat(32)}&code=${"c".repeat(43)}`,
+  })),
 }));
 
 const { mockRefreshSession, mockSignOut } = jest.requireMock(
@@ -141,20 +163,20 @@ it("validates, updates, and confirms active-account session security actions", a
   jest.mocked(accountApi.changeAccountPassword).mockResolvedValue(undefined);
 
   render(<SecurityScreen />);
-  expect(await screen.findByText("currentSession")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("currentSession")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
   expect(await screen.findAllByText("passwordRequired")).toHaveLength(3);
 
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
     target: { value: "old-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
     target: { value: "a-long-new-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: "a-long-new-secret" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
   await waitFor(() =>
     expect(accountApi.changeAccountPassword).toHaveBeenCalledWith(
       "test-access-token",
@@ -162,37 +184,37 @@ it("validates, updates, and confirms active-account session security actions", a
       expect.any(Object),
     ),
   );
-  expect(await screen.findByText("passwordSaved")).toBeVisible();
+  expect(await screen.findByText("passwordSaved")).toBeTruthy();
 });
 
 it("rejects short, mismatched, and reused passwords before calling the API", async () => {
   render(<SecurityScreen />);
   await screen.findByText("currentSession");
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
     target: { value: "old-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
     target: { value: "short" },
   });
-  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: "different" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("passwordMinLength")).toBeVisible();
-  expect(screen.getByText("passwordMismatch")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordMinLength")).toBeTruthy();
+  expect(screen.getByText("passwordMismatch")).toBeTruthy();
 
   const reusedPassword = "same-long-secret";
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
     target: { value: reusedPassword },
   });
-  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
     target: { value: reusedPassword },
   });
-  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: reusedPassword },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("passwordDifferent")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordDifferent")).toBeTruthy();
   expect(accountApi.changeAccountPassword).not.toHaveBeenCalled();
 });
 
@@ -233,39 +255,42 @@ it("reports session and account-removal failures and confirms revocation actions
   const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
 
   render(<SecurityScreen />);
-  expect(await screen.findByText("Browser")).toBeVisible();
+  expect(await screen.findByText("Browser")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "signOutOthers" }));
-  expect(await screen.findByText("signOutOthersError")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "signOutOthers" }));
+  expect(await screen.findByText("signOutOthersError")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "signOutSession" }));
+  fireEvent.press(screen.getByRole("button", { name: "signOutSession" }));
   const sessionActions = alert.mock.calls.at(-1)?.[2];
   await act(async () => {
     sessionActions
       ?.find((action) => action.style === "destructive")
       ?.onPress?.();
   });
-  expect(await screen.findByText("signOutSessionError")).toBeVisible();
+  expect(await screen.findByText("signOutSessionError")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "deleteAccount" }));
+  fireEvent.press(screen.getByRole("button", { name: "deleteAccount" }));
   const emptyDeleteActions = alert.mock.calls.at(-1)?.[2];
   await act(async () => {
     emptyDeleteActions
       ?.find((action) => action.style === "destructive")
       ?.onPress?.();
   });
-  expect(await screen.findByText("deleteAccountError")).toBeVisible();
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword").at(-1)!, {
-    target: { value: "confirm-password" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "deleteAccount" }));
+  expect(await screen.findByText("deleteAccountError")).toBeTruthy();
+  fireEvent.changeText(
+    screen.getAllByPlaceholderText("currentPassword").at(-1)!,
+    {
+      target: { value: "confirm-password" },
+    },
+  );
+  fireEvent.press(screen.getByRole("button", { name: "deleteAccount" }));
   const deleteActions = alert.mock.calls.at(-1)?.[2];
   await act(async () => {
     deleteActions
       ?.find((action) => action.style === "destructive")
       ?.onPress?.();
   });
-  expect(await screen.findByText("deleteAccountError")).toBeVisible();
+  expect(await screen.findByText("deleteAccountError")).toBeTruthy();
   expect(accountApi.deleteAccount).toHaveBeenCalledWith(
     "test-access-token",
     "confirm-password",
@@ -293,13 +318,13 @@ it("sets up mobile MFA and validates the one-time code before enabling", async (
   jest.mocked(accountApi.mutateMfa).mockResolvedValue(undefined);
 
   render(<MfaScreen />);
-  fireEvent.click(await screen.findByRole("button", { name: "mfaSetup" }));
-  expect(await screen.findByText("mfaSecret: test-secret")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "mfaEnable" }));
-  fireEvent.change(screen.getByLabelText("mfaCode"), {
+  fireEvent.press(await screen.findByRole("button", { name: "mfaSetup" }));
+  expect(await screen.findByText("mfaSecret: test-secret")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "mfaEnable" }));
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "123456" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "mfaEnable" }));
+  fireEvent.press(screen.getByRole("button", { name: "mfaEnable" }));
   await waitFor(() =>
     expect(accountApi.mutateMfa).toHaveBeenCalledWith(
       "test-access-token",
@@ -327,8 +352,8 @@ it("retries an unavailable MFA status and reports when MFA cannot be enabled", a
 
   render(<MfaScreen />);
 
-  fireEvent.click(await screen.findByText("sessionsRetry"));
-  expect(await screen.findByText("mfaUnavailable")).toBeVisible();
+  fireEvent.press(await screen.findByText("sessionsRetry"));
+  expect(await screen.findByText("mfaUnavailable")).toBeTruthy();
   expect(accountApi.getMfaStatus).toHaveBeenCalledTimes(2);
   expect(mockRefreshSession).toHaveBeenNthCalledWith(2, true);
 
@@ -361,30 +386,30 @@ it("regenerates recovery codes and handles invalid and successful MFA disable co
   jest.mocked(accountApi.mutateMfa).mockResolvedValue(undefined);
 
   render(<MfaScreen />);
-  expect(await screen.findByText("recoveryCodesRemaining: 2")).toBeVisible();
-  fireEvent.click(
+  expect(await screen.findByText("recoveryCodesRemaining: 2")).toBeTruthy();
+  fireEvent.press(
     screen.getByRole("button", { name: "recoveryCodesGenerate" }),
   );
-  expect(await screen.findByText("first-code")).toBeVisible();
-  expect(screen.getByText("second-code")).toBeVisible();
+  expect(await screen.findByText("first-code")).toBeTruthy();
+  expect(screen.getByText("second-code")).toBeTruthy();
 
-  fireEvent.change(screen.getByLabelText("mfaCode"), {
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "123" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "mfaDisable" }));
+  fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
   expect(await screen.findAllByText("mfaCode")).toHaveLength(2);
 
-  fireEvent.change(screen.getByLabelText("mfaCode"), {
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "123456" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "mfaDisable" }));
+  fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
   await waitFor(() => expect(accountApi.mutateMfa).toHaveBeenCalledTimes(1));
   expect(await screen.findAllByText("mfaCode")).toHaveLength(2);
 
-  fireEvent.change(screen.getByLabelText("mfaCode"), {
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "654321" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "mfaDisable" }));
+  fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
   await waitFor(() =>
     expect(accountApi.mutateMfa).toHaveBeenLastCalledWith(
       "test-access-token",
@@ -411,8 +436,8 @@ it("confirms linked social-provider removal and refreshes native link status", a
   const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
 
   render(<SocialLinksScreen />);
-  expect(await screen.findByText("socialConnected")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "socialRemove" }));
+  expect(await screen.findByText("socialConnected")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "socialRemove" }));
   const actions = alert.mock.calls[0]?.[2];
   const confirm = actions?.find((action) => action.style === "destructive");
   await act(async () => confirm?.onPress?.());
@@ -427,10 +452,10 @@ it("confirms linked social-provider removal and refreshes native link status", a
     kind: "success",
     message: "socialRemoveSuccess",
   });
-  expect(await screen.findByText("socialNotConnected")).toBeVisible();
+  expect(await screen.findByText("socialNotConnected")).toBeTruthy();
 });
 
-it("starts an enabled social-provider link flow and reloads its status", async () => {
+it("starts a native PKCE social-provider link flow and reloads its status", async () => {
   jest
     .mocked(accountApi.listSocialLinks)
     .mockResolvedValueOnce([
@@ -453,17 +478,107 @@ it("starts an enabled social-provider link flow and reloads its status", async (
         enabled: true,
       },
     ]);
+  jest.mocked(accountApi.startNativeSocialLink).mockResolvedValue({
+    authorizationUrl:
+      "https://kitezh.onrender.com/account/social-links/github/desktop/authorize?transaction=opaque",
+    state: "s".repeat(32),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  });
+  jest.mocked(accountApi.completeNativeSocialLink).mockResolvedValue({
+    provider: "github",
+    linked: true,
+  });
+  const storage = jest.requireMock("@/auth/storage") as {
+    consumeOAuthTransaction: jest.Mock;
+  };
+  storage.consumeOAuthTransaction.mockResolvedValue({
+    clientId: "mobile-account-console",
+    codeVerifier: "v".repeat(43),
+    createdAt: Date.now(),
+    redirectUri: "kitezh://social-link/callback",
+    state: "s".repeat(32),
+  });
 
   render(<SocialLinksScreen />);
-  expect(await screen.findByText("socialNotConnected")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "socialConnect" }));
+  expect(await screen.findByText("socialNotConnected")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "socialConnect" }));
 
   await waitFor(() =>
-    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith(
-      "https://kitezh.onrender.com/account/social-links/github/start",
+    expect(accountApi.startNativeSocialLink).toHaveBeenCalledWith(
+      "test-access-token",
+      "github",
+      { state: "s".repeat(32), codeChallenge: "c".repeat(43) },
+      expect.any(Object),
     ),
   );
-  expect(await screen.findByText("socialConnected")).toBeVisible();
+  expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledWith(
+    "https://kitezh.onrender.com/account/social-links/github/desktop/authorize?transaction=opaque",
+    "kitezh://social-link/callback",
+  );
+  expect(accountApi.completeNativeSocialLink).toHaveBeenCalledWith(
+    "test-access-token",
+    { code: "c".repeat(43), codeVerifier: "v".repeat(43) },
+    expect.any(Object),
+  );
+  expect(jest.requireMock("@/auth/storage").saveOAuthTransaction).toHaveBeenCalledWith(
+    "account",
+    expect.objectContaining({
+      clientId: "mobile-account-console",
+      codeVerifier: "v".repeat(43),
+      redirectUri: "kitezh://social-link/callback",
+      state: "s".repeat(32),
+    }),
+  );
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "success",
+    message: "socialLinkSuccess",
+  });
+  expect(await screen.findByText("socialConnected")).toBeTruthy();
+});
+
+it("rejects a social-link callback with a mismatched state", async () => {
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValue([
+    {
+      provider: "github",
+      displayName: "GitHub",
+      iconKey: "github",
+      linked: false,
+      configured: true,
+      enabled: true,
+    },
+  ]);
+  jest.mocked(accountApi.startNativeSocialLink).mockResolvedValue({
+    authorizationUrl:
+      "https://kitezh.onrender.com/account/social-links/github/desktop/authorize?transaction=opaque",
+    state: "s".repeat(32),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  });
+  jest
+    .mocked(WebBrowser.openAuthSessionAsync)
+    .mockResolvedValueOnce({
+      type: "success",
+      url: `kitezh://social-link/callback?state=mismatched-state&code=${"c".repeat(43)}`,
+    } as never);
+  jest
+    .mocked(jest.requireMock("@/auth/storage").consumeOAuthTransaction)
+    .mockResolvedValueOnce({
+      clientId: "mobile-account-console",
+      codeVerifier: "v".repeat(43),
+      createdAt: Date.now(),
+      redirectUri: "kitezh://social-link/callback",
+      state: "s".repeat(32),
+    });
+
+  render(<SocialLinksScreen />);
+  fireEvent.press(await screen.findByRole("button", { name: "socialConnect" }));
+
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "socialLinkError",
+    }),
+  );
+  expect(accountApi.completeNativeSocialLink).not.toHaveBeenCalled();
 });
 
 it("retries social-link loading and reports browser and unlink failures", async () => {
@@ -481,18 +596,18 @@ it("retries social-link loading and reports browser and unlink failures", async 
       },
     ]);
   jest
-    .mocked(WebBrowser.openBrowserAsync)
-    .mockRejectedValueOnce(new Error("browser unavailable"));
+    .mocked(accountApi.startNativeSocialLink)
+    .mockRejectedValueOnce(new Error("authorization server unavailable"));
 
   render(<SocialLinksScreen />);
-  expect(await screen.findByText("socialLinksError")).toBeVisible();
-  fireEvent.click(screen.getByText("sessionsRetry"));
-  expect(await screen.findByText("socialNotConnected")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "socialConnect" }));
+  expect(await screen.findByText("socialLinksError")).toBeTruthy();
+  fireEvent.press(screen.getByText("sessionsRetry"));
+  expect(await screen.findByText("socialNotConnected")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "socialConnect" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
-      message: "browserError",
+      message: "socialLinkError",
     }),
   );
 
@@ -516,14 +631,14 @@ it("retries social-link loading and reports browser and unlink failures", async 
   ) => {
     buttons?.find((button) => button.style === "destructive")?.onPress?.();
   }) as never);
-  fireEvent.click(screen.getByRole("button", { name: "back" }));
+  fireEvent.press(screen.getByRole("button", { name: "back" }));
   expect(jest.requireMock("expo-router").router.back).toHaveBeenCalled();
   // The link flow stays on this screen; refresh the mocked links before removal.
-  fireEvent.click(screen.getByRole("button", { name: "socialConnect" }));
+  fireEvent.press(screen.getByRole("button", { name: "socialConnect" }));
   await waitFor(() =>
     expect(accountApi.listSocialLinks).toHaveBeenCalledTimes(3),
   );
-  fireEvent.click(screen.getByRole("button", { name: "socialRemove" }));
+  fireEvent.press(screen.getByRole("button", { name: "socialRemove" }));
   const actions = alert.mock.calls.at(-1)?.[2];
   await act(async () => {
     actions?.find((action) => action.style === "destructive")?.onPress?.();
@@ -549,18 +664,18 @@ it("shows server password validation errors in the matching fields", async () =>
 
   render(<SecurityScreen />);
   await screen.findByText("sessionsEmpty");
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
     target: { value: "old-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
     target: { value: "a-long-new-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: "a-long-new-secret" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
 
-  expect(await screen.findByText("passwordPolicyRejected")).toBeVisible();
+  expect(await screen.findByText("passwordPolicyRejected")).toBeTruthy();
   expect(screen.queryByText("passwordSaveError")).toBeNull();
 });
 
@@ -581,19 +696,19 @@ it("maps legacy password validation data to the matching security fields", async
 
   render(<SecurityScreen />);
   await screen.findByText("sessionsEmpty");
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
     target: { value: "old-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
     target: { value: "a-long-new-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: "a-long-new-secret" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
 
-  expect(await screen.findByText("currentPasswordRejected")).toBeVisible();
-  expect(screen.getByText("confirmPasswordRejected")).toBeVisible();
+  expect(await screen.findByText("currentPasswordRejected")).toBeTruthy();
+  expect(screen.getByText("confirmPasswordRejected")).toBeTruthy();
   expect(screen.queryByText("passwordSaveError")).toBeNull();
 });
 
@@ -619,49 +734,55 @@ it("keeps security actions safe when the session expires before submission", asy
   render(<SecurityScreen />);
   expect(
     await screen.findByRole("button", { name: "signOutSession" }),
-  ).toBeVisible();
+  ).toBeTruthy();
   const enterValidPassword = () => {
-    fireEvent.change(screen.getAllByPlaceholderText("currentPassword")[0]!, {
-      target: { value: "old-secret" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+    fireEvent.changeText(
+      screen.getAllByPlaceholderText("currentPassword")[0]!,
+      {
+        target: { value: "old-secret" },
+      },
+    );
+    fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
       target: { value: "a-long-new-secret" },
     });
-    fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+    fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
       target: { value: "a-long-new-secret" },
     });
   };
   enterValidPassword();
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("passwordSaveError")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordSaveError")).toBeTruthy();
 
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "signOutOthers" }));
-  expect(await screen.findByText("signOutOthersError")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "signOutOthers" }));
+  expect(await screen.findByText("signOutOthersError")).toBeTruthy();
 
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "signOutSession" }));
+  fireEvent.press(screen.getByRole("button", { name: "signOutSession" }));
   const revokeActions = alert.mock.calls.at(-1)?.[2];
   await act(async () => {
     revokeActions
       ?.find((action) => action.style === "destructive")
       ?.onPress?.();
   });
-  expect(await screen.findByText("signOutSessionError")).toBeVisible();
+  expect(await screen.findByText("signOutSessionError")).toBeTruthy();
 
-  fireEvent.change(screen.getAllByPlaceholderText("currentPassword").at(-1)!, {
-    target: { value: "confirm-password" },
-  });
+  fireEvent.changeText(
+    screen.getAllByPlaceholderText("currentPassword").at(-1)!,
+    {
+      target: { value: "confirm-password" },
+    },
+  );
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "deleteAccount" }));
+  fireEvent.press(screen.getByRole("button", { name: "deleteAccount" }));
   const deleteActions = alert.mock.calls.at(-1)?.[2];
   await act(async () => {
     deleteActions
       ?.find((action) => action.style === "destructive")
       ?.onPress?.();
   });
-  expect(await screen.findByText("deleteAccountError")).toBeVisible();
+  expect(await screen.findByText("deleteAccountError")).toBeTruthy();
   expect(accountApi.changeAccountPassword).not.toHaveBeenCalled();
   expect(accountApi.signOutOtherAccountSessions).not.toHaveBeenCalled();
   expect(accountApi.signOutAccountSession).not.toHaveBeenCalled();
@@ -690,8 +811,8 @@ it("retries a failed native session list and supplies a refresh callback", async
     });
 
   render(<SecurityScreen />);
-  fireEvent.click(await screen.findByText("sessionsRetry"));
-  expect(await screen.findByText("currentSession")).toBeVisible();
+  fireEvent.press(await screen.findByText("sessionsRetry"));
+  expect(await screen.findByText("currentSession")).toBeTruthy();
   const options = jest.mocked(accountApi.listAccountSessions).mock
     .calls[1]?.[1];
   expect(options).toEqual(
@@ -699,6 +820,77 @@ it("retries a failed native session list and supplies a refresh callback", async
   );
   await expect(options?.refreshAccessToken?.()).resolves.toBe(
     "test-access-token",
+  );
+});
+
+it("pages active sessions with a single in-flight request", async () => {
+  let resolvePage!: (
+    value: Awaited<ReturnType<typeof accountApi.listAccountSessions>>,
+  ) => void;
+  const pendingPage = new Promise<
+    Awaited<ReturnType<typeof accountApi.listAccountSessions>>
+  >((resolve) => {
+    resolvePage = resolve;
+  });
+  jest
+    .mocked(accountApi.listAccountSessions)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "session-page-1",
+          createdAt: "2026-01-01T10:00:00Z",
+          lastAccessedAt: "2026-01-02T10:00:00Z",
+          expiresAt: "2026-02-01T10:00:00Z",
+          current: true,
+          clients: [{ clientId: "account", clientName: "First session" }],
+        },
+      ],
+      totalElements: 21,
+      totalPages: 2,
+      number: 0,
+      size: 20,
+    })
+    .mockReturnValueOnce(pendingPage);
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("currentSession")).toBeTruthy();
+  const previous = screen.getByRole("button", { name: "accountPreviousPage" });
+  fireEvent.press(previous);
+  expect(accountApi.listAccountSessions).toHaveBeenCalledTimes(1);
+
+  const next = screen.getByRole("button", { name: "accountNextPage" });
+  fireEvent.press(next);
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "accountNextPage" }).props
+        .accessibilityState.disabled,
+    ).toBe(true),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "accountNextPage" }));
+  expect(accountApi.listAccountSessions).toHaveBeenCalledTimes(2);
+
+  await act(async () => {
+    resolvePage({
+      content: [
+        {
+          id: "session-page-2",
+          createdAt: "2026-01-03T10:00:00Z",
+          lastAccessedAt: "2026-01-03T11:00:00Z",
+          expiresAt: "2026-02-03T10:00:00Z",
+          current: false,
+          clients: [{ clientId: "web", clientName: "Second session" }],
+        },
+      ],
+      totalElements: 21,
+      totalPages: 2,
+      number: 1,
+      size: 20,
+    });
+    await pendingPage;
+  });
+  expect(await screen.findByText("Second session")).toBeTruthy();
+  expect(accountApi.listAccountSessions.mock.calls[1]?.[1]).toEqual(
+    expect.objectContaining({ page: 1 }),
   );
 });
 
@@ -717,8 +909,8 @@ it("validates and completes native account registration", async () => {
 
   render(<RegisterScreen />);
   const create = await screen.findByRole("button", { name: "createAccount" });
-  fireEvent.click(create);
-  expect(await screen.findByText("registrationError")).toBeVisible();
+  fireEvent.press(create);
+  expect(await screen.findByText("registrationError")).toBeTruthy();
   for (const [label, value] of [
     ["username", "alice"],
     ["firstName", "Alice"],
@@ -727,17 +919,17 @@ it("validates and completes native account registration", async () => {
     ["newPassword", "a-long-password"],
     ["confirmPassword", "a-long-password"],
   ]) {
-    fireEvent.change(screen.getByPlaceholderText(label), {
+    fireEvent.changeText(screen.getByPlaceholderText(label), {
       target: { value },
     });
   }
-  fireEvent.click(create);
-  expect(await screen.findByText("Invalid email address")).toBeVisible();
-  fireEvent.change(screen.getByPlaceholderText("email"), {
+  fireEvent.press(create);
+  expect(await screen.findByText("Invalid email address")).toBeTruthy();
+  fireEvent.changeText(screen.getByPlaceholderText("email"), {
     target: { value: "alice@example.test" },
   });
   jest.mocked(publicApi.registerAccount).mockResolvedValueOnce(undefined);
-  fireEvent.click(create);
+  fireEvent.press(create);
   await waitFor(() =>
     expect(publicApi.registerAccount).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -747,7 +939,7 @@ it("validates and completes native account registration", async () => {
       }),
     ),
   );
-  expect(await screen.findByText("registrationSuccess")).toBeVisible();
+  expect(await screen.findByText("registrationSuccess")).toBeTruthy();
 });
 
 it("falls back to browser registration when captcha settings are unavailable", async () => {
@@ -763,14 +955,14 @@ it("falls back to browser registration when captcha settings are unavailable", a
   const continueButton = await screen.findByRole("button", {
     name: "continueInBrowser",
   });
-  fireEvent.click(continueButton);
-  expect(await screen.findByText("browserError")).toBeVisible();
+  fireEvent.press(continueButton);
+  expect(await screen.findByText("browserError")).toBeTruthy();
 
-  fireEvent.click(continueButton);
+  fireEvent.press(continueButton);
   await waitFor(() =>
     expect(WebBrowser.openBrowserAsync).toHaveBeenCalledTimes(2),
   );
-  expect(screen.queryByText("browserError")).not.toBeInTheDocument();
+  expect(screen.queryByText("browserError")).toBeNull();
 });
 
 it("validates and completes a deep-link password reset", async () => {
@@ -778,25 +970,25 @@ it("validates and completes a deep-link password reset", async () => {
   const { router } = jest.requireMock("expo-router");
 
   render(<ResetPasswordScreen />);
-  fireEvent.click(screen.getByRole("button", { name: "back" }));
+  fireEvent.press(screen.getByRole("button", { name: "back" }));
   expect(router.back).toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("resetError")).toBeVisible();
-  fireEvent.change(screen.getByPlaceholderText("newPassword"), {
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("passwordMinLength")).toBeTruthy();
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
     target: { value: "a-long-reset-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("confirmPassword"), {
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
     target: { value: "a-long-reset-secret" },
   });
-  fireEvent.change(screen.getByPlaceholderText("mfaCode"), {
+  fireEvent.changeText(screen.getByPlaceholderText("mfaCode"), {
     target: { value: " 123456 " },
   });
   jest
     .mocked(publicApi.resetPassword)
     .mockRejectedValueOnce(new Error("reset token expired"));
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("resetError")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("resetError")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
   await waitFor(() =>
     expect(publicApi.resetPassword).toHaveBeenCalledWith({
       token: "reset-token",
@@ -804,8 +996,8 @@ it("validates and completes a deep-link password reset", async () => {
       otpCode: "123456",
     }),
   );
-  expect(await screen.findByText("resetSuccess")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "signIn" }));
+  expect(await screen.findByText("resetSuccess")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
   expect(router.replace).toHaveBeenCalledWith("/sign-in");
 });
 
@@ -815,28 +1007,28 @@ it("validates password-reset requests, reports failures, and navigates after suc
   const { router } = jest.requireMock("expo-router");
   render(<ForgotPasswordScreen />);
 
-  fireEvent.click(screen.getByRole("button", { name: "continue" }));
-  expect(await screen.findByText("forgotError")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "continue" }));
+  expect(await screen.findByText("forgotError")).toBeTruthy();
 
-  fireEvent.change(screen.getByLabelText("username"), {
+  fireEvent.changeText(screen.getByLabelText("username"), {
     target: { value: " alice " },
   });
   jest
     .mocked(publicApi.requestPasswordReset)
     .mockRejectedValueOnce(new Error("offline"));
-  fireEvent.click(screen.getByRole("button", { name: "continue" }));
-  expect(await screen.findByText("forgotError")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "continue" }));
+  expect(await screen.findByText("forgotError")).toBeTruthy();
 
   jest.mocked(publicApi.requestPasswordReset).mockResolvedValueOnce(undefined);
-  fireEvent.click(screen.getByRole("button", { name: "continue" }));
-  expect(await screen.findByText("forgotSent")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "continue" }));
+  expect(await screen.findByText("forgotSent")).toBeTruthy();
   expect(publicApi.requestPasswordReset).toHaveBeenLastCalledWith(
     "alice",
     "en",
   );
-  fireEvent.click(screen.getByRole("button", { name: "signIn" }));
+  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
   expect(router.replace).toHaveBeenCalledWith("/sign-in");
-  fireEvent.click(screen.getByRole("button", { name: "back" }));
+  fireEvent.press(screen.getByRole("button", { name: "back" }));
   expect(router.back).toHaveBeenCalled();
 });
 
@@ -844,7 +1036,7 @@ it("routes account and admin auth callbacks by state and times out signed-out se
   jest.useFakeTimers();
   const { router } = jest.requireMock("expo-router");
   const { rerender } = render(<AccountAuthCallbackScreen />);
-  expect(screen.getByLabelText("loading")).toBeVisible();
+  expect(screen.getByLabelText("loading")).toBeTruthy();
   expect(router.replace).toHaveBeenCalledWith("/account");
 
   mockMobileAuthStatus = "error";

@@ -3,30 +3,207 @@ import test from "node:test";
 import {
   AccountApiError,
   changeAccountPassword,
+  completeNativeSocialLink,
   decideCibaRequest,
   deleteAccount,
   generateRecoveryCodes,
   getAccountProfile,
+  getAccountAvatar,
+  getAccountProfileAttributes,
   getMfaStatus,
   getRecoveryCodesStatus,
   listAccountApplications,
+  listAccountNotifications,
   listAccountSessions,
   listCibaRequests,
   listOfflineSessions,
   listSocialLinks,
+  getAccountUnreadNotificationCount,
+  markAccountNotificationRead,
   mutateMfa,
   revokeAccountApplication,
   revokeOfflineSession,
   signOutAccountSession,
   signOutOtherAccountSessions,
   startMfaSetup,
+  startNativeSocialLink,
   unlinkSocialProvider,
   updateAccountProfile,
+  updateAccountProfileAttributes,
+  uploadAccountAvatar,
+  deleteAccountAvatar,
+  sendAccountVerificationEmail,
 } from "./account-api.ts";
 
 import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
 
 installAxiosFetchMockCompatibility();
+
+test("profile attributes use the authenticated account contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: { path: string; method?: string; body?: string }[] = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      path: new URL(input.toString()).pathname,
+      method: init?.method,
+      body: typeof init?.body === "string" ? init.body : undefined,
+    });
+    return new Response(
+      JSON.stringify({
+        definitions: [],
+        attributes: { department: ["Engineering"] },
+      }),
+      { status: 200 },
+    );
+  };
+
+  try {
+    await getAccountProfileAttributes("access-token");
+    await updateAccountProfileAttributes("access-token", {
+      department: ["Platform"],
+    });
+    assert.deepEqual(requests, [
+      {
+        path: "/api/account/profile/attributes",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        path: "/api/account/profile/attributes",
+        method: "PUT",
+        body: JSON.stringify({ attributes: { department: ["Platform"] } }),
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("account avatar and verification actions use the authenticated native API", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: { path: string; method?: string; authorization?: string }[] =
+    [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      path: new URL(input.toString()).pathname,
+      method: init?.method,
+      authorization:
+        new Headers(init?.headers).get("Authorization") ?? undefined,
+    });
+    const path = new URL(input.toString()).pathname;
+    if (path === "/api/account/profile/avatar" && init?.method === "GET") {
+      return new Response(JSON.stringify({ avatarUrl: null }), { status: 200 });
+    }
+    if (path === "/api/account/profile/avatar" && init?.method === "PUT") {
+      return new Response(
+        JSON.stringify({ avatarUrl: "/avatars/current?v=2" }),
+        {
+          status: 200,
+        },
+      );
+    }
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    assert.equal((await getAccountAvatar("access-token")).avatarUrl, null);
+    assert.equal(
+      (
+        await uploadAccountAvatar("access-token", {
+          uri: "file:///avatar.jpg",
+          name: "avatar.jpg",
+          type: "image/jpeg",
+        })
+      ).avatarUrl,
+      "/avatars/current?v=2",
+    );
+    await deleteAccountAvatar("access-token");
+    await sendAccountVerificationEmail("access-token");
+    assert.deepEqual(requests, [
+      {
+        path: "/api/account/profile/avatar",
+        method: "GET",
+        authorization: "Bearer access-token",
+      },
+      {
+        path: "/api/account/profile/avatar",
+        method: "PUT",
+        authorization: "Bearer access-token",
+      },
+      {
+        path: "/api/account/profile/avatar",
+        method: "DELETE",
+        authorization: "Bearer access-token",
+      },
+      {
+        path: "/api/account/send-verify-email",
+        method: "POST",
+        authorization: "Bearer access-token",
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("account notifications use authenticated paged, unread-count, and mark-read routes", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: {
+    path: string;
+    search: string;
+    method?: string;
+    authorization?: string;
+  }[] = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      path: new URL(input.toString()).pathname,
+      search: new URL(input.toString()).search,
+      method: init?.method,
+      authorization:
+        new Headers(init?.headers).get("Authorization") ?? undefined,
+    });
+    const path = new URL(input.toString()).pathname;
+    if (path.endsWith("unread-count")) return new Response("2", { status: 200 });
+    if (path === "/api/account/notifications") {
+      return new Response(
+        JSON.stringify({ content: [], totalElements: 0, totalPages: 0, number: 2, size: 10 }),
+        { status: 200 },
+      );
+    }
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    await listAccountNotifications("access-token", { page: 2, size: 10 });
+    assert.equal(
+      await getAccountUnreadNotificationCount("access-token"),
+      2,
+    );
+    await markAccountNotificationRead("access-token", "notice/one");
+    assert.deepEqual(requests, [
+      {
+        path: "/api/account/notifications",
+        search: "?page=2&size=10&sort=createdAt,desc",
+        method: "GET",
+        authorization: "Bearer access-token",
+      },
+      {
+        path: "/api/account/notifications/unread-count",
+        search: "",
+        method: "GET",
+        authorization: "Bearer access-token",
+      },
+      {
+        path: "/api/account/notifications/notice%2Fone/read",
+        search: "",
+        method: "PUT",
+        authorization: "Bearer access-token",
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("CIBA requests use the authenticated account API and preserve encoded IDs", async () => {
   const originalFetch = globalThis.fetch;
@@ -76,6 +253,41 @@ test("CIBA requests use the authenticated account API and preserve encoded IDs",
         },
       ],
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("account pageable lists accept a page and clamp page size to the server limit", async () => {
+  const originalFetch = globalThis.fetch;
+  const urls: string[] = [];
+  globalThis.fetch = async (input) => {
+    urls.push(
+      new URL(input.toString()).pathname + new URL(input.toString()).search,
+    );
+    return new Response(
+      JSON.stringify({
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        number: 2,
+        size: 100,
+      }),
+      { status: 200 },
+    );
+  };
+
+  try {
+    await listAccountSessions("token", { page: 2, size: 500 });
+    await listAccountApplications("token", { page: 2, size: 500 });
+    await listOfflineSessions("token", { page: 2, size: 500 });
+    await listCibaRequests("token", { page: 2, size: 500 });
+    assert.deepEqual(urls, [
+      "/api/account/sessions?page=2&size=100",
+      "/api/account/applications?page=2&size=100",
+      "/api/account/offline-sessions?page=2&size=100",
+      "/api/ciba/requests?page=2&size=100&sort=createdAt,desc",
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -254,6 +466,14 @@ test("account endpoints use their protected methods, bodies, and encoded resourc
     await generateRecoveryCodes("token");
     await listSocialLinks("token");
     await unlinkSocialProvider("token", "provider/one");
+    await startNativeSocialLink("token", "github", {
+      state: "state-value",
+      codeChallenge: "challenge-value",
+    });
+    await completeNativeSocialLink("token", {
+      code: "completion-code",
+      codeVerifier: "verifier-value",
+    });
 
     assert.deepEqual(requests, [
       { path: "/api/account/profile", method: "GET", body: undefined },
@@ -334,6 +554,22 @@ test("account endpoints use their protected methods, bodies, and encoded resourc
         path: "/api/account/social-links/provider%2Fone",
         method: "DELETE",
         body: undefined,
+      },
+      {
+        path: "/api/account/social-links/github/mobile/start",
+        method: "POST",
+        body: JSON.stringify({
+          state: "state-value",
+          codeChallenge: "challenge-value",
+        }),
+      },
+      {
+        path: "/api/account/social-links/mobile/complete",
+        method: "POST",
+        body: JSON.stringify({
+          code: "completion-code",
+          codeVerifier: "verifier-value",
+        }),
       },
     ]);
     assert.ok(requests.every(({ method }) => method !== undefined));

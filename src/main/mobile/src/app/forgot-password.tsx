@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { requestPasswordReset } from "@/api/public-api";
+import { PublicApiError, requestPasswordReset } from "@/api/public-api";
+import { publicErrorMessage } from "@/api/public-error-message";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { MobileFormScrollView } from "@/components/MobileFormScrollView";
@@ -24,20 +25,30 @@ export default function ForgotPasswordScreen() {
   const [identifier, setIdentifier] = useState("");
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const identifierRef = useRef<TextInput>(null);
 
   const submit = async () => {
     if (pending || !identifier.trim()) {
-      if (!identifier.trim()) setError(true);
+      if (!identifier.trim()) {
+        setError(dictionary.forgotError);
+        identifierRef.current?.focus();
+      }
       return;
     }
     setPending(true);
-    setError(false);
+    setError(null);
     try {
       await requestPasswordReset(identifier.trim(), resolvedLocale);
       setSent(true);
-    } catch {
-      setError(true);
+    } catch (cause) {
+      setError(
+        publicErrorMessage(
+          cause instanceof PublicApiError ? cause.kind : undefined,
+          dictionary,
+          "forgotError",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -86,14 +97,16 @@ export default function ForgotPasswordScreen() {
             </Text>
             <TextInput
               accessibilityLabel={dictionary.username}
+              accessibilityHint={error ?? undefined}
               autoCapitalize="none"
               autoComplete="username"
               onChangeText={(value) => {
                 setIdentifier(value);
-                setError(false);
+                setError(null);
               }}
               placeholder={dictionary.username}
               placeholderTextColor={palette.textMuted}
+              ref={identifierRef}
               style={[
                 styles.input,
                 {
@@ -104,13 +117,16 @@ export default function ForgotPasswordScreen() {
               value={identifier}
             />
             {error ? (
-              <Text style={[styles.error, { color: palette.danger }]}>
-                {dictionary.forgotError}
+              <Text
+                accessibilityRole="alert"
+                style={[styles.error, { color: palette.danger }]}
+              >
+                {error}
               </Text>
             ) : null}
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: pending }}
+              accessibilityState={{ busy: pending, disabled: pending }}
               disabled={pending}
               onPress={() => void submit()}
               style={[
@@ -121,7 +137,12 @@ export default function ForgotPasswordScreen() {
                 },
               ]}
             >
-              {pending ? <ActivityIndicator color={palette.onPrimary} /> : null}
+              {pending ? (
+                <ActivityIndicator
+                  accessibilityLabel={dictionary.loading}
+                  color={palette.onPrimary}
+                />
+              ) : null}
               <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
                 {dictionary.continue}
               </Text>
@@ -135,12 +156,20 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { flex: 1, padding: spacing.xl },
+  content: {
+    alignSelf: "center",
+    flexGrow: 1,
+    maxWidth: 560,
+    padding: spacing.xl,
+    width: "100%",
+  },
   back: {
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.xs,
     marginBottom: spacing.xl,
+    minHeight: 44,
+    minWidth: 44,
   },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   help: { fontSize: 15, lineHeight: 22, marginTop: spacing.sm },

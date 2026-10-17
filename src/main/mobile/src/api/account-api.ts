@@ -1,4 +1,10 @@
-import type { AccountSocialLink } from "../../../shared/src/contracts.ts";
+import type {
+  AccountSocialLink,
+  DesktopSocialLinkCompleteRequest,
+  DesktopSocialLinkCompleteResponse,
+  DesktopSocialLinkStartRequest,
+  DesktopSocialLinkStartResponse,
+} from "../../../shared/src/contracts.ts";
 import {
   classifyApiError,
   createNativeRequestSignal,
@@ -28,6 +34,32 @@ export type AccountProfile = {
   preferredLocale: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AccountAvatar = { avatarUrl: string | null };
+
+export type AccountProfileAttributeType =
+  "STRING" | "EMAIL" | "INTEGER" | "BOOLEAN";
+
+export type AccountProfileAttributeDefinition = {
+  id: number;
+  name: string;
+  displayName: string;
+  description: string | null;
+  type: AccountProfileAttributeType;
+  required: boolean;
+  multivalued: boolean;
+  minLength: number | null;
+  maxLength: number | null;
+  pattern: string | null;
+  enabled: boolean;
+  displayOrder: number;
+  builtIn: boolean;
+};
+
+export type AccountProfileAttributes = {
+  definitions: AccountProfileAttributeDefinition[];
+  attributes: Record<string, string[]>;
 };
 
 export type AccountSession = {
@@ -61,6 +93,13 @@ export type AccountOfflineSession = {
   clientName: string;
   issuedAt: string;
   expiresAt: string | null;
+};
+
+export type AccountNotification = {
+  id: string;
+  messageKey: string;
+  createdAt: string;
+  read: boolean;
 };
 
 export type CibaPendingRequest = {
@@ -137,6 +176,17 @@ type RequestOptions = {
   signal?: AbortSignal;
   timeoutMs?: number;
 };
+
+type AccountPageRequestOptions = RequestOptions & {
+  page?: number;
+  size?: number;
+};
+
+function pageQuery(page: number | undefined, size: number | undefined) {
+  const safePage = Math.max(0, Math.floor(page ?? 0));
+  const safeSize = Math.min(100, Math.max(1, Math.floor(size ?? 20)));
+  return `page=${safePage}&size=${safeSize}`;
+}
 
 const accountClient = createMobileApiClient(DEFAULT_NATIVE_API_TIMEOUT_MS);
 
@@ -217,6 +267,92 @@ export function updateAccountProfile(
   );
 }
 
+export function getAccountProfileAttributes(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<AccountProfileAttributes>(
+    accessToken,
+    "/api/account/profile/attributes",
+    { method: "GET" },
+    options,
+    "Account profile attributes request failed",
+  );
+}
+
+export function updateAccountProfileAttributes(
+  accessToken: string,
+  attributes: Record<string, string[]>,
+  options: RequestOptions = {},
+) {
+  return requestAccount<AccountProfileAttributes>(
+    accessToken,
+    "/api/account/profile/attributes",
+    {
+      body: JSON.stringify({ attributes }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    },
+    options,
+    "Account profile attributes update failed",
+  );
+}
+
+export function getAccountAvatar(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<AccountAvatar>(
+    accessToken,
+    "/api/account/profile/avatar",
+    { method: "GET" },
+    options,
+    "Account avatar request failed",
+  );
+}
+
+export function uploadAccountAvatar(
+  accessToken: string,
+  file: { uri: string; name: string; type: "image/jpeg" },
+  options: RequestOptions = {},
+) {
+  const form = new FormData();
+  form.append("file", file as unknown as Blob);
+  return requestAccount<AccountAvatar>(
+    accessToken,
+    "/api/account/profile/avatar",
+    { body: form, method: "PUT" },
+    options,
+    "Account avatar upload failed",
+  );
+}
+
+export function deleteAccountAvatar(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    "/api/account/profile/avatar",
+    { method: "DELETE" },
+    options,
+    "Account avatar deletion failed",
+  );
+}
+
+export function sendAccountVerificationEmail(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    "/api/account/send-verify-email",
+    { method: "POST" },
+    options,
+    "Account verification email request failed",
+  );
+}
+
 export function changeAccountPassword(
   accessToken: string,
   password: { currentPassword: string; newPassword: string },
@@ -237,11 +373,11 @@ export function changeAccountPassword(
 
 export function listAccountSessions(
   accessToken: string,
-  options: RequestOptions = {},
+  options: AccountPageRequestOptions = {},
 ) {
   return requestAccount<AccountSessionPage>(
     accessToken,
-    "/api/account/sessions?page=0&size=20",
+    `/api/account/sessions?${pageQuery(options.page, options.size)}`,
     { method: "GET" },
     options,
     "Account sessions request failed",
@@ -277,11 +413,11 @@ export function signOutAccountSession(
 
 export function listAccountApplications(
   accessToken: string,
-  options: RequestOptions = {},
+  options: AccountPageRequestOptions = {},
 ) {
   return requestAccount<AccountPage<AccountApplication>>(
     accessToken,
-    "/api/account/applications?page=0&size=20",
+    `/api/account/applications?${pageQuery(options.page, options.size)}`,
     { method: "GET" },
     options,
     "Account applications request failed",
@@ -304,14 +440,54 @@ export function revokeAccountApplication(
 
 export function listOfflineSessions(
   accessToken: string,
-  options: RequestOptions = {},
+  options: AccountPageRequestOptions = {},
 ) {
   return requestAccount<AccountPage<AccountOfflineSession>>(
     accessToken,
-    "/api/account/offline-sessions?page=0&size=20",
+    `/api/account/offline-sessions?${pageQuery(options.page, options.size)}`,
     { method: "GET" },
     options,
     "Offline sessions request failed",
+  );
+}
+
+export function listAccountNotifications(
+  accessToken: string,
+  options: AccountPageRequestOptions = {},
+) {
+  return requestAccount<AccountPage<AccountNotification>>(
+    accessToken,
+    `/api/account/notifications?${pageQuery(options.page, options.size)}&sort=createdAt,desc`,
+    { method: "GET" },
+    options,
+    "Account notifications request failed",
+  );
+}
+
+export function getAccountUnreadNotificationCount(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<number>(
+    accessToken,
+    "/api/account/notifications/unread-count",
+    { method: "GET" },
+    options,
+    "Account notification count request failed",
+  );
+}
+
+export function markAccountNotificationRead(
+  accessToken: string,
+  notificationId: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    `/api/account/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: "PUT" },
+    options,
+    "Account notification update failed",
   );
 }
 
@@ -331,11 +507,11 @@ export function revokeOfflineSession(
 
 export function listCibaRequests(
   accessToken: string,
-  options: RequestOptions = {},
+  options: AccountPageRequestOptions = {},
 ) {
   return requestAccount<AccountPage<CibaPendingRequest>>(
     accessToken,
-    "/api/ciba/requests?page=0&size=20&sort=createdAt,desc",
+    `/api/ciba/requests?${pageQuery(options.page, options.size)}&sort=createdAt,desc`,
     { method: "GET" },
     options,
     "CIBA requests could not be loaded",
@@ -470,5 +646,42 @@ export function unlinkSocialProvider(
     { method: "DELETE" },
     options,
     "Social link request failed",
+  );
+}
+
+export function startNativeSocialLink(
+  accessToken: string,
+  provider: string,
+  request: DesktopSocialLinkStartRequest,
+  options: RequestOptions = {},
+) {
+  return requestAccount<DesktopSocialLinkStartResponse>(
+    accessToken,
+    `/api/account/social-links/${encodeURIComponent(provider)}/mobile/start`,
+    {
+      body: JSON.stringify(request),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+    options,
+    "Native social-link start request failed",
+  );
+}
+
+export function completeNativeSocialLink(
+  accessToken: string,
+  request: DesktopSocialLinkCompleteRequest,
+  options: RequestOptions = {},
+) {
+  return requestAccount<DesktopSocialLinkCompleteResponse>(
+    accessToken,
+    "/api/account/social-links/mobile/complete",
+    {
+      body: JSON.stringify(request),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+    options,
+    "Native social-link completion request failed",
   );
 }

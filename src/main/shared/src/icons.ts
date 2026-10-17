@@ -1,5 +1,6 @@
 export const iconNames = [
   "add",
+  "bell",
   "arrowLeft",
   "arrowRight",
   "check",
@@ -35,6 +36,7 @@ export const iconMetadata: Record<
     unicode: "+",
     svg: '<path d="M12 5v14M5 12h14"/>',
   },
+  bell: { labelKey: "notificationsTitle", unicode: "♧" },
   arrowLeft: { labelKey: "back", unicode: "←" },
   arrowRight: { labelKey: "continue", unicode: "→" },
   check: { labelKey: "save", unicode: "✓", svg: '<path d="m5 12 4 4L19 6"/>' },

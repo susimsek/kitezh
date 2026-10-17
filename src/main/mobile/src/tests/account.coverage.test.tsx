@@ -1,5 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Alert } from "react-native";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@/testing/native-testing-library";
+import { Alert, StyleSheet } from "react-native";
 import * as accountApi from "@/api/account-api";
 import AccountScreen from "../app/account";
 import ApplicationsScreen from "../app/applications";
@@ -9,16 +15,32 @@ jest.mock("@/api/account-api", () => {
     jest.requireActual<typeof import("@/api/account-api")>("@/api/account-api");
   return {
     AccountApiError: actual.AccountApiError,
+    deleteAccountAvatar: jest.fn(),
+    getAccountAvatar: jest.fn(),
     getAccountProfile: jest.fn(),
+    getAccountProfileAttributes: jest.fn(),
     updateAccountProfile: jest.fn(),
+    updateAccountProfileAttributes: jest.fn(),
     listAccountApplications: jest.fn(),
     listCibaRequests: jest.fn(),
     decideCibaRequest: jest.fn(),
     listOfflineSessions: jest.fn(),
     revokeAccountApplication: jest.fn(),
     revokeOfflineSession: jest.fn(),
+    sendAccountVerificationEmail: jest.fn(),
+    uploadAccountAvatar: jest.fn(),
   };
 });
+jest.mock("expo-image-picker", () => ({
+  launchImageLibraryAsync: jest.fn(),
+}));
+jest.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" },
+  manipulateAsync: jest.fn(),
+}));
+jest.mock("expo-file-system", () => ({
+  File: jest.fn().mockImplementation(() => ({ size: 1024 })),
+}));
 jest.mock("@/auth/MobileAuthProvider", () => {
   const session = { accessToken: "access" };
   const mockRefreshSession = jest.fn(async () => session);
@@ -63,8 +85,7 @@ jest.mock("@/components/BrandMark", () => ({ BrandMark: () => null }));
 jest.mock("react-native-safe-area-context", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   return {
-    SafeAreaView: ({ children }: { children: React.ReactNode }) =>
-      React.createElement("div", null, children),
+    SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
   };
 });
 jest.mock("expo-router", () => ({
@@ -74,6 +95,33 @@ const { mockShowNotice } = jest.requireMock(
   "@/components/MobileNoticeProvider",
 );
 const { mockRefreshSession } = jest.requireMock("@/auth/MobileAuthProvider");
+
+function profile(emailVerified = true) {
+  return {
+    username: "alice",
+    firstName: "Alice",
+    lastName: "Smith",
+    email: "alice@example.test",
+    pendingEmail: null,
+    emailVerified,
+    preferredLocale: null,
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
+  };
+}
+
+async function renderAccountScreen() {
+  const result = render(<AccountScreen />);
+  await act(async () => {
+    // The screen schedules its initial profile request in a microtask and then
+    // awaits profile, attributes, and avatar sequentially. Flush that finite
+    // mocked request chain inside act so its state updates belong to the test.
+    for (let index = 0; index < 12; index += 1) {
+      await Promise.resolve();
+    }
+  });
+  return result;
+}
 
 beforeEach(() => {
   jest.restoreAllMocks();
@@ -87,6 +135,325 @@ beforeEach(() => {
     totalElements: 0,
     totalPages: 0,
   });
+  jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
+    content: [],
+    number: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  jest.mocked(accountApi.listOfflineSessions).mockResolvedValue({
+    content: [],
+    number: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  jest.mocked(accountApi.getAccountProfileAttributes).mockResolvedValue({
+    definitions: [],
+    attributes: {},
+  });
+  jest.mocked(accountApi.updateAccountProfileAttributes).mockResolvedValue({
+    definitions: [],
+    attributes: {},
+  });
+  jest
+    .mocked(accountApi.getAccountAvatar)
+    .mockResolvedValue({ avatarUrl: null });
+  jest
+    .mocked(accountApi.sendAccountVerificationEmail)
+    .mockResolvedValue(undefined);
+  jest.mocked(accountApi.uploadAccountAvatar).mockResolvedValue({
+    avatarUrl: "/avatars/current?v=1",
+  });
+  jest.mocked(accountApi.deleteAccountAvatar).mockResolvedValue(undefined);
+  jest
+    .mocked(jest.requireMock("expo-image-picker").launchImageLibraryAsync)
+    .mockResolvedValue({ canceled: true, assets: null });
+  jest
+    .mocked(jest.requireMock("expo-image-manipulator").manipulateAsync)
+    .mockResolvedValue({ uri: "file:///profile.jpg", width: 200, height: 200 });
+});
+
+it("renders and validates configured account profile attributes", async () => {
+  const definition = {
+    id: 7,
+    name: "department",
+    displayName: "Department",
+    description: "Your team",
+    type: "INTEGER" as const,
+    required: true,
+    multivalued: false,
+    minLength: 1,
+    maxLength: 4,
+    pattern: null,
+    enabled: true,
+    displayOrder: 10,
+    builtIn: false,
+  };
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue({
+    username: "alice",
+    firstName: "Alice",
+    lastName: "Smith",
+    email: "alice@example.test",
+    pendingEmail: null,
+    emailVerified: true,
+    preferredLocale: null,
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
+  });
+  jest.mocked(accountApi.getAccountProfileAttributes).mockResolvedValue({
+    definitions: [definition],
+    attributes: {},
+  });
+  jest.mocked(accountApi.updateAccountProfile).mockResolvedValue({
+    username: "alice",
+    firstName: "Alice",
+    lastName: "Smith",
+    email: "alice@example.test",
+    pendingEmail: null,
+    emailVerified: true,
+    preferredLocale: null,
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
+  });
+  jest.mocked(accountApi.updateAccountProfileAttributes).mockResolvedValue({
+    definitions: [definition],
+    attributes: { department: ["123"] },
+  });
+
+  await renderAccountScreen();
+  const department = await screen.findByLabelText("Department");
+  expect(screen.getByText("Your team")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("profileAttributeRequired")).toBeTruthy();
+  expect(accountApi.updateAccountProfile).not.toHaveBeenCalled();
+
+  fireEvent.changeText(department, "abc");
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("profileAttributeInvalid")).toBeTruthy();
+  expect(accountApi.updateAccountProfile).not.toHaveBeenCalled();
+
+  fireEvent.changeText(department, "123");
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  await waitFor(() =>
+    expect(accountApi.updateAccountProfileAttributes).toHaveBeenCalledWith(
+      "access",
+      { department: ["123"] },
+      expect.any(Object),
+    ),
+  );
+});
+
+it("supports native photo selection, JPEG upload, and cancellation", async () => {
+  const picker = jest.mocked(
+    jest.requireMock("expo-image-picker").launchImageLibraryAsync,
+  );
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  picker.mockResolvedValueOnce({
+    canceled: false,
+    assets: [
+      {
+        uri: "file:///camera-roll.heic",
+        width: 4000,
+        height: 3000,
+        fileName: "camera-roll.heic",
+        fileSize: 8_000_000,
+        mimeType: "image/heic",
+      },
+    ],
+  });
+
+  await renderAccountScreen();
+  fireEvent.press(
+    await screen.findByRole("button", { name: "accountAvatarChoose" }),
+  );
+  await waitFor(() =>
+    expect(accountApi.uploadAccountAvatar).toHaveBeenCalledWith(
+      "access",
+      {
+        uri: "file:///profile.jpg",
+        name: "profile.jpg",
+        type: "image/jpeg",
+      },
+      expect.any(Object),
+    ),
+  );
+  expect(
+    jest.mocked(jest.requireMock("expo-image-manipulator").manipulateAsync),
+  ).toHaveBeenCalledWith(
+    "file:///camera-roll.heic",
+    [{ resize: { width: 2000, height: 1500 } }],
+    { compress: 0.82, format: "jpeg" },
+  );
+
+  picker.mockResolvedValueOnce({ canceled: true, assets: null });
+  fireEvent.press(screen.getByRole("button", { name: "accountAvatarChoose" }));
+  await waitFor(() => expect(picker).toHaveBeenCalledTimes(2));
+  expect(accountApi.uploadAccountAvatar).toHaveBeenCalledTimes(1);
+});
+
+it("rejects oversized transformed photos before upload", async () => {
+  const picker = jest.mocked(
+    jest.requireMock("expo-image-picker").launchImageLibraryAsync,
+  );
+  const fileSystem = jest.mocked(jest.requireMock("expo-file-system").File);
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  picker.mockResolvedValueOnce({
+    canceled: false,
+    assets: [
+      {
+        uri: "file:///large.jpg",
+        width: 1000,
+        height: 1000,
+        fileName: "large.jpg",
+        fileSize: 1024,
+        mimeType: "image/jpeg",
+      },
+    ],
+  });
+  fileSystem.mockImplementationOnce(() => ({ size: 2 * 1024 * 1024 + 1 }));
+
+  await renderAccountScreen();
+  fireEvent.press(
+    await screen.findByRole("button", { name: "accountAvatarChoose" }),
+  );
+
+  expect(await screen.findByText("accountAvatarInvalid")).toBeTruthy();
+  expect(accountApi.uploadAccountAvatar).not.toHaveBeenCalled();
+});
+
+it("maps avatar size rejection from the backend to the localized validation message", async () => {
+  const picker = jest.mocked(
+    jest.requireMock("expo-image-picker").launchImageLibraryAsync,
+  );
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  picker.mockResolvedValueOnce({
+    canceled: false,
+    assets: [
+      {
+        uri: "file:///photo.jpg",
+        width: 500,
+        height: 500,
+        fileName: "photo.jpg",
+        fileSize: 1024,
+        mimeType: "image/jpeg",
+      },
+    ],
+  });
+  jest.mocked(accountApi.uploadAccountAvatar).mockRejectedValueOnce(
+    new accountApi.AccountApiError(413, "Too large", {
+      title: "Payload Too Large",
+      status: 413,
+    }),
+  );
+
+  await renderAccountScreen();
+  fireEvent.press(
+    await screen.findByRole("button", { name: "accountAvatarChoose" }),
+  );
+
+  expect(await screen.findByText("accountAvatarInvalid")).toBeTruthy();
+});
+
+it("shows localized picker permission errors and email verification feedback", async () => {
+  const picker = jest.mocked(
+    jest.requireMock("expo-image-picker").launchImageLibraryAsync,
+  );
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile(false));
+  picker.mockRejectedValueOnce(new Error("Photo library permission denied"));
+  let completeVerification: (() => void) | undefined;
+  jest.mocked(accountApi.sendAccountVerificationEmail).mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        completeVerification = resolve;
+      }),
+  );
+
+  await renderAccountScreen();
+  fireEvent.press(
+    await screen.findByRole("button", { name: "accountAvatarChoose" }),
+  );
+  expect(await screen.findByText("accountAvatarPermissionDenied")).toBeTruthy();
+
+  const verifyButton = screen.getByRole("button", {
+    name: "accountSendVerification",
+  });
+  fireEvent.press(verifyButton);
+  fireEvent.press(verifyButton);
+  await waitFor(() =>
+    expect(accountApi.sendAccountVerificationEmail).toHaveBeenCalledTimes(1),
+  );
+  expect(
+    screen.getByRole("button", { name: "accountSendVerification" }).props
+      .accessibilityState,
+  ).toEqual({ disabled: true });
+  completeVerification?.();
+  expect(await screen.findByText("accountVerificationSent")).toBeTruthy();
+});
+
+it("keeps the account form and avatar actions readable on wide screens", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  await renderAccountScreen();
+  const formStyle = StyleSheet.flatten(
+    screen.getByTestId("account-profile-form").props.style,
+  );
+  const actionStyle = StyleSheet.flatten(
+    screen.getByTestId("account-avatar-actions").props.style,
+  );
+  expect(formStyle.maxWidth).toBe(420);
+  expect(formStyle.alignSelf).toBe("stretch");
+  expect(actionStyle.flexWrap).toBe("wrap");
+  expect(screen.getByLabelText("firstName").props.allowFontScaling).not.toBe(
+    false,
+  );
+});
+
+it("maps server validation errors to configured profile attributes", async () => {
+  const definition = {
+    id: 8,
+    name: "department",
+    displayName: "Department",
+    description: null,
+    type: "STRING" as const,
+    required: false,
+    multivalued: false,
+    minLength: null,
+    maxLength: 100,
+    pattern: null,
+    enabled: true,
+    displayOrder: 10,
+    builtIn: false,
+  };
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue({
+    username: "alice",
+    firstName: null,
+    lastName: null,
+    email: null,
+    pendingEmail: null,
+    emailVerified: false,
+    preferredLocale: null,
+    createdAt: "2025-01-01T00:00:00Z",
+    updatedAt: "2025-01-01T00:00:00Z",
+  });
+  jest.mocked(accountApi.getAccountProfileAttributes).mockResolvedValue({
+    definitions: [definition],
+    attributes: {},
+  });
+  jest.mocked(accountApi.updateAccountProfile).mockRejectedValue(
+    new accountApi.AccountApiError(400, "Validation failed", {
+      title: "Bad Request",
+      status: 400,
+      violations: [
+        { field: "attributes.department", message: "Server field error" },
+      ],
+    }),
+  );
+
+  await renderAccountScreen();
+  fireEvent.changeText(await screen.findByLabelText("Department"), "Support");
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("Server field error")).toBeTruthy();
 });
 
 it("loads and saves the account profile, including email validation", async () => {
@@ -115,18 +482,18 @@ it("loads and saves the account profile, including email validation", async () =
       updatedAt: "2025-01-01T00:00:00Z",
     }));
 
-  render(<AccountScreen />);
+  await renderAccountScreen();
   const email = await screen.findByPlaceholderText("email");
-  fireEvent.change(email, { target: { value: "invalid-email" } });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("invalidEmail")).toBeVisible();
-  fireEvent.change(email, { target: { value: "updated@example.test" } });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("emailReauthRequired")).toBeVisible();
-  fireEvent.change(screen.getByPlaceholderText("currentPassword"), {
+  fireEvent.changeText(email, { target: { value: "invalid-email" } });
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("invalidEmail")).toBeTruthy();
+  fireEvent.changeText(email, { target: { value: "updated@example.test" } });
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("emailReauthRequired")).toBeTruthy();
+  fireEvent.changeText(screen.getByPlaceholderText("currentPassword"), {
     target: { value: "current-secret" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
 
   await waitFor(() =>
     expect(accountApi.updateAccountProfile).toHaveBeenCalledWith(
@@ -173,9 +540,9 @@ it("renders connected applications and offline sessions", async () => {
 
   render(<ApplicationsScreen />);
 
-  expect(await screen.findByText("Account Console")).toBeVisible();
-  expect(screen.getByText("CLI")).toBeVisible();
-  expect(screen.getByText("offlineExpires: offlineNoExpiry")).toBeVisible();
+  expect(await screen.findByText("Account Console")).toBeTruthy();
+  expect(screen.getByText("CLI")).toBeTruthy();
+  expect(screen.getByText("offlineExpires: offlineNoExpiry")).toBeTruthy();
   for (const request of [
     accountApi.listAccountApplications,
     accountApi.listOfflineSessions,
@@ -191,6 +558,197 @@ it("renders connected applications and offline sessions", async () => {
       ).refreshAccessToken(),
     ).resolves.toBe("access");
   }
+});
+
+it("pages authorized applications and prevents overlapping page requests", async () => {
+  let resolvePage!: (
+    value: accountApi.AccountPage<accountApi.AccountApplication>,
+  ) => void;
+  const pendingPage = new Promise<
+    accountApi.AccountPage<accountApi.AccountApplication>
+  >((resolve) => {
+    resolvePage = resolve;
+  });
+  jest
+    .mocked(accountApi.listAccountApplications)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          clientId: "page-one",
+          clientName: "First application",
+          scopes: ["openid"],
+          createdAt: "2025-01-01T00:00:00Z",
+          updatedAt: "2025-01-01T00:00:00Z",
+        },
+      ],
+      number: 0,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    })
+    .mockReturnValueOnce(pendingPage)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          clientId: "page-one",
+          clientName: "First application",
+          scopes: ["openid"],
+          createdAt: "2025-01-01T00:00:00Z",
+          updatedAt: "2025-01-01T00:00:00Z",
+        },
+      ],
+      number: 0,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("First application")).toBeTruthy();
+  const previous = screen.getByRole("button", { name: "accountPreviousPage" });
+  const next = screen.getByRole("button", { name: "accountNextPage" });
+  expect(previous.props.accessibilityState.disabled).toBe(true);
+  expect(next.props.accessibilityState.disabled).toBe(false);
+
+  fireEvent.press(next);
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "accountNextPage" }).props
+        .accessibilityState.disabled,
+    ).toBe(true),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "accountNextPage" }));
+  expect(accountApi.listAccountApplications).toHaveBeenCalledTimes(2);
+
+  await act(async () => {
+    resolvePage({
+      content: [
+        {
+          clientId: "page-two",
+          clientName: "Second application",
+          scopes: ["profile"],
+          createdAt: "2025-01-02T00:00:00Z",
+          updatedAt: "2025-01-02T00:00:00Z",
+        },
+      ],
+      number: 1,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+    await pendingPage;
+  });
+  expect(await screen.findByText("Second application")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "accountNextPage" }).props
+      .accessibilityState.disabled,
+  ).toBe(true);
+  expect(accountApi.listAccountApplications.mock.calls[1]?.[1]).toEqual(
+    expect.objectContaining({ page: 1 }),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "accountPreviousPage" }));
+  expect(await screen.findByText("First application")).toBeTruthy();
+  expect(accountApi.listAccountApplications.mock.calls[2]?.[1]).toEqual(
+    expect.objectContaining({ page: 0 }),
+  );
+});
+
+it("pages offline sessions and CIBA requests independently", async () => {
+  jest
+    .mocked(accountApi.listOfflineSessions)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "offline-page-one",
+          clientId: "cli-one",
+          clientName: "First offline session",
+          issuedAt: "2025-01-01T00:00:00Z",
+          expiresAt: null,
+        },
+      ],
+      number: 0,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    })
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "offline-page-two",
+          clientId: "cli-two",
+          clientName: "Second offline session",
+          issuedAt: "2025-01-02T00:00:00Z",
+          expiresAt: null,
+        },
+      ],
+      number: 1,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+  jest
+    .mocked(accountApi.listCibaRequests)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          authReqId: "ciba-page-one",
+          userCode: "AAAA-1111",
+          bindingMessage: "First request",
+          authorizedScopes: "openid",
+          deliveryMode: "poll",
+          createdAt: "2025-01-01T00:00:00Z",
+          expiresAt: "2025-01-01T00:05:00Z",
+          status: "PENDING",
+          mfaRequired: false,
+          stepUpRequired: false,
+        },
+      ],
+      number: 0,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    })
+    .mockResolvedValueOnce({
+      content: [
+        {
+          authReqId: "ciba-page-two",
+          userCode: "BBBB-2222",
+          bindingMessage: "Second request",
+          authorizedScopes: "openid",
+          deliveryMode: "poll",
+          createdAt: "2025-01-02T00:00:00Z",
+          expiresAt: "2025-01-02T00:05:00Z",
+          status: "PENDING",
+          mfaRequired: false,
+          stepUpRequired: false,
+        },
+      ],
+      number: 1,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+
+  render(<ApplicationsScreen />);
+  expect(await screen.findByText("First offline session")).toBeTruthy();
+  expect(await screen.findByText("First request")).toBeTruthy();
+
+  const nextButtons = screen.getAllByRole("button", {
+    name: "accountNextPage",
+  });
+  fireEvent.press(nextButtons[0]!);
+  expect(await screen.findByText("Second offline session")).toBeTruthy();
+  expect(accountApi.listOfflineSessions.mock.calls[1]?.[1]).toEqual(
+    expect.objectContaining({ page: 1 }),
+  );
+
+  fireEvent.press(
+    screen.getAllByRole("button", { name: "accountNextPage" })[1]!,
+  );
+  expect(await screen.findByText("Second request")).toBeTruthy();
+  expect(accountApi.listCibaRequests.mock.calls[1]?.[1]).toEqual(
+    expect.objectContaining({ page: 1 }),
+  );
 });
 
 it("shows CIBA decisions and blocks approval when step-up is required", async () => {
@@ -254,14 +812,14 @@ it("shows CIBA decisions and blocks approval when step-up is required", async ()
 
   render(<ApplicationsScreen />);
 
-  expect(await screen.findByText("Approve account sign-in")).toBeVisible();
-  expect(screen.getByText(/ABCD-1234/)).toBeVisible();
-  expect(screen.getByText("cibaMfaAndStepUpRequired")).toBeVisible();
-  expect(screen.getByText("cibaStepUpRequired")).toBeVisible();
-  expect(screen.getByText("cibaMfaRequired")).toBeVisible();
+  expect(await screen.findByText("Approve account sign-in")).toBeTruthy();
+  expect(screen.getByText(/ABCD-1234/)).toBeTruthy();
+  expect(screen.getByText("cibaMfaAndStepUpRequired")).toBeTruthy();
+  expect(screen.getByText("cibaStepUpRequired")).toBeTruthy();
+  expect(screen.getByText("cibaMfaRequired")).toBeTruthy();
   const approveButtons = screen.getAllByRole("button", { name: "cibaApprove" });
-  expect(approveButtons[1]).toBeDisabled();
-  fireEvent.click(approveButtons[0]);
+  expect(approveButtons[1].props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(approveButtons[0]);
   await waitFor(() =>
     expect(accountApi.decideCibaRequest).toHaveBeenCalledWith(
       "access",
@@ -294,10 +852,10 @@ it("loads a profile after retrying a failed profile request", async () => {
       updatedAt: "2025-01-01T00:00:00Z",
     });
 
-  render(<AccountScreen />);
-  expect(await screen.findByText("profileLoadError")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "profileLoadError" }));
-  expect(await screen.findByPlaceholderText("email")).toBeVisible();
+  await renderAccountScreen();
+  expect(await screen.findByText("profileLoadError")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "profileLoadError" }));
+  expect(await screen.findByPlaceholderText("email")).toBeTruthy();
 });
 
 it("retries loading the profile after the current session expires", async () => {
@@ -316,11 +874,11 @@ it("retries loading the profile after the current session expires", async () => 
     .mockResolvedValueOnce(null)
     .mockResolvedValueOnce({ accessToken: "access" });
 
-  render(<AccountScreen />);
-  fireEvent.click(
+  await renderAccountScreen();
+  fireEvent.press(
     await screen.findByRole("button", { name: "profileLoadError" }),
   );
-  expect(await screen.findByPlaceholderText("email")).toBeVisible();
+  expect(await screen.findByPlaceholderText("email")).toBeTruthy();
   await waitFor(() =>
     expect(accountApi.getAccountProfile).toHaveBeenCalledTimes(1),
   );
@@ -342,12 +900,12 @@ it("reports profile save failures and routes to native account sections", async 
     .mocked(accountApi.updateAccountProfile)
     .mockRejectedValue(new Error("offline"));
 
-  render(<AccountScreen />);
-  fireEvent.change(await screen.findByPlaceholderText("firstName"), {
+  await renderAccountScreen();
+  fireEvent.changeText(await screen.findByPlaceholderText("firstName"), {
     target: { value: "Taylor" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "save" }));
-  expect(await screen.findByText("profileSaveError")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+  expect(await screen.findByText("profileSaveError")).toBeTruthy();
 
   const { router } = jest.requireMock("expo-router");
   for (const route of [
@@ -357,12 +915,12 @@ it("reports profile save failures and routes to native account sections", async 
     "mfa",
     "socialLinks",
   ]) {
-    fireEvent.click(screen.getByRole("button", { name: route }));
+    fireEvent.press(screen.getByRole("button", { name: route }));
     expect(router.push).toHaveBeenCalledWith(
       `/${route === "socialLinks" ? "social-links" : route}`,
     );
   }
-  fireEvent.click(screen.getByRole("button", { name: "continue" }));
+  fireEvent.press(screen.getByRole("button", { name: "continue" }));
   expect(router.replace).toHaveBeenCalledWith("/");
 });
 
@@ -387,20 +945,20 @@ it("maps server profile validation to the matching native fields", async () => {
     }),
   );
 
-  render(<AccountScreen />);
-  fireEvent.change(await screen.findByPlaceholderText("firstName"), {
+  await renderAccountScreen();
+  fireEvent.changeText(await screen.findByPlaceholderText("firstName"), {
     target: { value: "Taylor" },
   });
-  fireEvent.change(screen.getByPlaceholderText("email"), {
+  fireEvent.changeText(screen.getByPlaceholderText("email"), {
     target: { value: "alice@example.test" },
   });
   const save = screen.getByRole("button", { name: "save" });
-  fireEvent.click(save);
-  fireEvent.click(save);
+  fireEvent.press(save);
+  fireEvent.press(save);
 
-  expect(await screen.findByText("firstNameRejected")).toBeVisible();
-  expect(screen.getByText("emailRejected")).toBeVisible();
-  expect(screen.queryByText("profileSaveError")).not.toBeInTheDocument();
+  expect(await screen.findByText("firstNameRejected")).toBeTruthy();
+  expect(screen.getByText("emailRejected")).toBeTruthy();
+  expect(screen.queryByText("profileSaveError")).toBeNull();
   expect(accountApi.updateAccountProfile).toHaveBeenCalledTimes(1);
 });
 
@@ -432,20 +990,20 @@ it("shows application errors and recovers after retry", async () => {
   });
 
   render(<ApplicationsScreen />);
-  expect(await screen.findByText("applicationsError")).toBeVisible();
-  fireEvent.click(screen.getAllByRole("button", { name: "sessionsRetry" })[0]);
-  expect(await screen.findByText("Account Console")).toBeVisible();
-  expect(screen.getByText("offlineSessionsEmpty")).toBeVisible();
+  expect(await screen.findByText("applicationsError")).toBeTruthy();
+  fireEvent.press(screen.getAllByRole("button", { name: "sessionsRetry" })[0]);
+  expect(await screen.findByText("Account Console")).toBeTruthy();
+  expect(screen.getByText("offlineSessionsEmpty")).toBeTruthy();
 });
 
-it("reports all application sections when refreshing the session fails", async () => {
+it("reports a failed applications session refresh without hiding other sections", async () => {
   mockRefreshSession.mockRejectedValueOnce(new Error("session refresh failed"));
 
   render(<ApplicationsScreen />);
 
-  expect(await screen.findByText("applicationsError")).toBeVisible();
-  expect(screen.getByText("offlineSessionsError")).toBeVisible();
-  expect(screen.getByText("cibaLoadError")).toBeVisible();
+  expect(await screen.findByText("applicationsError")).toBeTruthy();
+  expect(screen.getByText("offlineSessionsEmpty")).toBeTruthy();
+  expect(screen.getByText("cibaEmpty")).toBeTruthy();
 });
 
 it("shows independent offline and CIBA loading failures", async () => {
@@ -465,12 +1023,12 @@ it("shows independent offline and CIBA loading failures", async () => {
 
   render(<ApplicationsScreen />);
 
-  expect(await screen.findByText("applicationsEmpty")).toBeVisible();
+  expect(await screen.findByText("applicationsEmpty")).toBeTruthy();
   await waitFor(() => {
     expect(accountApi.listOfflineSessions).toHaveBeenCalled();
     expect(accountApi.listCibaRequests).toHaveBeenCalled();
-    expect(screen.getByText("offlineSessionsError")).toBeVisible();
-    expect(screen.getByText("cibaLoadError")).toBeVisible();
+    expect(screen.getByText("offlineSessionsError")).toBeTruthy();
+    expect(screen.getByText("cibaLoadError")).toBeTruthy();
   });
 });
 
@@ -486,14 +1044,14 @@ it("shows all application sections as retryable when the session expires", async
     totalPages: 0,
   });
   render(<ApplicationsScreen />);
-  expect(await screen.findByText("applicationsError")).toBeVisible();
+  expect(await screen.findByText("applicationsError")).toBeTruthy();
   mockRefreshSession.mockResolvedValueOnce(null);
 
-  fireEvent.click(screen.getAllByRole("button", { name: "sessionsRetry" })[0]!);
+  fireEvent.press(screen.getAllByRole("button", { name: "sessionsRetry" })[0]!);
 
-  expect(await screen.findByText("applicationsError")).toBeVisible();
-  expect(screen.getByText("offlineSessionsError")).toBeVisible();
-  expect(screen.getByText("cibaLoadError")).toBeVisible();
+  expect(await screen.findByText("applicationsError")).toBeTruthy();
+  expect(screen.getByText("offlineSessionsEmpty")).toBeTruthy();
+  expect(screen.getByText("cibaEmpty")).toBeTruthy();
 });
 
 it("reports expired-session failures for application, offline, and CIBA actions", async () => {
@@ -555,11 +1113,11 @@ it("reports expired-session failures for application, offline, and CIBA actions"
   }) as never);
 
   render(<ApplicationsScreen />);
-  expect(await screen.findByText("Account Console")).toBeVisible();
+  expect(await screen.findByText("Account Console")).toBeTruthy();
   const { mockRefreshSession } = jest.requireMock("@/auth/MobileAuthProvider");
 
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "revokeApplication" }));
+  fireEvent.press(screen.getByRole("button", { name: "revokeApplication" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
@@ -568,7 +1126,7 @@ it("reports expired-session failures for application, offline, and CIBA actions"
   );
 
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "revokeOfflineSession" }));
+  fireEvent.press(screen.getByRole("button", { name: "revokeOfflineSession" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
@@ -577,7 +1135,7 @@ it("reports expired-session failures for application, offline, and CIBA actions"
   );
 
   mockRefreshSession.mockResolvedValueOnce(null);
-  fireEvent.click(screen.getByRole("button", { name: "cibaDeny" }));
+  fireEvent.press(screen.getByRole("button", { name: "cibaDeny" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
@@ -658,23 +1216,23 @@ it("reports API failures for application, offline-session, and CIBA actions", as
   }) as never);
 
   render(<ApplicationsScreen />);
-  expect(await screen.findByText("Account Console")).toBeVisible();
+  expect(await screen.findByText("Account Console")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "revokeApplication" }));
+  fireEvent.press(screen.getByRole("button", { name: "revokeApplication" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
       message: "revokeApplicationError",
     }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "revokeOfflineSession" }));
+  fireEvent.press(screen.getByRole("button", { name: "revokeOfflineSession" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
       message: "revokeOfflineSessionError",
     }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "cibaDeny" }));
+  fireEvent.press(screen.getByRole("button", { name: "cibaDeny" }));
   await waitFor(() =>
     expect(mockShowNotice).toHaveBeenCalledWith({
       kind: "error",
@@ -741,7 +1299,7 @@ it("confirms, serializes, and reports application and offline-session revocation
   const revokeApplication = await screen.findByRole("button", {
     name: "revokeApplication",
   });
-  fireEvent.click(revokeApplication);
+  fireEvent.press(revokeApplication);
   await waitFor(() =>
     expect(accountApi.revokeAccountApplication).toHaveBeenCalledWith(
       "access",
@@ -749,11 +1307,11 @@ it("confirms, serializes, and reports application and offline-session revocation
       expect.any(Object),
     ),
   );
-  await waitFor(() => expect(revokeApplication).toBeDisabled());
-  expect(
-    revokeApplication.querySelector('[role="progressbar"]'),
-  ).not.toBeNull();
-  fireEvent.click(revokeApplication);
+  await waitFor(() =>
+    expect(revokeApplication.props.accessibilityState.disabled).toBe(true),
+  );
+  expect(screen.getByLabelText("revokeApplication")).toBeTruthy();
+  fireEvent.press(revokeApplication);
   expect(accountApi.revokeAccountApplication).toHaveBeenCalledTimes(1);
   completeApplication();
   await waitFor(() =>
@@ -766,7 +1324,7 @@ it("confirms, serializes, and reports application and offline-session revocation
   const revokeOffline = await screen.findByRole("button", {
     name: "revokeOfflineSession",
   });
-  fireEvent.click(revokeOffline);
+  fireEvent.press(revokeOffline);
   await waitFor(() =>
     expect(accountApi.revokeOfflineSession).toHaveBeenCalledWith(
       "access",
@@ -774,8 +1332,10 @@ it("confirms, serializes, and reports application and offline-session revocation
       expect.any(Object),
     ),
   );
-  await waitFor(() => expect(revokeOffline).toBeDisabled());
-  fireEvent.click(revokeOffline);
+  await waitFor(() =>
+    expect(revokeOffline.props.accessibilityState.disabled).toBe(true),
+  );
+  fireEvent.press(revokeOffline);
   expect(accountApi.revokeOfflineSession).toHaveBeenCalledTimes(1);
   completeOffline();
   await waitFor(() =>

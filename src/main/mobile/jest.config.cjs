@@ -1,0 +1,27 @@
+module.exports = {
+  preset: "jest-expo",
+  testMatch: ["<rootDir>/src/**/*.coverage.test.tsx"],
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1",
+  },
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.cjs"],
+  collectCoverageFrom: [
+    "<rootDir>/src/app/admin.tsx",
+    "<rootDir>/src/app/account.tsx",
+    "<rootDir>/src/app/applications.tsx",
+    "<rootDir>/src/app/security.tsx",
+    "<rootDir>/src/app/mfa.tsx",
+    "<rootDir>/src/app/social-links.tsx",
+    "<rootDir>/src/app/register.tsx",
+    "<rootDir>/src/app/reset-password.tsx",
+    "<rootDir>/src/app/forgot-password.tsx",
+    "<rootDir>/src/auth/MobileAuthProvider.tsx",
+    "<rootDir>/src/updates/MobileUpdateProvider.tsx",
+    "<rootDir>/src/updates/install-update.ts",
+    "<rootDir>/src/auth/storage.ts",
+    "<rootDir>/src/components/AdminResourceEditor.tsx",
+    "<rootDir>/src/components/AuthCallbackScreen.tsx",
+  ],
+  coverageDirectory: "<rootDir>/coverage/ui",
+  coverageReporters: ["lcov", "text"],
+};

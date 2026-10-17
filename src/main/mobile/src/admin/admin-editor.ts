@@ -7,6 +7,68 @@ import type {
   AdminUserRequest,
 } from "@/api/admin-api";
 import type { AdminEditorResource } from "@/components/AdminResourceEditor";
+import { isValidEmail } from "../validation/email.ts";
+
+export type AdminEditorFieldError =
+  | "required"
+  | "email"
+  | "password"
+  | "role-required"
+  | "role-format"
+  | "parent-id";
+
+export function validateAdminEditor(
+  resource: AdminEditorResource,
+  values: Record<string, string>,
+  isCreate: boolean,
+): Record<string, AdminEditorFieldError> {
+  const errors: Record<string, AdminEditorFieldError> = {};
+  const required = (key: string) => {
+    if (!values[key]?.trim()) errors[key] = "required";
+  };
+
+  if (resource === "users") {
+    required("username");
+    if (values.email?.trim() && !isValidEmail(values.email.trim())) {
+      errors.email = "email";
+    }
+    if (isCreate && (values.password?.length ?? 0) < 12) {
+      errors.password = "password";
+    }
+    if (!splitValues(values.roles ?? "").length) {
+      errors.roles = "role-required";
+    }
+  } else if (resource === "clients") {
+    required("clientId");
+    required("clientName");
+    required("scopes");
+  } else if (resource === "scopes") {
+    required("name");
+  } else if (resource === "roles") {
+    required("name");
+    if (values.name?.trim() && !/^ROLE_[A-Z0-9_]+$/.test(values.name.trim())) {
+      errors.name = "role-format";
+    }
+  } else if (resource === "groups") {
+    required("name");
+    const parentId = values.parentId?.trim();
+    if (parentId && (!/^\d+$/.test(parentId) || Number(parentId) < 1)) {
+      errors.parentId = "parent-id";
+    }
+  } else {
+    for (const key of [
+      "registrationId",
+      "providerType",
+      "displayName",
+      "alias",
+      "iconKey",
+    ]) {
+      required(key);
+    }
+  }
+
+  return errors;
+}
 
 export function editorDefaults(
   resource: AdminEditorResource,
@@ -37,12 +99,44 @@ export function editorDefaults(
   return {
     providerType: "oidc",
     iconKey: "generic",
+    shortStateParameter: "false",
+    caseSensitiveUsername: "false",
     enabled: "true",
+    hideOnLogin: "false",
+    accountLinkingOnly: "false",
+    trustEmail: "false",
+    mfaRequired: "false",
+    requiredClaims: "",
+    storeTokens: "false",
+    storedTokensReadable: "false",
+    guiOrder: "0",
     showInAccountConsole: "always",
     syncMode: "import",
     clientAuthenticationMethod: "client_secret_basic",
     scopes: "openid,profile,email",
     userNameAttribute: "sub",
+    samlMetadataUri: "",
+    samlAssertingPartyEntityId: "",
+    samlSingleSignOnServiceUrl: "",
+    samlSingleLogoutServiceUrl: "",
+    samlIdpCertificate: "",
+    samlSigningCertificate: "",
+    samlServiceProviderEntityId: "",
+    samlSignAuthnRequests: "false",
+    samlWantAssertionsSigned: "true",
+    samlNameIdFormat: "",
+    samlPrincipalAttribute: "NameID",
+    samlEmailAttribute: "email",
+    samlFirstNameAttribute: "givenName",
+    samlLastNameAttribute: "sn",
+    samlGroupsAttribute: "groups",
+    samlDecryptionCertificate: "",
+    samlSignatureAlgorithm: "",
+    samlAuthnRequestBinding: "REDIRECT",
+    samlResponseBinding: "POST",
+    samlLogoutBinding: "REDIRECT",
+    samlForceAuthentication: "false",
+    samlPassSubject: "false",
   };
 }
 
@@ -147,53 +241,54 @@ export function toAdminRequest(
     displayName: values.displayName.trim(),
     alias: values.alias.trim(),
     iconKey: values.iconKey.trim() || "generic",
-    shortStateParameter: false,
-    caseSensitiveUsername: false,
-    enabled: true,
+    shortStateParameter: parseBoolean(values.shortStateParameter),
+    caseSensitiveUsername: parseBoolean(values.caseSensitiveUsername),
+    enabled: parseBoolean(values.enabled, true),
     clientId: values.clientId?.trim() || null,
     clientSecret: values.clientSecret?.trim() || null,
-    hideOnLogin: false,
-    accountLinkingOnly: false,
-    trustEmail: false,
-    mfaRequired: false,
-    requiredClaims: null,
-    storeTokens: false,
-    storedTokensReadable: false,
-    guiOrder: 0,
-    showInAccountConsole: "always",
-    syncMode: "import",
+    hideOnLogin: parseBoolean(values.hideOnLogin),
+    accountLinkingOnly: parseBoolean(values.accountLinkingOnly),
+    trustEmail: parseBoolean(values.trustEmail),
+    mfaRequired: parseBoolean(values.mfaRequired),
+    requiredClaims: values.requiredClaims?.trim() || null,
+    storeTokens: parseBoolean(values.storeTokens),
+    storedTokensReadable: parseBoolean(values.storedTokensReadable),
+    guiOrder: parseNonNegativeInteger(values.guiOrder),
+    showInAccountConsole: values.showInAccountConsole?.trim() || "always",
+    syncMode: values.syncMode?.trim() || "import",
     authorizationUri: values.authorizationUri?.trim() || null,
     tokenUri: values.tokenUri?.trim() || null,
     userInfoUri: values.userInfoUri?.trim() || null,
     jwkSetUri: values.jwkSetUri?.trim() || null,
     issuerUri: values.issuerUri?.trim() || null,
-    clientAuthenticationMethod: "client_secret_basic",
+    clientAuthenticationMethod:
+      values.clientAuthenticationMethod?.trim() || "client_secret_basic",
     scopes: values.scopes?.trim() || "openid,profile,email",
     userNameAttribute: values.userNameAttribute?.trim() || "sub",
-    samlMetadataUri: null,
-    samlAssertingPartyEntityId: null,
-    samlSingleSignOnServiceUrl: null,
-    samlSingleLogoutServiceUrl: null,
-    samlIdpCertificate: null,
+    samlMetadataUri: values.samlMetadataUri?.trim() || null,
+    samlAssertingPartyEntityId: values.samlAssertingPartyEntityId?.trim() || null,
+    samlSingleSignOnServiceUrl: values.samlSingleSignOnServiceUrl?.trim() || null,
+    samlSingleLogoutServiceUrl: values.samlSingleLogoutServiceUrl?.trim() || null,
+    samlIdpCertificate: values.samlIdpCertificate?.trim() || null,
     samlSigningPrivateKey: null,
-    samlSigningCertificate: null,
-    samlServiceProviderEntityId: null,
-    samlSignAuthnRequests: false,
-    samlWantAssertionsSigned: false,
-    samlNameIdFormat: null,
-    samlPrincipalAttribute: null,
-    samlEmailAttribute: null,
-    samlFirstNameAttribute: null,
-    samlLastNameAttribute: null,
-    samlGroupsAttribute: null,
+    samlSigningCertificate: values.samlSigningCertificate?.trim() || null,
+    samlServiceProviderEntityId: values.samlServiceProviderEntityId?.trim() || null,
+    samlSignAuthnRequests: parseBoolean(values.samlSignAuthnRequests),
+    samlWantAssertionsSigned: parseBoolean(values.samlWantAssertionsSigned, true),
+    samlNameIdFormat: values.samlNameIdFormat?.trim() || null,
+    samlPrincipalAttribute: values.samlPrincipalAttribute?.trim() || null,
+    samlEmailAttribute: values.samlEmailAttribute?.trim() || null,
+    samlFirstNameAttribute: values.samlFirstNameAttribute?.trim() || null,
+    samlLastNameAttribute: values.samlLastNameAttribute?.trim() || null,
+    samlGroupsAttribute: values.samlGroupsAttribute?.trim() || null,
     samlDecryptionPrivateKey: null,
-    samlDecryptionCertificate: null,
-    samlSignatureAlgorithm: null,
-    samlAuthnRequestBinding: null,
-    samlResponseBinding: null,
-    samlLogoutBinding: null,
-    samlForceAuthentication: false,
-    samlPassSubject: false,
+    samlDecryptionCertificate: values.samlDecryptionCertificate?.trim() || null,
+    samlSignatureAlgorithm: values.samlSignatureAlgorithm?.trim() || null,
+    samlAuthnRequestBinding: values.samlAuthnRequestBinding?.trim() || "REDIRECT",
+    samlResponseBinding: values.samlResponseBinding?.trim() || "POST",
+    samlLogoutBinding: values.samlLogoutBinding?.trim() || "REDIRECT",
+    samlForceAuthentication: parseBoolean(values.samlForceAuthentication),
+    samlPassSubject: parseBoolean(values.samlPassSubject),
   };
 }
 
@@ -235,7 +330,7 @@ export function editorValues(
     values.providerType = toDisplayString(source.providerType, "oidc");
     values.displayName = toDisplayString(source.displayName);
     values.alias = toDisplayString(source.alias);
-    values.iconKey = "generic";
+    values.iconKey = toDisplayString(source.iconKey, "generic");
   }
   return values;
 }
@@ -249,4 +344,13 @@ function splitValues(value: string, separator = /[,\n]/) {
     .split(separator)
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function parseBoolean(value: string | undefined, fallback = false) {
+  return value === undefined || value === "" ? fallback : value === "true";
+}
+
+function parseNonNegativeInteger(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
 }

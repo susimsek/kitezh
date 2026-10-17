@@ -51,6 +51,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView
+      testID="settings-screen"
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
       <View style={styles.screen}>
@@ -62,7 +63,13 @@ export default function SettingsScreen() {
             <Pressable
               accessibilityLabel={dictionary.back}
               accessibilityRole="button"
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace(session ? "/account" : "/");
+                }
+              }}
               style={[styles.back, { backgroundColor: palette.surfaceMuted }]}
             >
               <AppIcon
@@ -76,6 +83,30 @@ export default function SettingsScreen() {
               {dictionary.settingsTitle}
             </Text>
           </View>
+
+          {session ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/notifications")}
+              style={[
+                styles.notificationLink,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+              ]}
+              testID="settings-notifications"
+            >
+              <AppIcon name="bell" size={18} color={palette.primary} />
+              <Text style={{ color: palette.text, fontWeight: "700" }}>
+                {dictionary.notificationsTitle}
+              </Text>
+              <Text style={{ color: palette.textMuted, flex: 1 }}>
+                {dictionary.notificationsDescription}
+              </Text>
+              <AppIcon name="arrowRight" size={16} color={palette.textMuted} />
+            </Pressable>
+          ) : null}
 
           <SectionHeading
             icon="globe"
@@ -325,6 +356,7 @@ function Option({
 }>) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={onPress}
@@ -362,12 +394,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     minHeight: 48,
   },
+  notificationLink: {
+    alignItems: "center",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    minHeight: 56,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   back: {
     alignItems: "center",
     borderRadius: radii.pill,
-    height: 40,
+    height: 44,
     justifyContent: "center",
-    width: 40,
+    width: 44,
   },
   title: { fontSize: typography.pageTitle, fontWeight: "700" },
   sectionHeading: {
@@ -384,7 +426,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 30,
   },
-  sectionTitle: { fontSize: 17, fontWeight: "700" },
+  sectionTitle: { fontSize: 18, fontWeight: "700" },
   versionRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -400,7 +442,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.sm,
-    minHeight: 46,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
   },
   updateButtonText: { fontSize: 15, fontWeight: "700" },

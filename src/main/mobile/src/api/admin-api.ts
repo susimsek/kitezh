@@ -22,6 +22,60 @@ export type AdminDashboard = {
   consents: number;
 };
 
+export type AdminServerInfo = {
+  issuer: string;
+  discoveryEndpoint: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  introspectionEndpoint: string;
+  revocationEndpoint: string;
+  jwksEndpoint: string;
+  userInfoEndpoint: string;
+  endSessionEndpoint: string;
+  sessionTimeout: string | null;
+  activeSigningKey: {
+    kid: string;
+    type: string;
+    algorithm: string;
+    use: string;
+    createdAt: string;
+  } | null;
+};
+
+export type AdminAccessFlags = {
+  isAdmin: boolean;
+  queryClients: boolean;
+  viewClients: boolean;
+  manageClients: boolean;
+  queryUsers: boolean;
+  viewUsers: boolean;
+  manageUsers: boolean;
+  impersonateUsers: boolean;
+  queryGroups: boolean;
+  viewGroups: boolean;
+  manageGroups: boolean;
+  queryOrganizations: boolean;
+  viewOrganizations: boolean;
+  manageOrganizations: boolean;
+  viewRoles: boolean;
+  manageRoles: boolean;
+  viewSessions: boolean;
+  manageSessions: boolean;
+  viewConsents: boolean;
+  manageConsents: boolean;
+  viewEvents: boolean;
+  manageEvents: boolean;
+  viewKeys: boolean;
+  manageKeys: boolean;
+};
+
+export type AdminWhoAmI = {
+  username: string;
+  avatarUrl: string | null;
+  authorities: string[];
+  access: AdminAccessFlags;
+};
+
 export type AdminUser = {
   id: number;
   username: string;
@@ -65,6 +119,27 @@ export type AdminRole = {
   description: string | null;
 };
 
+export type AdminRoleUser = {
+  id: number;
+  username: string;
+  enabled: boolean;
+};
+
+export type AdminRoleDetail = AdminRole & {
+  userCount: number;
+  protectedRole: boolean;
+  users: AdminPage<AdminRoleUser>;
+  compositeRoles: string[];
+  compositeClientRoles: AdminClientRole[];
+};
+
+export type AdminClientRole = {
+  id: number;
+  clientId: string;
+  name: string;
+  description: string | null;
+};
+
 export type AdminGroup = {
   id: number;
   name: string;
@@ -74,6 +149,12 @@ export type AdminGroup = {
   effectiveRoles: string[];
   defaultGroup: boolean;
   userCount: number;
+};
+
+export type AdminGroupUser = {
+  id: number;
+  username: string;
+  enabled: boolean;
 };
 
 export type AdminIdentityProvider = {
@@ -127,6 +208,81 @@ export type AdminEvent = {
   details: string | null;
   occurredAt: string;
 };
+
+export type AdminEventSettings = {
+  eventsEnabled: boolean;
+  adminEventsEnabled: boolean;
+  adminEventsDetailsEnabled: boolean;
+  eventsExpirationDays: number;
+};
+
+export type AdminLocalizationSettings = {
+  internationalizationEnabled: boolean;
+  defaultLocale: string;
+  supportedLocales: string[];
+  availableLocales: string[];
+  availableBundles: string[];
+};
+
+export type AdminLocalizationSettingsRequest = Pick<
+  AdminLocalizationSettings,
+  "internationalizationEnabled" | "defaultLocale" | "supportedLocales"
+>;
+
+export type AdminEmailSettings = {
+  enabled: boolean;
+  fromAddress: string;
+  baseUrl: string;
+  host: string;
+  port: number;
+  username: string;
+  passwordConfigured: boolean;
+  smtpAuth: boolean;
+  starttls: boolean;
+  ssl: boolean;
+};
+
+export type AdminEmailSettingsRequest = Omit<
+  AdminEmailSettings,
+  "passwordConfigured"
+> & { password: string };
+
+export type NativeAdminLoginSettings = {
+  userRegistration: boolean;
+  forgotPassword: boolean;
+  rememberMe: boolean;
+  loginWithEmail: boolean;
+  verifyEmail: boolean;
+  sessionTimeoutMinutes: number;
+  passwordMinimumLength: number;
+  bruteForceEnabled: boolean;
+  bruteForceMaxFailures: number;
+  otpEnabled: boolean;
+  otpRequired: boolean;
+  passkeys: boolean;
+};
+
+export type AdminCibaPolicy = {
+  requestLifespanSeconds: number;
+  pollingIntervalSeconds: number;
+  deliveryMode: "all" | "poll" | "ping" | "push";
+  userVerification: "required" | "preferred" | "discouraged";
+  mfaRequired: boolean;
+  stepUpRequired: boolean;
+  stepUpAcr: string | null;
+};
+
+export type AdminOfflineAccessPolicy = {
+  idleTimeout: string;
+  maxLifespan: string | null;
+  maxLimited: boolean;
+  revokedBefore: string | null;
+};
+
+export type AdminOfflineAccessPolicyRequest = Pick<
+  AdminOfflineAccessPolicy,
+  "idleTimeout" | "maxLifespan" | "maxLimited"
+>;
 
 export type AdminUserRequest = {
   username: string;
@@ -348,6 +504,24 @@ export function getAdminDashboard(
   );
 }
 
+export function getAdminServerInfo(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminServerInfo>(
+    accessToken,
+    "/api/admin/server-info",
+    options,
+  );
+}
+
+export function getAdminWhoAmI(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminWhoAmI>(accessToken, "/api/admin/whoami", options);
+}
+
 export function listAdminUsers(
   accessToken: string,
   query = "",
@@ -425,6 +599,92 @@ export function listAdminRoles(
     accessToken,
     `/api/admin/roles?${params.toString()}`,
     options,
+  );
+}
+
+export function getAdminRoleDetail(
+  accessToken: string,
+  roleName: string,
+  query = "",
+  enabled: boolean | undefined = undefined,
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "username,asc",
+  });
+  if (enabled !== undefined) params.set("enabled", String(enabled));
+  return requestAdmin<AdminRoleDetail>(
+    accessToken,
+    `/api/admin/roles/${encodeURIComponent(roleName)}?${params.toString()}`,
+    options,
+  );
+}
+
+export function listAdminAvailableRoleUsers(
+  accessToken: string,
+  roleName: string,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "username,asc",
+  });
+  return requestAdmin<AdminPage<AdminRoleUser>>(
+    accessToken,
+    `/api/admin/roles/${encodeURIComponent(roleName)}/available-users?${params.toString()}`,
+    options,
+  );
+}
+
+export function assignAdminRoleUser(
+  accessToken: string,
+  roleName: string,
+  userId: number,
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "username,asc",
+  });
+  return jsonRequest<AdminRoleDetail>(
+    accessToken,
+    `/api/admin/roles/${encodeURIComponent(roleName)}/users?${params.toString()}`,
+    { userId },
+    options,
+  );
+}
+
+export function removeAdminRoleUser(
+  accessToken: string,
+  roleName: string,
+  userId: number,
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "username,asc",
+  });
+  return requestAdmin<AdminRoleDetail>(
+    accessToken,
+    `/api/admin/roles/${encodeURIComponent(roleName)}/users/${encodeURIComponent(userId)}?${params.toString()}`,
+    options,
+    { method: "DELETE" },
   );
 }
 
@@ -601,13 +861,200 @@ export function deleteAdminEvents(
   });
 }
 
+export function getAdminEventSettings(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminEventSettings>(
+    accessToken,
+    "/api/admin/events/config",
+    options,
+  );
+}
+
+export function updateAdminEventSettings(
+  accessToken: string,
+  settings: AdminEventSettings,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminEventSettings>(
+    accessToken,
+    "/api/admin/events/config",
+    options,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    },
+  );
+}
+
+export function getAdminLocalizationSettings(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminLocalizationSettings>(
+    accessToken,
+    "/api/admin/settings/localization",
+    options,
+  );
+}
+
+export function updateAdminLocalizationSettings(
+  accessToken: string,
+  settings: AdminLocalizationSettingsRequest,
+  options: RequestOptions = {},
+) {
+  return jsonRequest<AdminLocalizationSettings>(
+    accessToken,
+    "/api/admin/settings/localization",
+    settings,
+    options,
+    "PUT",
+  );
+}
+
+export function getAdminEmailSettings(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminEmailSettings>(
+    accessToken,
+    "/api/admin/settings/email",
+    options,
+  );
+}
+
+export function updateAdminEmailSettings(
+  accessToken: string,
+  settings: AdminEmailSettingsRequest,
+  options: RequestOptions = {},
+) {
+  return jsonRequest<AdminEmailSettings>(
+    accessToken,
+    "/api/admin/settings/email",
+    settings,
+    options,
+    "PUT",
+  );
+}
+
+export function testAdminEmailConnection(
+  accessToken: string,
+  settings: AdminEmailSettingsRequest,
+  options: RequestOptions = {},
+) {
+  return jsonRequest<void>(
+    accessToken,
+    "/api/admin/settings/email/test",
+    settings,
+    options,
+  );
+}
+
+export function getNativeAdminLoginSettings(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<NativeAdminLoginSettings>(
+    accessToken,
+    "/api/admin/settings/login/native",
+    options,
+  );
+}
+
+export function updateNativeAdminLoginSettings(
+  accessToken: string,
+  settings: NativeAdminLoginSettings,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<NativeAdminLoginSettings>(
+    accessToken,
+    "/api/admin/settings/login/native",
+    options,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    },
+  );
+}
+
+export function getAdminCibaPolicy(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminCibaPolicy>(
+    accessToken,
+    "/api/admin/settings/ciba-policy",
+    options,
+  );
+}
+
+export function updateAdminCibaPolicy(
+  accessToken: string,
+  policy: AdminCibaPolicy,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminCibaPolicy>(
+    accessToken,
+    "/api/admin/settings/ciba-policy",
+    options,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(policy),
+    },
+  );
+}
+
+export function getAdminOfflineAccessPolicy(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminOfflineAccessPolicy>(
+    accessToken,
+    "/api/admin/settings/offline-access",
+    options,
+  );
+}
+
+export function updateAdminOfflineAccessPolicy(
+  accessToken: string,
+  policy: AdminOfflineAccessPolicyRequest,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminOfflineAccessPolicy>(
+    accessToken,
+    "/api/admin/settings/offline-access",
+    options,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(policy),
+    },
+  );
+}
+
+export function revokeAllAdminOfflineAccess(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminOfflineAccessPolicy>(
+    accessToken,
+    "/api/admin/settings/offline-access/revoke-all",
+    options,
+    { method: "POST" },
+  );
+}
+
 export function revokeAdminConsent(
   accessToken: string,
   clientId: string,
   username: string,
   options: RequestOptions = {},
 ) {
-  return requestAdmin<void>(
+  return requestAdmin<AdminGroup>(
     accessToken,
     `/api/admin/consents/${encodeURIComponent(clientId)}/${encodeURIComponent(username)}`,
     options,
@@ -860,6 +1307,98 @@ export function deleteAdminGroup(
   return requestAdmin<void>(
     accessToken,
     `/api/admin/groups/${encodeURIComponent(groupId)}`,
+    options,
+    { method: "DELETE" },
+  );
+}
+
+export function listAdminGroupUsers(
+  accessToken: string,
+  groupId: number,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  return listAdminGroupMembershipUsers(
+    accessToken,
+    groupId,
+    "users",
+    query,
+    page,
+    size,
+    options,
+  );
+}
+
+export function listAdminAvailableGroupUsers(
+  accessToken: string,
+  groupId: number,
+  query = "",
+  page = 0,
+  size = 10,
+  options: RequestOptions = {},
+) {
+  return listAdminGroupMembershipUsers(
+    accessToken,
+    groupId,
+    "available-users",
+    query,
+    page,
+    size,
+    options,
+  );
+}
+
+function listAdminGroupMembershipUsers(
+  accessToken: string,
+  groupId: number,
+  collection: "users" | "available-users",
+  query: string,
+  page: number,
+  size: number,
+  options: RequestOptions,
+) {
+  const params = new URLSearchParams({
+    q: query,
+    page: String(page),
+    size: String(size),
+    sort: "username,asc",
+  });
+  return requestAdmin<AdminPage<AdminGroupUser>>(
+    accessToken,
+    `/api/admin/groups/${groupId}/${collection}?${params.toString()}`,
+    options,
+  );
+}
+
+export function addAdminGroupUser(
+  accessToken: string,
+  groupId: number,
+  userId: number,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminGroup>(
+    accessToken,
+    `/api/admin/groups/${groupId}/users`,
+    options,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    },
+  );
+}
+
+export function removeAdminGroupUser(
+  accessToken: string,
+  groupId: number,
+  userId: number,
+  options: RequestOptions = {},
+) {
+  return requestAdmin<AdminGroup>(
+    accessToken,
+    `/api/admin/groups/${groupId}/users/${userId}`,
     options,
     { method: "DELETE" },
   );

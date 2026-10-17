@@ -49,8 +49,6 @@ jobs:
           diff -qr src/main/resources/db helm/kitezh/db
           helm lint helm/kitezh
           helm template kitezh helm/kitezh >/dev/null
-          helm lint helm/kitezh-mcp
-          helm template kitezh-mcp helm/kitezh-mcp >/dev/null
 
       - name: Validate Terraform configuration
         run: |
@@ -356,9 +354,6 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm install --frozen-lockfile
 
-      - name: Install web test dependencies for native component coverage
-        run: pnpm --dir src/main/web install --frozen-lockfile
-
       - name: Type check mobile client
         working-directory: src/main/mobile
         run: pnpm run typecheck
@@ -383,16 +378,9 @@ jobs:
         working-directory: src/main/mobile
         run: pnpm run test:coverage
 
-      - name: Test native mobile screens and collect Sonar coverage
-        run: pnpm --dir src/main/web test:mobile:sonar-coverage
-
       - name: Test native fixture contract
         working-directory: src/main/mobile
         run: pnpm run test:fixture
-
-      - name: Build mobile web export
-        working-directory: src/main/mobile
-        run: pnpm run build:web
 
       - name: Upload mobile Sonar coverage
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

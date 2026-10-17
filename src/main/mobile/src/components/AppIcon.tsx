@@ -2,6 +2,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import {
   faArrowLeft,
   faArrowRight,
+  faBell,
   faBan,
   faCheck,
   faCircleCheck,
@@ -30,6 +31,7 @@ import type { AppIconName } from "@kitezh/shared/icons";
 
 const icons = {
   add: faPlus,
+  bell: faBell,
   arrowLeft: faArrowLeft,
   arrowRight: faArrowRight,
   check: faCheck,

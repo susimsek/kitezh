@@ -1,5 +1,6 @@
 {
   "expo": {
+    "platforms": ["ios", "android"],
     "name": "Kitezh",
     "slug": "kitezh",
     "version": "0.1.0",
@@ -45,6 +46,11 @@
         {
           "action": "VIEW",
           "category": ["BROWSABLE", "DEFAULT"],
+          "data": [{ "scheme": "kitezh", "host": "social-link", "path": "/callback" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
           "data": [{ "scheme": "kitezh", "host": "verify-email", "path": "/" }]
         },
         {
@@ -56,6 +62,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Kitezh to use a selected photo as your profile picture."
+        }
+      ],
       ["expo-secure-store", { "configureAndroidBackup": true }],
       [
         "expo-splash-screen",

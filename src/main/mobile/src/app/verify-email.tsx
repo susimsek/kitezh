@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { verifyEmail } from "@/api/public-api";
+import { PublicApiError, verifyEmail } from "@/api/public-api";
+import { publicErrorMessage } from "@/api/public-error-message";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -24,28 +25,34 @@ export default function VerifyEmailScreen() {
   const [pending, setPending] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   const submit = async () => {
     if (pending || completed) return;
     setAttempted(true);
     if (typeof token !== "string" || !token.trim()) {
-      setFailed(true);
+      setFailure(dictionary.verifyEmailError);
       return;
     }
     setPending(true);
     try {
       await verifyEmail(token.trim());
       setCompleted(true);
-    } catch {
-      setFailed(true);
+    } catch (cause) {
+      setFailure(
+        publicErrorMessage(
+          cause instanceof PublicApiError ? cause.kind : undefined,
+          dictionary,
+          "verifyEmailError",
+        ),
+      );
     } finally {
       setPending(false);
     }
   };
 
   let verificationContent: ReactNode = null;
-  if (pending || !attempted) {
+  if ((pending && !failure) || !attempted) {
     verificationContent = (
       <ActivityIndicator
         accessibilityLabel={dictionary.loading}
@@ -70,19 +77,25 @@ export default function VerifyEmailScreen() {
         </Pressable>
       </View>
     );
-  } else if (failed) {
+  } else if (failure) {
     verificationContent = (
       <View style={[styles.message, { borderColor: palette.danger }]}>
         <Text style={{ color: palette.danger }}>
-          {dictionary.verifyEmailError}
+          {failure}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: pending }}
+          accessibilityState={{ busy: pending, disabled: pending }}
           disabled={pending}
           onPress={() => void submit()}
           style={styles.action}
         >
+          {pending ? (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.primary}
+            />
+          ) : null}
           <Text style={{ color: palette.primary, fontWeight: "700" }}>
             {dictionary.sessionsRetry}
           </Text>
@@ -118,71 +131,7 @@ export default function VerifyEmailScreen() {
         <Text style={[styles.help, { color: palette.textMuted }]}>
           {dictionary.verifyEmailHelp}
         </Text>
-        {(() => {
-          if (pending || !attempted) {
-            return (
-              <ActivityIndicator
-                accessibilityLabel={dictionary.loading}
-                color={palette.primary}
-                style={styles.status}
-              />
-            );
-          } else {
-            if (completed) {
-              return (
-                <View
-                  style={[styles.message, { borderColor: palette.success }]}
-                >
-                  <Text style={{ color: palette.success }}>
-                    {dictionary.verifyEmailSuccess}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => router.replace("/sign-in")}
-                    style={styles.action}
-                  >
-                    <Text style={{ color: palette.primary, fontWeight: "700" }}>
-                      {dictionary.signIn}
-                    </Text>
-                  </Pressable>
-                </View>
-              );
-            } else {
-              if (failed) {
-                return (
-                  <View
-                    style={[styles.message, { borderColor: palette.danger }]}
-                  >
-                    <Text style={{ color: palette.danger }}>
-                      {dictionary.verifyEmailError}
-                    </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: pending }}
-                      disabled={pending}
-                      onPress={() => void submit()}
-                      style={[
-                        styles.action,
-                        { flexDirection: "row", gap: spacing.xs },
-                      ]}
-                    >
-                      {pending ? (
-                        <ActivityIndicator color={palette.primary} />
-                      ) : null}
-                      <Text
-                        style={{ color: palette.primary, fontWeight: "700" }}
-                      >
-                        {dictionary.sessionsRetry}
-                      </Text>
-                    </Pressable>
-                  </View>
-                );
-              } else {
-                return null;
-              }
-            }
-          }
-        })()}
+        {verificationContent}
       </ScrollView>
     </SafeAreaView>
   );
@@ -190,8 +139,20 @@ export default function VerifyEmailScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxl },
-  back: { alignItems: "center", flexDirection: "row", gap: spacing.xs },
+  content: {
+    alignSelf: "center",
+    maxWidth: 560,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+    width: "100%",
+  },
+  back: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+    minHeight: 44,
+    minWidth: 44,
+  },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   help: { fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   status: { marginTop: spacing.xl },
@@ -202,5 +163,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     padding: spacing.md,
   },
-  action: { minHeight: 44, justifyContent: "center" },
+  action: { minHeight: 44, minWidth: 44, justifyContent: "center" },
 });

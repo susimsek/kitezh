@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +37,8 @@ import {
   deleteAdminSession,
   revokeAdminConsent,
   getAdminDashboard,
+  getAdminServerInfo,
+  getAdminWhoAmI,
   listAdminClientScopes,
   listAdminClients,
   listAdminGroups,
@@ -47,10 +49,14 @@ import {
   listAdminKeys,
   rotateAdminKey,
   listAdminEvents,
+  getAdminEventSettings,
+  updateAdminEventSettings,
   deleteAdminEvents,
   listAdminUsers,
   setAdminUserEnabled,
   type AdminDashboard,
+  type AdminServerInfo,
+  type AdminAccessFlags,
   type AdminClient,
   type AdminClientScope,
   type AdminGroup,
@@ -62,6 +68,7 @@ import {
   type AdminUser,
   type AdminKey,
   type AdminEvent,
+  type AdminEventSettings as AdminEventSettingsModel,
   type AdminUserRequest,
   type AdminClientRequest,
   type AdminClientScopeRequest,
@@ -69,7 +76,14 @@ import {
   type AdminGroupRequest,
   type AdminIdentityProviderRequest,
 } from "@/api/admin-api";
-import { editorValues, toAdminRequest } from "./admin-editor";
+import { editorValues, toAdminRequest } from "@/admin/admin-editor";
+import { AdminLoginPolicySettings } from "@/admin/AdminLoginPolicySettings";
+import { AdminPolicySettings } from "@/admin/AdminPolicySettings";
+import { RoleMemberships } from "@/admin/RoleMemberships";
+import { AdminEventSettings } from "@/admin/AdminEventSettings";
+import { AdminEmailSettings } from "@/admin/AdminEmailSettings";
+import { AdminLocalizationSettings } from "@/admin/AdminLocalizationSettings";
+import { GroupMemberships } from "@/admin/GroupMemberships";
 import { AppIcon } from "@/components/AppIcon";
 import {
   AdminResourceEditor,
@@ -92,8 +106,143 @@ type AdminSection =
   | "sessions"
   | "consents"
   | "keys"
+  | "server-info"
   | "events"
   | "settings";
+
+const ADMIN_SECTIONS: readonly AdminSection[] = [
+  "dashboard",
+  "server-info",
+  "users",
+  "clients",
+  "scopes",
+  "roles",
+  "groups",
+  "identity-providers",
+  "sessions",
+  "consents",
+  "keys",
+  "events",
+  "settings",
+];
+
+type AdminReadErrorKind =
+  | "unauthorized"
+  | "forbidden"
+  | "offline"
+  | "timeout"
+  | "other";
+
+const EMPTY_ADMIN_ACCESS: AdminAccessFlags = {
+  isAdmin: false,
+  queryClients: false,
+  viewClients: false,
+  manageClients: false,
+  queryUsers: false,
+  viewUsers: false,
+  manageUsers: false,
+  impersonateUsers: false,
+  queryGroups: false,
+  viewGroups: false,
+  manageGroups: false,
+  queryOrganizations: false,
+  viewOrganizations: false,
+  manageOrganizations: false,
+  viewRoles: false,
+  manageRoles: false,
+  viewSessions: false,
+  manageSessions: false,
+  viewConsents: false,
+  manageConsents: false,
+  viewEvents: false,
+  manageEvents: false,
+  viewKeys: false,
+  manageKeys: false,
+};
+
+function normalizeAdminAccess(value: unknown): AdminAccessFlags {
+  if (!value || typeof value !== "object") return EMPTY_ADMIN_ACCESS;
+  const candidate = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.keys(EMPTY_ADMIN_ACCESS).map((key) => [key, candidate[key] === true]),
+  ) as unknown as AdminAccessFlags;
+}
+
+function canViewAdminSection(
+  section: AdminSection,
+  access: AdminAccessFlags,
+) {
+  switch (section) {
+    case "dashboard":
+    case "identity-providers":
+    case "keys":
+    case "server-info":
+      return access.isAdmin;
+    case "users":
+      return access.viewUsers || access.queryUsers;
+    case "clients":
+      return access.viewClients || access.queryClients;
+    case "scopes":
+      return access.viewClients || access.queryClients;
+    case "roles":
+      return access.viewRoles;
+    case "groups":
+      return access.viewGroups || access.queryGroups;
+    case "sessions":
+      return access.viewSessions;
+    case "consents":
+      return access.viewConsents;
+    case "events":
+      return access.viewEvents;
+    case "settings":
+      return access.isAdmin || access.viewEvents;
+  }
+}
+
+function canManageAdminResource(
+  resource: AdminEditorResource,
+  access: AdminAccessFlags,
+) {
+  switch (resource) {
+    case "users":
+      return access.manageUsers;
+    case "clients":
+    case "scopes":
+      return access.manageClients;
+    case "roles":
+      return access.manageRoles;
+    case "groups":
+      return access.manageGroups;
+    case "identity-providers":
+      return access.isAdmin;
+  }
+}
+
+function readErrorKind(cause: unknown): AdminReadErrorKind {
+  if (!(cause instanceof AdminApiError)) return "other";
+  if (cause.status === 401) return "unauthorized";
+  if (cause.status === 403) return "forbidden";
+  if (cause.kind === "offline" || cause.kind === "timeout") return cause.kind;
+  return "other";
+}
+
+function readErrorMessage(
+  errorKind: AdminReadErrorKind,
+  dictionary: ReturnType<typeof useLocale>["dictionary"],
+) {
+  switch (errorKind) {
+    case "unauthorized":
+      return dictionary.apiUnauthorized;
+    case "forbidden":
+      return dictionary.adminForbidden;
+    case "offline":
+      return dictionary.adminApiOfflineError;
+    case "timeout":
+      return dictionary.adminApiTimeoutError;
+    default:
+      return dictionary.adminLoadError;
+  }
+}
 
 export default function AdminScreen() {
   return (
@@ -109,7 +258,30 @@ function AdminConsole() {
   const { session, signIn, signOut, status, refreshSession } = useMobileAuth();
   const { showNotice } = useMobileNotice();
   const [section, setSection] = useState<AdminSection>("dashboard");
+  const [adminAccessState, setAdminAccessState] = useState<{
+    sessionKey: string;
+    access: AdminAccessFlags;
+  } | null>(null);
+  const [adminAccessLoading, setAdminAccessLoading] = useState(false);
+  const [adminAccessErrorState, setAdminAccessErrorState] = useState<{
+    sessionKey: string;
+    errorKind: AdminReadErrorKind;
+  } | null>(null);
+  const adminAccess =
+    session && adminAccessState?.sessionKey === session.accessToken
+      ? adminAccessState.access
+      : null;
+  const adminAccessError =
+    session && adminAccessErrorState?.sessionKey === session.accessToken
+      ? adminAccessErrorState.errorKind
+      : null;
+  const adminAccessRequestInFlight = useRef(false);
+  const contentScrollRef = useRef<ScrollView>(null);
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
+  const [serverInfo, setServerInfo] = useState<AdminServerInfo | null>(null);
+  const [serverInfoLoading, setServerInfoLoading] = useState(false);
+  const [serverInfoErrorKind, setServerInfoErrorKind] =
+    useState<AdminReadErrorKind | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [users, setUsers] = useState<AdminPage<AdminUser> | null>(null);
@@ -179,23 +351,79 @@ function AdminConsole() {
   const [consentActionKey, setConsentActionKey] = useState<string | null>(null);
   const [keys, setKeys] = useState<AdminPage<AdminKey> | null>(null);
   const [keysLoading, setKeysLoading] = useState(false);
-  const [keysErrorStatus, setKeysErrorStatus] = useState<number | null>(null);
+  const [keysErrorKind, setKeysErrorKind] =
+    useState<AdminReadErrorKind | null>(null);
   const [keyQuery, setKeyQuery] = useState("");
   const [keyPage, setKeyPage] = useState(0);
   const [keyActionKey, setKeyActionKey] = useState<string | null>(null);
   const [events, setEvents] = useState<AdminPage<AdminEvent> | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventsErrorStatus, setEventsErrorStatus] = useState<number | null>(
-    null,
-  );
+  const [eventsErrorKind, setEventsErrorKind] =
+    useState<AdminReadErrorKind | null>(null);
   const [eventQuery, setEventQuery] = useState("");
   const [eventPage, setEventPage] = useState(0);
   const [eventActionKey, setEventActionKey] = useState<string | null>(null);
+  const [eventSettings, setEventSettings] =
+    useState<AdminEventSettingsModel | null>(null);
+  const [eventSettingsLoading, setEventSettingsLoading] = useState(false);
+  const [eventSettingsErrorKind, setEventSettingsErrorKind] = useState<
+    "offline" | "timeout" | "forbidden" | "other" | null
+  >(null);
+  const [eventSettingsSaving, setEventSettingsSaving] = useState(false);
   const [editor, setEditor] = useState<AdminEditorState | null>(null);
+  const [roleMembershipName, setRoleMembershipName] = useState<string | null>(
+    null,
+  );
+  const [groupMembership, setGroupMembership] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [editorSaving, setEditorSaving] = useState(false);
+  const [editorServerErrors, setEditorServerErrors] = useState<
+    Record<string, string>
+  >({});
   const [resourceActionKey, setResourceActionKey] = useState<string | null>(
     null,
   );
+
+  const loadAdminAccess = useCallback(
+    async (retry = false) => {
+      if (!session || adminAccessRequestInFlight.current) return;
+      adminAccessRequestInFlight.current = true;
+      setAdminAccessLoading(true);
+      setAdminAccessErrorState(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        const identity = await getAdminWhoAmI(currentSession.accessToken, {
+          refreshAccessToken: async () =>
+            (await refreshSession(true))?.accessToken ?? null,
+        });
+        setAdminAccessState({
+          sessionKey: currentSession.accessToken,
+          access: normalizeAdminAccess(identity.access),
+        });
+      } catch (cause) {
+        setAdminAccessState(null);
+        setAdminAccessErrorState({
+          sessionKey: session.accessToken,
+          errorKind: readErrorKind(cause),
+        });
+      } finally {
+        adminAccessRequestInFlight.current = false;
+        setAdminAccessLoading(false);
+      }
+    },
+    [refreshSession, session],
+  );
+
+  const handleSignOut = useCallback(() => {
+    setAdminAccessState(null);
+    setAdminAccessErrorState(null);
+    void signOut();
+  }, [signOut]);
 
   const loadDashboard = useCallback(
     async (retry = false) => {
@@ -217,6 +445,31 @@ function AdminConsole() {
         setErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
       } finally {
         setLoading(false);
+      }
+    },
+    [refreshSession, session],
+  );
+
+  const loadServerInfo = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setServerInfoLoading(true);
+      setServerInfoErrorKind(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setServerInfo(
+          await getAdminServerInfo(currentSession.accessToken, {
+            refreshAccessToken: async () =>
+              (await refreshSession(true))?.accessToken ?? null,
+          }),
+        );
+      } catch (cause) {
+        setServerInfoErrorKind(readErrorKind(cause));
+      } finally {
+        setServerInfoLoading(false);
       }
     },
     [refreshSession, session],
@@ -255,7 +508,7 @@ function AdminConsole() {
 
   const updateUserEnabled = useCallback(
     async (user: AdminUser) => {
-      if (!session || userActionKey) return;
+      if (!session || !adminAccess?.manageUsers || userActionKey) return;
       const key = `enabled:${user.id}`;
       setUserActionKey(key);
       try {
@@ -285,6 +538,7 @@ function AdminConsole() {
       }
     },
     [
+      adminAccess?.manageUsers,
       dictionary.adminForbidden,
       dictionary.adminUserActionError,
       dictionary.adminUserUpdated,
@@ -298,7 +552,7 @@ function AdminConsole() {
 
   const unlockUser = useCallback(
     async (user: AdminUser) => {
-      if (!session || userActionKey) return;
+      if (!session || !adminAccess?.manageUsers || userActionKey) return;
       setUserActionKey(`unlock:${user.id}`);
       try {
         const currentSession = await refreshSession();
@@ -322,6 +576,7 @@ function AdminConsole() {
       }
     },
     [
+      adminAccess?.manageUsers,
       dictionary.adminForbidden,
       dictionary.adminUserActionError,
       dictionary.adminUserUpdated,
@@ -562,7 +817,7 @@ function AdminConsole() {
     async (retry = false) => {
       if (!session) return;
       setKeysLoading(true);
-      setKeysErrorStatus(null);
+      setKeysErrorKind(null);
       try {
         const currentSession = retry
           ? await refreshSession(true)
@@ -582,7 +837,7 @@ function AdminConsole() {
           ),
         );
       } catch (cause) {
-        setKeysErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+        setKeysErrorKind(readErrorKind(cause));
       } finally {
         setKeysLoading(false);
       }
@@ -594,7 +849,7 @@ function AdminConsole() {
     async (retry = false) => {
       if (!session) return;
       setEventsLoading(true);
-      setEventsErrorStatus(null);
+      setEventsErrorKind(null);
       try {
         const currentSession = retry
           ? await refreshSession(true)
@@ -613,7 +868,7 @@ function AdminConsole() {
           ),
         );
       } catch (cause) {
-        setEventsErrorStatus(cause instanceof AdminApiError ? cause.status : 0);
+        setEventsErrorKind(readErrorKind(cause));
       } finally {
         setEventsLoading(false);
       }
@@ -621,8 +876,82 @@ function AdminConsole() {
     [eventPage, eventQuery, refreshSession, session],
   );
 
+  const loadEventSettings = useCallback(
+    async (retry = false) => {
+      if (!session) return;
+      setEventSettingsLoading(true);
+      setEventSettingsErrorKind(null);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) return;
+        setEventSettings(
+          await getAdminEventSettings(currentSession.accessToken, {
+            refreshAccessToken: async () =>
+              (await refreshSession(true))?.accessToken ?? null,
+          }),
+        );
+      } catch (cause) {
+        setEventSettingsErrorKind(
+          cause instanceof AdminApiError
+            ? cause.status === 403
+              ? "forbidden"
+              : cause.kind === "offline" || cause.kind === "timeout"
+                ? cause.kind
+                : "other"
+            : "other",
+        );
+      } finally {
+        setEventSettingsLoading(false);
+      }
+    },
+    [refreshSession, session],
+  );
+
+  const saveEventSettings = useCallback(
+    async (settings: AdminEventSettingsModel) => {
+      if (
+        !session ||
+        !adminAccess ||
+        !(adminAccess.isAdmin || adminAccess.manageEvents) ||
+        eventSettingsSaving
+      ) return;
+      setEventSettingsSaving(true);
+      try {
+        const currentSession = await refreshSession();
+        if (!currentSession) throw new Error("No active session");
+        const saved = await updateAdminEventSettings(
+          currentSession.accessToken,
+          settings,
+          {
+            refreshAccessToken: async () =>
+              (await refreshSession(true))?.accessToken ?? null,
+          },
+        );
+        setEventSettings(saved);
+        showNotice({ kind: "success", message: dictionary.adminUpdated });
+      } catch (cause) {
+        showNotice({
+          kind: "error",
+          message:
+            cause instanceof AdminApiError && cause.status === 403
+              ? dictionary.adminForbidden
+              : cause instanceof AdminApiError && cause.kind === "offline"
+                ? dictionary.adminEventSettingsOfflineError
+                : cause instanceof AdminApiError && cause.kind === "timeout"
+                  ? dictionary.adminEventSettingsTimeoutError
+                  : dictionary.adminEventSettingsSaveError,
+        });
+      } finally {
+        setEventSettingsSaving(false);
+      }
+    },
+    [adminAccess, dictionary, eventSettingsSaving, refreshSession, session, showNotice],
+  );
+
   const rotateKey = useCallback(async () => {
-    if (!session || keyActionKey) return;
+    if (!session || !adminAccess?.manageKeys || keyActionKey) return;
     setKeyActionKey("rotate");
     try {
       const currentSession = await refreshSession();
@@ -644,10 +973,10 @@ function AdminConsole() {
     } finally {
       setKeyActionKey(null);
     }
-  }, [dictionary, keyActionKey, loadKeys, refreshSession, session, showNotice]);
+  }, [adminAccess?.manageKeys, dictionary, keyActionKey, loadKeys, refreshSession, session, showNotice]);
 
   const deleteEvents = useCallback(() => {
-    if (!session || eventActionKey) return;
+    if (!session || !adminAccess?.manageEvents || eventActionKey) return;
     Alert.alert(
       dictionary.adminDeleteEvents,
       dictionary.adminDeleteEventsConfirm,
@@ -688,6 +1017,7 @@ function AdminConsole() {
       ],
     );
   }, [
+    adminAccess?.manageEvents,
     dictionary,
     eventActionKey,
     loadEvents,
@@ -698,7 +1028,7 @@ function AdminConsole() {
 
   const deleteSession = useCallback(
     (adminSession: AdminSession) => {
-      if (!session || sessionActionKey) return;
+      if (!session || !adminAccess?.manageSessions || sessionActionKey) return;
       Alert.alert(
         dictionary.adminSessionDelete,
         dictionary.adminSessionDeleteConfirm,
@@ -744,6 +1074,7 @@ function AdminConsole() {
       );
     },
     [
+      adminAccess?.manageSessions,
       dictionary,
       loadSessions,
       refreshSession,
@@ -755,7 +1086,7 @@ function AdminConsole() {
 
   const revokeConsent = useCallback(
     (consent: AdminConsent) => {
-      if (!session || consentActionKey) return;
+      if (!session || !adminAccess?.manageConsents || consentActionKey) return;
       Alert.alert(
         dictionary.adminConsentRevoke,
         dictionary.adminConsentRevokeConfirm,
@@ -803,6 +1134,7 @@ function AdminConsole() {
       );
     },
     [
+      adminAccess?.manageConsents,
       consentActionKey,
       dictionary,
       loadConsents,
@@ -814,7 +1146,7 @@ function AdminConsole() {
 
   const deleteUser = useCallback(
     (user: AdminUser) => {
-      if (!session || userActionKey) return;
+      if (!session || !adminAccess?.manageUsers || userActionKey) return;
       Alert.alert(
         dictionary.adminUserDelete,
         dictionary.adminUserDeleteConfirm,
@@ -856,11 +1188,12 @@ function AdminConsole() {
         ],
       );
     },
-    [dictionary, loadUsers, refreshSession, session, showNotice, userActionKey],
+    [adminAccess?.manageUsers, dictionary, loadUsers, refreshSession, session, showNotice, userActionKey],
   );
 
   const openEditor = useCallback(
     (resource: AdminEditorResource, item?: unknown) => {
+      if (!adminAccess || !canManageAdminResource(resource, adminAccess)) return;
       const source = item as Record<string, unknown> | undefined;
       const id =
         source?.id ?? (resource === "roles" ? source?.name : undefined);
@@ -873,13 +1206,20 @@ function AdminConsole() {
         id: editorId,
         values: editorValues(resource, item),
       });
+      setEditorServerErrors({});
     },
-    [],
+    [adminAccess],
   );
 
   const saveEditor = useCallback(
     async (values: Record<string, string>) => {
-      if (!session || !editor || editorSaving) return;
+      if (
+        !session ||
+        !editor ||
+        !adminAccess ||
+        !canManageAdminResource(editor.resource, adminAccess) ||
+        editorSaving
+      ) return;
       setEditorSaving(true);
       try {
         const currentSession = await refreshSession();
@@ -988,6 +1328,16 @@ function AdminConsole() {
             : dictionary.adminCreated,
         });
       } catch (cause) {
+        if (cause instanceof AdminApiError) {
+          setEditorServerErrors(
+            Object.fromEntries(
+              (cause.problem?.violations ?? []).map(({ field, message }) => [
+                field,
+                message,
+              ]),
+            ),
+          );
+        }
         showNotice({
           kind: "error",
           message:
@@ -1000,6 +1350,7 @@ function AdminConsole() {
       }
     },
     [
+      adminAccess,
       dictionary,
       editor,
       editorSaving,
@@ -1017,7 +1368,12 @@ function AdminConsole() {
 
   const deleteResource = useCallback(
     (resource: AdminEditorResource, item: unknown) => {
-      if (!session || resourceActionKey) return;
+      if (
+        !session ||
+        !adminAccess ||
+        !canManageAdminResource(resource, adminAccess) ||
+        resourceActionKey
+      ) return;
       const source = item as Record<string, unknown>;
       const rawId = source.id ?? source.name;
       if (typeof rawId !== "string" && typeof rawId !== "number") return;
@@ -1100,6 +1456,7 @@ function AdminConsole() {
       ]);
     },
     [
+      adminAccess,
       dictionary,
       loadClients,
       loadGroups,
@@ -1115,66 +1472,109 @@ function AdminConsole() {
   );
 
   useEffect(() => {
-    if (session) queueMicrotask(() => void loadDashboard());
-  }, [loadDashboard, session]);
+    if (session && adminAccess === null && !adminAccessError) {
+      queueMicrotask(() => void loadAdminAccess());
+    }
+  }, [adminAccess, adminAccessError, loadAdminAccess, session]);
+
+  const visibleSections = useMemo(
+    () =>
+      adminAccess
+        ? ADMIN_SECTIONS.filter((candidate) =>
+            canViewAdminSection(candidate, adminAccess),
+          )
+        : [],
+    [adminAccess],
+  );
+  const activeSection =
+    adminAccess && canViewAdminSection(section, adminAccess)
+      ? section
+      : visibleSections[0] ?? "dashboard";
 
   useEffect(() => {
-    if (session && section === "users") queueMicrotask(() => void loadUsers());
-  }, [loadUsers, section, session]);
+    if (session && adminAccess?.isAdmin) {
+      queueMicrotask(() => void loadDashboard());
+    }
+  }, [adminAccess?.isAdmin, loadDashboard, session]);
 
   useEffect(() => {
-    if (session && section === "clients") {
+    if (session && activeSection === "server-info" && adminAccess?.isAdmin) {
+      queueMicrotask(() => void loadServerInfo());
+    }
+  }, [activeSection, adminAccess?.isAdmin, loadServerInfo, session]);
+
+  useEffect(() => {
+    if (session && adminAccess && activeSection === "users" && canViewAdminSection(activeSection, adminAccess)) queueMicrotask(() => void loadUsers());
+  }, [adminAccess, loadUsers, activeSection, session]);
+
+  useEffect(() => {
+    if (session && adminAccess && activeSection === "clients" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadClients());
     }
-  }, [loadClients, section, session]);
+  }, [adminAccess, loadClients, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "scopes") {
+    if (session && adminAccess && activeSection === "scopes" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadScopes());
     }
-  }, [loadScopes, section, session]);
+  }, [adminAccess, loadScopes, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "roles") {
+    if (session && adminAccess && activeSection === "roles" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadRoles());
     }
-  }, [loadRoles, section, session]);
+  }, [adminAccess, loadRoles, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "groups") {
+    if (session && adminAccess && activeSection === "groups" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadGroups());
     }
-  }, [loadGroups, section, session]);
+  }, [adminAccess, loadGroups, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "identity-providers") {
+    if (session && adminAccess && activeSection === "identity-providers" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadIdentityProviders());
     }
-  }, [loadIdentityProviders, section, session]);
+  }, [adminAccess, loadIdentityProviders, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "sessions") {
+    if (session && adminAccess && activeSection === "sessions" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadSessions());
     }
-  }, [loadSessions, section, session]);
+  }, [adminAccess, loadSessions, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "consents") {
+    if (session && adminAccess && activeSection === "consents" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadConsents());
     }
-  }, [loadConsents, section, session]);
+  }, [adminAccess, loadConsents, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "keys") {
+    if (session && adminAccess && activeSection === "keys" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadKeys());
     }
-  }, [loadKeys, section, session]);
+  }, [adminAccess, loadKeys, activeSection, session]);
 
   useEffect(() => {
-    if (session && section === "events") {
+    if (session && adminAccess && activeSection === "events" && canViewAdminSection(activeSection, adminAccess)) {
       queueMicrotask(() => void loadEvents());
     }
-  }, [loadEvents, section, session]);
+  }, [adminAccess, loadEvents, activeSection, session]);
+
+  useEffect(() => {
+    if (
+      session &&
+      adminAccess &&
+      activeSection === "settings" &&
+      (adminAccess.isAdmin || adminAccess.viewEvents)
+    ) {
+      queueMicrotask(() => void loadEventSettings());
+    }
+  }, [adminAccess, loadEventSettings, activeSection, session]);
+
+  useEffect(() => {
+    contentScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [activeSection, editor, groupMembership?.id, roleMembershipName]);
 
   if (status === "loading") {
     return <LoadingScreen />;
@@ -1209,6 +1609,61 @@ function AdminConsole() {
     );
   }
 
+  if (adminAccessLoading || (!adminAccess && !adminAccessError)) {
+    return <LoadingScreen />;
+  }
+
+  if (adminAccessError) {
+    return (
+      <SafeAreaView
+        style={[styles.safeArea, { backgroundColor: palette.background }]}
+      >
+        <View style={styles.authContent}>
+          <Text style={[styles.title, { color: palette.text }]}>
+            {dictionary.adminTitle}
+          </Text>
+          <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+            {readErrorMessage(adminAccessError, dictionary)}
+          </Text>
+          <ActionButton
+            label={dictionary.adminRetry}
+            busy={adminAccessLoading}
+            onPress={() => void loadAdminAccess(true)}
+            palette={palette}
+            testID="admin-access-retry"
+          />
+          <ActionButton
+            label={dictionary.signOut}
+            busy={false}
+            onPress={handleSignOut}
+            palette={palette}
+            secondary
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!adminAccess || visibleSections.length === 0) {
+    return (
+      <SafeAreaView
+        style={[styles.safeArea, { backgroundColor: palette.background }]}
+      >
+        <View style={styles.authContent}>
+          <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+            {dictionary.adminForbidden}
+          </Text>
+          <ActionButton
+            label={dictionary.signOut}
+            busy={false}
+            onPress={handleSignOut}
+            palette={palette}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const sectionTitleByKey: Record<AdminSection, string> = {
     dashboard: dictionary.adminDashboard,
     users: dictionary.adminUsers,
@@ -1220,9 +1675,16 @@ function AdminConsole() {
     sessions: dictionary.adminSessions,
     consents: dictionary.adminConsents,
     keys: dictionary.adminKeys,
+    "server-info": dictionary.adminServerInfo,
     events: dictionary.adminEvents,
     settings: dictionary.adminSettings,
   };
+  const standaloneContent =
+    Boolean(editor || roleMembershipName || groupMembership) ||
+    activeSection === "settings" ||
+    activeSection === "keys" ||
+    activeSection === "server-info" ||
+    activeSection === "events";
 
   return (
     <SafeAreaView
@@ -1253,9 +1715,12 @@ function AdminConsole() {
           </Pressable>
         </View>
         <View style={styles.body}>
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            ref={contentScrollRef}
+          >
             <Text style={[styles.title, { color: palette.text }]}>
-              {sectionTitleByKey[section]}
+              {sectionTitleByKey[activeSection]}
             </Text>
             <Text style={[styles.subtitle, { color: palette.textMuted }]}>
               {dictionary.adminOverview}
@@ -1266,16 +1731,121 @@ function AdminConsole() {
                   <AdminResourceEditor
                     key={`${editor.resource}:${editor.id ?? "new"}`}
                     initial={editor}
-                    onCancel={() => setEditor(null)}
+                    onCancel={() => {
+                      setEditor(null);
+                      setEditorServerErrors({});
+                    }}
                     onSave={(values) => void saveEditor(values)}
                     saving={editorSaving}
+                    serverErrors={editorServerErrors}
+                    onClearServerError={(field) =>
+                      setEditorServerErrors((current) => {
+                        if (!(field in current)) return current;
+                        const next = { ...current };
+                        delete next[field];
+                        return next;
+                      })
+                    }
                   />
                 );
               } else {
-                if (section === "keys") {
+                if (roleMembershipName) {
+                  return (
+                    <RoleMemberships
+                      roleName={roleMembershipName}
+                      onClose={() => setRoleMembershipName(null)}
+                    />
+                  );
+                }
+                if (groupMembership) {
+                  return (
+                    <GroupMemberships
+                      groupId={groupMembership.id}
+                      groupName={groupMembership.name}
+                      onClose={() => {
+                        setGroupMembership(null);
+                        void loadGroups(true);
+                      }}
+                    />
+                  );
+                }
+                if (activeSection === "settings") {
+                  return (
+                    <View
+                      style={{
+                        alignSelf: "center",
+                        gap: spacing.lg,
+                        maxWidth: 720,
+                        width: "100%",
+                      }}
+                    >
+                      {adminAccess.isAdmin || adminAccess.viewEvents ? (
+                        <AdminEventSettings
+                          canManage={
+                            adminAccess.isAdmin || adminAccess.manageEvents
+                          }
+                          errorKind={eventSettingsErrorKind}
+                          loading={eventSettingsLoading}
+                          onRetry={() => void loadEventSettings(true)}
+                          onSave={(settings) =>
+                            void saveEventSettings(settings)
+                          }
+                          saving={eventSettingsSaving}
+                          settings={eventSettings}
+                        />
+                      ) : null}
+                      {session ? (
+                        <>
+                          {adminAccess.isAdmin ? (
+                            <AdminLoginPolicySettings
+                              accessToken={session.accessToken}
+                              canManage={adminAccess.isAdmin}
+                              refreshAccessToken={async () =>
+                                (await refreshSession(true))?.accessToken ??
+                                null
+                              }
+                            />
+                          ) : null}
+                          {adminAccess.isAdmin ? (
+                            <AdminPolicySettings
+                              accessToken={session.accessToken}
+                              canManage={adminAccess.isAdmin}
+                              refreshAccessToken={async () =>
+                                (await refreshSession(true))?.accessToken ??
+                                null
+                              }
+                            />
+                          ) : null}
+                          {adminAccess.isAdmin ? (
+                            <AdminEmailSettings
+                              accessToken={session.accessToken}
+                              canManage={adminAccess.isAdmin}
+                              refreshAccessToken={async () =>
+                                (await refreshSession(true))?.accessToken ??
+                                null
+                              }
+                            />
+                          ) : null}
+                          {adminAccess.isAdmin ? (
+                            <AdminLocalizationSettings
+                              accessToken={session.accessToken}
+                              canManage={adminAccess.isAdmin}
+                              refreshAccessToken={async () =>
+                                (await refreshSession(true))?.accessToken ??
+                                null
+                              }
+                            />
+                          ) : null}
+                        </>
+                      ) : null}
+                    </View>
+                  );
+                }
+                if (activeSection === "keys") {
                   return (
                     <KeysContent
-                      errorStatus={keysErrorStatus}
+                      canManage={adminAccess.manageKeys}
+                      errorKind={keysErrorKind}
                       loading={keysLoading}
                       onNext={() => setKeyPage((page) => page + 1)}
                       onPrevious={() =>
@@ -1293,11 +1863,22 @@ function AdminConsole() {
                     />
                   );
                 } else {
-                  if (section === "events") {
+                  if (activeSection === "server-info") {
+                    return (
+                      <ServerInfoContent
+                        errorKind={serverInfoErrorKind}
+                        info={serverInfo}
+                        loading={serverInfoLoading}
+                        onRetry={() => void loadServerInfo(true)}
+                      />
+                    );
+                  }
+                  if (activeSection === "events") {
                     return (
                       <EventsContent
+                        canManage={adminAccess.manageEvents}
                         busyKey={eventActionKey}
-                        errorStatus={eventsErrorStatus}
+                        errorKind={eventsErrorKind}
                         loading={eventsLoading}
                         onDelete={deleteEvents}
                         onNext={() => setEventPage((page) => page + 1)}
@@ -1319,8 +1900,8 @@ function AdminConsole() {
                 }
               }
             })()}
-            {(() => {
-              if (section === "dashboard") {
+            {!standaloneContent ? (() => {
+              if (activeSection === "dashboard") {
                 return (
                   <DashboardContent
                     dashboard={dashboard}
@@ -1330,9 +1911,10 @@ function AdminConsole() {
                   />
                 );
               } else {
-                if (section === "users") {
+                if (activeSection === "users") {
                   return (
                     <UsersContent
+                      canManage={adminAccess.manageUsers}
                       errorStatus={usersErrorStatus}
                       loading={usersLoading}
                       onNext={() => setUserPage((page) => page + 1)}
@@ -1355,9 +1937,10 @@ function AdminConsole() {
                     />
                   );
                 } else {
-                  if (section === "clients") {
+                  if (activeSection === "clients") {
                     return (
                       <ClientsContent
+                        canManage={adminAccess.manageClients}
                         errorStatus={clientsErrorStatus}
                         loading={clientsLoading}
                         onNext={() => setClientPage((page) => page + 1)}
@@ -1378,9 +1961,10 @@ function AdminConsole() {
                       />
                     );
                   } else {
-                    if (section === "scopes") {
+                    if (activeSection === "scopes") {
                       return (
                         <ClientScopesContent
+                          canManage={adminAccess.manageClients}
                           errorStatus={scopesErrorStatus}
                           loading={scopesLoading}
                           onNext={() => setScopePage((page) => page + 1)}
@@ -1401,9 +1985,10 @@ function AdminConsole() {
                         />
                       );
                     } else {
-                      if (section === "roles") {
+                      if (activeSection === "roles") {
                         return (
                           <RolesContent
+                            canManage={adminAccess.manageRoles}
                             errorStatus={rolesErrorStatus}
                             loading={rolesLoading}
                             onNext={() => setRolePage((page) => page + 1)}
@@ -1419,14 +2004,18 @@ function AdminConsole() {
                             }}
                             onCreate={() => openEditor("roles")}
                             onEdit={(role) => openEditor("roles", role)}
+                            onManageUsers={(role) =>
+                              setRoleMembershipName(role.name)
+                            }
                             onDelete={(role) => deleteResource("roles", role)}
                             busyKey={resourceActionKey}
                           />
                         );
                       } else {
-                        if (section === "groups") {
+                        if (activeSection === "groups") {
                           return (
                             <GroupsContent
+                              canManage={adminAccess.manageGroups}
                               errorStatus={groupsErrorStatus}
                               loading={groupsLoading}
                               onNext={() => setGroupPage((page) => page + 1)}
@@ -1445,13 +2034,20 @@ function AdminConsole() {
                               onDelete={(group) =>
                                 deleteResource("groups", group)
                               }
+                              onManageUsers={(group) =>
+                                setGroupMembership({
+                                  id: group.id,
+                                  name: group.path || group.name,
+                                })
+                              }
                               busyKey={resourceActionKey}
                             />
                           );
                         } else {
-                          if (section === "identity-providers") {
+                          if (activeSection === "identity-providers") {
                             return (
                               <IdentityProvidersContent
+                                canManage={adminAccess.isAdmin}
                                 errorStatus={identityProvidersErrorStatus}
                                 loading={identityProvidersLoading}
                                 onNext={() =>
@@ -1482,9 +2078,10 @@ function AdminConsole() {
                               />
                             );
                           } else {
-                            if (section === "sessions") {
+                            if (activeSection === "sessions") {
                               return (
                                 <SessionsContent
+                                  canManage={adminAccess.manageSessions}
                                   errorStatus={sessionsErrorStatus}
                                   loading={sessionsLoading}
                                   onDelete={deleteSession}
@@ -1512,9 +2109,10 @@ function AdminConsole() {
                                 />
                               );
                             } else {
-                              if (section === "consents") {
+                              if (activeSection === "consents") {
                                 return (
                                   <ConsentsContent
+                                    canManage={adminAccess.manageConsents}
                                     busyKey={consentActionKey}
                                     errorStatus={consentsErrorStatus}
                                     loading={consentsLoading}
@@ -1547,18 +2145,167 @@ function AdminConsole() {
                   }
                 }
               }
-            })()}
+            })() : null}
           </ScrollView>
         </View>
-        <AdminTabBar active={section} onChange={setSection} />
+        <AdminTabBar
+          access={adminAccess}
+          active={activeSection}
+          onChange={setSection}
+        />
       </View>
     </SafeAreaView>
   );
 }
 
+function ServerInfoContent({
+  errorKind,
+  info,
+  loading,
+  onRetry,
+}: {
+  readonly errorKind: AdminReadErrorKind | null;
+  readonly info: AdminServerInfo | null;
+  readonly loading: boolean;
+  readonly onRetry: () => void;
+}) {
+  const { dictionary } = useLocale();
+  const { palette } = useTheme();
+  const endpointRows: readonly [string, string][] = info
+    ? [
+        [dictionary.adminIssuer, info.issuer],
+        [dictionary.adminDiscoveryEndpoint, info.discoveryEndpoint],
+        [dictionary.adminAuthorizationEndpoint, info.authorizationEndpoint],
+        [dictionary.adminTokenEndpoint, info.tokenEndpoint],
+        [dictionary.adminIntrospectionEndpoint, info.introspectionEndpoint],
+        [dictionary.adminRevocationEndpoint, info.revocationEndpoint],
+        [dictionary.adminJwksEndpoint, info.jwksEndpoint],
+        [dictionary.adminUserInfoEndpoint, info.userInfoEndpoint],
+        [dictionary.adminEndSessionEndpoint, info.endSessionEndpoint],
+      ]
+    : [];
+
+  if ((loading || !info) && errorKind === null) {
+    return (
+      <View
+        accessibilityRole="progressbar"
+        style={[styles.loading, { minHeight: 180 }]}
+        testID="admin-server-info-loading"
+      >
+        <ActivityIndicator color={palette.primary} />
+        <Text style={{ color: palette.textMuted }}>
+          {dictionary.adminServerInfoLoading}
+        </Text>
+      </View>
+    );
+  }
+
+  if (errorKind !== null || !info) {
+    const message = errorKind
+      ? readErrorMessage(errorKind, dictionary)
+      : dictionary.adminServerInfoLoadError;
+    return (
+      <View style={{ gap: spacing.md }} testID="admin-server-info-error">
+        <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+          {message}
+        </Text>
+        <ActionButton
+          label={dictionary.adminRetry}
+          busy={loading}
+          onPress={onRetry}
+          palette={palette}
+          testID="admin-server-info-retry"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: spacing.lg }} testID="admin-server-info-content">
+      <Text style={{ color: palette.textMuted }}>
+        {dictionary.adminServerInfoDescription}
+      </Text>
+      <View
+        style={[
+          {
+            backgroundColor: palette.surface,
+            borderColor: palette.border,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            padding: spacing.md,
+          },
+        ]}
+      >
+        <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
+          {dictionary.adminServerRuntime}
+        </Text>
+        <InfoRow
+          label={dictionary.adminSessionTimeout}
+          value={info.sessionTimeout ?? "—"}
+          palette={palette}
+        />
+        <InfoRow
+          label={dictionary.adminActiveSigningKey}
+          value={
+            info.activeSigningKey
+              ? `${info.activeSigningKey.kid} · ${info.activeSigningKey.algorithm} · ${info.activeSigningKey.type}`
+              : dictionary.adminNotConfigured
+          }
+          palette={palette}
+        />
+      </View>
+      <View
+        style={[
+          {
+            backgroundColor: palette.surface,
+            borderColor: palette.border,
+            borderRadius: radii.md,
+            borderWidth: 1,
+            padding: spacing.md,
+          },
+        ]}
+      >
+        <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700" }}>
+          {dictionary.adminEndpoints}
+        </Text>
+        {endpointRows.map(([label, value]) => (
+          <InfoRow key={label} label={label} value={value} palette={palette} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  palette,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly palette: ReturnType<typeof useTheme>["palette"];
+}) {
+  return (
+    <View
+      style={{
+        borderTopColor: palette.border,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        gap: spacing.xs,
+        paddingVertical: spacing.sm,
+      }}
+    >
+      <Text style={{ color: palette.textMuted, fontSize: 12 }}>{label}</Text>
+      <Text selectable style={{ color: palette.text, fontSize: 14 }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function KeysContent({
+  canManage,
   busyKey,
-  errorStatus,
+  errorKind,
   loading,
   onNext,
   onPrevious,
@@ -1568,8 +2315,9 @@ function KeysContent({
   query,
   setQuery,
 }: {
+  readonly canManage: boolean;
   readonly busyKey: string | null;
-  readonly errorStatus: number | null;
+  readonly errorKind: AdminReadErrorKind | null;
   readonly loading: boolean;
   readonly onNext: () => void;
   readonly onPrevious: () => void;
@@ -1595,13 +2343,13 @@ function KeysContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminRotateKey}
         busy={busyKey === "rotate"}
         disabled={busyKey !== null}
         onPress={onRotate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -1611,13 +2359,11 @@ function KeysContent({
             />
           );
         } else {
-          if (errorStatus !== null && !page) {
+          if (errorKind && !page) {
             return (
               <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-                <Text style={{ color: palette.danger }}>
-                  {errorStatus === 403
-                    ? dictionary.adminForbidden
-                    : dictionary.adminLoadError}
+                <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+                  {readErrorMessage(errorKind, dictionary)}
                 </Text>
                 <ActionButton
                   label={dictionary.adminRetry}
@@ -1695,8 +2441,9 @@ function KeysContent({
 }
 
 function EventsContent({
+  canManage,
   busyKey,
-  errorStatus,
+  errorKind,
   loading,
   onDelete,
   onNext,
@@ -1706,8 +2453,9 @@ function EventsContent({
   query,
   setQuery,
 }: {
+  readonly canManage: boolean;
   readonly busyKey: string | null;
-  readonly errorStatus: number | null;
+  readonly errorKind: AdminReadErrorKind | null;
   readonly loading: boolean;
   readonly onDelete: () => void;
   readonly onNext: () => void;
@@ -1733,14 +2481,14 @@ function EventsContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminDeleteEvents}
         busy={busyKey === "delete"}
         disabled={busyKey !== null}
         onPress={onDelete}
         palette={palette}
         secondary
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -1750,13 +2498,11 @@ function EventsContent({
             />
           );
         } else {
-          if (errorStatus !== null && !page) {
+          if (errorKind && !page) {
             return (
               <View style={[styles.errorCard, { borderColor: palette.danger }]}>
-                <Text style={{ color: palette.danger }}>
-                  {errorStatus === 403
-                    ? dictionary.adminForbidden
-                    : dictionary.adminLoadError}
+                <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+                  {readErrorMessage(errorKind, dictionary)}
                 </Text>
                 <ActionButton
                   label={dictionary.adminRetry}
@@ -1916,6 +2662,7 @@ function DashboardContent({
 }
 
 function UsersContent({
+  canManage,
   errorStatus,
   loading,
   onNext,
@@ -1931,6 +2678,7 @@ function UsersContent({
   onEdit,
   onUnlock,
 }: {
+  readonly canManage: boolean;
   readonly errorStatus: number | null;
   readonly loading: boolean;
   readonly onNext: () => void;
@@ -1962,12 +2710,12 @@ function UsersContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminCreate}
         busy={false}
         onPress={onCreate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -2046,7 +2794,7 @@ function UsersContent({
                           {user.effectiveRoles.join(", ")}
                         </Text>
                       ) : null}
-                      <View style={styles.userActions}>
+                      {canManage ? <View style={styles.userActions}>
                         <ActionButton
                           label={dictionary.adminEdit}
                           busy={false}
@@ -2092,7 +2840,7 @@ function UsersContent({
                           palette={palette}
                           secondary
                         />
-                      </View>
+                      </View> : null}
                     </View>
                   ))}
                   <View style={styles.pagination}>
@@ -2134,6 +2882,7 @@ function UsersContent({
 }
 
 function ClientsContent({
+  canManage,
   errorStatus,
   loading,
   onNext,
@@ -2147,6 +2896,7 @@ function ClientsContent({
   onDelete,
   busyKey,
 }: {
+  readonly canManage: boolean;
   readonly errorStatus: number | null;
   readonly loading: boolean;
   readonly onNext: () => void;
@@ -2176,12 +2926,12 @@ function ClientsContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminCreate}
         busy={false}
         onPress={onCreate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -2249,7 +2999,7 @@ function ClientsContent({
                       >
                         {client.scopes.join(", ") || "—"}
                       </Text>
-                      <View style={styles.userActions}>
+                      {canManage ? <View style={styles.userActions}>
                         <ActionButton
                           label={dictionary.adminEdit}
                           busy={false}
@@ -2269,7 +3019,7 @@ function ClientsContent({
                           palette={palette}
                           secondary
                         />
-                      </View>
+                      </View> : null}
                     </View>
                   ))}
                   <View style={styles.pagination}>
@@ -2311,6 +3061,7 @@ function ClientsContent({
 }
 
 function ClientScopesContent({
+  canManage,
   errorStatus,
   loading,
   onNext,
@@ -2324,6 +3075,7 @@ function ClientScopesContent({
   onDelete,
   busyKey,
 }: {
+  readonly canManage: boolean;
   readonly errorStatus: number | null;
   readonly loading: boolean;
   readonly onNext: () => void;
@@ -2353,12 +3105,12 @@ function ClientScopesContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminCreate}
         busy={false}
         onPress={onCreate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -2434,7 +3186,7 @@ function ClientScopesContent({
                         {scope.includeInTokenScope ? "token_scope" : "—"}
                         {scope.displayOnConsentScreen ? " · consent" : ""}
                       </Text>
-                      {!scope.builtIn ? (
+                      {canManage && !scope.builtIn ? (
                         <View style={styles.userActions}>
                           <ActionButton
                             label={dictionary.adminEdit}
@@ -2498,6 +3250,7 @@ function ClientScopesContent({
 }
 
 function RolesContent({
+  canManage,
   errorStatus,
   loading,
   onNext,
@@ -2508,9 +3261,11 @@ function RolesContent({
   setQuery,
   onCreate,
   onEdit,
+  onManageUsers,
   onDelete,
   busyKey,
 }: {
+  readonly canManage: boolean;
   readonly errorStatus: number | null;
   readonly loading: boolean;
   readonly onNext: () => void;
@@ -2521,6 +3276,7 @@ function RolesContent({
   readonly setQuery: (query: string) => void;
   readonly onCreate: () => void;
   readonly onEdit: (role: AdminRole) => void;
+  readonly onManageUsers: (role: AdminRole) => void;
   readonly onDelete: (role: AdminRole) => void;
   readonly busyKey: string | null;
 }) {
@@ -2540,12 +3296,12 @@ function RolesContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminCreate}
         busy={false}
         onPress={onCreate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -2595,7 +3351,15 @@ function RolesContent({
                           {role.description}
                         </Text>
                       ) : null}
-                      <View style={styles.userActions}>
+                      {canManage ? <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminRoleManageUsers}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onManageUsers(role)}
+                          palette={palette}
+                          secondary
+                        />
                         <ActionButton
                           label={dictionary.adminEdit}
                           busy={false}
@@ -2614,7 +3378,7 @@ function RolesContent({
                           palette={palette}
                           secondary
                         />
-                      </View>
+                      </View> : null}
                     </View>
                   ))}
                   <Pagination
@@ -2641,6 +3405,7 @@ function RolesContent({
 }
 
 function GroupsContent({
+  canManage,
   errorStatus,
   loading,
   onNext,
@@ -2651,9 +3416,11 @@ function GroupsContent({
   setQuery,
   onCreate,
   onEdit,
+  onManageUsers,
   onDelete,
   busyKey,
 }: {
+  readonly canManage: boolean;
   readonly errorStatus: number | null;
   readonly loading: boolean;
   readonly onNext: () => void;
@@ -2664,6 +3431,7 @@ function GroupsContent({
   readonly setQuery: (query: string) => void;
   readonly onCreate: () => void;
   readonly onEdit: (group: AdminGroup) => void;
+  readonly onManageUsers: (group: AdminGroup) => void;
   readonly onDelete: (group: AdminGroup) => void;
   readonly busyKey: string | null;
 }) {
@@ -2683,12 +3451,12 @@ function GroupsContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminCreate}
         busy={false}
         onPress={onCreate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -2750,7 +3518,16 @@ function GroupsContent({
                           {group.effectiveRoles.join(", ")}
                         </Text>
                       ) : null}
-                      <View style={styles.userActions}>
+                      {canManage ? <View style={styles.userActions}>
+                        <ActionButton
+                          label={dictionary.adminManageGroupMembers}
+                          busy={false}
+                          disabled={busyKey !== null}
+                          onPress={() => onManageUsers(group)}
+                          palette={palette}
+                          secondary
+                          testID={`admin-group-manage-members-${group.id}`}
+                        />
                         <ActionButton
                           label={dictionary.adminEdit}
                           busy={false}
@@ -2769,7 +3546,7 @@ function GroupsContent({
                           palette={palette}
                           secondary
                         />
-                      </View>
+                      </View> : null}
                     </View>
                   ))}
                   <Pagination
@@ -2796,6 +3573,7 @@ function GroupsContent({
 }
 
 function IdentityProvidersContent({
+  canManage,
   errorStatus,
   loading,
   onNext,
@@ -2809,6 +3587,7 @@ function IdentityProvidersContent({
   onDelete,
   busyKey,
 }: {
+  readonly canManage: boolean;
   readonly errorStatus: number | null;
   readonly loading: boolean;
   readonly onNext: () => void;
@@ -2838,12 +3617,12 @@ function IdentityProvidersContent({
         ]}
         value={query}
       />
-      <ActionButton
+      {canManage ? <ActionButton
         label={dictionary.adminCreate}
         busy={false}
         onPress={onCreate}
         palette={palette}
-      />
+      /> : null}
       {(() => {
         if (loading && !page) {
           return (
@@ -2917,7 +3696,7 @@ function IdentityProvidersContent({
                           : ""}
                         {` · ${provider.mapperCount} mappers`}
                       </Text>
-                      <View style={styles.userActions}>
+                      {canManage ? <View style={styles.userActions}>
                         <ActionButton
                           label={dictionary.adminEdit}
                           busy={false}
@@ -2937,7 +3716,7 @@ function IdentityProvidersContent({
                           palette={palette}
                           secondary
                         />
-                      </View>
+                      </View> : null}
                     </View>
                   ))}
                   <Pagination
@@ -2964,6 +3743,7 @@ function IdentityProvidersContent({
 }
 
 function ConsentsContent({
+  canManage,
   busyKey,
   errorStatus,
   loading,
@@ -2975,6 +3755,7 @@ function ConsentsContent({
   query,
   setQuery,
 }: {
+  readonly canManage: boolean;
   readonly busyKey: string | null;
   readonly errorStatus: number | null;
   readonly loading: boolean;
@@ -3019,13 +3800,13 @@ function ConsentsContent({
                     ? dictionary.adminForbidden
                     : dictionary.adminConsentsLoadError}
                 </Text>
-                <ActionButton
+                          {canManage ? <ActionButton
                   label={dictionary.adminRetry}
                   busy={loading}
                   onPress={onRetry}
                   palette={palette}
                   secondary
-                />
+                          /> : null}
               </View>
             );
           } else {
@@ -3060,14 +3841,14 @@ function ConsentsContent({
                         >
                           {consent.authorities.join(", ") || "—"}
                         </Text>
-                        <ActionButton
+                        {canManage ? <ActionButton
                           label={dictionary.adminConsentRevoke}
                           busy={busyKey === key}
                           disabled={busyKey !== null && busyKey !== key}
                           onPress={() => onRevoke(consent)}
                           palette={palette}
                           secondary
-                        />
+                        /> : null}
                       </View>
                     );
                   })}
@@ -3095,6 +3876,7 @@ function ConsentsContent({
 }
 
 function SessionsContent({
+  canManage,
   busyKey,
   errorStatus,
   loading,
@@ -3108,6 +3890,7 @@ function SessionsContent({
   setQuery,
   status,
 }: {
+  readonly canManage: boolean;
   readonly busyKey: string | null;
   readonly errorStatus: number | null;
   readonly loading: boolean;
@@ -3223,7 +4006,7 @@ function SessionsContent({
                       >
                         {adminSession.lastAccessedAt}
                       </Text>
-                      {adminSession.active ? (
+                      {adminSession.active && canManage ? (
                         <ActionButton
                           label={dictionary.adminSessionDelete}
                           busy={busyKey === adminSession.id}
@@ -3307,6 +4090,7 @@ function ActionButton({
   onPress,
   palette,
   secondary = false,
+  testID,
 }: {
   readonly label: string;
   readonly busy: boolean;
@@ -3314,6 +4098,7 @@ function ActionButton({
   readonly onPress: () => void;
   readonly palette: ReturnType<typeof useTheme>["palette"];
   readonly secondary?: boolean;
+  readonly testID?: string;
 }) {
   return (
     <Pressable
@@ -3321,6 +4106,7 @@ function ActionButton({
       accessibilityState={{ disabled: busy || disabled }}
       disabled={busy || disabled}
       onPress={onPress}
+      testID={testID}
       style={({ pressed }) => [
         styles.action,
         {
@@ -3348,9 +4134,11 @@ function ActionButton({
 }
 
 function AdminTabBar({
+  access,
   active,
   onChange,
 }: {
+  readonly access: AdminAccessFlags;
   readonly active: AdminSection;
   readonly onChange: (section: AdminSection) => void;
 }) {
@@ -3362,6 +4150,7 @@ function AdminTabBar({
     "home" | "shield" | "layers" | "globe" | "gear",
   ][] = [
     ["dashboard", dictionary.adminDashboard, "home"],
+    ["server-info", dictionary.adminServerInfo, "globe"],
     ["users", dictionary.adminUsers, "shield"],
     ["clients", dictionary.adminClients, "shield"],
     ["scopes", dictionary.adminClientScopes, "layers"],
@@ -3378,13 +4167,20 @@ function AdminTabBar({
     <ScrollView
       accessibilityRole="tablist"
       horizontal
+      nestedScrollEnabled
+      directionalLockEnabled
+      scrollEnabled
       showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.tabBarContent}
       style={[
         styles.tabBar,
         { backgroundColor: palette.surface, borderColor: palette.border },
       ]}
+      testID="admin-tab-list"
     >
-      {tabs.map(([section, label, icon]) => {
+      {tabs
+        .filter(([section]) => canViewAdminSection(section, access))
+        .map(([section, label, icon]) => {
         const selected = section === active;
         return (
           <Pressable
@@ -3393,6 +4189,7 @@ function AdminTabBar({
             accessibilityState={{ selected }}
             key={section}
             onPress={() => onChange(section)}
+            testID={`admin-tab-${section}`}
             style={[
               styles.tab,
               {
@@ -3418,7 +4215,7 @@ function AdminTabBar({
             </Text>
           </Pressable>
         );
-      })}
+        })}
     </ScrollView>
   );
 }
@@ -3527,11 +4324,23 @@ const styles = StyleSheet.create({
   },
   cardLabel: { fontSize: 13, lineHeight: 18 },
   cardValue: { fontSize: 30, fontWeight: "800", marginTop: spacing.sm },
-  tabBar: { borderTopWidth: 1, padding: spacing.xs },
+  tabBar: {
+    borderTopWidth: 1,
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 72,
+    padding: spacing.xs,
+  },
+  tabBarContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexGrow: 1,
+  },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   tab: {
     alignItems: "center",
     borderRadius: radii.sm,
+    flexShrink: 0,
     gap: spacing.xs,
     justifyContent: "center",
     minHeight: 60,

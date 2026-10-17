@@ -6,7 +6,18 @@ appId: io.github.susimsek.kitezh.mobile
 - extendedWaitUntil:
     visible: "Kitezh logo"
     timeout: 180000
-- tapOn: "Settings|Ayarlar"
+- runFlow:
+    when:
+      visible: "Account Console|Hesap Konsolu"
+    commands:
+      - tapOn:
+          id: account-tab-settings
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
 - assertVisible: "Settings|Ayarlar"
 - tapOn:
     id: settings-locale-system
@@ -31,3 +42,28 @@ appId: io.github.susimsek.kitezh.mobile
 - tapOn:
     id: settings-theme-light
 - assertVisible: "Açık"
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: "Account Console|Hesap Konsolu"
+    commands:
+      - tapOn:
+          id: account-tab-settings
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
+- assertVisible: "Ayarlar"
+- assertVisible:
+    id: settings-locale-turkish
+    selected: true
+- assertVisible:
+    id: settings-theme-light
+    selected: true

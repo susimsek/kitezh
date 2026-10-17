@@ -1,0 +1,101 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- openLink: "kitezh://admin"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    point: "68%,54%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Sign in to Administration|Administration Console"
+    timeout: 180000
+# Clear any SecureStore Admin session left by an earlier local run. iOS keychain
+# records survive Maestro's clearState option and the fixture may have restarted.
+- tapOn:
+    text: "Sign out"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- extendedWaitUntil:
+    visible: "Sign in to Administration"
+    timeout: 30000
+- tapOn: "Sign in"
+# iOS may ask once to allow the app to use the local fixture domain for sign-in.
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn:
+    text: "Continue with fixture account"
+    optional: true
+- extendedWaitUntil:
+    visible: "Administration Console"
+    timeout: 180000
+- swipe:
+    start: "95%,92%"
+    end: "5%,92%"
+- swipe:
+    start: "95%,92%"
+    end: "5%,92%"
+- swipe:
+    start: "95%,92%"
+    end: "5%,92%"
+- swipe:
+    start: "95%,92%"
+    end: "5%,92%"
+- tapOn:
+    id: admin-tab-settings
+- scrollUntilVisible:
+    element:
+      text: "Request lifetime (seconds)"
+    direction: DOWN
+- tapOn:
+    id: admin-ciba-request-lifetime
+- eraseText: 3
+- inputText: "360"
+- tapOn: "CIBA policy"
+- scrollUntilVisible:
+    element:
+      id: admin-ciba-policy-save
+    direction: DOWN
+- tapOn:
+    id: admin-ciba-policy-save
+- assertVisible: "Policy settings saved."
+- scrollUntilVisible:
+    element:
+      text: "Idle timeout"
+    direction: DOWN
+- tapOn:
+    id: admin-offline-idle-timeout
+- eraseText: 4
+- inputText: "P45D"
+- tapOn: "Offline access policy"
+- scrollUntilVisible:
+    element:
+      id: admin-offline-policy-save
+    direction: DOWN
+- tapOn:
+    id: admin-offline-policy-save
+- assertVisible: "Policy settings saved."
+# Leave and reopen Settings so both values are loaded from the fixture API again.
+- tapOn:
+    id: admin-tab-events
+- tapOn:
+    id: admin-tab-settings
+- scrollUntilVisible:
+    element:
+      text: "Request lifetime (seconds)"
+    direction: DOWN
+- assertVisible: "360"
+- scrollUntilVisible:
+    element:
+      text: "Idle timeout"
+    direction: DOWN
+- assertVisible: "P45D"

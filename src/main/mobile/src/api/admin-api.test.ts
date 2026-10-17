@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   AdminApiError,
   getAdminDashboard,
+  getAdminServerInfo,
+  getAdminWhoAmI,
   listAdminUsers,
   listAdminClients,
   listAdminClientScopes,
@@ -13,6 +15,14 @@ import {
   listAdminConsents,
   revokeAdminConsent,
   listAdminRoles,
+  getAdminRoleDetail,
+  listAdminAvailableRoleUsers,
+  listAdminGroupUsers,
+  listAdminAvailableGroupUsers,
+  addAdminGroupUser,
+  removeAdminGroupUser,
+  assignAdminRoleUser,
+  removeAdminRoleUser,
   deleteAdminUser,
   unlockAdminUser,
   setAdminUserEnabled,
@@ -37,11 +47,387 @@ import {
   rotateAdminKey,
   listAdminEvents,
   deleteAdminEvents,
+  getAdminEventSettings,
+  updateAdminEventSettings,
+  getAdminLocalizationSettings,
+  updateAdminLocalizationSettings,
+  getAdminEmailSettings,
+  updateAdminEmailSettings,
+  testAdminEmailConnection,
+  getNativeAdminLoginSettings,
+  updateNativeAdminLoginSettings,
+  getAdminCibaPolicy,
+  updateAdminCibaPolicy,
+  getAdminOfflineAccessPolicy,
+  updateAdminOfflineAccessPolicy,
+  revokeAllAdminOfflineAccess,
 } from "./admin-api.ts";
 
 import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
 
 installAxiosFetchMockCompatibility();
+
+test("admin whoami reads the backend-authoritative access flags", async () => {
+  const originalFetch = globalThis.fetch;
+  const response = {
+    username: "operator",
+    avatarUrl: null,
+    authorities: ["ROLE_CLIENT_VIEWER"],
+    access: {
+      isAdmin: false,
+      queryClients: false,
+      viewClients: true,
+      manageClients: false,
+      queryUsers: false,
+      viewUsers: false,
+      manageUsers: false,
+      impersonateUsers: false,
+      queryGroups: false,
+      viewGroups: false,
+      manageGroups: false,
+      queryOrganizations: false,
+      viewOrganizations: false,
+      manageOrganizations: false,
+      viewRoles: false,
+      manageRoles: false,
+      viewSessions: false,
+      manageSessions: false,
+      viewConsents: false,
+      manageConsents: false,
+      viewEvents: false,
+      manageEvents: false,
+      viewKeys: false,
+      manageKeys: false,
+    },
+  };
+  const calls: { method: string; url: string; authorization: string | null }[] = [];
+  globalThis.fetch = async (input, init) => {
+    const headers = new Headers(init?.headers);
+    calls.push({
+      method: init?.method ?? "GET",
+      url: input.toString(),
+      authorization: headers.get("Authorization"),
+    });
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    assert.deepEqual(await getAdminWhoAmI("access-token"), response);
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/whoami",
+        authorization: "Bearer access-token",
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("native login policy uses the bounded admin GET and PUT endpoints", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  const settings = {
+    userRegistration: true,
+    forgotPassword: true,
+    rememberMe: true,
+    loginWithEmail: true,
+    verifyEmail: false,
+    sessionTimeoutMinutes: 30,
+    passwordMinimumLength: 12,
+    bruteForceEnabled: true,
+    bruteForceMaxFailures: 5,
+    otpEnabled: true,
+    otpRequired: false,
+    passkeys: false,
+  };
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      method: init?.method ?? "GET",
+      url: input.toString(),
+      body: init?.body?.toString() ?? null,
+    });
+    return new Response(JSON.stringify(settings), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    assert.deepEqual(
+      await getNativeAdminLoginSettings("access-token"),
+      settings,
+    );
+    assert.deepEqual(
+      await updateNativeAdminLoginSettings("access-token", settings),
+      settings,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/settings/login/native",
+        body: null,
+      },
+      {
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/settings/login/native",
+        body: JSON.stringify(settings),
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin event settings use the protected native GET and PUT contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  const settings = {
+    eventsEnabled: true,
+    adminEventsEnabled: true,
+    adminEventsDetailsEnabled: false,
+    eventsExpirationDays: 90,
+  };
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      method: init?.method ?? "GET",
+      url: input.toString(),
+      body: init?.body?.toString() ?? null,
+    });
+    return new Response(JSON.stringify(settings), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    assert.deepEqual(await getAdminEventSettings("access-token"), settings);
+    assert.deepEqual(
+      await updateAdminEventSettings("access-token", settings),
+      settings,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/events/config",
+        body: null,
+      },
+      {
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/events/config",
+        body: JSON.stringify(settings),
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin localization settings use the protected GET and minimal PUT request", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  const settings = {
+    internationalizationEnabled: true,
+    defaultLocale: "en",
+    supportedLocales: ["en", "tr"],
+    availableLocales: ["en", "tr"],
+    availableBundles: ["login", "account", "admin", "email", "backend", "common"],
+  };
+  const request = {
+    internationalizationEnabled: false,
+    defaultLocale: "tr",
+    supportedLocales: ["tr"],
+  };
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      method: init?.method ?? "GET",
+      url: input.toString(),
+      body: init?.body?.toString() ?? null,
+    });
+    return new Response(JSON.stringify(settings), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    assert.deepEqual(await getAdminLocalizationSettings("access-token"), settings);
+    assert.deepEqual(
+      await updateAdminLocalizationSettings("access-token", request),
+      settings,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/settings/localization",
+        body: null,
+      },
+      {
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/settings/localization",
+        body: JSON.stringify(request),
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin email adapter never reads credentials and preserves blank-password contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  const response = {
+    enabled: true,
+    fromAddress: "noreply@example.com",
+    baseUrl: "https://example.com",
+    host: "smtp.example.com",
+    port: 587,
+    username: "mailer",
+    passwordConfigured: true,
+    smtpAuth: true,
+    starttls: true,
+    ssl: false,
+  };
+  const request = {
+    enabled: response.enabled,
+    fromAddress: response.fromAddress,
+    baseUrl: response.baseUrl,
+    host: response.host,
+    port: response.port,
+    username: response.username,
+    password: "",
+    smtpAuth: response.smtpAuth,
+    starttls: response.starttls,
+    ssl: response.ssl,
+  };
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      method: init?.method ?? "GET",
+      url: input.toString(),
+      body: init?.body?.toString() ?? null,
+    });
+    if (input.toString().endsWith("/test")) {
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const loaded = await getAdminEmailSettings("access-token");
+    assert.deepEqual(loaded, response);
+    assert.equal("password" in loaded, false);
+    assert.deepEqual(
+      await updateAdminEmailSettings("access-token", request),
+      response,
+    );
+    await testAdminEmailConnection("access-token", request);
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/settings/email",
+        body: null,
+      },
+      {
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/settings/email",
+        body: JSON.stringify(request),
+      },
+      {
+        method: "POST",
+        url: "https://kitezh.onrender.com/api/admin/settings/email/test",
+        body: JSON.stringify(request),
+      },
+    ]);
+    assert.equal(calls.some((call) => call.body?.includes("stored-secret")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("CIBA and offline-access policy adapters use the protected native contracts", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  const ciba = {
+    requestLifespanSeconds: 300,
+    pollingIntervalSeconds: 5,
+    deliveryMode: "all" as const,
+    userVerification: "preferred" as const,
+    mfaRequired: true,
+    stepUpRequired: false,
+    stepUpAcr: null,
+  };
+  const offline = {
+    idleTimeout: "P30D",
+    maxLifespan: "P180D",
+    maxLimited: true,
+    revokedBefore: null,
+  };
+  globalThis.fetch = async (input, init) => {
+    const url = input.toString();
+    const method = init?.method ?? "GET";
+    calls.push({ method, url, body: init?.body?.toString() ?? null });
+    const result = url.includes("ciba-policy") ? ciba : offline;
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    assert.deepEqual(await getAdminCibaPolicy("access-token"), ciba);
+    assert.deepEqual(await updateAdminCibaPolicy("access-token", ciba), ciba);
+    assert.deepEqual(
+      await getAdminOfflineAccessPolicy("access-token"),
+      offline,
+    );
+    assert.deepEqual(
+      await updateAdminOfflineAccessPolicy("access-token", {
+        idleTimeout: offline.idleTimeout,
+        maxLifespan: offline.maxLifespan,
+        maxLimited: offline.maxLimited,
+      }),
+      offline,
+    );
+    assert.deepEqual(
+      await revokeAllAdminOfflineAccess("access-token"),
+      offline,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/settings/ciba-policy",
+        body: null,
+      },
+      {
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/settings/ciba-policy",
+        body: JSON.stringify(ciba),
+      },
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/settings/offline-access",
+        body: null,
+      },
+      {
+        method: "PUT",
+        url: "https://kitezh.onrender.com/api/admin/settings/offline-access",
+        body: JSON.stringify({
+          idleTimeout: offline.idleTimeout,
+          maxLifespan: offline.maxLifespan,
+          maxLimited: offline.maxLimited,
+        }),
+      },
+      {
+        method: "POST",
+        url: "https://kitezh.onrender.com/api/admin/settings/offline-access/revoke-all",
+        body: null,
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("unlocks an administrator user through the bounded native endpoint", async () => {
   const originalFetch = globalThis.fetch;
@@ -86,6 +472,49 @@ test("admin dashboard uses the admin API scope endpoint", async () => {
     assert.equal(
       request?.toString(),
       "https://kitezh.onrender.com/api/admin/dashboard",
+    );
+    assert.equal(authorization, "Bearer access-token");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("admin server information uses the protected server metadata endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let request: RequestInfo | URL | undefined;
+  let authorization: string | null | undefined;
+  const response = {
+    issuer: "https://kitezh.onrender.com",
+    discoveryEndpoint: "https://kitezh.onrender.com/.well-known/openid-configuration",
+    authorizationEndpoint: "https://kitezh.onrender.com/oauth2/authorize",
+    tokenEndpoint: "https://kitezh.onrender.com/oauth2/token",
+    introspectionEndpoint: "https://kitezh.onrender.com/oauth2/introspect",
+    revocationEndpoint: "https://kitezh.onrender.com/oauth2/revoke",
+    jwksEndpoint: "https://kitezh.onrender.com/oauth2/jwks",
+    userInfoEndpoint: "https://kitezh.onrender.com/userinfo",
+    endSessionEndpoint: "https://kitezh.onrender.com/connect/logout",
+    sessionTimeout: "PT30M",
+    activeSigningKey: {
+      kid: "active-key",
+      type: "RSA",
+      algorithm: "RS256",
+      use: "sig",
+      createdAt: "2026-10-17T00:00:00Z",
+    },
+  };
+  globalThis.fetch = async (input, init) => {
+    request = input;
+    authorization = new Headers(init?.headers).get("Authorization");
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    assert.deepEqual(await getAdminServerInfo("access-token"), response);
+    assert.equal(
+      request?.toString(),
+      "https://kitezh.onrender.com/api/admin/server-info",
     );
     assert.equal(authorization, "Bearer access-token");
   } finally {
@@ -490,6 +919,95 @@ test("admin roles and groups requests use bounded sorted pages", async () => {
     assert.deepEqual(requests, [
       "https://kitezh.onrender.com/api/admin/roles?q=admin&page=0&size=10&sort=name%2Casc",
       "https://kitezh.onrender.com/api/admin/groups?q=finance&page=1&size=10&sort=name%2Casc",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("role membership adapters use the existing paged admin contracts", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      body: init?.body?.toString() ?? null,
+      method: init?.method ?? "GET",
+      url: input.toString(),
+    });
+    return new Response(JSON.stringify({}), { status: 200 });
+  };
+  try {
+    await getAdminRoleDetail("token", "ROLE/ADMIN", "alex", true, 1, 10);
+    await listAdminAvailableRoleUsers("token", "ROLE/ADMIN", "alex", 0, 10);
+    await assignAdminRoleUser("token", "ROLE/ADMIN", 42, 1, 10);
+    await removeAdminRoleUser("token", "ROLE/ADMIN", 42, 1, 10);
+
+    assert.deepEqual(
+      calls.map(({ method, url }) => ({ method, url })),
+      [
+        {
+          method: "GET",
+          url: "https://kitezh.onrender.com/api/admin/roles/ROLE%2FADMIN?q=alex&page=1&size=10&sort=username%2Casc&enabled=true",
+        },
+        {
+          method: "GET",
+          url: "https://kitezh.onrender.com/api/admin/roles/ROLE%2FADMIN/available-users?q=alex&page=0&size=10&sort=username%2Casc",
+        },
+        {
+          method: "POST",
+          url: "https://kitezh.onrender.com/api/admin/roles/ROLE%2FADMIN/users?page=1&size=10&sort=username%2Casc",
+        },
+        {
+          method: "DELETE",
+          url: "https://kitezh.onrender.com/api/admin/roles/ROLE%2FADMIN/users/42?page=1&size=10&sort=username%2Casc",
+        },
+      ],
+    );
+    assert.equal(calls[2].body, JSON.stringify({ userId: 42 }));
+    assert.equal(calls[3].body, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("group membership adapters match the authorized paged group contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { method: string; url: string; body: string | null }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      body: init?.body?.toString() ?? null,
+      method: init?.method ?? "GET",
+      url: input.toString(),
+    });
+    return new Response(JSON.stringify({}), { status: 200 });
+  };
+  try {
+    await listAdminGroupUsers("token", 3, "alex", 1, 10);
+    await listAdminAvailableGroupUsers("token", 3, "alex", 0, 10);
+    await addAdminGroupUser("token", 3, 42);
+    await removeAdminGroupUser("token", 3, 42);
+
+    assert.deepEqual(calls, [
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/groups/3/users?q=alex&page=1&size=10&sort=username%2Casc",
+        body: null,
+      },
+      {
+        method: "GET",
+        url: "https://kitezh.onrender.com/api/admin/groups/3/available-users?q=alex&page=0&size=10&sort=username%2Casc",
+        body: null,
+      },
+      {
+        method: "POST",
+        url: "https://kitezh.onrender.com/api/admin/groups/3/users",
+        body: JSON.stringify({ userId: 42 }),
+      },
+      {
+        method: "DELETE",
+        url: "https://kitezh.onrender.com/api/admin/groups/3/users/42",
+        body: null,
+      },
     ]);
   } finally {
     globalThis.fetch = originalFetch;

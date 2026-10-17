@@ -25,6 +25,7 @@ const requiredRoutes = new Set([
   "logout/callback",
   "admin/oauth/callback",
   "admin/logout/callback",
+  "social-link/callback",
   "verify-email/",
   "reset-password/",
 ]);
@@ -37,6 +38,7 @@ const configuredRoutes = new Set(
 );
 
 if (
+  JSON.stringify(config.platforms) !== JSON.stringify(["ios", "android"]) ||
   config.scheme !== "kitezh" ||
   config.name !== "Kitezh" ||
   android?.package !== "io.github.susimsek.kitezh.mobile" ||

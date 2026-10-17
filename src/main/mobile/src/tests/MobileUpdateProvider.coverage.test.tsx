@@ -4,8 +4,8 @@ import {
   render,
   screen,
   waitFor,
-} from "@testing-library/react";
-import { Alert, AppState, Platform } from "react-native";
+} from "@/testing/native-testing-library";
+import { Alert, AppState, Platform, Pressable, Text, View } from "react-native";
 
 import { getLatestReleaseMetadata } from "@/api/public-api";
 import {
@@ -35,8 +35,8 @@ Object.defineProperty(globalThis, "__DEV__", {
 function UpdateProbe() {
   const updates = useMobileUpdates();
   return (
-    <div>
-      <output data-testid="state">
+    <View>
+      <Text testID="state">
         {JSON.stringify({
           version: updates.release?.version,
           checked: updates.checked,
@@ -46,12 +46,12 @@ function UpdateProbe() {
           error: updates.error,
           permissionRequired: updates.permissionRequired,
         })}
-      </output>
-      <button onClick={() => void updates.checkForUpdates()}>check</button>
-      <button onClick={() => void updates.installOrOpenUpdate()}>
-        install
-      </button>
-    </div>
+      </Text>
+      <Pressable accessibilityRole="button" onPress={() => void updates.checkForUpdates()}><Text>check</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void updates.installOrOpenUpdate()}>
+        <Text>install</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -64,7 +64,7 @@ function renderUpdates() {
 }
 
 function state() {
-  return JSON.parse(screen.getByTestId("state").textContent ?? "{}") as {
+  return JSON.parse(screen.getByTestId("state").props.children ?? "{}") as {
     version?: string;
     checked: boolean;
     checking: boolean;
@@ -81,7 +81,7 @@ const release = {
   releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v1.3.0",
   assets: {
     androidApk:
-      "https://github.com/susimsek/kitezh/releases/download/v1.3.0/kitezh.apk",
+      "https://github.com/susimsek/kitezh/releases/download/v1.3.0/kitezh-1.3.0-android.apk",
   },
 };
 
@@ -107,12 +107,12 @@ it("checks for a release and installs its Android asset", async () => {
     });
 
   renderUpdates();
-  fireEvent.click(screen.getByRole("button", { name: "check" }));
+  fireEvent.press(screen.getByRole("button", { name: "check" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ checked: true, version: "1.3.0" }),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "install" }));
+  fireEvent.press(screen.getByRole("button", { name: "install" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ installing: false, progress: 100 }),
   );
@@ -120,6 +120,29 @@ it("checks for a release and installs its Android asset", async () => {
     expect.objectContaining({ name: "kitezh-1.3.0-android.apk" }),
     expect.any(Function),
   );
+});
+
+it("does not start duplicate Android installers while a download is pending", async () => {
+  jest.mocked(getLatestReleaseMetadata).mockResolvedValue(release);
+  let finishDownload!: (result: "installer-opened") => void;
+  jest.mocked(downloadAndOpenAndroidUpdate).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finishDownload = resolve;
+      }),
+  );
+
+  renderUpdates();
+  fireEvent.press(screen.getByRole("button", { name: "check" }));
+  await waitFor(() => expect(state()).toMatchObject({ version: "1.3.0" }));
+
+  const installButton = screen.getByRole("button", { name: "install" });
+  fireEvent.press(installButton);
+  fireEvent.press(installButton);
+
+  expect(downloadAndOpenAndroidUpdate).toHaveBeenCalledTimes(1);
+  await act(async () => finishDownload("installer-opened"));
+  await waitFor(() => expect(state()).toMatchObject({ progress: 100 }));
 });
 
 it("checks on app activation in production and prompts only once per version", async () => {
@@ -133,6 +156,10 @@ it("checks on app activation in production and prompts only once per version", a
     return { remove: jest.fn() };
   }) as never);
   const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  Object.defineProperty(AppState, "currentState", {
+    configurable: true,
+    value: "active",
+  });
   let now = 1_800_000_000_000;
   jest.spyOn(Date, "now").mockImplementation(() => now);
   Object.defineProperty(globalThis, "__DEV__", {
@@ -162,13 +189,13 @@ it("reports check and download failures and exposes installer permission state",
     .mocked(getLatestReleaseMetadata)
     .mockRejectedValueOnce(new Error("offline"));
   const view = renderUpdates();
-  fireEvent.click(screen.getByRole("button", { name: "check" }));
+  fireEvent.press(screen.getByRole("button", { name: "check" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ checked: true, error: "check" }),
   );
 
   jest.mocked(getLatestReleaseMetadata).mockResolvedValue(release);
-  fireEvent.click(screen.getByRole("button", { name: "check" }));
+  fireEvent.press(screen.getByRole("button", { name: "check" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ version: "1.3.0", error: null }),
   );
@@ -177,12 +204,12 @@ it("reports check and download failures and exposes installer permission state",
     .mocked(downloadAndOpenAndroidUpdate)
     .mockResolvedValueOnce("permission-required")
     .mockRejectedValueOnce(new Error("download failed"));
-  fireEvent.click(screen.getByRole("button", { name: "install" }));
+  fireEvent.press(screen.getByRole("button", { name: "install" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ permissionRequired: true }),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "install" }));
+  fireEvent.press(screen.getByRole("button", { name: "install" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ error: "download", progress: null }),
   );
@@ -196,20 +223,48 @@ it("opens the release page on iOS and handles link errors", async () => {
   Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
   jest.mocked(getLatestReleaseMetadata).mockResolvedValue(release);
   const view = renderUpdates();
-  fireEvent.click(screen.getByRole("button", { name: "check" }));
+  fireEvent.press(screen.getByRole("button", { name: "check" }));
   await waitFor(() => expect(state()).toMatchObject({ version: "1.3.0" }));
 
   linking.openURL.mockResolvedValueOnce(undefined);
-  fireEvent.click(screen.getByRole("button", { name: "install" }));
+  fireEvent.press(screen.getByRole("button", { name: "install" }));
   await waitFor(() =>
     expect(linking.openURL).toHaveBeenCalledWith(release.releaseUrl),
   );
   await waitFor(() => expect(state().installing).toBe(false));
 
   linking.openURL.mockRejectedValueOnce(new Error("no browser"));
-  fireEvent.click(screen.getByRole("button", { name: "install" }));
+  fireEvent.press(screen.getByRole("button", { name: "install" }));
   await waitFor(() =>
     expect(state()).toMatchObject({ installing: false, error: "download" }),
   );
   view.unmount();
+});
+
+it("prevents duplicate iOS release-page opens while the browser is pending", async () => {
+  const linking = jest.requireMock("expo-linking") as {
+    openURL: jest.Mock;
+  };
+  Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+  jest.mocked(getLatestReleaseMetadata).mockResolvedValue(release);
+  let finishOpen!: () => void;
+  linking.openURL.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finishOpen = resolve;
+      }),
+  );
+
+  renderUpdates();
+  fireEvent.press(screen.getByRole("button", { name: "check" }));
+  await waitFor(() => expect(state()).toMatchObject({ version: "1.3.0" }));
+
+  const installButton = screen.getByRole("button", { name: "install" });
+  fireEvent.press(installButton);
+  fireEvent.press(installButton);
+  expect(linking.openURL).toHaveBeenCalledTimes(1);
+  expect(state().installing).toBe(true);
+
+  await act(async () => finishOpen());
+  await waitFor(() => expect(state().installing).toBe(false));
 });

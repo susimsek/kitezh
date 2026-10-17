@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
+import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { controlSizes, spacing, typography } from "@/theme/tokens";
@@ -21,11 +23,15 @@ export default function SignInScreen() {
   const { error, signIn, status } = useMobileAuth();
   const pending = status === "signing-in";
 
+  useEffect(() => {
+    if (status === "signed-in") router.replace("/account");
+  }, [status]);
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
-      <View style={styles.content}>
+      <MobileFormScrollView contentContainerStyle={styles.content}>
         <Pressable
           accessibilityLabel={dictionary.back}
           accessibilityRole="button"
@@ -54,7 +60,10 @@ export default function SignInScreen() {
           {dictionary.signInNote}
         </Text>
         {error ? (
-          <Text style={[styles.error, { color: palette.danger }]}>
+          <Text
+            accessibilityRole="alert"
+            style={[styles.error, { color: palette.danger }]}
+          >
             {error === "authorization-timeout"
               ? dictionary.authTimeout
               : dictionary.authError}
@@ -62,7 +71,7 @@ export default function SignInScreen() {
         ) : null}
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: pending }}
+          accessibilityState={{ busy: pending, disabled: pending }}
           disabled={pending}
           testID="sign-in-submit"
           onPress={() => void signIn()}
@@ -71,7 +80,12 @@ export default function SignInScreen() {
             { backgroundColor: palette.primary, opacity: pending ? 0.7 : 1 },
           ]}
         >
-          {pending ? <ActivityIndicator color={palette.onPrimary} /> : null}
+          {pending ? (
+            <ActivityIndicator
+              accessibilityLabel={dictionary.loading}
+              color={palette.onPrimary}
+            />
+          ) : null}
           <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
             {dictionary.signIn}
           </Text>
@@ -102,7 +116,7 @@ export default function SignInScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
+      </MobileFormScrollView>
     </SafeAreaView>
   );
 }
@@ -110,10 +124,13 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   content: {
-    flex: 1,
+    alignSelf: "center",
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
+    maxWidth: 560,
     padding: spacing.xl,
+    width: "100%",
   },
   back: {
     alignSelf: "flex-start",

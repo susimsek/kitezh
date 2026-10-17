@@ -104,6 +104,34 @@ class DesktopSocialLinkTransactionServiceTest {
     }
 
     @Test
+    void startsMobileHandoffWithItsDedicatedAuthorizationRouteAndFixedCallback() {
+        when(socialLoginService.isProviderEnabled("github")).thenReturn(true);
+        when(clientRegistrationRepository.getIfAvailable())
+                .thenReturn(githubClientRegistrationRepository);
+        when(githubClientRegistrationRepository.findByRegistrationId("github"))
+                .thenReturn(registration());
+        var user = new UserEntity();
+        user.setUsername("ada");
+        when(userRepository.findForLoginUpdate("ada")).thenReturn(Optional.of(user));
+        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response =
+                service.startMobile(
+                        "ada",
+                        "github",
+                        new DesktopSocialLinkStartRequestDTO(STATE, challenge(VERIFIER)),
+                        "https://kitezh.example");
+
+        assertThat(response.authorizationUrl())
+                .startsWith(
+                        "https://kitezh.example/account/social-links/github/mobile/authorize?transaction=");
+        assertThat(response.state()).isEqualTo(STATE);
+        assertThat(response.expiresAt()).isAfter(java.time.Instant.now());
+        assertThat(service.callbackUrl(STATE, "completion-code", null))
+                .startsWith("kitezh://social-link/callback?state=");
+    }
+
+    @Test
     void rejectsUnavailableInvalidAndMissingProviderTransactions() {
         when(socialLoginService.isProviderEnabled("github")).thenReturn(false);
         assertThatThrownBy(
@@ -171,6 +199,8 @@ class DesktopSocialLinkTransactionServiceTest {
         assertThat(result.linked()).isTrue();
         assertThat(transaction.getConsumedAt()).isNotNull();
         verify(transactionRepository).save(transaction);
+        assertThatThrownBy(() -> service.complete("ada", request))
+                .isInstanceOf(RuntimeException.class);
         assertThatThrownBy(() -> service.complete("other", request))
                 .isInstanceOf(RuntimeException.class);
     }

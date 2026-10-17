@@ -4,8 +4,8 @@ import {
   render,
   screen,
   waitFor,
-} from "@testing-library/react";
-import { AppState, Linking, Platform } from "react-native";
+} from "@/testing/native-testing-library";
+import { AppState, Linking, Platform, Pressable, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import type { ReactNode } from "react";
 import * as storage from "../auth/storage";
@@ -119,22 +119,23 @@ const {
 function AuthProbe() {
   const auth = useMobileAuth();
   return (
-    <div>
-      <output>{auth.status}</output>
-      <output>{auth.error ?? "no-error"}</output>
-      <output>{auth.session?.accessToken ?? "no-session"}</output>
-      <button onClick={() => void auth.signIn()}>sign-in</button>
-      <button onClick={() => void auth.refreshSession(true)}>refresh</button>
-      <button
-        onClick={() => {
+    <View>
+      <Text>{auth.status}</Text>
+      <Text>{auth.error ?? "no-error"}</Text>
+      <Text>{auth.session?.accessToken ?? "no-session"}</Text>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn()}><Text>sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.refreshSession(true)}><Text>refresh</Text></Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
           void auth.refreshSession(true);
           void auth.refreshSession(true);
         }}
       >
-        refresh-twice
-      </button>
-      <button onClick={() => void auth.signOut()}>sign-out</button>
-    </div>
+        <Text>refresh-twice</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signOut()}><Text>sign-out</Text></Pressable>
+    </View>
   );
 }
 
@@ -211,8 +212,8 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
     expiresAt: Date.now() - 1,
   });
   renderProvider();
-  expect(await screen.findByText("signed-in")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() =>
     expect(storage.writeSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -245,7 +246,7 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
     expect.any(Object),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() =>
     expect(storage.writeSession).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -255,20 +256,20 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
       "account",
     ),
   );
-  fireEvent.click(screen.getByRole("button", { name: "sign-out" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-out" }));
   await waitFor(() =>
     expect(storage.clearSession).toHaveBeenCalledWith("account"),
   );
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
 });
 
 it("keeps a cancelled authorization signed out and reports unavailable discovery", async () => {
   mockPromptAsync.mockResolvedValueOnce({ type: "cancel" });
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.writeSession).not.toHaveBeenCalled();
 });
 
@@ -280,8 +281,8 @@ it("refuses an authorization endpoint from mismatched discovery metadata", async
   });
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
-  expect(await screen.findByText("error")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+  expect(await screen.findByText("error")).toBeTruthy();
   expect(mockPromptAsync).not.toHaveBeenCalled();
   expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
 });
@@ -291,9 +292,9 @@ it("reports unavailable discovery without starting an authorization request", as
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
 
-  expect(await screen.findByText("Authentication failed")).toBeVisible();
+  expect(await screen.findByText("Authentication failed")).toBeTruthy();
   expect(mockPromptAsync).not.toHaveBeenCalled();
   expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
 });
@@ -305,13 +306,13 @@ it("times out a browser authorization that never returns", async () => {
     renderProvider();
     await screen.findByText("signed-out");
 
-    fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+    fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
     await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
     await act(async () => {
       await jest.advanceTimersByTimeAsync(5 * 60_000);
     });
 
-    expect(screen.getByText("authorization-timeout")).toBeVisible();
+    expect(screen.getByText("authorization-timeout")).toBeTruthy();
     expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
   } finally {
     jest.useRealTimers();
@@ -342,7 +343,7 @@ it("completes Android authorization from the native redirect event", async () =>
 
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
   const state = savedOAuthTransaction?.state;
   expect(state).toBeDefined();
@@ -353,7 +354,7 @@ it("completes Android authorization from the native redirect event", async () =>
     });
   });
 
-  expect(await screen.findByText("signed-in")).toBeVisible();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
   expect(mockExchangeCode).toHaveBeenCalledWith(
     expect.objectContaining({ code: "android-code" }),
     expect.any(Object),
@@ -388,7 +389,7 @@ it("cancels Android authorization when the browser returns without a callback", 
 
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
 
   jest.useFakeTimers();
@@ -401,7 +402,7 @@ it("cancels Android authorization when the browser returns without a callback", 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(750);
     });
-    expect(await screen.findByText("signed-out")).toBeVisible();
+    expect(await screen.findByText("signed-out")).toBeTruthy();
     expect(mockExchangeCode).not.toHaveBeenCalled();
   } finally {
     jest.useRealTimers();
@@ -427,9 +428,9 @@ it("cleans up Android authorization listeners when browser launch fails", async 
 
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
 
-  expect(await screen.findByText("authorization-failed")).toBeVisible();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
   expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
   expect(removeUrlListener).toHaveBeenCalled();
   expect(removeAppStateListener).toHaveBeenCalled();
@@ -440,9 +441,9 @@ it("fails authorization when its PKCE transaction has expired", async () => {
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
 
-  expect(await screen.findByText("authorization-failed")).toBeVisible();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
   expect(mockExchangeCode).not.toHaveBeenCalled();
   expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
 });
@@ -458,9 +459,9 @@ it("rejects an authorization callback whose state differs from the saved transac
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
 
-  expect(await screen.findByText("authorization-failed")).toBeVisible();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
   expect(mockExchangeCode).not.toHaveBeenCalled();
   expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
 });
@@ -472,7 +473,7 @@ it("continues signed out when secure session restoration fails", async () => {
 
   renderProvider();
 
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.clearSession).not.toHaveBeenCalled();
 });
 
@@ -480,10 +481,10 @@ it("creates a fresh OAuth state for every sign-in attempt", async () => {
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(2));
   expect(storage.saveOAuthTransaction).toHaveBeenCalledTimes(2);
   const firstState = jest.mocked(storage.saveOAuthTransaction).mock
@@ -505,8 +506,8 @@ it("ignores repeated sign-in taps while the browser request is pending", async (
   await screen.findByText("signed-out");
   const signIn = screen.getByRole("button", { name: "sign-in" });
 
-  fireEvent.click(signIn);
-  fireEvent.click(signIn);
+  fireEvent.press(signIn);
+  fireEvent.press(signIn);
 
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
   expect(storage.saveOAuthTransaction).toHaveBeenCalledTimes(1);
@@ -540,7 +541,7 @@ it("resumes a cold-start callback from its SecureStore PKCE transaction", async 
     }),
     expect.any(Object),
   );
-  expect(await screen.findByText("signed-in")).toBeVisible();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
 });
 
 it("clears the pending transaction when a cold-start callback has no state", async () => {
@@ -556,7 +557,7 @@ it("clears the pending transaction when a cold-start callback has no state", asy
     expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
   );
   expect(mockExchangeCode).not.toHaveBeenCalled();
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
 });
 
 it("clears a session after refresh failure and rejects use outside its provider", async () => {
@@ -569,11 +570,11 @@ it("clears a session after refresh failure and rejects use outside its provider"
   mockRefresh.mockRejectedValue(new Error("refresh denied"));
   renderProvider();
   await screen.findByText("signed-in");
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() =>
     expect(storage.clearSession).toHaveBeenCalledWith("account"),
   );
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(() => render(<AuthProbe />)).toThrow(
     "useMobileAuth must be used inside MobileAuthProvider",
   );
@@ -597,7 +598,7 @@ it("coalesces concurrent forced refreshes into one token request", async () => {
   renderProvider();
   await screen.findByText("signed-in");
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh-twice" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh-twice" }));
   await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
   pendingRefresh.resolve({
     accessToken: "refreshed-access-token",
@@ -635,10 +636,10 @@ it("does not restore a session when logout races a pending refresh", async () =>
   renderProvider();
   await screen.findByText("signed-in");
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: "sign-out" }));
-  expect(await screen.findByText("signing-out")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "sign-out" }));
+  expect(await screen.findByText("signing-out")).toBeTruthy();
 
   pendingRefresh.resolve({
     accessToken: "stale-access-token",
@@ -648,7 +649,7 @@ it("does not restore a session when logout races a pending refresh", async () =>
     issuedAt: Math.floor(Date.now() / 1000),
   });
 
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.writeSession).not.toHaveBeenCalled();
   expect(storage.clearSession).toHaveBeenCalledWith("account");
 });
@@ -671,9 +672,9 @@ it("serializes reauthentication after a stale refresh completes", async () => {
   renderProvider();
   await screen.findByText("signed-in");
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   expect(mockPromptAsync).not.toHaveBeenCalled();
 
   pendingRefresh.resolve({
@@ -684,7 +685,7 @@ it("serializes reauthentication after a stale refresh completes", async () => {
     issuedAt: Math.floor(Date.now() / 1000),
   });
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
-  expect(await screen.findByText("signed-in")).toBeVisible();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
   expect(storage.writeSession).toHaveBeenCalledTimes(1);
   expect(storage.writeSession).toHaveBeenCalledWith(
     expect.objectContaining({ accessToken: "access-token" }),

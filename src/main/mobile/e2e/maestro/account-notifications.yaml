@@ -1,0 +1,43 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: false
+- assertVisible: "Kitezh logo"
+- runFlow:
+    when:
+      visible: "Account Console|Hesap Konsolu"
+    commands:
+      - tapOn:
+          id: account-tab-settings
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
+      - tapOn:
+          id: settings-locale-english
+      - tapOn: "Back|Geri"
+      - tapOn: "Continue|Devam et"
+      - tapOn: "Sign in|Giriş yap"
+      - tapOn:
+          text: "^Continue$"
+          optional: true
+      - tapOn:
+          text: "Stay signed out"
+          optional: true
+      - tapOn: "Continue with fixture account|Test hesabıyla devam et"
+- extendedWaitUntil:
+    visible: "Account Console|Hesap Konsolu"
+    timeout: 180000
+- tapOn:
+    id: settings-notifications
+- extendedWaitUntil:
+    visible: "Multi-factor authentication was enabled.|Çok faktörlü kimlik doğrulama etkinleştirildi."
+    timeout: 30000
+- assertVisible: "Notifications|Bildirimler"
+- assertVisible: "Unread notifications: 1|Okunmamış bildirimler: 1"
+- tapOn: "Mark as read|Okundu olarak işaretle"
+- assertVisible: "Read|Okundu"
+- assertVisible: "Unread notifications: 0|Okunmamış bildirimler: 0"

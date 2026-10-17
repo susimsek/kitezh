@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.web.account;
 import io.github.susimsek.kitezh.config.security.SamlRelyingPartyRegistrationRepository;
 import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
 import io.github.susimsek.kitezh.service.SocialLoginService;
+import io.github.susimsek.kitezh.service.error.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -95,11 +96,42 @@ public class SocialAccountLinkController {
         request.getSession(true)
                 .setAttribute(
                         DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE, transaction);
+        redirectToProvider(registrationId, authorization.provider(), response);
+    }
+
+    @GetMapping("/{registrationId}/mobile/authorize")
+    void mobileAuthorize(
+            @PathVariable String registrationId,
+            @RequestParam String transaction,
+            HttpServletRequest request,
+            HttpServletResponse response)
+            throws IOException {
+        if (desktopSocialLinkTransactionService == null) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+        DesktopSocialLinkTransactionService.DesktopSocialLinkAuthorization authorization;
+        try {
+            authorization =
+                    desktopSocialLinkTransactionService.authorize(transaction, registrationId);
+        } catch (ApiException exception) {
+            response.sendError(exception.getStatus().value());
+            return;
+        }
+        request.getSession(true)
+                .setAttribute(
+                        DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE, transaction);
+        redirectToProvider(registrationId, authorization.provider(), response);
+    }
+
+    private void redirectToProvider(
+            String registrationId, String provider, HttpServletResponse response)
+            throws IOException {
         response.sendRedirect(
                 samlRegistrationRepository != null
                                 && samlRegistrationRepository.findByRegistrationId(registrationId)
                                         != null
-                        ? "/saml2/authenticate/" + authorization.provider()
-                        : "/oauth2/authorization/" + authorization.provider());
+                        ? "/saml2/authenticate/" + provider
+                        : "/oauth2/authorization/" + provider);
     }
 }

@@ -218,7 +218,8 @@ public class SecurityConfig {
                                         .requestMatchers("/account/avatar")
                                         .authenticated()
                                         .requestMatchers(
-                                                "/account/social-links/*/desktop/authorize")
+                                                "/account/social-links/*/desktop/authorize",
+                                                "/account/social-links/*/mobile/authorize")
                                         .permitAll()
                                         .requestMatchers("/account/social-links/**")
                                         .authenticated()

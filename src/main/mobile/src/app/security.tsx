@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppIcon } from "@/components/AppIcon";
 import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { AccountTabBar } from "@/components/AccountTabBar";
+import { AccountPagination } from "@/components/AccountPagination";
 import {
   AccountApiError,
   changeAccountPassword,
@@ -85,7 +86,14 @@ export default function SecurityScreen() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [sessions, setSessions] = useState<AccountSession[]>([]);
+  const [sessionsPage, setSessionsPage] = useState<{
+    number: number;
+    totalPages: number;
+  } | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsPageDirection, setSessionsPageDirection] = useState<
+    "next" | "previous" | null
+  >(null);
   const [sessionsError, setSessionsError] = useState(false);
   const [signingOutOthers, setSigningOutOthers] = useState(false);
   const [signOutOthersError, setSignOutOthersError] = useState(false);
@@ -96,11 +104,19 @@ export default function SecurityScreen() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState(false);
+  const sessionsLoadInFlight = useRef(false);
+  const sessionsPageRef = useRef(0);
 
   const loadSessions = useCallback(
-    async (retry = false) => {
-      if (!session) return;
+    async (
+      retry = false,
+      requestedPage = 0,
+      direction: "next" | "previous" | null = null,
+    ) => {
+      if (!session || sessionsLoadInFlight.current) return;
+      sessionsLoadInFlight.current = true;
       setSessionsLoading(true);
+      setSessionsPageDirection(direction);
       setSessionsError(false);
       try {
         const currentSession = retry
@@ -110,15 +126,28 @@ export default function SecurityScreen() {
           setSessionsError(true);
           return;
         }
-        const page = await listAccountSessions(currentSession.accessToken, {
+        let page = await listAccountSessions(currentSession.accessToken, {
+          page: requestedPage,
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
         });
+        if (requestedPage > 0 && requestedPage >= page.totalPages) {
+          const fallbackPage = Math.max(0, page.totalPages - 1);
+          page = await listAccountSessions(currentSession.accessToken, {
+            page: fallbackPage,
+            refreshAccessToken: async () =>
+              (await refreshSession(true))?.accessToken ?? null,
+          });
+        }
         setSessions(page.content ?? []);
+        sessionsPageRef.current = page.number;
+        setSessionsPage({ number: page.number, totalPages: page.totalPages });
       } catch {
         setSessionsError(true);
       } finally {
         setSessionsLoading(false);
+        setSessionsPageDirection(null);
+        sessionsLoadInFlight.current = false;
       }
     },
     [refreshSession, session],
@@ -219,7 +248,7 @@ export default function SecurityScreen() {
         refreshAccessToken: async () =>
           (await refreshSession(true))?.accessToken ?? null,
       });
-      await loadSessions(true);
+      await loadSessions(true, sessionsPageRef.current);
     } catch {
       setSignOutOthersError(true);
     } finally {
@@ -242,7 +271,7 @@ export default function SecurityScreen() {
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
         });
-        await loadSessions(true);
+        await loadSessions(true, sessionsPageRef.current);
       } catch {
         setSignOutSessionError(true);
       } finally {
@@ -425,7 +454,7 @@ export default function SecurityScreen() {
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               {dictionary.sessionsTitle}
             </Text>
-            {sessionsLoading ? (
+            {sessionsLoading && !sessionsPage ? (
               <ActivityIndicator
                 color={palette.primary}
                 accessibilityLabel={dictionary.loading}
@@ -515,6 +544,23 @@ export default function SecurityScreen() {
                 </View>
               ))
             )}
+            {sessionsPage && !sessionsError ? (
+              <AccountPagination
+                loading={sessionsLoading}
+                loadingDirection={sessionsPageDirection}
+                onNext={() =>
+                  void loadSessions(false, sessionsPage.number + 1, "next")
+                }
+                onPrevious={() =>
+                  void loadSessions(
+                    false,
+                    Math.max(0, sessionsPage.number - 1),
+                    "previous",
+                  )
+                }
+                page={sessionsPage}
+              />
+            ) : null}
             {signOutOthersError ? (
               <Text style={[styles.errorText, { color: palette.danger }]}>
                 {dictionary.signOutOthersError}

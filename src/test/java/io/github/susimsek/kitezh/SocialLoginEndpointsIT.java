@@ -103,6 +103,27 @@ class SocialLoginEndpointsIT {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void mobileSocialLinkContractRequiresValidPkceAndAValidAuthorizationTransaction()
+            throws Exception {
+        mockMvc.perform(
+                        post("/api/account/social-links/google/mobile/start")
+                                .with(accountUser("validation-user"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"state\":\"short\",\"codeChallenge\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(
+                        post("/api/account/social-links/mobile/complete")
+                                .with(accountUser("validation-user"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"code\":\"short\",\"codeVerifier\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/account/social-links/google/mobile/authorize"))
+                .andExpect(status().isBadRequest());
+    }
+
     private static JwtRequestPostProcessor admin() {
         return jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }

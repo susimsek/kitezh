@@ -57,16 +57,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-node e2e/fixture-server.mjs --host 0.0.0.0 --port 8080 > "$run_dir/fixture.log" 2>&1 &
+node e2e/fixture-server.mjs --host 0.0.0.0 --port 9090 > "$run_dir/fixture.log" 2>&1 &
 fixture_pid=$!
 export REACT_NATIVE_PACKAGER_HOSTNAME="127.0.0.1"
-export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://127.0.0.1:8080"
+export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://127.0.0.1:9090"
 pnpm exec expo start --port 8081 --dev-client > "$run_dir/metro.log" 2>&1 &
 metro_pid=$!
 
 fixture_ready=false
 for attempt in $(seq 1 30); do
-  if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+  if curl --fail --silent http://127.0.0.1:9090/health >/dev/null; then
     fixture_ready=true
     break
   fi
@@ -106,7 +106,16 @@ xcrun simctl install "$simulator_udid" \
   "$derived_data_dir/Build/Products/Debug-iphonesimulator/Kitezh.app"
 xcrun simctl launch "$simulator_udid" io.github.susimsek.kitezh.mobile
 
-maestro test --udid "$simulator_udid" e2e/maestro/cold-start.yaml
-maestro test --udid "$simulator_udid" e2e/maestro/settings-locale-theme.yaml
-maestro test --udid "$simulator_udid" e2e/maestro/deep-links.yaml
-maestro test --udid "$simulator_udid" e2e/maestro/authenticated-fixture.yaml
+default_flows=(
+  cold-start
+  settings-locale-theme
+  deep-links
+  authenticated-fixture
+  admin-settings-groups
+  account-profile
+  account-notifications
+)
+IFS=',' read -r -a selected_flows <<< "${MAESTRO_FLOWS:-${default_flows[*]// /,}}"
+for flow in "${selected_flows[@]}"; do
+  maestro test --udid "$simulator_udid" "e2e/maestro/${flow}.yaml"
+done

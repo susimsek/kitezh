@@ -43,16 +43,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-node e2e/fixture-server.mjs --host 0.0.0.0 --port 8080 > "$run_dir/fixture.log" 2>&1 &
+node e2e/fixture-server.mjs --host 0.0.0.0 --port 9090 > "$run_dir/fixture.log" 2>&1 &
 fixture_pid=$!
 export REACT_NATIVE_PACKAGER_HOSTNAME="10.0.2.2"
-export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://10.0.2.2:8080"
+export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://10.0.2.2:9090"
 pnpm exec expo start --host lan --port 8081 --dev-client > "$run_dir/metro.log" 2>&1 &
 metro_pid=$!
 
 fixture_ready=false
 for attempt in $(seq 1 30); do
-  if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+  if curl --fail --silent http://127.0.0.1:9090/health >/dev/null; then
     fixture_ready=true
     break
   fi
@@ -85,3 +85,4 @@ maestro test --device "$android_serial" e2e/maestro/cold-start.yaml
 maestro test --device "$android_serial" e2e/maestro/settings-locale-theme.yaml
 maestro test --device "$android_serial" e2e/maestro/deep-links.yaml
 maestro test --device "$android_serial" e2e/maestro/authenticated-fixture.yaml
+maestro test --device "$android_serial" e2e/maestro/admin-settings-groups.yaml
