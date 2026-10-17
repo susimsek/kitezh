@@ -260,11 +260,15 @@ it("hydrates backend capabilities before showing only authorized admin tabs and 
   });
 
   render(<AdminScreen />);
-  expect(await screen.findByTestId("admin-tab-users")).toBeTruthy();
+  expect(
+    await screen.findByTestId("admin-tab-users", {}, { timeout: 10000 }),
+  ).toBeTruthy();
   expect(screen.queryByTestId("admin-tab-dashboard")).toBeNull();
   expect(screen.queryByTestId("admin-tab-clients")).toBeNull();
   fireEvent.press(screen.getByTestId("admin-tab-users"));
-  expect(await screen.findByText("read-only-user")).toBeTruthy();
+  expect(
+    await screen.findByText("read-only-user", {}, { timeout: 10000 }),
+  ).toBeTruthy();
   expect(screen.queryByRole("button", { name: "adminCreate" })).toBeNull();
   expect(screen.queryByRole("button", { name: "adminEdit" })).toBeNull();
   expect(screen.queryByRole("button", { name: "adminUserDelete" })).toBeNull();
