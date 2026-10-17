@@ -1,7 +1,8 @@
-package io.github.susimsek.kitezh.web.admin.validation;
+package io.github.susimsek.kitezh.validation.validator;
 
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
+import io.github.susimsek.kitezh.web.admin.validation.ValidAdminClientConfiguration;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.Set;

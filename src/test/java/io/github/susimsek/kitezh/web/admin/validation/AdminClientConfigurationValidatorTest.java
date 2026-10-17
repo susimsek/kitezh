@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
+import io.github.susimsek.kitezh.validation.validator.AdminClientConfigurationValidator;
 import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.Test;

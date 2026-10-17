@@ -1,5 +1,6 @@
-package io.github.susimsek.kitezh.web.admin.validation;
+package io.github.susimsek.kitezh.validation.validator;
 
+import io.github.susimsek.kitezh.web.admin.validation.OptionalPassword;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

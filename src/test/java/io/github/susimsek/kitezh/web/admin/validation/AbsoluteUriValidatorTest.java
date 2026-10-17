@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh.web.admin.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.susimsek.kitezh.validation.validator.AbsoluteUriValidator;
 import org.junit.jupiter.api.Test;
 
 class AbsoluteUriValidatorTest {
