@@ -284,71 +284,41 @@ jobs:
     permissions:
       contents: read
     env:
-      MCP_RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.MCP_RENDER_RELEASE_DEPLOY_HOOK_URL }}
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      MCP_RENDER_SERVICE_ID: srv-db9jm0m1egvs73fhcrp0
       MCP_IMAGE: docker.io/suayb/kitezh-mcp
       MCP_RENDER_IMAGE: docker.io/suayb/kitezh-mcp
       IMAGE_DIGEST: ${{ needs.publish-image-manifests.outputs.image_digest }}
     steps:
       - name: Verify Render deployment configuration
-        id: render-config
-        shell: bash
         run: |
           set -euo pipefail
-          test -n "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}" || {
-            echo "MCP_RENDER_RELEASE_DEPLOY_HOOK_URL is required." >&2
-            exit 1
-          }
           test -n "${RENDER_API_KEY}" || {
             echo "RENDER_API_KEY is required." >&2
             exit 1
           }
-          if [[ "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}" =~ /deploy/(srv-[A-Za-z0-9]+) ]]; then
-            echo "service_id=${BASH_REMATCH[1]}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "Could not read the Render service ID from the MCP deploy hook." >&2
-            exit 1
-          fi
 
       - name: Trigger Render deploy with the immutable image
         id: deploy
         shell: bash
-        env:
-          MCP_RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
         run: |
           set -euo pipefail
-          # Use the canonical Docker Hub URL accepted by Render's imgURL field.
           image_ref="${MCP_RENDER_IMAGE}@${IMAGE_DIGEST}"
           response_file="$(mktemp)"
           trap 'rm -f "${response_file}"' EXIT
-          request_started_at=$(( $(date +%s) - 5 ))
-          created_after="$(date -u -d "@${request_started_at}" '+%Y-%m-%dT%H:%M:%SZ')"
-          http_status="$(curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
-            --get --data-urlencode "imgURL=${image_ref}" \
-            "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}")"
-          case "${http_status}" in
-            200) deploy_id="$(jq -er '.deploy.id // empty' "${response_file}")" ;;
-            202)
-              deadline=$((SECONDS + 1200))
-              deploy_id=""
-              while [[ -z "${deploy_id}" ]] && (( SECONDS < deadline )); do
-                deploys="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
-                  -H "Authorization: Bearer ${RENDER_API_KEY}" \
-                  -H 'Accept: application/json' \
-                  --get --data-urlencode "createdAfter=${created_after}" \
-                  --data-urlencode 'limit=100' \
-                  "https://api.render.com/v1/services/${MCP_RENDER_SERVICE_ID}/deploys")"
-                deploy_id="$(jq -r --arg digest "@${IMAGE_DIGEST}" \
-                  '[.. | objects | select((.image.ref // "") | endswith($digest))] | first | .id // empty' \
-                  <<< "${deploys}")"
-                if [[ -z "${deploy_id}" ]]; then sleep 15; fi
-              done
-              ;;
-            *)
-              echo "MCP Render deploy hook returned HTTP ${http_status}." >&2
-              exit 1
-              ;;
-          esac
+          http_status="$(jq -n --arg imageUrl "${image_ref}" '{imageUrl: $imageUrl}' \
+            | curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
+              --request POST \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H 'Accept: application/json' \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              "https://api.render.com/v1/services/${MCP_RENDER_SERVICE_ID}/deploys")"
+          if [[ "${http_status}" != 201 ]]; then
+            echo "Render deploy API returned HTTP ${http_status}: $(cat "${response_file}")" >&2
+            exit 1
+          fi
+          deploy_id="$(jq -er '.id // empty' "${response_file}")"
           test -n "${deploy_id}" || { echo "Render did not return an MCP deploy ID." >&2; exit 1; }
           echo "deploy_id=${deploy_id}" >> "${GITHUB_OUTPUT}"
 
@@ -356,7 +326,6 @@ jobs:
         shell: bash
         env:
           DEPLOY_ID: ${{ steps.deploy.outputs.deploy_id }}
-          MCP_RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
         run: |
           set -euo pipefail
           deploy_url="https://api.render.com/v1/services/${MCP_RENDER_SERVICE_ID}/deploys/${DEPLOY_ID}"
