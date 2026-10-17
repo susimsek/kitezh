@@ -15,7 +15,7 @@ Copy `terraform.tfvars.example` to `terraform.tfvars` and adjust image tags and 
 terraform init
 terraform apply
 kubectl --kubeconfig=./kubeconfig -n apps create secret generic kitezh-mcp-client-secret \
-  --from-literal=client-secret="$KITEZH_MCP_CLIENT_SECRET"
+  --from-literal=client-secret="$APP_MCP_CLIENT_SECRET"
 ```
 
 The Terraform output `mcp_server_ingress_url` gives the MCP endpoint. The backend is available from `authorization_server_ingress_url`. Configure the same MCP URL as the backend's `app.mcp.resourceAudience`, the MCP service's security audience, and its public URL. For the default local values these are `http://mcp.kitezh.127.0.0.1.nip.io:9090/mcp`.

@@ -7,20 +7,17 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhMcpTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhMcpTools(KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = "kitezh_get_context",

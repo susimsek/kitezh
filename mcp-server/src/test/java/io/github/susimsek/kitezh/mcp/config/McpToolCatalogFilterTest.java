@@ -2,6 +2,7 @@ package io.github.susimsek.kitezh.mcp.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -62,8 +63,12 @@ class McpToolCatalogFilterTest {
     }
 
     private static McpToolAuthorizationFilter filter(String toolsets, String allowlist) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy(toolsets, allowlist);
         return new McpToolAuthorizationFilter(
-                new ObjectMapper(), new McpToolCatalogPolicy(toolsets, allowlist));
+                objectMapper,
+                catalogPolicy,
+                new McpOperationMetrics(new SimpleMeterRegistry(), catalogPolicy, objectMapper));
     }
 
     private static MockHttpServletRequest request(String method, String toolName) {

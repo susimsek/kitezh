@@ -1,10 +1,12 @@
 server:
   shutdown: graceful
 
-kitezh:
+app:
+  authorization-server:
+    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.onrender.com}
   mcp:
-    allowed-origins: ${KITEZH_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
-    allow-local-hosts: ${KITEZH_MCP_ALLOW_LOCAL_HOSTS:false}
+    allowed-origins: ${APP_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
+    allow-local-hosts: ${APP_MCP_ALLOW_LOCAL_HOSTS:false}
 
 management:
   metrics:
@@ -14,6 +16,7 @@ management:
         kitezh_mcp_tool_call_duration_seconds: true
         kitezh_mcp_token_exchange_duration_seconds: true
         kitezh_mcp_kitezh_api_request_duration_seconds: true
+        mcp_server_operation_duration_seconds: true
       percentiles:
         http.server.requests: 0.5,0.95,0.99
       slo:

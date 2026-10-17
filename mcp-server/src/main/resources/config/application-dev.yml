@@ -3,6 +3,13 @@ spring:
     compose:
       enabled: false
 
+app:
+  authorization-server:
+    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:http://localhost:9090}
+  mcp:
+    allowed-origins: ${APP_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
+    allow-local-hosts: ${APP_MCP_ALLOW_LOCAL_HOSTS:true}
+
 logging:
   level:
     root: INFO

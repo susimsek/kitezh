@@ -4,11 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -18,10 +18,16 @@ import org.springframework.web.filter.CorsFilter;
 class McpHttpBoundaryConfig {
 
     @Bean
+    RestClient kitezhRestClient(RestClient.Builder builder) {
+        return builder.build();
+    }
+
+    @Bean
     FilterRegistrationBean<McpRequestBoundaryFilter> mcpRequestBoundaryFilter(
-            @Value("${kitezh.mcp.public-url}") String publicUrl,
-            @Value("${kitezh.mcp.allowed-origins:}") String configuredOrigins,
-            @Value("${kitezh.mcp.allow-local-hosts:false}") boolean allowLocalHosts) {
+            ApplicationProperties properties) {
+        String publicUrl = properties.mcp().publicUrl();
+        String configuredOrigins = properties.mcp().allowedOrigins();
+        boolean allowLocalHosts = properties.mcp().allowLocalHosts();
         McpRequestBoundaryFilter filter =
                 new McpRequestBoundaryFilter(publicUrl, configuredOrigins, allowLocalHosts);
         FilterRegistrationBean<McpRequestBoundaryFilter> registration =
@@ -32,10 +38,10 @@ class McpHttpBoundaryConfig {
     }
 
     @Bean
-    FilterRegistrationBean<CorsFilter> mcpCorsFilter(
-            @Value("${kitezh.mcp.public-url}") String publicUrl,
-            @Value("${kitezh.mcp.allowed-origins:}") String configuredOrigins,
-            @Value("${kitezh.mcp.allow-local-hosts:false}") boolean allowLocalHosts) {
+    FilterRegistrationBean<CorsFilter> mcpCorsFilter(ApplicationProperties properties) {
+        String publicUrl = properties.mcp().publicUrl();
+        String configuredOrigins = properties.mcp().allowedOrigins();
+        boolean allowLocalHosts = properties.mcp().allowLocalHosts();
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(
                 allowedOrigins(publicUrl, configuredOrigins, allowLocalHosts));

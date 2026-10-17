@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import io.github.susimsek.kitezh.mcp.config.ApplicationProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -24,11 +25,10 @@ class KitezhTokenExchangeClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KitezhTokenExchangeClient client =
                 new KitezhTokenExchangeClient(
-                        builder,
+                        builder.build(),
                         new SimpleMeterRegistry(),
-                        "https://kitezh.test/oauth2/token",
-                        "mcp-server",
-                        "local-secret");
+                        properties(
+                                "https://kitezh.test/oauth2/token", "mcp-server", "local-secret"));
         server.expect(method(HttpMethod.POST))
                 .andExpect(requestTo("https://kitezh.test/oauth2/token"))
                 .andExpect(
@@ -90,11 +90,9 @@ class KitezhTokenExchangeClientTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhTokenExchangeClient client =
                 new KitezhTokenExchangeClient(
-                        RestClient.builder(),
+                        RestClient.builder().build(),
                         registry,
-                        "https://kitezh.test/oauth2/token",
-                        "mcp",
-                        "");
+                        properties("https://kitezh.test/oauth2/token", "mcp", ""));
         Jwt subject =
                 Jwt.withTokenValue("subject-token").header("alg", "none").subject("alice").build();
 
@@ -115,11 +113,9 @@ class KitezhTokenExchangeClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KitezhTokenExchangeClient client =
                 new KitezhTokenExchangeClient(
-                        builder,
+                        builder.build(),
                         new SimpleMeterRegistry(),
-                        "https://kitezh.test/oauth2/token",
-                        "mcp",
-                        "secret");
+                        properties("https://kitezh.test/oauth2/token", "mcp", "secret"));
         server.expect(requestTo("https://kitezh.test/oauth2/token"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
         Jwt subject =
@@ -129,5 +125,24 @@ class KitezhTokenExchangeClientTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Kitezh token endpoint returned no actor token");
         server.verify();
+    }
+
+    private static ApplicationProperties properties(
+            String tokenUri, String clientId, String clientSecret) {
+        return new ApplicationProperties(
+                null,
+                new ApplicationProperties.Security(
+                        "https://kitezh.test/oauth2/jwks",
+                        tokenUri,
+                        "https://kitezh-mcp.onrender.com/mcp"),
+                null,
+                new ApplicationProperties.Mcp(
+                        "https://kitezh-mcp.onrender.com/mcp",
+                        "",
+                        false,
+                        clientId,
+                        clientSecret,
+                        true,
+                        null));
     }
 }

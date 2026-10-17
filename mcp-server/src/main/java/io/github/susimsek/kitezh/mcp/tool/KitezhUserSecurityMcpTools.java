@@ -5,20 +5,17 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhUserSecurityMcpTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhUserSecurityMcpTools(KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = "kitezh_list_user_required_actions",

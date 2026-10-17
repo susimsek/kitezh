@@ -1,7 +1,7 @@
 package io.github.susimsek.kitezh.mcp.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -30,11 +30,13 @@ public class McpSecurityConfig {
     SecurityFilterChain mcpSecurityFilterChain(
             HttpSecurity http,
             ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
             McpToolCatalogPolicy mcpToolCatalogPolicy,
-            @Value("${kitezh.security.issuer-uri}") String issuer,
-            @Value("${kitezh.security.audience}") String audience,
-            @Value("${kitezh.mcp.public-url}") String publicUrl)
+            ApplicationProperties properties)
             throws Exception {
+        String issuer = properties.authorizationServer().issuer();
+        String audience = properties.security().audience();
+        String publicUrl = properties.mcp().publicUrl();
         http.authorizeHttpRequests(
                         authorize ->
                                 authorize
@@ -71,16 +73,18 @@ public class McpSecurityConfig {
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf.disable());
         http.addFilterAfter(
-                new McpToolAuthorizationFilter(objectMapper, mcpToolCatalogPolicy),
+                new McpToolAuthorizationFilter(
+                        objectMapper,
+                        mcpToolCatalogPolicy,
+                        new McpOperationMetrics(meterRegistry, mcpToolCatalogPolicy, objectMapper)),
                 BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
     @Bean
-    McpToolCatalogPolicy mcpToolCatalogPolicy(
-            @Value("${kitezh.mcp.tools.toolsets:all}") String toolsets,
-            @Value("${kitezh.mcp.tools.allowlist:*}") String allowlist) {
-        return new McpToolCatalogPolicy(toolsets, allowlist);
+    McpToolCatalogPolicy mcpToolCatalogPolicy(ApplicationProperties properties) {
+        return new McpToolCatalogPolicy(
+                properties.mcp().tools().toolsets(), properties.mcp().tools().allowlist());
     }
 
     private static AuthenticationEntryPoint metadataEntryPoint(String publicUrl) {
@@ -96,10 +100,10 @@ public class McpSecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(
-            @Value("${kitezh.security.issuer-uri}") String issuer,
-            @Value("${kitezh.security.jwk-set-uri}") String jwkSetUri,
-            @Value("${kitezh.security.audience}") String audience) {
+    JwtDecoder jwtDecoder(ApplicationProperties properties) {
+        String issuer = properties.authorizationServer().issuer();
+        String jwkSetUri = properties.security().jwkSetUri();
+        String audience = properties.security().audience();
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         decoder.setJwtValidator(
                 new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(

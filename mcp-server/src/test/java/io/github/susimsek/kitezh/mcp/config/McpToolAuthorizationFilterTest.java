@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.mcp.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.ServletInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,9 +19,14 @@ import tools.jackson.databind.ObjectMapper;
 
 class McpToolAuthorizationFilterTest {
 
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy("all", "*");
     private final McpToolAuthorizationFilter filter =
             new McpToolAuthorizationFilter(
-                    new ObjectMapper(), new McpToolCatalogPolicy("all", "*"));
+                    objectMapper,
+                    catalogPolicy,
+                    new McpOperationMetrics(meterRegistry, catalogPolicy, objectMapper));
 
     @AfterEach
     void clearSecurityContext() {
@@ -49,6 +55,15 @@ class McpToolAuthorizationFilterTest {
         assertThat(response.getContentAsString())
                 .contains("kitezh_search_users")
                 .doesNotContain("kitezh_search_clients");
+        assertThat(meterRegistry.find("mcp_server_operation_duration_seconds").timer().count())
+                .isEqualTo(1);
+        assertThat(
+                        meterRegistry
+                                .find("mcp_server_operation_duration_seconds")
+                                .tag("method", "tools/list")
+                                .tag("error_type", "none")
+                                .timer())
+                .isNotNull();
     }
 
     @Test
@@ -62,6 +77,14 @@ class McpToolAuthorizationFilterTest {
                     throw new AssertionError("Denied tool must not reach the MCP server");
                 });
         assertThat(deniedResponse.getContentAsString()).contains("\"code\":-32601");
+        assertThat(
+                        meterRegistry
+                                .find("mcp_server_operation_duration_seconds")
+                                .tag("method", "tools/call")
+                                .tag("tool_name", "kitezh_search_clients")
+                                .tag("error_type", "authorization")
+                                .timer())
+                .isNotNull();
 
         MockHttpServletRequest batchRequest = new MockHttpServletRequest("POST", "/mcp");
         batchRequest.setContent("[{}]".getBytes(StandardCharsets.UTF_8));

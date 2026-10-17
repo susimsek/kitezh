@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import io.github.susimsek.kitezh.mcp.config.ApplicationProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -38,10 +39,10 @@ class KitezhAdminApiClientTest {
                 .thenReturn("api-token");
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder,
+                        builder.build(),
                         tokenExchangeClient,
                         new SimpleMeterRegistry(),
-                        "https://kitezh.test");
+                        properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(method(HttpMethod.GET))
                 .andExpect(requestTo("https://kitezh.test/api/admin/users?page=0&q=alice&size=20"))
@@ -71,7 +72,10 @@ class KitezhAdminApiClientTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder, tokenExchangeClient, registry, "https://kitezh.test");
+                        builder.build(),
+                        tokenExchangeClient,
+                        registry,
+                        properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(requestTo("https://kitezh.test/api/admin/whoami"))
                 .andRespond(withServerError());
@@ -102,10 +106,10 @@ class KitezhAdminApiClientTest {
                 .thenReturn("api-token");
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder,
+                        builder.build(),
                         tokenExchangeClient,
                         new SimpleMeterRegistry(),
-                        "https://kitezh.test");
+                        properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(method(HttpMethod.GET))
                 .andExpect(requestTo("https://kitezh.test/api/admin/groups/3/permissions"))
@@ -136,7 +140,10 @@ class KitezhAdminApiClientTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder, tokenExchangeClient, registry, "https://kitezh.test");
+                        builder.build(),
+                        tokenExchangeClient,
+                        registry,
+                        properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(requestTo("https://kitezh.test/api/admin/groups/3/permissions"))
                 .andRespond(withServerError());
@@ -162,10 +169,10 @@ class KitezhAdminApiClientTest {
     void rejectsCallsWithoutAnAuthenticatedJwt() {
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        RestClient.builder(),
+                        RestClient.builder().build(),
                         mock(KitezhTokenExchangeClient.class),
                         new SimpleMeterRegistry(),
-                        "https://kitezh.test");
+                        properties("https://kitezh.test"));
 
         assertThatThrownBy(
                         () ->
@@ -181,5 +188,10 @@ class KitezhAdminApiClientTest {
         Jwt jwt =
                 Jwt.withTokenValue("subject-token").header("alg", "none").subject("alice").build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+    }
+
+    private static ApplicationProperties properties(String apiBaseUrl) {
+        return new ApplicationProperties(
+                null, null, new ApplicationProperties.Api(apiBaseUrl), null);
     }
 }

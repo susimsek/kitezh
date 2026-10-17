@@ -320,6 +320,41 @@ class McpServerSecurityIT {
         assertThatIllegalArgumentException().isThrownBy(() -> tools.getUser(0L));
 
         mockMvc.perform(
+                        post("/mcp")
+                                .header("MCP-Protocol-Version", "2025-11-25")
+                                .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .with(
+                                        SecurityMockMvcRequestPostProcessors.jwt()
+                                                .authorities(
+                                                        new SimpleGrantedAuthority(
+                                                                "SCOPE_mcp.read")))
+                                .content(
+                                        """
+                                        {"jsonrpc":"2.0","id":8,"method":"tools/list","params":{}}
+                                        """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(
+                        post("/mcp")
+                                .header("MCP-Protocol-Version", "2025-11-25")
+                                .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .with(
+                                        SecurityMockMvcRequestPostProcessors.jwt()
+                                                .authorities(
+                                                        new SimpleGrantedAuthority(
+                                                                "SCOPE_mcp.read"),
+                                                        new SimpleGrantedAuthority(
+                                                                "ROLE_USER_VIEWER")))
+                                .content(
+                                        """
+                                        {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"kitezh_search_clients","arguments":{}}}
+                                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.error.code").value(-32601));
+
+        mockMvc.perform(
                         get("/actuator/prometheus")
                                 .with(
                                         SecurityMockMvcRequestPostProcessors.jwt()
@@ -329,6 +364,14 @@ class McpServerSecurityIT {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("kitezh_mcp_tool_calls_total")))
                 .andExpect(content().string(containsString("status=\"client_error\"")))
+                .andExpect(
+                        content()
+                                .string(
+                                        containsString(
+                                                "mcp_server_operation_duration_seconds_bucket")))
+                .andExpect(content().string(containsString("method=\"tools/list\"")))
+                .andExpect(content().string(containsString("tool_name=\"kitezh_search_clients\"")))
+                .andExpect(content().string(containsString("error_type=\"authorization\"")))
                 .andExpect(
                         content()
                                 .string(

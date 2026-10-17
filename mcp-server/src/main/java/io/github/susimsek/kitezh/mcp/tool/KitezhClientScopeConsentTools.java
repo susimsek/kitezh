@@ -6,12 +6,14 @@ import io.micrometer.core.instrument.Timer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /** Read-only OAuth client-scope and consent inspection tools. */
 @Component
+@RequiredArgsConstructor
 public class KitezhClientScopeConsentTools {
 
     private static final String CLIENT_ID_PATTERN = "[A-Za-z0-9._~+-]{1,128}";
@@ -22,12 +24,6 @@ public class KitezhClientScopeConsentTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhClientScopeConsentTools(
-            KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = "kitezh_search_client_scopes",

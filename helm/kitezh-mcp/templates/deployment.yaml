@@ -59,27 +59,11 @@ spec:
               value: {{ .Values.spring.profiles.active | quote }}
             - name: OTEL_SERVICE_NAME
               value: kitezh-mcp
-            - name: KITEZH_SECURITY_ISSUER_URI
-              value: {{ .Values.app.security.issuerUri | quote }}
-            - name: KITEZH_SECURITY_JWK_SET_URI
-              value: {{ .Values.app.security.jwkSetUri | quote }}
-            - name: KITEZH_SECURITY_TOKEN_URI
-              value: {{ .Values.app.security.tokenUri | quote }}
-            - name: KITEZH_SECURITY_AUDIENCE
-              value: {{ .Values.app.security.audience | quote }}
-            - name: KITEZH_API_BASE_URL
-              value: {{ .Values.app.api.baseUrl | quote }}
-            - name: KITEZH_MCP_PUBLIC_URL
-              value: {{ .Values.app.mcp.publicUrl | quote }}
-            - name: KITEZH_MCP_CLIENT_ID
-              value: {{ .Values.app.mcp.clientId | quote }}
-            - name: KITEZH_MCP_CLIENT_SECRET
+            - name: APP_MCP_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "kitezh-mcp.clientSecretName" . }}
                   key: {{ .Values.existingSecret.key | quote }}
-            - name: KITEZH_READ_ONLY
-              value: {{ .Values.app.mcp.readOnly | quote }}
           volumeMounts:
             - name: config
               mountPath: /opt/config/application.yml

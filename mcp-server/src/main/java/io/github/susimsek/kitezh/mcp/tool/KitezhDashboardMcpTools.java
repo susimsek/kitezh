@@ -5,19 +5,16 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.Map;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhDashboardMcpTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhDashboardMcpTools(KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = "kitezh_get_admin_dashboard_summary",

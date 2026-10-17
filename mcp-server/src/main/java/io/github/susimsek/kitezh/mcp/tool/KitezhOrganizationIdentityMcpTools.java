@@ -8,11 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhOrganizationIdentityMcpTools {
 
     private static final Set<String> IDENTITY_PROVIDER_FIELDS =
@@ -22,12 +24,6 @@ public class KitezhOrganizationIdentityMcpTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhOrganizationIdentityMcpTools(
-            KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = "kitezh_list_organization_identity_providers",

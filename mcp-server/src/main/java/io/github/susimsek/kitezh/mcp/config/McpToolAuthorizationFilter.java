@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,6 +29,7 @@ import tools.jackson.databind.node.NullNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Filters MCP discovery and calls against the authority set in the verified bearer token. */
+@RequiredArgsConstructor
 final class McpToolAuthorizationFilter extends OncePerRequestFilter {
 
     private static final int TOOL_NOT_FOUND = -32601;
@@ -51,11 +53,7 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
     private final McpToolCatalogPolicy catalogPolicy;
-
-    McpToolAuthorizationFilter(ObjectMapper objectMapper, McpToolCatalogPolicy catalogPolicy) {
-        this.objectMapper = objectMapper;
-        this.catalogPolicy = catalogPolicy;
-    }
+    private final McpOperationMetrics operationMetrics;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -72,40 +70,58 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         byte[] requestBody = request.getInputStream().readAllBytes();
         JsonNode jsonRequest = readJson(requestBody);
-        if (jsonRequest != null && jsonRequest.isArray()) {
-            writeError(response, NullNode.getInstance(), INVALID_REQUEST, "Invalid request");
-            return;
-        }
+        String method = McpOperationMetrics.methodName(jsonRequest);
+        String toolName = McpOperationMetrics.toolName(jsonRequest);
+        McpOperationMetrics.Operation operation =
+                operationMetrics.start(
+                        method,
+                        toolName,
+                        McpOperationMetrics.protocolVersion(
+                                jsonRequest, request.getHeader("MCP-Protocol-Version")));
+        String errorType = McpOperationMetrics.noneErrorType();
+        try {
+            if (jsonRequest != null && jsonRequest.isArray()) {
+                writeError(response, NullNode.getInstance(), INVALID_REQUEST, "Invalid request");
+                return;
+            }
 
-        String method = text(jsonRequest, "method");
-        JsonNode requestId = jsonRequest == null ? NullNode.getInstance() : jsonRequest.path("id");
-        if ("tools/call".equals(method)) {
-            String toolName = text(jsonRequest.path("params"), "name");
-            if (!canUse(toolName, currentAuthorities())) {
+            JsonNode requestId =
+                    jsonRequest == null ? NullNode.getInstance() : jsonRequest.path("id");
+            if ("tools/call".equals(method) && !canUse(toolName, currentAuthorities())) {
+                errorType = "authorization";
                 writeError(response, requestId, TOOL_NOT_FOUND, "Tool not found");
                 return;
             }
-        }
 
-        ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);
-        filterChain.doFilter(new ReplayableRequest(request, requestBody), wrappedResponse);
-        if ("tools/list".equals(method)) {
-            byte[] body = wrappedResponse.getContentAsByteArray();
-            JsonNode jsonResponse = readJson(body);
-            if (jsonResponse instanceof ObjectNode responseObject
-                    && responseObject.path("result").path("tools") instanceof ArrayNode tools) {
-                Set<String> authorities = currentAuthorities();
-                ArrayNode visibleTools = objectMapper.createArrayNode();
-                for (JsonNode tool : tools) {
-                    if (canUse(text(tool, "name"), authorities)) {
-                        visibleTools.add(tool);
+            ContentCachingResponseWrapper wrappedResponse =
+                    new ContentCachingResponseWrapper(response);
+            filterChain.doFilter(new ReplayableRequest(request, requestBody), wrappedResponse);
+            if ("tools/list".equals(method)) {
+                byte[] body = wrappedResponse.getContentAsByteArray();
+                JsonNode jsonResponse = readJson(body);
+                if (jsonResponse instanceof ObjectNode responseObject
+                        && responseObject.path("result").path("tools") instanceof ArrayNode tools) {
+                    Set<String> authorities = currentAuthorities();
+                    ArrayNode visibleTools = objectMapper.createArrayNode();
+                    for (JsonNode tool : tools) {
+                        if (canUse(text(tool, "name"), authorities)) {
+                            visibleTools.add(tool);
+                        }
                     }
+                    ((ObjectNode) responseObject.path("result")).set("tools", visibleTools);
+                    replaceResponse(wrappedResponse, responseObject);
                 }
-                ((ObjectNode) responseObject.path("result")).set("tools", visibleTools);
-                replaceResponse(wrappedResponse, responseObject);
             }
+            errorType =
+                    operationMetrics.responseErrorType(
+                            wrappedResponse.getStatus(), wrappedResponse.getContentAsByteArray());
+            wrappedResponse.copyBodyToResponse();
+        } catch (IOException | ServletException | RuntimeException exception) {
+            errorType = operationMetrics.exceptionErrorType(exception);
+            throw exception;
+        } finally {
+            operationMetrics.record(operation, errorType);
         }
-        wrappedResponse.copyBodyToResponse();
     }
 
     private boolean canUse(String toolName, Set<String> authorities) {

@@ -7,11 +7,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhRoleMcpTools {
 
     private static final String ROLE_NAME_PATTERN = "ROLE_[A-Z0-9_]{1,45}";
@@ -20,11 +22,6 @@ public class KitezhRoleMcpTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhRoleMcpTools(KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = "kitezh_search_roles",

@@ -1,9 +1,10 @@
 package io.github.susimsek.kitezh.mcp.service;
 
+import io.github.susimsek.kitezh.mcp.config.ApplicationProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
@@ -12,28 +13,14 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhTokenExchangeClient {
 
     private static final String ACCESS_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token";
 
     private final RestClient restClient;
     private final MeterRegistry meterRegistry;
-    private final String tokenUri;
-    private final String clientId;
-    private final String clientSecret;
-
-    public KitezhTokenExchangeClient(
-            RestClient.Builder restClientBuilder,
-            MeterRegistry meterRegistry,
-            @Value("${kitezh.security.token-uri}") String tokenUri,
-            @Value("${kitezh.mcp.client-id}") String clientId,
-            @Value("${kitezh.mcp.client-secret}") String clientSecret) {
-        this.restClient = restClientBuilder.build();
-        this.meterRegistry = meterRegistry;
-        this.tokenUri = tokenUri;
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
-    }
+    private final ApplicationProperties properties;
 
     public String exchange(Jwt subjectToken) {
         Timer.Sample sample = Timer.start(meterRegistry);
@@ -55,7 +42,7 @@ public class KitezhTokenExchangeClient {
     }
 
     private String exchangeToken(Jwt subjectToken) {
-        if (clientSecret.isBlank()) {
+        if (properties.mcp().clientSecret().isBlank()) {
             throw new IllegalStateException("MCP service client credentials are not configured");
         }
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
@@ -69,8 +56,12 @@ public class KitezhTokenExchangeClient {
         Map<?, ?> response =
                 restClient
                         .post()
-                        .uri(tokenUri)
-                        .headers(headers -> headers.setBasicAuth(clientId, clientSecret))
+                        .uri(properties.security().tokenUri())
+                        .headers(
+                                headers ->
+                                        headers.setBasicAuth(
+                                                properties.mcp().clientId(),
+                                                properties.mcp().clientSecret()))
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .body(form)
                         .retrieve()
@@ -89,8 +80,12 @@ public class KitezhTokenExchangeClient {
         Map<?, ?> response =
                 restClient
                         .post()
-                        .uri(tokenUri)
-                        .headers(headers -> headers.setBasicAuth(clientId, clientSecret))
+                        .uri(properties.security().tokenUri())
+                        .headers(
+                                headers ->
+                                        headers.setBasicAuth(
+                                                properties.mcp().clientId(),
+                                                properties.mcp().clientSecret()))
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .body(form)
                         .retrieve()

@@ -1,4 +1,5 @@
 {
+  "id": null,
   "annotations": {
     "list": [
       {
@@ -15,32 +16,73 @@
       }
     ]
   },
-  "description": "Kitezh MCP service observability. HTTP metric names follow the units observed in the Kitezh Grafana Cloud backend dashboard. The telemetry status panel shows 0 when MCP metrics are absent from the datasource.",
+  "description": "Kitezh MCP observability following the Kitezh backend dashboard panel naming and ordering where applicable. Database, cache, user session, and login panels do not apply to this standalone stateless service.",
   "editable": true,
-  "id": null,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
   "links": [
     {
+      "keepTime": true,
+      "targetBlank": true,
       "title": "Kitezh backend dashboard",
       "type": "link",
-      "url": "/d/spring-auth-prod/kitezh",
-      "targetBlank": true,
-      "keepTime": true
+      "url": "/d/spring-auth-prod/kitezh"
     }
   ],
   "panels": [
     {
-      "id": 1,
-      "type": "stat",
-      "title": "MCP telemetry present",
+      "collapsed": false,
       "gridPos": {
-        "h": 4,
-        "w": 6,
+        "h": 1,
+        "w": 24,
         "x": 0,
         "y": 0
       },
+      "id": 100,
+      "panels": [],
+      "title": "Service Overview",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
+      },
+      "description": "1 means MCP process metrics are arriving in Grafana Cloud; 0 means no MCP telemetry series was found.",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
@@ -48,28 +90,69 @@
           "refId": "A"
         }
       ],
+      "title": "Availability",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Age of the latest OTLP process metric sample.",
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
+          "decimals": 3,
+          "unit": "s"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 9,
       "options": {
-        "colorMode": "background",
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(time() - max(timestamp(process_uptime_milliseconds{service_name=\"$service\"}))) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Telemetry age",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "value",
         "graphMode": "area",
         "reduceOptions": {
           "calcs": [
@@ -80,219 +163,174 @@
         },
         "textMode": "auto"
       },
-      "description": "1 means MCP process metrics are arriving in Grafana Cloud; 0 means no MCP telemetry series was found."
+      "targets": [
+        {
+          "expr": "max(process_uptime_milliseconds{service_name=\"$service\"}) / 1000",
+          "refId": "A"
+        }
+      ],
+      "title": "Process uptime",
+      "type": "stat"
     },
     {
-      "id": 2,
-      "type": "timeseries",
-      "title": "MCP HTTP request rate",
-      "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 6,
-        "y": 0
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "targets": [
-        {
-          "expr": "sum by (status) (rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])) or vector(0)",
-          "refId": "A",
-          "legendFormat": "HTTP {{status}}"
-        }
-      ],
+      "description": "Time from process start until the MCP application is ready.",
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
+          "decimals": 2,
+          "unit": "s"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "description": "Spring Boot HTTP request count uses millisecond-suffixed metric names in this Grafana Cloud stack."
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "MCP HTTP p95 latency",
       "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 15,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "(histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m]))) and (sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])) > 0)) or vector(0)",
-          "refId": "A",
-          "legendFormat": "p95"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Tool calls by outcome",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (tool, status) (rate(kitezh_mcp_tool_calls_total{service_name=\"$service\"}[5m])) or vector(0)",
-          "refId": "A",
-          "legendFormat": "{{tool}} · {{status}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "description": "Tool/status labels are bounded; do not add user IDs, tokens, query text, or resource IDs."
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Tool call p95 latency",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 5,
+        "w": 4,
         "x": 12,
-        "y": 8
+        "y": 1
       },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "max(application_ready_time_milliseconds{service_name=\"$service\"}) / 1000",
+          "refId": "A"
+        }
+      ],
+      "title": "Application ready time",
+      "type": "stat"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "targets": [
-        {
-          "expr": "(histogram_quantile(0.95, sum by (le, tool) (rate(kitezh_mcp_tool_call_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum by (tool) (rate(kitezh_mcp_tool_call_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)) or vector(0)",
-          "refId": "A",
-          "legendFormat": "{{tool}} p95"
-        }
-      ],
+      "description": "Time from process start until the application context has started.",
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
+          "decimals": 2,
+          "unit": "s"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 12,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "max(application_started_time_milliseconds{service_name=\"$service\"}) / 1000",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Application started time",
+      "type": "stat"
     },
     {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Token exchange requests",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
-        "h": 8,
+        "h": 5,
         "w": 8,
         "x": 0,
-        "y": 16
+        "y": 6
       },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "jvm_info{service_name=\"$service\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "JVM information",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 101,
+      "panels": [],
+      "title": "HTTP Metrics & SLO",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "targets": [
-        {
-          "expr": "sum by (outcome) (rate(kitezh_mcp_token_exchange_requests_total{service_name=\"$service\"}[5m])) or vector(0)",
-          "refId": "A",
-          "legendFormat": "{{outcome}}"
-        }
-      ],
+      "description": "Spring Boot HTTP request count uses millisecond-suffixed metric names in this Grafana Cloud stack.",
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
+          "decimals": 2,
+          "unit": "reqps"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
       "options": {
         "legend": {
           "displayMode": "table",
@@ -302,41 +340,38 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum by (status) (rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])) or on() label_replace(vector(0), \"status\", \"none\", \"__name__\", \".*\")",
+          "legendFormat": "HTTP {{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP request rate",
+      "type": "timeseries"
     },
     {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Kitezh API request errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Share of MCP and unmatched HTTP requests that return a 5xx response.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
       "gridPos": {
-        "h": 8,
+        "h": 4,
         "w": 8,
         "x": 8,
-        "y": 16
+        "y": 12
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "expr": "sum by (tool, outcome) (rate(kitezh_mcp_kitezh_api_requests_total{service_name=\"$service\",outcome=\"error\"}[5m])) or vector(0)",
-          "refId": "A",
-          "legendFormat": "{{tool}} · {{outcome}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
+      "id": 14,
       "options": {
         "legend": {
           "displayMode": "table",
@@ -346,38 +381,1378 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "(100 * sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])), 1e-9)) or vector(0)",
+          "legendFormat": "5xx %",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP 5xx error rate",
+      "type": "timeseries"
     },
     {
-      "id": 8,
-      "type": "timeseries",
-      "title": "JVM heap usage",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 16
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "targets": [
-        {
-          "expr": "100 * sum(jvm_memory_used_bytes{service_name=\"$service\",area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{service_name=\"$service\",area=\"heap\"}), 1)",
-          "refId": "A",
-          "legendFormat": "Heap used"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "decimals": 2,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(rate(http_server_requests_milliseconds_sum{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])), 1e-9) or vector(0)",
+          "legendFormat": "average",
+          "refId": "A"
+        }
+      ],
+      "title": "Average response time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 17
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "(histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m]))) and (sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])) > 0)) or vector(0)",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "title": "95th percentile response time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 17
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "(histogram_quantile(0.99, sum by (le) (rate(http_server_requests_milliseconds_bucket{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m]))) and (sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[5m])) > 0)) or vector(0)",
+          "legendFormat": "p99",
+          "refId": "A"
+        }
+      ],
+      "title": "99th percentile response time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "1 means MCP process telemetry arrived during the last five minutes; this uses OTLP freshness instead of Prometheus scrape health.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 16,
+        "y": 17
+      },
+      "id": 34,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "count_over_time(process_uptime_milliseconds{service_name=\"$service\"}[5m]) > bool 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Telemetry availability",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Fraction of MCP and unmatched HTTP responses completed within 250 ms.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 22
+      },
+      "id": 20,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "(sum(rate(http_server_requests_milliseconds_bucket{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\",le=\"250\"}[$__range])) / clamp_min(sum(rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[$__range])), 1e-9)) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Responses under 250 ms",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 22
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(increase(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}[$__range])) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total HTTP requests",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 22
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(http_server_requests_active_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\"}) or vector(0)",
+          "legendFormat": "in-flight",
+          "refId": "A"
+        }
+      ],
+      "title": "In-flight HTTP requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 21,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "sum by (uri,method,status,outcome) (rate(http_server_requests_milliseconds_count{service_name=\"$service\"}[5m]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP requests by route and status",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum by (status) (rate(http_server_requests_milliseconds_count{service_name=\"$service\",uri=~\"/mcp|UNKNOWN\",status=~\"4..|5..\"}[5m]))",
+          "legendFormat": "{{status}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP errors by status",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "id": 103,
+      "panels": [],
+      "title": "JVM Memory & GC",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 16,
+        "x": 0,
+        "y": 36
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{service_name=\"$service\",area=\"heap\"})",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(jvm_memory_committed_bytes{service_name=\"$service\",area=\"heap\"})",
+          "legendFormat": "committed",
+          "refId": "B"
+        }
+      ],
+      "title": "Heap memory: used and committed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 36
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * jvm_gc_overhead{service_name=\"$service\"}",
+          "legendFormat": "pause seconds/sec",
+          "refId": "A"
+        }
+      ],
+      "title": "GC overhead",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
             "fillOpacity": 10,
+            "lineWidth": 2,
             "showPoints": "never"
-          }
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 41
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(jvm_memory_used_bytes{service_name=\"$service\",area=\"heap\"}) / clamp_min((sum(jvm_memory_max_bytes{service_name=\"$service\",area=\"heap\"}) > 0) or sum(jvm_memory_committed_bytes{service_name=\"$service\",area=\"heap\"}), 1)",
+          "legendFormat": "Heap used",
+          "refId": "A"
+        }
+      ],
+      "title": "JVM heap usage",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "id": 104,
+      "panels": [],
+      "title": "JVM Runtime",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 48
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * process_cpu_usage{service_name=\"$service\"}",
+          "legendFormat": "process %",
+          "refId": "A"
+        },
+        {
+          "expr": "100 * system_cpu_usage{service_name=\"$service\"}",
+          "legendFormat": "system %",
+          "refId": "B"
+        }
+      ],
+      "title": "Process CPU usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 8,
+        "y": 48
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "system_load_average_1m{service_name=\"$service\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "System load (1m)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 14,
+        "y": 48
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "system_cpu_count{service_name=\"$service\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Available CPU cores",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "jvm_threads_live{service_name=\"$service\"}",
+          "legendFormat": "live",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_threads_daemon{service_name=\"$service\"}",
+          "legendFormat": "daemon",
+          "refId": "B"
+        }
+      ],
+      "title": "JVM thread count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 8,
+        "y": 53
+      },
+      "id": 35,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "jvm_threads_peak{service_name=\"$service\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "JVM peak threads",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 14,
+        "y": 53
+      },
+      "id": 36,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(jvm_threads_started_total{service_name=\"$service\"}[5m])",
+          "legendFormat": "threads/sec",
+          "refId": "A"
+        }
+      ],
+      "title": "JVM threads started",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 58
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (state) (jvm_threads_states{service_name=\"$service\"})",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "title": "JVM thread states",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 6,
+        "y": 58
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "jvm_classes_loaded{service_name=\"$service\"}",
+          "legendFormat": "loaded",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_classes_unloaded_total{service_name=\"$service\"}",
+          "legendFormat": "unloaded total",
+          "refId": "B"
+        }
+      ],
+      "title": "Loaded JVM classes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 14,
+        "y": 58
+      },
+      "id": 32,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "100 * process_files_open{service_name=\"$service\"} / clamp_min(process_files_max{service_name=\"$service\"}, 1)",
+          "refId": "A"
+        }
+      ],
+      "title": "Open file descriptor usage",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 63
+      },
+      "id": 33,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(disk_free_bytes{service_name=\"$service\"}) / clamp_min(sum(disk_total_bytes{service_name=\"$service\"}), 1)",
+          "refId": "A"
+        }
+      ],
+      "title": "Free disk space",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 6,
+        "y": 63
+      },
+      "id": 30,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(executor_active_threads{service_name=\"$service\"}) or vector(0)",
+          "legendFormat": "active",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(executor_queued_tasks{service_name=\"$service\"}) or vector(0)",
+          "legendFormat": "queued",
+          "refId": "B"
+        }
+      ],
+      "title": "Executor activity and queue",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "id": 105,
+      "panels": [],
+      "title": "Logging Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Error and warning log event rates; this panel reports counts, not log contents.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 69
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (level) (rate(logback_events_total{service_name=\"$service\",level=~\"error|warn\"}[5m])) or on() label_replace(vector(0), \"level\", \"no events\", \"__name__\", \".*\")",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Application log events",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 75
+      },
+      "id": 106,
+      "panels": [],
+      "title": "OAuth & Authentication",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 76
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(kitezh_mcp_token_exchange_requests_total{service_name=\"$service\"}[5m])) or on() label_replace(vector(0), \"outcome\", \"none\", \"__name__\", \".*\")",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Token exchange requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "decimals": 3,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 16,
+        "x": 8,
+        "y": 76
+      },
+      "id": 37,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(kitezh_mcp_token_exchange_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum(rate(kitezh_mcp_token_exchange_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum(rate(kitezh_mcp_token_exchange_duration_seconds_sum{service_name=\"$service\"}[5m])) / clamp_min(sum(rate(kitezh_mcp_token_exchange_duration_seconds_count{service_name=\"$service\"}[5m])), 1e-9)) and (sum(rate(kitezh_mcp_token_exchange_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "legendFormat": "average",
+          "refId": "B"
+        }
+      ],
+      "title": "Token exchange latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 82
+      },
+      "id": 107,
+      "panels": [],
+      "title": "MCP Operations",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Tool/status labels are bounded; do not add user IDs, tokens, query text, or resource IDs.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 83
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (tool, status) (rate(kitezh_mcp_tool_calls_total{service_name=\"$service\"}[5m])) or on() label_replace(label_replace(vector(0), \"tool\", \"no calls\", \"__name__\", \".*\"), \"status\", \"none\", \"__name__\", \".*\")",
+          "legendFormat": "{{tool}} \u00b7 {{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool calls by outcome",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 83
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(histogram_quantile(0.95, sum by (le, tool) (rate(kitezh_mcp_tool_call_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum by (tool) (rate(kitezh_mcp_tool_call_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)) or on() label_replace(vector(0), \"tool\", \"no calls\", \"__name__\", \".*\")",
+          "legendFormat": "{{tool}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool call p95 latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 88
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (tool, outcome) (rate(kitezh_mcp_kitezh_api_requests_total{service_name=\"$service\",outcome=\"error\"}[5m])) or on() label_replace(label_replace(vector(0), \"tool\", \"no errors\", \"__name__\", \".*\"), \"outcome\", \"none\", \"__name__\", \".*\")",
+          "legendFormat": "{{tool}} \u00b7 {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Kitezh API request errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "decimals": 3,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 88
+      },
+      "id": 38,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(kitezh_mcp_kitezh_api_request_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_sum{service_name=\"$service\"}[5m])) / clamp_min(sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_count{service_name=\"$service\"}[5m])), 1e-9)) and (sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "legendFormat": "average",
+          "refId": "B"
+        }
+      ],
+      "title": "Kitezh API request latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
         },
         "overrides": []
       },
@@ -390,11 +1765,119 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "type": "timeseries",
+      "id": 39,
+      "title": "MCP operation rate",
+      "description": "Rate of tools/list and tools/call requests, grouped by MCP method.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 93
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method) (rate(mcp_server_operation_duration_seconds_count{service_name=\"$service\"}[5m]))",
+          "legendFormat": "{{method}}"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "decimals": 3,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "type": "timeseries",
+      "id": 40,
+      "title": "MCP operation p95 latency",
+      "description": "End-to-end MCP operation latency by protocol method. Tool-specific handler latency remains available in Tool call p95 latency.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 93
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, method) (rate(mcp_server_operation_duration_seconds_bucket{service_name=\"$service\"}[5m])))",
+          "legendFormat": "{{method}} p95"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "type": "timeseries",
+      "id": 41,
+      "title": "MCP operation errors by type",
+      "description": "Protocol, tool, authorization, validation, timeout, and HTTP failures grouped by MCP method.",
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 93
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method, error_type) (rate(mcp_server_operation_duration_seconds_count{service_name=\"$service\",error_type!=\"none\"}[5m]))",
+          "legendFormat": "{{method}} \u00b7 {{error_type}}"
+        }
+      ]
     }
   ],
   "refresh": "30s",
-  "schemaVersion": 39,
+  "schemaVersion": 42,
   "tags": [
     "kitezh",
     "mcp",
@@ -405,35 +1888,34 @@
   "templating": {
     "list": [
       {
-        "name": "datasource",
-        "label": "Prometheus",
-        "type": "datasource",
-        "query": "prometheus",
         "current": {
           "text": "Prometheus",
           "value": "${DS_PROMETHEUS}"
         },
         "hide": 0,
         "includeAll": false,
+        "label": "Prometheus",
         "multi": false,
+        "name": "datasource",
         "options": [],
+        "query": "prometheus",
         "refresh": 1,
-        "regex": ""
+        "regex": "",
+        "type": "datasource"
       },
       {
-        "name": "service",
-        "label": "Service",
-        "type": "constant",
-        "query": "kitezh-mcp",
         "current": {
           "text": "kitezh-mcp",
           "value": "kitezh-mcp"
         },
         "hide": 0,
         "includeAll": false,
+        "label": "Service",
         "multi": false,
-        "options": [],
-        "skipUrlSync": false
+        "name": "service",
+        "query": "kitezh-mcp",
+        "skipUrlSync": false,
+        "type": "constant"
       }
     ]
   },
@@ -445,5 +1927,5 @@
   "timezone": "browser",
   "title": "Kitezh MCP Server",
   "uid": "kitezh-mcp",
-  "version": 1
+  "weekStart": ""
 }

@@ -9,9 +9,10 @@ data:
     spring:
       profiles:
         active: {{ .Values.spring.profiles.active | quote }}
-    kitezh:
+    app:
+      authorization-server:
+        issuer: {{ .Values.app.authorizationServer.issuer | quote }}
       security:
-        issuer-uri: {{ .Values.app.security.issuerUri | quote }}
         jwk-set-uri: {{ .Values.app.security.jwkSetUri | quote }}
         token-uri: {{ .Values.app.security.tokenUri | quote }}
         audience: {{ .Values.app.security.audience | quote }}
@@ -19,5 +20,10 @@ data:
         base-url: {{ .Values.app.api.baseUrl | quote }}
       mcp:
         public-url: {{ .Values.app.mcp.publicUrl | quote }}
+        allowed-origins: {{ .Values.app.mcp.allowedOrigins | quote }}
+        allow-local-hosts: {{ .Values.app.mcp.allowLocalHosts }}
         client-id: {{ .Values.app.mcp.clientId | quote }}
         read-only: {{ .Values.app.mcp.readOnly }}
+        tools:
+          toolsets: {{ .Values.app.mcp.tools.toolsets | quote }}
+          allowlist: {{ .Values.app.mcp.tools.allowlist | quote }}

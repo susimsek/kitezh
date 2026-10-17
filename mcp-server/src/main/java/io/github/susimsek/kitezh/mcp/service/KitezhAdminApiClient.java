@@ -1,10 +1,11 @@
 package io.github.susimsek.kitezh.mcp.service;
 
+import io.github.susimsek.kitezh.mcp.config.ApplicationProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.core.Authentication;
@@ -15,6 +16,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
+@RequiredArgsConstructor
 public class KitezhAdminApiClient {
 
     private static final ParameterizedTypeReference<List<Map<String, Object>>> MAP_LIST_TYPE =
@@ -23,18 +25,7 @@ public class KitezhAdminApiClient {
     private final RestClient restClient;
     private final KitezhTokenExchangeClient tokenExchangeClient;
     private final MeterRegistry meterRegistry;
-    private final String baseUrl;
-
-    public KitezhAdminApiClient(
-            RestClient.Builder restClientBuilder,
-            KitezhTokenExchangeClient tokenExchangeClient,
-            MeterRegistry meterRegistry,
-            @Value("${kitezh.api.base-url}") String baseUrl) {
-        this.restClient = restClientBuilder.build();
-        this.tokenExchangeClient = tokenExchangeClient;
-        this.meterRegistry = meterRegistry;
-        this.baseUrl = baseUrl;
-    }
+    private final ApplicationProperties properties;
 
     public Map<?, ?> get(String tool, String path, Map<String, ?> parameters) {
         Timer.Sample sample = Timer.start(meterRegistry);
@@ -42,7 +33,7 @@ public class KitezhAdminApiClient {
         try {
             String token = tokenExchangeClient.exchange(currentJwt());
             UriComponentsBuilder uriBuilder =
-                    UriComponentsBuilder.fromUriString(baseUrl).path(path);
+                    UriComponentsBuilder.fromUriString(properties.api().baseUrl()).path(path);
             parameters.entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .forEach(
@@ -92,7 +83,7 @@ public class KitezhAdminApiClient {
         try {
             String token = tokenExchangeClient.exchange(currentJwt());
             UriComponentsBuilder uriBuilder =
-                    UriComponentsBuilder.fromUriString(baseUrl).path(path);
+                    UriComponentsBuilder.fromUriString(properties.api().baseUrl()).path(path);
             parameters.entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .forEach(

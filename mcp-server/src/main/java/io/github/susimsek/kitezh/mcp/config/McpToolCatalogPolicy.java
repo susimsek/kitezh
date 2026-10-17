@@ -40,6 +40,10 @@ final class McpToolCatalogPolicy {
         return enabledTools.contains(toolName);
     }
 
+    boolean isKnownTool(String toolName) {
+        return ALL_TOOLS.contains(toolName);
+    }
+
     private static Set<String> parse(String value, String propertyName, boolean allowEmpty) {
         if (value == null || value.isBlank()) {
             if (allowEmpty) {

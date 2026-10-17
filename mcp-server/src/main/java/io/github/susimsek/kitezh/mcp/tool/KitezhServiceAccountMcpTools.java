@@ -5,12 +5,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.util.Map;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /** Read-only service-account metadata and effective-role inspection tool. */
 @Component
+@RequiredArgsConstructor
 public class KitezhServiceAccountMcpTools {
 
     private static final String CLIENT_RECORD_ID_PATTERN = "[A-Za-z0-9._~-]{1,128}";
@@ -18,12 +20,6 @@ public class KitezhServiceAccountMcpTools {
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;
-
-    public KitezhServiceAccountMcpTools(
-            KitezhAdminApiClient apiClient, MeterRegistry meterRegistry) {
-        this.apiClient = apiClient;
-        this.meterRegistry = meterRegistry;
-    }
 
     @McpTool(
             name = TOOL_NAME,

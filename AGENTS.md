@@ -280,7 +280,7 @@ curl http://localhost:9090/actuator/health/readiness
 ## Authentication
 
 - Keep the MCP service separately deployable under `mcp-server/`; authenticate inbound bearer tokens against its configured issuer and MCP resource audience, require `mcp.read`, and use a short-lived RFC 8693 exchange token for the Kitezh Admin API audience. MCP tools remain read-only and must use typed API operations; never add direct JPA/database access or generic URL/SQL tools.
-- Keep the MCP public resource URI synchronized across `AuthorizationServerConfig`, `KITEZH_SECURITY_AUDIENCE`, `KITEZH_MCP_PUBLIC_URL`, and the Render service. Rotate the `mcp-server` secret for deployed environments and store it only in Render/GitHub secret configuration.
+- Keep the MCP public resource URI synchronized across `AuthorizationServerConfig`, `APP_SECURITY_AUDIENCE`, `APP_MCP_PUBLIC_URL`, and the Render service. Rotate the `mcp-server` secret for deployed environments and store it only in Render/GitHub secret configuration.
 
 - Form login is used for end-user authentication.
 - Registered OAuth2 clients are stored in `oauth2_registered_client`.
