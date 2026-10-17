@@ -1,0 +1,102 @@
+server:
+  port: ${SERVER_PORT:10000}
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: kitezh-mcp
+    version: '@project.version@'
+  profiles:
+    active: '@spring.profiles.active@'
+  http:
+    clients:
+      connect-timeout: 2s
+      read-timeout: 5s
+  ai:
+    mcp:
+      server:
+        protocol: STATELESS
+        name: kitezh-mcp
+        version: 1.0.0
+        type: SYNC
+        instructions: Read-only Kitezh identity and access administration tools.
+        streamable-http:
+          mcp-endpoint: /mcp
+
+kitezh:
+  security:
+    issuer-uri: ${KITEZH_SECURITY_ISSUER_URI:https://kitezh.onrender.com}
+    audience: ${KITEZH_SECURITY_AUDIENCE:https://kitezh-mcp.onrender.com/mcp}
+  api:
+    base-url: ${KITEZH_API_BASE_URL:http://localhost:9090}
+  mcp:
+    public-url: ${KITEZH_MCP_PUBLIC_URL:https://kitezh-mcp.onrender.com/mcp}
+    client-id: ${KITEZH_MCP_CLIENT_ID:mcp-server}
+    client-secret: ${KITEZH_MCP_CLIENT_SECRET:}
+    read-only: ${KITEZH_READ_ONLY:true}
+
+management:
+  opentelemetry:
+    enabled: ${MANAGEMENT_OPENTELEMETRY_ENABLED:false}
+    resource-attributes:
+      service.name: ${OTEL_SERVICE_NAME:kitezh-mcp}
+      deployment.environment: ${SPRING_PROFILES_ACTIVE:dev}
+    tracing:
+      export:
+        otlp:
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:}
+          headers:
+            Authorization: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
+    logging:
+      export:
+        otlp:
+          endpoint: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT:}
+          headers:
+            Authorization: ${MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      service_name: ${OTEL_SERVICE_NAME:kitezh-mcp}
+    distribution:
+      percentiles-histogram:
+        kitezh_mcp_tool_call_duration_seconds: true
+        kitezh_mcp_token_exchange_duration_seconds: true
+        kitezh_mcp_kitezh_api_request_duration_seconds: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  logging:
+    export:
+      otlp:
+        enabled: ${MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED:false}
+  otlp:
+    metrics:
+      export:
+        enabled: ${MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED:false}
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:}
+        headers:
+          Authorization: ${MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION:}
+  tracing:
+    export:
+      enabled: ${MANAGEMENT_TRACING_EXPORT_ENABLED:false}
+      otlp:
+        enabled: ${MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED:false}
+        endpoint: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT:}
+        headers:
+          Authorization: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}
+
+otel:
+  service:
+    name: ${OTEL_SERVICE_NAME:kitezh-mcp}

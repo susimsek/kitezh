@@ -188,6 +188,8 @@ app:
   authorization-server:
     issuer: https://kitezh.local
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
+  mcp:
+    resource-audience: ${APP_MCP_RESOURCE_AUDIENCE:https://kitezh-mcp.onrender.com/mcp}
   dpop:
     nonce-required: ${APP_DPOP_NONCE_REQUIRED:false}
     nonce-ttl: ${APP_DPOP_NONCE_TTL:PT5M}

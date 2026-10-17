@@ -364,7 +364,10 @@ public class AdminApiSecurityConfig {
         return ConsoleJwtDecoderFactory.create(
                 jwkSource,
                 applicationProperties.authorizationServer().issuer(),
-                ConsoleClients.ADMIN_CLIENTS,
+                java.util.stream.Stream.concat(
+                                ConsoleClients.ADMIN_CLIENTS.stream(),
+                                java.util.stream.Stream.of("admin-api"))
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet()),
                 authorizationRepository,
                 revocationPolicyService);
     }

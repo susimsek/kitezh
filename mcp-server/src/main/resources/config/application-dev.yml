@@ -1,0 +1,9 @@
+spring:
+  docker:
+    compose:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    io.github.susimsek.kitezh.mcp: DEBUG

@@ -114,6 +114,133 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  mcp-server-quality:
+    name: MCP server quality and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Verify MCP server
+        run: ./mvnw -B -ntp -f mcp-server/pom.xml verify
+
+      - name: Upload MCP Sonar inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mcp-server-sonar-inputs
+          path: |
+            mcp-server/target/classes/**
+            mcp-server/target/test-classes/**
+            mcp-server/target/surefire-reports/**
+            mcp-server/target/failsafe-reports/**
+            mcp-server/target/site/**
+            mcp-server/target/checkstyle-result.xml
+          if-no-files-found: error
+          retention-days: 1
+
+  mcp-server-native-image:
+    name: MCP native image (${{ matrix.architecture }})
+    needs: mcp-server-quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+            native_image_musl: "true"
+            native_image_args: "--no-fallback,-Os,--static,--libc=musl,-J-Xmx10g"
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+            native_image_musl: "false"
+            native_image_args: "--no-fallback,-Os,--static-nolibc,-J-Xmx10g"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+      NATIVE_IMAGE_ARGS: ${{ matrix.native_image_args }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          java-version: "25"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: "maven"
+          native-image-musl: ${{ matrix.native_image_musl }}
+
+      - name: Print tool versions
+        run: |
+          java -version
+          native-image --version
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Install UPX
+        run: |
+          set -euo pipefail
+          UPX_VERSION=5.1.0
+          UPX_ARCHIVE="upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux.tar.xz"
+          curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
+          tar -xJf "${UPX_ARCHIVE}"
+          mkdir -p "${RUNNER_TEMP}/bin"
+          mv "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux/upx" "${RUNNER_TEMP}/bin/upx"
+          chmod +x "${RUNNER_TEMP}/bin/upx"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+          rm -rf "${UPX_ARCHIVE}" "upx-${UPX_VERSION}-${NATIVE_ARCHITECTURE}_linux"
+          upx --version
+
+      - name: Build MCP GraalVM native executable
+        env:
+          # Keep conditional OTLP exporters in the native image; Render provides their endpoints at runtime.
+          MANAGEMENT_OPENTELEMETRY_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_ENABLED: "true"
+          MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "true"
+          MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "true"
+        run: |
+          ./mvnw -B -ntp -f mcp-server/pom.xml -Pnative -DskipTests \
+            -DbuildArgs="${NATIVE_IMAGE_ARGS}" \
+            native:compile
+
+      - name: Compress MCP native executable
+        run: upx --lzma --best mcp-server/target/native-executable
+
+      - name: Verify compressed executable
+        run: |
+          file mcp-server/target/native-executable
+          test -x mcp-server/target/native-executable
+          test -s mcp-server/target/native-executable
+
+      - name: Upload MCP native executable
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mcp-native-${{ matrix.architecture }}
+          path: |
+            mcp-server/target/native-executable
+            mcp-server/target/classes/**
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
   web-quality:
     name: Web quality and unit tests
     runs-on: ubuntu-latest
@@ -279,6 +406,7 @@ jobs:
     name: SonarCloud analysis
     needs:
       - build
+      - mcp-server-quality
       - web-quality
       - desktop-quality
       - mobile-quality
@@ -322,6 +450,12 @@ jobs:
         with:
           name: backend-sonar-inputs
           path: target
+
+      - name: Download MCP server Sonar inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mcp-server-sonar-inputs
+          path: mcp-server/target
 
       - name: Download client coverage reports
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

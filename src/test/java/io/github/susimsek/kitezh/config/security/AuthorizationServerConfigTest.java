@@ -77,6 +77,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationServerMetadata;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
@@ -491,6 +492,112 @@ class AuthorizationServerConfigTest {
 
         assertThat(claims.build().getClaims())
                 .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+    }
+
+    @Test
+    void addsMcpResourceAudienceOnlyToMcpReadAccessTokens() {
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.read")));
+
+        assertThat(claims.build().getAudience())
+                .containsExactly("https://kitezh-mcp.onrender.com/mcp", "mcp-server");
+    }
+
+    @Test
+    void supportsCustomMcpResourceAudience() {
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+        AuthorizationServerConfig.JwtTokenCustomizerDependencies dependencies =
+                new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        false,
+                        null,
+                        null,
+                        null);
+
+        config.jwtTokenCustomizer(dependencies, "https://mcp.example.org/mcp")
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.read")));
+
+        assertThat(claims.build().getAudience())
+                .containsExactly("https://mcp.example.org/mcp", "mcp-server");
+    }
+
+    @Test
+    void addsAdminRolesToMcpTokenExchangeOnlyForAdminApiAudience() {
+        RegisteredClient client =
+                RegisteredClient.withId("mcp-server-id")
+                        .clientId("mcp-server")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .build();
+        OAuth2ClientAuthenticationToken clientPrincipal =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        OAuth2TokenExchangeAuthenticationToken grant =
+                new OAuth2TokenExchangeAuthenticationToken(
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        "subject-token",
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        clientPrincipal,
+                        null,
+                        null,
+                        null,
+                        Set.of("admin-api"),
+                        Set.of("admin-api", "roles"),
+                        Map.of());
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        JwtEncodingContext context =
+                JwtEncodingContext.with(JwsHeader.with(SignatureAlgorithm.RS256), claims)
+                        .registeredClient(client)
+                        .principal(
+                                new UsernamePasswordAuthenticationToken(
+                                        "admin",
+                                        "n/a",
+                                        List.of(
+                                                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                                                new SimpleGrantedAuthority("ROLE_USER"))))
+                        .authorizedScopes(Set.of("admin-api", "roles"))
+                        .tokenType(OAuth2TokenType.ACCESS_TOKEN)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .authorizationGrant(grant)
+                        .build();
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(new UserEntity()));
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+        verify(userRepository).findByUsername("admin");
     }
 
     @Test

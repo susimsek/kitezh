@@ -49,20 +49,21 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 13. [OAuth2 and OIDC Endpoints](#oauth2-and-oidc-endpoints)
 14. [Authorization Server Flows](#authorization-server-flows)
 15. [Try with curl](#try-with-curl)
-16. [Client Registration and Seed Data](#client-registration-and-seed-data)
-17. [Database](#database)
-18. [Internationalization](#internationalization)
-19. [Build](#build)
-20. [Performance Tests](#performance-tests)
-21. [Code Quality](#code-quality)
-22. [GraalVM Native Image](#graalvm-native-image)
-23. [Docker Image](#docker-image)
-24. [Kubernetes Health Probe](#kubernetes-health-probe)
-25. [Docker Compose Support](#docker-compose-support)
-26. [Helm](#helm)
-27. [Terraform](#terraform)
-28. [Continuous Integration](#continuous-integration)
-29. [Project Policies](#project-policies)
+16. [Kitezh MCP Server](#kitezh-mcp-server)
+17. [Client Registration and Seed Data](#client-registration-and-seed-data)
+18. [Database](#database)
+19. [Internationalization](#internationalization)
+20. [Build](#build)
+21. [Performance Tests](#performance-tests)
+22. [Code Quality](#code-quality)
+23. [GraalVM Native Image](#graalvm-native-image)
+24. [Docker Image](#docker-image)
+25. [Kubernetes Health Probe](#kubernetes-health-probe)
+26. [Docker Compose Support](#docker-compose-support)
+27. [Helm](#helm)
+28. [Terraform](#terraform)
+29. [Continuous Integration](#continuous-integration)
+30. [Project Policies](#project-policies)
 
 ## Features
 
@@ -75,6 +76,7 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 - Form login backed by Spring Security and JPA user storage
 - Optional account TOTP MFA with configurable issuer, algorithm, digits, period, clock-drift window, reusable-code policy, recovery codes, and required-action enrollment
 - Built-in Administration and Account consoles using public OIDC clients with Authorization Code + PKCE, refresh tokens, and OIDC logout
+- Separate read-only Kitezh MCP Server with Streamable HTTP, OAuth audience validation, and token exchange to the Admin API
 - H2 in-memory database in PostgreSQL compatibility mode for `dev`
 - H2 web console at `/h2-console` for local `dev`-profile database inspection
 - PostgreSQL support for `prod`
@@ -943,6 +945,12 @@ Check readiness:
 ```bash
 curl http://127.0.0.1:9090/actuator/health/readiness
 ```
+
+## Kitezh MCP Server
+
+Kitezh MCP Server is configured as an independent Render service with the default public endpoint `https://kitezh-mcp.onrender.com/mcp`. It authenticates user tokens for the MCP resource audience and `mcp.read` scope, then exchanges them for short-lived `admin-api` tokens before calling Kitezh's Admin API. Its initial tool set is read-only and covers users, groups, OAuth clients, sessions, audit events, and the current operator context.
+
+The module has its own Spring Boot application, Docker image, Render Web Service, CI quality job, release workflow, Sonar coverage inputs, and Grafana dashboard/alert definitions. See [`mcp-server/README.md`](mcp-server/README.md) for local setup, OAuth client registration, and deployment secrets. The public MCP resource URI must match `APP_MCP_RESOURCE_AUDIENCE`, `KITEZH_SECURITY_AUDIENCE`, and `KITEZH_MCP_PUBLIC_URL`.
 
 ## Client Registration and Seed Data
 

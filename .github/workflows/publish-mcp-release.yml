@@ -1,0 +1,372 @@
+name: Publish Kitezh MCP Server
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mcp-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-ci:
+    name: Verify successful main CI for this commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      ci_run_id: ${{ steps.ci.outputs.ci_run_id }}
+    steps:
+      - name: Validate release tag
+        id: release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a version tag such as v0.1.4; received '${RELEASE_TAG}'." >&2
+            exit 1
+          fi
+          {
+            echo "release_tag=${RELEASE_TAG}"
+            echo "release_sha=${RELEASE_SHA}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Find successful main CI run for the tagged commit
+        id: ci
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          runs="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${RELEASE_SHA}&per_page=100")"
+          successful_run="$(jq -er --arg sha "${RELEASE_SHA}" '
+            [.workflow_runs[] | select(
+              .head_sha == $sha and
+              .head_branch == "main" and
+              .event == "push" and
+              .status == "completed" and
+              .conclusion == "success"
+            )] | first // empty
+          ' <<< "${runs}")" || {
+            echo "No successful main CI run exists for ${RELEASE_SHA}; refusing to publish the MCP image." >&2
+            exit 1
+          }
+          ci_run_id="$(jq -r '.id' <<< "${successful_run}")"
+          echo "ci_run_id=${ci_run_id}" >> "${GITHUB_OUTPUT}"
+          echo "Verified successful CI run ${ci_run_id} for ${RELEASE_SHA}."
+
+  publish-image-architecture:
+    name: Publish MCP image (${{ matrix.architecture }})
+    needs: verify-ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runtime_image: scratch
+          - architecture: arm64
+            runtime_image: gcr.io/distroless/base-debian12:nonroot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: mcp-release
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+      NATIVE_RUNTIME_IMAGE: ${{ matrix.runtime_image }}
+      MCP_DOCKERHUB_USERNAME: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
+      MCP_DOCKERHUB_TOKEN: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+      MCP_IMAGE: docker.io/suayb/kitezh-mcp
+      RELEASE_TAG: ${{ needs.verify-ci.outputs.release_tag }}
+      RELEASE_SHA: ${{ needs.verify-ci.outputs.release_sha }}
+      CI_RUN_ID: ${{ needs.verify-ci.outputs.ci_run_id }}
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.verify-ci.outputs.release_sha }}
+
+      - name: Verify MCP release configuration
+        run: |
+          set -euo pipefail
+          test -n "${MCP_DOCKERHUB_USERNAME}"
+          test -n "${MCP_DOCKERHUB_TOKEN}"
+          test -n "${CI_RUN_ID}"
+          [[ "${MCP_DOCKERHUB_USERNAME}" == "suayb" ]]
+
+      - name: Download compressed MCP native executable
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mcp-native-${{ matrix.architecture }}
+          path: mcp-server/target
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.verify-ci.outputs.ci_run_id }}
+
+      - name: Verify native release artifact
+        run: |
+          set -euo pipefail
+          test -s mcp-server/target/native-executable
+          test -d mcp-server/target/classes
+          test -n "$(find mcp-server/target/classes -type f -print -quit)"
+          chmod +x mcp-server/target/native-executable
+
+      - name: Set up Java
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+
+      - name: Publish architecture image with Jib Native Image extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          chmod +x mvnw
+          ./mvnw -B -ntp -f mcp-server/pom.xml -Pnative -DskipTests \
+            -Dapplication.version="${VERSION}" \
+            -Djib-maven-plugin.image="${NATIVE_RUNTIME_IMAGE}" \
+            -Djib-maven-plugin.architecture="${NATIVE_ARCHITECTURE}" \
+            jib:build \
+            -Djib.to.image="${MCP_IMAGE}:${VERSION}-${NATIVE_ARCHITECTURE}" \
+            -Djib.to.auth.username="${MCP_DOCKERHUB_USERNAME}" \
+            -Djib.to.auth.password="${MCP_DOCKERHUB_TOKEN}"
+
+  publish-image-manifests:
+    name: Publish multi-architecture MCP tags
+    needs:
+      - verify-ci
+      - publish-image-architecture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: mcp-release
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image_digest: ${{ steps.manifests.outputs.image_digest }}
+    env:
+      MCP_DOCKERHUB_USERNAME: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
+      MCP_DOCKERHUB_TOKEN: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+      MCP_IMAGE: docker.io/suayb/kitezh-mcp
+      RELEASE_TAG: ${{ needs.verify-ci.outputs.release_tag }}
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.verify-ci.outputs.release_sha }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ secrets.MCP_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.MCP_DOCKERHUB_TOKEN }}
+
+      - name: Create and verify release and latest manifests
+        id: manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          docker buildx imagetools create \
+            --tag "${MCP_IMAGE}:${VERSION}" \
+            "${MCP_IMAGE}:${VERSION}-amd64" \
+            "${MCP_IMAGE}:${VERSION}-arm64"
+          docker buildx imagetools create \
+            --tag "${MCP_IMAGE}:latest" \
+            "${MCP_IMAGE}:${VERSION}-amd64" \
+            "${MCP_IMAGE}:${VERSION}-arm64"
+          docker buildx imagetools inspect "${MCP_IMAGE}:${VERSION}"
+          digest="$(docker buildx imagetools inspect "${MCP_IMAGE}:${VERSION}" | awk '$1 == "Digest:" { print $2; exit }')"
+          [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "Could not resolve the immutable MCP image digest." >&2
+            exit 1
+          }
+          echo "image_digest=${digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        with:
+          cosign-release: v2.6.1
+
+      - name: Sign and verify multi-architecture MCP image
+        env:
+          IMAGE: ${{ env.MCP_IMAGE }}
+          IMAGE_DIGEST: ${{ steps.manifests.outputs.image_digest }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          image_ref="${IMAGE}@${IMAGE_DIGEST}"
+          cosign sign --yes "${image_ref}"
+          cosign verify \
+            --certificate-identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-mcp-release.yml@refs/tags/${RELEASE_TAG}" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${image_ref}"
+
+      - name: Update MCP Docker Hub description
+        shell: bash
+        run: |
+          set -euo pipefail
+          README_PATH="mcp-server/README-dockerhub.md"
+          test -f "${README_PATH}" || {
+            echo "${README_PATH} not found; refusing to publish an empty image description." >&2
+            exit 1
+          }
+          TOKEN="$(
+            jq -n \
+              --arg identifier "${MCP_DOCKERHUB_USERNAME}" \
+              --arg secret "${MCP_DOCKERHUB_TOKEN}" \
+              '{identifier: $identifier, secret: $secret}' \
+            | curl -fsS -X POST \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              https://hub.docker.com/v2/auth/token \
+            | jq -er '.access_token')"
+          jq -n --rawfile readme "${README_PATH}" '{full_description: $readme}' \
+            | curl -fsS -X PATCH \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H 'Content-Type: application/json' \
+              --data-binary @- \
+              "https://hub.docker.com/v2/repositories/${MCP_DOCKERHUB_USERNAME}/kitezh-mcp"
+
+  deploy-render:
+    name: Deploy versioned MCP image to Render
+    needs:
+      - verify-ci
+      - publish-image-manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    concurrency:
+      group: mcp-render-production-deploy
+      cancel-in-progress: false
+    environment: mcp-release
+    permissions:
+      contents: read
+    env:
+      MCP_RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.MCP_RENDER_RELEASE_DEPLOY_HOOK_URL }}
+      MCP_RENDER_API_KEY: ${{ secrets.MCP_RENDER_API_KEY }}
+      MCP_IMAGE: docker.io/suayb/kitezh-mcp
+      IMAGE_DIGEST: ${{ needs.publish-image-manifests.outputs.image_digest }}
+    steps:
+      - name: Verify Render deployment configuration
+        id: render-config
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}" || {
+            echo "MCP_RENDER_RELEASE_DEPLOY_HOOK_URL is required." >&2
+            exit 1
+          }
+          test -n "${MCP_RENDER_API_KEY}" || {
+            echo "MCP_RENDER_API_KEY is required." >&2
+            exit 1
+          }
+          if [[ "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}" =~ /deploy/(srv-[A-Za-z0-9]+) ]]; then
+            echo "service_id=${BASH_REMATCH[1]}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Could not read the Render service ID from the MCP deploy hook." >&2
+            exit 1
+          fi
+
+      - name: Trigger Render deploy with the immutable image
+        id: deploy
+        shell: bash
+        env:
+          MCP_RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
+        run: |
+          set -euo pipefail
+          image_ref="${MCP_IMAGE}@${IMAGE_DIGEST}"
+          response_file="$(mktemp)"
+          trap 'rm -f "${response_file}"' EXIT
+          request_started_at=$(( $(date +%s) - 5 ))
+          created_after="$(date -u -d "@${request_started_at}" '+%Y-%m-%dT%H:%M:%SZ')"
+          http_status="$(curl --silent --show-error --output "${response_file}" --write-out '%{http_code}' \
+            --get --data-urlencode "imgURL=${image_ref}" \
+            "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}")"
+          case "${http_status}" in
+            200) deploy_id="$(jq -er '.deploy.id // empty' "${response_file}")" ;;
+            202)
+              deadline=$((SECONDS + 1200))
+              deploy_id=""
+              while [[ -z "${deploy_id}" ]] && (( SECONDS < deadline )); do
+                deploys="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
+                  -H "Authorization: Bearer ${MCP_RENDER_API_KEY}" \
+                  -H 'Accept: application/json' \
+                  --get --data-urlencode "createdAfter=${created_after}" \
+                  --data-urlencode 'limit=100' \
+                  "https://api.render.com/v1/services/${MCP_RENDER_SERVICE_ID}/deploys")"
+                deploy_id="$(jq -r --arg digest "@${IMAGE_DIGEST}" \
+                  '[.. | objects | select((.image.ref // "") | endswith($digest))] | first | .id // empty' \
+                  <<< "${deploys}")"
+                if [[ -z "${deploy_id}" ]]; then sleep 15; fi
+              done
+              ;;
+            *)
+              echo "MCP Render deploy hook returned HTTP ${http_status}." >&2
+              exit 1
+              ;;
+          esac
+          test -n "${deploy_id}" || { echo "Render did not return an MCP deploy ID." >&2; exit 1; }
+          echo "deploy_id=${deploy_id}" >> "${GITHUB_OUTPUT}"
+
+      - name: Wait for MCP Render deployment to become live
+        shell: bash
+        env:
+          DEPLOY_ID: ${{ steps.deploy.outputs.deploy_id }}
+          MCP_RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
+        run: |
+          set -euo pipefail
+          deploy_url="https://api.render.com/v1/services/${MCP_RENDER_SERVICE_ID}/deploys/${DEPLOY_ID}"
+          deadline=$((SECONDS + 1200))
+          while (( SECONDS < deadline )); do
+            deploy="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
+              -H "Authorization: Bearer ${MCP_RENDER_API_KEY}" \
+              -H 'Accept: application/json' "${deploy_url}")"
+            status="$(jq -er '.status' <<< "${deploy}")"
+            image_ref="$(jq -r '.image.ref // empty' <<< "${deploy}")"
+            if [[ "${image_ref}" != "${MCP_IMAGE}@${IMAGE_DIGEST}" ]]; then
+              echo "MCP Render deploy resolved to unexpected image '${image_ref}'." >&2
+              exit 1
+            fi
+            echo "MCP Render deploy status: ${status}"
+            case "${status}" in
+              live) exit 0 ;;
+              build_failed|update_failed|pre_deploy_failed|canceled|deactivated)
+                echo "MCP Render deploy ended with '${status}'." >&2
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for MCP Render deploy ${DEPLOY_ID}." >&2
+          exit 1
+
+      - name: Verify public MCP readiness endpoint
+        run: |
+          curl --fail --silent --show-error --retry 24 --retry-all-errors --retry-delay 10 \
+            --max-time 20 \
+            https://kitezh-mcp.onrender.com/actuator/health/readiness

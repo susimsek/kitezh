@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -96,6 +97,10 @@ public class AuthorizationServerConfig {
 
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
+    private static final String MCP_READ_SCOPE = "mcp.read";
+    private static final String MCP_RESOURCE_AUDIENCE = "https://kitezh-mcp.onrender.com/mcp";
+    private static final String MCP_SERVER_CLIENT_ID = "mcp-server";
+    private static final String MCP_ADMIN_API_AUDIENCE = "admin-api";
     private static final String EMAIL_CLAIM = "email";
 
     record AuthorizationServerFilterDependencies(
@@ -452,7 +457,9 @@ public class AuthorizationServerConfig {
             UserProfileAttributeRepository userProfileAttributeRepository,
             SocialIdentityRepository socialIdentityRepository,
             ObjectMapper objectMapper,
-            OrganizationClaimRepository organizationClaimRepository) {
+            OrganizationClaimRepository organizationClaimRepository,
+            @Value("${app.mcp.resource-audience:https://kitezh-mcp.onrender.com/mcp}")
+                    String mcpResourceAudience) {
         return jwtTokenCustomizer(
                 new JwtTokenCustomizerDependencies(
                         userRepository,
@@ -466,7 +473,8 @@ public class AuthorizationServerConfig {
                         false,
                         socialIdentityRepository,
                         objectMapper,
-                        organizationClaimRepository));
+                        organizationClaimRepository),
+                mcpResourceAudience);
     }
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
@@ -514,10 +522,16 @@ public class AuthorizationServerConfig {
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
             JwtTokenCustomizerDependencies dependencies) {
+        return jwtTokenCustomizer(dependencies, MCP_RESOURCE_AUDIENCE);
+    }
+
+    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+            JwtTokenCustomizerDependencies dependencies, String mcpResourceAudience) {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 context.getClaims().claim("client_id", context.getRegisteredClient().getClientId());
             }
+            appendMcpResourceAudience(context, mcpResourceAudience);
             boolean adminAccessToken = isAdminAccessToken(context);
             List<ClientScopeEntity> groupMappers =
                     groupMappers(context, dependencies.clientScopeRepository());
@@ -593,9 +607,27 @@ public class AuthorizationServerConfig {
     }
 
     private static boolean isAdminAccessToken(JwtEncodingContext context) {
-        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
-                && ConsoleClients.ADMIN_CLIENTS.contains(
-                        context.getRegisteredClient().getClientId());
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+            return false;
+        }
+        if (ConsoleClients.ADMIN_CLIENTS.contains(context.getRegisteredClient().getClientId())) {
+            return true;
+        }
+        return context.getAuthorizationGrant()
+                        instanceof
+                        org.springframework.security.oauth2.server.authorization.authentication
+                                        .OAuth2TokenExchangeAuthenticationToken
+                                tokenExchange
+                && MCP_SERVER_CLIENT_ID.equals(context.getRegisteredClient().getClientId())
+                && tokenExchange.getAudiences().contains(MCP_ADMIN_API_AUDIENCE);
+    }
+
+    private static void appendMcpResourceAudience(
+            JwtEncodingContext context, String mcpResourceAudience) {
+        if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                && context.getAuthorizedScopes().contains(MCP_READ_SCOPE)) {
+            appendAudienceClaim(context, List.of(mcpResourceAudience, MCP_SERVER_CLIENT_ID));
+        }
     }
 
     private static List<ClientScopeEntity> groupMappers(
