@@ -2,8 +2,8 @@
 
 [![Latest release](https://img.shields.io/github/v/release/susimsek/kitezh?label=latest%20release&color=blue)](https://github.com/susimsek/kitezh/releases/latest)
 [![Build Status](https://github.com/susimsek/kitezh/actions/workflows/ci.yml/badge.svg)](https://github.com/susimsek/kitezh/actions/workflows/ci.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=kitezh)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kitezh)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=alert_status&branch=main)](https://sonarcloud.io/summary/new_code?id=kitezh&branch=main)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage&branch=main)](https://sonarcloud.io/summary/new_code?id=kitezh&branch=main)
 [![Vulnerabilities](https://snyk.io/test/github/susimsek/kitezh/badge.svg)](https://snyk.io/test/github/susimsek/kitezh)
 [![Docker Image Size](https://img.shields.io/docker/image-size/suayb/kitezh/latest?label=Image%20Size)](https://hub.docker.com/r/suayb/kitezh)
 [![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh.onrender.com)
