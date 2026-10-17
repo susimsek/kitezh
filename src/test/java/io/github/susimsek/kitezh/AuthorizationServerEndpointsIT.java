@@ -216,10 +216,8 @@ class AuthorizationServerEndpointsIT {
                         .get("access_token")
                         .asText();
         JsonNode claims = jwtClaims(accessToken);
-        assertThat(claims.get("scope").asText()).isEqualTo("openid mcp.read");
-        assertThat(claims.get("scope").asText())
-                .doesNotContain("admin-api")
-                .doesNotContain("roles");
+        String[] tokenScopes = JSON_MAPPER.treeToValue(claims.get("scope"), String[].class);
+        assertThat(tokenScopes).containsExactlyInAnyOrder("openid", "mcp.read");
         assertThat(claims.get("roles").toString()).contains("ROLE_ADMIN");
         assertThat(claims.has("realm_access")).isFalse();
     }
