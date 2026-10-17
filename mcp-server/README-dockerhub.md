@@ -78,7 +78,7 @@ Register `http://localhost:8765/callback` as the callback URI on the Claude Code
 
 ```bash
 claude mcp add --transport http \
-  --client-id '<KITEZH_CLAUDE_CLIENT_ID>' \
+  --client-id '<claude-oauth-client-id>' \
   --callback-port 8765 \
   kitezh https://kitezh-mcp.onrender.com/mcp
 ```
@@ -92,7 +92,7 @@ Register the exact localhost callback URI requested by Codex for its OAuth clien
 ```bash
 codex mcp add kitezh \
   --url https://kitezh-mcp.onrender.com/mcp \
-  --oauth-client-id '<KITEZH_CODEX_CLIENT_ID>'
+  --oauth-client-id '<codex-oauth-client-id>'
 ```
 
 Run `codex mcp login kitezh` and finish signing in through the browser. The Codex CLI and IDE extension use the same MCP configuration.

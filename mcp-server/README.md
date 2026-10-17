@@ -32,7 +32,7 @@ Pick a fixed callback port and register `http://localhost:8765/callback` on the 
 
 ```bash
 claude mcp add --transport http \
-  --client-id '<KITEZH_CLAUDE_CLIENT_ID>' \
+  --client-id '<claude-oauth-client-id>' \
   --callback-port 8765 \
   kitezh https://kitezh-mcp.onrender.com/mcp
 ```
@@ -46,7 +46,7 @@ Add the remote endpoint with the separately registered Codex public client ID:
 ```bash
 codex mcp add kitezh \
   --url https://kitezh-mcp.onrender.com/mcp \
-  --oauth-client-id '<KITEZH_CODEX_CLIENT_ID>'
+  --oauth-client-id '<codex-oauth-client-id>'
 ```
 
 Run `codex mcp login kitezh`, complete the browser sign-in, then check `/mcp` in the Codex TUI or run `codex mcp list`. Codex prints or uses its OAuth callback during setup; register the exact callback URI it requests on that OAuth client before login. Codex CLI and its IDE extension share the MCP configuration.
