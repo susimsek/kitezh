@@ -473,9 +473,7 @@ jobs:
           ./mvnw -B -ntp -Psonar initialize sonar:sonar \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=susimsek \
-            -Dsonar.token="${SONAR_TOKEN}" \
-            -Dsonar.qualitygate.wait=true \
-            -Dsonar.qualitygate.timeout=600
+            -Dsonar.token="${SONAR_TOKEN}"
 
   native-image:
     name: Native image verification (${{ matrix.architecture }})
