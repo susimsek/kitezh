@@ -287,7 +287,7 @@ jobs:
       MCP_RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.MCP_RENDER_RELEASE_DEPLOY_HOOK_URL }}
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
       MCP_IMAGE: docker.io/suayb/kitezh-mcp
-      MCP_RENDER_IMAGE: suayb/kitezh-mcp
+      MCP_RENDER_IMAGE: docker.io/suayb/kitezh-mcp
       IMAGE_DIGEST: ${{ needs.publish-image-manifests.outputs.image_digest }}
     steps:
       - name: Verify Render deployment configuration
@@ -317,9 +317,7 @@ jobs:
           MCP_RENDER_SERVICE_ID: ${{ steps.render-config.outputs.service_id }}
         run: |
           set -euo pipefail
-          # Render's configured Docker Hub source is represented without the
-          # docker.io prefix. Keep the registry path aligned with that source;
-          # Render validates every imgURL component other than the digest.
+          # Use the canonical Docker Hub URL accepted by Render's imgURL field.
           image_ref="${MCP_RENDER_IMAGE}@${IMAGE_DIGEST}"
           response_file="$(mktemp)"
           trap 'rm -f "${response_file}"' EXIT
@@ -370,7 +368,7 @@ jobs:
             status="$(jq -er '.status' <<< "${deploy}")"
             image_ref="$(jq -r '.image.ref // empty' <<< "${deploy}")"
             if [[ "${image_ref}" != "${MCP_RENDER_IMAGE}@${IMAGE_DIGEST}" \
-              && "${image_ref}" != "docker.io/${MCP_RENDER_IMAGE}@${IMAGE_DIGEST}" ]]; then
+              && "${image_ref}" != "${MCP_RENDER_IMAGE#docker.io/}@${IMAGE_DIGEST}" ]]; then
               echo "MCP Render deploy resolved to unexpected image '${image_ref}'." >&2
               exit 1
             fi
