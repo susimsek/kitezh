@@ -268,7 +268,7 @@ jobs:
       contents: read
     env:
       MCP_RENDER_RELEASE_DEPLOY_HOOK_URL: ${{ secrets.MCP_RENDER_RELEASE_DEPLOY_HOOK_URL }}
-      MCP_RENDER_API_KEY: ${{ secrets.MCP_RENDER_API_KEY }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
       MCP_IMAGE: docker.io/suayb/kitezh-mcp
       IMAGE_DIGEST: ${{ needs.publish-image-manifests.outputs.image_digest }}
     steps:
@@ -281,8 +281,8 @@ jobs:
             echo "MCP_RENDER_RELEASE_DEPLOY_HOOK_URL is required." >&2
             exit 1
           }
-          test -n "${MCP_RENDER_API_KEY}" || {
-            echo "MCP_RENDER_API_KEY is required." >&2
+          test -n "${RENDER_API_KEY}" || {
+            echo "RENDER_API_KEY is required." >&2
             exit 1
           }
           if [[ "${MCP_RENDER_RELEASE_DEPLOY_HOOK_URL}" =~ /deploy/(srv-[A-Za-z0-9]+) ]]; then
@@ -314,7 +314,7 @@ jobs:
               deploy_id=""
               while [[ -z "${deploy_id}" ]] && (( SECONDS < deadline )); do
                 deploys="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
-                  -H "Authorization: Bearer ${MCP_RENDER_API_KEY}" \
+                  -H "Authorization: Bearer ${RENDER_API_KEY}" \
                   -H 'Accept: application/json' \
                   --get --data-urlencode "createdAfter=${created_after}" \
                   --data-urlencode 'limit=100' \
@@ -344,7 +344,7 @@ jobs:
           deadline=$((SECONDS + 1200))
           while (( SECONDS < deadline )); do
             deploy="$(curl --fail --silent --show-error --retry 2 --retry-delay 3 \
-              -H "Authorization: Bearer ${MCP_RENDER_API_KEY}" \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
               -H 'Accept: application/json' "${deploy_url}")"
             status="$(jq -er '.status' <<< "${deploy}")"
             image_ref="$(jq -r '.image.ref // empty' <<< "${deploy}")"
