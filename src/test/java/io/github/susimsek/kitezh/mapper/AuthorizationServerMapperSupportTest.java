@@ -7,6 +7,7 @@ import io.github.susimsek.kitezh.config.security.SecurityJsonMapper;
 import io.github.susimsek.kitezh.domain.AuthorizationConsentId;
 import java.time.Duration;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -77,5 +78,24 @@ class AuthorizationServerMapperSupportTest {
         assertThatThrownBy(() -> support.readMap("{not-json"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Failed to deserialize authorization server value");
+    }
+
+    @Test
+    void normalizesImmutableCollectionsBeforePersistingPolymorphicMetadata() {
+        String serialized =
+                support.writeMap(
+                        Map.of(
+                                "claims",
+                                Map.of(
+                                        "scope",
+                                        Set.of("mcp.read"),
+                                        "roles",
+                                        List.of("ROLE_USER"))));
+
+        assertThat(serialized).doesNotContain("ImmutableCollections");
+        assertThat(support.readMap(serialized))
+                .containsEntry(
+                        "claims",
+                        Map.of("scope", List.of("mcp.read"), "roles", List.of("ROLE_USER")));
     }
 }
