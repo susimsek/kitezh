@@ -62,20 +62,19 @@ future EAS build, but Expo Updates is not installed or enabled, so no OTA JavaSc
 currently served to native builds.
 
 `mobile-release.yml` builds and adds direct-download test builds to the same GitHub Release as the
-desktop packages. It builds an Android APK signed with a stable release keystore and, by default,
-an unsigned iOS IPA for personal-device sideloading. The release workflow does not run Maestro; the
-mobile quality job runs API/component tests, and native device E2E is a separate verification step.
-Android signing is configured in the GitHub Actions `mobile-release` environment
-with `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEYSTORE_PASSWORD`,
+desktop packages. Android and iOS signing are enabled automatically when all platform signing
+secrets are configured; if any are missing, that platform's build continues unsigned. Android
+signing uses `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEYSTORE_PASSWORD`,
 `ANDROID_RELEASE_KEY_ALIAS`, and `ANDROID_RELEASE_KEY_PASSWORD`. Keep a secure backup of that
-keystore; replacing it prevents existing Android installs from accepting an in-place update.
+keystore; replacing it prevents existing Android installs from accepting an in-place update. The
+release workflow does not run Maestro; the mobile quality job runs API/component tests, and native
+device E2E is a separate verification step.
 
 Optional iOS distribution signing uses the same environment with
 `IOS_DISTRIBUTION_CERTIFICATE_BASE64` (Apple Distribution `.p12`),
 `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD`, `IOS_PROVISIONING_PROFILE_BASE64` (ad hoc profile), and
-`IOS_TEAM_ID`. Set the environment variable `IOS_SIGNING_MODE` to `signed` and configure all four
-secrets to produce a signed ad hoc IPA. It is currently `unsigned`, so the workflow produces an
-unsigned IPA. Partial signing configuration fails before the Xcode build.
+`IOS_TEAM_ID`. Configure all four secrets to produce a signed ad hoc IPA. Otherwise the workflow
+produces an unsigned IPA.
 
 The iOS IPA is for testing, not App Store or TestFlight submission. The user signs it with a personal
 Apple Account through AltStore or Sideloadly; free provisioning expires after seven days and needs

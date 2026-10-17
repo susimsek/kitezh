@@ -396,20 +396,20 @@ same-origin `/api/public/desktop-release` endpoint. The backend fetches GitHub R
 once per cache period and returns only allowlisted, versioned platform assets, so browsers do not
 call the GitHub API directly or consume its unauthenticated rate limit. The Electron updater
 continues to use the standard `latest*.yml` manifests; no duplicate binary aliases are published.
-macOS and Windows CI packages remain unsigned until their platform signing credentials are configured;
-Linux packages receive keyless Sigstore bundles in the release workflow.
+macOS, Windows, Android, and iOS release packages use their signing credentials when the complete
+platform key set is configured and continue unsigned when it is absent. Linux desktop packages also
+receive keyless Sigstore bundles through the release workflow.
 The packaged app uses the `kitezh://oauth/callback` protocol and stores console sessions in
 the operating system's protected Electron storage. Release signing, macOS notarization, and
 auto-update publishing require platform certificates and are not part of the unsigned local build.
 
-Signing is controlled by the `MAC_SIGNING_MODE` and `WINDOWS_SIGNING_MODE` variables in the
-`desktop-release` GitHub Environment. Both currently use `unsigned`. To enable macOS signing, set
-`MAC_SIGNING_MODE` to `signed` and configure `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` environment
-secrets for the base64-encoded Developer ID `.p12`. Optional notarization additionally uses
-`APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. To enable Windows signing, set
-`WINDOWS_SIGNING_MODE` to `signed` and configure `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` for the
-base64-encoded Windows `.pfx`. A signed mode fails early when its required certificate secrets are
-missing; do not put signing material in repository-level secrets.
+Desktop macOS signing uses `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` for the base64-encoded
+Developer ID `.p12`; notarization runs when `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and
+`APPLE_API_ISSUER` are also configured. Windows signing uses `WIN_CSC_LINK` and
+`WIN_CSC_KEY_PASSWORD` for the base64-encoded `.pfx`. Android signing uses the four
+`ANDROID_RELEASE_*` keystore secrets documented in `src/main/mobile/README.md`. iOS signing uses
+the distribution certificate, profile, and team ID secrets documented there. Keep signing material
+in the protected GitHub Environments, never in the repository.
 Linux always validates Debian metadata, publishes `SHA256SUMS`, and creates a Sigstore bundle beside
 each AppImage, Debian, RPM, and Snap package. These keyless signatures are produced by GitHub Actions
 through GitHub OIDC, so no paid certificate or private signing secret is required. Verify a package
@@ -423,8 +423,8 @@ platform manifest, downloads only after the user confirms, and installs only aft
 download succeeds. The release workflow can add detached Ed25519 signatures for `latest*.yml` by
 setting the `UPDATE_MANIFEST_SIGNING_KEY` secret in the `desktop-release` environment; the matching
 public key is derived during the build and bundled in the application. When a signature is present,
-the desktop app verifies it before asking `electron-updater` to check for a package.
-Set `DESKTOP_UPDATE_REQUIRE_SIGNATURE=true` for deployments that must reject unsigned manifests.
+the desktop app verifies it before asking `electron-updater` to check for a package. When no key is
+configured, the app accepts unsigned manifests.
 Failed signature, download, or installation preparation leaves the current installation in place.
 Before installing on supported auto-update targets, the app creates a protected backup of the
 current macOS app bundle, Windows installation directory, or Linux AppImage. A detached watchdog

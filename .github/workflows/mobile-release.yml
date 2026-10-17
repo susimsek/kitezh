@@ -67,7 +67,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   android:
-    name: Build signed Android APK
+    name: Build Android APK
     needs: resolve-release
     if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
     runs-on: ubuntu-latest
@@ -130,20 +130,28 @@ jobs:
           fs.writeFileSync('app.json', `${JSON.stringify(appConfig, null, 2)}\n`);
           NODE
 
-      - name: Check Android signing secrets
+      - name: Resolve Android signing mode
+        id: android-signing
         shell: bash
         run: |
           set -euo pipefail
+          signing_configured=true
           for secret_name in \
             ANDROID_RELEASE_KEYSTORE_BASE64 \
             ANDROID_RELEASE_KEYSTORE_PASSWORD \
             ANDROID_RELEASE_KEY_ALIAS \
             ANDROID_RELEASE_KEY_PASSWORD; do
             if [[ -z "${!secret_name}" ]]; then
-              echo "${secret_name} must be configured in the mobile-release environment." >&2
-              exit 1
+              signing_configured=false
             fi
           done
+          if [[ "${signing_configured}" == true ]]; then
+            echo "mode=signed" >> "${GITHUB_OUTPUT}"
+            echo "All Android signing secrets are configured; the APK will be signed."
+          else
+            echo "mode=unsigned" >> "${GITHUB_OUTPUT}"
+            echo "Android signing secrets are incomplete; the APK will be built unsigned."
+          fi
 
       - name: Generate native Android project
         working-directory: src/main/mobile
@@ -178,7 +186,7 @@ jobs:
           echo "Could not install Android NDK ${ndk_version} after three attempts." >&2
           exit 1
 
-      - name: Build and sign release APK
+      - name: Build release APK
         working-directory: src/main/mobile/android
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -187,18 +195,39 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          keystore_path="${RUNNER_TEMP}/kitezh-release.keystore"
-          printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
-          ./gradlew --no-daemon --stacktrace --build-cache --console=plain assembleRelease \
-            "-PreactNativeArchitectures=arm64-v8a" \
-            "-Pandroid.enableMinifyInReleaseBuilds=true" \
-            "-Pandroid.enableShrinkResourcesInReleaseBuilds=true" \
-            "-Pandroid.enableBundleCompression=true" \
-            "-Pexpo.useLegacyPackaging=true" \
-            "-Pandroid.injected.signing.store.file=${keystore_path}" \
-            "-Pandroid.injected.signing.store.password=${KEYSTORE_PASSWORD}" \
-            "-Pandroid.injected.signing.key.alias=${KEY_ALIAS}" \
-            "-Pandroid.injected.signing.key.password=${KEY_PASSWORD}"
+          gradle_args=(
+            "-PreactNativeArchitectures=arm64-v8a"
+            "-Pandroid.enableMinifyInReleaseBuilds=true"
+            "-Pandroid.enableShrinkResourcesInReleaseBuilds=true"
+            "-Pandroid.enableBundleCompression=true"
+            "-Pexpo.useLegacyPackaging=true"
+          )
+          if [[ "${{ steps.android-signing.outputs.mode }}" == signed ]]; then
+            keystore_path="${RUNNER_TEMP}/kitezh-release.keystore"
+            printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
+            gradle_args+=(
+              "-Pandroid.injected.signing.store.file=${keystore_path}"
+              "-Pandroid.injected.signing.store.password=${KEYSTORE_PASSWORD}"
+              "-Pandroid.injected.signing.key.alias=${KEY_ALIAS}"
+              "-Pandroid.injected.signing.key.password=${KEY_PASSWORD}"
+            )
+          else
+            node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const buildGradlePath = 'app/build.gradle';
+          const source = fs.readFileSync(buildGradlePath, 'utf8');
+          const updated = source.replace(
+            /(\n        release \{\n(?:(?!\n        \}).)*?)^\s*signingConfig signingConfigs\.debug\s*$/ms,
+            '$1',
+          );
+          if (updated === source) {
+            throw new Error('Could not remove Expo’s default debug signing from the Android release build.');
+          }
+          fs.writeFileSync(buildGradlePath, updated);
+          NODE
+          fi
+          ./gradlew --no-daemon --stacktrace --build-cache --console=plain assembleRelease "${gradle_args[@]}"
           apk_path="app/build/outputs/apk/release/app-release.apk"
           test -s "${apk_path}"
           if unzip -Z1 "${apk_path}" | grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/'; then
@@ -241,7 +270,6 @@ jobs:
       contents: read
     env:
       EXPO_PUBLIC_APP_VERSION: ${{ needs.resolve-release.outputs.release_version }}
-      IOS_SIGNING_MODE: ${{ vars.IOS_SIGNING_MODE || 'unsigned' }}
       IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 || '' }}
       IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD || '' }}
       IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 || '' }}
@@ -353,25 +381,19 @@ jobs:
             IOS_PROVISIONING_PROFILE_BASE64
             IOS_TEAM_ID
           )
-          case "${IOS_SIGNING_MODE}" in
-            unsigned)
-              echo "mode=unsigned" >> "${GITHUB_OUTPUT}"
-              echo "iOS signing mode is unsigned; producing an IPA for personal sideloading."
-              ;;
-            signed)
-              for secret_name in "${signing_values[@]}"; do
-                if [[ -z "${!secret_name}" ]]; then
-                  echo "${secret_name} is required when IOS_SIGNING_MODE=signed." >&2
-                  exit 1
-                fi
-              done
-              echo "mode=signed" >> "${GITHUB_OUTPUT}"
-              ;;
-            *)
-              echo "IOS_SIGNING_MODE must be 'unsigned' or 'signed'." >&2
-              exit 1
-              ;;
-          esac
+          signing_configured=true
+          for secret_name in "${signing_values[@]}"; do
+            if [[ -z "${!secret_name}" ]]; then
+              signing_configured=false
+            fi
+          done
+          if [[ "${signing_configured}" == true ]]; then
+            echo "mode=signed" >> "${GITHUB_OUTPUT}"
+            echo "All iOS signing secrets are configured; the IPA will be signed."
+          else
+            echo "mode=unsigned" >> "${GITHUB_OUTPUT}"
+            echo "iOS signing secrets are incomplete; the IPA will be built unsigned."
+          fi
 
       - name: Import iOS distribution certificate
         if: steps.ios-signing.outputs.mode == 'signed'

@@ -203,6 +203,33 @@ test("configures the updater, checks signed release metadata, and reports update
   else process.env.DESKTOP_AUTO_UPDATE = previousAutoUpdate;
 });
 
+test("checks unsigned update manifests when no verification key is bundled", async () => {
+  const originalAppPath = runtime.appPath;
+  const unsignedAppPath = path.join(updateDirectory, "unsigned-build");
+  await mkdir(path.join(unsignedAppPath, "assets"), { recursive: true });
+  runtime.appPath = unsignedAppPath;
+  runtime.netFetch = async (url) => {
+    if (url.endsWith(".sig")) return { status: 404, ok: false };
+    return {
+      status: 200,
+      ok: true,
+      arrayBuffer: async () => signedManifest,
+    };
+  };
+  const beforeCheck = publishedStatuses.length;
+
+  try {
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeCheck), [
+      { state: "checking" },
+      { state: "available", version: "0.1.4" },
+    ]);
+  } finally {
+    runtime.appPath = originalAppPath;
+    runtime.netFetch = successfulManifestFetch;
+  }
+});
+
 test("returns download results and publishes download errors", async () => {
   runtime.updateDownload = async () => undefined;
   assert.equal(await update.downloadUpdate(), true);

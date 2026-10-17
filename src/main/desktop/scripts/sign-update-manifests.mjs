@@ -10,9 +10,8 @@ const releaseDirectory = path.resolve(
 const privateKeyValue = process.env.UPDATE_MANIFEST_SIGNING_KEY;
 
 if (!privateKeyValue) {
-  throw new Error(
-    "UPDATE_MANIFEST_SIGNING_KEY is required to sign desktop update manifests.",
-  );
+  console.log("No update manifest signing key configured; leaving manifests unsigned.");
+  process.exit(0);
 }
 
 const privateKey = createPrivateKey(privateKeyValue);
