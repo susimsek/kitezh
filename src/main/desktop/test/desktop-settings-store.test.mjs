@@ -85,11 +85,13 @@ test("desktop settings store persists preferences and language with private file
     assert.deepEqual(await store.readDesktopPreferences(defaults), preferences);
     assert.equal(await store.readDesktopLanguage("en"), "tr");
     assert.equal(await store.readDesktopLanguageMode(), "en");
-    assert.equal(
-      (await stat(path.join(root, "user-data", "desktop-preferences.json")))
-        .mode & 0o777,
-      0o600,
-    );
+    if (process.platform !== "win32") {
+      assert.equal(
+        (await stat(path.join(root, "user-data", "desktop-preferences.json")))
+          .mode & 0o777,
+        0o600,
+      );
+    }
     assert.deepEqual(loginSettings, []);
   });
 });
@@ -130,7 +132,9 @@ test("desktop settings store reflects Linux autostart files and manages their li
       await readFile(autostartFile, "utf8"),
       /Exec="\/opt\/Kitezh\/kitezh"/,
     );
-    assert.equal((await stat(autostartFile)).mode & 0o777, 0o600);
+    if (process.platform !== "win32") {
+      assert.equal((await stat(autostartFile)).mode & 0o777, 0o600);
+    }
 
     await store.applyLaunchAtLogin(false);
     assert.equal(store.launchAtLoginEnabled(), false);

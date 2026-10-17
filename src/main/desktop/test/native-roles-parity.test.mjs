@@ -89,6 +89,24 @@ test("native role list is compact, protects built-in roles and sends bounded pag
     assert.ok(calls.some(({ path }) => path.includes("sort=name%2Cdesc")));
     const menu = document.querySelector(".role-menu");
     menu.open = true;
+    const menuItems = [...menu.querySelectorAll("button:not(:disabled)")];
+    assert.ok(menuItems.length > 0);
+    menu.dispatchEvent(
+      new document.defaultView.KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    assert.equal(document.activeElement, menuItems[0]);
+    menu.dispatchEvent(
+      new document.defaultView.KeyboardEvent("keydown", {
+        key: "ArrowUp",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    assert.equal(document.activeElement, menuItems[0]);
     menu.dispatchEvent(
       new document.defaultView.KeyboardEvent("keydown", {
         key: "Escape",
@@ -97,6 +115,46 @@ test("native role list is compact, protects built-in roles and sends bounded pag
     );
     assert.equal(menu.open, false);
     assert.equal(document.activeElement, menu.querySelector("summary"));
+  } finally {
+    h.restore();
+  }
+});
+
+test("role detail tabs support ArrowRight, Home, and End keyboard navigation", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    const tabs = () => [
+      ...h.document.querySelectorAll('[data-action="role-tab"]'),
+    ];
+    assert.ok(tabs().length > 1);
+    tabs()[0].dispatchEvent(
+      new h.document.defaultView.KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(tabs()[1].getAttribute("aria-selected"), "true");
+    tabs()[1].dispatchEvent(
+      new h.document.defaultView.KeyboardEvent("keydown", {
+        key: "End",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(tabs().at(-1).getAttribute("aria-selected"), "true");
+    tabs().at(-1).dispatchEvent(
+      new h.document.defaultView.KeyboardEvent("keydown", {
+        key: "Home",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(tabs()[0].getAttribute("aria-selected"), "true");
   } finally {
     h.restore();
   }
@@ -154,6 +212,19 @@ test("native role search debounces, retains focus and ignores an older response"
       false,
     );
     assert.equal(h.document.activeElement.id, "admin-role-query");
+    const formQuery = h.document.getElementById("admin-role-query");
+    formQuery.value = "FORM";
+    emit(h.document, formQuery);
+    h.document
+      .getElementById("admin-role-search")
+      .dispatchEvent(
+        new h.dom.window.Event("submit", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    await settle();
+    assert.ok(h.calls.some(({ path }) => path.includes("q=FORM&page=0")));
     h.document.querySelector('[data-action="role-clear"]').click();
     await settle();
     assert.equal(h.document.getElementById("admin-role-query").value, "");
@@ -205,6 +276,25 @@ test("role detail preserves list state and saves a blank description as null onc
   }
 });
 
+test("role detail keeps overlong descriptions local and shows a field error", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    const form = h.document.querySelector('[data-form="admin-role-edit"]');
+    form.elements.description.value = "x".repeat(501);
+    emit(h.document, form, "submit");
+    await settle();
+    assert.equal(h.calls.some(({ method }) => method === "PUT"), false);
+    assert.match(h.document.querySelector(".content").textContent, /500/);
+    assert.equal(
+      h.document.querySelector('[name="description"]').value.length,
+      501,
+    );
+  } finally {
+    h.restore();
+  }
+});
+
 test("role users select candidates, exclude current members, filter, assign and confirm removal", async () => {
   const h = await renderConsole("admin");
   let members = [user];
@@ -236,6 +326,34 @@ test("role users select candidates, exclude current members, filter, assign and 
       }),
     );
     const search = h.document.getElementById("role-candidate-user");
+    search.value = "かな";
+    search.dispatchEvent(
+      new h.dom.window.InputEvent("input", {
+        bubbles: true,
+        isComposing: true,
+      }),
+    );
+    await delay();
+    assert.equal(
+      h.calls.some(
+        ({ path }) =>
+          new URL(path, "https://test.invalid").searchParams.get("q") ===
+          "かな",
+      ),
+      false,
+    );
+    search.dispatchEvent(
+      new h.dom.window.CompositionEvent("compositionend", { bubbles: true }),
+    );
+    await delay();
+    await settle();
+    assert.ok(
+      h.calls.some(
+        ({ path }) =>
+          new URL(path, "https://test.invalid").searchParams.get("q") ===
+          "かな",
+      ),
+    );
     search.value = "ada";
     emit(h.document, search);
     await delay();

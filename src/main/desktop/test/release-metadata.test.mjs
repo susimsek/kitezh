@@ -65,3 +65,59 @@ test("rejects malformed versions and untrusted release URLs", () => {
     null,
   );
 });
+
+test("selects a published asset only for supported platform architectures", () => {
+  const allAssets = {
+    ...metadata.assets,
+    linuxArm64AppImage:
+      "https://github.com/susimsek/kitezh/releases/download/v0.1.5/kitezh-linux-arm64.AppImage",
+  };
+  const completeMetadata = { ...metadata, assets: allAssets };
+  for (const [platform, arch] of [
+    ["win32", "arm64"],
+    ["darwin", "x64"],
+    ["linux", "x64"],
+    ["linux", "arm64"],
+  ]) {
+    assert.equal(
+      hasNewerDesktopRelease(completeMetadata, "0.1.4", platform, arch),
+      true,
+      `${platform}/${arch}`,
+    );
+  }
+  assert.equal(
+    hasNewerDesktopRelease(completeMetadata, "0.1.6", "linux", "x64"),
+    false,
+  );
+  assert.equal(
+    hasNewerDesktopRelease(completeMetadata, "invalid", "linux", "x64"),
+    null,
+  );
+  assert.equal(
+    hasNewerDesktopRelease(completeMetadata, "0.1.4", "freebsd", "x64"),
+    null,
+  );
+  assert.equal(
+    hasNewerDesktopRelease(completeMetadata, "0.1.4", "darwin", "ia32"),
+    null,
+  );
+});
+
+test("rejects incomplete release metadata before checking its version", () => {
+  for (const value of [
+    null,
+    [],
+    { ...metadata, tag: "wrong-tag" },
+    {
+      ...metadata,
+      releaseUrl: "http://github.com/susimsek/kitezh/releases/tag/v0.1.5",
+    },
+    { ...metadata, assets: [] },
+    { ...metadata, version: "1.2" },
+  ]) {
+    assert.equal(
+      hasNewerDesktopRelease(value, "0.1.4", "win32", "x64"),
+      null,
+    );
+  }
+});

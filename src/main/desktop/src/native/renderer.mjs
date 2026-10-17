@@ -87,11 +87,6 @@ function adminUserById(id) {
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const actionIcons = {
-  "admin-provider-mappers-toggle": "edit",
-  "admin-identity-provider-config-edit": "edit",
-  "admin-saml-provider-config-edit": "edit",
-  "admin-oidc-provider-create": "add",
-  "admin-saml-provider-create": "add",
   "admin-message-delete-request": "delete",
   "admin-message-delete-confirm": "delete",
   "admin-provider-mapper-create": "add",
@@ -125,14 +120,11 @@ const actionIcons = {
   "admin-client-scope-mapper-delete-confirm": "delete",
   "admin-client-delete-request": "delete",
   "admin-client-delete-confirm": "delete",
-  "admin-client-scope-assignments-toggle": "edit",
   "admin-client-scope-assignments-save": "check",
-  "admin-client-mappers-toggle": "edit",
   "admin-client-mapper-create": "add",
   "admin-client-mapper-edit": "edit",
   "admin-client-mapper-delete-request": "delete",
   "admin-client-mapper-delete-confirm": "delete",
-  "admin-client-roles-toggle": "edit",
   "admin-client-role-assignments-toggle": "edit",
   "admin-client-role-assignment-add": "add",
   "admin-client-role-assignment-remove-request": "delete",
@@ -4966,20 +4958,6 @@ function render({ preserveDrafts = true } = {}) {
   }
 }
 
-async function loadProfile() {
-  state.loading = true;
-  state.error = null;
-  render();
-  try {
-    state.profile = await request("/api/account/profile");
-    state.loading = false;
-    render();
-  } catch {
-    state.loading = false;
-    render();
-  }
-}
-
 async function loadRoute({ preserveError = false, keepContent = false } = {}) {
   if (state.console === "admin" && !adminRouteAllowed(state.route)) {
     state.loading = false;
@@ -5782,12 +5760,6 @@ function preserveOfflineDrafts() {
         form.dataset.form === "admin-saml-identity-provider-connection"
           ? samlIdentityProviderConfigurationFormDraft(form)
           : identityProviderConfigurationFormDraft(form);
-    } else if (form.dataset.form === "admin-client-native-metadata") {
-      const id = form.dataset.clientId;
-      if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
-        state.data.clientMetadataDrafts ??= {};
-        state.data.clientMetadataDrafts[id] = values;
-      }
     } else if (form.dataset.form === "admin-client-scope-assignments") {
       const id = form.dataset.clientId;
       if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
@@ -6637,31 +6609,6 @@ async function submitForm(form) {
     render();
     return;
   }
-  if (form.dataset.form === "admin-client-scope-role-candidate-search") {
-    const scopeId = form.dataset.scopeId ?? "";
-    const kind = form.dataset.roleKind ?? "";
-    const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
-    if (
-      state.offline ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
-      !mapping ||
-      !["applicationRoles", "clientRoleIds"].includes(kind)
-    )
-      return;
-    const queryKey = kind === "applicationRoles" ? "applicationRoleQuery" : "clientRoleQuery";
-    mapping[queryKey] = String(formString(values.q, "")).trim();
-    state.error = null;
-    state.busy = `client-scope-role-candidates:${scopeId}:${kind}`;
-    render();
-    try {
-      await loadClientScopeRoleCandidates(scopeId, kind, 0);
-    } catch {
-      /* request rendered localized authorization or transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
   if (form.dataset.form === "client-evaluation") {
     if (state.busy || state.offline || state.route !== "client-detail") return;
     const params = new URLSearchParams({
@@ -6891,53 +6838,6 @@ async function submitForm(form) {
     }
     state.busy = null;
     render({ preserveDrafts: false });
-    return;
-  }
-  if (form.dataset.form === "admin-client-native-metadata") {
-    const id = form.dataset.clientId ?? "";
-    const clients =
-      state.data.clientConfiguration && state.route === "client-detail"
-        ? [state.data.clientConfiguration]
-        : nativeClientRows();
-    if (
-      state.offline ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !clients.some((client) => client.id === id) ||
-      !form.reportValidity()
-    )
-      return;
-    const body = {
-      clientName: String(formString(values.clientName, "")).trim(),
-    };
-    state.data.clientMetadataDrafts ??= {};
-    state.data.clientMetadataDrafts[id] = body;
-    state.data.clientMetadataErrorId = id;
-    state.error = null;
-    state.notice = null;
-    state.busy = `client-metadata-save:${id}`;
-    render();
-    try {
-      const saved = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}/native-metadata`,
-        { method: "PUT", body },
-      );
-      state.data.clients = {
-        ...state.data.clients,
-        content: clients.map((client) =>
-          client.id === id
-            ? { ...client, clientName: saved.clientName }
-            : client,
-        ),
-      };
-      delete state.data.clientMetadataDrafts[id];
-      state.data.clientMetadataEditId = null;
-      state.data.clientMetadataErrorId = null;
-      state.notice = text("adminClientMetadataUpdated");
-    } catch {
-      /* request rendered localized server validation or transport feedback */
-    }
-    state.busy = null;
-    render();
     return;
   }
   if (form.dataset.form === "admin-client-scope-assignments") {
@@ -9534,32 +9434,6 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-client-roles-toggle") {
-    const clientId = element.dataset.id ?? "";
-    if (
-      state.busy ||
-      state.offline ||
-      state.data.adminAccess?.manageClients !== true ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
-      !state.data.clients?.content?.some((client) => client.id === clientId) ||
-      clientId === "admin-console"
-    )
-      return;
-    state.data.clientRoles ??= {};
-    const panel = (state.data.clientRoles[clientId] ??= { open: false });
-    if (panel.open) {
-      panel.open = false;
-      render();
-      return;
-    }
-    await loadClientRoles(
-      clientId,
-      0,
-      panel.query ?? "",
-      `client-roles-load:${clientId}`,
-    );
-    return;
-  }
   if (
     action === "admin-client-role-edit" ||
     action === "admin-client-role-edit-cancel" ||
@@ -9942,43 +9816,6 @@ async function action(action, element) {
         : [];
       state.data.clientScopeMappersOpenId = scopeId;
     } catch {
-      /* request rendered localized authorization or transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
-  if (action === "admin-client-mappers-toggle") {
-    if (state.busy || state.offline) return;
-    const clientId = element.dataset.id;
-    const client = nativeClientRows().some(
-      (item) => String(item.id) === clientId,
-    );
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") || !client) return;
-    if (state.data.clientMappersOpenId === clientId) {
-      state.data.clientMappersOpenId = null;
-      render();
-      return;
-    }
-    state.data.clientMappersOpenId = clientId;
-    if (Array.isArray(state.data.clientMappers?.[clientId])) {
-      render();
-      return;
-    }
-    state.busy = `client-mappers-load:${clientId}`;
-    state.error = null;
-    state.notice = null;
-    render();
-    try {
-      const page = await request(
-        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
-      );
-      state.data.clientMappers ??= {};
-      state.data.clientMappers[clientId] = Array.isArray(page?.content)
-        ? page.content
-        : [];
-    } catch {
-      state.data.clientMappersOpenId = null;
       /* request rendered localized authorization or transport feedback */
     }
     state.busy = null;
@@ -11085,46 +10922,6 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-provider-mappers-toggle") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const providers = state.data.identityProviders?.content ?? [];
-    if (
-      typeof id !== "string" ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !providers.some((provider) => provider.id === id)
-    )
-      return;
-    if (state.data.identityProviderMappersOpenId === id) {
-      state.data.identityProviderMappersOpenId = null;
-      render();
-      return;
-    }
-    const cached = state.data.identityProviderMappers?.[id];
-    if (Array.isArray(cached)) {
-      state.data.identityProviderMappersOpenId = id;
-      render();
-      return;
-    }
-    state.busy = `provider-mappers:${id}`;
-    state.error = null;
-    render();
-    try {
-      const page = await request(
-        `/api/admin/identity-providers/${id}/mappers?page=0&size=20&sort=name,asc`,
-      );
-      state.data.identityProviderMappers ??= {};
-      state.data.identityProviderMappers[id] = Array.isArray(page?.content)
-        ? page.content
-        : [];
-      state.data.identityProviderMappersOpenId = id;
-    } catch {
-      /* request rendered localized transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
   if (
     action === "admin-provider-mapper-delete-request" ||
     action === "admin-provider-mapper-delete-confirm"
@@ -11198,131 +10995,6 @@ async function action(action, element) {
     )
       return;
     state.data.providerMapperDeleteConfirm = null;
-    render();
-    return;
-  }
-  if (action === "admin-identity-provider-policy-toggle") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const provider = (state.data.identityProviders?.content ?? []).some(
-      (item) => item.id === id,
-    );
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !provider) return;
-    if (state.data.identityProviderPolicyOpenId === id) {
-      state.data.identityProviderPolicyOpenId = null;
-      delete state.data.identityProviderPolicyDrafts?.[id];
-      state.data.identityProviderPolicyErrorId = null;
-      render();
-      return;
-    }
-    state.busy = `identity-provider-policy-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const policy = await request(
-        `/api/admin/identity-providers/${id}/native-policy`,
-      );
-      state.data.identityProviderPolicies ??= {};
-      state.data.identityProviderPolicies[id] = policy;
-      state.data.identityProviderPolicyOpenId = id;
-      state.data.identityProviderPolicyDrafts ??= {};
-      state.data.identityProviderPolicyDrafts[id] = policy;
-      state.data.identityProviderPolicyErrorId = null;
-    } catch {
-      /* request rendered localized transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
-  if (action === "admin-oidc-provider-create") {
-    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
-      return;
-    state.data.identityProviderConfigurationOpenId = "new";
-    state.data.identityProviderConfigurationBaselines ??= {};
-    state.data.identityProviderConfigurationDrafts ??= {};
-    state.data.identityProviderConfigurationBaselines.new =
-      defaultIdentityProviderConfiguration();
-    state.data.identityProviderConfigurationDrafts.new =
-      identityProviderConfigurationDraft(
-        state.data.identityProviderConfigurationBaselines.new,
-      );
-    state.data.identityProviderConfigurationErrorId = null;
-    state.error = null;
-    render();
-    return;
-  }
-  if (action === "admin-saml-provider-create") {
-    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
-      return;
-    const baseline = {
-      ...defaultIdentityProviderConfiguration(),
-      providerType: "saml",
-    };
-    state.data.identityProviderConfigurationOpenId = "new-saml";
-    state.data.identityProviderConfigurationBaselines ??= {};
-    state.data.identityProviderConfigurationDrafts ??= {};
-    state.data.identityProviderConfigurationBaselines["new-saml"] = baseline;
-    state.data.identityProviderConfigurationDrafts["new-saml"] =
-      identityProviderConfigurationDraft(baseline);
-    state.data.identityProviderConfigurationErrorId = null;
-    state.error = null;
-    render();
-    return;
-  }
-  if (
-    action === "admin-identity-provider-config-edit" ||
-    action === "admin-saml-provider-config-edit"
-  ) {
-    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
-      return;
-    const id = element.dataset.id ?? "";
-    const provider = (state.data.identityProviders?.content ?? []).find(
-      (item) => item.id === id,
-    );
-    const expectedProviderType =
-      action === "admin-saml-provider-config-edit" ? "saml" : "oidc";
-    if (
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !provider ||
-      provider.providerType !== expectedProviderType
-    )
-      return;
-    if (state.data.identityProviderConfigurationOpenId === id) {
-      state.data.identityProviderConfigurationOpenId = null;
-      delete state.data.identityProviderConfigurationDrafts?.[id];
-      delete state.data.identityProviderConfigurationBaselines?.[id];
-      state.data.identityProviderConfigurationErrorId = null;
-      render();
-      return;
-    }
-    state.busy = `identity-provider-config-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const response = await request(
-        `/api/admin/identity-providers/${encodeURIComponent(id)}`,
-      );
-      if (
-        response?.id !== id ||
-        response.providerType !== expectedProviderType ||
-        typeof response.registrationId !== "string" ||
-        (expectedProviderType === "oidc" &&
-          typeof response.clientId !== "string")
-      )
-        throw new Error("invalid_identity_provider_connection_response");
-      const baseline = safeIdentityProviderConfiguration(response);
-      state.data.identityProviderConfigurationBaselines ??= {};
-      state.data.identityProviderConfigurationDrafts ??= {};
-      state.data.identityProviderConfigurationBaselines[id] = baseline;
-      state.data.identityProviderConfigurationDrafts[id] =
-        identityProviderConfigurationDraft(baseline);
-      state.data.identityProviderConfigurationOpenId = id;
-      state.data.identityProviderConfigurationErrorId = null;
-    } catch {
-      /* The API adapter supplies localized authorization and transport feedback. */
-    }
-    state.busy = null;
     render();
     return;
   }
@@ -11401,90 +11073,6 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-client-metadata-edit") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const client = nativeClientRows().some((item) => item.id === id);
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
-    if (state.data.clientMetadataEditId === id) {
-      state.data.clientMetadataEditId = null;
-      delete state.data.clientMetadataDrafts?.[id];
-      state.data.clientMetadataErrorId = null;
-      render();
-      return;
-    }
-    state.busy = `client-metadata-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const metadata = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}/native-metadata`,
-      );
-      state.data.clientMetadataEditId = id;
-      state.data.clientMetadataDrafts ??= {};
-      state.data.clientMetadataDrafts[id] = {
-        clientName: metadata.clientName,
-      };
-      state.data.clientMetadataErrorId = null;
-    } catch {
-      /* request rendered localized transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
-  if (action === "admin-client-configuration-edit") {
-    if (state.busy || state.offline || !adminRouteAllowed("clients")) return;
-    const id = element.dataset.id ?? "";
-    const client = nativeClientRows().find((entry) => entry.id === id);
-    if (
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !client ||
-      client.clientId === "admin-console" ||
-      !state.data.adminAccess?.manageClients
-    )
-      return;
-    if (state.data.clientConfigurationEditId === id) {
-      state.data.clientConfigurationEditId = null;
-      state.data.clientConfiguration = null;
-      delete state.data.clientConfigurationDrafts?.[id];
-      state.data.clientConfigurationErrorId = null;
-      state.error = null;
-      render();
-      return;
-    }
-    state.busy = `client-configuration-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const configuration = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}`,
-      );
-      if (
-        configuration?.id !== id ||
-        typeof configuration.clientId !== "string" ||
-        !Array.isArray(configuration.clientAuthenticationMethods) ||
-        !Array.isArray(configuration.authorizationGrantTypes)
-      )
-        throw new Error("invalid_client_configuration_response");
-      const {
-        serviceAccountUsername: _serviceAccountUsername,
-        ...safeConfiguration
-      } = configuration;
-      void _serviceAccountUsername;
-      state.data.clientConfiguration = safeConfiguration;
-      state.data.clientConfigurationEditId = id;
-      state.data.clientConfigurationDrafts ??= {};
-      state.data.clientConfigurationDrafts[id] =
-        clientConfigurationDraft(safeConfiguration);
-      state.data.clientConfigurationErrorId = null;
-    } catch {
-      /* request rendered localized authorization, timeout, or transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
   if (action === "admin-client-configuration-cancel") {
     if (state.busy) return;
     const id = element.dataset.id ?? "";
@@ -11495,61 +11083,6 @@ async function action(action, element) {
     state.data.clientConfigurationErrorId = null;
     state.error = null;
     render({ preserveDrafts: false });
-    return;
-  }
-  if (action === "admin-client-metadata-cancel") {
-    if (state.busy) return;
-    const id = element.dataset.id;
-    if (state.data.clientMetadataEditId !== id) return;
-    state.data.clientMetadataEditId = null;
-    delete state.data.clientMetadataDrafts?.[id];
-    state.data.clientMetadataErrorId = null;
-    state.error = null;
-    render();
-    return;
-  }
-  if (action === "admin-client-scope-assignments-toggle") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const client = nativeClientRows().some((item) => item.id === id);
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
-    if (state.data.clientScopeAssignmentsOpenId === id) {
-      state.data.clientScopeAssignmentsOpenId = null;
-      render();
-      return;
-    }
-    const cached = state.data.clientScopeAssignments?.[id];
-    state.data.clientScopeAssignmentsOpenId = id;
-    state.data.clientScopeAssignmentErrorId = null;
-    state.error = null;
-    if (cached) {
-      state.data.clientScopeAssignmentDrafts ??= {};
-      state.data.clientScopeAssignmentDrafts[id] = {
-        defaultScopes: [...(cached.defaultScopes ?? [])],
-        optionalScopes: [...(cached.optionalScopes ?? [])],
-      };
-      render();
-      return;
-    }
-    state.busy = `client-scope-assignments-load:${id}`;
-    render();
-    try {
-      const assignments = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}/scope-assignments`,
-      );
-      state.data.clientScopeAssignments ??= {};
-      state.data.clientScopeAssignments[id] = assignments;
-      state.data.clientScopeAssignmentDrafts ??= {};
-      state.data.clientScopeAssignmentDrafts[id] = {
-        defaultScopes: [...(assignments.defaultScopes ?? [])],
-        optionalScopes: [...(assignments.optionalScopes ?? [])],
-      };
-    } catch {
-      state.data.clientScopeAssignmentsOpenId = null;
-      /* request rendered localized authorization or transport feedback */
-    }
-    state.busy = null;
-    render();
     return;
   }
   if (action === "admin-client-scope-assignments-cancel") {
@@ -11567,16 +11100,6 @@ async function action(action, element) {
     state.data.clientScopeAssignmentErrorId = null;
     state.error = null;
     render({ preserveDrafts: false });
-    return;
-  }
-  if (action === "admin-identity-provider-policy-cancel") {
-    if (state.busy) return;
-    const id = element.dataset.id;
-    if (state.data.identityProviderPolicyOpenId !== id) return;
-    state.data.identityProviderPolicyOpenId = null;
-    delete state.data.identityProviderPolicyDrafts?.[id];
-    state.data.identityProviderPolicyErrorId = null;
-    render();
     return;
   }
   if (
@@ -12516,43 +12039,6 @@ function bind() {
     }),
   );
   document
-    .querySelectorAll("[data-client-scope-role-page]")
-    .forEach((element) =>
-      element.addEventListener("click", () => {
-        if (state.busy || element.disabled || state.offline) return;
-        const scopeId = element.dataset.scopeId;
-        const kind = element.dataset.clientScopeRolePage;
-        const page = Number(element.dataset.page);
-        const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
-        const candidatesKey =
-          kind === "applicationRoles"
-            ? "applicationRoleCandidates"
-            : "clientRoleCandidates";
-        const currentPage = mapping?.[candidatesKey];
-        if (
-          typeof scopeId !== "string" ||
-          !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
-          !["applicationRoles", "clientRoleIds"].includes(kind) ||
-          !Number.isSafeInteger(page) ||
-          page < 0 ||
-          !currentPage ||
-          page >= Number(currentPage.totalPages ?? 0)
-        )
-          return;
-        state.busy = `client-scope-role-page:${scopeId}:${kind}`;
-        state.error = null;
-        render();
-        void loadClientScopeRoleCandidates(scopeId, kind, page)
-          .catch(() => {
-            /* request rendered localized authorization or transport feedback */
-          })
-          .finally(() => {
-            state.busy = null;
-            render();
-          });
-      }),
-    );
-  document
     .getElementById("admin-client-search")
     ?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -12580,22 +12066,6 @@ function bind() {
         state.busy = null;
         render();
       });
-    }),
-  );
-  document.querySelectorAll("[data-client-role-page]").forEach((element) =>
-    element.addEventListener("click", () => {
-      if (state.busy || element.disabled) return;
-      const clientId = element.dataset.clientRolePage ?? "";
-      const nextPage = Number(element.dataset.page);
-      const panel = state.data.clientRoles?.[clientId];
-      if (!panel?.open || !Number.isSafeInteger(nextPage) || nextPage < 0)
-        return;
-      void loadClientRoles(
-        clientId,
-        nextPage,
-        panel.query ?? "",
-        `client-role-page:${clientId}`,
-      );
     }),
   );
   document
@@ -13068,19 +12538,15 @@ function bind() {
         mapping.draft = {
           applicationRoles: [
             ...new Set(
-              [
-                ...panel.querySelectorAll(
-                  'input[name="applicationRoles"]:checked',
-                ),
-              ]
-                .map((input) => input.value.trim())
+              [...panel.querySelectorAll('select[name="applicationRoles"] option:checked')]
+                .map((option) => option.value.trim())
                 .filter(Boolean),
             ),
           ],
           clientRoleIds: [
             ...new Set(
-              [...panel.querySelectorAll('input[name="clientRoleIds"]:checked')]
-                .map((input) => Number(input.value))
+              [...panel.querySelectorAll('select[name="clientRoleIds"] option:checked')]
+                .map((option) => Number(option.value))
                 .filter((id) => Number.isSafeInteger(id) && id > 0),
             ),
           ],

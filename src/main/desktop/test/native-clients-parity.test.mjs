@@ -132,6 +132,16 @@ test("native clients sends bounded search, name sorting and page size; returning
   try {
     const input = h.document.getElementById("admin-client-query");
     input.value = "account";
+    input.dispatchEvent(new h.dom.window.Event("input", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await settle();
+    assert.ok(
+      h.calls.some(({ path }) => {
+        if (!path.startsWith("/api/admin/clients?")) return false;
+        return new URL(path, "http://local").searchParams.get("q") === "account";
+      }),
+      "typing a client query should trigger the debounced search",
+    );
     submit(h, h.document.getElementById("admin-client-search"));
     await settle();
     change(

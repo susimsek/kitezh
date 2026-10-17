@@ -248,6 +248,49 @@ test("refreshes once and retries concurrent requests without exposing refresh da
   assert.equal(readSession().accessToken, "new-access");
 });
 
+test("clears the stored session when refresh fails or the refreshed token is rejected", async () => {
+  for (const [refreshResponse, expectedRequests] of [
+    [new Response("unavailable", { status: 503 }), 2],
+    [
+      new Response(
+        JSON.stringify({ access_token: "new-access", expires_in: 300 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+      3,
+    ],
+  ]) {
+    let current = { ...session };
+    let requests = 0;
+    const cleared = [];
+    const adapter = createDesktopApiAdapter({
+      apiBaseUrl: "https://kitezh.onrender.com",
+      fetcher: async (url) => {
+        requests += 1;
+        if (url.endsWith("/oauth2/token")) return refreshResponse;
+        return new Response("unauthorized", { status: 401 });
+      },
+      readSession: async () => current,
+      writeSession: async (_namespace, next) => {
+        current = next;
+      },
+      clearSession: async (namespace) => {
+        cleared.push(namespace);
+        current = null;
+      },
+    });
+
+    const response = await adapter.request({
+      console: "account",
+      path: "/api/account/profile",
+    });
+
+    assert.equal(response.status, 401);
+    assert.equal(requests, expectedRequests);
+    assert.equal(current, null);
+    assert.deepEqual(cleared, ["account"]);
+  }
+});
+
 test("keeps forbidden responses authoritative and rejects unapproved API paths", async () => {
   const { adapter } = harness(
     async () => new Response("forbidden", { status: 403 }),

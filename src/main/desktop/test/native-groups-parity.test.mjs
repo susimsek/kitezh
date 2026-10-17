@@ -181,12 +181,65 @@ test("group list renders counts, overflow actions, search, sorting, all paginati
       h.calls.some(({ path }) => path.includes("q=Engineering&page=0&size=50")),
     );
     assert.equal(h.document.activeElement.id, "group-query");
+    query.value = "Parent";
+    emit(h, query);
+    emit(h, h.document.getElementById("group-search"), "submit");
+    await delay();
+    await settle();
+    assert.ok(
+      h.calls.some(({ path }) =>
+        path.includes("q=Parent&page=0&size=50"),
+      ),
+    );
+    const requestCount = h.calls.length;
+    query.value = "東京";
+    query.dispatchEvent(
+      new h.dom.window.InputEvent("input", {
+        bubbles: true,
+        isComposing: true,
+      }),
+    );
+    await delay();
+    assert.equal(h.calls.length, requestCount);
+    query.dispatchEvent(
+      new h.dom.window.CompositionEvent("compositionend", { bubbles: true }),
+    );
+    await delay();
+    assert.ok(
+      h.calls.some(({ path }) =>
+        new URL(path, "https://test.invalid").searchParams.has("q", "東京"),
+      ),
+    );
     await click(h, '[data-action="group-clear"]');
     assert.equal(h.document.getElementById("group-query").value, "");
     assert.equal(
       h.document.querySelector(".topbar p").textContent,
       "Manage user groups and role mappings.",
     );
+  } finally {
+    h.restore();
+  }
+});
+
+test("group navigation restores a user detail deep link from browser history", async () => {
+  const h = await harness();
+  h.setResponse("/api/admin/users/1", "GET", () => ({
+    id: 1,
+    username: "ada",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    enabled: true,
+    emailVerified: true,
+    authorities: [],
+    attributes: {},
+  }));
+  try {
+    await list(h);
+    h.dom.window.history.pushState(null, "", "#/admin/users/1/details");
+    h.dom.window.dispatchEvent(new h.dom.window.PopStateEvent("popstate"));
+    await settle();
+    assert.ok(h.calls.some(({ path }) => path === "/api/admin/users/1"));
+    assert.ok(h.document.querySelector('[data-form="admin-user-detail-save"]'));
   } finally {
     h.restore();
   }
@@ -483,6 +536,83 @@ test("members debounce autocomplete, add, remove, filter, sort, size and link to
       h.document.querySelector('[role="tab"][aria-selected="true"]')
         .textContent,
       "Members",
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("group tabs and member suggestions support keyboard navigation", async () => {
+  const h = await harness();
+  try {
+    await open(h);
+    const detailsTab = h.document.querySelector(
+      '[data-action="group-tab"][data-id="details"]',
+    );
+    detailsTab.dispatchEvent(
+      new h.dom.window.KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(
+      h.document.querySelector('[role="tab"][aria-selected="true"]')
+        .textContent,
+      "Permissions",
+    );
+    for (const [key, expectedTab] of [
+      ["Home", "Settings"],
+      ["End", "Members"],
+      ["ArrowLeft", "Role mappings"],
+    ]) {
+      const activeTab = h.document.querySelector(
+        '[role="tab"][aria-selected="true"]',
+      );
+      activeTab.dispatchEvent(
+        new h.dom.window.KeyboardEvent("keydown", {
+          key,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await settle();
+      assert.equal(
+        h.document.querySelector('[role="tab"][aria-selected="true"]')
+          .textContent,
+        expectedTab,
+      );
+    }
+    await click(h, '[data-action="group-tab"][data-id="members"]');
+
+    const query = h.document.getElementById("group-candidate-query");
+    query.value = "gr";
+    emit(h, query);
+    await delay();
+    const activeQuery = h.document.getElementById("group-candidate-query");
+    const arrowDown = new h.dom.window.KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    activeQuery.dispatchEvent(arrowDown);
+    assert.equal(arrowDown.defaultPrevented, true);
+    assert.equal(
+      h.document.activeElement,
+      h.document.querySelector('#group-candidates [role="option"]'),
+    );
+
+    const escape = new h.dom.window.KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    activeQuery.dispatchEvent(escape);
+    await settle();
+    assert.equal(
+      h.document.querySelector('#group-candidates [role="option"]'),
+      null,
     );
   } finally {
     h.restore();
