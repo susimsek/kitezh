@@ -11,7 +11,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(
+        properties = {
+            "app.mcp.public-url=https://kitezh-mcp.onrender.com/mcp",
+            "app.cors.allowed-origins=app://renderer,http://localhost:6274,http://127.0.0.1:6274"
+        })
 @AutoConfigureMockMvc
 class McpHttpBoundaryIT {
 

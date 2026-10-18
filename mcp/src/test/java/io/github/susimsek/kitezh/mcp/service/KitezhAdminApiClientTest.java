@@ -9,6 +9,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.susimsek.kitezh.mcp.config.ApplicationProperties;
+import io.github.susimsek.kitezh.mcp.config.http.KitezhApiAuthenticationInterceptor;
+import io.github.susimsek.kitezh.mcp.service.client.KitezhAdminApiHttpClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +22,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
+import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 class KitezhAdminApiClientTest {
 
@@ -34,7 +38,7 @@ class KitezhAdminApiClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder.build(),
+                        httpClient(builder),
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
         setAuthenticatedUser();
@@ -63,7 +67,7 @@ class KitezhAdminApiClientTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder.build(), registry, properties("https://kitezh.test"));
+                        httpClient(builder), registry, properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(requestTo("https://kitezh.test/api/admin/whoami"))
                 .andRespond(withServerError());
@@ -86,7 +90,7 @@ class KitezhAdminApiClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder.build(),
+                        httpClient(builder),
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
         setAuthenticatedUser();
@@ -116,7 +120,7 @@ class KitezhAdminApiClientTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder.build(), registry, properties("https://kitezh.test"));
+                        httpClient(builder), registry, properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(requestTo("https://kitezh.test/api/admin/groups/3/permissions"))
                 .andRespond(withServerError());
@@ -142,7 +146,7 @@ class KitezhAdminApiClientTest {
     void rejectsCallsWithoutAnAuthenticatedJwt() {
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        RestClient.builder().build(),
+                        httpClient(RestClient.builder()),
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
 
@@ -159,6 +163,14 @@ class KitezhAdminApiClientTest {
 
     private static ApplicationProperties properties(String apiBaseUrl) {
         return new ApplicationProperties(
-                null, null, new ApplicationProperties.Api(apiBaseUrl), null);
+                null, null, new ApplicationProperties.Api(apiBaseUrl), null, null);
+    }
+
+    private static KitezhAdminApiHttpClient httpClient(RestClient.Builder builder) {
+        RestClient restClient =
+                builder.requestInterceptor(new KitezhApiAuthenticationInterceptor()).build();
+        HttpServiceProxyFactory factory =
+                HttpServiceProxyFactory.builderFor(RestClientAdapter.create(restClient)).build();
+        return factory.createClient(KitezhAdminApiHttpClient.class);
     }
 }

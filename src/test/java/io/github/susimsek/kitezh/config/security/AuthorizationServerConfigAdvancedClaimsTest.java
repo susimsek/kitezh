@@ -2,6 +2,8 @@ package io.github.susimsek.kitezh.config.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
@@ -21,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -65,6 +68,32 @@ class AuthorizationServerConfigAdvancedClaimsTest {
         assertThat(context.getClaims().build().getClaims())
                 .containsEntry("department", List.of("engineering", "security"))
                 .doesNotContainKey("excluded");
+    }
+
+    @Test
+    void resolvesOrganizationClaimUsersOnlyForAccessAndIdTokenKinds() {
+        UserRepository userRepository = mock(UserRepository.class);
+        OrganizationClaimRepository claimRepository = mock(OrganizationClaimRepository.class);
+        UserEntity user = new UserEntity();
+        user.setId(42L);
+        user.setUsername("sample-client");
+        when(userRepository.findByUsername("sample-client")).thenReturn(Optional.of(user));
+        when(claimRepository.findEnabledClaimsForUser(42L)).thenReturn(List.of());
+        var customGrant = new AuthorizationGrantType("urn:custom");
+
+        config.jwtTokenCustomizer(dependencies(userRepository, claimRepository))
+                .customize(context(OAuth2TokenType.ACCESS_TOKEN, customGrant, Set.of(), null));
+        config.jwtTokenCustomizer(dependencies(userRepository, claimRepository))
+                .customize(
+                        context(
+                                new OAuth2TokenType(OidcParameterNames.ID_TOKEN),
+                                customGrant,
+                                Set.of(),
+                                null));
+        config.jwtTokenCustomizer(dependencies(userRepository, claimRepository))
+                .customize(context(new OAuth2TokenType("custom"), customGrant, Set.of(), null));
+
+        verify(claimRepository, times(2)).findEnabledClaimsForUser(42L);
     }
 
     @Test

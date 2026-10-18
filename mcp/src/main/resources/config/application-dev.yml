@@ -5,10 +5,15 @@ spring:
 
 app:
   authorization-server:
-    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:http://localhost:9090}
+    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.onrender.com}
+  security:
+    audience: ${APP_SECURITY_AUDIENCE:https://kitezh-mcp.onrender.com/mcp}
+  api:
+    base-url: ${APP_API_BASE_URL:https://kitezh.onrender.com}
   mcp:
-    allowed-origins: ${APP_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
-    allow-local-hosts: ${APP_MCP_ALLOW_LOCAL_HOSTS:true}
+    public-url: ${APP_MCP_PUBLIC_URL:http://localhost:10000/mcp}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
 
 logging:
   level:

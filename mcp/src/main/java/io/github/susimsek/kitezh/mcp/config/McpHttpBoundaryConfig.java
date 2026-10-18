@@ -1,5 +1,7 @@
 package io.github.susimsek.kitezh.mcp.config;
 
+import io.github.susimsek.kitezh.mcp.config.http.KitezhApiAuthenticationInterceptor;
+import io.github.susimsek.kitezh.mcp.service.client.KitezhAdminApiHttpClient;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Arrays;
@@ -9,9 +11,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 /** Servlet filters for MCP origin policy and cross-origin browser access. */
 @Configuration(proxyBeanMethods = false)
@@ -19,17 +23,24 @@ class McpHttpBoundaryConfig {
 
     @Bean
     RestClient kitezhRestClient(RestClient.Builder builder) {
-        return builder.build();
+        return builder.requestInterceptor(new KitezhApiAuthenticationInterceptor()).build();
+    }
+
+    @Bean
+    KitezhAdminApiHttpClient kitezhAdminApiHttpClient(RestClient kitezhRestClient) {
+        HttpServiceProxyFactory factory =
+                HttpServiceProxyFactory.builderFor(RestClientAdapter.create(kitezhRestClient))
+                        .build();
+        return factory.createClient(KitezhAdminApiHttpClient.class);
     }
 
     @Bean
     FilterRegistrationBean<McpRequestBoundaryFilter> mcpRequestBoundaryFilter(
             ApplicationProperties properties) {
         String publicUrl = properties.mcp().publicUrl();
-        String configuredOrigins = properties.mcp().allowedOrigins();
-        boolean allowLocalHosts = properties.mcp().allowLocalHosts();
+        String configuredOrigins = properties.cors().allowedOrigins();
         McpRequestBoundaryFilter filter =
-                new McpRequestBoundaryFilter(publicUrl, configuredOrigins, allowLocalHosts);
+                new McpRequestBoundaryFilter(publicUrl, configuredOrigins);
         FilterRegistrationBean<McpRequestBoundaryFilter> registration =
                 new FilterRegistrationBean<>(filter);
         registration.setName("mcpRequestBoundaryFilter");
@@ -40,11 +51,9 @@ class McpHttpBoundaryConfig {
     @Bean
     FilterRegistrationBean<CorsFilter> mcpCorsFilter(ApplicationProperties properties) {
         String publicUrl = properties.mcp().publicUrl();
-        String configuredOrigins = properties.mcp().allowedOrigins();
-        boolean allowLocalHosts = properties.mcp().allowLocalHosts();
+        String configuredOrigins = properties.cors().allowedOrigins();
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(
-                allowedOrigins(publicUrl, configuredOrigins, allowLocalHosts));
+        configuration.setAllowedOrigins(allowedOrigins(publicUrl, configuredOrigins));
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(
@@ -74,22 +83,13 @@ class McpHttpBoundaryConfig {
         return registration;
     }
 
-    private static List<String> allowedOrigins(
-            String publicUrl, String configuredOrigins, boolean allowLocalHosts) {
+    private static List<String> allowedOrigins(String publicUrl, String configuredOrigins) {
         String publicOrigin = origin(URI.create(publicUrl));
-        List<String> origins =
-                Arrays.stream(configuredOrigins.split(","))
-                        .map(String::trim)
-                        .filter(origin -> !origin.isEmpty())
-                        .toList();
-        List<String> localOrigins =
-                allowLocalHosts
-                        ? List.of("http://localhost:6274", "http://127.0.0.1:6274")
-                        : List.of();
         return java.util.stream.Stream.concat(
-                        java.util.stream.Stream.concat(
-                                java.util.stream.Stream.of(publicOrigin), origins.stream()),
-                        localOrigins.stream())
+                        java.util.stream.Stream.of(publicOrigin),
+                        Arrays.stream(configuredOrigins.split(","))
+                                .map(String::trim)
+                                .filter(origin -> !origin.isEmpty()))
                 .distinct()
                 .toList();
     }

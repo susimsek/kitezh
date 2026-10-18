@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.service.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,6 +95,50 @@ class MfaBruteForceServiceTest {
         assertThat(service.isLocked(null)).isFalse();
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(locked));
         assertThat(service.isLocked(" alice ")).isFalse();
+    }
+
+    @Test
+    void safelyHandlesMissingUsersAcrossMfaOperations() {
+        when(loginSettingsService.isBruteForceEnabled()).thenReturn(true);
+        when(loginSettingsService.bruteForceMaxSecondaryFailures()).thenReturn(2);
+        when(userRepository.findForMfaUpdate("missing")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
+        UserEntity locked = user();
+        locked.setMfaPermanentlyLocked(true);
+        when(userRepository.findByUsername("locked")).thenReturn(Optional.of(locked));
+
+        service.recordFailure(" missing ");
+        service.recordSuccess("missing");
+        service.reset("missing");
+
+        assertThat(service.isLocked("missing")).isFalse();
+        assertThat(service.isLocked("locked")).isTrue();
+        verify(userRepository, times(3)).findForMfaUpdate("missing");
+    }
+
+    @Test
+    void leavesAnUnlockedUserWithNoFailedAttemptsUnchangedOnSuccess() {
+        UserEntity user = user();
+        when(userRepository.findForMfaUpdate("alice")).thenReturn(Optional.of(user));
+
+        service.recordSuccess("alice");
+
+        assertThat(user.getMfaFailedAttemptCount()).isZero();
+        assertThat(user.isMfaPermanentlyLocked()).isFalse();
+    }
+
+    @Test
+    void ignoresNullAndBlankUsernamesForMfaMutations() {
+        when(loginSettingsService.isBruteForceEnabled()).thenReturn(true);
+
+        service.recordFailure(null);
+        service.recordFailure(" ");
+        service.recordSuccess(null);
+        service.recordSuccess(" ");
+        service.reset(null);
+        service.reset(" ");
+
+        verify(userRepository, never()).findForMfaUpdate(org.mockito.ArgumentMatchers.anyString());
     }
 
     private static UserEntity user() {

@@ -21,7 +21,11 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(
+        properties = {
+            "app.mcp.public-url=https://kitezh-mcp.onrender.com/mcp",
+            "app.cors.allowed-origins=app://renderer,http://localhost:6274,http://127.0.0.1:6274"
+        })
 @AutoConfigureMockMvc
 class McpServerSecurityIT {
 

@@ -447,6 +447,44 @@ class TokenExchangeAuthenticationProviderTest {
     }
 
     @Test
+    void rejectsCollectionAudienceThatDoesNotIncludeTheRequestingClient() {
+        RegisteredClient requestingClient =
+                client("requester", ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        RegisteredClient subjectClient =
+                RegisteredClient.withId("subject-id")
+                        .clientId("subject-client")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .build();
+        OAuth2AccessToken subjectToken = accessToken("subject");
+        OAuth2Authorization subjectAuthorization =
+                OAuth2Authorization.withRegisteredClient(subjectClient)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("service")
+                        .attribute(
+                                Principal.class.getName(),
+                                new TestingAuthenticationToken("service", null))
+                        .authorizedScopes(Set.of("openid"))
+                        .token(
+                                subjectToken,
+                                metadata ->
+                                        metadata.put(
+                                                OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
+                                                Map.of("aud", java.util.List.of("another-client"))))
+                        .build();
+        when(authorizationService.findByToken("subject", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(subjectAuthorization);
+
+        assertThatThrownBy(() -> provider().authenticate(request(requestingClient, null, Set.of())))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("access_denied"));
+    }
+
+    @Test
     void rejectsTargetThatDoesNotOptIntoTokenExchange() {
         RegisteredClient client =
                 RegisteredClient.from(

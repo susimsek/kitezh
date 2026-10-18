@@ -224,3 +224,76 @@ test("native Admin user detail renders sparse related data and reversible consen
     harness.restore();
   }
 });
+
+test("read-only user group tab shows an empty state without membership controls", async () => {
+  const access = Object.fromEntries(
+    [
+      "isAdmin",
+      "queryUsers",
+      "viewUsers",
+      "manageUsers",
+      "viewRoles",
+      "manageRoles",
+      "queryGroups",
+      "viewGroups",
+      "manageGroups",
+      "queryClients",
+      "viewClients",
+      "manageClients",
+      "viewSessions",
+      "manageSessions",
+      "viewConsents",
+      "manageConsents",
+      "viewEvents",
+      "manageEvents",
+      "viewKeys",
+      "manageKeys",
+    ].map((key) => [key, false]),
+  );
+  access.queryUsers = true;
+  access.viewUsers = true;
+  access.viewGroups = true;
+  const harness = await renderConsole("admin", {
+    response: (path) => {
+      if (path === "/api/admin/whoami") return { access };
+      if (path === "/api/admin/users/1")
+        return { id: 1, username: "ada", enabled: true, authorities: [] };
+      if (path.startsWith("/api/admin/users?"))
+        return {
+          content: [{ id: 1, username: "ada", enabled: true }],
+          number: 0,
+          totalElements: 1,
+          totalPages: 1,
+        };
+      if (path.startsWith("/api/admin/users/1/groups?"))
+        return { content: [], number: 0, totalElements: 0, totalPages: 0 };
+      return null;
+    },
+  });
+  try {
+    const { document } = harness;
+    await settle();
+    document.querySelector('[data-route="users"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-open"][data-id="1"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-user-detail-tab"][data-tab="groups"]')
+      .click();
+    await settle();
+
+    assert.match(
+      document.querySelector(".admin-user-related-card").textContent,
+      /No records found/,
+    );
+    assert.equal(document.querySelector("#admin-user-detail-group-search"), null);
+    assert.equal(
+      document.querySelector('[data-action="admin-user-detail-add-group"]'),
+      null,
+    );
+  } finally {
+    harness.restore();
+  }
+});

@@ -9,11 +9,12 @@ import { UserForm } from "./UserForm";
 
 const mockPush = jest.fn();
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
+let mockUserAccess = { manageUsers: true, impersonateUsers: true, viewEvents: true };
 
 jest.mock("@/lib/admin-api", () => ({ adminRequest: jest.fn() }));
 jest.mock("./AdminAuthProvider", () => ({
   useAdminAuth: () => ({
-    access: { manageUsers: true, impersonateUsers: true, viewEvents: true },
+    access: mockUserAccess,
     accessToken: "test-token",
   }),
 }));
@@ -41,6 +42,33 @@ function userResponse() {
 describe("UserForm uncovered paths", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUserAccess = { manageUsers: true, impersonateUsers: true, viewEvents: true };
+  });
+
+  it("keeps account actions read-only when user management permissions are absent", async () => {
+    mockUserAccess = { manageUsers: false, impersonateUsers: false, viewEvents: false };
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return userResponse();
+      if (config.url?.includes("/sessions?page=")) {
+        return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+      }
+      return { status: 200, data: [] } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" tab="sessions" />);
+
+    expect(await screen.findByRole("heading", { name: "ada" })).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: dictionary.admin.resources.impersonate }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: dictionary.admin.resources.delete })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: dictionary.admin.resources.signOutAllUser }),
+    ).toBeNull();
+    expect(screen.queryByRole("link", { name: dictionary.admin.events.title })).toBeNull();
   });
 
   it("hydrates profile definitions and attributes from the object response shape", async () => {
@@ -442,6 +470,184 @@ describe("UserForm uncovered paths", () => {
     expect(await screen.findByText(dictionary.admin.resources.operationError)).toBeVisible();
   });
 
+  it("uses a fallback label and validates it before renaming an unlabeled verified passkey", async () => {
+    const credential = {
+      credentialId: "credential-without-label",
+      label: null,
+      credentialType: "public-key",
+      signatureCount: 0,
+      uvInitialized: true,
+      createdAt: "2026-01-01T00:00:00Z",
+      lastUsedAt: "2026-01-02T00:00:00Z",
+    };
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return userResponse();
+      if (config.url?.includes("/webauthn/credentials?page")) {
+        return { status: 200, data: { content: [credential] } } as never;
+      }
+      return { status: 200, data: null } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" tab="credentials" />);
+    const label = await screen.findByDisplayValue(dictionary.admin.resources.unnamedPasskey);
+    const passkeyCard = label.closest<HTMLElement>(".border");
+    if (!passkeyCard) throw new Error("Passkey card was not rendered");
+    fireEvent.change(label, { target: { value: "" } });
+    fireEvent.click(
+      within(passkeyCard).getByRole("button", { name: dictionary.admin.resources.save }),
+    );
+    expect(await screen.findByText(dictionary.admin.common.validation.required)).toBeVisible();
+
+    fireEvent.change(label, { target: { value: "Hardware key" } });
+    fireEvent.click(
+      within(passkeyCard).getByRole("button", { name: dictionary.admin.resources.save }),
+    );
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "test-token",
+        expect.objectContaining({
+          method: "PUT",
+          url: "/api/admin/users/31/webauthn/credentials/credential-without-label",
+          data: { label: "Hardware key" },
+        }),
+      ),
+    );
+  });
+
+  it("falls back to the details tab and empty profile definitions for unknown tab and payload shapes", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return userResponse();
+      if (config.url === "/api/admin/users/31/profile-attributes") {
+        return { status: 200, data: { malformed: true } } as never;
+      }
+      return { status: 200, data: [] } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" tab="unexpected-tab" />);
+
+    expect(await screen.findByRole("heading", { name: "ada" })).toBeVisible();
+    expect(screen.getByLabelText(dictionary.admin.resources.email)).toBeVisible();
+    expect(screen.queryByText(dictionary.admin.resources.requiredActions)).not.toBeInTheDocument();
+  });
+
+  it("reports a non-success response while loading the user record", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return { status: 503, data: null } as never;
+      return { status: 200, data: [] } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" />);
+
+    expect(await screen.findByText(dictionary.admin.resources.notFound)).toBeVisible();
+  });
+
+  it("shows the profile settings error when the profile configuration request fails", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return userResponse();
+      if (config.url === "/api/admin/users/31/profile-attributes") {
+        return { status: 503, data: null } as never;
+      }
+      return { status: 200, data: [] } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" />);
+
+    expect(await screen.findByText(dictionary.admin.userProfileSettings.error)).toBeVisible();
+  });
+
+  it("uses empty states for non-array required-action and missing passkey lists", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return userResponse();
+      if (config.url === "/api/admin/required-actions/users/31") {
+        return { status: 200, data: { malformed: true } } as never;
+      }
+      if (config.url?.includes("/webauthn/credentials?page")) {
+        return { status: 200, data: {} } as never;
+      }
+      return { status: 200, data: [] } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" tab="credentials" />);
+
+    expect(await screen.findByText(dictionary.admin.resources.noPasskeys)).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: dictionary.admin.resources.requiredActions }),
+    ).toBeVisible();
+    expect(screen.queryByRole("checkbox", { name: "Verify email" })).not.toBeInTheDocument();
+  });
+
+  it("unassigns a required action and renders passkey verification as disabled", async () => {
+    const credential = {
+      credentialId: "credential-no-verification",
+      label: "Laptop key",
+      credentialType: "public-key",
+      signatureCount: 4,
+      uvInitialized: false,
+      createdAt: "2026-01-01T00:00:00Z",
+      lastUsedAt: "2026-01-02T00:00:00Z",
+    };
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") return userResponse();
+      if (config.url === "/api/admin/required-actions/users/31") {
+        return {
+          status: 200,
+          data: [
+            {
+              key: "VERIFY_EMAIL",
+              displayName: "Verify email",
+              enabled: true,
+              assigned: true,
+              globalPolicy: false,
+            },
+          ],
+        } as never;
+      }
+      if (config.url?.includes("/webauthn/credentials?page")) {
+        return { status: 200, data: { content: [credential] } } as never;
+      }
+      return { status: 200, data: null } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" tab="credentials" />);
+
+    const verifyEmailLabels = await screen.findAllByText("Verify email");
+    const unassign = screen
+      .getAllByRole("checkbox")
+      .find((input) => input.parentElement?.textContent?.includes("Verify email"));
+    if (!unassign) throw new Error("Required action checkbox was not rendered");
+    expect(verifyEmailLabels[0]).toBeVisible();
+    expect(await screen.findByText("Laptop key")).toBeVisible();
+    fireEvent.click(unassign);
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "test-token",
+        expect.objectContaining({
+          method: "DELETE",
+          url: "/api/admin/required-actions/users/31/VERIFY_EMAIL",
+        }),
+      ),
+    );
+  });
+
   it("reports profile attribute save failures after the user record was saved", async () => {
     mockAdminRequest.mockImplementation(async (_token, config) => {
       if (config.url === "/api/admin/roles?page=0&size=100") {
@@ -526,6 +732,43 @@ describe("UserForm uncovered paths", () => {
       "test-token",
       expect.objectContaining({ method: "POST", url: "/api/admin/users/31/unlock" }),
     );
+  });
+
+  it("shows lockout expiry and clears the lock state after a successful unlock", async () => {
+    const lockedUntil = "2026-10-20T12:00:00Z";
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      if (config.url === "/api/admin/users/31") {
+        return {
+          status: 200,
+          data: {
+            id: 31,
+            username: "ada",
+            enabled: true,
+            authorities: ["ROLE_USER"],
+            locked: true,
+            lockedUntil,
+            failedLoginCount: 5,
+            avatarUrl: null,
+          },
+        } as never;
+      }
+      if (config.url === "/api/admin/users/31/unlock") return { status: 204, data: null } as never;
+      return { status: 200, data: [] } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} id="31" locale="en" tab="details" />);
+    const lockedStatus = await screen.findByText(new RegExp(dictionary.admin.resources.locked));
+    expect(lockedStatus).toHaveTextContent(`${dictionary.admin.resources.failedLogins}: 5`);
+    expect(lockedStatus).toHaveTextContent(new Date(lockedUntil).toLocaleString("en"));
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.resources.unlock }));
+
+    const unlockedStatus = await screen.findByText(new RegExp(dictionary.admin.resources.unlocked));
+    expect(unlockedStatus).toHaveTextContent(`${dictionary.admin.resources.failedLogins}: 0`);
+    expect(screen.queryByRole("button", { name: dictionary.admin.resources.unlock })).toBeNull();
   });
 
   it("shows an error when resetting the user's authenticator is rejected", async () => {

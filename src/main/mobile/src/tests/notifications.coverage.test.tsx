@@ -119,6 +119,23 @@ it("renders localized retry after a notification request fails", async () => {
   expect(await screen.findByText("You have no notifications.")).toBeTruthy();
 });
 
+it("shows retry when the account session expires during loading or marking read", async () => {
+  mockRefreshSession.mockResolvedValueOnce(null);
+  renderNotifications();
+
+  expect(await screen.findByText("We could not load notifications. Try again.")).toBeTruthy();
+  expect(listAccountNotifications).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByRole("button", { name: "Mark as read" })).toBeTruthy();
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.press(screen.getByRole("button", { name: "Mark as read" }));
+
+  expect(await screen.findByText("We could not load notifications. Try again.")).toBeTruthy();
+  expect(markAccountNotificationRead).not.toHaveBeenCalled();
+});
+
 it("moves between notification pages and keeps navigation synchronized", async () => {
   jest.mocked(listAccountNotifications).mockImplementation(async (_token, options) => ({
     content: [{
@@ -172,4 +189,44 @@ it("shows a retry state when marking a notification read fails", async () => {
   expect(await screen.findByText("We could not load notifications. Try again.")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Unread notifications: 1")).toBeTruthy();
+});
+
+it("provides refresh callbacks for notification reads and mutations", async () => {
+  renderNotifications();
+  expect(await screen.findByRole("button", { name: "Mark as read" })).toBeTruthy();
+
+  const listOptions = jest.mocked(listAccountNotifications).mock.calls[0]?.[1];
+  const countOptions = jest.mocked(getAccountUnreadNotificationCount).mock.calls[0]?.[1];
+  for (const options of [listOptions, countOptions]) {
+    await expect(options?.refreshAccessToken?.()).resolves.toBe("access-token");
+  }
+
+  fireEvent.press(screen.getByRole("button", { name: "Mark as read" }));
+  await waitFor(() => expect(markAccountNotificationRead).toHaveBeenCalled());
+  const mutationOptions = jest.mocked(markAccountNotificationRead).mock.calls[0]?.[2];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(mutationOptions?.refreshAccessToken?.()).resolves.toBeNull();
+});
+
+it("disables repeated mark-read actions while the update is pending", async () => {
+  let completeUpdate!: () => void;
+  jest.mocked(markAccountNotificationRead).mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        completeUpdate = resolve;
+      }),
+  );
+  renderNotifications();
+
+  const markRead = await screen.findByRole("button", { name: "Mark as read" });
+  fireEvent.press(markRead);
+  await waitFor(() =>
+    expect(markRead.props.accessibilityState).toEqual({ busy: true, disabled: true }),
+  );
+  expect(markRead.props.children).toBeTruthy();
+  fireEvent.press(markRead);
+  expect(markAccountNotificationRead).toHaveBeenCalledTimes(1);
+
+  await act(async () => completeUpdate());
+  expect(await screen.findByText("Read")).toBeTruthy();
 });

@@ -246,6 +246,44 @@ describe("personal access tokens", () => {
     );
   });
 
+  it("reports a token-copy failure when the clipboard rejects the write", async () => {
+    mockRequestAccount
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ ...token, token: "kzh_pat_once" })
+      .mockResolvedValueOnce([token]);
+    const writeText = jest.fn().mockRejectedValue(new Error("clipboard unavailable"));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    renderSettings();
+
+    expect(
+      await screen.findByText(dictionary.account.security.personalAccessTokens.empty),
+    ).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Token name"), { target: { value: "Codex" } });
+    fireEvent.click(screen.getByRole("button", { name: /Create token/i }));
+    expect(await screen.findByText("kzh_pat_once")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Copy token/i }));
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(
+        dictionary.account.security.personalAccessTokens.copyError,
+      ),
+    );
+  });
+
+  it("reports a failed token revocation", async () => {
+    mockRequestAccount.mockResolvedValueOnce([token]).mockRejectedValueOnce(new Error("offline"));
+    renderSettings();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Revoke/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Revoke/ }).at(-1)!);
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(
+        dictionary.account.security.personalAccessTokens.revokeError,
+      ),
+    );
+  });
+
   it("reports load and create failures", async () => {
     mockRequestAccount.mockRejectedValueOnce(new Error("offline"));
     renderSettings();

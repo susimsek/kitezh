@@ -20,6 +20,49 @@ import tools.jackson.databind.json.JsonMapper;
 class LoginRateLimitFilterTest {
 
     @Test
+    void continuesAllowedLoginAndSkipsUnrelatedRequests() throws Exception {
+        LoginRateLimitService rateLimitService = mock(LoginRateLimitService.class);
+        ObjectMapper objectMapper = JsonMapper.builder().build();
+        LoginRateLimitFilter filter =
+                new LoginRateLimitFilter(rateLimitService, objectMapper, new StaticMessageSource());
+        jakarta.servlet.FilterChain chain = mock(jakarta.servlet.FilterChain.class);
+
+        when(rateLimitService.check("alice", "127.0.0.1"))
+                .thenReturn(new LoginRateLimitService.RateLimitDecision(true, 5, 4, 60));
+        when(rateLimitService.check("bob", "127.0.0.1"))
+                .thenReturn(new LoginRateLimitService.RateLimitDecision(false, 5, 2, 30));
+        MockHttpServletRequest allowedLogin = new MockHttpServletRequest("POST", "/login");
+        allowedLogin.setParameter("username", "alice");
+        allowedLogin.setRemoteAddr("127.0.0.1");
+        MockHttpServletResponse allowedResponse = new MockHttpServletResponse();
+        filter.doFilter(allowedLogin, allowedResponse, chain);
+        assertThat(allowedResponse.getHeader("X-RateLimit-Limit")).isEqualTo("5");
+        assertThat(allowedResponse.getHeader("X-RateLimit-Remaining")).isEqualTo("4");
+        assertThat(allowedResponse.getHeader("Retry-After")).isNull();
+
+        MockHttpServletRequest deniedLogin = new MockHttpServletRequest("POST", "/login");
+        deniedLogin.setParameter("username", "bob");
+        deniedLogin.setRemoteAddr("127.0.0.1");
+        MockHttpServletResponse deniedResponse = new MockHttpServletResponse();
+        filter.doFilter(deniedLogin, deniedResponse, chain);
+        assertThat(deniedResponse.getStatus()).isEqualTo(429);
+        assertThat(deniedResponse.getHeader("Retry-After")).isNull();
+
+        MockHttpServletRequest otherMethod = new MockHttpServletRequest("GET", "/login");
+        MockHttpServletResponse otherMethodResponse = new MockHttpServletResponse();
+        filter.doFilter(otherMethod, otherMethodResponse, chain);
+        MockHttpServletRequest otherPath = new MockHttpServletRequest("POST", "/logout");
+        MockHttpServletResponse otherPathResponse = new MockHttpServletResponse();
+        filter.doFilter(otherPath, otherPathResponse, chain);
+
+        verify(chain).doFilter(allowedLogin, allowedResponse);
+        verify(chain).doFilter(otherMethod, otherMethodResponse);
+        verify(chain).doFilter(otherPath, otherPathResponse);
+        verify(rateLimitService).check("alice", "127.0.0.1");
+        verify(rateLimitService).check("bob", "127.0.0.1");
+    }
+
+    @Test
     void writesLocalizedProblemDetailAndLegacyHeadersWhenBlocked() throws Exception {
         LoginRateLimitService rateLimitService = mock(LoginRateLimitService.class);
         StaticMessageSource messages = new StaticMessageSource();

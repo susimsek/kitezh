@@ -21,6 +21,14 @@ import {
 } from "@/components/AuthCallbackScreen";
 
 let mockMobileAuthStatus = "signed-in";
+let mockSocialAuthRequestConfig: {
+  codeChallenge: string | null;
+  state: string | null;
+} = {
+  codeChallenge: "c".repeat(43),
+  state: "s".repeat(32),
+};
+let mockSocialAuthCodeVerifier: string | null = "v".repeat(43);
 
 jest.mock("@/api/account-api", () => ({
   AccountApiError: class AccountApiError extends Error {
@@ -54,10 +62,10 @@ jest.mock("@/auth/storage", () => ({
 }));
 jest.mock("expo-auth-session", () => ({
   AuthRequest: class {
-    codeVerifier = "v".repeat(43);
+    codeVerifier = mockSocialAuthCodeVerifier;
 
     async getAuthRequestConfigAsync() {
-      return { codeChallenge: "c".repeat(43), state: "s".repeat(32) };
+      return mockSocialAuthRequestConfig;
     }
   },
 }));
@@ -148,6 +156,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockRefreshSession.mockResolvedValue({ accessToken: "test-access-token" });
   mockAuthState.session = { accessToken: "test-access-token" };
+  mockSocialAuthRequestConfig = {
+    codeChallenge: "c".repeat(43),
+    state: "s".repeat(32),
+  };
+  mockSocialAuthCodeVerifier = "v".repeat(43);
   jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([]);
   mockMobileAuthStatus = "signed-in";
 });
@@ -213,6 +226,9 @@ it("validates, updates, and confirms active-account session security actions", a
     ),
   );
   expect(await screen.findByText("passwordSaved")).toBeTruthy();
+  const options = jest.mocked(accountApi.changeAccountPassword).mock.calls[0]?.[2];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(options?.refreshAccessToken?.()).resolves.toBeNull();
 });
 
 it("creates, reveals, copies, hides, and revokes personal access tokens", async () => {
@@ -281,6 +297,14 @@ it("creates, reveals, copies, hides, and revokes personal access tokens", async 
     kind: "success",
     message: "personalAccessTokenRevoked",
   });
+  const createOptions = jest.mocked(accountApi.createPersonalAccessToken).mock
+    .calls[0]?.[2];
+  const revokeOptions = jest.mocked(accountApi.revokePersonalAccessToken).mock
+    .calls[0]?.[2];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(createOptions?.refreshAccessToken?.()).resolves.toBeNull();
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(revokeOptions?.refreshAccessToken?.()).resolves.toBeNull();
 });
 
 it("keeps the final security form action clear of the persistent tab bar", async () => {
@@ -486,6 +510,79 @@ it("shows the in-progress state while a personal access token is being revoked",
   expect(await screen.findByText("personalAccessTokensEmpty")).toBeTruthy();
 });
 
+it("disables session revocation and account deletion while their requests are pending", async () => {
+  jest.mocked(accountApi.listAccountSessions)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          id: "session-pending-revoke",
+          createdAt: "2026-01-01T10:00:00Z",
+          lastAccessedAt: "2026-01-02T10:00:00Z",
+          expiresAt: "2026-02-01T10:00:00Z",
+          current: false,
+          clients: [{ clientId: "browser", clientName: "Browser" }],
+        },
+      ],
+      number: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    })
+    .mockResolvedValueOnce({
+      content: [],
+      number: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+    });
+  let finishSessionRevoke!: () => void;
+  let finishAccountDelete!: () => void;
+  jest.mocked(accountApi.signOutAccountSession).mockReturnValue(
+    new Promise<void>((resolve) => {
+      finishSessionRevoke = resolve;
+    }),
+  );
+  jest.mocked(accountApi.deleteAccount).mockReturnValue(
+    new Promise<void>((resolve) => {
+      finishAccountDelete = resolve;
+    }),
+  );
+  let alertActions:
+    | { onPress?: () => void; style?: string }[]
+    | undefined;
+  jest.spyOn(Alert, "alert").mockImplementation((_title, _message, actions) => {
+    alertActions = actions;
+  });
+
+  render(<SecurityScreen />);
+  expect(await screen.findByText("Browser")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "signOutSession" }));
+  await act(async () => {
+    alertActions?.find((action) => action.style === "destructive")?.onPress?.();
+  });
+  const sessionAction = screen.getByRole("button", { name: "signOutSession" });
+  await waitFor(() =>
+    expect(sessionAction.props.accessibilityState.disabled).toBe(true),
+  );
+  expect(screen.getAllByLabelText("loading").length).toBeGreaterThan(0);
+  await act(async () => finishSessionRevoke());
+
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword").at(-1)!, {
+    target: { value: "confirm-password" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "deleteAccount" }));
+  await act(async () => {
+    alertActions?.find((action) => action.style === "destructive")?.onPress?.();
+  });
+  const deleteAction = screen.getByRole("button", { name: "deleteAccount" });
+  await waitFor(() =>
+    expect(deleteAction.props.accessibilityState.disabled).toBe(true),
+  );
+  expect(screen.getAllByLabelText("loading").length).toBeGreaterThan(0);
+  await act(async () => finishAccountDelete());
+  expect(mockSignOut).toHaveBeenCalled();
+});
+
 it("rejects short, mismatched, and reused passwords before calling the API", async () => {
   render(<SecurityScreen />);
   await screen.findByText("currentSession");
@@ -595,6 +692,15 @@ it("reports session and account-removal failures and confirms revocation actions
     "confirm-password",
     expect.any(Object),
   );
+  const otherSessionsOptions = jest.mocked(accountApi.signOutOtherAccountSessions)
+    .mock.calls[0]?.[1];
+  const sessionOptions = jest.mocked(accountApi.signOutAccountSession).mock
+    .calls[0]?.[2];
+  const deleteOptions = jest.mocked(accountApi.deleteAccount).mock.calls[0]?.[2];
+  for (const options of [otherSessionsOptions, sessionOptions, deleteOptions]) {
+    mockRefreshSession.mockResolvedValueOnce(null);
+    await expect(options?.refreshAccessToken?.()).resolves.toBeNull();
+  }
 });
 
 it("sets up mobile MFA and validates the one-time code before enabling", async () => {
@@ -632,7 +738,74 @@ it("sets up mobile MFA and validates the one-time code before enabling", async (
       expect.any(Object),
     ),
   );
+  const setupOptions = jest.mocked(accountApi.startMfaSetup).mock.calls[0]?.[1];
+  const mutationOptions = jest.mocked(accountApi.mutateMfa).mock.calls[0]?.[3];
+  await expect(setupOptions?.refreshAccessToken?.()).resolves.toBe(
+    "test-access-token",
+  );
+  await expect(mutationOptions?.refreshAccessToken?.()).resolves.toBe(
+    "test-access-token",
+  );
   expect(mockSignOut).toHaveBeenCalledTimes(1);
+});
+
+it("reports an expired session when starting MFA setup", async () => {
+  jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
+    enabled: false,
+    available: true,
+    required: false,
+    issuer: "Kitezh",
+    algorithm: "SHA1",
+    digits: 6,
+    periodSeconds: 30,
+  });
+
+  render(<MfaScreen />);
+  await screen.findByRole("button", { name: "mfaSetup" });
+  mockRefreshSession.mockResolvedValueOnce(null);
+
+  fireEvent.press(screen.getByRole("button", { name: "mfaSetup" }));
+  expect(await screen.findByText("mfaError")).toBeTruthy();
+  expect(accountApi.startMfaSetup).not.toHaveBeenCalled();
+});
+
+it("reports an expired session before generating recovery codes", async () => {
+  jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
+    enabled: true,
+    available: true,
+    required: false,
+    issuer: "Kitezh",
+    algorithm: "SHA1",
+    digits: 6,
+    periodSeconds: 30,
+  });
+  jest.mocked(accountApi.getRecoveryCodesStatus).mockResolvedValue({
+    remaining: 2,
+  });
+
+  render(<MfaScreen />);
+  await screen.findByRole("button", { name: "recoveryCodesGenerate" });
+  mockRefreshSession.mockResolvedValueOnce(null);
+
+  fireEvent.press(screen.getByRole("button", { name: "recoveryCodesGenerate" }));
+  expect(await screen.findByText("mfaError")).toBeTruthy();
+  expect(accountApi.generateRecoveryCodes).not.toHaveBeenCalled();
+});
+
+it("waits for auth restoration before redirecting the signed-out MFA screen", async () => {
+  const { router } = jest.requireMock("expo-router");
+  mockAuthState.session = null;
+  mockMobileAuthStatus = "loading";
+
+  const screenResult = render(<MfaScreen />);
+  expect(await screen.findByLabelText("loading")).toBeTruthy();
+  expect(router.replace).not.toHaveBeenCalled();
+
+  mockMobileAuthStatus = "signed-out";
+  screenResult.rerender(<MfaScreen />);
+
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/sign-in"));
+  expect(accountApi.getMfaStatus).not.toHaveBeenCalled();
 });
 
 it("retries an unavailable MFA status and reports when MFA cannot be enabled", async () => {
@@ -691,6 +864,11 @@ it("regenerates recovery codes and handles invalid and successful MFA disable co
   );
   expect(await screen.findByText("first-code")).toBeTruthy();
   expect(screen.getByText("second-code")).toBeTruthy();
+  const recoveryOptions = jest.mocked(accountApi.generateRecoveryCodes).mock
+    .calls[0]?.[1];
+  await expect(recoveryOptions?.refreshAccessToken?.()).resolves.toBe(
+    "test-access-token",
+  );
 
   fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "123" },
@@ -717,11 +895,49 @@ it("regenerates recovery codes and handles invalid and successful MFA disable co
       expect.any(Object),
     ),
   );
+  const mutationOptions = jest.mocked(accountApi.mutateMfa).mock.calls.at(-1)
+    ?.[3];
+  await expect(mutationOptions?.refreshAccessToken?.()).resolves.toBe(
+    "test-access-token",
+  );
   expect(mockSignOut).toHaveBeenCalledTimes(1);
 });
 
+it.each([
+  ["network failure", new Error("offline")],
+  ["server failure", Object.assign(new accountApi.AccountApiError(), { status: 500 })],
+])("shows the retry error for an MFA mutation %s", async (_scenario, failure) => {
+  jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
+    enabled: true,
+    available: true,
+    required: false,
+    issuer: "Kitezh",
+    algorithm: "SHA1",
+    digits: 6,
+    periodSeconds: 30,
+  });
+  jest.mocked(accountApi.getRecoveryCodesStatus).mockResolvedValue({ remaining: 2 });
+  jest.mocked(accountApi.mutateMfa).mockRejectedValueOnce(failure);
+
+  render(<MfaScreen />);
+  await screen.findByText("recoveryCodesRemaining: 2");
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), {
+    target: { value: "123456" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
+
+  expect(await screen.findByText("mfaError")).toBeTruthy();
+  expect(screen.getByText("sessionsRetry")).toBeTruthy();
+  expect(accountApi.mutateMfa).toHaveBeenCalledWith(
+    "test-access-token",
+    "disable",
+    "123456",
+    expect.any(Object),
+  );
+});
+
 it("confirms linked social-provider removal and refreshes native link status", async () => {
-  jest.mocked(accountApi.listSocialLinks).mockResolvedValue([
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValueOnce([
     {
       provider: "google",
       displayName: "Google",
@@ -832,7 +1048,138 @@ it("starts a native PKCE social-provider link flow and reloads its status", asyn
     kind: "success",
     message: "socialLinkSuccess",
   });
+  const listOptions = jest.mocked(accountApi.listSocialLinks).mock.calls[0]?.[1];
+  const startOptions = jest.mocked(accountApi.startNativeSocialLink).mock
+    .calls[0]?.[3];
+  const completeOptions = jest.mocked(accountApi.completeNativeSocialLink).mock
+    .calls[0]?.[2];
+  for (const options of [listOptions, startOptions, completeOptions]) {
+    await expect(options?.refreshAccessToken?.()).resolves.toBe(
+      "test-access-token",
+    );
+  }
   expect(await screen.findByText("socialConnected")).toBeTruthy();
+});
+
+it("rejects a social-link completion that does not confirm the provider link", async () => {
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValueOnce([
+    {
+      provider: "github",
+      displayName: "GitHub",
+      iconKey: "github",
+      linked: false,
+      configured: true,
+      enabled: true,
+    },
+  ]);
+  jest.mocked(accountApi.startNativeSocialLink).mockResolvedValueOnce({
+    authorizationUrl:
+      "https://kitezh.onrender.com/account/social-links/github/desktop/authorize?transaction=opaque",
+    state: "s".repeat(32),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  });
+  jest.mocked(accountApi.completeNativeSocialLink).mockResolvedValueOnce({
+    provider: "github",
+    linked: false,
+  });
+  jest
+    .mocked(jest.requireMock("@/auth/storage").consumeOAuthTransaction)
+    .mockResolvedValueOnce({
+      clientId: "mobile-account-console",
+      codeVerifier: "v".repeat(43),
+      createdAt: Date.now(),
+      redirectUri: "kitezh://social-link/callback",
+      state: "s".repeat(32),
+    });
+
+  render(<SocialLinksScreen />);
+  fireEvent.press(await screen.findByRole("button", { name: "socialConnect" }));
+
+  await waitFor(() =>
+    expect(accountApi.completeNativeSocialLink).toHaveBeenCalledWith(
+      "test-access-token",
+      { code: "c".repeat(43), codeVerifier: "v".repeat(43) },
+      expect.any(Object),
+    ),
+  );
+  expect(mockShowNotice).toHaveBeenCalledWith({
+    kind: "error",
+    message: "socialLinkError",
+  });
+  expect(mockShowNotice).not.toHaveBeenCalledWith({
+    kind: "success",
+    message: "socialLinkSuccess",
+  });
+  expect(jest.requireMock("@/auth/storage").clearOAuthTransaction).toHaveBeenCalledWith(
+    "account",
+  );
+});
+
+it("keeps social connect disabled when a provider is unavailable", async () => {
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValue([
+    {
+      provider: "linkedin",
+      displayName: "LinkedIn",
+      iconKey: "linkedin",
+      linked: false,
+      configured: false,
+      enabled: true,
+    },
+    {
+      provider: "microsoft",
+      displayName: "Microsoft",
+      iconKey: "microsoft",
+      linked: false,
+      configured: true,
+      enabled: false,
+    },
+  ]);
+
+  render(<SocialLinksScreen />);
+  expect(await screen.findAllByText("socialNotConfigured")).toHaveLength(2);
+  const connectButtons = screen.getAllByRole("button", {
+    name: "socialConnect",
+  });
+  expect(connectButtons).toHaveLength(2);
+  expect(
+    connectButtons.every((button) => button.props.accessibilityState.disabled),
+  ).toBe(true);
+  fireEvent.press(connectButtons[0]);
+  fireEvent.press(connectButtons[1]);
+  expect(accountApi.startNativeSocialLink).not.toHaveBeenCalled();
+});
+
+it("clears the saved transaction when a social provider link is cancelled", async () => {
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValue([
+    {
+      provider: "github",
+      displayName: "GitHub",
+      iconKey: "github",
+      linked: false,
+      configured: true,
+      enabled: true,
+    },
+  ]);
+  jest.mocked(accountApi.startNativeSocialLink).mockResolvedValue({
+    authorizationUrl:
+      "https://kitezh.onrender.com/account/social-links/github/desktop/authorize?transaction=opaque",
+    state: "s".repeat(32),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  });
+  jest.mocked(WebBrowser.openAuthSessionAsync).mockResolvedValueOnce({
+    type: "cancel",
+  } as never);
+
+  render(<SocialLinksScreen />);
+  fireEvent.press(await screen.findByRole("button", { name: "socialConnect" }));
+
+  await waitFor(() =>
+    expect(jest.requireMock("@/auth/storage").clearOAuthTransaction).toHaveBeenCalledWith(
+      "account",
+    ),
+  );
+  expect(mockShowNotice).not.toHaveBeenCalled();
+  expect(accountApi.completeNativeSocialLink).not.toHaveBeenCalled();
 });
 
 it("rejects a social-link callback with a mismatched state", async () => {
@@ -948,6 +1295,81 @@ it("retries social-link loading and reports browser and unlink failures", async 
   });
 });
 
+it("rejects a native social-link request when its PKCE state is incomplete", async () => {
+  mockSocialAuthRequestConfig = { codeChallenge: "", state: "s".repeat(32) };
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValue([
+    {
+      provider: "github",
+      displayName: "GitHub",
+      iconKey: "github",
+      linked: false,
+      configured: true,
+      enabled: true,
+    },
+  ]);
+
+  render(<SocialLinksScreen />);
+  fireEvent.press(await screen.findByRole("button", { name: "socialConnect" }));
+
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "socialLinkError",
+    }),
+  );
+  expect(accountApi.startNativeSocialLink).not.toHaveBeenCalled();
+  expect(jest.requireMock("@/auth/storage").clearOAuthTransaction).toHaveBeenCalledWith(
+    "account",
+  );
+});
+
+it.each([
+  ["a mismatched state", "different-state", "https://kitezh.onrender.com/account/social-links/github/desktop/authorize?transaction=opaque"],
+  ["an untrusted authorization URL", "s".repeat(32), "https://attacker.example/authorize"],
+])("rejects social-link start responses with %s", async (_description, state, authorizationUrl) => {
+  jest.mocked(accountApi.listSocialLinks).mockResolvedValue([
+    {
+      provider: "github",
+      displayName: "GitHub",
+      iconKey: "github",
+      linked: false,
+      configured: true,
+      enabled: true,
+    },
+  ]);
+  jest.mocked(accountApi.startNativeSocialLink).mockResolvedValueOnce({
+    authorizationUrl,
+    state,
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  });
+
+  render(<SocialLinksScreen />);
+  fireEvent.press(await screen.findByRole("button", { name: "socialConnect" }));
+
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenCalledWith({
+      kind: "error",
+      message: "socialLinkError",
+    }),
+  );
+  expect(WebBrowser.openAuthSessionAsync).not.toHaveBeenCalled();
+  expect(jest.requireMock("@/auth/storage").clearOAuthTransaction).toHaveBeenCalledWith(
+    "account",
+  );
+});
+
+it("shows the social-link authentication loading state before restoring a session", async () => {
+  const { router } = jest.requireMock("expo-router");
+  mockAuthState.session = null;
+  mockMobileAuthStatus = "loading";
+
+  render(<SocialLinksScreen />);
+
+  expect(await screen.findByLabelText("loading")).toBeTruthy();
+  expect(router.replace).not.toHaveBeenCalled();
+  expect(accountApi.listSocialLinks).not.toHaveBeenCalled();
+});
+
 it("shows server password validation errors in the matching fields", async () => {
   const validationError = Object.assign(new accountApi.AccountApiError(), {
     problem: {
@@ -985,6 +1407,8 @@ it("maps legacy password validation data to the matching security fields", async
         { field: "currentPassword", message: "currentPasswordRejected" },
         { field: "confirmPassword", message: "confirmPasswordRejected" },
         null,
+        {},
+        { field: "newPassword" },
         { field: "newPassword", message: 12 },
       ],
     },
@@ -1014,6 +1438,30 @@ it("maps legacy password validation data to the matching security fields", async
 it("falls back to a generic password error for malformed validation data", async () => {
   const malformedError = Object.assign(new accountApi.AccountApiError(), {
     data: { violations: "unexpected-server-shape" },
+  });
+  jest
+    .mocked(accountApi.changeAccountPassword)
+    .mockRejectedValueOnce(malformedError);
+
+  render(<SecurityScreen />);
+  await screen.findByText("sessionsEmpty");
+  fireEvent.changeText(screen.getAllByPlaceholderText("currentPassword")[0]!, {
+    target: { value: "old-secret" },
+  });
+  fireEvent.changeText(screen.getByPlaceholderText("newPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.changeText(screen.getByPlaceholderText("confirmPassword"), {
+    target: { value: "a-long-new-secret" },
+  });
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+
+  expect(await screen.findByText("passwordSaveError")).toBeTruthy();
+});
+
+it("uses the generic password error when legacy validation data has no violations", async () => {
+  const malformedError = Object.assign(new accountApi.AccountApiError(), {
+    data: {},
   });
   jest
     .mocked(accountApi.changeAccountPassword)
@@ -1168,6 +1616,13 @@ it("retries token and session reads after the session refresh is unavailable", a
   expect(await screen.findByText("sessionsEmpty")).toBeTruthy();
   expect(accountApi.listPersonalAccessTokens).toHaveBeenCalledTimes(1);
   expect(accountApi.listAccountSessions).toHaveBeenCalledTimes(1);
+  const tokenOptions = jest.mocked(accountApi.listPersonalAccessTokens).mock
+    .calls[0]?.[1];
+  const sessionOptions = jest.mocked(accountApi.listAccountSessions).mock
+    .calls[0]?.[1];
+  mockRefreshSession.mockResolvedValue(null);
+  await expect(tokenOptions?.refreshAccessToken?.()).resolves.toBeNull();
+  await expect(sessionOptions?.refreshAccessToken?.()).resolves.toBeNull();
 });
 
 it("pages active sessions with a single in-flight request", async () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import dictionary from "@kitezh/shared/web-messages/en";
 import { adminRequest } from "@/lib/admin-api";
@@ -221,6 +221,52 @@ describe("AdminLocalizationSettings", () => {
     );
   });
 
+  it("updates an existing override and reports a rejected deletion", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.endsWith("/settings/localization"))
+        return Promise.resolve({ status: 200, data: settings }) as never;
+      if (request.url?.includes("/messages/7") && request.method === "PUT")
+        return Promise.resolve({
+          status: 200,
+          data: { ...override, messageValue: "Updated" },
+        }) as never;
+      if (request.url?.includes("/messages/7") && request.method === "DELETE")
+        return Promise.resolve({ status: 500, data: null }) as never;
+      if (request.url?.includes("/settings/localization/messages"))
+        return Promise.resolve({
+          status: 200,
+          data: { content: [override], totalPages: 1, totalElements: 1 },
+        }) as never;
+      return Promise.resolve({ status: 200, data: { welcome: "Bundled" } }) as never;
+    });
+
+    render(<AdminLocalizationSettings dictionary={dictionary} section="overrides" />);
+    expect(await screen.findByText("Welcome override")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: `${dictionary.admin.localization.edit}: welcome` }),
+    );
+    fireEvent.change(screen.getByLabelText(dictionary.admin.localization.messageValue), {
+      target: { value: "Updated" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.localization.update }));
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "PUT",
+          url: "/api/admin/settings/localization/messages/7",
+        }),
+      ),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: `${dictionary.admin.localization.delete}: welcome` }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(dictionary.admin.localization.error)).toBeVisible(),
+    );
+  });
+
   it("renders the error state when initial requests fail", async () => {
     mockAdminRequest.mockImplementation((_token, request) => {
       if (request.url?.endsWith("/settings/localization")) {
@@ -233,7 +279,10 @@ describe("AdminLocalizationSettings", () => {
   });
 
   it("covers effective backend messages, sorting, filtering, and pagination", async () => {
-    render(<AdminLocalizationSettings dictionary={dictionary} section="effective" />);
+    await act(async () => {
+      render(<AdminLocalizationSettings dictionary={dictionary} section="effective" />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(await screen.findByText(dictionary.admin.localization.effectiveTitle)).toBeVisible();
     fireEvent.change(screen.getByLabelText(dictionary.admin.localization.bundle), {
       target: { value: "email" },
@@ -251,6 +300,53 @@ describe("AdminLocalizationSettings", () => {
     expect(mockAdminRequest).toHaveBeenCalledWith(
       "admin-token",
       expect.objectContaining({ url: expect.stringContaining("/bundled?locale=tr&bundle=email") }),
+    );
+  });
+
+  it("shows the empty effective preview when both message sources are unavailable", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.endsWith("/settings/localization"))
+        return Promise.resolve({ status: 200, data: settings }) as never;
+      if (request.url?.includes("/settings/localization/messages"))
+        return Promise.resolve({
+          status: 200,
+          data: { content: [], totalPages: 0, totalElements: 0 },
+        }) as never;
+      if (request.url?.includes("/settings/localization/bundled"))
+        return Promise.resolve({ status: 503, data: null }) as never;
+      return Promise.resolve({ status: 200, data: settings }) as never;
+    });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: false }) as unknown as typeof fetch;
+
+    await act(async () => {
+      render(<AdminLocalizationSettings dictionary={dictionary} section="effective" />);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(await screen.findByText(dictionary.admin.localization.effectiveTitle)).toBeVisible();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(dictionary.admin.localization.bundle), {
+        target: { value: "backend" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/auth/localization/messages?locale=en&bundle=backend",
+        { credentials: "same-origin" },
+      );
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          url: "/api/admin/settings/localization/bundled?locale=en&bundle=backend",
+        }),
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("table").querySelector("tbody")?.children).toHaveLength(0),
     );
   });
 

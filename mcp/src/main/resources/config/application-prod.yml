@@ -4,9 +4,6 @@ server:
 app:
   authorization-server:
     issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.onrender.com}
-  mcp:
-    allowed-origins: ${APP_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
-    allow-local-hosts: ${APP_MCP_ALLOW_LOCAL_HOSTS:false}
 
 management:
   metrics:

@@ -15,7 +15,7 @@ class McpRequestBoundaryFilterTest {
     void acceptsConfiguredHostAndReplaysBoundedBody() throws Exception {
         McpRequestBoundaryFilter filter =
                 new McpRequestBoundaryFilter(
-                        "https://kitezh-mcp.test/mcp", "https://inspector.test", false);
+                        "https://kitezh-mcp.test/mcp", "https://inspector.test");
         MockHttpServletRequest request = request("POST", "/mcp", "kitezh-mcp.test");
         request.setContent("{}".getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -41,7 +41,7 @@ class McpRequestBoundaryFilterTest {
     @Test
     void bypassesBodyBufferingForGetAndNonMcpRequests() throws Exception {
         McpRequestBoundaryFilter filter =
-                new McpRequestBoundaryFilter("https://kitezh-mcp.test/mcp", "", false);
+                new McpRequestBoundaryFilter("https://kitezh-mcp.test/mcp", "");
         MockHttpServletRequest getRequest = request("GET", "/mcp", "kitezh-mcp.test");
         filter.doFilter(
                 getRequest,
@@ -58,9 +58,11 @@ class McpRequestBoundaryFilterTest {
     }
 
     @Test
-    void allowsLocalHostsOnlyWhenConfiguredAndRejectsInvalidPublicUrls() throws Exception {
+    void allowsLocalHostsOnlyWhenTheirOriginsAreConfiguredAndRejectsInvalidPublicUrls()
+            throws Exception {
         McpRequestBoundaryFilter localFilter =
-                new McpRequestBoundaryFilter("https://kitezh-mcp.test/mcp", "", true);
+                new McpRequestBoundaryFilter(
+                        "https://kitezh-mcp.test/mcp", "http://localhost:6274");
         MockHttpServletRequest localRequest = request("GET", "/mcp", "localhost");
         localFilter.doFilter(
                 localRequest,
@@ -68,12 +70,23 @@ class McpRequestBoundaryFilterTest {
                 (actualRequest, ignoredResponse) ->
                         assertThat(actualRequest).isSameAs(localRequest));
 
-        assertThatThrownBy(
-                        () -> new McpRequestBoundaryFilter("ftp://kitezh-mcp.test/mcp", "", false))
+        assertThatThrownBy(() -> new McpRequestBoundaryFilter("ftp://kitezh-mcp.test/mcp", ""))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("MCP public URL must be an absolute HTTP URL");
-        assertThatThrownBy(() -> new McpRequestBoundaryFilter("/mcp", "", false))
+        assertThatThrownBy(() -> new McpRequestBoundaryFilter("/mcp", ""))
                 .isInstanceOf(IllegalArgumentException.class);
+
+        McpRequestBoundaryFilter restrictedFilter =
+                new McpRequestBoundaryFilter(
+                        "https://kitezh-mcp.test/mcp", "https://inspector.test");
+        MockHttpServletRequest unlistedLocalRequest = request("GET", "/mcp", "localhost");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        restrictedFilter.doFilter(
+                unlistedLocalRequest,
+                response,
+                (actualRequest, ignoredResponse) ->
+                        assertThat(actualRequest).isSameAs(unlistedLocalRequest));
+        assertThat(response.getStatus()).isEqualTo(400);
     }
 
     private static MockHttpServletRequest request(String method, String path, String host) {

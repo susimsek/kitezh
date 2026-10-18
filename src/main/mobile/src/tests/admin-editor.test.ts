@@ -79,6 +79,49 @@ test("validates mobile admin editors by field and accepts an optional edit passw
   );
 });
 
+test("validates required fields and accepts valid values for each editor resource", () => {
+  assert.deepEqual(validateAdminEditor("clients", {}, true), {
+    clientId: "required",
+    clientName: "required",
+    scopes: "required",
+  });
+  assert.deepEqual(
+    validateAdminEditor(
+      "clients",
+      { clientId: "mobile", clientName: "Mobile", scopes: "openid" },
+      true,
+    ),
+    {},
+  );
+  assert.deepEqual(validateAdminEditor("scopes", {}, true), { name: "required" });
+  assert.deepEqual(validateAdminEditor("roles", { name: "ROLE_ADMIN" }, true), {});
+  assert.deepEqual(
+    validateAdminEditor("groups", { name: "Operators", parentId: "42" }, true),
+    {},
+  );
+  assert.deepEqual(
+    validateAdminEditor(
+      "identity-providers",
+      {
+        registrationId: "github",
+        providerType: "oidc",
+        displayName: "GitHub",
+        alias: "github",
+        iconKey: "github",
+      },
+      true,
+    ),
+    {},
+  );
+  assert.deepEqual(validateAdminEditor("identity-providers", {}, true), {
+    registrationId: "required",
+    providerType: "required",
+    displayName: "required",
+    alias: "required",
+    iconKey: "required",
+  });
+});
+
 test("normalizes user, role, and client form requests", () => {
   assert.deepEqual(
     toAdminRequest("users", {
@@ -125,6 +168,79 @@ test("normalizes user, role, and client form requests", () => {
   assert.deepEqual(client.scopes, ["openid", "profile", "email"]);
   assert.equal(client.requireProofKey, true);
   assert.equal(client.tokenExchangeDownscopeOnly, false);
+});
+
+test("normalizes blank optional fields and malformed provider values safely", () => {
+  assert.deepEqual(
+    toAdminRequest("users", {
+      username: "alice",
+      firstName: " ",
+      lastName: "",
+      email: " ",
+      password: " ",
+      roles: "",
+    }),
+    {
+      username: "alice",
+      firstName: null,
+      lastName: null,
+      email: null,
+      emailVerified: false,
+      password: null,
+      temporary: false,
+      enabled: true,
+      roles: ["ROLE_USER"],
+    },
+  );
+  const client = toAdminRequest("clients", {
+    clientId: "mobile",
+    clientName: "Mobile",
+    scopes: " ",
+    redirectUris: " ",
+    postLogoutRedirectUris: "",
+  }) as AdminClientRequest;
+  assert.deepEqual(client.scopes, []);
+  assert.deepEqual(client.redirectUris, []);
+  assert.deepEqual(client.postLogoutRedirectUris, []);
+
+  assert.deepEqual(
+    toAdminRequest("scopes", { name: "profile", displayName: " ", description: "" }),
+    {
+      name: "profile",
+      displayName: null,
+      description: null,
+      displayOnConsentScreen: true,
+      consentScreenText: null,
+      includeInTokenScope: true,
+      groupMapperEnabled: false,
+      groupClaimName: "groups",
+      groupMapperFullPath: false,
+    },
+  );
+
+  const provider = toAdminRequest("identity-providers", {
+    registrationId: "provider",
+    providerType: " OIDC ",
+    displayName: "Provider",
+    alias: "provider",
+    iconKey: " ",
+    enabled: "",
+    guiOrder: "-1",
+    userInfoUri: " ",
+    jwkSetUri: " ",
+    issuerUri: " ",
+    scopes: " ",
+    userNameAttribute: " ",
+  }) as AdminIdentityProviderRequest;
+  assert.equal(provider.providerType, "oidc");
+  assert.equal(provider.iconKey, "generic");
+  assert.equal(provider.enabled, true);
+  assert.equal(provider.guiOrder, 0);
+  assert.equal(provider.userInfoUri, null);
+  assert.equal(provider.jwkSetUri, null);
+  assert.equal(provider.issuerUri, null);
+  assert.equal(provider.scopes, "openid,profile,email");
+  assert.equal(provider.userNameAttribute, "sub");
 });
 
 test("normalizes client-scope and group requests including optional values", () => {
@@ -305,4 +421,33 @@ test("hydrates user, client, and provider editors from resource details", () => 
     name: "Operators",
     parentId: "2",
   });
+});
+
+test("uses safe editor fallbacks for malformed optional detail values", () => {
+  assert.deepEqual(
+    editorValues("clients", {
+      clientId: 12,
+      clientName: false,
+      scopes: "openid email",
+      redirectUris: ["https://client.example/callback", 12],
+    }),
+    {
+      clientName: "",
+      scopes: "openid,profile",
+      redirectUris: "",
+      postLogoutRedirectUris: "",
+      clientId: "",
+    },
+  );
+  assert.deepEqual(
+    editorValues("users", { username: 42, enabled: false, effectiveRoles: [] }),
+    {
+      username: "42",
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      roles: "",
+    },
+  );
 });

@@ -8,6 +8,8 @@ import { adminRequest } from "@/lib/admin-api";
 import { ClientScopeDetail } from "./ClientScopeDetail";
 
 const mockReplace = jest.fn();
+const mockAddAlert = jest.fn();
+const mockAddError = jest.fn();
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
 
 jest.mock("@/lib/admin-api", () => ({ adminRequest: jest.fn() }));
@@ -23,7 +25,7 @@ jest.mock("@/routing/Link", () => ({ children, href, ...props }: React.Component
   </a>
 ));
 jest.mock("@/components/auth/ConsoleAlerts", () => ({
-  useConsoleAlerts: () => ({ addAlert: jest.fn(), addError: jest.fn() }),
+  useConsoleAlerts: () => ({ addAlert: mockAddAlert, addError: mockAddError }),
 }));
 
 const scope = {
@@ -42,7 +44,7 @@ const scope = {
   groupMapperFullPath: true,
 };
 
-function mockScopeRequests() {
+function mockScopeRequests(deleteStatus = 204) {
   mockAdminRequest.mockImplementation((_token, request) => {
     const url = request.url ?? "";
     if (request.method === "PUT" && url === "/api/admin/client-scopes/scope-1") {
@@ -52,7 +54,7 @@ function mockScopeRequests() {
       }) as never;
     }
     if (request.method === "DELETE" && url === "/api/admin/client-scopes/scope-1") {
-      return Promise.resolve({ status: 204, data: null }) as never;
+      return Promise.resolve({ status: deleteStatus, data: null }) as never;
     }
     if (url.endsWith("/mappers?page=0&size=20&sort=name,asc")) {
       return Promise.resolve({ status: 200, data: { content: [] } }) as never;
@@ -76,6 +78,25 @@ function mockScopeRequests() {
 describe("ClientScopeDetail", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it.each([
+    [400, dictionary.admin.clientScopes.assignedDeleteError],
+    [500, dictionary.admin.clientScopes.operationError],
+  ])("reports the appropriate error when deleting a scope returns %i", async (status, message) => {
+    mockScopeRequests(status);
+
+    render(<ClientScopeDetail dictionary={dictionary} id="scope-1" locale="en" />);
+    await screen.findByRole("heading", { name: "profile" });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.clientScopes.delete }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.clientScopes.delete,
+      }),
+    );
+
+    await waitFor(() => expect(mockAddError).toHaveBeenCalledWith(message));
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it("loads a scope, links back to the list, and edits it inline", async () => {

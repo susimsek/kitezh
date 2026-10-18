@@ -596,6 +596,12 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   await apiDependencies.writeSession("account", completeTokens);
   assert.deepEqual(await apiDependencies.readSession("account"), completeTokens);
   await apiDependencies.clearSession("account");
+  await apiDependencies.writeSession("admin", validTokens);
+  await authDependencies.logoutDesktopSession("admin");
+  assert.equal(
+    new URL(externalUrls.at(-1)).searchParams.has("id_token_hint"),
+    false,
+  );
   await apiDependencies.writeSession("admin", { ...validTokens, idToken: 7 });
   await assert.rejects(apiDependencies.readSession("admin"), /Invalid session/);
   await authDependencies.writeVault({});
@@ -796,7 +802,19 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
     channel === "desktop:auth-callback" && payload.console === "admin" && !payload.error,
   ));
   assert.equal((await apiDependencies.readSession("admin")).accessToken, "access-token");
+  const loginWindowCount = windows.length;
   await mainWindowDependencies.openLogin();
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (windows.length > loginWindowCount) break;
+  }
+  const loginWindow = windows.findLast((candidate) =>
+    candidate.loadedUrls.includes("app://renderer/desktop-login"),
+  );
+  assert.ok(loginWindow);
+  loginWindow.focused = false;
+  await mainWindowDependencies.openLogin();
+  assert.equal(loginWindow.focused, true);
   await mainWindowDependencies.sendDeepLink("kitezh://logout/callback");
   assert.equal(mainWindowDependencies.isAllowedExternalUrl("https://example.test"), false);
   mainWindowDependencies.openExternal("https://example.test");
@@ -944,6 +962,18 @@ test("desktop main startup registers trusted IPC, CSP, and renderer protocol", a
   );
   menuActions.checkForUpdates();
   await updateStatusHandler({ state: "not-available" });
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (windows.some((candidate) => candidate.options.width === 720)) break;
+  }
+  const updateResultWindow = windows.findLast(
+    (candidate) => candidate.options.width === 720,
+  );
+  assert.ok(updateResultWindow);
+  updateResultWindow.focused = false;
+  menuActions.checkForUpdates();
+  await updateStatusHandler({ state: "not-available" });
+  assert.equal(updateResultWindow.focused, true);
   menuActions.checkForUpdates();
   await updateStatusHandler({ state: "available", version: "1.1.0" });
   for (let attempt = 0; attempt < 20; attempt += 1) {

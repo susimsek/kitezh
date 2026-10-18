@@ -40,6 +40,15 @@ class OptionalSamlValueValidatorTest {
                                 "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
                                 null))
                 .isFalse();
+        assertThat(
+                        validator.isValid(
+                                "-----BEGIN CERTIFICATE-----\nabc\n-----END PRIVATE KEY-----",
+                                null))
+                .isFalse();
+        assertThat(
+                        validator.isValid(
+                                "-----BEGIN CERTIFICATE-----abc-----END CERTIFICATE-----", null))
+                .isFalse();
         assertThat(validator.isValid("not-pem", null)).isFalse();
     }
 }

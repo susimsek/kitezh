@@ -267,6 +267,57 @@ describe("previously uncovered administration components", () => {
     );
   });
 
+  it("validates client scope fields and keeps the editor open after a rejected save", async () => {
+    const scope = {
+      id: "profile",
+      name: "profile",
+      displayName: "Profile",
+      description: "Basic profile",
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      builtIn: false,
+    };
+    mockAdminRequest
+      .mockResolvedValueOnce(page([scope]) as never)
+      .mockResolvedValueOnce({ status: 500, data: null } as never);
+
+    render(<ClientScopesTable dictionary={dictionary} />);
+    expect(await screen.findByText("profile")).toBeVisible();
+    fireEvent.click(screen.getByText(dictionary.admin.clientScopes.edit));
+
+    fireEvent.change(document.querySelector('input[name="name"]')!, {
+      target: { value: " " },
+    });
+    fireEvent.change(document.querySelector('input[name="displayName"]')!, {
+      target: { value: "d".repeat(201) },
+    });
+    fireEvent.change(document.querySelector('textarea[name="description"]')!, {
+      target: { value: "d".repeat(501) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    expect(await screen.findByText(dictionary.admin.common.validation.required)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.common.validation.max200)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.common.validation.max500)).toBeVisible();
+    expect(mockAdminRequest).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(document.querySelector('input[name="name"]')!, {
+      target: { value: "profile-v2" },
+    });
+    fireEvent.change(document.querySelector('input[name="displayName"]')!, {
+      target: { value: "Profile v2" },
+    });
+    fireEvent.change(document.querySelector('textarea[name="description"]')!, {
+      target: { value: "Updated profile" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.clientScopes.operationError),
+    );
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
   it("renders server information, copies endpoints, and handles endpoint failures", async () => {
     const info = {
       issuer: "http://localhost:9090",

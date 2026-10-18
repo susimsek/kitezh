@@ -181,6 +181,73 @@ test("native Admin identity-provider rows cover alias, status, and empty-page va
   }
 });
 
+test("native signing-key list covers last-page, empty-filter, and rotation-result states", async () => {
+  const harness = await renderConsole("admin", {
+    response: (path) => {
+      if (path === "/api/admin/keys/rotate") return { kid: "rotated-key" };
+      if (path.startsWith("/api/admin/keys?")) {
+        const url = new URL(path, "https://test.invalid");
+        const pageNumber = Number(url.searchParams.get("page") ?? 0);
+        if (url.searchParams.get("active"))
+          return {
+            content: [],
+            number: 0,
+            totalElements: 0,
+            totalPages: 0,
+          };
+        return {
+          content: Array.from({ length: pageNumber === 2 ? 5 : 10 }, (_, index) => ({
+            kid: `key-${pageNumber}-${index}`,
+            type: "RSA",
+            algorithm: "RS256",
+            active: pageNumber === 0,
+            createdAt: "2026-10-10T08:00:00Z",
+          })),
+          number: pageNumber,
+          totalElements: 25,
+          totalPages: 3,
+        };
+      }
+      return null;
+    },
+  });
+  try {
+    const { calls, document } = harness;
+    await settle();
+    document.querySelector('[data-route="keys"]').click();
+    await settle();
+    assert.match(document.querySelector(".admin-key-count").textContent, /25/);
+    document.querySelector('[data-admin-key-page="2"]').click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path }) =>
+          path.startsWith("/api/admin/keys?") &&
+          new URL(path, "https://test.invalid").searchParams.get("page") === "2",
+      ),
+    );
+    assert.match(document.querySelector(".admin-session-summary").textContent, /21–25/);
+
+    const active = document.getElementById("admin-key-active");
+    active.value = "false";
+    active.dispatchEvent(new document.defaultView.Event("change", { bubbles: true }));
+    await settle();
+    assert.ok(document.querySelector(".admin-key-table .empty"));
+    assert.equal(document.querySelector(".admin-session-pagination-controls"), null);
+    assert.ok(document.querySelector(".admin-key-active-filters"));
+
+    document.querySelector('[data-action="admin-key-rotate-request"]').click();
+    await settle();
+    document.querySelector('[data-action="admin-key-rotate-confirm"]').click();
+    await settle();
+    assert.match(document.querySelector("dialog").textContent, /rotated-key/);
+    document.querySelector('[data-action="admin-key-rotated-close"]').click();
+    assert.equal(document.querySelector("dialog"), null);
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native read-only Admin access keeps collection details and hides mutation controls", async () => {
   const access = Object.fromEntries(
     [

@@ -218,6 +218,24 @@ class EffectiveRoleServiceTest {
     }
 
     @Test
+    void ignoresNullDirectAuthoritiesAndCompositeRoles() {
+        java.util.Set<AuthorityEntity> directRoles = new java.util.LinkedHashSet<>();
+        AuthorityEntity parent = authority(11L, "ROLE_PARENT");
+        java.util.Set<AuthorityEntity> compositeRoles = new java.util.LinkedHashSet<>();
+        compositeRoles.add(null);
+        parent.setCompositeRoles(compositeRoles);
+        directRoles.add(parent);
+
+        UserEntity user = new UserEntity();
+        user.setAuthorities(directRoles);
+        user.setClientRoles(null);
+        user.setGroups(null);
+
+        assertThat(EffectiveRoleService.effectiveRoleNames(user)).containsExactly("ROLE_PARENT");
+        assertThat(EffectiveRoleService.effectiveClientRoleNames(user)).isEmpty();
+    }
+
+    @Test
     void handlesEmptyCompositeCollectionsAndIdentityMatches() {
         AuthorityEntity authority = authority(10L, "ROLE_EMPTY");
         authority.setCompositeRoles(null);

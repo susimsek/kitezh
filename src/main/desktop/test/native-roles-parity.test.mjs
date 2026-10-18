@@ -625,6 +625,49 @@ test("role member candidate failures can be retried and empty results stay expli
   }
 });
 
+test("role member removal can be canceled and retains the row after an API failure", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    h.document
+      .querySelector('[data-action="role-tab"][data-id="users"]')
+      .click();
+    await settle();
+    const remove = () =>
+      h.document.querySelector('[data-action="role-user-remove"][data-id="8"]');
+    remove().click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-user-remove-cancel"]')
+      .click();
+    await settle();
+    assert.ok(remove());
+    assert.equal(h.calls.some(({ method }) => method === "DELETE"), false);
+
+    h.setResponse("/api/admin/roles/ROLE_USER/users/8", "DELETE", () => ({
+      status: 503,
+      kind: "server",
+      body: null,
+    }));
+    remove().click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-user-remove-confirm"][data-id="8"]')
+      .click();
+    await settle();
+    assert.ok(h.calls.some(({ method, path }) =>
+      method === "DELETE" && path.endsWith("/users/8"),
+    ));
+    assert.ok(
+      h.document.querySelector(
+        '[data-action="role-user-remove-confirm"][data-id="8"]',
+      ),
+    );
+  } finally {
+    h.restore();
+  }
+});
+
 test("role deletion refreshes the previous page after deleting the last row", async () => {
   const h = await renderConsole("admin");
   try {
@@ -731,6 +774,72 @@ test("composite candidates require two characters, ignore stale results and pres
     );
     await delay();
     await settle();
+  } finally {
+    h.restore();
+  }
+});
+
+test("role composite search filters malformed, self, and already assigned candidates", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    const realmPath =
+      "/api/admin/roles/ROLE_USER/available-composites?q=ROLE&page=0&size=10&sort=name,asc";
+    h.setResponse(realmPath, "GET", () => ({
+      content: [
+        { name: "not-a-role" },
+        { name: "ROLE_USER" },
+        { name: "ROLE_EDITOR" },
+        { name: "ROLE_REVIEWER" },
+      ],
+    }));
+    const realmSearch = h.document.getElementById("role-candidate-realm");
+    realmSearch.value = "ROLE";
+    emit(h.document, realmSearch);
+    await delay();
+    await settle();
+    assert.ok(
+      h.document.querySelector(
+        '#role-candidate-select-realm option[value="ROLE_REVIEWER"]',
+      ),
+    );
+    for (const excluded of ["not-a-role", "ROLE_USER", "ROLE_EDITOR"])
+      assert.equal(
+        h.document.querySelector(
+          `#role-candidate-select-realm option[value="${excluded}"]`,
+        ),
+        null,
+      );
+
+    const clientPath =
+      "/api/admin/roles/ROLE_USER/available-client-composites?q=client&page=0&size=10&sort=name,asc";
+    h.setResponse(clientPath, "GET", () => ({
+      content: [
+        { id: 0, clientId: "console", name: "READ" },
+        { id: 43, clientId: "bad/client", name: "READ" },
+        { id: 45, name: "READ" },
+        { id: 44, clientId: "console", name: null },
+        { id: 42, clientId: "demo-client", name: "read" },
+        { id: 43, clientId: "console", name: "REVIEW" },
+      ],
+    }));
+    const clientSearch = h.document.getElementById("role-candidate-client");
+    clientSearch.value = "client";
+    emit(h.document, clientSearch);
+    await delay();
+    await settle();
+    assert.ok(
+      h.document.querySelector(
+        '#role-candidate-select-client option[value="43"]',
+      ),
+    );
+    for (const excluded of ["0", "42", "44", "45"])
+      assert.equal(
+        h.document.querySelector(
+          `#role-candidate-select-client option[value="${excluded}"]`,
+        ),
+        null,
+      );
   } finally {
     h.restore();
   }

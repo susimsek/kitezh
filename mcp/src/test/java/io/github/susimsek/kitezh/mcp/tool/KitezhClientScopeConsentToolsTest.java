@@ -20,13 +20,15 @@ import org.junit.jupiter.api.Test;
 class KitezhClientScopeConsentToolsTest {
 
     private KitezhAdminApiClient apiClient;
+    private SimpleMeterRegistry meterRegistry;
     private KitezhClientScopeConsentTools tools;
 
     @BeforeEach
     void setUp() {
         apiClient = mock(KitezhAdminApiClient.class);
         doReturn(Map.of("result", "ok")).when(apiClient).get(anyString(), anyString(), anyMap());
-        tools = new KitezhClientScopeConsentTools(apiClient, new SimpleMeterRegistry());
+        meterRegistry = new SimpleMeterRegistry();
+        tools = new KitezhClientScopeConsentTools(apiClient, meterRegistry);
     }
 
     @Test
@@ -136,5 +138,54 @@ class KitezhClientScopeConsentToolsTest {
         assertThatRuntimeException()
                 .isThrownBy(() -> tools.searchClientScopes(null, 0, 20))
                 .isInstanceOf(KitezhAdminApiClient.KitezhApiException.class);
+    }
+
+    @Test
+    void recordsClientUpstreamAndInternalFailuresSeparately() {
+        doThrow(new IllegalArgumentException("invalid downstream argument"))
+                .doThrow(new KitezhAdminApiClient.KitezhApiException("upstream failure"))
+                .doThrow(new IllegalStateException("unexpected failure"))
+                .when(apiClient)
+                .get(anyString(), anyString(), anyMap());
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> tools.searchClientScopes(null, 0, 20));
+        assertThatRuntimeException()
+                .isThrownBy(() -> tools.searchClientScopes(null, 0, 20))
+                .isInstanceOf(KitezhAdminApiClient.KitezhApiException.class);
+        assertThatRuntimeException()
+                .isThrownBy(() -> tools.searchClientScopes(null, 0, 20))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(
+                        meterRegistry
+                                .counter(
+                                        "kitezh_mcp_tool_calls_total",
+                                        "tool",
+                                        "search_client_scopes",
+                                        "status",
+                                        "client_error")
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        meterRegistry
+                                .counter(
+                                        "kitezh_mcp_tool_calls_total",
+                                        "tool",
+                                        "search_client_scopes",
+                                        "status",
+                                        "upstream_error")
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        meterRegistry
+                                .counter(
+                                        "kitezh_mcp_tool_calls_total",
+                                        "tool",
+                                        "search_client_scopes",
+                                        "status",
+                                        "internal_error")
+                                .count())
+                .isEqualTo(1);
     }
 }

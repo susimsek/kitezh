@@ -10,7 +10,8 @@ public record ApplicationProperties(
         @DefaultValue AuthorizationServer authorizationServer,
         @DefaultValue Security security,
         @DefaultValue Api api,
-        @DefaultValue Mcp mcp) {
+        @DefaultValue Mcp mcp,
+        @DefaultValue Cors cors) {
 
     @ConstructorBinding
     public ApplicationProperties {
@@ -28,12 +29,12 @@ public record ApplicationProperties(
         mcp =
                 mcp == null
                         ? new Mcp(
-                                "https://kitezh-mcp.onrender.com/mcp",
-                                "app://renderer,http://localhost:6274,http://127.0.0.1:6274",
-                                true,
-                                true,
-                                new Tools("all", "*"))
+                                "https://kitezh-mcp.onrender.com/mcp", true, new Tools("all", "*"))
                         : mcp;
+        cors =
+                cors == null
+                        ? new Cors("app://renderer,http://localhost:6274,http://127.0.0.1:6274")
+                        : cors;
     }
 
     public record AuthorizationServer(@DefaultValue("https://kitezh.local") String issuer) {
@@ -58,9 +59,6 @@ public record ApplicationProperties(
 
     public record Mcp(
             @DefaultValue("https://kitezh-mcp.onrender.com/mcp") String publicUrl,
-            @DefaultValue("app://renderer,http://localhost:6274,http://127.0.0.1:6274")
-                    String allowedOrigins,
-            @DefaultValue("true") boolean allowLocalHosts,
             @DefaultValue("true") boolean readOnly,
             @DefaultValue Tools tools) {
 
@@ -68,6 +66,14 @@ public record ApplicationProperties(
         public Mcp {
             tools = tools == null ? new Tools("all", "*") : tools;
         }
+    }
+
+    public record Cors(
+            @DefaultValue("app://renderer,http://localhost:6274,http://127.0.0.1:6274")
+                    String allowedOrigins) {
+
+        @ConstructorBinding
+        public Cors {}
     }
 
     public record Tools(@DefaultValue("all") String toolsets, @DefaultValue("*") String allowlist) {

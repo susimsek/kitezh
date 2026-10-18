@@ -164,6 +164,40 @@ class AdminAvatarServiceTest {
     }
 
     @Test
+    void rejectsAvatarWhenOnlyHeightOrPixelCountExceedsTheLimit() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(5L);
+        when(adminUserService.requireManageableUser(5L, "admin")).thenReturn(user);
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .updateAvatar(
+                                                5L,
+                                                new MockMultipartFile(
+                                                        "file",
+                                                        "tall.png",
+                                                        "image/png",
+                                                        image("png", 1, 5000)),
+                                                "admin"))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Avatar dimensions must not exceed 4 megapixels");
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .updateAvatar(
+                                                5L,
+                                                new MockMultipartFile(
+                                                        "file",
+                                                        "pixels.png",
+                                                        "image/png",
+                                                        image("png", 2001, 2000)),
+                                                "admin"))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Avatar dimensions must not exceed 4 megapixels");
+    }
+
+    @Test
     void rejectsUnsupportedImageFormat() {
         UserEntity user = new UserEntity();
         user.setId(5L);

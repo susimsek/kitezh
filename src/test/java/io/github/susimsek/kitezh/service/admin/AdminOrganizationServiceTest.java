@@ -115,6 +115,15 @@ class AdminOrganizationServiceTest {
                 .extracting(ApiException.class::cast)
                 .extracting(ApiException::getErrorCode)
                 .isEqualTo(ApiErrorCode.ORGANIZATION_INVALID_DOMAIN);
+        assertThatThrownBy(
+                        () ->
+                                service.addDomain(
+                                        10L,
+                                        new AdminOrganizationDomainRequestDTO("example.com/path")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_INVALID_DOMAIN);
     }
 
     @Test
@@ -490,6 +499,14 @@ class AdminOrganizationServiceTest {
                 .isEqualTo(ApiErrorCode.ORGANIZATION_INVITATION_USED);
 
         invitation.setRevokedAt(null);
+        invitation.setAcceptedAt(Instant.now());
+        assertThatThrownBy(() -> service.acceptInvitation("token", "alice"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ApiException.class::cast)
+                .extracting(ApiException::getErrorCode)
+                .isEqualTo(ApiErrorCode.ORGANIZATION_INVITATION_USED);
+        invitation.setAcceptedAt(null);
+
         invitation.setExpiresAt(Instant.now().minusSeconds(1));
         assertThatThrownBy(() -> service.acceptInvitation("token", "alice"))
                 .isInstanceOf(ApiException.class)

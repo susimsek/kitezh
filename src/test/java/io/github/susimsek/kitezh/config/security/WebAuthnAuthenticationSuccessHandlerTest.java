@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -64,5 +65,41 @@ class WebAuthnAuthenticationSuccessHandlerTest {
                 .onAuthenticationSuccess(request, response, mock(Authentication.class));
 
         assertThat(response.getHeader(HttpHeaders.LOCATION)).isEqualTo("/admin");
+    }
+
+    @Test
+    void rejectsSavedTargetsWithoutALocalPath() throws Exception {
+        for (String redirectUrl :
+                List.of(
+                        "mailto:attacker@example.test",
+                        "https://evil.example.test",
+                        "https://evil.example.test//admin")) {
+            RequestCache requestCache = mock(RequestCache.class);
+            SavedRequest savedRequest = mock(SavedRequest.class);
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            when(requestCache.getRequest(request, response)).thenReturn(savedRequest);
+            when(savedRequest.getRedirectUrl()).thenReturn(redirectUrl);
+
+            new WebAuthnAuthenticationSuccessHandler(requestCache)
+                    .onAuthenticationSuccess(request, response, mock(Authentication.class));
+
+            assertThat(response.getHeader(HttpHeaders.LOCATION)).isEqualTo("/admin");
+        }
+    }
+
+    @Test
+    void preservesLocalSavedTargetWithoutQueryParameters() throws Exception {
+        RequestCache requestCache = mock(RequestCache.class);
+        SavedRequest savedRequest = mock(SavedRequest.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(requestCache.getRequest(request, response)).thenReturn(savedRequest);
+        when(savedRequest.getRedirectUrl()).thenReturn("http://localhost:9090/account/security");
+
+        new WebAuthnAuthenticationSuccessHandler(requestCache)
+                .onAuthenticationSuccess(request, response, mock(Authentication.class));
+
+        assertThat(response.getHeader(HttpHeaders.LOCATION)).isEqualTo("/account/security");
     }
 }

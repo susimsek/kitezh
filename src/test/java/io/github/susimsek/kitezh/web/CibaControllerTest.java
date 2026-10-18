@@ -91,6 +91,53 @@ class CibaControllerTest {
     }
 
     @Test
+    void omitsPollingIntervalForPushDeliveryAndAcceptsCredentialAssurance() {
+        RegisteredClient registeredClient =
+                RegisteredClient.withId("client-id")
+                        .clientId("client")
+                        .clientSecret("secret")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new org.springframework.security.oauth2.core.AuthorizationGrantType(
+                                        "urn:openid:params:grant-type:ciba"))
+                        .scope("openid")
+                        .build();
+        OAuth2ClientAuthenticationToken client =
+                new OAuth2ClientAuthenticationToken(
+                        registeredClient, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        CibaAuthenticationRequestEntity request =
+                new CibaAuthenticationRequestEntity(
+                        "request",
+                        "client-id",
+                        "admin",
+                        "openid",
+                        null,
+                        Instant.EPOCH,
+                        Instant.EPOCH.plusSeconds(300),
+                        5);
+        request.setDeliveryMode("push");
+        when(clients.authenticate(any())).thenReturn(client);
+        when(cibaService.create(registeredClient, "openid", "admin", null, null))
+                .thenReturn(request);
+
+        assertThat(
+                        controller
+                                .authorize(
+                                        new MockHttpServletRequest(), "openid", "admin", null, null)
+                                .interval())
+                .isNull();
+
+        TestingAuthenticationToken authentication =
+                new TestingAuthenticationToken("admin", "secret");
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        servletRequest
+                .getSession(true)
+                .setAttribute(MfaAuthorizationFilter.MFA_CREDENTIAL_VERIFIED, true);
+        controller.approve(authentication, servletRequest, "request");
+        verify(cibaService).approve("request", "admin", false, true);
+    }
+
+    @Test
     void listsPendingRequestsForAuthenticatedUser() {
         TestingAuthenticationToken authentication =
                 new TestingAuthenticationToken("admin", "secret");

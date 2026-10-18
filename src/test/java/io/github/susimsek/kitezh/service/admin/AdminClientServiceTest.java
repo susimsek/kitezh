@@ -1382,6 +1382,31 @@ class AdminClientServiceTest {
     }
 
     @Test
+    void validatesTokenExchangeClientTypeAndAllowedAudiences() {
+        assertThatThrownBy(
+                        () -> service().create(tokenExchangeRequest(Set.of("none"), Set.of(" "))))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A public client cannot use the token exchange grant");
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                tokenExchangeRequest(
+                                                        Set.of("client_secret_basic"), Set.of(""))))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Token exchange audiences must be client identifiers");
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .create(
+                                                tokenExchangeRequest(
+                                                        Set.of("client_secret_basic"),
+                                                        Set.of("client with spaces"))))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Token exchange audiences must be client identifiers");
+    }
+
+    @Test
     void rejectsInvalidCibaConfiguration() {
         assertThatThrownBy(
                         () ->
@@ -1697,6 +1722,48 @@ class AdminClientServiceTest {
                 null,
                 null,
                 null);
+    }
+
+    private static AdminClientRequestDTO tokenExchangeRequest(
+            Set<String> methods, Set<String> audiences) {
+        return new AdminClientRequestDTO(
+                "exchange-client",
+                "Exchange Client",
+                methods,
+                Set.of(AuthorizationGrantTypes.TOKEN_EXCHANGE),
+                Set.of(),
+                Set.of(),
+                Set.of("openid"),
+                false,
+                false,
+                false,
+                false,
+                false,
+                Set.of("RS256"),
+                "poll",
+                null,
+                null,
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(5),
+                Duration.ofHours(1),
+                false,
+                null,
+                true,
+                null,
+                null,
+                Set.of(),
+                null,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                audiences);
     }
 
     private static AdminClientRequestDTO advancedRequest(

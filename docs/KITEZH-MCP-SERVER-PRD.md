@@ -8,9 +8,9 @@
 
 **Önerilen ilk sürüm:** Ayrı Render Web Service olarak çalışan uzak, salt okunur MCP sunucusu
 
-**Uygulama notu (17 Ekim 2026):** İlk bağımsız `mcp/` modülü, salt okunur on araç, MCP resource audience ve `mcp.read`, protected resource metadata, RFC 8693 token exchange, ayrı Render servisi, CI kalite işi, tag bazlı yayın akışı, Sonar girdileri ve Grafana dashboard/alert dosyaları eklendi. MCP native build ve release akışı backend ile aynı GraalVM Native Image, UPX ve Jib Native Image extension yapısını kullanır; CI Linux AMD64 ve ARM64 native binary'lerini doğrular, mimariye özel imajları Docker Hub'a basar, multi-architecture manifest'i Render'a dağıtır ve `mcp/docs/README-dockerhub.md` açıklamasını günceller. Canlı testte önceden kayıtlı `mcp-client` ile Authorization Code + PKCE token alımı, MCP `initialize`, `tools/list` (10 araç) ve `get_context` çağrısı başarılı oldu; yeni istemci kaydı oluşturulmadı. Test ayrıca kritik bir kapsam fazlası buldu: yalnız `openid mcp.read` istenmesine rağmen verilen token `admin-api` ve `roles` kapsamlarını da içerdi. Bu durum P0 güvenlik kabul maddesidir. Kullanılan Spring AI 2.0.1 / MCP Java SDK 2.0.0 bileşimi en fazla `2025-11-25` protokolünü destekliyor; 17 Ekim 2026 itibarıyla yayımlanmış `2026-07-28` belirtimi henüz karşılanmıyor. Aşağıdaki gap incelemesi, canlı gözlem ile depo kodunu ve resmi GitHub MCP Server / MCP belgelerini karşılaştırır.
+**Uygulama durumu (18 Ekim 2026):** Bağımsız `mcp/` servisi, salt okunur 40 araç, MCP resource audience, `mcp.read`, korumalı kaynak metaverisi, rol bazlı araç filtreleme, ayrı Render servisi, CI/release akışı ve Grafana dashboard/alert varlıklarıyla uygulanmıştır. OAuth Authorization Code + PKCE ve kişisel erişim belirteci (PAT) desteklenir. MCP, doğruladığı kullanıcının aynı access token'ını `admin-api` audience'ı ile Admin API'ye iletir; token exchange ve MCP servis sırrı kullanılmaz. Araç adları `get_context`, `search_users` gibi yalın adlardır; `kitezh_` öneki yoktur. İstemci kurulumları ve doğrulama adımları için güncel [MCP README](../mcp/README.md) esas alınır. Native build ve yayın akışı backend ile aynı GraalVM Native Image, UPX ve Jib Native Image extension yapısını kullanır; CI Linux AMD64/ARM64 imajlarını üretir. Açık protokol uyumluluğu ve işletim maddeleri, tamamlanmış MCP/OAuth temel akışından ayrı takip edilir.
 
-**Güvenlik modeli güncellemesi (18 Ekim 2026):** MCP sunucusu kullanıcı access token'ını değiştirmeden Admin API'ye iletir. MCP token'ı hem yapılandırılmış MCP resource audience'ını hem `admin-api` audience'ını taşır. Backend `mcp.read` + iki audience'ı doğrular, MCP token'larını açıkça izin verilen GET endpoint'leriyle sınırlar ve mevcut endpoint/rol yetkilerini uygular. MCP token-exchange istemcisi, client secret, kodu, metrikleri, dashboard panelleri ve uyarısı kaldırılmıştır.
+**Kimlik doğrulama modeli (18 Ekim 2026):** OAuth ile alınan access token veya PAT, aynı kullanıcıyı temsil eden imzalı access token'dır. MCP token'ın issuer, MCP resource audience ve `mcp.read` kapsamını doğrular; Admin API'ye aynı token'ı `Bearer` olarak iletir. Token MCP resource ve `admin-api` audience'larını taşır. Backend audience'ları ve kapsamı doğrular, MCP amaçlı token'ları izinli salt okunur GET yollarıyla sınırlar ve mevcut rol/yetki kurallarını uygular. Ayrı token exchange, MCP service client secret'ı veya yükseltilmiş servis hesabı yoktur.
 
 ## 1. Amaç ve karar
 
@@ -20,7 +20,7 @@ Kitezh MCP Server, yetkili bir operatörün bir MCP istemcisinden Kitezh kimlik 
 
 Kaynak kodu ilk aşamada aynı Git deposunda bağımsız bir Maven modülü/uygulaması olarak tutulabilir; fakat ayrı artifact, ayrı başlangıç sınıfı, ayrı Docker imajı, ayrı ortam değişkenleri, ayrı sağlık kontrolü ve ayrı Render deploy yaşam döngüsü bulunur. Ana Kitezh uygulaması MCP bağımlılıklarını yüklemez ve `/mcp` endpoint'i yayımlamaz.
 
-**Teknoloji kararı:** Ayrı MCP uygulamasının tool ve Streamable HTTP katmanı için Spring Boot 4.x ile uyumlu **Spring AI 2.x MCP Server WebMVC starter** kullanılacak. Uygulama bir LLM modeli çağırmayacağı için Spring AI'nin model sağlayıcısı, prompt zinciri veya vector store bileşenleri eklenmeyecek. MCP giriş kimlik doğrulaması Spring Security resource server ile yapılır. Kitezh yönetim API'sine kullanıcı adına erişim, OAuth 2.0 Token Exchange ile alınan kısa ömürlü ve `admin-api` audience değerine bağlı ikinci bir token üzerinden yapılır.
+**Teknoloji kararı:** Ayrı MCP uygulamasının tool ve Streamable HTTP katmanı için Spring Boot 4.x ile uyumlu **Spring AI 2.x MCP Server WebMVC starter** kullanılır. Uygulama LLM modeli çağırmadığı için model sağlayıcısı, prompt zinciri veya vector store bileşenleri eklenmez. MCP giriş kimlik doğrulaması Spring Security resource server ile yapılır. Kullanıcının doğrulanmış access token'ı, HTTP interface tabanlı Admin API istemcisi ve bearer-auth interceptor üzerinden değiştirilmeden iletilir; backend `mcp.read`, iki audience, GET allowlist'i ve kullanıcının mevcut rollerini denetler.
 
 MCP sunucusu, modelin çağırabileceği **sınırlı iş araçları** sunar. Genel URL çağırma, SQL çalıştırma, rastgele REST yolu çağırma veya tüm OpenAPI işlemlerini otomatik araçlara dönüştürme yoktur.
 
@@ -43,7 +43,7 @@ Bu inceleme canlı `kitezh-mcp.onrender.com` akışını, `mcp/` uygulamasını,
 
 | Öncelik | Bulgu | Kabul için gereken çalışma |
 | --- | --- | --- |
-| **P0 — kapsam fazlası (uygulandı)** | `mcp-client` CSV seed'i yalnız `openid,mcp.read` kapsamlarını tanımlar. Authorization Code entegrasyon testi verilen kapsamları ve JWT `scope` claim'ini doğruluyor; access token'daki izinli `roles` claim'i ayrıca `roles` OAuth kapsamı vermeden ekleniyor. Server-side token exchange `admin-api roles` kullanmaya devam ediyor. | Yerel testler geçti. Canlı authorization-code ve refresh akışı yeni seed ile yayınlandıktan sonra tekrar doğrulanmalı. |
+| **P0 — en az yetki ve kullanıcı bazlı erişim (uygulandı)** | Inspector için seeded `mcp-client` `openid,mcp.read` ister. MCP resource access token'ı MCP resource ve `admin-api` audience'larını taşır; aynı kullanıcı token'ı MCP ve Admin API tarafından doğrulanır. `tools/list` ve doğrudan `tools/call`, token'daki rollerle filtrelenir. | OAuth akışı, tool rol filtresi ve Admin API'nin GET/audience/scope sınırı kod ve entegrasyon testleriyle doğrulanır. Üretim kurulumunda her MCP istemcisine ayrı OAuth client veya kullanıcıya ait PAT kullanılır; servis hesabı token'ı verilmez. |
 | **P0 — kullanıcıya göre araç yetkisi (uygulandı)** | 40 araç için rol haritası backend Admin API GET kurallarıyla hizalı. `tools/list` token yetkilerine göre filtreleniyor; bilinmeyen araç/rol için liste boş kalıyor ve doğrudan `tools/call` aynı kontrolle reddediliyor. MCP API güvenlik kontrolleri nihai yetki kararı olmaya devam ediyor. | Admin, sınırlı rol, bilinmeyen rol, doğrudan çağrı ve JWT `roles` claim'inden authority üretimi entegrasyon testleriyle doğrulandı. |
 | **P0 — Origin/Host ve metadata adresi (uygulandı)** | MCP CORS ayarı backend CorsConfig'teki açık origin yaklaşımını, HTTP yöntem/başlıklarını, credentials ve 3600 saniyelik max-age politikasını izliyor; MCP protokol başlıkları ekli. `Origin` ve Host izin listeleri uygulanıyor, forwarded header'lar güvenilmiyor, metadata yalnız `APP_MCP_PUBLIC_URL` üzerinden üretiliyor. İstek başlıkları 16 KiB, MCP gövdesi 1 MiB ile sınırlı; Tomcat bağlantı/iş parçacığı sayıları sınırlandırılmıştır. | CORS preflight, izinli/ret edilen Origin, sahte Host/forwarded header ve gövde boyutu testleriyle doğrulanıyor. Kullanıcı/IP başına oran sınırlaması halen açık P1 işletim işidir; güvenilir proxy IP kaynağı ve dağıtık limiter kararı gerekir. |
 | **P0 — güncel protokol uyumluluğu** | Uygulama `2025-11-25` ailesindeki handshake'i destekliyor; canlı testte `2025-03-26` `initialize` ile bağlantı da başarılı oldu. Bu, yayımlanmış `2026-07-28` protokol desteğini kanıtlamaz. Yeni sürüm handshake/session başlıklarını kaldırıp `server/discover` ve istek başına protokol bağlamı getiriyor; Streamable HTTP isteklerinde `Mcp-Method` ve `Mcp-Name` başlıklarını standartlaştırıyor. | Spring AI/MCP Java SDK güncellemesiyle `2026-07-28` desteğini ekle ya da bu sürümü destek dışı ilan edip istemci uyumluluk matrisini yayımla. `server/discover`, standart MCP istek başlıkları, stateless çağrı, eski istemci geriye uyumluluğu ve gerçek Codex/Claude/Inspector bağlantısını test et. Eski SSE taşıması açma. |
@@ -58,12 +58,12 @@ GitHub'ın scope ve araç filtrelemesi faydalı bir ürün/operasyon örneğidir
 - Uygulama tek issuer kullanır; Keycloak realm seçicisine denk çoklu realm sınırı yoktur. MCP araçlarına `realm` parametresi eklenmez.
 - Yönetim verileri `/api/admin/**` altında yer alır. Kullanıcı, grup, istemci, oturum, olay ve genel arama uç noktaları ile ayrı `Admin*Service` sınıfları vardır.
 - Yönetim API'si JWT issuer/audience doğrulaması, aktif authorization denetimi, DPoP ve `ROLE_*` yetkileri uygular. `whoami` mevcut kullanıcının yetki bayraklarını verir.
-- Ayrı MCP audience, protected resource metadata, ön kayıtlı MCP istemcisi ve MCP + `admin-api` audience'larını taşıyan `mcp.read` token'ı uygulanmıştır. MCP, aynı bearer token'ını Admin API'ye iletir; backend MCP token'larını açık GET allowlist'i ve mevcut rol kontrolleriyle sınırlar.
+- Ayrı MCP audience, protected resource metadata, ön kayıtlı OAuth istemcisi ve `mcp.read` token'ı uygulanmıştır. OAuth token'ı ve PAT, MCP resource ile `admin-api` audience'larını taşır. MCP aynı bearer token'ını Admin API'ye iletir; backend audience, kapsam, açık GET allowlist'i ve mevcut rol kontrollerini uygular.
 - Normal Authorization Code + PKCE ile alınan token `/mcp` üzerinde kabul edilir; canlı uçtan uca denemede MCP `initialize`, `tools/list` ve `get_context` başarılı olmuştur. Denemede `mcp-client` istemcisi kullanılmış, yeni istemci kaydı oluşturulmamıştır. Sonraki yerel değişiklikte istemci kapsamları `openid,mcp.read` olarak daraltıldı ve §2.1'de token scope testi eklendi; canlı yayın sonrası tekrar doğrulanmalıdır.
-- MCP için confidential servis istemcisi veya client secret gerekmez. Yönetim API'si her çağrıda audience, `mcp.read`, HTTP metodu, endpoint allowlist'i ve mevcut rol kontrollerini uygular; MCP araç kataloğu da aynı token'daki filtrelenmiş Kitezh rollerine göre daraltılır ve doğrudan araç çağrısını denetler.
+- MCP için confidential servis istemcisi veya client secret gerekmez. İstemci OAuth Authorization Code + PKCE veya kullanıcı PAT'iyle bağlanır. Yönetim API'si her çağrıda audience, `mcp.read`, HTTP metodu, endpoint allowlist'i ve mevcut rol kontrollerini uygular; MCP araç kataloğu aynı token'daki rollere göre daraltılır ve doğrudan araç çağrısı da denetlenir. `ROLE_USER` tek başına MCP araç yetkisi vermez; normal kullanıcıya uygun `*_QUERY`/`*_VIEWER` rolleri atanırsa yalnız o araçları kullanabilir.
 - Gruplar, roller veya kullanıcının etkin durumu değiştiğinde mevcut yönetim servislerinin audit ve `UserAccessInvalidationService` davranışı korunmalıdır.
 
-Bu saptamalar 17 Ekim 2026 tarihli çalışma ağacı ve canlı Render denemesinden yapılmıştır; özellikle `McpSecurityConfig`, `KitezhTokenExchangeClient`, `KitezhMcpTools`, Authorization Server istemci CSV'si ve ilgili yönetim API güvenlik kuralları incelenmiştir.
+Bu saptamalar 18 Ekim 2026 tarihli çalışma ağacı ve güncel [MCP README](../mcp/README.md) üzerinden yapılmıştır; `McpSecurityConfig`, `McpToolAuthorizationFilter`, HTTP interface istemcisi, OAuth istemci seed'i ve Admin API güvenlik kuralları incelenmiştir.
 
 ## 4. Kullanıcılar, işler ve başarı ölçütleri
 
@@ -91,7 +91,7 @@ Bu saptamalar 17 Ekim 2026 tarihli çalışma ağacı ve canlı Render denemesin
 
 - Ayrı Render Web Service üzerinde tek `/mcp` Streamable HTTP uç noktası, stateless istek işleme ve HTTPS dağıtımı.
 - OAuth ile kullanıcı adına oturum, ayrı MCP audience, protected resource metadata ve ön kayıtlı MCP istemcileri.
-- MCP token'ını Kitezh API'ye taşımadan, OAuth 2.0 Token Exchange ile kısa ömürlü `admin-api` token'ı alma.
+- Kullanıcının OAuth access token'ını veya PAT'ini doğrulayıp değiştirmeden Admin API'ye iletme; backend'de aynı kullanıcının rolüyle yetkilendirme.
 - Kitezh yönetim API'sine yalnız HTTP üzerinden erişim; MCP uygulamasında veritabanı/JPA bağlantısı bulunmaması.
 - `context`, `users`, `groups`, `clients`, `sessions`, `events` araç kümeleri.
 - Operatör düzeyinde görünürlük: yalnız yetkili araçlar `tools/list` sonucunda gösterilir; `tools/call` içinde aynı yetki yeniden denetlenir.
@@ -112,7 +112,7 @@ Bu saptamalar 17 Ekim 2026 tarihli çalışma ağacı ve canlı Render denemesin
 
 ## 6. P0 araç sözleşmesi
 
-İsimler sabit `kitezh_` öneki taşır. Liste araçları `page` (0 tabanlı), `size` (1–100) ve açık filtre alır. Serbest sorgu metni yalnız ilgili servis filtresine gider; URL, SQL veya komut olarak yorumlanmaz. Çıktılar DTO tabanlıdır ve isteğe uygun alanları seçer.
+Araç adları `get_context`, `search_users`, `get_client` gibi kısa, kaynak odaklı adlardır; ortak `kitezh_` öneki kullanılmaz. Güncel araç adlarının ve toolset'lerin kanonik listesi [MCP README](../mcp/README.md#available-tools) içindedir. Liste araçları `page` (0 tabanlı), `size` (1–100) ve açık filtre alır. Serbest sorgu metni yalnız ilgili servis filtresine gider; URL, SQL veya komut olarak yorumlanmaz. Çıktılar DTO tabanlıdır ve isteğe uygun alanları seçer.
 
 | Araç | Girdi | Çıktı | Yetki | Kitezh API kaynağı |
 | --- | --- | --- | --- | --- |
@@ -153,14 +153,14 @@ MVP'de dinamik `resources` ve `prompts` yayımlamak zorunlu değildir. Sonraki a
 
 ## 7. Yetkilendirme ve güvenlik sözleşmesi
 
-1. **Ayrı kaynak kimliği:** MCP kaynağı kendi genel URI'siyle tanımlanır, örneğin `https://mcp.kitezh.example/mcp`. Gelen token `iss`, `exp`, imza ve bu URI'ye bağlı `aud` açısından MCP servisinde doğrulanır. `admin-api` veya başka bir servis için verilmiş token `/mcp` üzerinde kabul edilmez. MCP belirtimi audience doğrulamasını zorunlu tutar: [MCP Authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
-2. **Keşif:** MCP kaynağı RFC 9728 Protected Resource Metadata yayımlar; 401 yanıtında `WWW-Authenticate` ile metadata ve asgari kapsamı bildirir. Kitezh yetkilendirme sunucusu OIDC/OAuth metadata üzerinden keşfedilir. Eksik kapsamda 403 ve gerekli kapsam bilgisi döner.
+1. **Ayrı kaynak kimliği:** MCP kaynağı kendi genel URI'siyle tanımlanır, örneğin `https://mcp.kitezh.example/mcp`. Gelen token `iss`, `exp`, imza ve MCP resource `aud` açısından doğrulanır. Yalnız `admin-api` audience'ı taşıyan veya başka bir servise verilmiş token `/mcp` üzerinde kabul edilmez. MCP belirtimi audience doğrulamasını zorunlu tutar: [MCP Authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
+2. **Keşif:** MCP kaynağı RFC 9728 Protected Resource Metadata yayımlar; 401 yanıtında `WWW-Authenticate` ile metadata ve asgari kapsamı bildirir. Kitezh yetkilendirme sunucusu OIDC/OAuth metadata üzerinden keşfedilir. Eksik kapsamda 403 ve gerekli kapsam bilgisi döner. PAT de aynı issuer ve MCP resource audience kurallarını karşılayan kullanıcı token'ıdır.
 3. **İstemci kaydı:** P0'da bilinen MCP istemcileri Kitezh Authorization Server'a yönetici tarafından ön kaydedilir; Authorization Code + PKCE S256 ve kesin redirect URI listesi kullanılır. DCR veya Client ID Metadata Documents desteği, SSRF/redirect/istemci politikaları ve kullanılan istemci uyumluluğu ayrı tasarlanıp P1 sonrası değerlendirilebilir. `client_credentials` insan adına yönetim için kullanılmaz.
-4. **Kapsam ve rol:** Yeni `mcp.read` kapsamı MCP giriş iznidir; gerçek nesne/işlem yetkisi mevcut `ROLE_*` ve servis kontrollerinden gelir. P1 için ayrı `mcp.write` gerekir. `mcp.write`, rol yetkisinin yerine geçmez.
-5. **Doğrudan token iletimi ve audience ayrımı:** Authorization Server, `mcp.read` kapsamlı kullanıcı token'ına yapılandırılmış MCP resource URI'si ve `admin-api` audience'larını ekler. MCP, bu token'ı değiştirmeden typed Admin API çağrısında bearer olarak iletir. Backend iki audience'ı, `mcp.read` kapsamını, HTTP `GET` metodunu ve MCP araçlarının kullandığı açık endpoint allowlist'ini zorunlu tutar.
+4. **Kapsam ve rol:** `mcp.read` MCP giriş kapsamıdır; gerçek tool/veri yetkisi token'daki mevcut `ROLE_*` rollerinden ve Admin API servis kontrollerinden gelir. `ROLE_USER` tek başına araç izni vermez. Normal kullanıcı, kendisine atanan query/viewer rolüne karşılık gelen okuma araçlarını kullanabilir. İleride `mcp.write` eklenmesi değerlendirilse bile bu kapsam rol yetkisinin yerine geçmez.
+5. **Doğrudan token iletimi ve audience ayrımı:** Authorization Server, MCP için verilen kullanıcı token'ına yapılandırılmış MCP resource URI'si ile `admin-api` audience'larını ekler. MCP, OAuth token'ını veya PAT'i değiştirmeden typed Admin API HTTP interface'i üzerinden bearer olarak iletir. Backend iki audience'ı, `mcp.read` kapsamını, HTTP `GET` metodunu ve MCP araçlarının kullandığı açık endpoint allowlist'ini zorunlu tutar. Token exchange veya servis kimliğine geçiş yapılmaz.
 6. **Yetkinin kaynağı:** MCP servisi araç listesini kullanıcı bağlamına göre daraltabilir; nihai authorization kararı her Kitezh API çağrısında `AdminApiSecurityConfig` ve servis katmanında verilir. MCP token'ı allowlist dışı endpoint veya yazma metoduna erişemez; izinli endpoint'lerde mevcut rol kontrolleri uygulanır.
-7. **İptal:** Kullanıcı kapatılması, yetki veya grup değişikliği, oturum/token iptali sonraki MCP çağrısında geçerli olmalıdır. MCP ve Kitezh API decoder'ı aynı access token için aktif authorization/revocation denetimini uygular; yetki kararı uzun süre cache'lenmez.
-8. **Servis kimliği:** MCP kullanıcı access token'ını doğrudan ilettiği için MCP confidential client secret'ı veya service-to-service OAuth kimliği kullanılmaz. Yetki kullanıcı token'ı ve onun rollerinden gelir.
+7. **İptal:** Kullanıcı kapatılması, yetki veya grup değişikliği, oturum/token iptali sonraki MCP çağrısında geçerli olmalıdır. MCP ve Kitezh API decoder'ı aynı access token için aktif authorization/revocation denetimini uygular; yetki kararı uzun süre cache'lenmez. PAT iptali de sonraki çağrılarda etkili olmalıdır.
+8. **Servis kimliği:** MCP kullanıcı access token'ını doğrudan ilettiği için MCP confidential client secret'ı veya service-to-service OAuth kimliği kullanılmaz. Yetki kullanıcı token'ı ve onun rollerinden gelir. PAT, kullanıcıya bağlı ve kullanıcı tarafından iptal edilebilir aynı kullanıcı token modelidir.
 9. **Araç görünürlüğü:** Dağıtımın izin verdiği kümeler üst sınırdır. Kullanıcı/istemci bunları yalnız daraltabilir. Salt okunur dağıtımda yazma aracı `tools/list` içinde bulunmaz; adı bilinse bile `tools/call` reddedilir.
 10. **Veri ve çıktı güvenliği:** Parola, parola hash'i, istemci sırrı, özel JWK, kurtarma kodu, access/refresh/ID token, SAML anahtarı ve şifreleme anahtarı hiçbir araç sonucunda bulunmaz. Kullanıcı ve olay verileri güvenilmeyen içeriktir; araç metni talimat gibi yorumlanmaz. Çıktı boyutu, sayfa boyutu ve çağrı süresi sınırlandırılır.
 11. **Tarayıcı/HTTP sınırı:** HTTPS zorunlu; `Origin`/Host doğrulaması ve dar CORS listesi uygulanır. MCP endpoint'i oturum çerezinden kimlik almaz; bearer token gerektirir. `GET` ile değişiklik yapılmaz.
@@ -169,17 +169,17 @@ MVP'de dinamik `resources` ve `prompts` yayımlamak zorunlu değildir. Sonraki a
 
 ```text
 MCP istemcisi
-   │  OAuth Authorization Code + PKCE
+   │  OAuth Authorization Code + PKCE veya kullanıcı PAT'i
    ▼
-Kitezh Authorization Server ── MCP audience'lı kullanıcı token'ı
+Kitezh Authorization Server ── MCP + admin-api audience'lı kullanıcı token'ı
    │
    ▼
 Kitezh MCP Server (ayrı Render Web Service)
    /mcp → güvenlik zinciri → tool katmanı
                                │
-                               ├─ OAuth Token Exchange
-                               │  audience: admin-api
-                               ▼
+                               └─ aynı bearer token'ı ilet
+                                  (typed HTTP interface + auth interceptor)
+                                  ▼
 Kitezh yönetim API'si (ayrı Render Web Service)
    /api/admin/** → mevcut güvenlik + Admin*Service
                                │
@@ -221,17 +221,17 @@ Kitezh yönetim API'si (ayrı Render Web Service)
 | Kimlik / istek | Beklenen sonuç |
 | --- | --- |
 | Token yok | `/mcp` 401 ve protected resource keşif bilgisi. |
-| Geçerli `admin-api` audience token'ı | 401; MCP kaynağına yönelik token gerekir. |
-| Public MCP istemcisi `openid mcp.read` ister | Token yalnız bu kapsamları verir; `admin-api` ve `roles` claim'leri dış istemci token'ına eklenmez. |
-| MCP token audience ve API sınırı | Kullanıcı token'ı MCP resource ve `admin-api` audience'larını, ayrıca `mcp.read` kapsamını taşır; Admin API yalnız açıkça izin verilen GET rotalarını mevcut rollerle kabul eder. |
-| `mcp.read` var, `ROLE_USER_QUERY` var | Kullanıcı araması çalışır; yetki dışı detay aracı listede görünmez ve çağrısı 403 döner. |
+| Yalnız `admin-api` audience'ı taşıyan token | 401; MCP resource audience'ı da gerekir. |
+| OAuth istemcisi `openid mcp.read` ister | Token MCP resource ve `admin-api` audience'larını taşır; MCP aynı kullanıcı token'ını değiştirmeden API'ye iletir. Token exchange yoktur. |
+| `mcp.read` ve uygun rol var | Yalnız o rolün izin verdiği araçlar listelenir ve çağrılabilir; örneğin `ROLE_USER_QUERY` kullanıcı aramasına izin verir. |
+| Yalnız `ROLE_USER` var | MCP bağlantısı kurulabilir, ancak araç rol haritasında bu role izin verilmediğinden araç listesi boştur ve araç çağrıları reddedilir. |
 | Sınırlı kullanıcı `tools/list` ve doğrudan `tools/call` gönderir | Araç görünürlüğü kullanıcı rolüne göre daraltılır; elle yapılan yetkisiz çağrı da Kitezh API tarafından 403 ile engellenir. |
 | Sahte `Origin`, `Host` veya forwarded host ile `/mcp` isteği | İzin listesi dışı istek reddedilir; 401 metadata adresi yalnız sabit public MCP URL'sini kullanır. |
 | MCP `2026-07-28` istemcisi | `server/discover` ve istek başına stateless taşıma sözleşmesi başarıyla işler; desteklenen eski protokol sürümleri geriye dönük test edilir. |
 | `tools/list` | İzinli araçlar kararlı sırada ve tanımlı input/output şemalarıyla döner; salt okunur katalogda yazma aracı bulunmaz. |
 | Operatör toolset ve allowlist sınırı belirler | `tools/list` yalnız toolset birleşimi ∩ server allowlist ∩ rol iznini döndürür; istemci başlıkları veya tool parametreleri kapsamı genişletemez. Aynı sınır doğrudan `tools/call` için uygulanır. |
 | İstek iptali/aşırı yük | İptal downstream HTTP çağrısını durdurur; kullanıcı/istemci başına hız ve boyut sınırları uygulanır. |
-| MCP token'ının doğrudan Kitezh yönetim API'sine gönderilmesi | İki audience ve `mcp.read` ile sadece allowlist'teki GET yollarında geçer; rolü olmayan istek 403, yazma ve allowlist dışı istekler 403 alır. |
+| Kullanıcı MCP token'ının doğrudan Kitezh yönetim API'sine gönderilmesi | İki audience ve `mcp.read` ile sadece allowlist'teki GET yollarında geçer; rolü olmayan istek 403, yazma ve allowlist dışı istekler 403 alır. |
 | MCP token'ı geçersiz/iptal edilmiş veya audience/scope eksik | MCP veya Admin API isteği reddeder; Kitezh verisi dönmez ve gizli ayrıntı açığa çıkmaz. |
 | `ROLE_EVENT_VIEWER` var | Olay araması çalışır; olay silme aracı yayımlanmaz. |
 | `size=101` veya bilinmeyen sıralama alanı | Doğrulama hatası; sınırsız sorgu oluşmaz. |
@@ -245,7 +245,7 @@ Kitezh yönetim API'si (ayrı Render Web Service)
 
 ## 11. Uygulama iş paketleri ve çıkış kapıları
 
-1. **P0 OAuth least-privilege — uygulandı:** Dış MCP istemci kapsamı `openid,mcp.read`; rol claim'i yalnız MCP access token'ında yer alır ve OAuth `roles` kapsamı verilmez. Backend entegrasyon testi geçti. Yeni seed'in canlıda yayınlanması ve refresh davranışının tekrar doğrulanması kalır.
+1. **P0 OAuth ve doğrudan yetki — uygulandı:** MCP istemci kapsamı `openid,mcp.read`; access token MCP resource ve `admin-api` audience'larını taşır. MCP aynı kullanıcı token'ını Admin API'ye iletir; araçlar token rollerine, API ise audience/scope/GET allowlist'i ve mevcut rol kurallarına göre sınırlandırır. Token exchange ve confidential MCP client secret yoktur.
 2. **P0 yetki matrisi — uygulandı:** Admin/sınırlı/bilinmeyen rol araç listesi, doğrudan çağrı reddi ve JWT role claim eşlemesi MCP entegrasyon testleriyle doğrulandı. Backend API kendi authorization kontrolünü korur.
 3. **P0 HTTP güvenlik sınırı — uygulandı:** Origin/Host, sabit public metadata URL, backend ile hizalı CORS ve istek boyutu sınırları test ediliyor. Kullanıcı/IP bazlı rate limiting, güvenilir proxy IP ve dağıtık limit deposu kararıyla P1 kapsamında takip edilecek.
 4. **P0 protokol uyumluluğu:** Yayımlanmış `2026-07-28` belirtimini destekleyen Spring AI/MCP Java SDK sürümüne geç; `server/discover`, stateless çağrı, şema, gerçek Codex/Claude/MCP Inspector bağlantısı ve geriye uyumluluk testlerini ekle. Sürüm desteklenmeyecekse README ve PRD'de açıkça belirt.

@@ -27,18 +27,16 @@ class McpRequestBoundaryFilter extends OncePerRequestFilter {
 
     private final Set<String> allowedHosts;
     private final Set<String> allowedOrigins;
-    private final boolean allowLocalHosts;
 
-    McpRequestBoundaryFilter(String publicUrl, String configuredOrigins, boolean allowLocalHosts) {
+    McpRequestBoundaryFilter(String publicUrl, String configuredOrigins) {
         URI publicUri = URI.create(publicUrl);
         if (!("http".equals(publicUri.getScheme()) || "https".equals(publicUri.getScheme()))
                 || publicUri.getHost() == null
                 || publicUri.getUserInfo() != null) {
             throw new IllegalArgumentException("MCP public URL must be an absolute HTTP URL");
         }
-        this.allowedHosts = Set.of(publicUri.getHost().toLowerCase(Locale.ROOT));
-        this.allowedOrigins = allowedOrigins(publicUri, configuredOrigins, allowLocalHosts);
-        this.allowLocalHosts = allowLocalHosts;
+        this.allowedOrigins = allowedOrigins(publicUri, configuredOrigins);
+        this.allowedHosts = allowedHosts(publicUri, this.allowedOrigins);
     }
 
     @Override
@@ -46,7 +44,7 @@ class McpRequestBoundaryFilter extends OncePerRequestFilter {
             HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String host = request.getServerName().toLowerCase(Locale.ROOT);
-        if (!allowedHosts.contains(host) && !(allowLocalHosts && LOCAL_HOSTS.contains(host))) {
+        if (!allowedHosts.contains(host)) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
@@ -86,19 +84,30 @@ class McpRequestBoundaryFilter extends OncePerRequestFilter {
         return new ReplayableBodyRequest(request, body);
     }
 
-    private static Set<String> allowedOrigins(
-            URI publicUri, String configuredOrigins, boolean allowLocalHosts) {
+    private static Set<String> allowedOrigins(URI publicUri, String configuredOrigins) {
         Set<String> origins = new HashSet<>();
         origins.add(origin(publicUri));
         Arrays.stream(configuredOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .forEach(origins::add);
-        if (allowLocalHosts) {
-            origins.add("http://localhost:6274");
-            origins.add("http://127.0.0.1:6274");
-        }
         return Set.copyOf(origins);
+    }
+
+    private static Set<String> allowedHosts(URI publicUri, Set<String> origins) {
+        Set<String> hosts = new HashSet<>();
+        hosts.add(publicUri.getHost().toLowerCase(Locale.ROOT));
+        origins.stream()
+                .map(URI::create)
+                .map(URI::getHost)
+                .filter(host -> host != null && LOCAL_HOSTS.contains(normalizeHost(host)))
+                .map(McpRequestBoundaryFilter::normalizeHost)
+                .forEach(hosts::add);
+        return Set.copyOf(hosts);
+    }
+
+    private static String normalizeHost(String host) {
+        return host.toLowerCase(Locale.ROOT).replace("[", "").replace("]", "");
     }
 
     private static String origin(URI uri) {

@@ -201,6 +201,52 @@ describe("LdapFederationSettings", () => {
     );
   });
 
+  it("validates and creates a new LDAP mapper", async () => {
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url === "/api/admin/settings/ldap")
+        return Promise.resolve({ status: 200, data: [provider] }) as never;
+      if (request.url?.endsWith("/mappers") && request.method !== "POST")
+        return Promise.resolve({ status: 200, data: [] }) as never;
+      if (request.url?.endsWith("/mappers") && request.method === "POST")
+        return Promise.resolve({
+          status: 201,
+          data: { ...mapper, id: 10, name: "Username" },
+        }) as never;
+      return Promise.resolve({ status: 204, data: null }) as never;
+    });
+
+    render(<LdapFederationSettings />);
+    await screen.findByRole("heading", { name: dictionary.admin.ldapFederation.title });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.ldapFederation.mappers }));
+    const mapperName = await screen.findByLabelText(dictionary.admin.ldapFederation.mapperName);
+    const mapperForm = mapperName.closest("form");
+    if (!mapperForm) throw new Error("Mapper form was not rendered");
+    fireEvent.submit(mapperForm);
+    expect(mockAdminRequest).not.toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({
+        method: "POST",
+        url: "/api/admin/settings/ldap/provider-id/mappers",
+      }),
+    );
+
+    fireEvent.change(mapperName, {
+      target: { value: "Username" },
+    });
+    fireEvent.submit(mapperForm);
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "POST",
+          url: "/api/admin/settings/ldap/provider-id/mappers",
+          data: expect.objectContaining({ name: "Username", type: "USER_ATTRIBUTE" }),
+        }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.admin.ldapFederation.saveMapper);
+  });
+
   it("reports mapper loading and LDAP test failures", async () => {
     mockAdminRequest.mockImplementation((_token, request) => {
       if (request.url === "/api/admin/settings/ldap")
@@ -221,6 +267,58 @@ describe("LdapFederationSettings", () => {
     fireEvent.click(screen.getByRole("button", { name: dictionary.admin.ldapFederation.mappers }));
     await waitFor(() =>
       expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.ldapFederation.mapperError),
+    );
+  });
+
+  it("keeps invalid LDAP provider values out of the save request", async () => {
+    render(<LdapFederationSettings />);
+    await screen.findByRole("heading", { name: dictionary.admin.ldapFederation.title });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.ldapFederation.name), {
+      target: { value: "Directory" },
+    });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.ldapFederation.connectionUrl), {
+      target: { value: "https://directory.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.ldapFederation.save }));
+
+    expect(await screen.findByText(dictionary.admin.ldapFederation.invalidUrl)).toBeVisible();
+    expect(
+      mockAdminRequest.mock.calls.some(
+        ([, request]) => request.method === "PUT" && request.url === "/api/admin/settings/ldap",
+      ),
+    ).toBe(false);
+  });
+
+  it("normalizes legacy provider attributes and reports rejected save, test, and sync requests", async () => {
+    const legacyProvider = { ...provider, usernameAttribute: "", emailAttribute: "" };
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url === "/api/admin/settings/ldap") {
+        if (request.method === "PUT") return Promise.resolve({ status: 500, data: null }) as never;
+        return Promise.resolve({ status: 200, data: [legacyProvider] }) as never;
+      }
+      return Promise.resolve({ status: 500, data: null }) as never;
+    });
+
+    render(<LdapFederationSettings />);
+    await screen.findByRole("heading", { name: dictionary.admin.ldapFederation.title });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.ldapFederation.save }));
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.ldapFederation.error),
+    );
+    const saveCall = mockAdminRequest.mock.calls.find(
+      ([, request]) => request.method === "PUT" && request.url === "/api/admin/settings/ldap",
+    );
+    expect(saveCall?.[1].data).toMatchObject({
+      providers: [{ usernameAttribute: "sAMAccountName", emailAttribute: "mail" }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.ldapFederation.test }));
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.ldapFederation.testFailed),
+    );
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.ldapFederation.syncFull }));
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.ldapFederation.syncFailed),
     );
   });
 });

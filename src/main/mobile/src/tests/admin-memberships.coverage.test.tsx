@@ -141,6 +141,10 @@ test("shows empty membership lists and requests later pages for groups and roles
   await waitFor(() => expect(adminApi.listAdminGroupUsers).toHaveBeenLastCalledWith(
     "access-token", 7, "", 1, 10, expect.objectContaining({ refreshAccessToken: expect.any(Function) }),
   ));
+  fireEvent.press(screen.getByRole("button", { name: "adminPrevious" }));
+  await waitFor(() => expect(adminApi.listAdminGroupUsers).toHaveBeenLastCalledWith(
+    "access-token", 7, "", 0, 10, expect.objectContaining({ refreshAccessToken: expect.any(Function) }),
+  ));
   group.unmount();
 
   jest.mocked(adminApi.getAdminRoleDetail).mockResolvedValue({
@@ -162,4 +166,161 @@ test("shows empty membership lists and requests later pages for groups and roles
     "access-token", "operator", "", undefined, 1, 10,
     expect.objectContaining({ refreshAccessToken: expect.any(Function) }),
   ));
+});
+
+it.each([
+  [new adminApi.AdminApiError(403), "adminForbidden"],
+  [new adminApi.AdminApiError(0, "offline"), "adminApiOfflineError"],
+  [new adminApi.AdminApiError(0, "timeout"), "adminApiTimeoutError"],
+  [new adminApi.AdminApiError(500), "adminLoadError"],
+  [new Error("unexpected load failure"), "adminLoadError"],
+] as const)("shows a recoverable group membership read error: %s", async (failure, message) => {
+  jest.mocked(adminApi.listAdminGroupUsers).mockRejectedValue(failure);
+  jest.mocked(adminApi.listAdminAvailableGroupUsers).mockResolvedValue(page([]));
+  render(<GroupMemberships groupId={7} groupName="Engineering" onClose={jest.fn()} />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  jest.mocked(adminApi.listAdminGroupUsers).mockResolvedValue(page([assignedGroupUser]));
+  jest.mocked(adminApi.listAdminAvailableGroupUsers).mockResolvedValue(page([availableGroupUser]));
+  fireEvent.press(screen.getByRole("button", { name: "adminRetry" }));
+  expect(await screen.findByText("alice")).toBeTruthy();
+});
+
+it.each([
+  [new adminApi.AdminApiError(403), "adminForbidden"],
+  [new adminApi.AdminApiError(0, "offline"), "adminApiOfflineError"],
+  [new adminApi.AdminApiError(0, "timeout"), "adminApiTimeoutError"],
+  [new adminApi.AdminApiError(500), "adminActionError"],
+  [new Error("unexpected membership failure"), "adminActionError"],
+] as const)("localizes group assignment failures: %s", async (failure, message) => {
+  jest.mocked(adminApi.addAdminGroupUser).mockRejectedValueOnce(failure);
+  render(<GroupMemberships groupId={7} groupName="Engineering" onClose={jest.fn()} />);
+
+  fireEvent.press(await screen.findByRole("button", { name: "adminAddGroupUser" }));
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenLastCalledWith({ kind: "error", message }),
+  );
+  expect(adminApi.addAdminGroupUser).toHaveBeenCalledTimes(1);
+});
+
+test("does not query group memberships when refresh cannot recover a session", async () => {
+  mockRefreshSession.mockResolvedValueOnce(null);
+  render(<GroupMemberships groupId={7} groupName="Engineering" onClose={jest.fn()} />);
+
+  expect(await screen.findByText("adminNoGroupMembers")).toBeTruthy();
+  expect(screen.getByText("adminNoAvailableUsers")).toBeTruthy();
+  expect(adminApi.listAdminGroupUsers).not.toHaveBeenCalled();
+  expect(adminApi.listAdminAvailableGroupUsers).not.toHaveBeenCalled();
+});
+
+it.each([
+  [new adminApi.AdminApiError(403), "adminForbidden"],
+  [new adminApi.AdminApiError(500), "adminRoleUserActionError"],
+] as const)("localizes role assignment failure for %s", async (failure, message) => {
+  jest.mocked(adminApi.assignAdminRoleUser).mockRejectedValueOnce(failure);
+  render(<RoleMemberships roleName="operator" onClose={jest.fn()} />);
+
+  fireEvent.press(await screen.findByRole("button", { name: "adminRoleAssignUser" }));
+
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenLastCalledWith({ kind: "error", message }),
+  );
+});
+
+test("keeps role membership actions disabled while assignment is pending", async () => {
+  let completeAssignment!: () => void;
+  jest.mocked(adminApi.assignAdminRoleUser).mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        completeAssignment = resolve;
+      }),
+  );
+  render(<RoleMemberships roleName="operator" onClose={jest.fn()} />);
+
+  const assign = await screen.findByRole("button", {
+    name: "adminRoleAssignUser",
+  });
+  fireEvent.press(assign);
+  await waitFor(() =>
+    expect(assign.props.accessibilityState.disabled).toBe(true),
+  );
+  expect(screen.getByLabelText("loading")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "adminRoleRemoveUser" }).props
+      .accessibilityState.disabled,
+  ).toBe(true);
+
+  await act(async () => completeAssignment());
+  await waitFor(() =>
+    expect(adminApi.assignAdminRoleUser).toHaveBeenCalledTimes(1),
+  );
+});
+
+it.each([
+  [new adminApi.AdminApiError(403), "adminForbidden"],
+  [new Error("role read failed"), "adminRoleUsersLoadError"],
+] as const)("shows a role membership load error and recovers on search: %s", async (failure, message) => {
+  jest.mocked(adminApi.getAdminRoleDetail).mockRejectedValue(failure);
+  render(<RoleMemberships roleName="operator" onClose={jest.fn()} />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  jest.mocked(adminApi.getAdminRoleDetail).mockResolvedValue({
+    name: "operator",
+    description: null,
+    userCount: 1,
+    protectedRole: false,
+    users: page([assignedRoleUser]),
+    compositeRoles: [],
+    compositeClientRoles: [],
+  });
+  fireEvent.changeText(screen.getByLabelText("adminRoleUserSearch"), "car");
+
+  expect(await screen.findByText("carol")).toBeTruthy();
+  expect(screen.queryByText(message)).toBeNull();
+});
+
+test("reports a missing refreshed session as an assignment failure", async () => {
+  render(<RoleMemberships roleName="operator" onClose={jest.fn()} />);
+  await screen.findByText("dave");
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.press(screen.getByRole("button", { name: "adminRoleAssignUser" }));
+
+  await waitFor(() =>
+    expect(mockShowNotice).toHaveBeenLastCalledWith({
+      kind: "error",
+      message: "adminRoleUserActionError",
+    }),
+  );
+});
+
+test("confirms a role removal and reports success", async () => {
+  let confirmRemove: (() => void) | undefined;
+  const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+    confirmRemove = buttons?.find((button) => button.style === "destructive")?.onPress;
+  });
+  render(<RoleMemberships roleName="operator" onClose={jest.fn()} />);
+
+  fireEvent.press(await screen.findByRole("button", { name: "adminRoleRemoveUser" }));
+  expect(alert).toHaveBeenCalledWith(
+    "adminRoleRemoveUser",
+    "adminRoleRemoveUserConfirm",
+    expect.any(Array),
+  );
+  await act(async () => confirmRemove?.());
+
+  await waitFor(() =>
+    expect(adminApi.removeAdminRoleUser).toHaveBeenCalledWith(
+      "access-token",
+      "operator",
+      3,
+      0,
+      10,
+      expect.objectContaining({ refreshAccessToken: expect.any(Function) }),
+    ),
+  );
+  expect(mockShowNotice).toHaveBeenLastCalledWith({
+    kind: "success",
+    message: "adminRoleUserRemoved",
+  });
+  alert.mockRestore();
 });

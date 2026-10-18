@@ -420,9 +420,14 @@ const pageHeader = (title, description) => {
   return `<div class="topbar ${["clients", "client-detail", "client-create"].includes(state.route) ? "is-client-screen" : ""}"><div><h1 tabindex="-1" class="${state.route === "role-detail" ? "role-name" : ""}">${escapeHtml(title)}${eventCount}</h1>${state.route === "client-detail" ? `<code class="muted client-heading-id">${escapeHtml(state.data.clientConfiguration?.clientId ?? "")}</code>` : `<p>${escapeHtml(description)}</p>`}</div><div class="actions">${createAction}${deleteScopeAction}${sessionAction}${keyAction}</div></div>`;
 };
 
+function identityProviderItems() {
+  const content = state.data.identityProviders?.content;
+  return Array.isArray(content) ? content : [];
+}
+
 function identityProviderBreadcrumb() {
   if (!['identity-provider-create', 'identity-provider-detail'].includes(state.route)) return '';
-  const provider = (state.data.identityProviders?.content ?? []).find((item) => String(item.id) === String(state.data.identityProviderDetailId));
+  const provider = identityProviderItems().find((item) => String(item.id) === String(state.data.identityProviderDetailId));
   const current = state.route === 'identity-provider-create' ? text('adminCreateProvider') : provider?.displayName ?? text('adminIdentityProviders');
   return `<nav class="admin-breadcrumb" aria-label="${escapeHtml(text('adminBreadcrumb'))}"><a href="#/admin/identity-providers" data-action="admin-provider-list">${escapeHtml(text('adminIdentityProviders'))}</a><span aria-current="page">${escapeHtml(current)}</span></nav>`;
 }
@@ -746,7 +751,7 @@ function routeTitle() {
       "identity-providers": text("adminIdentityProviders"),
       "identity-provider-create": text("adminCreateProvider"),
       "identity-provider-detail":
-        (state.data.identityProviders?.content ?? []).find((item) => String(item.id) === String(state.data.identityProviderDetailId))?.displayName ?? text("adminIdentityProviders"),
+        identityProviderItems().find((item) => String(item.id) === String(state.data.identityProviderDetailId))?.displayName ?? text("adminIdentityProviders"),
       sessions: text("adminSessions"),
       notifications: text("notificationsTitle"),
       consents: text("adminNavConsents"),
@@ -3731,7 +3736,7 @@ function identityProviderDetailContent(id, tab) {
   const creating = id === "new";
   const provider = creating
     ? null
-    : (state.data.identityProviders?.content ?? []).find(
+    : identityProviderItems().find(
         (item) => String(item.id) === String(id),
       );
   const providerId = creating ? "" : String(id ?? "");

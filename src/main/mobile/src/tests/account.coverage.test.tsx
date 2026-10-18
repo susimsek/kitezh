@@ -42,6 +42,13 @@ jest.mock("expo-file-system", () => ({
   File: jest.fn().mockImplementation(() => ({ size: 1024 })),
 }));
 const mockSignOut = jest.fn();
+const mockAuthState: {
+  session: { accessToken: string } | null;
+  status: string;
+} = {
+  session: { accessToken: "access" },
+  status: "signed-in",
+};
 jest.mock("@/auth/MobileAuthProvider", () => {
   const session = { accessToken: "access" };
   const mockRefreshSession = jest.fn(async () => session);
@@ -49,11 +56,12 @@ jest.mock("@/auth/MobileAuthProvider", () => {
     MobileAuthProvider: ({ children }: { children: React.ReactNode }) =>
       children,
     mockRefreshSession,
+    mockAuthState,
     useMobileAuth: () => ({
-      session,
+      session: mockAuthState.session,
       signIn: jest.fn(),
       signOut: mockSignOut,
-      status: "signed-in",
+      status: mockAuthState.status,
       refreshSession: mockRefreshSession,
     }),
   };
@@ -129,6 +137,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockShowNotice.mockClear();
   mockSignOut.mockClear();
+  mockAuthState.session = { accessToken: "access" };
+  mockAuthState.status = "signed-in";
   mockRefreshSession.mockReset().mockResolvedValue({ accessToken: "access" });
   jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
     content: [],
@@ -245,6 +255,40 @@ it("renders and validates configured account profile attributes", async () => {
       expect.any(Object),
     ),
   );
+  const options = jest.mocked(accountApi.updateAccountProfileAttributes).mock
+    .calls[0]?.[2];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(options?.refreshAccessToken?.()).resolves.toBeNull();
+});
+
+it("does not validate built-in profile fields as custom attributes", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  jest.mocked(accountApi.getAccountProfileAttributes).mockResolvedValue({
+    definitions: [
+      {
+        id: 10,
+        name: "email",
+        displayName: "Email",
+        description: null,
+        type: "EMAIL",
+        required: true,
+        multivalued: false,
+        minLength: null,
+        maxLength: null,
+        pattern: null,
+        enabled: true,
+        displayOrder: 1,
+        builtIn: true,
+      },
+    ],
+    attributes: {},
+  });
+
+  await renderAccountScreen();
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+
+  await waitFor(() => expect(accountApi.updateAccountProfile).toHaveBeenCalled());
+  expect(screen.queryByText("profileAttributeRequired")).toBeNull();
 });
 
 it("rejects multiple values and malformed custom attribute values", async () => {
@@ -322,6 +366,10 @@ it("supports native photo selection, JPEG upload, and cancellation", async () =>
       expect.any(Object),
     ),
   );
+  const uploadOptions = jest.mocked(accountApi.uploadAccountAvatar).mock
+    .calls[0]?.[2];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(uploadOptions?.refreshAccessToken?.()).resolves.toBeNull();
   expect(
     jest.mocked(jest.requireMock("expo-image-manipulator").manipulateAsync),
   ).toHaveBeenCalledWith(
@@ -458,12 +506,50 @@ it("shows localized picker permission errors and email verification feedback", a
   await waitFor(() =>
     expect(accountApi.sendAccountVerificationEmail).toHaveBeenCalledTimes(1),
   );
+  const verificationOptions = jest.mocked(
+    accountApi.sendAccountVerificationEmail,
+  ).mock.calls[0]?.[1];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(verificationOptions?.refreshAccessToken?.()).resolves.toBeNull();
   expect(
     screen.getByRole("button", { name: "accountSendVerification" }).props
       .accessibilityState,
   ).toEqual({ disabled: true });
   completeVerification?.();
   expect(await screen.findByText("accountVerificationSent")).toBeTruthy();
+});
+
+it("shows a pending email change without offering verification for the old address", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue({
+    ...profile(false),
+    pendingEmail: "new-address@example.test",
+  });
+
+  await renderAccountScreen();
+
+  expect(
+    await screen.findByText(
+      "accountEmailVerificationPending new-address@example.test",
+    ),
+  ).toBeTruthy();
+  expect(
+    screen.queryByRole("button", { name: "accountSendVerification" }),
+  ).toBeNull();
+  expect(accountApi.sendAccountVerificationEmail).not.toHaveBeenCalled();
+});
+
+it("shows a generic upload error for non-permission avatar picker failures", async () => {
+  const picker = jest.mocked(
+    jest.requireMock("expo-image-picker").launchImageLibraryAsync,
+  );
+  picker.mockRejectedValueOnce(new Error("picker unavailable"));
+
+  await renderAccountScreen();
+  fireEvent.press(
+    await screen.findByRole("button", { name: "accountAvatarChoose" }),
+  );
+
+  expect(await screen.findByText("accountAvatarUploadError")).toBeTruthy();
 });
 
 it("removes an existing avatar only after native confirmation", async () => {
@@ -488,7 +574,32 @@ it("removes an existing avatar only after native confirmation", async () => {
   await waitFor(() => expect(accountApi.deleteAccountAvatar).toHaveBeenCalledWith(
     "access", expect.any(Object),
   ));
+  const options = jest.mocked(accountApi.deleteAccountAvatar).mock.calls[0]?.[1];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(options?.refreshAccessToken?.()).resolves.toBeNull();
   expect(screen.queryByRole("button", { name: "accountAvatarRemove" })).toBeNull();
+  alert.mockRestore();
+});
+
+it("keeps the avatar action available and reports a failed removal", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  jest.mocked(accountApi.getAccountAvatar).mockResolvedValue({
+    avatarUrl: "/avatars/alice?v=1",
+  });
+  jest
+    .mocked(accountApi.deleteAccountAvatar)
+    .mockRejectedValueOnce(new Error("offline"));
+  let confirmRemove: (() => void) | undefined;
+  const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons) => {
+    confirmRemove = buttons?.find((button) => button.style === "destructive")?.onPress;
+  });
+
+  await renderAccountScreen();
+  fireEvent.press(await screen.findByRole("button", { name: "accountAvatarRemove" }));
+  await act(async () => confirmRemove?.());
+
+  expect(await screen.findByText("accountAvatarUploadError")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "accountAvatarRemove" })).toBeTruthy();
   alert.mockRestore();
 });
 
@@ -516,6 +627,17 @@ it("shows a localized email-verification failure", async () => {
   expect(await screen.findByText("accountVerificationError")).toBeTruthy();
 });
 
+it("reports when the account session expires before email verification", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile(false));
+
+  await renderAccountScreen();
+  mockRefreshSession.mockResolvedValueOnce(null);
+  fireEvent.press(await screen.findByRole("button", { name: "accountSendVerification" }));
+
+  expect(await screen.findByText("accountVerificationError")).toBeTruthy();
+  expect(accountApi.sendAccountVerificationEmail).not.toHaveBeenCalled();
+});
+
 it("passes refresh callbacks for each profile-related API request", async () => {
   jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
   jest.mocked(accountApi.getAccountProfileAttributes).mockResolvedValue({ definitions: [], attributes: {} });
@@ -529,6 +651,10 @@ it("passes refresh callbacks for each profile-related API request", async () => 
   ];
   for (const call of calls) {
     await expect(call?.[1]?.refreshAccessToken?.()).resolves.toBe("access");
+  }
+  mockRefreshSession.mockResolvedValue(null);
+  for (const call of calls) {
+    await expect(call?.[1]?.refreshAccessToken?.()).resolves.toBeNull();
   }
   expect(mockRefreshSession).toHaveBeenCalledWith(true);
 });
@@ -624,6 +750,45 @@ it("maps server validation errors to configured profile attributes", async () =>
   expect(await screen.findByText("Server field error")).toBeTruthy();
 });
 
+it("falls back to a profile error when attribute violations lack usable fields", async () => {
+  const definition = {
+    id: 8,
+    name: "department",
+    displayName: "Department",
+    description: null,
+    type: "STRING" as const,
+    required: false,
+    multivalued: false,
+    minLength: null,
+    maxLength: 100,
+    pattern: null,
+    enabled: true,
+    displayOrder: 10,
+    builtIn: false,
+  };
+  jest.mocked(accountApi.getAccountProfileAttributes).mockResolvedValue({
+    definitions: [definition],
+    attributes: {},
+  });
+  jest.mocked(accountApi.updateAccountProfile).mockRejectedValue(
+    new accountApi.AccountApiError(400, "Validation failed", {
+      title: "Bad Request",
+      status: 400,
+      violations: [
+        { field: "", message: "Missing field" },
+        { field: "attributes.department", message: "" },
+      ],
+    }),
+  );
+
+  await renderAccountScreen();
+  fireEvent.changeText(await screen.findByLabelText("Department"), "Support");
+  fireEvent.press(screen.getByRole("button", { name: "save" }));
+
+  expect(await screen.findByText("profileSaveError")).toBeTruthy();
+  expect(screen.queryByText("Missing field")).toBeNull();
+});
+
 it("loads and saves the account profile, including email validation", async () => {
   jest.mocked(accountApi.getAccountProfile).mockResolvedValue({
     username: "alice",
@@ -673,6 +838,9 @@ it("loads and saves the account profile, including email validation", async () =
       expect.any(Object),
     ),
   );
+  const options = jest.mocked(accountApi.updateAccountProfile).mock.calls[0]?.[2];
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(options?.refreshAccessToken?.()).resolves.toBeNull();
 });
 
 it("clears profile fields when the server response omits their values", async () => {
@@ -696,6 +864,22 @@ it("clears profile fields when the server response omits their values", async ()
   expect(screen.getByPlaceholderText("firstName").props.value).toBe("");
   expect(screen.getByPlaceholderText("lastName").props.value).toBe("");
   expect(screen.getByPlaceholderText("email").props.value).toBe("");
+});
+
+it("keeps the profile available when optional attribute and avatar reads fail", async () => {
+  jest.mocked(accountApi.getAccountProfile).mockResolvedValue(profile());
+  jest.mocked(accountApi.getAccountProfileAttributes).mockRejectedValue(
+    new Error("attributes unavailable"),
+  );
+  jest.mocked(accountApi.getAccountAvatar).mockRejectedValue(
+    new Error("avatar unavailable"),
+  );
+
+  await renderAccountScreen();
+
+  expect(screen.getByText("alice")).toBeTruthy();
+  expect(screen.getByText("profileAttributesLoadError")).toBeTruthy();
+  expect(screen.getByLabelText("accountAvatar")).toBeTruthy();
 });
 
 it("renders connected applications and offline sessions", async () => {
@@ -1019,6 +1203,133 @@ it("falls back to the last valid page when application sections shrink", async (
   expect(screen.getByText("Last CIBA page")).toBeTruthy();
 });
 
+it("renders empty states for nullable page content and blocks MFA-required CIBA approval", async () => {
+  jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
+    content: null,
+    number: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  } as unknown as accountApi.AccountPage<accountApi.AccountApplication>);
+  jest.mocked(accountApi.listOfflineSessions).mockResolvedValue({
+    content: null,
+    number: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  } as unknown as accountApi.AccountPage<accountApi.AccountOfflineSession>);
+  jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
+    content: [
+      {
+        authReqId: "mfa-request",
+        userCode: "MFA-1234",
+        bindingMessage: "Confirm with MFA",
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: "2025-01-01T00:05:00Z",
+        status: "PENDING",
+        mfaRequired: true,
+        stepUpRequired: false,
+      },
+    ],
+    number: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+  });
+
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("applicationsEmpty")).toBeTruthy();
+  expect(screen.getByText("offlineSessionsEmpty")).toBeTruthy();
+  expect(screen.getByText("cibaMfaRequired")).toBeTruthy();
+  const approve = screen.getByRole("button", { name: "cibaApprove" });
+  expect(approve.props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(approve);
+  expect(accountApi.decideCibaRequest).not.toHaveBeenCalled();
+});
+
+it("uses explicit date fallbacks for missing and malformed offline and CIBA dates", async () => {
+  jest.mocked(accountApi.listOfflineSessions).mockResolvedValue({
+    content: [
+      {
+        id: "offline-date-fallback",
+        clientId: "legacy-client",
+        clientName: "Legacy client",
+        issuedAt: null,
+        expiresAt: "not-a-date",
+      },
+    ],
+    number: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+  } as unknown as accountApi.AccountPage<accountApi.AccountOfflineSession>);
+  jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
+    content: [
+      {
+        authReqId: "legacy-request",
+        userCode: "LEGACY-1",
+        bindingMessage: null,
+        authorizedScopes: "openid",
+        deliveryMode: "poll",
+        createdAt: "2025-01-01T00:00:00Z",
+        expiresAt: null,
+        status: "PENDING",
+        mfaRequired: false,
+        stepUpRequired: false,
+      },
+    ],
+    number: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+  } as unknown as accountApi.AccountPage<accountApi.CibaPendingRequest>);
+
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("Legacy client")).toBeTruthy();
+  expect(screen.getByText(/offlineIssued: —/)).toBeTruthy();
+  expect(screen.getByText(/offlineExpires: not-a-date/)).toBeTruthy();
+  expect(screen.getByText("cibaRequestTitle")).toBeTruthy();
+  expect(screen.getByText(/cibaExpires: —/)).toBeTruthy();
+});
+
+it("shows the loading then signed-out state for account sections", async () => {
+  mockAuthState.session = null;
+  mockAuthState.status = "loading";
+  const applications = render(<ApplicationsScreen />);
+  expect(screen.getByLabelText("loading")).toBeTruthy();
+  applications.rerender(<ApplicationsScreen />);
+
+  mockAuthState.status = "signed-out";
+  applications.rerender(<ApplicationsScreen />);
+  await waitFor(() =>
+    expect(jest.requireMock("expo-router").router.replace).toHaveBeenCalledWith(
+      "/sign-in",
+    ),
+  );
+  expect(screen.queryByText("applications")).toBeNull();
+});
+
+it("shows account loading before redirecting a signed-out user", async () => {
+  mockAuthState.session = null;
+  mockAuthState.status = "loading";
+  const account = render(<AccountScreen />);
+  expect(screen.getByLabelText("loading")).toBeTruthy();
+
+  mockAuthState.status = "signed-out";
+  account.rerender(<AccountScreen />);
+  await waitFor(() =>
+    expect(jest.requireMock("expo-router").router.replace).toHaveBeenCalledWith(
+      "/sign-in",
+    ),
+  );
+  expect(screen.queryByLabelText("loading")).toBeNull();
+  expect(accountApi.getAccountProfile).not.toHaveBeenCalled();
+});
+
 it("shows CIBA decisions and blocks approval when step-up is required", async () => {
   jest.mocked(accountApi.listCibaRequests).mockResolvedValue({
     content: [
@@ -1280,6 +1591,71 @@ it("reports a failed applications session refresh without hiding other sections"
   expect(screen.getByText("cibaEmpty")).toBeTruthy();
 });
 
+it("shows independent expiry errors when no application section can refresh", async () => {
+  mockRefreshSession
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(null);
+
+  render(<ApplicationsScreen />);
+
+  expect(await screen.findByText("applicationsError")).toBeTruthy();
+  expect(await screen.findByText("offlineSessionsError")).toBeTruthy();
+  expect(await screen.findByText("cibaLoadError")).toBeTruthy();
+  expect(accountApi.listAccountApplications).not.toHaveBeenCalled();
+  expect(accountApi.listOfflineSessions).not.toHaveBeenCalled();
+  expect(accountApi.listCibaRequests).not.toHaveBeenCalled();
+});
+
+it("successfully denies a CIBA request and tolerates a null refresh page", async () => {
+  jest.mocked(accountApi.listCibaRequests)
+    .mockResolvedValueOnce({
+      content: [
+        {
+          authReqId: "deny-request",
+          userCode: "DENY-1234",
+          bindingMessage: "Confirm sign-in",
+          authorizedScopes: "openid",
+          deliveryMode: "poll",
+          createdAt: "2025-01-01T00:00:00Z",
+          expiresAt: "2025-01-01T00:05:00Z",
+          status: "PENDING",
+          mfaRequired: false,
+          stepUpRequired: false,
+        },
+      ],
+      number: 0,
+      size: 10,
+      totalElements: 1,
+      totalPages: 1,
+    })
+    .mockResolvedValueOnce({
+      content: null,
+      number: 0,
+      size: 10,
+      totalElements: 0,
+      totalPages: 0,
+    } as unknown as accountApi.AccountPage<accountApi.CibaPendingRequest>);
+
+  render(<ApplicationsScreen />);
+  expect(await screen.findByText(/DENY-1234/)).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "cibaDeny" }));
+
+  await waitFor(() =>
+    expect(accountApi.decideCibaRequest).toHaveBeenCalledWith(
+      "access",
+      expect.objectContaining({ authReqId: "deny-request" }),
+      "deny",
+      expect.any(Object),
+    ),
+  );
+  expect(await screen.findByText("cibaEmpty")).toBeTruthy();
+  expect(mockShowNotice).toHaveBeenLastCalledWith({
+    kind: "success",
+    message: "cibaDenied",
+  });
+});
+
 it("shows independent offline and CIBA loading failures", async () => {
   jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
     content: [],
@@ -1536,7 +1912,44 @@ it("reports API failures for application, offline-session, and CIBA actions", as
   expect(accountApi.revokeAccountApplication).toHaveBeenCalledTimes(1);
   expect(accountApi.revokeOfflineSession).toHaveBeenCalledTimes(1);
   expect(accountApi.decideCibaRequest).toHaveBeenCalledTimes(1);
+  for (const [request, optionsIndex] of [
+    [accountApi.revokeAccountApplication, 2],
+    [accountApi.revokeOfflineSession, 2],
+    [accountApi.decideCibaRequest, 3],
+  ] as const) {
+    const options = jest.mocked(request).mock.calls[0]?.[optionsIndex] as
+      | { refreshAccessToken?: () => Promise<string | null> }
+      | undefined;
+    mockRefreshSession.mockResolvedValueOnce(null);
+    await expect(options?.refreshAccessToken?.()).resolves.toBeNull();
+  }
   expect(alert).toHaveBeenCalledTimes(2);
+});
+
+it("refreshes access tokens for each application section query", async () => {
+  render(<ApplicationsScreen />);
+  await waitFor(() => {
+    expect(accountApi.listAccountApplications).toHaveBeenCalled();
+    expect(accountApi.listOfflineSessions).toHaveBeenCalled();
+    expect(accountApi.listCibaRequests).toHaveBeenCalled();
+  });
+
+  const callbacks = [
+    jest.mocked(accountApi.listAccountApplications).mock.calls[0]?.[1]
+      ?.refreshAccessToken,
+    jest.mocked(accountApi.listOfflineSessions).mock.calls[0]?.[1]
+      ?.refreshAccessToken,
+    jest.mocked(accountApi.listCibaRequests).mock.calls[0]?.[1]
+      ?.refreshAccessToken,
+  ];
+  expect(callbacks).toHaveLength(3);
+
+  for (const callback of callbacks) {
+    await expect(callback?.()).resolves.toBe("access");
+  }
+
+  mockRefreshSession.mockResolvedValueOnce(null);
+  await expect(callbacks[0]?.()).resolves.toBeNull();
 });
 
 it("confirms, serializes, and reports application and offline-session revocations", async () => {

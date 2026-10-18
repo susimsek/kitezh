@@ -128,6 +128,27 @@ it("cleans an unsuccessful download and rejects when the cache directory is miss
   );
 });
 
+it("cleans the partial APK when the download task returns no result", async () => {
+  jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+    exists: false,
+    isDirectory: false,
+    uri: "/cache/kitezh.apk",
+    modificationTime: 0,
+  });
+  jest.mocked(FileSystem.createDownloadResumable).mockReturnValue({
+    downloadAsync: async () => null,
+  } as never);
+
+  await expect(downloadAndOpenAndroidUpdate(asset, jest.fn())).rejects.toThrow(
+    "Android update download failed",
+  );
+  expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+    "/cache/kitezh-1.3.0-android.apk.download",
+    { idempotent: true },
+  );
+  expect(FileSystem.moveAsync).not.toHaveBeenCalled();
+});
+
 it("opens Android settings when the package installer requires permission", async () => {
   jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
     exists: true,
@@ -144,6 +165,29 @@ it("opens Android settings when the package installer requires permission", asyn
     "permission-required",
   );
   expect(startActivityAsync).toHaveBeenLastCalledWith(
+    ActivityAction.MANAGE_UNKNOWN_APP_SOURCES,
+    { data: "package:io.github.susimsek.kitezh.mobile" },
+  );
+});
+
+it("propagates failure when Android settings cannot open after installer denial", async () => {
+  jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+    exists: true,
+    size: 12,
+    isDirectory: false,
+    uri: "/cache/kitezh.apk",
+    modificationTime: 0,
+  });
+  jest
+    .mocked(startActivityAsync)
+    .mockRejectedValueOnce(new Error("installer permission required"))
+    .mockRejectedValueOnce(new Error("settings unavailable"));
+
+  await expect(downloadAndOpenAndroidUpdate(asset, jest.fn())).rejects.toThrow(
+    "settings unavailable",
+  );
+  expect(startActivityAsync).toHaveBeenNthCalledWith(
+    2,
     ActivityAction.MANAGE_UNKNOWN_APP_SOURCES,
     { data: "package:io.github.susimsek.kitezh.mobile" },
   );

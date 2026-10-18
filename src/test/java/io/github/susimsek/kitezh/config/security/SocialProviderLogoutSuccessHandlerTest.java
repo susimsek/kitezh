@@ -285,4 +285,57 @@ class SocialProviderLogoutSuccessHandlerTest {
                                         "a value"))
                 .isEqualTo("https://issuer.example/logout?existing=1&state=a+value");
     }
+
+    @Test
+    void usesProviderSpecificRedirectParameterNames() {
+        SocialProviderLogoutEndpointResolver resolver =
+                mock(SocialProviderLogoutEndpointResolver.class);
+        SocialProviderSettingsService settings = mock(SocialProviderSettingsService.class);
+        SocialProviderLogoutSuccessHandler handler =
+                new SocialProviderLogoutSuccessHandler(settings, resolver);
+        OidcLogoutAuthenticationToken logout =
+                new OidcLogoutAuthenticationToken(
+                        "hint",
+                        UsernamePasswordAuthenticationToken.authenticated(
+                                "ada", null, java.util.List.of()),
+                        "account-console",
+                        null,
+                        "/account/callback",
+                        null);
+        SocialProviderSettingsService.ProviderCredentials github =
+                new SocialProviderSettingsService.ProviderCredentials("github", "client", "secret");
+        SocialProviderSettingsService.ProviderCredentials linkedin =
+                new SocialProviderSettingsService.ProviderCredentials(
+                        "linkedin", "client", "secret");
+        when(resolver.resolve(github)).thenReturn("https://github.example/logout");
+        when(resolver.resolve(linkedin)).thenReturn("https://linkedin.example/logout");
+        OidcLogoutAuthenticationToken withoutRedirect = mock(OidcLogoutAuthenticationToken.class);
+        when(withoutRedirect.getPostLogoutRedirectUri()).thenReturn(null);
+
+        assertThat((String) invokeMethod(handler, "upstreamLogout", github, logout))
+                .isEqualTo("https://github.example/logout?return_to=%2Faccount%2Fcallback");
+        assertThat((String) invokeMethod(handler, "upstreamLogout", linkedin, logout))
+                .isEqualTo("https://linkedin.example/logout?redirect_uri=%2Faccount%2Fcallback");
+        assertThat((String) invokeMethod(handler, "upstreamLogout", github, withoutRedirect))
+                .isEqualTo("https://github.example/logout?return_to=%2F");
+    }
+
+    @Test
+    void omitsBlankIdTokenHintFromGenericProviderLogout() {
+        SocialProviderSettingsService.ProviderCredentials credentials =
+                new SocialProviderSettingsService.ProviderCredentials("oidc", "client", "secret");
+        OidcLogoutAuthenticationToken logout = mock(OidcLogoutAuthenticationToken.class);
+        when(logout.getIdTokenHint()).thenReturn(" ");
+        when(logout.getPostLogoutRedirectUri()).thenReturn("/account/callback");
+        SocialProviderLogoutEndpointResolver resolver =
+                mock(SocialProviderLogoutEndpointResolver.class);
+        when(resolver.resolve(credentials)).thenReturn("https://issuer.example/logout");
+        SocialProviderLogoutSuccessHandler handler =
+                new SocialProviderLogoutSuccessHandler(
+                        mock(SocialProviderSettingsService.class), resolver);
+
+        assertThat((String) invokeMethod(handler, "upstreamLogout", credentials, logout))
+                .isEqualTo(
+                        "https://issuer.example/logout?post_logout_redirect_uri=%2Faccount%2Fcallback");
+    }
 }

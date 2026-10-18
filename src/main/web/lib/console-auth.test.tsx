@@ -175,7 +175,6 @@ describe("useConsoleAuth token lifecycle", () => {
     );
     const { result } = renderHook(() => useConsoleAuth(config, "admin"));
     await waitFor(() => expect(persistTokens).toHaveBeenCalled());
-
     let refreshOne!: Promise<string | null>;
     let refreshTwo!: Promise<string | null>;
     act(() => {
@@ -211,6 +210,75 @@ describe("useConsoleAuth token lifecycle", () => {
     await expect(second.result.current.refreshAccessToken(-1)).resolves.toEqual(
       expect.stringContaining("header."),
     );
+  });
+
+  it("returns no access token when a transient refresh error leaves the current token expired", async () => {
+    mockReadTokens.mockResolvedValueOnce(storedTokens({ expiresAt: Date.now() - 1 }));
+    mockAxios.post.mockRejectedValueOnce(new Error("network unavailable"));
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(persistTokens).toHaveBeenCalled());
+
+    await expect(result.current.refreshAccessToken(-1)).resolves.toBeNull();
+    expect(removePersistedTokens).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing ID and refresh tokens when a refresh response omits them", async () => {
+    mockReadTokens.mockResolvedValueOnce(storedTokens({ expiresAt: Date.now() - 1 }));
+    const nextAccessToken = jwt({ sub: "user-1" });
+    mockAxios.post.mockResolvedValueOnce({
+      data: { access_token: nextAccessToken, expires_in: 90 },
+    } as never);
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(persistTokens).toHaveBeenCalled());
+
+    await expect(result.current.refreshAccessToken(-1)).resolves.toBe(nextAccessToken);
+    expect(persistTokens).toHaveBeenLastCalledWith(
+      "admin",
+      expect.objectContaining({
+        accessToken: nextAccessToken,
+        idToken: expect.any(String),
+        refreshToken: "refresh-1",
+      }),
+    );
+  });
+
+  it("initializes cleanly when reading the persisted token set fails", async () => {
+    mockReadTokens.mockRejectedValueOnce(new Error("storage unavailable"));
+    renderHook(() => useConsoleAuth(config, "admin"));
+
+    await waitFor(() =>
+      expect(dispatch).toHaveBeenCalledWith({
+        type: "auth/setConsoleInitialized",
+        payload: { console: "admin", initialized: true },
+      }),
+    );
+  });
+
+  it("ignores a refresh response after the local session is cleared", async () => {
+    mockReadTokens.mockResolvedValueOnce(storedTokens({ expiresAt: Date.now() - 1 }));
+    let finishRefresh!: (value: { data: ReturnType<typeof tokenResponse> }) => void;
+    mockAxios.post.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRefresh = resolve;
+      }) as never,
+    );
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(persistTokens).toHaveBeenCalled());
+    const appliedTokensBeforeRefresh = dispatch.mock.calls.filter(
+      ([action]) => action.type === "auth/applyConsoleToken",
+    ).length;
+
+    let pendingRefresh!: Promise<string | null>;
+    act(() => {
+      pendingRefresh = result.current.refreshAccessToken(-1);
+      result.current.clearLocalSession();
+    });
+    await act(async () => finishRefresh({ data: tokenResponse() }));
+
+    await expect(pendingRefresh).resolves.toBeNull();
+    expect(
+      dispatch.mock.calls.filter(([action]) => action.type === "auth/applyConsoleToken"),
+    ).toHaveLength(appliedTokensBeforeRefresh);
   });
 
   it("does not refresh when the restored session has no refresh token", async () => {
@@ -296,6 +364,38 @@ describe("useConsoleAuth token lifecycle", () => {
       "token endpoint unavailable",
     );
     expect(mockTransaction).toHaveBeenCalledWith(config, "state-1");
+  });
+
+  it("rejects an authorization-code response after the local session is cleared", async () => {
+    mockTransaction.mockReturnValueOnce({
+      codeVerifier: "verifier",
+      expires: Date.now() + 1000,
+      nonce: "nonce-1",
+      redirectUri: "https://kitezh.example/en/callback",
+      returnTo: "/admin/users",
+      state: "state-1",
+    });
+    let finishExchange!: (value: { data: ReturnType<typeof tokenResponse> }) => void;
+    mockAxios.post.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishExchange = resolve;
+      }) as never,
+    );
+    const { result } = renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+
+    let pendingExchange!: Promise<string>;
+    act(() => {
+      pendingExchange = result.current.completeAuthorization("auth-code", "state-1");
+      result.current.clearLocalSession();
+    });
+    const rejectedExchange = expect(pendingExchange).rejects.toThrow("Authorization was cancelled");
+    await act(async () => finishExchange({ data: tokenResponse() }));
+
+    await rejectedExchange;
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "auth/applyConsoleToken" }),
+    );
   });
 
   it("starts one PKCE authorization and stores the localized return path", async () => {

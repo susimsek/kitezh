@@ -131,6 +131,61 @@ test("group metadata and attributes follow the real wire contract", () => {
   });
   for (const invalid of ["null", "[]", '{"a":"b"}', '{"a":[1]}', "{"])
     assert.throws(() => groupAttributes(invalid));
+
+  assert.deepEqual(groupPage(null), {
+    content: [],
+    size: 10,
+    number: 0,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  assert.deepEqual(
+    groupPage(
+      {
+        content: "not-an-array",
+        page: {
+          size: 0,
+          number: 1.5,
+          totalElements: -1,
+          totalPages: Number.MAX_SAFE_INTEGER + 1,
+        },
+      },
+      20,
+    ),
+    {
+      content: [],
+      size: 20,
+      number: 0,
+      totalElements: 0,
+      totalPages: 0,
+    },
+  );
+  assert.deepEqual(groupPage({ content: [group], totalElements: 1 }), {
+    content: [group],
+    size: 10,
+    number: 0,
+    totalElements: 1,
+    totalPages: 1,
+  });
+});
+
+test("sparse group list records render safe defaults for optional metadata", async () => {
+  const sparseGroup = { id: 12, name: "Platform" };
+  const h = await harness({
+    response: (path, method) =>
+      path.startsWith("/api/admin/groups?") && method === "GET"
+        ? page([sparseGroup], { totalElements: 1, totalPages: 1 })
+        : undefined,
+  });
+  try {
+    await list(h);
+    const row = h.document.querySelector(".group-table tbody tr");
+    assert.equal(row.querySelector("td:first-child a").textContent, "Platform");
+    assert.equal(row.querySelector("td:nth-child(2)").textContent, "0");
+    assert.equal(row.querySelector("td:nth-child(3)").textContent, "0");
+  } finally {
+    h.restore();
+  }
 });
 
 test("group list renders counts, overflow actions, search, sorting, all pagination and size", async () => {
@@ -407,6 +462,64 @@ test("permissions add validates a blank row, save and remove sends complete assi
     assert.deepEqual(
       h.calls.filter(({ method }) => method === "PUT").at(-1).body,
       { permissions: [] },
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("group permission assignments reject duplicate user and permission pairs", async () => {
+  const h = await harness();
+  try {
+    await open(h, "permissions");
+    await click(h, '[data-action="group-permission-add"]');
+    await click(h, '[data-action="group-permission-add"]');
+    for (const index of [0, 1]) {
+      const user = h.document.getElementById(`group-permission-user-${index}`);
+      user.value = "1";
+      emit(h, user, "change");
+      const permission = h.document.getElementById(
+        `group-permission-value-${index}`,
+      );
+      permission.value = "MANAGE_GROUP";
+      emit(h, permission, "change");
+    }
+    const form = h.document.querySelector(
+      '[data-form="native-group-permissions"]',
+    );
+    emit(h, form, "submit");
+    await settle();
+    assert.match(
+      h.document.querySelectorAll(".group-permission-row .field-error")[1]
+        .textContent,
+      /must be unique/i,
+    );
+    assert.equal(
+      h.calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/groups/3/permissions" && method === "PUT",
+      ),
+      false,
+    );
+
+    const secondPermission = h.document.getElementById(
+      "group-permission-value-1",
+    );
+    secondPermission.value = "MANAGE_ROLES";
+    emit(h, secondPermission, "change");
+    emit(h, form, "submit");
+    await settle();
+    assert.deepEqual(
+      h.calls.find(
+        ({ path, method }) =>
+          path === "/api/admin/groups/3/permissions" && method === "PUT",
+      ).body,
+      {
+        permissions: [
+          { userId: 1, permission: "MANAGE_GROUP" },
+          { userId: 1, permission: "MANAGE_ROLES" },
+        ],
+      },
     );
   } finally {
     h.restore();
@@ -841,6 +954,26 @@ test("deep link hydrates active tab, locale and theme after reload", async () =>
     await settle();
     assert.equal(h.dom.window.location.hash, "#/admin/groups/3/roles");
     assert.equal(h.document.documentElement.dataset.theme, "dark");
+  } finally {
+    h.restore();
+  }
+});
+
+test("group member deep links clamp invalid pagination and restore the member sort", async () => {
+  const h = await harness({
+    hash: "#/admin/groups/3/members?page=1000001&size=25&sort=name,asc&q=ada",
+  });
+  try {
+    await settle();
+    assert.equal(h.document.getElementById("groupMember-size").value, "10");
+    assert.equal(h.document.getElementById("groupMember-sort").value, "username,asc");
+    assert.ok(
+      h.calls.some(
+        ({ path }) =>
+          path ===
+          "/api/admin/groups/3/users?q=ada&page=0&size=10&sort=username%2Casc",
+      ),
+    );
   } finally {
     h.restore();
   }

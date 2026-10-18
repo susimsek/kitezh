@@ -165,6 +165,99 @@ describe("ClientForm", () => {
     }
   });
 
+  it("covers client security switches and create-time scope selection", async () => {
+    mockAdminRequest.mockImplementation(async (_token, request) => {
+      if (request.url === "/api/admin/client-scopes?page=0&size=100") {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                id: "scope-openid",
+                name: "openid",
+                displayName: "OpenID scope",
+                description: "Provides the OpenID Connect identity scope.",
+              },
+              { id: "scope-custom", name: "custom-api", displayName: "Custom API" },
+            ],
+          },
+        } as never;
+      }
+      if (request.url === "/api/admin/clients" && request.method === "POST") {
+        return {
+          status: 201,
+          data: { client: { id: "security-client" }, clientSecret: null },
+        } as never;
+      }
+      return { status: 200, data: {} } as never;
+    });
+
+    render(<ClientForm dictionary={dictionary} locale="en" mode="create" />);
+    fireEvent.change(document.querySelector('input[name="clientId"]')!, {
+      target: { value: "security-client" },
+    });
+    fireEvent.change(document.querySelector('input[name="clientName"]')!, {
+      target: { value: "Security client" },
+    });
+    advanceCreateStep();
+    advanceCreateStep();
+    await screen.findByText("OpenID scope");
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    const toggleSetting = (label: string) => {
+      const input = screen.getByText(label).closest(".admin-setting-row")?.querySelector("input");
+      if (!input) throw new Error(`Missing client security switch: ${label}`);
+      fireEvent.click(input);
+    };
+    for (const label of [
+      dictionary.admin.clients.requirePkce,
+      dictionary.admin.clients.requireConsent,
+      dictionary.admin.clients.requireDpop,
+      dictionary.admin.clients.requireDpopJkt,
+      dictionary.admin.clients.dpopRefreshTokenOnly,
+    ]) {
+      toggleSetting(label);
+    }
+
+    const dpopSettings = screen
+      .getByText(dictionary.admin.clients.dpopAlgorithms)
+      .closest(".admin-setting-row");
+    const algorithms = dpopSettings?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    if (!algorithms || algorithms.length < 2) throw new Error("Missing DPoP algorithm options");
+    fireEvent.click(algorithms[0]);
+    fireEvent.click(algorithms[0]);
+
+    advanceCreateStep();
+    fireEvent.change(document.querySelector('textarea[name="redirectUris"]')!, {
+      target: { value: "https://app.example/callback" },
+    });
+    const openIdScope = screen
+      .getByText("OpenID scope")
+      .closest(".client-scope-create-option")
+      ?.querySelector("input");
+    if (!openIdScope) throw new Error("Missing OpenID scope option");
+    fireEvent.click(openIdScope);
+    fireEvent.click(openIdScope);
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({
+          method: "POST",
+          data: expect.objectContaining({
+            requireProofKey: false,
+            requireAuthorizationConsent: false,
+            requireDpop: true,
+            requireDpopJkt: true,
+            dpopRefreshTokenOnly: true,
+            dpopSigningAlgorithms: expect.arrayContaining(["RS256", "ES256"]),
+            scopes: ["profile", "openid"],
+          }),
+        }),
+      ),
+    );
+  });
+
   it("rejects a public client combined with client credentials", async () => {
     mockAdminRequest.mockResolvedValue({ status: 200, data: { content: [] } } as never);
     render(<ClientForm dictionary={dictionary} locale="en" mode="create" />);

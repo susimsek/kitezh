@@ -1,5 +1,7 @@
 package io.github.susimsek.kitezh.mcp.config;
 
+import io.github.susimsek.kitezh.mcp.config.observability.LoggingProperties;
+import io.github.susimsek.kitezh.mcp.config.observability.ObservabilityMdcFilter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +23,7 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthen
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.ExceptionTranslationFilter;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
@@ -32,7 +35,8 @@ public class McpSecurityConfig {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             McpToolCatalogPolicy mcpToolCatalogPolicy,
-            ApplicationProperties properties)
+            ApplicationProperties properties,
+            LoggingProperties loggingProperties)
             throws Exception {
         String issuer = properties.authorizationServer().issuer();
         String audience = properties.security().audience();
@@ -72,6 +76,8 @@ public class McpSecurityConfig {
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf.disable());
+        http.addFilterBefore(
+                new ObservabilityMdcFilter(loggingProperties), ExceptionTranslationFilter.class);
         http.addFilterAfter(
                 new McpToolAuthorizationFilter(
                         objectMapper,

@@ -1917,6 +1917,52 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   );
 });
 
+test("Admin event, localization, consent and key filters enforce typed bounds", async () => {
+  const requests = [];
+  const { adapter } = harness(async (url) => {
+    requests.push(String(url));
+    return new Response("{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  for (const path of [
+    "/api/admin/events?page=0&size=20&sort=occurredAt,desc&action=login&targetType=user&targetId=7",
+    "/api/admin/events?from=2026-10-01T00:00:00Z&to=2026-10-18T23:59:59.123456789%2B03:00",
+    "/api/admin/settings/localization/messages?locale=tr-TR&bundle=backend&page=0&size=20&sort=locale,asc",
+    "/api/admin/settings/localization/messages?locale=fr&bundle=account&page=0&size=20&sort=locale,asc",
+    "/api/admin/keys?active=false&page=0&size=20&sort=createdAt,desc",
+    "/api/admin/consents?clientId=account-console&username=ada&scope=openid&page=0&size=20",
+    "/api/admin/users?enabled=true&page=0&size=20&sort=username,asc",
+  ]) {
+    assert.equal(
+      (await adapter.request({ console: "admin", path })).status,
+      200,
+      path,
+    );
+  }
+  for (const path of [
+    "/api/admin/events?targetType=system",
+    "/api/admin/events?targetType=USER",
+    `/api/admin/events?action=${"a".repeat(101)}`,
+    `/api/admin/events?targetId=${"x".repeat(101)}`,
+    "/api/admin/events?from=not-an-instant",
+    "/api/admin/events?to=not-an-instant",
+    "/api/admin/settings/localization/messages?locale=tr_TR",
+    `/api/admin/settings/localization/messages?bundle=${"b".repeat(65)}`,
+    "/api/admin/keys?active=1",
+    `/api/admin/consents?clientId=${"c".repeat(101)}`,
+    "/api/admin/users?enabled=maybe",
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", path }),
+      /not allowed/,
+      path,
+    );
+  }
+  assert.equal(requests.length, 7, "Rejected filter values must not reach fetch");
+});
+
 test("maps transport failures to a recoverable offline result", async () => {
   const { adapter } = harness(async () => {
     throw new TypeError("network unavailable");

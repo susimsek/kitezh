@@ -102,6 +102,37 @@ test("shows authorization and transport errors, then allows retry", async () => 
   expect(await screen.findByText("adminLocalizationSettingsTitle")).toBeTruthy();
 });
 
+it.each([
+  ["unauthorized", new adminApi.AdminApiError(401), "apiUnauthorized"],
+  ["offline", new adminApi.AdminApiError(0, "offline"), "adminApiOfflineError"],
+  ["timeout", new adminApi.AdminApiError(0, "timeout"), "adminApiTimeoutError"],
+  ["unexpected", new Error("settings unavailable"), "adminLocalizationSettingsLoadError"],
+] as const)("shows the localized %s load error", async (_kind, failure, message) => {
+  jest.mocked(adminApi.getAdminLocalizationSettings).mockRejectedValueOnce(failure);
+  render(<AdminLocalizationSettings accessToken="access-token" canManage />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  expect(screen.getByTestId("admin-localization-retry")).toBeTruthy();
+});
+
+it.each([
+  ["unauthorized", new adminApi.AdminApiError(401), "apiUnauthorized"],
+  ["forbidden", new adminApi.AdminApiError(403), "adminForbidden"],
+  ["offline", new adminApi.AdminApiError(0, "offline"), "adminApiOfflineError"],
+  ["timeout", new adminApi.AdminApiError(0, "timeout"), "adminApiTimeoutError"],
+  ["unexpected", new Error("settings update failed"), "adminLocalizationSettingsSaveError"],
+] as const)("shows the localized %s save error", async (_kind, failure, message) => {
+  jest.mocked(adminApi.updateAdminLocalizationSettings).mockRejectedValueOnce(failure);
+  render(<AdminLocalizationSettings accessToken="access-token" canManage />);
+
+  fireEvent.press(await screen.findByTestId("admin-localization-save"));
+
+  await waitFor(() => {
+    expect(mockShowNotice).toHaveBeenCalledWith({ kind: "error", message });
+  });
+  expect(screen.getByTestId("admin-localization-save").props.accessibilityState.disabled).toBe(false);
+});
+
 test("prevents duplicate saves while a request is pending", async () => {
   let finishSave: ((value: adminApi.AdminLocalizationSettings) => void) | undefined;
   jest.mocked(adminApi.updateAdminLocalizationSettings).mockImplementation(

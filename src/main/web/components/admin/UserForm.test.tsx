@@ -347,6 +347,42 @@ describe("UserForm", () => {
     ).toHaveLength(2);
   });
 
+  it.each([
+    ["user_duplicate_email", "email", dictionary.admin.common.validation.emailDuplicate],
+    ["validation_failed", "roles", dictionary.admin.common.validation.roles],
+    ["validation_failed", "firstName", dictionary.admin.common.validation.required],
+  ])("maps server validation for %s on %s", async (errorCode, field, expectedMessage) => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/admin/roles?page=0&size=100")
+        return { status: 200, data: rolePage({ name: "ROLE_USER" }) } as never;
+      if (config.url === "/api/admin/profile-attributes")
+        return { status: 200, data: [] } as never;
+      return {
+        status: 400,
+        data: { errorCode, violations: [{ field }] },
+      } as never;
+    });
+
+    render(<UserForm dictionary={dictionary} locale="en" />);
+    await screen.findAllByRole("checkbox");
+    fireEvent.change(document.querySelector('input[name="username"]')!, {
+      target: { value: "ada" },
+    });
+    fireEvent.change(document.querySelector('input[name="email"]')!, {
+      target: { value: "ada@example.test" },
+    });
+    fireEvent.change(document.querySelector('input[name="password"]')!, {
+      target: { value: "StrongPassword1!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    expect(await screen.findByText(expectedMessage)).toBeVisible();
+    expect(mockAdminRequest).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ method: "POST", url: "/api/admin/users" }),
+    );
+  });
+
   it("rejects oversized images and bitmap decoding failures", async () => {
     const close = jest.fn();
     Object.assign(globalThis, {

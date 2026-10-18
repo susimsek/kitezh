@@ -105,6 +105,56 @@ describe("MFA account settings", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("reports setup failures returned by the server", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        response(200, {
+          enabled: false,
+          available: true,
+          required: false,
+          issuer: "Kitezh",
+          digits: 6,
+        }),
+      )
+      .mockResolvedValueOnce(response(503, { detail: "Setup is temporarily unavailable." }));
+
+    render(<MfaSettings dictionary={dictionary} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: dictionary.account.security.mfa.setup }),
+    );
+
+    expect(await screen.findByText("Setup is temporarily unavailable.")).toBeVisible();
+  });
+
+  it("handles unavailable recovery counts and blank recovery error details", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        response(200, {
+          enabled: true,
+          available: true,
+          required: false,
+          issuer: "Kitezh",
+          digits: 6,
+        }),
+      )
+      .mockResolvedValueOnce(response(503))
+      .mockResolvedValueOnce(response(503, { detail: "  " }));
+
+    render(<MfaSettings dictionary={dictionary} />);
+
+    expect(await screen.findByText(dictionary.account.security.mfa.enabled)).toBeVisible();
+    expect(
+      screen.queryByText(
+        dictionary.account.security.mfa.recoveryRemaining.replace("{{count}}", "0"),
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.account.security.mfa.recoveryGenerate }),
+    );
+
+    expect(await screen.findByText(dictionary.account.security.mfa.recoveryError)).toBeVisible();
+  });
+
   it("handles enabled MFA recovery codes, invalid disable codes, and successful disable", async () => {
     fetchMock
       .mockResolvedValueOnce(

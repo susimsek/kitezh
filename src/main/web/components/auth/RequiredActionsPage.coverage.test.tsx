@@ -134,6 +134,69 @@ describe("RequiredActionsPage error and validation flows", () => {
     expect(await screen.findByText("TOTP setup is unavailable")).toBeVisible();
   });
 
+  it("shows a fallback error when recovery-code setup has no server detail", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            key: "RECOVERY_CODES",
+            displayName: "Save recovery codes",
+            description: "Keep backup codes somewhere safe",
+            version: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => {
+          throw new Error("empty response body");
+        },
+      });
+
+    render(<RequiredActionsPage dictionary={dictionary} />);
+
+    expect(await screen.findByText(dictionary.requiredActions.error)).toBeVisible();
+  });
+
+  it("requires saving recovery codes before continuing and shows completion failures", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            key: "RECOVERY_CODES",
+            displayName: "Save recovery codes",
+            description: "Keep backup codes somewhere safe",
+            version: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ codes: ["ABCD-1234", "WXYZ-9876"], remaining: 2 }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ detail: " " }),
+      });
+
+    render(<RequiredActionsPage dictionary={dictionary} />);
+
+    expect(await screen.findByText("ABCD-1234")).toBeVisible();
+    const continueButton = screen.getByRole("button", {
+      name: dictionary.requiredActions.continue,
+    });
+    expect(continueButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(dictionary.requiredActions.recoverySaved));
+    expect(continueButton).toBeEnabled();
+    fireEvent.click(continueButton);
+
+    expect(await screen.findByText(dictionary.requiredActions.error)).toBeVisible();
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3));
+  });
+
   it("shows the passkey registration error without submitting the action", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

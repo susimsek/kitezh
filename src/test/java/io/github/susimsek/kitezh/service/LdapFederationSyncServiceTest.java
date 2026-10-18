@@ -195,6 +195,32 @@ class LdapFederationSyncServiceTest {
     }
 
     @Test
+    void schedulesFullOnlyProvidersAfterTheirIntervalAndSkipsProvidersWithoutIntervals() {
+        LdapFederationProviderEntity fullOnly = provider(true);
+        fullOnly.setId("full-only");
+        fullOnly.setLastSyncAt(Instant.now().minusSeconds(120));
+        fullOnly.setFullSyncIntervalMinutes(1);
+        LdapFederationProviderEntity notScheduled = provider(true);
+        notScheduled.setId("not-scheduled");
+        notScheduled.setLastSyncAt(null);
+        LdapDirectoryClient.Configuration configuration =
+                mock(LdapDirectoryClient.Configuration.class);
+        when(providerRepository.findAllByEnabledTrueOrderByPriorityAscNameAsc())
+                .thenReturn(List.of(fullOnly, notScheduled));
+        when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(transactionStatus);
+        when(providerRepository.findById("full-only")).thenReturn(Optional.of(fullOnly));
+        when(settingsService.configuration(fullOnly, null)).thenReturn(configuration);
+        when(directoryClient.searchUsers(configuration, null)).thenReturn(List.of());
+        doNothing().when(transactionManager).commit(transactionStatus);
+
+        service.synchronizeScheduledProviders();
+
+        verify(directoryClient).searchUsers(configuration, null);
+        verify(providerRepository, never()).findById("not-scheduled");
+    }
+
+    @Test
     void reportsExceptionTypeWhenSynchronizationFailureHasNoMessage() {
         LdapFederationProviderEntity provider = provider(true);
         LdapDirectoryClient.Configuration configuration =

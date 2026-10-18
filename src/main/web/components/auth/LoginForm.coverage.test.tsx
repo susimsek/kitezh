@@ -5,6 +5,10 @@ import dictionary from "@kitezh/shared/web-messages/en";
 jest.mock("@/routing/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
+jest.mock("@/lib/webauthn", () => ({
+  authenticatePasskey: jest.fn(),
+  supportsConditionalMediation: jest.fn().mockResolvedValue(false),
+}));
 jest.mock("./RegistrationCaptcha", () => ({
   RegistrationCaptcha: ({
     onReady,
@@ -36,6 +40,7 @@ jest.mock("./RegistrationCaptcha", () => ({
 }));
 
 import { LoginForm } from "./LoginForm";
+import { authenticatePasskey } from "@/lib/webauthn";
 
 describe("LoginForm CAPTCHA coverage", () => {
   beforeEach(() => {
@@ -87,5 +92,52 @@ describe("LoginForm CAPTCHA coverage", () => {
     await waitFor(() => expect(submit).toHaveBeenCalled());
     expect(screen.getByDisplayValue("verified-token")).toHaveAttribute("name", "captchaToken");
     submit.mockRestore();
+  });
+
+  it("filters malformed social providers and keeps unconfigured providers disabled", async () => {
+    jest.mocked(globalThis.fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return {
+        ok: true,
+        json: async () =>
+          url.includes("social-providers")
+            ? [
+                "google",
+                { provider: "custom", configured: false },
+                { provider: 7, configured: true },
+                { provider: "", configured: true },
+              ]
+            : {},
+      } as Response;
+    });
+
+    render(<LoginForm dictionary={dictionary} />);
+
+    const google = await screen.findByRole("link", {
+      name: `${dictionary.login.socialLogin} Google`,
+    });
+    expect(google).toHaveAttribute("href", "/oauth2/authorization/google");
+    const custom = screen.getByRole("button", {
+      name: `${dictionary.login.socialLogin} custom`,
+    });
+    expect(custom).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("button", { name: "7" })).not.toBeInTheDocument();
+  });
+
+  it("shows a recoverable error when passkey authentication fails", async () => {
+    jest.mocked(globalThis.fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return {
+        ok: true,
+        json: async () => (url.includes("login-settings") ? { passkeys: true } : {}),
+      } as Response;
+    });
+    jest.mocked(authenticatePasskey).mockRejectedValue(new Error("Passkey unavailable"));
+
+    render(<LoginForm dictionary={dictionary} />);
+    fireEvent.click(await screen.findByRole("button", { name: dictionary.login.passkey }));
+
+    expect(await screen.findByText(dictionary.login.passkeyError)).toBeVisible();
+    expect(authenticatePasskey).toHaveBeenCalledTimes(1);
   });
 });

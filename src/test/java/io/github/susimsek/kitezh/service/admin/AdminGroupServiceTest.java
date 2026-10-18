@@ -13,6 +13,7 @@ import io.github.susimsek.kitezh.domain.UserEntity;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupPermissionsRequestDTO;
+import io.github.susimsek.kitezh.dto.admin.AdminGroupRenameRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRequestDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminGroupRolesRequestDTO;
 import io.github.susimsek.kitezh.mapper.AdminGroupMapper;
@@ -118,6 +119,45 @@ class AdminGroupServiceTest {
 
         verify(userAccessInvalidationService).invalidate("alice");
         verify(userAccessInvalidationService).invalidate("bob");
+    }
+
+    @Test
+    void renameUpdatesGroupAndAuditsTheChange() {
+        GroupEntity group = group(7L, "finance");
+        UserEntity member = user(3L, "alice");
+        when(groupRepository.findById(7L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByName("finance-operators")).thenReturn(false);
+        when(userRepository.findAllByGroupsId(7L)).thenReturn(List.of(member));
+
+        var result =
+                service().rename(7L, new AdminGroupRenameRequestDTO(" finance-operators "), null);
+
+        assertThat(result.name()).isEqualTo("finance-operators");
+        verify(userAccessInvalidationService).invalidate("alice");
+        verify(adminAuditEventService).record("group.updated", "group", "7");
+    }
+
+    @Test
+    void renameDoesNotCheckForDuplicatesWhenNameIsUnchanged() {
+        GroupEntity group = group(7L, "finance");
+        when(groupRepository.findById(7L)).thenReturn(Optional.of(group));
+
+        assertThat(service().rename(7L, new AdminGroupRenameRequestDTO("finance"), null).name())
+                .isEqualTo("finance");
+
+        verify(groupRepository, never()).existsByName("finance");
+    }
+
+    @Test
+    void renameRejectsAnotherGroupsName() {
+        when(groupRepository.findById(7L)).thenReturn(Optional.of(group(7L, "finance")));
+        when(groupRepository.existsByName("support")).thenReturn(true);
+
+        assertThatThrownBy(
+                        () -> service().rename(7L, new AdminGroupRenameRequestDTO("support"), null))
+                .isInstanceOf(ApiException.class);
+
+        verify(adminAuditEventService, never()).record("group.updated", "group", "7");
     }
 
     @Test

@@ -150,6 +150,72 @@ describe("RoleDetail", () => {
     );
   });
 
+  it("clears a role description through the save operation", async () => {
+    render(<RoleDetail locale="en" dictionary={dictionary} name="ROLE_EDITOR" />);
+    await screen.findByRole("heading", { name: "ROLE_EDITOR" });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.roles.description), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.roles.saveDescription }));
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "admin-token",
+        expect.objectContaining({
+          method: "PUT",
+          data: { name: "ROLE_EDITOR", description: null },
+        }),
+      ),
+    );
+  });
+
+  it("reports failed realm and client composite mutations", async () => {
+    const withComposites = {
+      ...detail,
+      compositeRoles: ["ROLE_AUDITOR"],
+      compositeClientRoles: [{ id: 1, clientId: "account-console", name: "read" }],
+    };
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.includes("available-composites")) {
+        return Promise.resolve({ status: 200, data: { content: [{ name: "ROLE_NEW" }] } }) as never;
+      }
+      if (request.url?.includes("available-client-composites")) {
+        return Promise.resolve({
+          status: 200,
+          data: { content: [{ id: 2, clientId: "admin-console", name: "manage" }] },
+        }) as never;
+      }
+      if (request.method === "POST" || request.method === "DELETE") {
+        return Promise.resolve({ status: 500, data: null }) as never;
+      }
+      return Promise.resolve({ status: 200, data: withComposites }) as never;
+    });
+
+    render(<RoleDetail locale="en" dictionary={dictionary} name="ROLE_EDITOR" />);
+    await screen.findByRole("heading", { name: "ROLE_EDITOR" });
+    fireEvent.change(screen.getByLabelText(dictionary.admin.roles.assignComposite), {
+      target: { value: "NEW" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "ROLE_NEW" }));
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.assign })[0]);
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.roles.operationError),
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.remove })[0]);
+    await waitFor(() => expect(mockAddError).toHaveBeenCalledTimes(2));
+
+    fireEvent.change(screen.getByLabelText(dictionary.admin.roles.assignClientComposite), {
+      target: { value: "manage" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "admin-console:manage" }));
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.assign })[1]);
+    await waitFor(() => expect(mockAddError).toHaveBeenCalledTimes(3));
+
+    fireEvent.click(screen.getAllByRole("button", { name: dictionary.admin.roles.remove })[1]);
+    await waitFor(() => expect(mockAddError).toHaveBeenCalledTimes(4));
+  });
+
   it("searches, assigns, navigates to, and removes role users", async () => {
     render(<RoleDetail locale="en" dictionary={dictionary} name="ROLE_EDITOR" tab="users" />);
     expect(await screen.findByText("ada")).toBeVisible();
