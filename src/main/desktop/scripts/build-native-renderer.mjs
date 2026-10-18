@@ -47,7 +47,7 @@ await mkdir(outputDirectory, { recursive: true });
 await mkdir(path.join(outputDirectory, "brand"), { recursive: true });
 for (const name of ["logo-light.svg", "logo-dark.svg"]) {
   await copyFile(
-    path.join(desktopDirectory, "../web/public/brand", name),
+    path.join(desktopDirectory, "assets", "brand", name),
     path.join(outputDirectory, "brand", name),
   );
 }

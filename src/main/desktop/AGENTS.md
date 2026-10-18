@@ -39,7 +39,7 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
 - `src/config.ts`: API origin, desktop protocol, and environment validation.
 - `src/security/auth-flow.ts`: PKCE state, callback parsing, token exchange, and callback sanitization.
 - `src/security/origin-policy.ts`: trusted renderer and external-origin checks.
-- `scripts/build-renderer.mjs`: builds the shared Next.js static renderer into `renderer/`.
+- `scripts/build-native-renderer.mjs`: builds the standalone native renderer into `dist/native/`.
 - `scripts/collect-release-assets.mjs`: stages only user-downloadable installers, updater metadata,
   and verification files for a GitHub Release.
 - `scripts/run-desktop.mjs`: cross-platform local/production launcher and local DevTools configuration.
@@ -146,8 +146,8 @@ Run the Spring Boot development server on port `9090` before using `pnpm dev`.
   own product identity and keyboard-first desktop behavior.
 - The authenticated Desktop console owns its screens in `src/native/native.html` and
   `src/native/renderer.mjs`; `scripts/build-native-renderer.mjs` builds the native renderer.
-  `scripts/build-renderer.mjs` is a legacy Web-export helper and must not supply the native release
-  renderer. Keep native acceptance evidence in `docs/NATIVE-DESKTOP-FEATURE-MATRIX.md`; independent
+  The native renderer must not consume the Web static export. Keep native acceptance evidence in
+  `docs/NATIVE-DESKTOP-FEATURE-MATRIX.md`; independent
   screen ownership alone does not prove feature parity. Native sign-in, settings, update, and
   confirmation windows share `src/ui/native-styles.ts` and must remain independently themed.
 - Keep native window typography, spacing, control heights, radii, borders, and action colors aligned

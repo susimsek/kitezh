@@ -64,6 +64,9 @@ test("release packages consume one native renderer artifact and separate Mac arc
   const workflow = load(releaseWorkflow);
   const rendererSteps = workflow.jobs.renderer.steps;
   const packageSteps = workflow.jobs.package.steps;
+  const rendererCommands = rendererSteps
+    .map((step) => step.run ?? "")
+    .join("\n");
   const upload = rendererSteps.find((step) =>
     step.uses?.startsWith("actions/upload-artifact@"),
   );
@@ -79,10 +82,15 @@ test("release packages consume one native renderer artifact and separate Mac arc
   assert.equal(upload.with.name, download.with.name);
   assert.equal(upload.with["retention-days"], 1);
   assert.match(upload.with.path, /dist\/native\/$/);
+  assert.match(rendererCommands, /build:native/);
+  assert.doesNotMatch(
+    rendererCommands,
+    /src\/main\/web|pnpm --dir .*web|web\/out|build:renderer/,
+  );
   const packageCommands = packageSteps.map((step) => step.run ?? "").join("\n");
   assert.doesNotMatch(
     packageCommands,
-    /pnpm run build(?:\s|$)|build:native|build:renderer|--universal/,
+    /pnpm run build(?:\s|$)|build:native|--universal/,
   );
   assert.match(packageCommands, /--mac --x64 --arm64/);
   assert.match(packageCommands, /pnpm run build:main/);

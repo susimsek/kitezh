@@ -18,7 +18,6 @@
   "type": "commonjs",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
-    "build:renderer": "node scripts/build-renderer.mjs",
     "build:native": "node scripts/build-native-renderer.mjs",
     "typecheck": "tsc --noEmit",
     "pretypecheck": "pnpm run build:shared",

@@ -61,7 +61,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   renderer:
-    name: Build desktop renderer
+    name: Build native desktop renderer
     needs: resolve-release
     if: ${{ needs.resolve-release.outputs.current_release == 'true' }}
     runs-on: ubuntu-latest
@@ -83,21 +83,21 @@ jobs:
           cache-dependency-path: src/main/desktop/pnpm-lock.yaml
           install: false
 
-      - name: Install renderer dependencies
+      - name: Install desktop build dependencies
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
 
-      - name: Build desktop renderer
+      - name: Build native desktop renderer
         working-directory: src/main/desktop
         run: pnpm run build:shared && pnpm run build:native
 
-      - name: Verify desktop renderer output
+      - name: Verify native desktop renderer output
         run: test -s src/main/desktop/dist/native/native.html
 
-      - name: Upload shared desktop renderer
+      - name: Upload native desktop renderer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: renderer-${{ needs.resolve-release.outputs.release_tag }}
+          name: native-renderer-${{ needs.resolve-release.outputs.release_tag }}
           path: src/main/desktop/dist/native/
           if-no-files-found: error
           retention-days: 1
@@ -162,10 +162,10 @@ jobs:
         working-directory: src/main/desktop
         run: pnpm install --frozen-lockfile
 
-      - name: Download shared desktop renderer
+      - name: Download native desktop renderer
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: renderer-${{ needs.resolve-release.outputs.release_tag }}
+          name: native-renderer-${{ needs.resolve-release.outputs.release_tag }}
           path: src/main/desktop/dist/native/
 
       - name: Prepare update manifest verification key
