@@ -76,7 +76,7 @@ jest.mock("expo-auth-session", () => {
       authDiscovery = discovery;
     },
     exchangeCodeAsync: exchangeCode,
-    makeRedirectUri: () => "kitezh://account/oauth/callback",
+    makeRedirectUri: () => "kitezh://oauth/callback",
     refreshAsync: refresh,
   };
 });
@@ -124,6 +124,7 @@ jest.mock("@/api/public-api", () => ({
   startMobileLogin: jest.fn(),
   startMobileGoogleLogin: jest.fn(),
   submitMobileLoginAction: jest.fn(),
+  submitMobileLoginConsent: jest.fn(),
   submitMobileLoginMfa: jest.fn(),
 }));
 jest.mock("expo-linking", () => ({
@@ -136,8 +137,8 @@ jest.mock("@/config", () => ({
   getMobileConsoleConfig: () => ({
     clientId: "mobile-account",
     namespace: "account",
-    postLogoutRedirectUri: "kitezh://account/logout/callback",
-    redirectUri: "kitezh://account/oauth/callback",
+    postLogoutRedirectUri: "kitezh://logout/callback",
+    redirectUri: "kitezh://oauth/callback",
     scopes: ["openid", "account-api"],
   }),
 }));
@@ -149,11 +150,19 @@ jest.mock("@/i18n/LocaleProvider", () => ({
 }));
 jest.mock("../auth/storage", () => ({
   clearSession: jest.fn(),
+  clearSessionIfCurrent: jest.fn(async (namespace: string) => {
+    await jest.requireMock("../auth/storage").clearSession(namespace);
+    return true;
+  }),
   clearOAuthTransaction: jest.fn(),
   consumeOAuthTransaction: jest.fn(),
   readSession: jest.fn(),
   saveOAuthTransaction: jest.fn(),
   writeSession: jest.fn(),
+  writeSessionIfCurrent: jest.fn(async (session: unknown, namespace: string) => {
+    await jest.requireMock("../auth/storage").writeSession(session, namespace);
+    return true;
+  }),
 }));
 
 let savedOAuthTransaction: Awaited<
@@ -176,6 +185,7 @@ const {
   startMobileLogin: mockStartMobileLogin,
   startMobileGoogleLogin: mockStartMobileGoogleLogin,
   submitMobileLoginAction: mockSubmitMobileLoginAction,
+  submitMobileLoginConsent: mockSubmitMobileLoginConsent,
   submitMobileLoginMfa: mockSubmitMobileLoginMfa,
 } = jest.requireMock("@/api/public-api");
 
@@ -192,6 +202,8 @@ function AuthProbe() {
       <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google")}><Text>native-google-sign-in</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.nativeLogin("alice", "secret")}><Text>native-sign-in</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginMfa("123456")}><Text>submit-login-mfa</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginConsent(true)}><Text>approve-login-consent</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginConsent(false)}><Text>deny-login-consent</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginAction({ newPassword: "a-long-password" })}><Text>submit-login-action</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.refreshSession(true)}><Text>refresh</Text></Pressable>
       <Pressable
@@ -238,7 +250,7 @@ beforeEach(() => {
     status: "authorized",
     code: "authorization-code",
     state: "test-state-2",
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
   });
   jest.mocked(storage.readSession).mockResolvedValue(null);
   jest.mocked(storage.writeSession).mockResolvedValue(undefined);
@@ -248,7 +260,7 @@ beforeEach(() => {
     clientId: "mobile-account",
     codeVerifier: "test-verifier",
     createdAt: Date.now(),
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
     state: "test-state",
   });
   jest.mocked(storage.saveOAuthTransaction).mockResolvedValue(undefined);
@@ -306,13 +318,13 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
     expect.objectContaining({
       clientId: "mobile-account",
       codeVerifier: expect.stringMatching(/^test-verifier-\d+$/),
-      redirectUri: "kitezh://account/oauth/callback",
+      redirectUri: "kitezh://oauth/callback",
       state: expect.stringMatching(/^test-state-\d+$/),
     }),
   );
   expect(storage.consumeOAuthTransaction).toHaveBeenCalledWith("account", {
     clientId: "mobile-account",
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
   });
   expect(mockExchangeCode).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -495,7 +507,7 @@ it("completes Android authorization from the native redirect event", async () =>
 
   act(() => {
     receiveUrl?.({
-      url: `kitezh://account/oauth/callback?code=android-code&state=${state}`,
+      url: `kitezh://oauth/callback?code=android-code&state=${state}`,
     });
   });
 
@@ -538,7 +550,7 @@ it("does not cancel Android authorization for an active state without a backgrou
   expect(screen.getByText("signing-in")).toBeTruthy();
   act(() => {
     receiveUrl?.({
-      url: `kitezh://account/oauth/callback?code=android-code&state=${state}`,
+      url: `kitezh://oauth/callback?code=android-code&state=${state}`,
     });
   });
 
@@ -706,7 +718,7 @@ it("rejects an authorization callback whose state differs from the saved transac
     clientId: "mobile-account",
     codeVerifier: "test-verifier",
     createdAt: Date.now(),
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
     state: "another-request-state",
   });
   renderProvider();
@@ -887,7 +899,7 @@ it("binds provider selection to the mobile PKCE authorization endpoint", async (
     "account",
     expect.objectContaining({
       codeVerifier: "test-verifier-1",
-      redirectUri: "kitezh://account/oauth/callback",
+      redirectUri: "kitezh://oauth/callback",
       state: "test-state-1",
     }),
   );
@@ -898,7 +910,7 @@ it("uses native Google sign-in and continues through mobile PKCE without provide
     status: "authorized",
     code: "kitezh-authorization-code",
     state: "test-state-2",
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
   });
   renderProvider();
   await screen.findByText("signed-out");
@@ -969,7 +981,7 @@ it("uses the native credential API and exchanges its validated PKCE code", async
     expect.objectContaining({
       platform: expect.stringMatching(/^(ANDROID|IOS)$/),
       clientId: "mobile-account",
-      redirectUri: "kitezh://account/oauth/callback",
+      redirectUri: "kitezh://oauth/callback",
       scope: "openid account-api",
       state: "test-state-2",
       codeChallenge: "test-challenge-2",
@@ -1011,7 +1023,7 @@ it("completes native MFA and a required action before the PKCE exchange", async 
     status: "authorized",
     code: "authorization-code",
     state: "test-state-2",
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
   });
   renderProvider();
   await screen.findByText("signed-out");
@@ -1040,17 +1052,77 @@ it("completes native MFA and a required action before the PKCE exchange", async 
   expect(await screen.findByText("signed-in")).toBeTruthy();
 });
 
+it("requires explicit native consent approval before the PKCE exchange", async () => {
+  jest.mocked(mockStartMobileLogin).mockResolvedValueOnce({
+    status: "consent_required",
+    transactionId: "consent-transaction",
+    clientName: "Kitezh Account",
+    scopes: [
+      {
+        name: "profile",
+        displayName: "Profile",
+        description: "Read your profile",
+      },
+    ],
+  });
+  jest.mocked(mockSubmitMobileLoginConsent).mockResolvedValueOnce({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+  expect(await screen.findByText("consent")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "approve-login-consent" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockSubmitMobileLoginConsent).toHaveBeenCalledWith(
+    "consent-transaction",
+    true,
+    { locale: "en" },
+  );
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+});
+
+it("never exchanges a code after native consent is denied", async () => {
+  jest.mocked(mockStartMobileLogin).mockResolvedValueOnce({
+    status: "consent_required",
+    transactionId: "consent-transaction",
+    clientName: "Kitezh Account",
+    scopes: [],
+  });
+  jest.mocked(mockSubmitMobileLoginConsent).mockResolvedValueOnce({
+    status: "denied",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+  expect(await screen.findByText("consent")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "deny-login-consent" }));
+
+  await waitFor(() => expect(screen.getByText("consent-denied")).toBeTruthy());
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+});
+
 it("resumes a cold-start callback from its SecureStore PKCE transaction", async () => {
   jest
     .spyOn(Linking, "getInitialURL")
     .mockResolvedValueOnce(
-      "kitezh://account/oauth/callback?code=resumed-authorization-code&state=test-state",
+      "kitezh://oauth/callback?code=resumed-authorization-code&state=test-state",
     );
   jest.mocked(storage.consumeOAuthTransaction).mockResolvedValueOnce({
     clientId: "mobile-account",
     codeVerifier: "persisted-test-verifier",
     createdAt: Date.now(),
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
     state: "test-state",
   });
 
@@ -1070,7 +1142,7 @@ it("clears the pending transaction when a cold-start callback has no state", asy
   jest
     .spyOn(Linking, "getInitialURL")
     .mockResolvedValueOnce(
-      "kitezh://account/oauth/callback?code=untrusted-authorization-code",
+      "kitezh://oauth/callback?code=untrusted-authorization-code",
     );
 
   renderProvider();
@@ -1098,7 +1170,7 @@ it.each([
 it("ignores duplicate cold-start callback parameters", async () => {
   jest
     .spyOn(Linking, "getInitialURL")
-    .mockResolvedValueOnce("kitezh://account/oauth/callback?state=duplicate");
+    .mockResolvedValueOnce("kitezh://oauth/callback?state=duplicate");
   jest.spyOn(ExpoLinking, "parse").mockReturnValueOnce({
     queryParams: {
       code: ["first-code", "second-code"],
@@ -1229,7 +1301,7 @@ it("clears a refreshed token when logout races its storage write", async () => {
   pendingWrite.resolve(undefined);
 
   expect(await screen.findByText("signed-out")).toBeTruthy();
-  await waitFor(() => expect(storage.clearSession).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(storage.clearSession).toHaveBeenCalledTimes(1));
   expect(screen.getByText("no-session")).toBeTruthy();
   expect(screen.getByText("signed-out")).toBeTruthy();
 });

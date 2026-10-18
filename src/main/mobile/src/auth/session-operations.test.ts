@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   invalidateSessionOperations,
   isSessionOperationCurrent,
+  runSessionStorageMutation,
   sessionOperationGeneration,
   sessionRefreshCoordinator,
 } from "./session-operations.ts";
@@ -26,15 +27,51 @@ test("refreshes are single-flight per session namespace", async () => {
   finish?.(null);
   assert.equal(await first, null);
   assert.equal(await second, null);
-  assert.notEqual(sessionRefreshCoordinator("account"), sessionRefreshCoordinator("admin"));
+  assert.equal(sessionRefreshCoordinator("account"), coordinator);
+  assert.notEqual(coordinator, sessionRefreshCoordinator("admin"));
+});
+
+test("queued SecureStore writes skip stale session generations", async () => {
+  const generation = sessionOperationGeneration("account");
+  let release: (() => void) | undefined;
+  let markStarted: (() => void) | undefined;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  const first = runSessionStorageMutation("account", () => {
+    markStarted?.();
+    return new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  });
+  const staleMutation = runSessionStorageMutation(
+    "account",
+    async () => "stale-write",
+    generation,
+  );
+  await started;
+  invalidateSessionOperations("account");
+  release?.();
+  await first;
+  assert.equal(await staleMutation, undefined);
+});
+
+test("session mutations stay isolated across console namespaces", async () => {
+  const generation = sessionOperationGeneration("admin");
+  const results = await Promise.all([
+    runSessionStorageMutation("account", async () => "account"),
+    runSessionStorageMutation("admin", async () => "admin", generation),
+  ]);
+  assert.deepEqual(results, ["account", "admin"]);
 });
 
 test("logout invalidates pending session mutations", () => {
   const generation = sessionOperationGeneration("admin");
+  const accountGeneration = sessionOperationGeneration("account");
   assert.equal(isSessionOperationCurrent("admin", generation), true);
   invalidateSessionOperations("admin");
   assert.equal(isSessionOperationCurrent("admin", generation), false);
-  assert.equal(isSessionOperationCurrent("account", generation), true);
+  assert.equal(isSessionOperationCurrent("account", accountGeneration), true);
 });
 
 test("SecureStore records migrate legacy sessions and reject cross-console records", () => {

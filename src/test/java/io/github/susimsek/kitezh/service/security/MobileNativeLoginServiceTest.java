@@ -24,6 +24,7 @@ import io.github.susimsek.kitezh.dto.account.MobileLoginResponseDTO;
 import io.github.susimsek.kitezh.dto.account.MobilePasskeyLoginRequestDTO;
 import io.github.susimsek.kitezh.dto.account.RecoveryCodesDTO;
 import io.github.susimsek.kitezh.dto.account.RequiredActionDTO;
+import io.github.susimsek.kitezh.repository.ClientScopeRepository;
 import io.github.susimsek.kitezh.repository.MobileLoginTransactionRepository;
 import io.github.susimsek.kitezh.service.DomainUserDetailsService;
 import io.github.susimsek.kitezh.service.account.MfaService;
@@ -52,6 +53,8 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -72,6 +75,8 @@ class MobileNativeLoginServiceTest {
     private RegisteredClientRepository clients;
     private OAuth2AuthorizationService authorizations;
     private MobileLoginTransactionRepository transactions;
+    private OAuth2AuthorizationConsentService consentService;
+    private ClientScopeRepository clientScopeRepository;
     private DomainUserDetailsService userDetailsService;
     private AuthenticationManager authenticationManager;
     private LoginRateLimitService rateLimitService;
@@ -92,6 +97,8 @@ class MobileNativeLoginServiceTest {
         clients = mock(RegisteredClientRepository.class);
         authorizations = mock(OAuth2AuthorizationService.class);
         transactions = mock(MobileLoginTransactionRepository.class);
+        consentService = mock(OAuth2AuthorizationConsentService.class);
+        clientScopeRepository = mock(ClientScopeRepository.class);
         userDetailsService = mock(DomainUserDetailsService.class);
         Map<String, MobileLoginTransactionEntity> transactionRows = new ConcurrentHashMap<>();
         when(transactions.saveAndFlush(any(MobileLoginTransactionEntity.class)))
@@ -154,6 +161,8 @@ class MobileNativeLoginServiceTest {
                         clients,
                         authorizations,
                         transactions,
+                        consentService,
+                        clientScopeRepository,
                         userDetailsService,
                         Map.of("formAuthenticationManager", authenticationManager),
                         rateLimitService,
@@ -226,6 +235,64 @@ class MobileNativeLoginServiceTest {
                                         challenge.transactionId(),
                                         new MobileLoginMfaRequestDTO("123456"),
                                         servletRequest))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void requiresExplicitNativeConsentBeforeIssuingAnAuthorizationCode() {
+        RegisteredClient consentClient = client(true);
+        when(clients.findByClientId(CLIENT_ID)).thenReturn(consentClient);
+        when(clients.findById("mobile-account-console-id")).thenReturn(consentClient);
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, true, false, "Kitezh", "SHA1", 6, 30));
+
+        MobileLoginResponseDTO pending = service.begin(request(), servletRequest);
+
+        assertThat(pending.status()).isEqualTo("consent_required");
+        assertThat(pending.clientName()).isEqualTo("Kitezh Mobile Account");
+        assertThat(pending.scopes())
+                .extracting(scope -> scope.name())
+                .containsExactly("account-api", "email", "openid", "profile");
+        assertThat(pending.transactionId()).isNotBlank();
+        verify(authorizations, never()).save(any(OAuth2Authorization.class));
+    }
+
+    @Test
+    void explicitConsentPersistsOnlyServerBoundScopesBeforeIssuingCode() {
+        RegisteredClient consentClient = client(true);
+        when(clients.findByClientId(CLIENT_ID)).thenReturn(consentClient);
+        when(clients.findById("mobile-account-console-id")).thenReturn(consentClient);
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, true, false, "Kitezh", "SHA1", 6, 30));
+        MobileLoginResponseDTO pending = service.begin(request(), servletRequest);
+        when(consentService.findById("mobile-account-console-id", "admin")).thenReturn(null);
+
+        MobileLoginResponseDTO response = service.decideConsent(pending.transactionId(), true);
+
+        assertThat(response.status()).isEqualTo("authorized");
+        assertThat(response.state()).isEqualTo(STATE);
+        assertThat(response.redirectUri()).isEqualTo(REDIRECT_URI);
+        verify(consentService).save(any(OAuth2AuthorizationConsent.class));
+        verify(authorizations).save(any(OAuth2Authorization.class));
+    }
+
+    @Test
+    void denialConsumesConsentTransactionWithoutSavingConsentOrIssuingCode() {
+        RegisteredClient consentClient = client(true);
+        when(clients.findByClientId(CLIENT_ID)).thenReturn(consentClient);
+        when(clients.findById("mobile-account-console-id")).thenReturn(consentClient);
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, true, false, "Kitezh", "SHA1", 6, 30));
+        MobileLoginResponseDTO pending = service.begin(request(), servletRequest);
+
+        MobileLoginResponseDTO denied = service.decideConsent(pending.transactionId(), false);
+
+        assertThat(denied.status()).isEqualTo("denied");
+        assertThat(denied.state()).isEqualTo(STATE);
+        assertThat(denied.redirectUri()).isEqualTo(REDIRECT_URI);
+        verify(consentService, never()).save(any(OAuth2AuthorizationConsent.class));
+        verify(authorizations, never()).save(any(OAuth2Authorization.class));
+        assertThatThrownBy(() -> service.decideConsent(pending.transactionId(), true))
                 .isInstanceOf(ApiException.class);
     }
 
@@ -442,6 +509,10 @@ class MobileNativeLoginServiceTest {
     }
 
     private static RegisteredClient client() {
+        return client(false);
+    }
+
+    private static RegisteredClient client(boolean requireConsent) {
         return RegisteredClient.withId("mobile-account-console-id")
                 .clientId(CLIENT_ID)
                 .clientName("Kitezh Mobile Account")
@@ -456,7 +527,7 @@ class MobileNativeLoginServiceTest {
                 .clientSettings(
                         ClientSettings.builder()
                                 .requireProofKey(true)
-                                .requireAuthorizationConsent(false)
+                                .requireAuthorizationConsent(requireConsent)
                                 .build())
                 .tokenSettings(TokenSettings.builder().build())
                 .build();

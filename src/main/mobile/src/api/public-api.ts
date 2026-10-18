@@ -1,5 +1,6 @@
 import type {
   ReleaseMetadata,
+  MobileAuthServerCapabilities,
   SocialProviderAvailability,
 } from "../../../shared/src/contracts.ts";
 import type { MfaSetup } from "./account-api.ts";
@@ -67,11 +68,62 @@ export type CaptchaSettings = {
 };
 export type { SocialProviderAvailability } from "../../../shared/src/contracts.ts";
 
+export async function getMobileAuthCapabilities(
+  options: RequestOptions = {},
+): Promise<MobileAuthServerCapabilities> {
+  try {
+    const response = await publicClient.request<unknown>({
+      headers: {
+        Accept: "application/json",
+        ...(options.locale ? { "Accept-Language": options.locale } : {}),
+      },
+      method: "GET",
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
+      url: "/api/auth/mobile/capabilities",
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new PublicApiError(
+        response.status,
+        "Mobile authentication capabilities request failed",
+        readMobileResponseData(response.data),
+        readRetryAfterHeader(response.headers),
+      );
+    }
+    const value = readMobileResponseData(response.data) as Partial<MobileAuthServerCapabilities>;
+    if (
+      !Number.isInteger(value?.contractVersion) ||
+      (value.contractVersion ?? 0) < 1 ||
+      !Array.isArray(value.capabilities) ||
+      !value.capabilities.every((capability) => typeof capability === "string")
+    ) {
+      throw new PublicApiError(502, "Mobile authentication capabilities were invalid");
+    }
+    return {
+      contractVersion: value.contractVersion as number,
+      capabilities: [...new Set(value.capabilities)],
+    };
+  } catch (cause) {
+    if (cause instanceof PublicApiError) throw cause;
+    throw new PublicApiError(
+      0,
+      "Mobile authentication capabilities unavailable",
+      getMobileTransportCause(cause),
+    );
+  }
+}
+
 export type MobileLoginAction = {
   key: string;
   displayName: string;
   description: string;
   version: number;
+};
+
+export type MobileConsentScope = {
+  name: string;
+  displayName: string;
+  description: string;
 };
 
 export type MobileLoginResponse =
@@ -91,7 +143,14 @@ export type MobileLoginResponse =
       status: "passkey_required";
       transactionId: string;
       publicKey: NativeRequestOptions;
-    };
+    }
+  | {
+      status: "consent_required";
+      transactionId: string;
+      clientName: string;
+      scopes: MobileConsentScope[];
+    }
+  | { status: "denied"; state: string; redirectUri: string };
 
 export type LoginCaptchaSettings = {
   enabled: boolean;
@@ -353,6 +412,18 @@ export function submitMobileLoginMfa(
   ).then(parseMobileLoginResponse);
 }
 
+export function submitMobileLoginConsent(
+  transactionId: string,
+  approved: boolean,
+  options: RequestOptions = {},
+) {
+  return post<MobileLoginResponse>(
+    `/api/auth/mobile/login/${encodeURIComponent(transactionId)}/consent`,
+    { approved },
+    options,
+  ).then(parseMobileLoginResponse);
+}
+
 export function submitMobileLoginAction(
   transactionId: string,
   actionKey: string,
@@ -492,6 +563,22 @@ function parseMobileLoginResponse(value: unknown): MobileLoginResponse {
   ) {
     return response as MobileLoginResponse;
   }
+  if (
+    response.status === "consent_required" &&
+    typeof response.transactionId === "string" &&
+    typeof response.clientName === "string" &&
+    Array.isArray(response.scopes) &&
+    response.scopes.every(isMobileConsentScope)
+  ) {
+    return response as MobileLoginResponse;
+  }
+  if (
+    response.status === "denied" &&
+    typeof response.state === "string" &&
+    typeof response.redirectUri === "string"
+  ) {
+    return response as MobileLoginResponse;
+  }
   throw new PublicApiError(502, "Mobile login response was invalid");
 }
 
@@ -508,6 +595,15 @@ function isMobileLoginAction(value: unknown): value is MobileLoginAction {
     typeof action.description === "string" &&
     typeof action.version === "number" &&
     Number.isFinite(action.version)
+  );
+}
+
+function isMobileConsentScope(value: unknown): value is MobileConsentScope {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.name === "string" &&
+    typeof value.displayName === "string" &&
+    typeof value.description === "string"
   );
 }
 

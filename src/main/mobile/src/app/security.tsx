@@ -20,18 +20,23 @@ import { AccountPagination } from "@/components/AccountPagination";
 import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import {
   AccountApiError,
+  beginAccountPasskeyEnrollment,
   changeAccountPassword,
   createPersonalAccessToken,
   deleteAccount,
   listPersonalAccessTokens,
+  listAccountPasskeys,
+  completeAccountPasskeyEnrollment,
   listAccountSessions,
   revokePersonalAccessToken,
   signOutAccountSession,
   signOutOtherAccountSessions,
   type AccountSession,
+  type AccountPasskey,
   type CreatedPersonalAccessToken,
   type PersonalAccessToken,
 } from "@/api/account-api";
+import { createNativePasskey } from "@/auth/native-passkey";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -109,6 +114,11 @@ export default function SecurityScreen() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [sessions, setSessions] = useState<AccountSession[]>([]);
+  const [passkeys, setPasskeys] = useState<AccountPasskey[]>([]);
+  const [passkeysLoading, setPasskeysLoading] = useState(true);
+  const [passkeysError, setPasskeysError] = useState(false);
+  const [passkeyLabel, setPasskeyLabel] = useState("");
+  const [addingPasskey, setAddingPasskey] = useState(false);
   const [personalAccessTokens, setPersonalAccessTokens] = useState<PersonalAccessToken[]>([]);
   const [personalAccessTokensLoading, setPersonalAccessTokensLoading] = useState(true);
   const [personalAccessTokensError, setPersonalAccessTokensError] = useState(false);
@@ -164,6 +174,24 @@ export default function SecurityScreen() {
       setPersonalAccessTokensError(true);
     } finally {
       setPersonalAccessTokensLoading(false);
+    }
+  }, [refreshSession, session]);
+
+  const loadPasskeys = useCallback(async (retry = false) => {
+    if (!session) return;
+    setPasskeysLoading(true);
+    setPasskeysError(false);
+    try {
+      const currentSession = retry ? await refreshSession(true) : await refreshSession();
+      if (!currentSession) throw new Error("Session unavailable");
+      const result = await listAccountPasskeys(currentSession.accessToken, {
+        refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+      });
+      setPasskeys(result.content ?? []);
+    } catch {
+      setPasskeysError(true);
+    } finally {
+      setPasskeysLoading(false);
     }
   }, [refreshSession, session]);
 
@@ -224,6 +252,38 @@ export default function SecurityScreen() {
   useEffect(() => {
     if (session) queueMicrotask(() => void loadPersonalAccessTokens());
   }, [loadPersonalAccessTokens, session]);
+
+  useEffect(() => {
+    if (session) queueMicrotask(() => void loadPasskeys());
+  }, [loadPasskeys, session]);
+
+  const addPasskey = useCallback(async () => {
+    if (!session || addingPasskey) return;
+    setAddingPasskey(true);
+    try {
+      const currentSession = await refreshSession();
+      if (!currentSession) throw new Error("Session unavailable");
+      const registration = await beginAccountPasskeyEnrollment(currentSession.accessToken, {
+        refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null,
+      });
+      const credential = await createNativePasskey(registration.publicKey);
+      await completeAccountPasskeyEnrollment(
+        currentSession.accessToken,
+        registration.challengeId,
+        credential,
+        passkeyLabel.trim() || `${dictionary.accountPasskeysTitle} ${passkeys.length + 1}`,
+        { refreshAccessToken: async () => (await refreshSession(true))?.accessToken ?? null },
+      );
+      setPasskeyLabel("");
+      await loadPasskeys(true);
+      showNotice({ kind: "success", message: dictionary.accountPasskeyAdded });
+    } catch {
+      setPasskeysError(true);
+      showNotice({ kind: "error", message: dictionary.accountPasskeyAddError });
+    } finally {
+      setAddingPasskey(false);
+    }
+  }, [addingPasskey, dictionary.accountPasskeyAddError, dictionary.accountPasskeyAdded, dictionary.accountPasskeysTitle, loadPasskeys, passkeyLabel, passkeys.length, refreshSession, session, showNotice]);
 
   const createPersonalToken = useCallback(async () => {
     if (!session || creatingPersonalAccessToken) return;
@@ -775,6 +835,45 @@ export default function SecurityScreen() {
               <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
                 {dictionary.personalAccessTokenCreate}
               </Text>
+            </Pressable>
+          </View>
+
+          <View
+            style={[styles.section, { borderColor: palette.border }]}
+            testID="account-passkeys"
+          >
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              {dictionary.accountPasskeysTitle}
+            </Text>
+            <Text style={[styles.help, { color: palette.textMuted }]}>
+              {dictionary.accountPasskeysHelp}
+            </Text>
+            {passkeysLoading ? (
+              <ActivityIndicator color={palette.primary} accessibilityLabel={dictionary.loading} />
+            ) : passkeysError ? (
+              <Pressable accessibilityRole="button" onPress={() => void loadPasskeys(true)} style={styles.errorAction}>
+                <Text style={{ color: palette.danger }}>{dictionary.accountPasskeyListError}</Text>
+                <Text style={{ color: palette.primary }}>{dictionary.sessionsRetry}</Text>
+              </Pressable>
+            ) : passkeys.length === 0 ? (
+              <Text style={[styles.help, { color: palette.textMuted }]}>{dictionary.accountPasskeysEmpty}</Text>
+            ) : passkeys.map((passkey) => (
+              <View key={passkey.credentialId} style={[styles.session, { borderColor: palette.border }]}>
+                <Text style={[styles.sessionTitle, { color: palette.text }]}>{passkey.label}</Text>
+                <Text style={[styles.sessionMeta, { color: palette.textMuted }]}>{formatDate(passkey.createdAt, resolvedLocale)}</Text>
+              </View>
+            ))}
+            <TextInput
+              accessibilityLabel={dictionary.accountPasskeyLabel}
+              onChangeText={setPasskeyLabel}
+              placeholder={dictionary.accountPasskeyLabel}
+              placeholderTextColor={palette.textMuted}
+              value={passkeyLabel}
+              style={[styles.input, { color: palette.text, borderColor: palette.border }]}
+            />
+            <Pressable accessibilityRole="button" testID="passkey-add" accessibilityState={{ disabled: addingPasskey }} disabled={addingPasskey} onPress={() => void addPasskey()} style={[styles.primaryAction, { backgroundColor: palette.primary, opacity: addingPasskey ? 0.65 : 1 }]}>
+              {addingPasskey ? <ActivityIndicator color={palette.onPrimary} accessibilityLabel={dictionary.loading} /> : null}
+              <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>{dictionary.accountPasskeyAdd}</Text>
             </Pressable>
           </View>
 

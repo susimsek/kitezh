@@ -3,6 +3,7 @@ import {
   render,
   screen,
   fireEvent,
+  waitFor,
 } from "@/testing/native-testing-library";
 import { ActivityIndicator, StyleSheet } from "react-native";
 import { router } from "expo-router";
@@ -16,13 +17,21 @@ import VerifyEmailScreen from "../app/verify-email";
 
 let mockAuthStatus = "signed-out";
 let mockVerificationToken: string | undefined = "verify-token";
+let mockLoginChallenge: {
+  kind: "actions";
+  transactionId: string;
+  actions: { key: string; displayName: string; description: string; version: number }[];
+} | null = null;
 const mockSignIn = jest.fn();
+const mockNativePasskeyLogin = jest.fn();
+const mockSubmitLoginPasskeyRegistration = jest.fn();
 
 jest.mock("@/api/public-api", () => ({
   ...jest.requireActual("@/api/public-api"),
   getCaptchaSettings: jest.fn(),
   getLoginCaptchaSettings: jest.fn(),
   registerAccount: jest.fn(),
+  getMobileLoginPasskeyRegistrationOptions: jest.fn(),
   requestPasswordReset: jest.fn(),
   resetPassword: jest.fn(),
   verifyEmail: jest.fn(),
@@ -43,10 +52,18 @@ jest.mock("@/auth/MobileAuthProvider", () => ({
   useMobileAuth: () => ({
     discoveryStatus: "ready",
     error: null,
+    loginChallenge: mockLoginChallenge,
+    nativeLogin: jest.fn(),
+    nativePasskeyLogin: mockNativePasskeyLogin,
     retryDiscovery: jest.fn(),
     signIn: mockSignIn,
+    submitLoginPasskeyRegistration: mockSubmitLoginPasskeyRegistration,
     status: mockAuthStatus,
   }),
+}));
+jest.mock("@/auth/native-passkey", () => ({
+  createNativePasskey: jest.fn(async () => ({ id: "credential-id" })),
+  isNativePasskeySupported: jest.fn(() => true),
 }));
 jest.mock("@/i18n/LocaleProvider", () => ({
   useLocale: () => ({
@@ -76,6 +93,7 @@ jest.mock("react-native-safe-area-context", () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockAuthStatus = "signed-out";
+  mockLoginChallenge = null;
   mockVerificationToken = "verify-token";
   jest.mocked(publicApi.getCaptchaSettings).mockResolvedValue({ enabled: false });
   jest.mocked(publicApi.getLoginCaptchaSettings).mockResolvedValue({
@@ -90,6 +108,12 @@ beforeEach(() => {
     androidSiteKey: "",
     iosSiteKey: "",
   });
+  jest.mocked(publicApi.getMobileLoginPasskeyRegistrationOptions).mockResolvedValue({
+    challenge: "challenge",
+    rp: { id: "kitezh.onrender.com", name: "Kitezh" },
+    user: { id: "user-id", name: "alice", displayName: "Alice" },
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+  } as never);
   jest.mocked(publicApi.verifyEmail).mockResolvedValue(undefined);
 });
 
@@ -121,6 +145,53 @@ it("opens the Account Console after an authorization callback signs in", () => {
   render(<SignInScreen />);
 
   expect(router.replace).toHaveBeenCalledWith("/account");
+});
+
+it("starts native passkey login for the entered account", async () => {
+  render(<SignInScreen />);
+  fireEvent.changeText(await screen.findByLabelText("username"), "alice");
+  const passkey = screen.getByRole("button", { name: "passkeySignIn" });
+  fireEvent.press(passkey);
+
+  expect(mockNativePasskeyLogin).toHaveBeenCalledWith("alice");
+  expect(passkey.props.accessibilityState.disabled).toBe(false);
+});
+
+it("registers a native passkey for the transaction-bound required action", async () => {
+  mockLoginChallenge = {
+    kind: "actions",
+    transactionId: "login-transaction",
+    actions: [
+      {
+        key: "CONFIGURE_PASSKEY",
+        displayName: "Register passkey",
+        description: "Register a passkey",
+        version: 1,
+      },
+    ],
+  };
+
+  render(<SignInScreen />);
+  const register = await screen.findByRole("button", {
+    name: "requiredActionPasskey",
+  });
+  await waitFor(() =>
+    expect(publicApi.getMobileLoginPasskeyRegistrationOptions).toHaveBeenCalledWith(
+      "login-transaction",
+      "CONFIGURE_PASSKEY",
+      expect.any(Object),
+    ),
+  );
+  fireEvent.changeText(screen.getByLabelText("passkeyLabel"), "My phone");
+  fireEvent.press(register);
+
+  await waitFor(() =>
+    expect(mockSubmitLoginPasskeyRegistration).toHaveBeenCalledWith(
+      "CONFIGURE_PASSKEY",
+      { id: "credential-id" },
+      "My phone",
+    ),
+  );
 });
 
 it("announces password-reset request progress and rejects duplicate taps", async () => {

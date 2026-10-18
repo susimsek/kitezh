@@ -23,6 +23,7 @@ import {
   type MfaSetup,
   type MfaStatus,
 } from "@/api/account-api";
+import { apiErrorMessage } from "@/api/public-error-message";
 import { useMobileAuth } from "@/auth/MobileAuthProvider";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -464,20 +465,7 @@ function getMfaErrorMessage(
   dictionary: ReturnType<typeof useLocale>["dictionary"],
 ) {
   if (!(cause instanceof AccountApiError)) return fallback;
-  switch (cause.kind) {
-    case "offline":
-      return dictionary.apiOffline;
-    case "timeout":
-      return dictionary.apiTimeout;
-    case "unauthorized":
-      return dictionary.apiUnauthorized;
-    case "forbidden":
-      return dictionary.apiForbidden;
-    case "validation":
-      return dictionary.apiValidation;
-    default:
-      return fallback;
-  }
+  return apiErrorMessage(cause.kind, dictionary, fallback);
 }
 
 function ActionButton({

@@ -23,6 +23,11 @@ export type AuthorizationDiscovery = {
   endSessionEndpoint?: string;
 };
 
+const NATIVE_AUTH_REDIRECTS = new Set([
+  "oauth/callback",
+  "admin/oauth/callback",
+]);
+
 /**
  * Validates OIDC metadata before a native client trusts its endpoints.
  * Development may use loopback HTTP; every other issuer/endpoint must use TLS.
@@ -51,6 +56,10 @@ export function validateNativeAuthorizationConfig(
       !allowedProtocol(issuerUrl) ||
       !clientId.trim() ||
       redirect.protocol !== "kitezh:" ||
+      !NATIVE_AUTH_REDIRECTS.has(`${redirect.hostname}${redirect.pathname}`) ||
+      hasUnsafeNativeUrlAuthority(redirectUri, redirect) ||
+      redirect.search ||
+      redirect.hash ||
       !discovery?.issuer ||
       !discovery.authorizationEndpoint ||
       !discovery.tokenEndpoint
@@ -107,6 +116,7 @@ function hasUnsafeNativeUrlAuthority(value: string, url: URL): boolean {
   return (
     value.trim() !== value ||
     authority.includes("@") ||
+    authority.toLowerCase() !== url.hostname.toLowerCase() ||
     Boolean(url.username || url.password || url.port) ||
     value.includes("#")
   );

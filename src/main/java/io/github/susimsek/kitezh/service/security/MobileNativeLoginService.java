@@ -3,8 +3,10 @@ package io.github.susimsek.kitezh.service.security;
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.config.security.SecurityJsonMapper;
 import io.github.susimsek.kitezh.domain.AuthenticationFlowBindingType;
+import io.github.susimsek.kitezh.domain.ClientScopeEntity;
 import io.github.susimsek.kitezh.domain.MobileLoginTransactionEntity;
 import io.github.susimsek.kitezh.dto.account.MfaSetupDTO;
+import io.github.susimsek.kitezh.dto.account.MobileConsentScopeDTO;
 import io.github.susimsek.kitezh.dto.account.MobileGoogleLoginRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobileLoginActionRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobileLoginMfaRequestDTO;
@@ -17,6 +19,7 @@ import io.github.susimsek.kitezh.dto.account.MobilePasskeyOptionsDTO;
 import io.github.susimsek.kitezh.dto.account.MobilePasskeyRegistrationRequestDTO;
 import io.github.susimsek.kitezh.dto.account.RecoveryCodesDTO;
 import io.github.susimsek.kitezh.dto.account.RequiredActionDTO;
+import io.github.susimsek.kitezh.repository.ClientScopeRepository;
 import io.github.susimsek.kitezh.repository.MobileLoginTransactionRepository;
 import io.github.susimsek.kitezh.service.DomainUserDetailsService;
 import io.github.susimsek.kitezh.service.account.MfaService;
@@ -48,6 +51,8 @@ import org.springframework.security.authentication.event.AuthenticationFailureBa
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -56,6 +61,8 @@ import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -98,6 +105,8 @@ public class MobileNativeLoginService {
     private final RegisteredClientRepository registeredClientRepository;
     private final OAuth2AuthorizationService authorizationService;
     private final MobileLoginTransactionRepository transactionRepository;
+    private final OAuth2AuthorizationConsentService authorizationConsentService;
+    private final ClientScopeRepository clientScopeRepository;
     private final DomainUserDetailsService userDetailsService;
     private final Map<String, AuthenticationManager> authenticationManagers;
     private final LoginRateLimitService loginRateLimitService;
@@ -502,6 +511,38 @@ public class MobileNativeLoginService {
     }
 
     @Transactional
+    public MobileLoginResponseDTO decideConsent(String transactionId, boolean approved) {
+        LoginTransaction transaction = transaction(transactionId);
+        if (transaction.challengeKind() != ChallengeKind.CONSENT) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_REQUEST,
+                    "The mobile login transaction is not awaiting consent.");
+        }
+        if (!approved) {
+            String state = transaction.state();
+            String redirectUri = transaction.redirectUri();
+            transactionRepository.delete(transaction.entity());
+            return MobileLoginResponseDTO.denied(state, redirectUri);
+        }
+        RegisteredClient client = clientFor(transaction);
+        OAuth2AuthorizationConsent existingConsent =
+                authorizationConsentService.findById(
+                        client.getId(), transaction.principal().getName());
+        OAuth2AuthorizationConsent.Builder consentBuilder =
+                OAuth2AuthorizationConsent.withId(
+                        client.getId(), transaction.principal().getName());
+        if (existingConsent != null) {
+            existingConsent.getAuthorities().forEach(consentBuilder::authority);
+        }
+        transaction.pendingConsentScopes().stream()
+                .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
+                .forEach(consentBuilder::authority);
+        authorizationConsentService.save(consentBuilder.build());
+        transaction.markConsentApproved();
+        return issueAuthorizationCode(transactionId, transaction);
+    }
+
+    @Transactional
     public MfaSetupDTO setupTotp(String transactionId) {
         LoginTransaction transaction = transaction(transactionId);
         synchronized (transaction) {
@@ -592,8 +633,7 @@ public class MobileNativeLoginService {
                                         .NONE)
                 || !client.getAuthorizationGrantTypes()
                         .contains(AuthorizationGrantType.AUTHORIZATION_CODE)
-                || !client.getClientSettings().isRequireProofKey()
-                || client.getClientSettings().isRequireAuthorizationConsent()) {
+                || !client.getClientSettings().isRequireProofKey()) {
             throw invalidRequest();
         }
         Set<String> scopes = new HashSet<>(Arrays.asList(requestedScope.trim().split("\\s+")));
@@ -669,7 +709,80 @@ public class MobileNativeLoginService {
             transaction.awaitMfa();
             return MobileLoginResponseDTO.mfaRequired(transactionId);
         }
+        RegisteredClient client = clientFor(transaction);
+        Set<String> unapprovedScopes = unapprovedScopes(transaction, client);
+        if (!unapprovedScopes.isEmpty()) {
+            transaction.awaitConsent(unapprovedScopes);
+            return consentResponse(transactionId, transaction, unapprovedScopes);
+        }
         return issueAuthorizationCode(transactionId, transaction);
+    }
+
+    private Set<String> unapprovedScopes(LoginTransaction transaction, RegisteredClient client) {
+        if (!client.getClientSettings().isRequireAuthorizationConsent()) {
+            return Set.of();
+        }
+        OAuth2AuthorizationConsent consent =
+                authorizationConsentService.findById(
+                        client.getId(), transaction.principal().getName());
+        Set<String> approvedScopes = new HashSet<>();
+        if (consent != null) {
+            consent.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .filter(authority -> authority.startsWith("SCOPE_"))
+                    .map(authority -> authority.substring("SCOPE_".length()))
+                    .forEach(approvedScopes::add);
+        }
+        Set<String> unapprovedScopes = new HashSet<>(transaction.scopes());
+        unapprovedScopes.removeAll(approvedScopes);
+        return Set.copyOf(unapprovedScopes);
+    }
+
+    private MobileLoginResponseDTO consentResponse(
+            String transactionId, LoginTransaction transaction, Set<String> scopeNames) {
+        RegisteredClient client = clientFor(transaction);
+        Map<String, ClientScopeEntity> configuredScopes =
+                clientScopeRepository.findByNameIn(scopeNames).stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        ClientScopeEntity::getName, scope -> scope));
+        List<MobileConsentScopeDTO> scopes =
+                scopeNames.stream()
+                        .sorted()
+                        .map(
+                                name -> {
+                                    ClientScopeEntity scope = configuredScopes.get(name);
+                                    if (scope == null) {
+                                        return new MobileConsentScopeDTO(name, name, name);
+                                    }
+                                    String label =
+                                            StringUtils.hasText(scope.getDisplayName())
+                                                    ? scope.getDisplayName()
+                                                    : name;
+                                    String description =
+                                            StringUtils.hasText(scope.getConsentScreenText())
+                                                    ? scope.getConsentScreenText()
+                                                    : StringUtils.hasText(scope.getDescription())
+                                                            ? scope.getDescription()
+                                                            : name;
+                                    return new MobileConsentScopeDTO(name, label, description);
+                                })
+                        .toList();
+        return MobileLoginResponseDTO.consentRequired(
+                transactionId, client.getClientName(), scopes);
+    }
+
+    private RegisteredClient clientFor(LoginTransaction transaction) {
+        RegisteredClient client =
+                registeredClientRepository.findById(transaction.entity().getRegisteredClientId());
+        if (client == null
+                || !MOBILE_CLIENTS.contains(client.getClientId())
+                || !client.getRedirectUris().contains(transaction.redirectUri())
+                || !client.getScopes().containsAll(transaction.scopes())) {
+            transactionRepository.delete(transaction.entity());
+            throw invalidRequest();
+        }
+        return client;
     }
 
     private boolean requiresMfa(String username) {
@@ -694,7 +807,6 @@ public class MobileNativeLoginService {
                 || !client.getAuthorizationGrantTypes()
                         .contains(AuthorizationGrantType.AUTHORIZATION_CODE)
                 || !client.getClientSettings().isRequireProofKey()
-                || client.getClientSettings().isRequireAuthorizationConsent()
                 || !client.getScopes().containsAll(transaction.scopes())) {
             transactionRepository.delete(transaction.entity());
             throw invalidRequest();
@@ -785,7 +897,8 @@ public class MobileNativeLoginService {
         NONE,
         MFA,
         PASSKEY,
-        REQUIRED_ACTIONS
+        REQUIRED_ACTIONS,
+        CONSENT
     }
 
     private static final class LoginTransaction {
@@ -854,6 +967,20 @@ public class MobileNativeLoginService {
 
         void awaitMfa() {
             entity.setChallengeKind(ChallengeKind.MFA.name());
+            entity.setPendingActionKeys(null);
+        }
+
+        void awaitConsent(Set<String> scopes) {
+            entity.setChallengeKind(ChallengeKind.CONSENT.name());
+            entity.setPendingActionKeys(String.join(",", scopes));
+        }
+
+        Set<String> pendingConsentScopes() {
+            return pendingActionKeys();
+        }
+
+        void markConsentApproved() {
+            entity.setChallengeKind(ChallengeKind.NONE.name());
             entity.setPendingActionKeys(null);
         }
 

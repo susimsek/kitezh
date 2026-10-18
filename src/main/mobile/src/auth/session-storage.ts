@@ -3,6 +3,10 @@ import {
   type MobileSessionNamespace,
 } from "./session-keys.ts";
 import type { NativeSession } from "../../../shared/src/api.ts";
+import {
+  runSessionStorageMutation,
+  sessionOperationGeneration,
+} from "./session-operations.ts";
 
 export type MobileSession = NativeSession;
 const SESSION_SCHEMA_VERSION = 1;
@@ -18,6 +22,7 @@ export function createSessionStorage(secureStore: SecureSessionStore) {
     async readSession(
       namespace: MobileSessionNamespace = "account",
     ): Promise<MobileSession | null> {
+      const generation = sessionOperationGeneration(namespace);
       const stored = await secureStore.getItemAsync(
         sessionStorageKey(namespace),
       );
@@ -30,7 +35,7 @@ export function createSessionStorage(secureStore: SecureSessionStore) {
           | Partial<MobileSession>
           | { schemaVersion?: number; session?: Partial<MobileSession> };
       } catch {
-        await secureStore.deleteItemAsync(sessionStorageKey(namespace));
+        await deleteStoredSession(namespace, generation, secureStore);
         return null;
       }
       const envelope = parsed as {
@@ -41,7 +46,7 @@ export function createSessionStorage(secureStore: SecureSessionStore) {
         envelope.schemaVersion !== undefined &&
         (envelope.schemaVersion !== SESSION_SCHEMA_VERSION || !envelope.session)
       ) {
-        await secureStore.deleteItemAsync(sessionStorageKey(namespace));
+        await deleteStoredSession(namespace, generation, secureStore);
         return null;
       }
       const session = (
@@ -61,7 +66,7 @@ export function createSessionStorage(secureStore: SecureSessionStore) {
           session.idToken !== null &&
           typeof session.idToken !== "string")
       ) {
-        await secureStore.deleteItemAsync(sessionStorageKey(namespace));
+        await deleteStoredSession(namespace, generation, secureStore);
         return null;
       }
       const normalized = {
@@ -71,12 +76,17 @@ export function createSessionStorage(secureStore: SecureSessionStore) {
         expiresAt: session.expiresAt,
       };
       if (envelope.schemaVersion === undefined) {
-        await secureStore.setItemAsync(
-          sessionStorageKey(namespace),
-          JSON.stringify({
-            schemaVersion: SESSION_SCHEMA_VERSION,
-            session: normalized,
-          }),
+        await runSessionStorageMutation(
+          namespace,
+          () =>
+            secureStore.setItemAsync(
+              sessionStorageKey(namespace),
+              JSON.stringify({
+                schemaVersion: SESSION_SCHEMA_VERSION,
+                session: normalized,
+              }),
+            ),
+          generation,
         );
       }
       return normalized;
@@ -94,4 +104,16 @@ export function createSessionStorage(secureStore: SecureSessionStore) {
       await secureStore.deleteItemAsync(sessionStorageKey(namespace));
     },
   };
+
+async function deleteStoredSession(
+  namespace: MobileSessionNamespace,
+  generation: number,
+  secureStore: SecureSessionStore,
+): Promise<void> {
+  await runSessionStorageMutation(
+    namespace,
+    () => secureStore.deleteItemAsync(sessionStorageKey(namespace)),
+    generation,
+  );
+}
 }

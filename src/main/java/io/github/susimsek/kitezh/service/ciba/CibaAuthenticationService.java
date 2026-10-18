@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -578,6 +579,28 @@ public class CibaAuthenticationService {
             boolean mfaVerified,
             boolean stepUpVerified) {
         approveRequest(authReqId, username, userCode, mfaVerified, stepUpVerified);
+    }
+
+    @Transactional
+    public boolean approveWithNativeMfa(
+            String authReqId, String username, String userCode, BooleanSupplier mfaVerifier) {
+        CibaAuthenticationRequestEntity request = request(authReqId);
+        validateNativeApprovalTarget(request, username, userCode);
+        if (!mfaVerifier.getAsBoolean()) {
+            return false;
+        }
+        approveRequest(authReqId, username, userCode, true, true);
+        return true;
+    }
+
+    private void validateNativeApprovalTarget(
+            CibaAuthenticationRequestEntity request, String username, String userCode) {
+        ensureOwner(request, username);
+        ensureUserCode(request, userCode);
+        expireIfNecessary(request, Instant.now());
+        if (request.getStatus() != CibaAuthenticationRequestStatus.PENDING) {
+            throw protocol(ACCESS_DENIED, "The CIBA request was already acted on");
+        }
     }
 
     private void approveRequest(

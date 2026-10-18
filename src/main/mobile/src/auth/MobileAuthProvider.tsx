@@ -26,24 +26,27 @@ import {
   validateNativeAuthorizationConfig,
   validateAuthorizationCallback,
 } from "../../../shared/src/auth.ts";
-import {
-  createSingleFlight,
-  NATIVE_REFRESH_EXPIRY_SKEW_MS,
-} from "../../../shared/src/session.ts";
+import { NATIVE_REFRESH_EXPIRY_SKEW_MS } from "../../../shared/src/session.ts";
 import {
   authorizationServerIssuer,
   getMobileConsoleConfig,
   type MobileConsole,
 } from "@/config";
 import {
-  clearSession,
   clearOAuthTransaction,
   consumeOAuthTransaction,
   readSession,
   saveOAuthTransaction,
   type MobileSession,
-  writeSession,
+  writeSessionIfCurrent,
+  clearSessionIfCurrent,
 } from "./storage";
+import {
+  invalidateSessionOperations,
+  isSessionOperationCurrent,
+  sessionOperationGeneration,
+  sessionRefreshCoordinator,
+} from "./session-operations";
 import {
   fetchNativeAuthorizationDiscovery,
   NativeDiscoveryError,
@@ -55,9 +58,11 @@ import {
   startMobilePasskeyLogin,
   startMobileLogin,
   submitMobileLoginAction,
+  submitMobileLoginConsent,
   submitMobileLoginMfa,
   verifyMobilePasskeyLogin,
   type MobileLoginAction,
+  type MobileConsentScope,
   type MobileLoginResponse,
 } from "@/api/public-api";
 import {
@@ -142,6 +147,12 @@ type DiscoveryStatus = "loading" | "ready" | "unavailable" | "timeout";
 type LoginChallenge =
   | { kind: "mfa"; transactionId: string }
   | {
+      kind: "consent";
+      transactionId: string;
+      clientName: string;
+      scopes: MobileConsentScope[];
+    }
+  | {
       kind: "actions";
       transactionId: string;
       actions: MobileLoginAction[];
@@ -162,6 +173,7 @@ type MobileAuthContextValue = {
   ) => Promise<void>;
   readonly nativePasskeyLogin: (username: string) => Promise<void>;
   readonly submitLoginMfa: (code: string) => Promise<void>;
+  readonly submitLoginConsent: (approved: boolean) => Promise<void>;
   readonly submitLoginAction: (
     values: Record<string, unknown>,
   ) => Promise<void>;
@@ -303,8 +315,8 @@ export function MobileAuthProvider({
     null,
   );
   const refreshCoordinator = useMemo(
-    () => createSingleFlight<MobileSession | null>(),
-    [],
+    () => sessionRefreshCoordinator(consoleConfig.namespace),
+    [consoleConfig.namespace],
   );
   const sessionRevision = useRef(0);
   const processingAuthorizationResult = useRef(false);
@@ -343,8 +355,15 @@ export function MobileAuthProvider({
   }, [consoleConfig.clientId, redirectUri]);
 
   const handleNativeLoginResponse = useCallback(
-    async (result: MobileLoginResponse, expectedRevision: number) => {
-      if (sessionRevision.current !== expectedRevision) return;
+    async (
+      result: MobileLoginResponse,
+      expectedRevision: number,
+      expectedGeneration: number,
+    ) => {
+      if (
+        sessionRevision.current !== expectedRevision ||
+        !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+      ) return;
       if (result.status === "mfa_required") {
         setLoginChallenge({
           kind: "mfa",
@@ -365,6 +384,23 @@ export function MobileAuthProvider({
       if (result.status === "passkey_required") {
         throw new Error("native-passkey-challenge-unverified");
       }
+      if (result.status === "consent_required") {
+        setLoginChallenge({
+          kind: "consent",
+          transactionId: result.transactionId,
+          clientName: result.clientName,
+          scopes: result.scopes,
+        });
+        setStatus("signed-out");
+        return;
+      }
+      if (result.status === "denied") {
+        await clearOAuthTransaction(consoleConfig.namespace);
+        setLoginChallenge(null);
+        setStatus("signed-out");
+        setError("consent-denied");
+        return;
+      }
 
       const transaction = await consumeOAuthTransaction(
         consoleConfig.namespace,
@@ -377,7 +413,10 @@ export function MobileAuthProvider({
         { code: result.code, state: result.state },
         transaction.state,
       );
-      if (sessionRevision.current !== expectedRevision) return;
+      if (
+        sessionRevision.current !== expectedRevision ||
+        !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+      ) return;
       const token = await withTimeout(
         exchangeCodeAsync(
           {
@@ -391,18 +430,26 @@ export function MobileAuthProvider({
         AUTH_CODE_EXCHANGE_TIMEOUT_MS,
         "authorization_timeout",
       );
-      if (sessionRevision.current !== expectedRevision) return;
+      if (
+        sessionRevision.current !== expectedRevision ||
+        !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+      ) return;
       const nextSession: MobileSession = {
         accessToken: token.accessToken,
         refreshToken: token.refreshToken ?? null,
         idToken: token.idToken ?? null,
         expiresAt: expiresAtFromToken(token.expiresIn, token.issuedAt * 1000),
       };
-      await writeSession(nextSession, consoleConfig.namespace);
-      if (sessionRevision.current !== expectedRevision) {
-        await clearSession(consoleConfig.namespace);
-        return;
-      }
+      const stored = await writeSessionIfCurrent(
+        nextSession,
+        consoleConfig.namespace,
+        expectedGeneration,
+      );
+      if (
+        !stored ||
+        sessionRevision.current !== expectedRevision ||
+        !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+      ) return;
       setLoginChallenge(null);
       setSession(nextSession);
       setStatus("signed-in");
@@ -426,6 +473,7 @@ export function MobileAuthProvider({
       }
       nativeLoginInFlight.current = true;
       sessionRevision.current += 1;
+      const generation = invalidateSessionOperations(consoleConfig.namespace);
       const revision = sessionRevision.current;
       setStatus("signing-in");
       setError(null);
@@ -479,7 +527,7 @@ export function MobileAuthProvider({
           },
           { locale: resolvedLocale },
         );
-        await handleNativeLoginResponse(result, revision);
+        await handleNativeLoginResponse(result, revision, generation);
       } catch (cause) {
         await clearOAuthTransaction(consoleConfig.namespace);
         if (sessionRevision.current === revision) {
@@ -512,6 +560,7 @@ export function MobileAuthProvider({
       }
       nativeLoginInFlight.current = true;
       sessionRevision.current += 1;
+      const generation = invalidateSessionOperations(consoleConfig.namespace);
       const revision = sessionRevision.current;
       setStatus("signing-in");
       setError(null);
@@ -564,7 +613,7 @@ export function MobileAuthProvider({
           { locale: resolvedLocale },
         );
         if (challenge.status !== "passkey_required") {
-          await handleNativeLoginResponse(challenge, revision);
+          await handleNativeLoginResponse(challenge, revision, generation);
           return;
         }
         const credential = await getNativePasskey(challenge.publicKey);
@@ -573,6 +622,7 @@ export function MobileAuthProvider({
             locale: resolvedLocale,
           }),
           revision,
+          generation,
         );
       } catch {
         await clearOAuthTransaction(consoleConfig.namespace);
@@ -599,10 +649,11 @@ export function MobileAuthProvider({
       if (!loginChallenge || nativeLoginInFlight.current) return;
       nativeLoginInFlight.current = true;
       const revision = sessionRevision.current;
+      const generation = sessionOperationGeneration(consoleConfig.namespace);
       setStatus("signing-in");
       setError(null);
       try {
-        await handleNativeLoginResponse(await submit(), revision);
+        await handleNativeLoginResponse(await submit(), revision, generation);
       } catch (cause) {
         if (sessionRevision.current === revision) {
           setStatus("signed-out");
@@ -612,7 +663,7 @@ export function MobileAuthProvider({
         nativeLoginInFlight.current = false;
       }
     },
-    [handleNativeLoginResponse, loginChallenge],
+    [consoleConfig.namespace, handleNativeLoginResponse, loginChallenge],
   );
 
   const submitLoginMfa = useCallback(
@@ -620,6 +671,18 @@ export function MobileAuthProvider({
       if (loginChallenge?.kind !== "mfa" || !/^\d{6,8}$/.test(code)) return;
       await continueNativeChallenge(() =>
         submitMobileLoginMfa(loginChallenge.transactionId, code, {
+          locale: resolvedLocale,
+        }),
+      );
+    },
+    [continueNativeChallenge, loginChallenge, resolvedLocale],
+  );
+
+  const submitLoginConsent = useCallback(
+    async (approved: boolean) => {
+      if (loginChallenge?.kind !== "consent") return;
+      await continueNativeChallenge(() =>
+        submitMobileLoginConsent(loginChallenge.transactionId, approved, {
           locale: resolvedLocale,
         }),
       );
@@ -666,6 +729,7 @@ export function MobileAuthProvider({
 
   const cancelNativeLogin = useCallback(async () => {
     sessionRevision.current += 1;
+    invalidateSessionOperations(consoleConfig.namespace);
     nativeLoginInFlight.current = false;
     setLoginChallenge(null);
     setError(null);
@@ -683,14 +747,24 @@ export function MobileAuthProvider({
 
   useEffect(() => {
     let cancelled = false;
+    const revision = sessionRevision.current;
+    const generation = sessionOperationGeneration(consoleConfig.namespace);
     void readSession(consoleConfig.namespace)
       .then((stored) => {
-        if (cancelled) return;
+        if (
+          cancelled ||
+          sessionRevision.current !== revision ||
+          !isSessionOperationCurrent(consoleConfig.namespace, generation)
+        ) return;
         setSession(stored);
         setStatus(stored ? "signed-in" : "signed-out");
       })
       .catch(() => {
-        if (!cancelled) setStatus("signed-out");
+        if (
+          !cancelled &&
+          sessionRevision.current === revision &&
+          isSessionOperationCurrent(consoleConfig.namespace, generation)
+        ) setStatus("signed-out");
       });
     return () => {
       cancelled = true;
@@ -698,13 +772,20 @@ export function MobileAuthProvider({
   }, [consoleConfig.namespace]);
 
   const processAuthorizationResult = useCallback(
-    async (result: AuthSessionResult | null, expectedRevision: number) => {
+    async (
+      result: AuthSessionResult | null,
+      expectedRevision: number,
+      expectedGeneration: number,
+    ) => {
       if (!result || processingAuthorizationResult.current) return;
       processingAuthorizationResult.current = true;
       setStatus("signing-in");
       setError(null);
       try {
-        if (sessionRevision.current !== expectedRevision) return;
+        if (
+          sessionRevision.current !== expectedRevision ||
+          !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+        ) return;
         if (result.type === "cancel" || result.type === "dismiss") {
           await clearOAuthTransaction(consoleConfig.namespace);
           if (sessionRevision.current === expectedRevision) {
@@ -739,7 +820,10 @@ export function MobileAuthProvider({
           result.params,
           transaction.state,
         );
-        if (sessionRevision.current !== expectedRevision) return;
+        if (
+          sessionRevision.current !== expectedRevision ||
+          !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+        ) return;
         const token = await withTimeout(
           exchangeCodeAsync(
             {
@@ -753,18 +837,26 @@ export function MobileAuthProvider({
           AUTH_CODE_EXCHANGE_TIMEOUT_MS,
           "authorization_timeout",
         );
-        if (sessionRevision.current !== expectedRevision) return;
+        if (
+          sessionRevision.current !== expectedRevision ||
+          !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+        ) return;
         const nextSession: MobileSession = {
           accessToken: token.accessToken,
           refreshToken: token.refreshToken ?? null,
           idToken: token.idToken ?? null,
           expiresAt: expiresAtFromToken(token.expiresIn, token.issuedAt * 1000),
         };
-        await writeSession(nextSession, consoleConfig.namespace);
-        if (sessionRevision.current !== expectedRevision) {
-          await clearSession(consoleConfig.namespace);
-          return;
-        }
+        const stored = await writeSessionIfCurrent(
+          nextSession,
+          consoleConfig.namespace,
+          expectedGeneration,
+        );
+        if (
+          !stored ||
+          sessionRevision.current !== expectedRevision ||
+          !isSessionOperationCurrent(consoleConfig.namespace, expectedGeneration)
+        ) return;
         setSession(nextSession);
         setStatus("signed-in");
       } catch (cause) {
@@ -804,6 +896,7 @@ export function MobileAuthProvider({
         void processAuthorizationResult(
           { type: "success", params } as AuthSessionResult,
           sessionRevision.current,
+          sessionOperationGeneration(consoleConfig.namespace),
         );
       })
       .catch(() => {
@@ -838,6 +931,7 @@ export function MobileAuthProvider({
         return;
       }
       sessionRevision.current += 1;
+      const generation = invalidateSessionOperations(consoleConfig.namespace);
       const revision = sessionRevision.current;
       setStatus("signing-in");
       setError(null);
@@ -899,7 +993,7 @@ export function MobileAuthProvider({
             },
             { locale: resolvedLocale },
           );
-          await handleNativeLoginResponse(result, revision);
+          await handleNativeLoginResponse(result, revision, generation);
           return;
         }
         const request = new ExpoAuthRequest({
@@ -937,7 +1031,7 @@ export function MobileAuthProvider({
                 request.promptAsync(requestDiscovery),
               );
         if (sessionRevision.current !== revision) return;
-        await processAuthorizationResult(result, revision);
+        await processAuthorizationResult(result, revision, generation);
       } catch (cause) {
         await clearOAuthTransaction(consoleConfig.namespace);
         if (sessionRevision.current !== revision) return;
@@ -956,6 +1050,7 @@ export function MobileAuthProvider({
       consoleConfig,
       dictionary.authError,
       discovery,
+      handleNativeLoginResponse,
       processAuthorizationResult,
       resolvedLocale,
       redirectUri,
@@ -974,6 +1069,7 @@ export function MobileAuthProvider({
         return session;
       }
       const revision = sessionRevision.current;
+      const generation = sessionOperationGeneration(consoleConfig.namespace);
       return refreshCoordinator.run(async () => {
         try {
           const token = await refreshAsync(
@@ -983,7 +1079,10 @@ export function MobileAuthProvider({
             },
             discovery,
           );
-          if (sessionRevision.current !== revision) return null;
+          if (
+            sessionRevision.current !== revision ||
+            !isSessionOperationCurrent(consoleConfig.namespace, generation)
+          ) return null;
           const nextSession: MobileSession = {
             accessToken: token.accessToken,
             refreshToken: token.refreshToken ?? session.refreshToken,
@@ -993,17 +1092,25 @@ export function MobileAuthProvider({
               token.issuedAt * 1000,
             ),
           };
-          await writeSession(nextSession, consoleConfig.namespace);
-          if (sessionRevision.current !== revision) {
-            await clearSession(consoleConfig.namespace);
-            return null;
-          }
+          const stored = await writeSessionIfCurrent(
+            nextSession,
+            consoleConfig.namespace,
+            generation,
+          );
+          if (
+            !stored ||
+            sessionRevision.current !== revision ||
+            !isSessionOperationCurrent(consoleConfig.namespace, generation)
+          ) return null;
           setSession(nextSession);
           setStatus("signed-in");
           return nextSession;
         } catch {
-          if (sessionRevision.current !== revision) return null;
-          await clearSession(consoleConfig.namespace);
+          if (
+            sessionRevision.current !== revision ||
+            !isSessionOperationCurrent(consoleConfig.namespace, generation)
+          ) return null;
+          await clearSessionIfCurrent(consoleConfig.namespace, generation);
           setSession(null);
           setStatus("signed-out");
           return null;
@@ -1024,6 +1131,7 @@ export function MobileAuthProvider({
     if (signOutInFlight.current || status === "signing-out") return;
     signOutInFlight.current = true;
     sessionRevision.current += 1;
+    const generation = invalidateSessionOperations(consoleConfig.namespace);
     const currentSession = session;
     setStatus("signing-out");
     try {
@@ -1048,7 +1156,7 @@ export function MobileAuthProvider({
         }
       } finally {
         try {
-          await clearSession(consoleConfig.namespace);
+          await clearSessionIfCurrent(consoleConfig.namespace, generation);
         } finally {
           setSession(null);
           setStatus("signed-out");
@@ -1071,6 +1179,7 @@ export function MobileAuthProvider({
       nativeLogin,
       nativePasskeyLogin,
       submitLoginMfa,
+      submitLoginConsent,
       submitLoginAction,
       submitLoginPasskeyRegistration,
       cancelNativeLogin,
@@ -1086,6 +1195,7 @@ export function MobileAuthProvider({
       submitLoginAction,
       submitLoginPasskeyRegistration,
       submitLoginMfa,
+      submitLoginConsent,
       cancelNativeLogin,
       refreshSession,
       retryDiscovery,

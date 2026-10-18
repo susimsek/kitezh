@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh.web.account;
 
 import io.github.susimsek.kitezh.dto.account.MfaSetupDTO;
+import io.github.susimsek.kitezh.dto.account.MobileConsentDecisionDTO;
 import io.github.susimsek.kitezh.dto.account.MobileGoogleLoginRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobileLoginActionRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobileLoginMfaRequestDTO;
@@ -179,6 +180,26 @@ public class MobileNativeLoginController {
                     MobileLoginMfaRequestDTO request,
             HttpServletRequest servletRequest) {
         return mobileNativeLoginService.verifyMfa(transactionId, request, servletRequest);
+    }
+
+    @PostMapping("/{transactionId}/consent")
+    @Operation(
+            summary = "Approve or deny native OAuth consent",
+            description =
+                    "Applies an explicit decision to the scopes shown by the server-bound consent"
+                            + " continuation. The request cannot change client, scope, state, PKCE,"
+                            + " or redirect values.")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Authorization code issued after approval, or denial returned.",
+            content = @Content(schema = @Schema(implementation = MobileLoginResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Transaction is absent, expired, or consumed.")
+    @ApiResponse(responseCode = "400", description = "Transaction is not awaiting consent.")
+    public MobileLoginResponseDTO decideConsent(
+            @PathVariable String transactionId,
+            @Valid @org.springframework.web.bind.annotation.RequestBody
+                    MobileConsentDecisionDTO request) {
+        return mobileNativeLoginService.decideConsent(transactionId, request.approved());
     }
 
     @PostMapping("/{transactionId}/actions/{actionKey}")

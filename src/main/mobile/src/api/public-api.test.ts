@@ -4,6 +4,7 @@ import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.
 import {
   PublicApiError,
   getCaptchaSettings,
+  getMobileAuthCapabilities,
   getLoginCaptchaSettings,
   getMobileLoginMfaSetup,
   getMobileLoginPasskeyRegistrationOptions,
@@ -17,6 +18,7 @@ import {
   verifyMobilePasskeyLogin,
   registerMobileLoginPasskey,
   submitMobileLoginAction,
+  submitMobileLoginConsent,
   submitMobileLoginMfa,
   registerAccount,
   requestPasswordReset,
@@ -26,6 +28,100 @@ import {
 import { setMobileApiLocale } from "../i18n/api-locale.ts";
 
 installAxiosFetchMockCompatibility();
+
+test("discovers versioned mobile authentication capabilities", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedPath = "";
+  const capabilities = {
+    contractVersion: 1,
+    capabilities: [
+      "authorization_code_pkce",
+      "native_password_login",
+      "native_social_account_link",
+    ],
+  };
+  globalThis.fetch = async (input) => {
+    requestedPath = new URL(input.toString()).pathname;
+    return new Response(JSON.stringify(capabilities), { status: 200 });
+  };
+
+  try {
+    assert.deepEqual(await getMobileAuthCapabilities(), capabilities);
+    assert.equal(requestedPath, "/api/auth/mobile/capabilities");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("posts an explicit native OAuth consent decision and validates its continuation", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ path: string; body: unknown }> = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      path: new URL(input.toString()).pathname,
+      body: JSON.parse(String(init?.body)),
+    });
+    return new Response(
+      JSON.stringify({
+        status: "consent_required",
+        transactionId: "opaque-transaction",
+        clientName: "Kitezh Account",
+        scopes: [
+          {
+            name: "profile",
+            displayName: "Profile",
+            description: "Read your profile",
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+  };
+
+  try {
+    assert.deepEqual(
+      await submitMobileLoginConsent("opaque-transaction", true),
+      {
+        status: "consent_required",
+        transactionId: "opaque-transaction",
+        clientName: "Kitezh Account",
+        scopes: [
+          {
+            name: "profile",
+            displayName: "Profile",
+            description: "Read your profile",
+          },
+        ],
+      },
+    );
+    assert.deepEqual(requests, [
+      {
+        path: "/api/auth/mobile/login/opaque-transaction/consent",
+        body: { approved: true },
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rejects malformed mobile authentication capability contracts", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ contractVersion: 0, capabilities: [false] }), {
+      status: 200,
+    });
+
+  try {
+    await assert.rejects(getMobileAuthCapabilities(), (error: unknown) => {
+      assert.ok(error instanceof PublicApiError);
+      assert.equal(error.status, 502);
+      return true;
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("reads the shared cached application release metadata endpoint", async () => {
   const originalFetch = globalThis.fetch;

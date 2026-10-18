@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +17,7 @@ import { AccountTabBar } from "@/components/AccountTabBar";
 import { AccountPagination } from "@/components/AccountPagination";
 import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import {
+  approveCibaRequestWithMfa,
   decideCibaRequest,
   listAccountApplications,
   listCibaRequests,
@@ -78,6 +80,7 @@ export default function ApplicationsScreen() {
     authReqId: string;
     decision: "approve" | "deny";
   } | null>(null);
+  const [cibaMfaCodes, setCibaMfaCodes] = useState<Record<string, string>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const mutationInFlight = useRef(false);
   const pageRequestsInFlight = useRef({
@@ -343,11 +346,16 @@ export default function ApplicationsScreen() {
   );
 
   const decideCiba = useCallback(
-    async (request: CibaPendingRequest, decision: "approve" | "deny") => {
+    async (
+      request: CibaPendingRequest,
+      decision: "approve" | "deny",
+      mfaCode?: string,
+    ) => {
       if (!session || busyKey || mutationInFlight.current) return;
       if (
         decision === "approve" &&
-        (request.mfaRequired || request.stepUpRequired)
+        (request.mfaRequired || request.stepUpRequired) &&
+        !mfaCode
       ) {
         return;
       }
@@ -364,10 +372,29 @@ export default function ApplicationsScreen() {
           });
           return;
         }
-        await decideCibaRequest(currentSession.accessToken, request, decision, {
+        const requestOptions = {
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
-        });
+        };
+        if (decision === "approve" && mfaCode) {
+          await approveCibaRequestWithMfa(
+            currentSession.accessToken,
+            request,
+            mfaCode,
+            requestOptions,
+          );
+          setCibaMfaCodes((current) => ({
+            ...current,
+            [request.authReqId]: "",
+          }));
+        } else {
+          await decideCibaRequest(
+            currentSession.accessToken,
+            request,
+            decision,
+            requestOptions,
+          );
+        }
         await loadCibaPage(pageNumbers.current.ciba);
         showNotice({
           kind: "success",
@@ -703,6 +730,31 @@ export default function ApplicationsScreen() {
                             {stepUpDescription}
                           </Text>
                         ) : null}
+                        {requiresStepUp ? (
+                          <TextInput
+                            accessibilityLabel={dictionary.mfaCode}
+                            autoComplete="one-time-code"
+                            keyboardType="number-pad"
+                            maxLength={8}
+                            onChangeText={(value) =>
+                              setCibaMfaCodes((current) => ({
+                                ...current,
+                                [request.authReqId]: value.replace(/\D/g, ""),
+                              }))
+                            }
+                            placeholder={dictionary.mfaCode}
+                            placeholderTextColor={palette.textMuted}
+                            style={[
+                              styles.cibaMfaCode,
+                              {
+                                backgroundColor: palette.surface,
+                                borderColor: palette.border,
+                                color: palette.text,
+                              },
+                            ]}
+                            value={cibaMfaCodes[request.authReqId] ?? ""}
+                          />
+                        ) : null}
                         <View style={styles.cibaActions}>
                           <ActionButton
                             label={dictionary.cibaApprove}
@@ -710,8 +762,22 @@ export default function ApplicationsScreen() {
                               cibaBusy?.authReqId === request.authReqId &&
                               cibaBusy.decision === "approve"
                             }
-                            disabled={Boolean(busyKey) || requiresStepUp}
-                            onPress={() => void decideCiba(request, "approve")}
+                            disabled={
+                              Boolean(busyKey) ||
+                              (requiresStepUp &&
+                                !/^\d{6,8}$/.test(
+                                  cibaMfaCodes[request.authReqId] ?? "",
+                                ))
+                            }
+                            onPress={() =>
+                              void decideCiba(
+                                request,
+                                "approve",
+                                requiresStepUp
+                                  ? cibaMfaCodes[request.authReqId]
+                                  : undefined,
+                              )
+                            }
                             palette={palette}
                           />
                           <ActionButton
@@ -867,4 +933,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   cibaActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  cibaMfaCode: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    fontSize: 18,
+    letterSpacing: 4,
+    marginTop: spacing.md,
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+  },
 });

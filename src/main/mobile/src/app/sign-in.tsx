@@ -72,6 +72,7 @@ export default function SignInScreen() {
     discoveryStatus,
     retryDiscovery,
     submitLoginMfa,
+    submitLoginConsent,
     submitLoginAction,
     submitLoginPasskeyRegistration,
     cancelNativeLogin,
@@ -388,6 +389,8 @@ export default function SignInScreen() {
                   ? dictionary.authTimeout
                   : error === "authorization-cancelled"
                     ? dictionary.authCancelled
+                    : error === "consent-denied"
+                      ? dictionary.loginConsentDenied
                     : error === "google-account-link-required"
                       ? dictionary.googleAccountLinkRequired
                     : error === "login-credentials-invalid"
@@ -571,12 +574,19 @@ export default function SignInScreen() {
             <Text style={[styles.challengeTitle, { color: palette.text }]}>
               {loginChallenge.kind === "mfa"
                 ? dictionary.loginMfaTitle
-                : (action?.displayName ?? dictionary.requiredActions)}
+                : loginChallenge.kind === "consent"
+                  ? dictionary.loginConsentTitle
+                  : (action?.displayName ?? dictionary.requiredActions)}
             </Text>
             <Text style={[styles.help, { color: palette.textMuted }]}>
               {loginChallenge.kind === "mfa"
                 ? dictionary.loginMfaHelp
-                : action?.description}
+                : loginChallenge.kind === "consent"
+                  ? dictionary.loginConsentHelp.replace(
+                      "{client}",
+                      loginChallenge.clientName,
+                    )
+                  : action?.description}
             </Text>
             {error ? (
               <Text style={[styles.error, { color: palette.danger }]}>
@@ -588,7 +598,37 @@ export default function SignInScreen() {
                 {fieldError}
               </Text>
             ) : null}
-            {loginChallenge.kind === "mfa" ? (
+            {loginChallenge.kind === "consent" ? (
+              <>
+                <View style={styles.consentScopes}>
+                  {loginChallenge.scopes.map((scope) => (
+                    <View key={scope.name} style={styles.consentScope}>
+                      <Text style={[styles.consentScopeTitle, { color: palette.text }]}>
+                        {scope.displayName}
+                      </Text>
+                      <Text style={[styles.help, { color: palette.textMuted }]}>
+                        {scope.description}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <ActionButton
+                  label={dictionary.loginConsentApprove}
+                  loading={pending}
+                  disabled={pending}
+                  onPress={() => void submitLoginConsent(true)}
+                  palette={palette}
+                  primary
+                />
+                <ActionButton
+                  label={dictionary.loginConsentDeny}
+                  loading={pending}
+                  disabled={pending}
+                  onPress={() => void submitLoginConsent(false)}
+                  palette={palette}
+                />
+              </>
+            ) : loginChallenge.kind === "mfa" ? (
               <>
                 <Field
                   label={dictionary.mfaCode}
@@ -1123,5 +1163,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: spacing.xs,
     textAlign: "center",
+  },
+  consentScopes: {
+    gap: spacing.md,
+    marginVertical: spacing.md,
+  },
+  consentScope: {
+    gap: spacing.xs,
+  },
+  consentScopeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

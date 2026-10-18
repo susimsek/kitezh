@@ -12,6 +12,12 @@ test("maps public API transport and authorization failures to localized copy", (
     ["unauthorized", messages.en.apiUnauthorized],
     ["forbidden", messages.en.apiForbidden],
     ["validation", messages.en.apiValidation],
+    ["cancelled", messages.en.apiCancelled],
+    ["conflict", messages.en.apiConflict],
+    ["rate-limited", messages.en.apiRateLimited],
+    ["unavailable", messages.en.apiUnavailable],
+    ["server", messages.en.apiServer],
+    ["http", messages.en.apiHttp],
   ] as const;
 
   for (const [kind, expected] of cases) {
@@ -29,6 +35,12 @@ test("maps the same public failures to Turkish copy", () => {
     ["unauthorized", messages.tr.apiUnauthorized],
     ["forbidden", messages.tr.apiForbidden],
     ["validation", messages.tr.apiValidation],
+    ["cancelled", messages.tr.apiCancelled],
+    ["conflict", messages.tr.apiConflict],
+    ["rate-limited", messages.tr.apiRateLimited],
+    ["unavailable", messages.tr.apiUnavailable],
+    ["server", messages.tr.apiServer],
+    ["http", messages.tr.apiHttp],
   ] as const;
 
   for (const [kind, expected] of cases) {
@@ -39,13 +51,9 @@ test("maps the same public failures to Turkish copy", () => {
   }
 });
 
-test("uses the screen fallback for service errors and unexpected exceptions", () => {
+test("uses the screen fallback for update errors and unexpected exceptions", () => {
   assert.equal(
-    publicErrorMessage(
-      "server",
-      messages.en,
-      "forgotError",
-    ),
+    publicErrorMessage("update", messages.en, "forgotError"),
     messages.en.forgotError,
   );
   assert.equal(

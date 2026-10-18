@@ -15,7 +15,9 @@ public record MobileLoginResponseDTO(
                             "authorized",
                             "mfa_required",
                             "required_actions",
-                            "passkey_required"
+                            "passkey_required",
+                            "consent_required",
+                            "denied"
                         })
                 String status,
         @Schema(description = "Single-use SAS authorization code; only present when authorized.")
@@ -31,26 +33,58 @@ public record MobileLoginResponseDTO(
         @Schema(description = "Required actions; only present for required-actions challenges.")
                 List<RequiredActionDTO> actions,
         @Schema(description = "WebAuthn request options; only present for passkey authentication.")
-                Map<String, Object> publicKey) {
+                Map<String, Object> publicKey,
+        @Schema(description = "OAuth client display name; present for consent challenges.")
+                String clientName,
+        @Schema(description = "Scopes requiring explicit user consent.")
+                List<MobileConsentScopeDTO> scopes) {
 
     public static MobileLoginResponseDTO authorized(String code, String state, String redirectUri) {
-        return new MobileLoginResponseDTO("authorized", code, state, redirectUri, null, null, null);
+        return new MobileLoginResponseDTO(
+                "authorized", code, state, redirectUri, null, null, null, null, null);
     }
 
     public static MobileLoginResponseDTO mfaRequired(String transactionId) {
         return new MobileLoginResponseDTO(
-                "mfa_required", null, null, null, transactionId, null, null);
+                "mfa_required", null, null, null, transactionId, null, null, null, null);
     }
 
     public static MobileLoginResponseDTO requiredActions(
             String transactionId, List<RequiredActionDTO> actions) {
         return new MobileLoginResponseDTO(
-                "required_actions", null, null, null, transactionId, List.copyOf(actions), null);
+                "required_actions",
+                null,
+                null,
+                null,
+                transactionId,
+                List.copyOf(actions),
+                null,
+                null,
+                null);
     }
 
     public static MobileLoginResponseDTO passkeyRequired(
             String transactionId, Map<String, Object> publicKey) {
         return new MobileLoginResponseDTO(
-                "passkey_required", null, null, null, transactionId, null, publicKey);
+                "passkey_required", null, null, null, transactionId, null, publicKey, null, null);
+    }
+
+    public static MobileLoginResponseDTO consentRequired(
+            String transactionId, String clientName, List<MobileConsentScopeDTO> scopes) {
+        return new MobileLoginResponseDTO(
+                "consent_required",
+                null,
+                null,
+                null,
+                transactionId,
+                null,
+                null,
+                clientName,
+                List.copyOf(scopes));
+    }
+
+    public static MobileLoginResponseDTO denied(String state, String redirectUri) {
+        return new MobileLoginResponseDTO(
+                "denied", null, state, redirectUri, null, null, null, null, null);
     }
 }

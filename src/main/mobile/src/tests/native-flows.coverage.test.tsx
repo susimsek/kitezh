@@ -9,6 +9,7 @@ import { Alert, StyleSheet } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as accountApi from "@/api/account-api";
 import * as publicApi from "@/api/public-api";
+import { createNativePasskey } from "@/auth/native-passkey";
 import MfaScreen from "../app/mfa";
 import RegisterScreen from "../app/register";
 import ResetPasswordScreen from "../app/reset-password";
@@ -38,6 +39,8 @@ jest.mock("@/api/account-api", () => ({
     data = undefined;
     problem = undefined;
   },
+  beginAccountPasskeyEnrollment: jest.fn(),
+  completeAccountPasskeyEnrollment: jest.fn(),
   changeAccountPassword: jest.fn(),
   createPersonalAccessToken: jest.fn(),
   deleteAccount: jest.fn(),
@@ -45,6 +48,7 @@ jest.mock("@/api/account-api", () => ({
   getMfaStatus: jest.fn(),
   getRecoveryCodesStatus: jest.fn(),
   listAccountSessions: jest.fn(),
+  listAccountPasskeys: jest.fn(),
   listPersonalAccessTokens: jest.fn(),
   listSocialLinks: jest.fn(),
   startNativeSocialLink: jest.fn(),
@@ -56,6 +60,7 @@ jest.mock("@/api/account-api", () => ({
   startMfaSetup: jest.fn(),
   unlinkSocialProvider: jest.fn(),
 }));
+jest.mock("@/auth/native-passkey", () => ({ createNativePasskey: jest.fn() }));
 jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn() }));
 jest.mock("@/auth/storage", () => ({
   clearOAuthTransaction: jest.fn(),
@@ -165,8 +170,37 @@ beforeEach(() => {
   };
   mockSocialAuthCodeVerifier = "v".repeat(43);
   jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([]);
+  jest.mocked(accountApi.listAccountPasskeys).mockResolvedValue({
+    content: [], totalElements: 0, totalPages: 0, number: 0, size: 100,
+  });
   mockMobileAuthStatus = "signed-in";
   mockMobileDiscoveryStatus = "ready";
+});
+
+it("enrolls an account passkey through a native credential and account-bound challenge", async () => {
+  jest.mocked(accountApi.beginAccountPasskeyEnrollment).mockResolvedValue({
+    challengeId: "registration-challenge",
+    publicKey: { challenge: "server-challenge" } as never,
+  });
+  jest.mocked(createNativePasskey).mockResolvedValue({
+    id: "credential-id", rawId: "credential-id", type: "public-key",
+    authenticatorAttachment: "platform", clientExtensionResults: {},
+    response: { attestationObject: "signed-attestation", clientDataJSON: "client-data" },
+  });
+  jest.mocked(accountApi.completeAccountPasskeyEnrollment).mockResolvedValue(undefined);
+
+  render(<SecurityScreen />);
+  fireEvent.changeText(screen.getByLabelText("accountPasskeyLabel"), "My phone");
+  fireEvent.press(await screen.findByTestId("passkey-add"));
+
+  await waitFor(() => expect(accountApi.beginAccountPasskeyEnrollment).toHaveBeenCalled());
+  expect(createNativePasskey).toHaveBeenCalledWith({ challenge: "server-challenge" });
+  await waitFor(() =>
+    expect(accountApi.completeAccountPasskeyEnrollment).toHaveBeenCalledWith(
+      "test-access-token", "registration-challenge", expect.objectContaining({ id: "credential-id" }), "My phone",
+      expect.any(Object),
+    ),
+  );
 });
 
 afterEach(() => jest.useRealTimers());

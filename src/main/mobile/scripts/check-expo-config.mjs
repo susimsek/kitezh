@@ -60,6 +60,36 @@ const configuredAppLinkRoutes = new Set(
     )
     .map((data) => data.path),
 );
+const appLinkFilters = filters.filter((filter) => filter.autoVerify === true);
+const validAppLinkFilters = appLinkFilters.every((filter) => {
+  const data = filter.data ?? [];
+  const categories = new Set(filter.category ?? []);
+  return (
+    filter.action === "VIEW" &&
+    categories.has("DEFAULT") &&
+    categories.has("BROWSABLE") &&
+    data.length === 1 &&
+    data[0].scheme === "https" &&
+    data[0].host === "kitezh.onrender.com" &&
+    requiredAppLinkRoutes.has(data[0].path)
+  );
+});
+const validCustomSchemeFilters = filters
+  .filter((filter) =>
+    (filter.data ?? []).some((data) => data.scheme === "kitezh"),
+  )
+  .every((filter) => {
+    const data = filter.data ?? [];
+    const categories = new Set(filter.category ?? []);
+    return (
+      filter.autoVerify !== true &&
+      filter.action === "VIEW" &&
+      categories.has("DEFAULT") &&
+      categories.has("BROWSABLE") &&
+      data.length === 1 &&
+      data[0].scheme === "kitezh"
+    );
+  });
 const brandAssets = [
   config.icon,
   adaptiveIcon?.foregroundImage,
@@ -73,6 +103,7 @@ if (
   JSON.stringify(config.platforms) !== JSON.stringify(["ios", "android"]) ||
   config.scheme !== "kitezh" ||
   config.name !== "Kitezh" ||
+  config.ios?.bundleIdentifier !== "io.github.susimsek.kitezh.mobile" ||
   android?.package !== "io.github.susimsek.kitezh.mobile" ||
   !adaptiveIcon?.foregroundImage ||
   !adaptiveIcon?.backgroundImage ||
@@ -81,6 +112,9 @@ if (
   brandAssets.some((asset) => !asset || !existsSync(resolve(asset))) ||
   !iosDomains.includes("applinks:kitezh.onrender.com") ||
   !iosDomains.includes("webcredentials:kitezh.onrender.com") ||
+  new Set(iosDomains).size !== iosDomains.length ||
+  !validAppLinkFilters ||
+  !validCustomSchemeFilters ||
   requiredRoutes.size !== configuredRoutes.size ||
   [...requiredRoutes].some((route) => !configuredRoutes.has(route)) ||
   requiredAppLinkRoutes.size !== configuredAppLinkRoutes.size ||

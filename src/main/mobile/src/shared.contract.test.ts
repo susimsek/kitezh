@@ -423,6 +423,27 @@ test("native authorization metadata requires a trusted issuer and endpoints", ()
     ),
     false,
   );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      {
+        ...discovery,
+        authorizationEndpoint: "https://attacker.example/authorize",
+      },
+    ),
+    false,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback?state=unexpected",
+      discovery,
+    ),
+    false,
+  );
   const androidFixtureDiscovery = {
     issuer: "http://10.0.2.2:8080",
     authorizationEndpoint: "http://10.0.2.2:8080/oauth2/authorize",
@@ -472,6 +493,9 @@ test("native deep links accept only registered routes", () => {
   assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
     kind: "oauth-callback",
   });
+  assert.deepEqual(parseNativeDeepLink("kitezh://logout/callback"), {
+    kind: "logout-callback",
+  });
   assert.deepEqual(parseNativeDeepLink("kitezh://admin/oauth/callback"), {
     kind: "admin-oauth-callback",
   });
@@ -506,9 +530,29 @@ test("native deep links accept only registered routes", () => {
     parseNativeDeepLink("https://kitezh.onrender.com/admin/oauth/callback"),
     { kind: "admin-oauth-callback" },
   );
+  assert.deepEqual(
+    parseNativeDeepLink("https://kitezh.onrender.com/logout/callback"),
+    { kind: "logout-callback" },
+  );
+  assert.deepEqual(
+    parseNativeDeepLink("https://kitezh.onrender.com/admin/logout/callback"),
+    { kind: "admin-logout-callback" },
+  );
   assert.equal(
     parseNativeDeepLink(
       "https://kitezh.onrender.com.attacker.example/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com:443/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com/verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
     ),
     null,
   );
@@ -564,6 +608,18 @@ test("native intent routes registered callback links without callback parameters
       "https://kitezh.onrender.com/reset-password?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
     ),
     "/reset-password?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "https://kitezh.onrender.com/oauth/callback?code=secret&state=private",
+    ),
+    "/oauth/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "https://kitezh.onrender.com/admin/logout/callback?state=private",
+    ),
+    "/admin/logout/callback",
   );
   assert.equal(
     resolveNativeIntentPath(

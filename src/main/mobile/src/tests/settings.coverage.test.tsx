@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@/testing/native-testing-library";
+import * as ReactNative from "react-native";
 import { AppState, Platform, StyleSheet } from "react-native";
 import * as Localization from "expo-localization";
 import * as SecureStore from "expo-secure-store";
@@ -14,6 +15,7 @@ import SettingsScreen from "@/app/settings";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { colors } from "@/theme/tokens";
+import { getMobileApiLocale } from "@/i18n/api-locale";
 import type { MobileRelease } from "@/updates/release-check";
 
 const mockStoredPreferences = new Map<string, string>();
@@ -201,10 +203,45 @@ it("refreshes the system language when the app becomes active", async () => {
 
   act(() => onChange?.("active"));
   expect(await screen.findByText("Ayarlar")).toBeTruthy();
+  expect(getMobileApiLocale()).toBe("tr");
 
   rendered.unmount();
   addListener.mockRestore();
   getLocales.mockRestore();
+});
+
+it("tracks a system appearance change while the saved theme is system", async () => {
+  const useColorScheme = jest
+    .spyOn(ReactNative, "useColorScheme")
+    .mockReturnValue("light");
+  const rendered = renderSettings();
+  const tree = (
+    <ThemeProvider>
+      <LocaleProvider>
+        <SettingsScreen />
+      </LocaleProvider>
+    </ThemeProvider>
+  );
+
+  try {
+    expect(await screen.findByText("Settings")).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
+        .backgroundColor,
+    ).toBe(colors.light.background);
+
+    useColorScheme.mockReturnValue("dark");
+    rendered.rerender(tree);
+
+    await waitFor(() =>
+      expect(
+        StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
+          .backgroundColor,
+      ).toBe(colors.dark.background),
+    );
+  } finally {
+    useColorScheme.mockRestore();
+  }
 });
 
 it.each([

@@ -24,6 +24,7 @@ jest.mock("@/api/account-api", () => {
     listAccountApplications: jest.fn(),
     listCibaRequests: jest.fn(),
     decideCibaRequest: jest.fn(),
+    approveCibaRequestWithMfa: jest.fn(),
     listOfflineSessions: jest.fn(),
     revokeAccountApplication: jest.fn(),
     revokeOfflineSession: jest.fn(),
@@ -1203,7 +1204,7 @@ it("falls back to the last valid page when application sections shrink", async (
   expect(screen.getByText("Last CIBA page")).toBeTruthy();
 });
 
-it("renders empty states for nullable page content and blocks MFA-required CIBA approval", async () => {
+it("renders empty states and requires a TOTP input for native CIBA approval", async () => {
   jest.mocked(accountApi.listAccountApplications).mockResolvedValue({
     content: null,
     number: 0,
@@ -1248,6 +1249,19 @@ it("renders empty states for nullable page content and blocks MFA-required CIBA 
   expect(approve.props.accessibilityState.disabled).toBe(true);
   fireEvent.press(approve);
   expect(accountApi.decideCibaRequest).not.toHaveBeenCalled();
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), "123456");
+  const enabledApprove = screen.getByRole("button", { name: "cibaApprove" });
+  expect(enabledApprove.props.accessibilityState.disabled).toBe(false);
+  jest.mocked(accountApi.approveCibaRequestWithMfa).mockResolvedValue(undefined);
+  fireEvent.press(enabledApprove);
+  await waitFor(() =>
+    expect(accountApi.approveCibaRequestWithMfa).toHaveBeenCalledWith(
+      "access",
+      expect.objectContaining({ authReqId: "mfa-request" }),
+      "123456",
+      expect.any(Object),
+    ),
+  );
 });
 
 it("uses explicit date fallbacks for missing and malformed offline and CIBA dates", async () => {

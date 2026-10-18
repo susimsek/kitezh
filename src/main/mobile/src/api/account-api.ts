@@ -164,6 +164,21 @@ export type RecoveryCodesStatus = {
   warningThreshold: number;
 };
 
+export type AccountPasskey = {
+  credentialId: string;
+  label: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  transports: string[];
+  backupEligible: boolean;
+  backupState: boolean;
+};
+
+export type NativePasskeyCreationOptions = {
+  challengeId: string;
+  publicKey: import("@/auth/native-passkey").NativeCreationOptions;
+};
+
 export type SocialLink = AccountSocialLink;
 
 export class AccountApiError extends Error {
@@ -262,6 +277,48 @@ export function getAccountProfile(
     { method: "GET" },
     options,
     "Account profile request failed",
+  );
+}
+
+export function listAccountPasskeys(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<AccountPage<AccountPasskey>>(
+    accessToken,
+    "/api/account/webauthn/credentials?page=0&size=100",
+    { method: "GET" },
+    options,
+    "Passkey list request failed",
+  );
+}
+
+export function beginAccountPasskeyEnrollment(
+  accessToken: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<NativePasskeyCreationOptions>(
+    accessToken,
+    "/api/account/webauthn/registration-options",
+    { body: "{}", headers: { "Content-Type": "application/json" }, method: "POST" },
+    options,
+    "Passkey registration options could not be created",
+  );
+}
+
+export function completeAccountPasskeyEnrollment(
+  accessToken: string,
+  challengeId: string,
+  credential: import("@/auth/native-passkey-contract").NativePasskeyCredential,
+  label: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    `/api/account/webauthn/registration/${encodeURIComponent(challengeId)}`,
+    { body: JSON.stringify({ credential, label }), headers: { "Content-Type": "application/json" }, method: "POST" },
+    options,
+    "Passkey could not be registered",
   );
 }
 
@@ -591,6 +648,25 @@ export function decideCibaRequest(
     accessToken,
     `/api/ciba/requests/${encodeURIComponent(request.authReqId)}/${decision}?user_code=${encodeURIComponent(request.userCode)}`,
     { method: "POST" },
+    options,
+    "CIBA request decision failed",
+  );
+}
+
+export function approveCibaRequestWithMfa(
+  accessToken: string,
+  request: Pick<CibaPendingRequest, "authReqId" | "userCode">,
+  code: string,
+  options: RequestOptions = {},
+) {
+  return requestAccount<void>(
+    accessToken,
+    `/api/ciba/requests/${encodeURIComponent(request.authReqId)}/approve/native?user_code=${encodeURIComponent(request.userCode)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    },
     options,
     "CIBA request decision failed",
   );
