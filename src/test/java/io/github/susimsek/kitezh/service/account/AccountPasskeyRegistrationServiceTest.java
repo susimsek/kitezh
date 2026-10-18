@@ -82,6 +82,22 @@ class AccountPasskeyRegistrationServiceTest {
     }
 
     @Test
+    void rejectsMissingChallengeBeforeInspectingAttestation() {
+        when(repository.findByIdForUpdate("missing")).thenReturn(null);
+
+        assertThatThrownBy(
+                        () ->
+                                service.complete(
+                                        UsernamePasswordAuthenticationToken.authenticated(
+                                                "alice", null, java.util.List.of()),
+                                        "missing",
+                                        null))
+                .isInstanceOf(ApiException.class);
+
+        verify(relyingParty, never()).registerCredential(any());
+    }
+
+    @Test
     void createsOptionsAndConsumesTheChallengeAfterSuccessfulEnrollment() throws IOException {
         PublicKeyCredentialCreationOptions options = mock(PublicKeyCredentialCreationOptions.class);
         PublicKeyCredential<?> credential = mock(PublicKeyCredential.class);
@@ -151,6 +167,43 @@ class AccountPasskeyRegistrationServiceTest {
                                 enrollmentService.complete(
                                         UsernamePasswordAuthenticationToken.authenticated(
                                                 "alice", null, java.util.List.of()),
+                                        "challenge-1",
+                                        new MobilePasskeyRegistrationRequestDTO(
+                                                Map.of("id", "credential-id"), "Phone")))
+                .isInstanceOf(ApiException.class);
+        verify(relyingParty, never()).registerCredential(any());
+    }
+
+    @Test
+    void rejectsInvalidBase64AndNonCredentialStoredOptions() throws Exception {
+        PublicKeyCredentialCreationOptions options = mock(PublicKeyCredentialCreationOptions.class);
+        PublicKeyCredential<?> credential = mock(PublicKeyCredential.class);
+        JsonMapper delegate = mock(JsonMapper.class);
+        SecurityJsonMapper mapper = mock(SecurityJsonMapper.class);
+        AccountPasskeyRegistrationService enrollmentService =
+                serviceWithMapper(mapper, delegate, options, credential);
+        Authentication authentication =
+                UsernamePasswordAuthenticationToken.authenticated(
+                        "alice", null, java.util.List.of());
+        var challenge = challenge("alice", Instant.now().plusSeconds(60));
+        when(repository.findByIdForUpdate("challenge-1")).thenReturn(challenge);
+        challenge.setOptions("!");
+
+        assertThatThrownBy(
+                        () ->
+                                enrollmentService.complete(
+                                        authentication,
+                                        "challenge-1",
+                                        new MobilePasskeyRegistrationRequestDTO(
+                                                Map.of("id", "credential-id"), "Phone")))
+                .isInstanceOf(ApiException.class);
+
+        challenge.setOptions("unused");
+        when(mapper.readSessionAttribute(any(InputStream.class))).thenReturn(Map.of());
+        assertThatThrownBy(
+                        () ->
+                                enrollmentService.complete(
+                                        authentication,
                                         "challenge-1",
                                         new MobilePasskeyRegistrationRequestDTO(
                                                 Map.of("id", "credential-id"), "Phone")))

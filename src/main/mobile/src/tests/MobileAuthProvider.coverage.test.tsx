@@ -6,7 +6,14 @@ import {
   waitFor,
 } from "@/testing/native-testing-library";
 import * as ExpoLinking from "expo-linking";
-import { AppState, Linking, Platform, Pressable, Text, View } from "react-native";
+import {
+  AppState,
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import type { ReactNode } from "react";
 import * as storage from "../auth/storage";
@@ -114,7 +121,8 @@ jest.mock("@react-native-google-signin/google-signin", () => ({
       data: { idToken: "signed-google-id-token" },
     })),
   },
-  isSuccessResponse: (response: { type: string }) => response.type === "success",
+  isSuccessResponse: (response: { type: string }) =>
+    response.type === "success",
 }));
 jest.mock("../auth/native-social-login", () => ({
   isNativeSocialProviderConfigured: jest.fn(() => true),
@@ -123,9 +131,14 @@ jest.mock("../auth/native-social-login", () => ({
 jest.mock("@/api/public-api", () => ({
   startMobileLogin: jest.fn(),
   startMobileGoogleLogin: jest.fn(),
+  startMobilePasskeyLogin: jest.fn(),
   submitMobileLoginAction: jest.fn(),
   submitMobileLoginConsent: jest.fn(),
   submitMobileLoginMfa: jest.fn(),
+  verifyMobilePasskeyLogin: jest.fn(),
+}));
+jest.mock("@/auth/native-passkey", () => ({
+  getNativePasskey: jest.fn(),
 }));
 jest.mock("expo-linking", () => ({
   parse: (url: string) => ({
@@ -159,10 +172,14 @@ jest.mock("../auth/storage", () => ({
   readSession: jest.fn(),
   saveOAuthTransaction: jest.fn(),
   writeSession: jest.fn(),
-  writeSessionIfCurrent: jest.fn(async (session: unknown, namespace: string) => {
-    await jest.requireMock("../auth/storage").writeSession(session, namespace);
-    return true;
-  }),
+  writeSessionIfCurrent: jest.fn(
+    async (session: unknown, namespace: string) => {
+      await jest
+        .requireMock("../auth/storage")
+        .writeSession(session, namespace);
+      return true;
+    },
+  ),
 }));
 
 let savedOAuthTransaction: Awaited<
@@ -187,7 +204,12 @@ const {
   submitMobileLoginAction: mockSubmitMobileLoginAction,
   submitMobileLoginConsent: mockSubmitMobileLoginConsent,
   submitMobileLoginMfa: mockSubmitMobileLoginMfa,
+  startMobilePasskeyLogin: mockStartMobilePasskeyLogin,
+  verifyMobilePasskeyLogin: mockVerifyMobilePasskeyLogin,
 } = jest.requireMock("@/api/public-api");
+const { getNativePasskey: mockGetNativePasskey } = jest.requireMock(
+  "@/auth/native-passkey",
+);
 
 function AuthProbe() {
   const auth = useMobileAuth();
@@ -197,15 +219,71 @@ function AuthProbe() {
       <Text>{auth.error ?? "no-error"}</Text>
       <Text>{auth.session?.accessToken ?? "no-session"}</Text>
       <Text>{auth.loginChallenge?.kind ?? "no-login-challenge"}</Text>
-      <Pressable accessibilityRole="button" onPress={() => void auth.signIn()}><Text>sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google-alias")}><Text>provider-sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google")}><Text>native-google-sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.nativeLogin("alice", "secret")}><Text>native-sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginMfa("123456")}><Text>submit-login-mfa</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginConsent(true)}><Text>approve-login-consent</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginConsent(false)}><Text>deny-login-consent</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginAction({ newPassword: "a-long-password" })}><Text>submit-login-action</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.refreshSession(true)}><Text>refresh</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn()}>
+        <Text>sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.signIn("google-alias")}
+      >
+        <Text>provider-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.signIn("google")}
+      >
+        <Text>native-google-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.nativeLogin("alice", "secret")}
+      >
+        <Text>native-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.nativePasskeyLogin("alice")}
+      >
+        <Text>native-passkey-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.cancelNativeLogin()}
+      >
+        <Text>cancel-native-login</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.submitLoginMfa("123456")}
+      >
+        <Text>submit-login-mfa</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.submitLoginConsent(true)}
+      >
+        <Text>approve-login-consent</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.submitLoginConsent(false)}
+      >
+        <Text>deny-login-consent</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          void auth.submitLoginAction({ newPassword: "a-long-password" })
+        }
+      >
+        <Text>submit-login-action</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.refreshSession(true)}
+      >
+        <Text>refresh</Text>
+      </Pressable>
       <Pressable
         accessibilityRole="button"
         onPress={() => {
@@ -215,7 +293,9 @@ function AuthProbe() {
       >
         <Text>refresh-twice</Text>
       </Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.signOut()}><Text>sign-out</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signOut()}>
+        <Text>sign-out</Text>
+      </Pressable>
     </View>
   );
 }
@@ -247,6 +327,23 @@ beforeEach(() => {
   });
   mockSetRequestHasCodeVerifier(true);
   mockStartMobileLogin.mockResolvedValue({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  mockStartMobilePasskeyLogin.mockResolvedValue({
+    status: "passkey_required",
+    transactionId: "passkey-transaction",
+    publicKey: { challenge: "public-key-challenge" },
+  });
+  mockGetNativePasskey.mockResolvedValue({
+    id: "credential-id",
+    rawId: "raw-credential-id",
+    response: { clientDataJSON: "client-data" },
+    type: "public-key",
+  });
+  mockVerifyMobilePasskeyLogin.mockResolvedValue({
     status: "authorized",
     code: "authorization-code",
     state: "test-state-2",
@@ -527,13 +624,19 @@ it("does not cancel Android authorization for an active state without a backgrou
   });
   let receiveUrl: ((event: { url: string }) => void) | undefined;
   let changeAppState: ((state: string) => void) | undefined;
-  jest.spyOn(Linking, "addEventListener").mockImplementation(((event, listener) => {
+  jest.spyOn(Linking, "addEventListener").mockImplementation(((
+    event,
+    listener,
+  ) => {
     if (event === "url") {
       receiveUrl = listener as (event: { url: string }) => void;
     }
     return { remove: jest.fn() };
   }) as never);
-  jest.spyOn(AppState, "addEventListener").mockImplementation(((_event, listener) => {
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
     changeAppState = listener as (state: string) => void;
     return { remove: jest.fn() };
   }) as never);
@@ -803,7 +906,10 @@ it("retains stored refresh and ID tokens when refresh omits rotated values", asy
 
 it("refreshes an expired session when the app becomes active", async () => {
   let changeAppState: ((state: string) => void) | undefined;
-  jest.spyOn(AppState, "addEventListener").mockImplementation(((_event, listener) => {
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
     changeAppState = listener as (state: string) => void;
     return { remove: jest.fn() };
   }) as never);
@@ -824,7 +930,10 @@ it("refreshes an expired session when the app becomes active", async () => {
 
 it("keeps a fresh session without refreshing when the app becomes active", async () => {
   let changeAppState: ((state: string) => void) | undefined;
-  jest.spyOn(AppState, "addEventListener").mockImplementation(((_event, listener) => {
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
     changeAppState = listener as (state: string) => void;
     return { remove: jest.fn() };
   }) as never);
@@ -915,7 +1024,9 @@ it("uses native Google sign-in and continues through mobile PKCE without provide
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.press(screen.getByRole("button", { name: "native-google-sign-in" }));
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-google-sign-in" }),
+  );
 
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
   expect(mockStartMobileGoogleLogin).toHaveBeenCalledWith(
@@ -932,6 +1043,114 @@ it("uses native Google sign-in and continues through mobile PKCE without provide
   );
 });
 
+it("uses a native passkey challenge and exchanges the verified PKCE authorization code", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockStartMobilePasskeyLogin).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platform: expect.stringMatching(/^(ANDROID|IOS)$/),
+      username: "alice",
+      codeChallengeMethod: "S256",
+    }),
+    { locale: "en" },
+  );
+  expect(mockGetNativePasskey).toHaveBeenCalledWith({
+    challenge: "public-key-challenge",
+  });
+  expect(mockVerifyMobilePasskeyLogin).toHaveBeenCalledWith(
+    "passkey-transaction",
+    expect.objectContaining({ id: "credential-id" }),
+    { locale: "en" },
+  );
+  expect(mockAuthorizationEndpoints).toContain(
+    "https://issuer.example.test/authorize",
+  );
+});
+
+it("clears the passkey transaction and reports native credential failures", async () => {
+  mockGetNativePasskey.mockRejectedValueOnce(new Error("credential cancelled"));
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  expect(await screen.findByText("passkey-authentication-failed")).toBeTruthy();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(mockVerifyMobilePasskeyLogin).not.toHaveBeenCalled();
+});
+
+it.each([
+  [401, "login-credentials-invalid"],
+  [503, "authorization-failed"],
+])(
+  "maps native password login HTTP %i to a stable error",
+  async (status, error) => {
+    mockStartMobileLogin.mockRejectedValueOnce(
+      Object.assign(new Error("server rejected login"), { status }),
+    );
+    renderProvider();
+    await screen.findByText("signed-out");
+
+    fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+
+    expect(await screen.findByText(error)).toBeTruthy();
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  },
+);
+
+it("reports an invalid native passkey PKCE request without asking for a credential", async () => {
+  mockSetRequestHasCodeVerifier(false);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  expect(await screen.findByText("passkey-authentication-failed")).toBeTruthy();
+  expect(mockStartMobilePasskeyLogin).not.toHaveBeenCalled();
+  expect(mockGetNativePasskey).not.toHaveBeenCalled();
+});
+
+it("cancels a native login attempt and clears its saved transaction", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "cancel-native-login" }));
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  await waitFor(() =>
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
+  );
+});
+
+it("uses native passkey authorization directly when the server does not require a credential", async () => {
+  mockStartMobilePasskeyLogin.mockResolvedValueOnce({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockGetNativePasskey).not.toHaveBeenCalled();
+  expect(mockVerifyMobilePasskeyLogin).not.toHaveBeenCalled();
+});
+
 it("maps a Google account-link conflict to an explicit local-link outcome", async () => {
   mockStartMobileGoogleLogin.mockRejectedValueOnce(
     Object.assign(new Error("Google identity belongs to a local account"), {
@@ -941,7 +1160,9 @@ it("maps a Google account-link conflict to an explicit local-link outcome", asyn
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.press(screen.getByRole("button", { name: "native-google-sign-in" }));
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-google-sign-in" }),
+  );
 
   await waitFor(() =>
     expect(screen.getByText("google-account-link-required")).toBeTruthy(),
@@ -961,7 +1182,9 @@ it("uses the system-browser provider flow when native Google is not configured",
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.press(screen.getByRole("button", { name: "native-google-sign-in" }));
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-google-sign-in" }),
+  );
 
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
   expect(mockAuthorizationEndpoints).toContain(
@@ -1078,7 +1301,9 @@ it("requires explicit native consent approval before the PKCE exchange", async (
   expect(await screen.findByText("consent")).toBeTruthy();
   expect(mockExchangeCode).not.toHaveBeenCalled();
 
-  fireEvent.press(screen.getByRole("button", { name: "approve-login-consent" }));
+  fireEvent.press(
+    screen.getByRole("button", { name: "approve-login-consent" }),
+  );
 
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
   expect(mockSubmitMobileLoginConsent).toHaveBeenCalledWith(
@@ -1156,16 +1381,22 @@ it("clears the pending transaction when a cold-start callback has no state", asy
 
 it.each([
   ["no URL", null],
-  ["an unregistered URL", "https://untrusted.example.test/callback?state=state"],
-] as const)("ignores cold-start callbacks from %s", async (_description, url) => {
-  jest.spyOn(Linking, "getInitialURL").mockResolvedValueOnce(url);
+  [
+    "an unregistered URL",
+    "https://untrusted.example.test/callback?state=state",
+  ],
+] as const)(
+  "ignores cold-start callbacks from %s",
+  async (_description, url) => {
+    jest.spyOn(Linking, "getInitialURL").mockResolvedValueOnce(url);
 
-  renderProvider();
+    renderProvider();
 
-  expect(await screen.findByText("signed-out")).toBeTruthy();
-  expect(storage.consumeOAuthTransaction).not.toHaveBeenCalled();
-  expect(mockExchangeCode).not.toHaveBeenCalled();
-});
+    expect(await screen.findByText("signed-out")).toBeTruthy();
+    expect(storage.consumeOAuthTransaction).not.toHaveBeenCalled();
+    expect(mockExchangeCode).not.toHaveBeenCalled();
+  },
+);
 
 it("ignores duplicate cold-start callback parameters", async () => {
   jest

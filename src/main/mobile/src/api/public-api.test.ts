@@ -108,9 +108,12 @@ test("posts an explicit native OAuth consent decision and validates its continua
 test("rejects malformed mobile authentication capability contracts", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
-    new Response(JSON.stringify({ contractVersion: 0, capabilities: [false] }), {
-      status: 200,
-    });
+    new Response(
+      JSON.stringify({ contractVersion: 0, capabilities: [false] }),
+      {
+        status: 200,
+      },
+    );
 
   try {
     await assert.rejects(getMobileAuthCapabilities(), (error: unknown) => {
@@ -118,6 +121,74 @@ test("rejects malformed mobile authentication capability contracts", async () =>
       assert.equal(error.status, 502);
       return true;
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("normalizes capability, release, and social discovery failures", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const path = new URL(input.toString()).pathname;
+    return new Response(JSON.stringify({ title: `${path} unavailable` }), {
+      status: 503,
+      headers: { "Retry-After": "3" },
+    });
+  };
+
+  try {
+    await assert.rejects(
+      getMobileAuthCapabilities(),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 503 &&
+        error.retryAfterMs === 3_000,
+    );
+    await assert.rejects(
+      getLatestReleaseMetadata(),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 503 &&
+        error.message === "Release metadata request failed",
+    );
+    await assert.rejects(
+      getSocialProviders(),
+      (error: unknown) =>
+        error instanceof PublicApiError && error.status === 503,
+    );
+
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ providers: [] }), { status: 200 });
+    await assert.rejects(
+      getSocialProviders(),
+      (error: unknown) =>
+        error instanceof PublicApiError && error.status === 502,
+    );
+
+    globalThis.fetch = async () => {
+      throw new TypeError("private network detail");
+    };
+    await assert.rejects(
+      getMobileAuthCapabilities(),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 0 &&
+        error.message === "Mobile authentication capabilities unavailable",
+    );
+    await assert.rejects(
+      getLatestReleaseMetadata(),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 0 &&
+        error.message === "Release metadata request failed",
+    );
+    await assert.rejects(
+      getSocialProviders(),
+      (error: unknown) =>
+        error instanceof PublicApiError &&
+        error.status === 0 &&
+        error.message === "Social provider discovery unavailable",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -542,6 +613,49 @@ test("mobile TOTP and recovery code setup use transaction-bound endpoints", asyn
         method: "POST",
       },
     ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rejects malformed mobile login setup and consent responses", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({}), { status: 200 });
+
+  try {
+    await assert.rejects(
+      getMobileLoginMfaSetup("transaction-1"),
+      (error: unknown) =>
+        error instanceof PublicApiError && error.status === 502,
+    );
+    await assert.rejects(
+      getMobileLoginRecoveryCodes("transaction-1"),
+      (error: unknown) =>
+        error instanceof PublicApiError && error.status === 502,
+    );
+
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          status: "denied",
+          state: "state-1234",
+          redirectUri: "kitezh://callback",
+        }),
+        { status: 200 },
+      );
+    assert.deepEqual(await submitMobileLoginConsent("transaction-1", false), {
+      status: "denied",
+      state: "state-1234",
+      redirectUri: "kitezh://callback",
+    });
+
+    globalThis.fetch = async () => new Response("null", { status: 200 });
+    await assert.rejects(
+      submitMobileLoginConsent("transaction-1", true),
+      (error: unknown) =>
+        error instanceof PublicApiError && error.status === 502,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
