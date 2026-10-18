@@ -123,26 +123,12 @@ class AccountPersonalAccessTokenEndpointsIT {
     }
 
     @Test
-    void liquibaseSeedsNoExpirationTokensForAdminAndUser() {
+    void doesNotSeedPersonalAccessTokensForAdminAndUser() {
         for (String username : java.util.List.of("admin", "user")) {
-            var token =
-                    personalAccessTokenRepository
-                            .findAllByUserUsernameOrderByCreatedAtDesc(username)
-                            .stream()
-                            .filter(candidate -> candidate.getSeedKey() != null)
-                            .findFirst()
-                            .orElseThrow();
-
-            assertThat(token.getSeedKey()).isEqualTo("demo-" + username + "-mcp");
-            assertThat(token.getExpiresAt()).isNull();
-            var authorization = authorizationRepository.findById(token.getAuthorizationId());
-            assertThat(authorization).isPresent();
-            var jwtToken = jwtDecoder.decode(authorization.orElseThrow().getAccessTokenValue());
-            assertThat(jwtToken.getSubject()).isEqualTo(username);
-            assertThat(jwtToken.getClaimAsStringList("scope")).containsExactly("mcp.read");
-            assertThat(jwtToken.getClaimAsStringList("roles"))
-                    .contains(username.equals("admin") ? "ROLE_ADMIN" : "ROLE_USER");
-            assertThat(jwtToken.getExpiresAt()).isNull();
+            assertThat(
+                            personalAccessTokenRepository.findAllByUserUsernameOrderByCreatedAtDesc(
+                                    username))
+                    .noneMatch(token -> token.getName().equals("MCP personal access token"));
         }
     }
 

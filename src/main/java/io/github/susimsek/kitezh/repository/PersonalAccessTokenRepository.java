@@ -15,8 +15,6 @@ public interface PersonalAccessTokenRepository
 
     Optional<PersonalAccessTokenEntity> findByIdAndUserUsername(String id, String username);
 
-    boolean existsBySeedKey(String seedKey);
-
     @Query(
             "select count(t) from PersonalAccessTokenEntity t where t.user.username = :username"
                     + " and (t.expiresAt is null or t.expiresAt > :now)")

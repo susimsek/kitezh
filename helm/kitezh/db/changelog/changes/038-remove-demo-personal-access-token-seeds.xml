@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="038-remove-demo-personal-access-token-seeds" author="kitezh">
+		<sql>delete from oauth2_authorization where id in (select authorization_id from personal_access_tokens where seed_key is not null)</sql>
+		<dropTable tableName="personal_access_token_seeds"/>
+		<dropColumn tableName="personal_access_tokens" columnName="seed_key"/>
+	</changeSet>
+</databaseChangeLog>

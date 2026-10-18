@@ -30,9 +30,6 @@ public class PersonalAccessTokenEntity {
     @Column(name = "authorization_id", nullable = false, unique = true, length = 100)
     private String authorizationId;
 
-    @Column(name = "seed_key", unique = true, length = 100)
-    private String seedKey;
-
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 

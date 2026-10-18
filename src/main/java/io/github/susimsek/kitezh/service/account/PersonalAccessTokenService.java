@@ -75,19 +75,7 @@ public class PersonalAccessTokenService {
             String username, PersonalAccessTokenRequestDTO request) {
         Instant createdAt = Instant.now();
         Instant expiresAt = expirationAt(request, createdAt);
-        return createToken(
-                username, request.name(), request.description(), expiresAt, null, createdAt);
-    }
-
-    @Transactional
-    public void ensureSeedToken(
-            String seedKey, String username, String name, String description, String expiration) {
-        if (!"never".equals(expiration)) {
-            throw new IllegalStateException("Unsupported seeded personal access token expiration");
-        }
-        if (!personalAccessTokenRepository.existsBySeedKey(seedKey)) {
-            createToken(username, name, description, null, seedKey, Instant.now());
-        }
+        return createToken(username, request.name(), request.description(), expiresAt, createdAt);
     }
 
     private PersonalAccessTokenCreatedDTO createToken(
@@ -95,7 +83,6 @@ public class PersonalAccessTokenService {
             String name,
             String description,
             Instant expiresAt,
-            String seedKey,
             Instant createdAt) {
         if (personalAccessTokenRepository.countActiveByUsername(username, Instant.now())
                 >= MAX_TOKENS_PER_USER) {
@@ -161,7 +148,6 @@ public class PersonalAccessTokenService {
         entity.setName(name.trim());
         entity.setDescription(
                 description == null || description.isBlank() ? null : description.trim());
-        entity.setSeedKey(seedKey);
         entity.setCreatedAt(createdAt);
         entity.setExpiresAt(expiresAt);
         personalAccessTokenRepository.save(entity);

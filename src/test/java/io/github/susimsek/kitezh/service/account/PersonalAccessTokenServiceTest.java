@@ -49,25 +49,6 @@ class PersonalAccessTokenServiceTest {
     @InjectMocks private PersonalAccessTokenService service;
 
     @Test
-    void rejectsSeedTokensWithAnUnsupportedExpiration() {
-        assertThatThrownBy(() -> service.ensureSeedToken("seed", USERNAME, "MCP", null, "30"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Unsupported seeded personal access token expiration");
-
-        verify(personalAccessTokenRepository, never()).existsBySeedKey(any());
-    }
-
-    @Test
-    void skipsAnExistingSeedToken() {
-        when(personalAccessTokenRepository.existsBySeedKey("seed")).thenReturn(true);
-
-        service.ensureSeedToken("seed", USERNAME, "MCP", null, "never");
-
-        verify(personalAccessTokenRepository).existsBySeedKey("seed");
-        verify(personalAccessTokenRepository, never()).countActiveByUsername(any(), any());
-    }
-
-    @Test
     void rejectsCreationWhenTheAccountHasReachedItsTokenLimit() {
         when(personalAccessTokenRepository.countActiveByUsername(any(), any())).thenReturn(50L);
 
