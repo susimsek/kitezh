@@ -19,6 +19,7 @@ done
 run_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/kitezh-ios-e2e"
 derived_data_dir="$run_dir/derived-data"
 mkdir -p "$run_dir"
+fixture_port="${FIXTURE_PORT:-9090}"
 
 if [[ -n "${SIMULATOR_UDID:-}" ]]; then
   simulator_udid="$SIMULATOR_UDID"
@@ -57,16 +58,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-node e2e/fixture-server.mjs --host 0.0.0.0 --port 9090 > "$run_dir/fixture.log" 2>&1 &
+node e2e/fixture-server.mjs --host 0.0.0.0 --port "$fixture_port" > "$run_dir/fixture.log" 2>&1 &
 fixture_pid=$!
 export REACT_NATIVE_PACKAGER_HOSTNAME="127.0.0.1"
-export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://127.0.0.1:9090"
+export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://127.0.0.1:$fixture_port"
 pnpm exec expo start --port 8081 --dev-client > "$run_dir/metro.log" 2>&1 &
 metro_pid=$!
 
 fixture_ready=false
 for attempt in $(seq 1 30); do
-  if curl --fail --silent http://127.0.0.1:9090/health >/dev/null; then
+  if curl --fail --silent "http://127.0.0.1:$fixture_port/health" >/dev/null; then
     fixture_ready=true
     break
   fi
@@ -108,14 +109,33 @@ xcrun simctl launch "$simulator_udid" io.github.susimsek.kitezh.mobile
 
 default_flows=(
   cold-start
+  oauth-lifecycle
   settings-locale-theme
   deep-links
   authenticated-fixture
+  discovery-unavailable
+  discovery-timeout
+  session-lifecycle
+  mfa-required-actions
+  account-mfa
+  passkey-login-attempt
+  admin-policy-save
   admin-settings-groups
   account-profile
   account-notifications
+  account-personal-access-tokens
 )
 IFS=',' read -r -a selected_flows <<< "${MAESTRO_FLOWS:-${default_flows[*]// /,}}"
 for flow in "${selected_flows[@]}"; do
+  case "$flow" in
+    discovery-unavailable)
+      curl --fail --silent --show-error -X POST \
+        "http://127.0.0.1:$fixture_port/fixture/discovery-mode?mode=unavailable-once" >/dev/null
+      ;;
+    discovery-timeout)
+      curl --fail --silent --show-error -X POST \
+        "http://127.0.0.1:$fixture_port/fixture/discovery-mode?mode=timeout-once" >/dev/null
+      ;;
+  esac
   maestro test --udid "$simulator_udid" "e2e/maestro/${flow}.yaml"
 done

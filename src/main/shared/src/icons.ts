@@ -27,6 +27,21 @@ export const iconNames = [
 
 export type AppIconName = (typeof iconNames)[number];
 
+export const socialProviderIconNames = {
+  generic: "globe",
+  github: "globe",
+  google: "globe",
+  linkedin: "globe",
+  microsoft: "globe",
+} as const satisfies Record<string, AppIconName>;
+
+export function socialProviderIcon(iconKey: string): AppIconName {
+  return (
+    socialProviderIconNames[iconKey as keyof typeof socialProviderIconNames] ??
+    "globe"
+  );
+}
+
 export const iconMetadata: Record<
   AppIconName,
   { labelKey: string; unicode: string; svg?: string }

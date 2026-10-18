@@ -4,7 +4,7 @@ appId: io.github.susimsek.kitezh.mobile
 - launchApp:
     clearState: false
 - extendedWaitUntil:
-    visible: "Kitezh logo"
+    visible: "Kitezh logo|Continue|Devam et|Account Console|Hesap Konsolu"
     timeout: 180000
 - runFlow:
     when:
@@ -27,10 +27,16 @@ appId: io.github.susimsek.kitezh.mobile
 - tapOn:
     id: settings-locale-english
 - assertVisible: "Settings"
+- assertVisible:
+    id: settings-locale-english
+    selected: true
 - tapOn:
     id: settings-locale-turkish
 - assertVisible: "Ayarlar"
 - assertVisible: "Görünüm"
+- assertVisible:
+    id: settings-locale-turkish
+    selected: true
 - tapOn:
     id: settings-theme-system
 - assertVisible:
@@ -39,14 +45,20 @@ appId: io.github.susimsek.kitezh.mobile
 - tapOn:
     id: settings-theme-dark
 - assertVisible: "Koyu"
+- assertVisible:
+    id: settings-theme-dark
+    selected: true
 - tapOn:
     id: settings-theme-light
 - assertVisible: "Açık"
+- assertVisible:
+    id: settings-theme-light
+    selected: true
 - stopApp
 - launchApp:
     clearState: false
 - extendedWaitUntil:
-    visible: "Kitezh logo"
+    visible: "Kitezh logo|Continue|Devam et|Account Console|Hesap Konsolu"
     timeout: 180000
 - runFlow:
     when:
@@ -66,4 +78,14 @@ appId: io.github.susimsek.kitezh.mobile
     selected: true
 - assertVisible:
     id: settings-theme-light
+    selected: true
+- tapOn:
+    id: settings-locale-system
+- assertVisible:
+    id: settings-locale-system
+    selected: true
+- tapOn:
+    id: settings-theme-system
+- assertVisible:
+    id: settings-theme-system
     selected: true

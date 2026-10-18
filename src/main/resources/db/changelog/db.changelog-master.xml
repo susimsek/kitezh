@@ -50,5 +50,6 @@
 	<include file="db/changelog/changes/034-create-desktop-social-link-transactions.xml"/>
 	<include file="db/changelog/changes/035-create-notifications.xml"/>
 	<include file="db/changelog/changes/036-create-personal-access-tokens.xml"/>
+	<include file="db/changelog/changes/037-create-mobile-login-transactions.xml"/>
 	<include file="db/changelog/changes/038-remove-demo-personal-access-token-seeds.xml"/>
 </databaseChangeLog>

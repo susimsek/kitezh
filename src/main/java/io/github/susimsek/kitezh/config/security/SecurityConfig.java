@@ -227,6 +227,11 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers("/.well-known/uma2-configuration")
                                         .permitAll()
+                                        .requestMatchers(
+                                                "/.well-known/assetlinks.json",
+                                                "/.well-known/apple-app-site-association",
+                                                "/apple-app-site-association")
+                                        .permitAll()
                                         .requestMatchers("/api/authz/protection/**")
                                         .hasAuthority("SCOPE_uma_protection")
                                         .requestMatchers("/api/public/app-release")
@@ -361,8 +366,10 @@ public class SecurityConfig {
                                             new DesktopSocialLinkAuthenticationFailureHandler(
                                                     socialDependencies
                                                             .desktopSocialLinkTransactionService(),
-                                                    new SimpleUrlAuthenticationFailureHandler(
-                                                            LOGIN_ERROR_PATH)))
+                                                    mobileSocialFailureHandler(
+                                                            socialDependencies,
+                                                            new SimpleUrlAuthenticationFailureHandler(
+                                                                    LOGIN_ERROR_PATH))))
                                     .permitAll());
         }
 
@@ -397,8 +404,10 @@ public class SecurityConfig {
                                             new DesktopSocialLinkAuthenticationFailureHandler(
                                                     socialDependencies
                                                             .desktopSocialLinkTransactionService(),
-                                                    new SimpleUrlAuthenticationFailureHandler(
-                                                            LOGIN_ERROR_PATH)))
+                                                    mobileSocialFailureHandler(
+                                                            socialDependencies,
+                                                            new SimpleUrlAuthenticationFailureHandler(
+                                                                    LOGIN_ERROR_PATH))))
                                     .permitAll());
         }
 
@@ -495,7 +504,9 @@ public class SecurityConfig {
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
             OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
                     socialTokenResponseClient,
-            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService,
+            io.github.susimsek.kitezh.service.MobileSocialLoginTransactionService
+                    mobileSocialLoginTransactionService) {
         return new SocialSecurityDependencies(
                 clientRegistrationRepository,
                 socialLoginSuccessHandler,
@@ -503,7 +514,8 @@ public class SecurityConfig {
                 socialLoginService,
                 socialAuthorizedClientRepository,
                 socialTokenResponseClient,
-                desktopSocialLinkTransactionService);
+                desktopSocialLinkTransactionService,
+                mobileSocialLoginTransactionService);
     }
 
     record BrowserSecurityDependencies(
@@ -523,7 +535,9 @@ public class SecurityConfig {
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
             OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
                     socialTokenResponseClient,
-            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService,
+            io.github.susimsek.kitezh.service.MobileSocialLoginTransactionService
+                    mobileSocialLoginTransactionService) {
 
         SocialSecurityDependencies(
                 ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
@@ -541,8 +555,21 @@ public class SecurityConfig {
                     socialLoginService,
                     socialAuthorizedClientRepository,
                     socialTokenResponseClient,
+                    null,
                     null);
         }
+    }
+
+    private static org.springframework.security.web.authentication.AuthenticationFailureHandler
+            mobileSocialFailureHandler(
+                    SocialSecurityDependencies dependencies,
+                    org.springframework.security.web.authentication.AuthenticationFailureHandler
+                            fallback) {
+        if (dependencies.mobileSocialLoginTransactionService() == null) {
+            return fallback;
+        }
+        return new MobileSocialLoginAuthenticationFailureHandler(
+                dependencies.mobileSocialLoginTransactionService(), fallback);
     }
 
     private static WebAuthnSettings resolveWebAuthnSettings(
@@ -703,7 +730,9 @@ public class SecurityConfig {
             OAuth2AuthorizedClientRepository socialAuthorizedClientRepository,
             SocialTokenService socialTokenService,
             MfaService mfaService,
-            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService,
+            io.github.susimsek.kitezh.service.MobileSocialLoginTransactionService
+                    mobileSocialLoginTransactionService) {
         return new SocialLoginAuthenticationSuccessHandler(
                 socialLoginService,
                 userDetailsService,
@@ -711,7 +740,8 @@ public class SecurityConfig {
                 socialAuthorizedClientRepository,
                 socialTokenService,
                 mfaService,
-                desktopSocialLinkTransactionService);
+                desktopSocialLinkTransactionService,
+                mobileSocialLoginTransactionService);
     }
 
     SocialLoginAuthenticationSuccessHandler socialLoginAuthenticationSuccessHandler(

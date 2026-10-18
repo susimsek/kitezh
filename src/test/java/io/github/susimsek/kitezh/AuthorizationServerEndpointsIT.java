@@ -30,6 +30,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -37,6 +38,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
+@TestPropertySource(
+        properties = {
+            "app.mobile.ios-team-id=ABCDE12345",
+            "app.mobile.android-sha256-cert-fingerprint=49:C2:E1:D2:E3:7C:C3:F2:18:2A:CE:73:50:EE:16:36:9B:A2:68:92:C9:55:85:C7:12:CA:C3:72:D2:8D:DB:A6"
+        })
 class AuthorizationServerEndpointsIT {
 
     private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
@@ -88,6 +94,43 @@ class AuthorizationServerEndpointsIT {
                 .andExpect(jsonPath("$.provider").value(""))
                 .andExpect(jsonPath("$.secretKey").doesNotExist())
                 .andExpect(jsonPath("$.apiKey").doesNotExist());
+    }
+
+    @Test
+    void androidAppLinkAssociationIsPublicAndMatchesTheReleaseSigningCertificate()
+            throws Exception {
+        mockMvc.perform(get("/.well-known/assetlinks.json"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$[0].target.package_name")
+                                .value("io.github.susimsek.kitezh.mobile"))
+                .andExpect(
+                        jsonPath("$[0].target.sha256_cert_fingerprints[0]")
+                                .value(
+                                        "49:C2:E1:D2:E3:7C:C3:F2:18:2A:CE:73:50:EE:16:36:9B:A2:68:92:C9:55:85:C7:12:CA:C3:72:D2:8D:DB:A6"));
+
+        mockMvc.perform(get("/.well-known/apple-app-site-association"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.applinks.details[0].appIDs[0]")
+                                .value("ABCDE12345.io.github.susimsek.kitezh.mobile"))
+                .andExpect(jsonPath("$.applinks.details[0].components.length()").value(7));
+    }
+
+    @Test
+    void mobileOAuthClientsRegisterTheirVerifiedAppLinkCallbacks() {
+        RegisteredClient account =
+                registeredClientRepository.findByClientId("mobile-account-console");
+        RegisteredClient admin = registeredClientRepository.findByClientId("mobile-admin-console");
+
+        assertThat(account.getRedirectUris())
+                .contains("https://kitezh.onrender.com/oauth/callback");
+        assertThat(account.getPostLogoutRedirectUris())
+                .contains("https://kitezh.onrender.com/logout/callback");
+        assertThat(admin.getRedirectUris())
+                .contains("https://kitezh.onrender.com/admin/oauth/callback");
+        assertThat(admin.getPostLogoutRedirectUris())
+                .contains("https://kitezh.onrender.com/admin/logout/callback");
     }
 
     @ParameterizedTest

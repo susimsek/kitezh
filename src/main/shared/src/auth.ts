@@ -102,6 +102,16 @@ export function validateAuthorizationCallback(
   return { code: params.code, state: params.state };
 }
 
+function hasUnsafeNativeUrlAuthority(value: string, url: URL): boolean {
+  const authority = value.match(/^[a-z][a-z\d+.-]*:\/\/([^/?#]*)/i)?.[1] ?? "";
+  return (
+    value.trim() !== value ||
+    authority.includes("@") ||
+    Boolean(url.username || url.password || url.port) ||
+    value.includes("#")
+  );
+}
+
 export function isAllowedNativeRedirect(
   value: string,
   expectedRedirect: string,
@@ -109,12 +119,14 @@ export function isAllowedNativeRedirect(
   try {
     const actual = new URL(value);
     const expected = new URL(expectedRedirect);
-    return (
-      actual.protocol === "kitezh:" &&
-      actual.protocol === expected.protocol &&
-      actual.hostname === expected.hostname &&
-      actual.pathname === expected.pathname
-    );
+    if (
+      hasUnsafeNativeUrlAuthority(value, actual) ||
+      hasUnsafeNativeUrlAuthority(expectedRedirect, expected) ||
+      expected.search
+    ) {
+      return false;
+    }
+    return matchesNativeRedirect(actual, expected);
   } catch {
     return false;
   }
@@ -127,6 +139,7 @@ export type NativeDeepLink = {
     | "logout-callback"
     | "admin-logout-callback"
     | "verify-email"
+    | "confirm-email"
     | "reset-password";
   token?: string;
 };
@@ -138,23 +151,69 @@ const CALLBACK_LINK_KINDS = new Map<string, NativeDeepLink["kind"]>([
   ["admin/logout/callback", "admin-logout-callback"],
 ]);
 
-const TOKEN_LINK_KINDS = new Map<string, "verify-email" | "reset-password">([
+const TOKEN_LINK_KINDS = new Map<
+  string,
+  "verify-email" | "confirm-email" | "reset-password"
+>([
   ["verify-email", "verify-email"],
+  ["confirm-email", "confirm-email"],
   ["reset-password", "reset-password"],
 ]);
+const NATIVE_APP_LINK_HOST = "kitezh.onrender.com";
+const UNIVERSAL_REDIRECT_PATHS = new Map([
+  ["kitezh://oauth/callback", "/oauth/callback"],
+  ["kitezh://admin/oauth/callback", "/admin/oauth/callback"],
+  ["kitezh://logout/callback", "/logout/callback"],
+  ["kitezh://admin/logout/callback", "/admin/logout/callback"],
+]);
+
+function matchesNativeRedirect(actual: URL, expected: URL): boolean {
+  if (
+    actual.protocol === "kitezh:" &&
+    actual.protocol === expected.protocol &&
+    actual.hostname === expected.hostname &&
+    actual.pathname === expected.pathname
+  ) {
+    return true;
+  }
+  const universalPath = UNIVERSAL_REDIRECT_PATHS.get(expected.href);
+  return (
+    actual.protocol === "https:" &&
+    actual.hostname === NATIVE_APP_LINK_HOST &&
+    Boolean(universalPath) &&
+    actual.pathname === universalPath
+  );
+}
 
 export function parseNativeDeepLink(value: string): NativeDeepLink | null {
   try {
     const url = new URL(value);
-    if (url.protocol !== "kitezh:") return null;
+    const customScheme = url.protocol === "kitezh:";
+    const verifiedAppLink =
+      url.protocol === "https:" && url.hostname === NATIVE_APP_LINK_HOST;
+    if (
+      (!customScheme && !verifiedAppLink) ||
+      hasUnsafeNativeUrlAuthority(value, url)
+    ) {
+      return null;
+    }
     const callbackKind = CALLBACK_LINK_KINDS.get(
-      `${url.hostname}${url.pathname}`,
+      customScheme
+        ? `${url.hostname}${url.pathname}`
+        : url.pathname.replace(/^\//, ""),
     );
     if (callbackKind) return { kind: callbackKind };
 
-    const tokenKind = TOKEN_LINK_KINDS.get(url.hostname);
-    if (!tokenKind || url.pathname !== "/") return null;
-    const token = url.searchParams.get("token")?.trim();
+    const actionRoute = customScheme
+      ? url.pathname === "/"
+        ? url.hostname
+        : ""
+      : url.pathname.replace(/^\//, "");
+    const tokenKind = TOKEN_LINK_KINDS.get(actionRoute);
+    if (!tokenKind) return null;
+    const tokens = url.searchParams.getAll("token");
+    if (tokens.length !== 1) return null;
+    const token = tokens[0];
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
     return { kind: tokenKind, token };
   } catch {
@@ -176,6 +235,8 @@ export function resolveNativeIntentPath(value: string): string | null {
       return "/admin/logout/callback";
     case "verify-email":
       return `/verify-email?token=${encodeURIComponent(deepLink.token ?? "")}`;
+    case "confirm-email":
+      return `/confirm-email?token=${encodeURIComponent(deepLink.token ?? "")}`;
     case "reset-password":
       return `/reset-password?token=${encodeURIComponent(deepLink.token ?? "")}`;
   }

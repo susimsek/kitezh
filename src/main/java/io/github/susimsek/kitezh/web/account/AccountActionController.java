@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.web.account;
 import io.github.susimsek.kitezh.dto.account.AccountRegistrationRequestDTO;
 import io.github.susimsek.kitezh.dto.account.ActionTokenRequestDTO;
 import io.github.susimsek.kitezh.dto.account.ForgotPasswordRequestDTO;
+import io.github.susimsek.kitezh.dto.account.MobileLoginPlatform;
 import io.github.susimsek.kitezh.dto.account.ResetPasswordRequestDTO;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
 import io.github.susimsek.kitezh.service.account.AccountRegistrationService;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -54,12 +56,20 @@ public class AccountActionController {
                     @RequestBody
                     AccountRegistrationRequestDTO request,
             HttpServletRequest httpRequest,
+            @Parameter(description = "Native platform for a mobile CAPTCHA token.")
+                    @RequestHeader(value = "X-Mobile-Platform", required = false)
+                    MobileLoginPlatform mobilePlatform,
             @Parameter(description = "BCP 47 locale used for action emails.", example = "en")
                     Locale locale) {
         if (!loginSettingsService.isUserRegistrationEnabled()) {
             throw ApiException.notFound("Account registration is disabled");
         }
-        registrationCaptchaService.verifyOrThrow(request.captchaToken(), httpRequest);
+        if (mobilePlatform == null) {
+            registrationCaptchaService.verifyOrThrow(request.captchaToken(), httpRequest);
+        } else {
+            registrationCaptchaService.verifyMobileRegistrationOrThrow(
+                    request.captchaToken(), mobilePlatform, httpRequest);
+        }
         Locale emailLocale =
                 request.locale() == null ? locale : Locale.forLanguageTag(request.locale());
         accountRegistrationService.register(

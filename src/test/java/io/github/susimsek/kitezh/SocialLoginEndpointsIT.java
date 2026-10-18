@@ -39,6 +39,22 @@ class SocialLoginEndpointsIT {
     }
 
     @Test
+    void mobileSocialLoginFailsClosedWhenTheProviderIsNotConfigured() throws Exception {
+        mockMvc.perform(
+                        get("/api/auth/mobile-social-login/google")
+                                .param("response_type", "code")
+                                .param("client_id", "mobile-account-console")
+                                .param("redirect_uri", "kitezh://oauth/callback")
+                                .param("scope", "openid account-api")
+                                .param("state", "abcdefghijklmnopqrstuvwxyz012345")
+                                .param(
+                                        "code_challenge",
+                                        "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHijklmnoPQR")
+                                .param("code_challenge_method", "S256"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void administratorCanReadSocialProviderSettingsWithoutReceivingSecrets() throws Exception {
         mockMvc.perform(
                         get("/api/admin/settings/social-providers")

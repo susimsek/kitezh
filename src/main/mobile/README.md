@@ -1,7 +1,8 @@
 # Kitezh Mobile
 
 This is the React Native mobile client for Kitezh. It currently provides the native public shell,
-account sign-in with Authorization Code + PKCE, SecureStore-backed session persistence, refresh,
+native username/password sign-in using a server-issued Authorization Code + PKCE transaction,
+SecureStore-backed session persistence, refresh,
 OIDC logout, typed account profile read/update, password changes, active-session management, and
 authorized application/offline-session management, shared Turkish/English theme and locale
 controls. Settings can reset both preferences to the device defaults without changing web
@@ -9,15 +10,66 @@ preferences. It also includes TOTP MFA setup/verification, recovery-code generat
 deletion with password confirmation. Account adapters retry one unauthorized request after a secure
 token refresh and expose localized loading/error states.
 
+The Account Console keeps profile, security, applications, and settings in a native bottom tab
+bar. The Admin Console keeps Dashboard, Users, and Clients on its compact bottom tab bar; the
+localized “More” sheet opens the remaining administration sections without a horizontally clipped
+navigation strip. Account data routes require an Account session, while Settings stays available
+before sign-in for device preferences. Admin routes use their isolated Admin session.
+
 Social account status and unlinking are available natively; provider linking hands off to the
 authorization server in the system browser.
 
-Registration, forgot-password, reset-password, and email verification are native screens with
-typed API adapters, localized validation, and inline progress states. Registration uses the
-system browser only when CAPTCHA is enabled, because the CAPTCHA challenge is owned by the
-authorization server. Email links can open the native `/verify-email?token=...` screen after the
-app link or custom `kitezh://verify-email` redirect is registered. Social-provider linking still
+Login MFA and supported required actions use native challenge screens. This includes TOTP setup
+with its server-generated QR/secret, recovery-code display, profile/password updates, terms
+acceptance, explicit confirmations, and passkey enrollment. Native passkey sign-in and enrollment
+use the iOS/Android system credential manager and the server's transaction-bound WebAuthn API.
+Configured social providers and social-account linking
+use the native provider SDK or an external provider flow. Login and registration generate
+platform-bound action tokens with Google's native reCAPTCHA Enterprise SDK when server CAPTCHA is
+enabled. Registration, forgot-password, reset-password, email verification, and email-change
+confirmation are native screens with typed API adapters, localized validation, and inline progress
+states. Email links for `kitezh.onrender.com/verify-email`, `/confirm-email`, and `/reset-password` are
+configured as verified Android App Links and iOS Universal Links. The server publishes the checked-in
+Android release fingerprint by default; override `APP_ANDROID_SHA256_CERT_FINGERPRINT` to match the
+certificate used to sign the deployed app. Configure `APP_IOS_TEAM_ID` on the server to publish the
+iOS association file.
+Set `WEBAUTHN_ALLOWED_ORIGINS` to include the issuer origin and each Android
+`android:apk-key-hash:<base64url SHA-256 signing certificate>` origin used by the app; debug and
+release builds can have different signing origins. The `kitezh://` scheme remains available for
+OAuth browser callbacks. Social-provider linking still
 uses the system browser until its native deep-link completion screen is added.
+
+### Native CAPTCHA configuration
+
+Create separate score-based reCAPTCHA Enterprise mobile keys for Android and iOS; use separate keys
+for staging and production. Configure the authorization server with
+`APP_MOBILE_CAPTCHA_ANDROID_SITE_KEY` and `APP_MOBILE_CAPTCHA_IOS_SITE_KEY`; the app receives these
+public identifiers from its CAPTCHA settings endpoint. Set
+`APP_MOBILE_CAPTCHA_ANDROID_PACKAGE_NAME` and `APP_MOBILE_CAPTCHA_IOS_BUNDLE_ID` to the exact native
+application identities registered on those keys. In Administration > Settings > Login, select
+reCAPTCHA Enterprise and configure its project ID, API key, score threshold, and login/registration
+actions. The backend verifies token validity, action, score, and platform application identity.
+
+The app uses `@google-cloud/recaptcha-enterprise-react-native`; Expo config enables static iOS
+framework linkage for CocoaPods. Native development or release builds are required; Expo Go does
+not include this module.
+
+### Native social sign-in
+
+Google sign-in uses the native Google Sign-In SDK and sends its signed ID token to Kitezh for
+server-side signature and claim verification. Configure
+`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` in the mobile build and use that same web client ID in the
+authorization server's Google social-provider settings. iOS builds also require
+`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`; the Expo config derives the Google callback URL scheme from it.
+These values are public OAuth client IDs, not client secrets. Keep the Google client secret in the
+server's encrypted social-provider settings. Build a native development/release app after changing
+these values; Expo Go does not include Google Sign-In.
+
+GitHub, LinkedIn, and Microsoft sign-in continue through the system browser and the server's OAuth
+provider flow. If Google returns an identity whose email already belongs to an unlinked local
+account, the app stops sign-in and asks the user to authenticate to that local account and link
+Google from Account Security. It does not link by email automatically. Social account linking itself
+still completes through the existing browser flow.
 
 ## Local development
 

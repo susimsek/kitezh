@@ -110,7 +110,7 @@ it("updates locale and theme immediately, exposes native radio state, and restor
   const firstRender = renderSettings();
   expect(await screen.findByText("Settings")).toBeTruthy();
   expect(screen.getByTestId("settings-locale-system").props.accessibilityState)
-    .toEqual({ selected: true });
+    .toEqual(expect.objectContaining({ selected: true }));
 
   fireEvent.press(screen.getByTestId("settings-locale-turkish"));
   expect(await screen.findByText("Ayarlar")).toBeTruthy();
@@ -135,9 +135,9 @@ it("updates locale and theme immediately, exposes native radio state, and restor
   renderSettings();
   expect(await screen.findByText("Ayarlar")).toBeTruthy();
   expect(screen.getByTestId("settings-locale-turkish").props.accessibilityState)
-    .toEqual({ selected: true });
+    .toEqual(expect.objectContaining({ selected: true }));
   expect(screen.getByTestId("settings-theme-dark").props.accessibilityState)
-    .toEqual({ selected: true });
+    .toEqual(expect.objectContaining({ selected: true }));
   expect(
     StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
       .backgroundColor,
@@ -157,8 +157,8 @@ it("resets the saved locale and theme back to system preferences", async () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("kitezh.mobile.locale");
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("kitezh.mobile.theme");
   });
-  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual({ selected: true });
-  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
 });
 
 it("keeps settings usable when resetting secure preferences fails", async () => {
@@ -182,8 +182,8 @@ it("falls back to system preferences when secure storage cannot be read", async 
   renderSettings();
 
   expect(await screen.findByText("Settings")).toBeTruthy();
-  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual({ selected: true });
-  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
 });
 
 it("refreshes the system language when the app becomes active", async () => {

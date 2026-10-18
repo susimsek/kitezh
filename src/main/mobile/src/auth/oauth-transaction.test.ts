@@ -71,3 +71,40 @@ test("OAuth transactions reject expired, future, and mismatched records", async 
   assert.equal(await transactions.consume("account", transaction, 999), null);
   assert.equal(storage.values.size, 0);
 });
+
+test("OAuth callbacks cannot consume one transaction concurrently", async () => {
+  const storage = createStore();
+  const transactions = createOAuthTransactionStorage(storage);
+  const transaction = {
+    clientId: "mobile-account-console",
+    codeVerifier: "v".repeat(43),
+    createdAt: 1_000,
+    redirectUri: "kitezh://oauth/callback",
+    state: "one-time-state",
+  };
+  await transactions.save("account", transaction);
+
+  const results = await Promise.all([
+    transactions.consume("account", transaction, 1_001),
+    transactions.consume("account", transaction, 1_001),
+  ]);
+
+  assert.equal(results.filter(Boolean).length, 1);
+  assert.equal(storage.values.size, 0);
+});
+
+test("OAuth transactions reject malformed state values before exchange", async () => {
+  const storage = createStore();
+  const transactions = createOAuthTransactionStorage(storage);
+  const transaction = {
+    clientId: "mobile-account-console",
+    codeVerifier: "v".repeat(43),
+    createdAt: 1_000,
+    redirectUri: "kitezh://oauth/callback",
+    state: "short",
+  };
+  await transactions.save("account", transaction);
+
+  assert.equal(await transactions.consume("account", transaction, 1_001), null);
+  assert.equal(storage.values.size, 0);
+});

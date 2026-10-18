@@ -10,11 +10,13 @@ import io.github.susimsek.kitezh.dto.account.AccountRegistrationRequestDTO;
 import io.github.susimsek.kitezh.dto.account.ActionTokenRequestDTO;
 import io.github.susimsek.kitezh.dto.account.ForgotPasswordRequestDTO;
 import io.github.susimsek.kitezh.dto.account.LoginSettingsDTO;
+import io.github.susimsek.kitezh.dto.account.MobileLoginPlatform;
 import io.github.susimsek.kitezh.dto.account.ResetPasswordRequestDTO;
 import io.github.susimsek.kitezh.dto.account.SocialLinkDTO;
 import io.github.susimsek.kitezh.dto.account.SocialProviderDTO;
 import io.github.susimsek.kitezh.dto.account.SocialProviderTokenDTO;
 import io.github.susimsek.kitezh.service.LoginSettingsService;
+import io.github.susimsek.kitezh.service.MobileSocialLoginTransactionService;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialTokenService;
 import io.github.susimsek.kitezh.service.account.AccountRegistrationService;
@@ -57,7 +59,10 @@ class AccountPublicControllerTest {
         assertThat(
                         controller
                                 .register(
-                                        registration, new MockHttpServletRequest(), Locale.ENGLISH)
+                                        registration,
+                                        new MockHttpServletRequest(),
+                                        null,
+                                        Locale.ENGLISH)
                                 .getStatusCode())
                 .isEqualTo(HttpStatus.CREATED);
         verify(registrationService)
@@ -69,6 +74,12 @@ class AccountPublicControllerTest {
                         "password",
                         "password",
                         Locale.forLanguageTag("tr"));
+
+        MockHttpServletRequest mobileRequest = new MockHttpServletRequest();
+        controller.register(
+                registration, mobileRequest, MobileLoginPlatform.ANDROID, Locale.ENGLISH);
+        verify(captchaService)
+                .verifyMobileRegistrationOrThrow(null, MobileLoginPlatform.ANDROID, mobileRequest);
 
         var forgot = mock(ForgotPasswordRequestDTO.class);
         when(forgot.identifier()).thenReturn("alice");
@@ -95,7 +106,10 @@ class AccountPublicControllerTest {
         assertThatThrownBy(
                         () ->
                                 controller.register(
-                                        registration, new MockHttpServletRequest(), Locale.ENGLISH))
+                                        registration,
+                                        new MockHttpServletRequest(),
+                                        null,
+                                        Locale.ENGLISH))
                 .isInstanceOf(ApiException.class);
         when(settings.isForgotPasswordEnabled()).thenReturn(false);
         assertThatThrownBy(() -> controller.forgotPassword(forgot))
@@ -114,7 +128,9 @@ class AccountPublicControllerTest {
         var socialLogin = mock(SocialLoginService.class);
         var providers = List.of(mock(SocialProviderDTO.class));
         when(socialLogin.availableProviders()).thenReturn(providers);
-        var loginController = new SocialLoginController(socialLogin);
+        var loginController =
+                new SocialLoginController(
+                        socialLogin, mock(MobileSocialLoginTransactionService.class));
         assertThat(loginController.providers()).isSameAs(providers);
 
         var links = List.of(mock(SocialLinkDTO.class));

@@ -150,6 +150,14 @@ management:
           include: readinessState,db
 
 app:
+  mobile:
+    captcha:
+      android-site-key: ${APP_MOBILE_CAPTCHA_ANDROID_SITE_KEY:}
+      ios-site-key: ${APP_MOBILE_CAPTCHA_IOS_SITE_KEY:}
+      android-package-name: ${APP_MOBILE_CAPTCHA_ANDROID_PACKAGE_NAME:io.github.susimsek.kitezh.mobile}
+      ios-bundle-id: ${APP_MOBILE_CAPTCHA_IOS_BUNDLE_ID:io.github.susimsek.kitezh.mobile}
+    ios-team-id: ${APP_IOS_TEAM_ID:}
+    android-sha256-cert-fingerprint: "${APP_ANDROID_SHA256_CERT_FINGERPRINT:49:C2:E1:D2:E3:7C:C3:F2:18:2A:CE:73:50:EE:16:36:9B:A2:68:92:C9:55:85:C7:12:CA:C3:72:D2:8D:DB:A6}"
   github-api:
     token: ${GITHUB_API_TOKEN:}
   desktop:
@@ -195,7 +203,7 @@ app:
   web-authn:
     rp-name: Kitezh
     rp-id: ""
-    allowed-origins: ""
+    allowed-origins: ${WEBAUTHN_ALLOWED_ORIGINS:}
     timeout-seconds: 300
     resident-key: REQUIRED
     user-verification: REQUIRED

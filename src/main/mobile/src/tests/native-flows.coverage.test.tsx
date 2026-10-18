@@ -29,12 +29,14 @@ let mockSocialAuthRequestConfig: {
   state: "s".repeat(32),
 };
 let mockSocialAuthCodeVerifier: string | null = "v".repeat(43);
+let mockMobileDiscoveryStatus = "ready";
 
 jest.mock("@/api/account-api", () => ({
   AccountApiError: class AccountApiError extends Error {
     status = 0;
-    data: unknown;
-    problem: undefined;
+    kind = "offline";
+    data = undefined;
+    problem = undefined;
   },
   changeAccountPassword: jest.fn(),
   createPersonalAccessToken: jest.fn(),
@@ -98,15 +100,16 @@ jest.mock("@/auth/MobileAuthProvider", () => {
     useMobileAuth: jest.fn(() => ({
       ...mockAuthState,
       status: mockMobileAuthStatus,
+      discoveryStatus: mockMobileDiscoveryStatus,
     })),
   };
 });
-jest.mock("@/i18n/LocaleProvider", () => ({
-  useLocale: () => ({
-    dictionary: new Proxy({}, { get: (_target, key) => String(key) }),
-    resolvedLocale: "en",
-  }),
-}));
+jest.mock("@/i18n/LocaleProvider", () => {
+  const dictionary = new Proxy({}, { get: (_target, key) => String(key) });
+  return {
+    useLocale: () => ({ dictionary, resolvedLocale: "en" }),
+  };
+});
 jest.mock("@/theme/ThemeProvider", () => ({
   useTheme: () => ({
     palette: new Proxy({}, { get: (_target, key) => String(key) }),
@@ -163,6 +166,7 @@ beforeEach(() => {
   mockSocialAuthCodeVerifier = "v".repeat(43);
   jest.mocked(accountApi.listPersonalAccessTokens).mockResolvedValue([]);
   mockMobileAuthStatus = "signed-in";
+  mockMobileDiscoveryStatus = "ready";
 });
 
 afterEach(() => jest.useRealTimers());
@@ -765,7 +769,7 @@ it("reports an expired session when starting MFA setup", async () => {
   mockRefreshSession.mockResolvedValueOnce(null);
 
   fireEvent.press(screen.getByRole("button", { name: "mfaSetup" }));
-  expect(await screen.findByText("mfaError")).toBeTruthy();
+  expect(await screen.findByText("mfaSetupError")).toBeTruthy();
   expect(accountApi.startMfaSetup).not.toHaveBeenCalled();
 });
 
@@ -788,7 +792,7 @@ it("reports an expired session before generating recovery codes", async () => {
   mockRefreshSession.mockResolvedValueOnce(null);
 
   fireEvent.press(screen.getByRole("button", { name: "recoveryCodesGenerate" }));
-  expect(await screen.findByText("mfaError")).toBeTruthy();
+  expect(await screen.findByText("recoveryCodesError")).toBeTruthy();
   expect(accountApi.generateRecoveryCodes).not.toHaveBeenCalled();
 });
 
@@ -874,14 +878,14 @@ it("regenerates recovery codes and handles invalid and successful MFA disable co
     target: { value: "123" },
   });
   fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
-  expect(await screen.findAllByText("mfaCode")).toHaveLength(2);
+  expect(await screen.findByText("mfaInvalidCode")).toBeTruthy();
 
   fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "123456" },
   });
   fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
   await waitFor(() => expect(accountApi.mutateMfa).toHaveBeenCalledTimes(1));
-  expect(await screen.findAllByText("mfaCode")).toHaveLength(2);
+  expect(await screen.findByText("mfaInvalidCode")).toBeTruthy();
 
   fireEvent.changeText(screen.getByLabelText("mfaCode"), {
     target: { value: "654321" },
@@ -904,9 +908,13 @@ it("regenerates recovery codes and handles invalid and successful MFA disable co
 });
 
 it.each([
-  ["network failure", new Error("offline")],
-  ["server failure", Object.assign(new accountApi.AccountApiError(), { status: 500 })],
-])("shows the retry error for an MFA mutation %s", async (_scenario, failure) => {
+  ["network failure", new Error("offline"), "mfaError"],
+  [
+    "server failure",
+    Object.assign(new accountApi.AccountApiError(), { status: 500 }),
+    "apiOffline",
+  ],
+])("shows the retry error for an MFA mutation %s", async (_scenario, failure, message) => {
   jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
     enabled: true,
     available: true,
@@ -916,7 +924,9 @@ it.each([
     digits: 6,
     periodSeconds: 30,
   });
-  jest.mocked(accountApi.getRecoveryCodesStatus).mockResolvedValue({ remaining: 2 });
+  jest.mocked(accountApi.getRecoveryCodesStatus).mockResolvedValue({
+    remaining: 2,
+  });
   jest.mocked(accountApi.mutateMfa).mockRejectedValueOnce(failure);
 
   render(<MfaScreen />);
@@ -926,7 +936,7 @@ it.each([
   });
   fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
 
-  expect(await screen.findByText("mfaError")).toBeTruthy();
+  expect(await screen.findByText(message)).toBeTruthy();
   expect(screen.getByText("sessionsRetry")).toBeTruthy();
   expect(accountApi.mutateMfa).toHaveBeenCalledWith(
     "test-access-token",
@@ -934,6 +944,53 @@ it.each([
     "123456",
     expect.any(Object),
   );
+});
+
+it.each([
+  [401, "unauthorized", "apiUnauthorized"],
+  [403, "forbidden", "apiForbidden"],
+  [0, "offline", "apiOffline"],
+  [0, "timeout", "apiTimeout"],
+] as const)(
+  "localizes MFA API failure %s as %s",
+  async (status, kind, message) => {
+    const failure = new accountApi.AccountApiError();
+    Object.assign(failure, { kind, status });
+    jest.mocked(accountApi.getMfaStatus).mockRejectedValue(failure);
+
+    render(<MfaScreen />);
+
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByText("sessionsRetry")).toBeTruthy();
+  },
+);
+
+it("shows field-level MFA validation details returned by the server", async () => {
+  jest.mocked(accountApi.getMfaStatus).mockResolvedValue({
+    enabled: true,
+    available: true,
+    required: false,
+    issuer: "Kitezh",
+    algorithm: "SHA1",
+    digits: 6,
+    periodSeconds: 30,
+  });
+  jest.mocked(accountApi.getRecoveryCodesStatus).mockResolvedValue({
+    remaining: 2,
+  });
+  const invalidCode = new accountApi.AccountApiError();
+  Object.assign(invalidCode, {
+    problem: { violations: [{ field: "code", message: "serverInvalidTotp" }] },
+    status: 400,
+  });
+  jest.mocked(accountApi.mutateMfa).mockRejectedValue(invalidCode);
+
+  render(<MfaScreen />);
+  await screen.findByText("recoveryCodesRemaining: 2");
+  fireEvent.changeText(screen.getByLabelText("mfaCode"), "123456");
+  fireEvent.press(screen.getByRole("button", { name: "mfaDisable" }));
+
+  expect(await screen.findByText("serverInvalidTotp")).toBeTruthy();
 });
 
 it("confirms linked social-provider removal and refreshes native link status", async () => {
@@ -1802,27 +1859,18 @@ it("validates and completes native account registration", async () => {
   expect(await screen.findByText("registrationSuccess")).toBeTruthy();
 });
 
-it("falls back to browser registration when captcha settings are unavailable", async () => {
+it("blocks registration when native CAPTCHA settings are unavailable", async () => {
   jest
     .mocked(publicApi.getCaptchaSettings)
     .mockRejectedValueOnce(new Error("captcha settings unavailable"));
-  jest
-    .mocked(WebBrowser.openBrowserAsync)
-    .mockRejectedValueOnce(new Error("browser could not open"));
 
   render(<RegisterScreen />);
 
-  const continueButton = await screen.findByRole("button", {
-    name: "continueInBrowser",
-  });
-  fireEvent.press(continueButton);
-  expect(await screen.findByText("browserError")).toBeTruthy();
-
-  fireEvent.press(continueButton);
-  await waitFor(() =>
-    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledTimes(2),
-  );
-  expect(screen.queryByText("browserError")).toBeNull();
+  expect(
+    await screen.findByText("registrationCaptchaSettingsUnavailable"),
+  ).toBeTruthy();
+  expect(publicApi.registerAccount).not.toHaveBeenCalled();
+  expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
 });
 
 it("validates and completes a deep-link password reset", async () => {
@@ -1904,6 +1952,15 @@ it("routes account and admin auth callbacks by state and times out signed-out se
   await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/sign-in"));
 
   mockMobileAuthStatus = "signed-out";
+  mockMobileDiscoveryStatus = "loading";
+  router.replace.mockClear();
+  rerender(<AccountAuthCallbackScreen />);
+  act(() => {
+    jest.advanceTimersByTime(15_000);
+  });
+  expect(router.replace).not.toHaveBeenCalledWith("/sign-in");
+
+  mockMobileDiscoveryStatus = "ready";
   rerender(<AccountAuthCallbackScreen />);
   act(() => {
     jest.advanceTimersByTime(15_000);

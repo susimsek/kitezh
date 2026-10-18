@@ -1,0 +1,29 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Continue|Devam et"
+    timeout: 180000
+- tapOn: "Continue|Devam et"
+- assertVisible: "Sign in|Giriş yap"
+- tapOn: "Sign in|Giriş yap"
+- extendedWaitUntil:
+    visible: "Continue with fixture account"
+    timeout: 30000
+- tapOn:
+    point: "6%,9%"
+- extendedWaitUntil:
+    visible: "Sign-in was cancelled. You can try again.|Giriş iptal edildi. Tekrar deneyebilirsiniz."
+    timeout: 30000
+- assertVisible: "Sign in|Giriş yap"
+- tapOn: "Sign in|Giriş yap"
+- extendedWaitUntil:
+    visible: "Continue with fixture account"
+    timeout: 30000
+- tapOn: "Continue with fixture account"
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- assertVisible: "fixture-user"

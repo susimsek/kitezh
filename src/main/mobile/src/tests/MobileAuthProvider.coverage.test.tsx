@@ -13,19 +13,15 @@ import * as storage from "../auth/storage";
 import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
 
 jest.mock("expo-auth-session", () => {
-  let authDiscovery: unknown = {
-    authorizationEndpoint: "https://issuer.example.test/authorize",
-    discoveryDocument: { issuer: "https://issuer.example.test" },
-    endSessionEndpoint: "https://issuer.example.test/logout",
-    tokenEndpoint: "https://issuer.example.test/token",
-  };
   const promptAsync = jest.fn();
   const exchangeCode = jest.fn();
   const refresh = jest.fn();
+  const authorizationEndpoints: string[] = [];
   let requestSequence = 0;
   let requestHasCodeVerifier = true;
   class MockAuthRequest {
     codeVerifier: string | null = null;
+    codeChallenge: string | null = null;
     redirectUri: string;
     state: string;
 
@@ -35,7 +31,11 @@ jest.mock("expo-auth-session", () => {
       this.state = `test-state-${requestSequence}`;
     }
 
-    async makeAuthUrlAsync() {
+    async makeAuthUrlAsync(discovery?: { authorizationEndpoint: string }) {
+      if (discovery?.authorizationEndpoint) {
+        authorizationEndpoints.push(discovery.authorizationEndpoint);
+      }
+      this.codeChallenge = `test-challenge-${requestSequence}`;
       this.codeVerifier = requestHasCodeVerifier
         ? `test-verifier-${requestSequence}`
         : null;
@@ -62,11 +62,15 @@ jest.mock("expo-auth-session", () => {
   }
   return {
     AuthRequest: MockAuthRequest,
+    __authorizationEndpoints: authorizationEndpoints,
     __exchangeCode: exchangeCode,
     __promptAsync: promptAsync,
     __refresh: refresh,
     __setRequestHasCodeVerifier: (hasCodeVerifier: boolean) => {
       requestHasCodeVerifier = hasCodeVerifier;
+    },
+    __resetRequestSequence: () => {
+      requestSequence = 0;
     },
     __setDiscovery: (discovery: unknown) => {
       authDiscovery = discovery;
@@ -74,13 +78,52 @@ jest.mock("expo-auth-session", () => {
     exchangeCodeAsync: exchangeCode,
     makeRedirectUri: () => "kitezh://account/oauth/callback",
     refreshAsync: refresh,
-    useAutoDiscovery: () => authDiscovery,
+  };
+});
+jest.mock("../auth/discovery", () => {
+  class MockNativeDiscoveryError extends Error {
+    kind: string;
+
+    constructor(kind: string) {
+      super(kind);
+      this.kind = kind;
+    }
+  }
+  return {
+    fetchNativeAuthorizationDiscovery: jest.fn(async () => ({
+      authorizationEndpoint: "https://issuer.example.test/authorize",
+      discoveryDocument: { issuer: "https://issuer.example.test" },
+      endSessionEndpoint: "https://issuer.example.test/logout",
+      tokenEndpoint: "https://issuer.example.test/token",
+    })),
+    NativeDiscoveryError: MockNativeDiscoveryError,
   };
 });
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(async () => ({ type: "success" })),
   openBrowserAsync: jest.fn(async () => ({ type: "opened" })),
+}));
+jest.mock("@react-native-google-signin/google-signin", () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({
+      type: "success",
+      data: { idToken: "signed-google-id-token" },
+    })),
+  },
+  isSuccessResponse: (response: { type: string }) => response.type === "success",
+}));
+jest.mock("../auth/native-social-login", () => ({
+  isNativeSocialProviderConfigured: jest.fn(() => true),
+  requestNativeGoogleIdToken: jest.fn(async () => "signed-google-id-token"),
+}));
+jest.mock("@/api/public-api", () => ({
+  startMobileLogin: jest.fn(),
+  startMobileGoogleLogin: jest.fn(),
+  submitMobileLoginAction: jest.fn(),
+  submitMobileLoginMfa: jest.fn(),
 }));
 jest.mock("expo-linking", () => ({
   parse: (url: string) => ({
@@ -117,12 +160,23 @@ let savedOAuthTransaction: Awaited<
 > = null;
 
 const {
+  __authorizationEndpoints: mockAuthorizationEndpoints,
   __exchangeCode: mockExchangeCode,
   __promptAsync: mockPromptAsync,
   __refresh: mockRefresh,
   __setRequestHasCodeVerifier: mockSetRequestHasCodeVerifier,
   __setDiscovery: mockSetDiscovery,
 } = jest.requireMock("expo-auth-session");
+const { fetchNativeAuthorizationDiscovery: mockFetchDiscovery } =
+  jest.requireMock("../auth/discovery");
+const { isNativeSocialProviderConfigured: mockNativeSocialConfigured } =
+  jest.requireMock("../auth/native-social-login");
+const {
+  startMobileLogin: mockStartMobileLogin,
+  startMobileGoogleLogin: mockStartMobileGoogleLogin,
+  submitMobileLoginAction: mockSubmitMobileLoginAction,
+  submitMobileLoginMfa: mockSubmitMobileLoginMfa,
+} = jest.requireMock("@/api/public-api");
 
 function AuthProbe() {
   const auth = useMobileAuth();
@@ -132,6 +186,16 @@ function AuthProbe() {
       <Text>{auth.error ?? "no-error"}</Text>
       <Text>{auth.session?.accessToken ?? "no-session"}</Text>
       <Pressable accessibilityRole="button" onPress={() => void auth.signIn()}><Text>sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google-alias")}><Text>provider-sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google")}><Text>native-google-sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.nativeLogin("alice", "secret")}><Text>native-sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginMfa("123456")}><Text>submit-login-mfa</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginAction({ newPassword: "a-long-password" })}><Text>submit-login-action</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google-alias")}><Text>provider-sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google")}><Text>native-google-sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.nativeLogin("alice", "secret")}><Text>native-sign-in</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginMfa("123456")}><Text>submit-login-mfa</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginAction({ newPassword: "a-long-password" })}><Text>submit-login-action</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.refreshSession(true)}><Text>refresh</Text></Pressable>
       <Pressable
         accessibilityRole="button"
@@ -165,6 +229,7 @@ beforeEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
   Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+  jest.requireMock("expo-auth-session").__resetRequestSequence();
   mockSetDiscovery({
     authorizationEndpoint: "https://issuer.example.test/authorize",
     discoveryDocument: { issuer: "https://issuer.example.test" },
@@ -172,6 +237,12 @@ beforeEach(() => {
     tokenEndpoint: "https://issuer.example.test/token",
   });
   mockSetRequestHasCodeVerifier(true);
+  mockStartMobileLogin.mockResolvedValue({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://account/oauth/callback",
+  });
   jest.mocked(storage.readSession).mockResolvedValue(null);
   jest.mocked(storage.writeSession).mockResolvedValue(undefined);
   jest.mocked(storage.clearSession).mockResolvedValue(undefined);
@@ -333,7 +404,7 @@ it("reports a provider authorization error without exchanging a code", async () 
 
   fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
 
-  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(await screen.findByText("authorization-cancelled")).toBeTruthy();
   expect(mockExchangeCode).not.toHaveBeenCalled();
   expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
 });
@@ -351,7 +422,7 @@ it("clears the pending transaction when the browser dismisses authorization", as
 });
 
 it("refuses an authorization endpoint from mismatched discovery metadata", async () => {
-  mockSetDiscovery({
+  jest.mocked(mockFetchDiscovery).mockResolvedValueOnce({
     authorizationEndpoint: "https://attacker.example.test/authorize",
     discoveryDocument: { issuer: "https://issuer.example.test" },
     tokenEndpoint: "https://issuer.example.test/token",
@@ -803,6 +874,167 @@ it("ignores repeated sign-in taps while the browser request is pending", async (
     params: { code: "authorization-code", state: "replaced-by-request" },
   });
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+});
+
+it("binds provider selection to the mobile PKCE authorization endpoint", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "provider-sign-in" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockAuthorizationEndpoints).toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google-alias",
+  );
+  expect(storage.saveOAuthTransaction).toHaveBeenCalledWith(
+    "account",
+    expect.objectContaining({
+      codeVerifier: "test-verifier-1",
+      redirectUri: "kitezh://account/oauth/callback",
+      state: "test-state-1",
+    }),
+  );
+});
+
+it("uses native Google sign-in and continues through mobile PKCE without provider browser OAuth", async () => {
+  mockStartMobileGoogleLogin.mockResolvedValueOnce({
+    status: "authorized",
+    code: "kitezh-authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://account/oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-google-sign-in" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockStartMobileGoogleLogin).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platform: expect.stringMatching(/^(ANDROID|IOS)$/),
+      clientId: "mobile-account",
+      idToken: "signed-google-id-token",
+      codeChallengeMethod: "S256",
+    }),
+    { locale: "en" },
+  );
+  expect(mockAuthorizationEndpoints).not.toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google",
+  );
+});
+
+it("maps a Google account-link conflict to an explicit local-link outcome", async () => {
+  mockStartMobileGoogleLogin.mockRejectedValueOnce(
+    Object.assign(new Error("Google identity belongs to a local account"), {
+      status: 409,
+    }),
+  );
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-google-sign-in" }));
+
+  await waitFor(() =>
+    expect(screen.getByText("google-account-link-required")).toBeTruthy(),
+  );
+  expect(mockAuthorizationEndpoints).not.toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google",
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+});
+
+it("uses the system-browser provider flow when native Google is not configured", async () => {
+  mockNativeSocialConfigured.mockReturnValue(false);
+  mockPromptAsync.mockResolvedValueOnce({
+    type: "success",
+    params: { code: "provider-code", state: "ignored" },
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-google-sign-in" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockAuthorizationEndpoints).toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google",
+  );
+  expect(mockStartMobileGoogleLogin).not.toHaveBeenCalled();
+});
+
+it("uses the native credential API and exchanges its validated PKCE code", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockStartMobileLogin).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platform: expect.stringMatching(/^(ANDROID|IOS)$/),
+      clientId: "mobile-account",
+      redirectUri: "kitezh://account/oauth/callback",
+      scope: "openid account-api",
+      state: "test-state-2",
+      codeChallenge: "test-challenge-2",
+      codeChallengeMethod: "S256",
+      username: "alice",
+      password: "secret",
+      captchaToken: null,
+    }),
+    { locale: "en" },
+  );
+  expect(mockExchangeCode).toHaveBeenCalledWith(
+    expect.objectContaining({
+      code: "authorization-code",
+      extraParams: { code_verifier: "test-verifier-2" },
+    }),
+    expect.any(Object),
+  );
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+});
+
+it("completes native MFA and a required action before the PKCE exchange", async () => {
+  jest.mocked(mockStartMobileLogin).mockResolvedValueOnce({
+    status: "mfa_required",
+    transactionId: "login-transaction",
+  });
+  jest.mocked(mockSubmitMobileLoginMfa).mockResolvedValueOnce({
+    status: "required_actions",
+    transactionId: "login-transaction",
+    actions: [
+      {
+        key: "UPDATE_PASSWORD",
+        displayName: "Update password",
+        description: "Choose a new password",
+        version: 1,
+      },
+    ],
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+  expect(await screen.findByText("mfa")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "submit-login-mfa" }));
+  expect(await screen.findByText("actions")).toBeTruthy();
+  expect(mockSubmitMobileLoginMfa).toHaveBeenCalledWith(
+    "login-transaction",
+    "123456",
+    { locale: "en" },
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "submit-login-action" }));
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockSubmitMobileLoginAction).toHaveBeenCalledWith(
+    "login-transaction",
+    "UPDATE_PASSWORD",
+    { newPassword: "a-long-password" },
+    { locale: "en" },
+  );
+  expect(await screen.findByText("signed-in")).toBeTruthy();
 });
 
 it("resumes a cold-start callback from its SecureStore PKCE transaction", async () => {

@@ -9,6 +9,7 @@ public enum ApiErrorCode {
     FORBIDDEN("forbidden", "You are not allowed to perform this operation."),
     INTERNAL_ERROR("internal_error", "An unexpected error occurred."),
     RATE_LIMIT_EXCEEDED("rate_limit_exceeded", "Too many requests. Please try again later."),
+    AUTHENTICATION_FAILED("authentication_failed", "Invalid username or password."),
     INVALID_CURRENT_PASSWORD("invalid_current_password", "Current password is invalid."),
     REAUTHENTICATION_REQUIRED(
             "reauthentication_required",

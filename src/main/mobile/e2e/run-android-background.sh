@@ -13,6 +13,7 @@ done
 
 run_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/kitezh-android-e2e"
 mkdir -p "$run_dir"
+fixture_port="${FIXTURE_PORT:-9090}"
 
 android_serial="${ANDROID_SERIAL:-}"
 if [[ -z "$android_serial" ]]; then
@@ -43,16 +44,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-node e2e/fixture-server.mjs --host 0.0.0.0 --port 9090 > "$run_dir/fixture.log" 2>&1 &
+node e2e/fixture-server.mjs --host 0.0.0.0 --port "$fixture_port" > "$run_dir/fixture.log" 2>&1 &
 fixture_pid=$!
 export REACT_NATIVE_PACKAGER_HOSTNAME="10.0.2.2"
-export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://10.0.2.2:9090"
+export EXPO_PUBLIC_AUTHORIZATION_SERVER_ISSUER="http://10.0.2.2:$fixture_port"
 pnpm exec expo start --host lan --port 8081 --dev-client > "$run_dir/metro.log" 2>&1 &
 metro_pid=$!
 
 fixture_ready=false
 for attempt in $(seq 1 30); do
-  if curl --fail --silent http://127.0.0.1:9090/health >/dev/null; then
+  if curl --fail --silent "http://127.0.0.1:$fixture_port/health" >/dev/null; then
     fixture_ready=true
     break
   fi
@@ -81,8 +82,23 @@ apk_path="android/app/build/outputs/apk/debug/app-debug.apk"
 adb -s "$android_serial" install -r "$apk_path"
 adb -s "$android_serial" shell monkey -p io.github.susimsek.kitezh.mobile 1 >/dev/null
 
+curl --fail --silent --show-error -X POST \
+  "http://127.0.0.1:$fixture_port/fixture/discovery-mode?mode=unavailable-once" >/dev/null
+maestro test --device "$android_serial" e2e/maestro/discovery-unavailable.yaml
+curl --fail --silent --show-error -X POST \
+  "http://127.0.0.1:$fixture_port/fixture/discovery-mode?mode=timeout-once" >/dev/null
+maestro test --device "$android_serial" e2e/maestro/discovery-timeout.yaml
 maestro test --device "$android_serial" e2e/maestro/cold-start.yaml
+maestro test --device "$android_serial" e2e/maestro/oauth-lifecycle.yaml
 maestro test --device "$android_serial" e2e/maestro/settings-locale-theme.yaml
 maestro test --device "$android_serial" e2e/maestro/deep-links.yaml
 maestro test --device "$android_serial" e2e/maestro/authenticated-fixture.yaml
 maestro test --device "$android_serial" e2e/maestro/admin-settings-groups.yaml
+maestro test --device "$android_serial" e2e/maestro/admin-policy-save.yaml
+maestro test --device "$android_serial" e2e/maestro/account-profile.yaml
+maestro test --device "$android_serial" e2e/maestro/account-notifications.yaml
+maestro test --device "$android_serial" e2e/maestro/account-personal-access-tokens.yaml
+maestro test --device "$android_serial" e2e/maestro/session-lifecycle.yaml
+maestro test --device "$android_serial" e2e/maestro/mfa-required-actions.yaml
+maestro test --device "$android_serial" e2e/maestro/account-mfa.yaml
+maestro test --device "$android_serial" e2e/maestro/passkey-login-attempt.yaml

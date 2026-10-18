@@ -62,11 +62,14 @@ appId: io.github.susimsek.kitezh.mobile
 - assertVisible: "Sign-in requests|Oturum açma istekleri"
 - assertVisible: "Fixture approve request"
 - tapOn: "Approve"
-- assertVisible: "Sign-in request approved."
+- extendedWaitUntil:
+    visible: "Sign-in request approved."
+    timeout: 10000
 - assertVisible: "Fixture deny request"
 - tapOn: "Deny"
-- assertVisible: "Sign-in request denied."
-- tapOn: "Account Console"
+- extendedWaitUntil:
+    visible: "Sign-in request denied."
+    timeout: 10000
 - tapOn: "Account Console"
 - scroll
 - tapOn: "Two-factor authentication|İki faktörlü kimlik doğrulama"

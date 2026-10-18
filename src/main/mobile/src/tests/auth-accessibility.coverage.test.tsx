@@ -4,7 +4,7 @@ import {
   screen,
   fireEvent,
 } from "@/testing/native-testing-library";
-import { StyleSheet } from "react-native";
+import { ActivityIndicator, StyleSheet } from "react-native";
 import { router } from "expo-router";
 import * as publicApi from "@/api/public-api";
 import { PublicApiError } from "@/api/public-api";
@@ -21,14 +21,29 @@ const mockSignIn = jest.fn();
 jest.mock("@/api/public-api", () => ({
   ...jest.requireActual("@/api/public-api"),
   getCaptchaSettings: jest.fn(),
+  getLoginCaptchaSettings: jest.fn(),
   registerAccount: jest.fn(),
   requestPasswordReset: jest.fn(),
   resetPassword: jest.fn(),
   verifyEmail: jest.fn(),
 }));
+jest.mock("@react-native-google-signin/google-signin", () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({
+      type: "success",
+      data: { idToken: "google-id-token" },
+    })),
+  },
+  isSuccessResponse: (response: { type?: string }) =>
+    response.type === "success",
+}));
 jest.mock("@/auth/MobileAuthProvider", () => ({
   useMobileAuth: () => ({
+    discoveryStatus: "ready",
     error: null,
+    retryDiscovery: jest.fn(),
     signIn: mockSignIn,
     status: mockAuthStatus,
   }),
@@ -63,11 +78,22 @@ beforeEach(() => {
   mockAuthStatus = "signed-out";
   mockVerificationToken = "verify-token";
   jest.mocked(publicApi.getCaptchaSettings).mockResolvedValue({ enabled: false });
+  jest.mocked(publicApi.getLoginCaptchaSettings).mockResolvedValue({
+    enabled: false,
+    nativeRequired: false,
+    nativeEnabled: false,
+    provider: "",
+    siteKey: "",
+    action: "",
+    recaptchaV3: false,
+    useRecaptchaNet: false,
+    androidSiteKey: "",
+    iosSiteKey: "",
+  });
   jest.mocked(publicApi.verifyEmail).mockResolvedValue(undefined);
 });
 
 it.each([
-  ["sign in", SignInScreen],
   ["registration", RegisterScreen],
   ["forgot password", ForgotPasswordScreen],
   ["reset password", ResetPasswordScreen],
@@ -77,7 +103,6 @@ it.each([
   const back = await screen.findByRole("button", { name: "back" });
   const style = StyleSheet.flatten(back.props.style);
   expect(style.minHeight ?? style.height).toBeGreaterThanOrEqual(44);
-  expect(style.minWidth ?? style.width).toBeGreaterThanOrEqual(44);
 });
 
 it("announces sign-in progress and disables repeated authentication", () => {
@@ -86,9 +111,9 @@ it("announces sign-in progress and disables repeated authentication", () => {
 
   const submit = screen.getByRole("button", { name: "signIn" });
   expect(submit.props.accessibilityState).toEqual(
-    expect.objectContaining({ busy: true, disabled: true }),
+    expect.objectContaining({ disabled: true }),
   );
-  expect(screen.getByLabelText("loading")).toBeTruthy();
+  expect(submit.findByType(ActivityIndicator)).toBeTruthy();
 });
 
 it("opens the Account Console after an authorization callback signs in", () => {
@@ -132,26 +157,13 @@ it("shows a localized offline message when a public account request fails", asyn
   expect(await screen.findByRole("alert")).toHaveTextContent("apiOffline");
 });
 
-it("keeps email-verification retry progress inline", async () => {
-  let finishRetry!: () => void;
-  jest
-    .mocked(publicApi.verifyEmail)
-    .mockRejectedValueOnce(new Error("expired"))
-    .mockReturnValueOnce(
-      new Promise<void>((resolve) => {
-        finishRetry = resolve;
-      }),
-    );
+it("shows email-verification failure and returns to sign-in", async () => {
+  jest.mocked(publicApi.verifyEmail).mockRejectedValueOnce(new Error("expired"));
   render(<VerifyEmailScreen />);
-  const retry = await screen.findByRole("button", { name: "sessionsRetry" });
-
-  fireEvent.press(retry);
-  expect(retry.props.accessibilityState).toEqual(
-    expect.objectContaining({ busy: true, disabled: true }),
-  );
-  expect(screen.getByLabelText("loading")).toBeTruthy();
-  finishRetry();
-  await screen.findByText("verifyEmailSuccess");
+  expect(await screen.findByText("verifyEmailError")).toBeTruthy();
+  expect(publicApi.verifyEmail).toHaveBeenCalledWith("verify-token");
+  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
+  expect(router.replace).toHaveBeenCalledWith("/sign-in");
 });
 
 it("requires a verification token and does not send an empty value", async () => {

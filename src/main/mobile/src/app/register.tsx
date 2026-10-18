@@ -1,8 +1,8 @@
 import { router } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -15,12 +15,13 @@ import {
   getCaptchaSettings,
   PublicApiError,
   registerAccount,
+  type CaptchaSettings,
 } from "@/api/public-api";
 import { publicErrorMessage } from "@/api/public-error-message";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { MobileFormScrollView } from "@/components/MobileFormScrollView";
-import { authorizationServerIssuer } from "@/config";
+import { createNativeCaptchaToken } from "@/auth/native-captcha";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -36,23 +37,46 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [captchaEnabled, setCaptchaEnabled] = useState<boolean | null>(null);
+  const [captchaSettings, setCaptchaSettings] =
+    useState<CaptchaSettings | null>(null);
+  const [captchaSettingsUnavailable, setCaptchaSettingsUnavailable] =
+    useState(false);
   const [pending, setPending] = useState(false);
-  const [browserPending, setBrowserPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [browserError, setBrowserError] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const nativeCaptchaSiteKey =
+    Platform.OS === "ios"
+      ? captchaSettings?.iosSiteKey
+      : captchaSettings?.androidSiteKey;
+  const nativeCaptchaUnavailable =
+    captchaSettings?.nativeRequired === true &&
+    (captchaSettings.nativeEnabled !== true ||
+      captchaSettings.provider !== "enterprise" ||
+      !nativeCaptchaSiteKey);
 
   useEffect(() => {
     void getCaptchaSettings()
-      .then((settings) => setCaptchaEnabled(settings.enabled))
-      .catch(() => setCaptchaEnabled(true));
+      .then((settings) => {
+        setCaptchaSettings(settings);
+        setCaptchaSettingsUnavailable(false);
+      })
+      .catch(() => {
+        setCaptchaSettings(null);
+        setCaptchaSettingsUnavailable(true);
+      });
   }, []);
 
   const submit = async () => {
-    if (pending || captchaEnabled !== false) return;
+    if (
+      pending ||
+      !captchaSettings ||
+      captchaSettingsUnavailable ||
+      nativeCaptchaUnavailable
+    ) {
+      return;
+    }
     const invalidField = [
       {
         name: "username",
@@ -104,6 +128,13 @@ export default function RegisterScreen() {
     setError(null);
     setFieldErrors({});
     try {
+      const captchaToken =
+        captchaSettings.nativeRequired && nativeCaptchaSiteKey
+          ? await createNativeCaptchaToken(
+              nativeCaptchaSiteKey,
+              captchaSettings.action,
+            )
+          : null;
       await registerAccount({
         username: username.trim(),
         firstName: firstName.trim(),
@@ -111,6 +142,8 @@ export default function RegisterScreen() {
         email: email.trim(),
         password,
         confirmPassword,
+        captchaToken,
+        mobilePlatform: Platform.OS === "ios" ? "IOS" : "ANDROID",
         locale: resolvedLocale,
       });
       setSuccess(true);
@@ -125,21 +158,6 @@ export default function RegisterScreen() {
       );
     } finally {
       setPending(false);
-    }
-  };
-
-  const openBrowserRegistration = async () => {
-    if (browserPending) return;
-    setBrowserPending(true);
-    setBrowserError(false);
-    try {
-      await WebBrowser.openBrowserAsync(
-        `${authorizationServerIssuer.replace(/\/$/, "")}/register`,
-      );
-    } catch {
-      setBrowserError(true);
-    } finally {
-      setBrowserPending(false);
     }
   };
 
@@ -186,7 +204,7 @@ export default function RegisterScreen() {
               </View>
             );
           } else {
-            if (captchaEnabled === null) {
+            if (captchaSettings === null && !captchaSettingsUnavailable) {
               return (
                 <ActivityIndicator
                   color={palette.primary}
@@ -194,45 +212,23 @@ export default function RegisterScreen() {
                   style={styles.loading}
                 />
               );
+            } else if (captchaSettings === null) {
+              return (
+                <View style={[styles.message, { borderColor: palette.danger }]}>
+                  <Text style={{ color: palette.danger }}>
+                    {dictionary.registrationCaptchaSettingsUnavailable}
+                  </Text>
+                </View>
+              );
             } else {
-              if (captchaEnabled) {
+              if (nativeCaptchaUnavailable) {
                 return (
                   <View
-                    style={[styles.message, { borderColor: palette.border }]}
+                    style={[styles.message, { borderColor: palette.danger }]}
                   >
                     <Text style={{ color: palette.text }}>
                       {dictionary.registrationCaptcha}
                     </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        busy: browserPending,
-                        disabled: browserPending,
-                      }}
-                      disabled={browserPending}
-                      onPress={() => void openBrowserRegistration()}
-                      style={[
-                        styles.link,
-                        { opacity: browserPending ? 0.65 : 1 },
-                      ]}
-                    >
-                      {browserPending ? (
-                        <ActivityIndicator
-                          color={palette.primary}
-                          size="small"
-                        />
-                      ) : null}
-                      <Text
-                        style={{ color: palette.primary, fontWeight: "700" }}
-                      >
-                        {dictionary.continueInBrowser}
-                      </Text>
-                    </Pressable>
-                    {browserError ? (
-                      <Text style={[styles.error, { color: palette.danger }]}>
-                        {dictionary.browserError}
-                      </Text>
-                    ) : null}
                   </View>
                 );
               } else {

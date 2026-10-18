@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { useMobileAuth, MobileAuthProvider } from "@/auth/MobileAuthProvider";
 import { BrandMark } from "@/components/BrandMark";
@@ -255,7 +259,16 @@ export default function AdminScreen() {
 function AdminConsole() {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
-  const { session, signIn, signOut, status, refreshSession } = useMobileAuth();
+  const {
+    error: authError,
+    session,
+    signIn,
+    signOut,
+    status,
+    refreshSession,
+    discoveryStatus,
+    retryDiscovery,
+  } = useMobileAuth();
   const { showNotice } = useMobileNotice();
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [adminAccessState, setAdminAccessState] = useState<{
@@ -1593,14 +1606,37 @@ function AdminConsole() {
           <Text style={[styles.subtitle, { color: palette.textMuted }]}>
             {dictionary.adminSignInNote}
           </Text>
-          {status === "error" ? (
+          {authError ? (
             <Text style={[styles.error, { color: palette.danger }]}>
-              {dictionary.authError}
+              {authError === "authorization-timeout"
+                ? dictionary.authTimeout
+                : authError === "authorization-cancelled"
+                  ? dictionary.authCancelled
+                  : dictionary.authError}
             </Text>
+          ) : null}
+          {discoveryStatus !== "ready" ? (
+            <Text style={[styles.error, { color: palette.textMuted }]}>
+              {discoveryStatus === "loading"
+                ? dictionary.authDiscoveryLoading
+                : discoveryStatus === "timeout"
+                  ? dictionary.authDiscoveryTimeout
+                  : dictionary.authDiscoveryUnavailable}
+            </Text>
+          ) : null}
+          {discoveryStatus !== "ready" ? (
+            <ActionButton
+              label={dictionary.retry}
+              busy={discoveryStatus === "loading"}
+              onPress={() => void retryDiscovery()}
+              palette={palette}
+              secondary
+            />
           ) : null}
           <ActionButton
             label={dictionary.signIn}
             busy={status === "signing-in"}
+            disabled={discoveryStatus !== "ready"}
             onPress={() => void signIn()}
             palette={palette}
           />
@@ -4144,6 +4180,8 @@ function AdminTabBar({
 }) {
   const { dictionary } = useLocale();
   const { palette } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [moreOpen, setMoreOpen] = useState(false);
   const tabs: readonly [
     AdminSection,
     string,
@@ -4153,6 +4191,12 @@ function AdminTabBar({
     ["server-info", dictionary.adminServerInfo, "globe"],
     ["users", dictionary.adminUsers, "shield"],
     ["clients", dictionary.adminClients, "shield"],
+  ];
+  const moreTabs: readonly [
+    AdminSection,
+    string,
+    "layers" | "shield" | "globe" | "gear",
+  ][] = [
     ["scopes", dictionary.adminClientScopes, "layers"],
     ["roles", dictionary.adminRoles, "shield"],
     ["groups", dictionary.adminGroups, "layers"],
@@ -4163,60 +4207,171 @@ function AdminTabBar({
     ["events", dictionary.adminEvents, "layers"],
     ["settings", dictionary.adminSettings, "gear"],
   ];
+  const selectMoreTab = (section: AdminSection) => {
+    onChange(section);
+    setMoreOpen(false);
+  };
+  const visibleTabs = tabs.filter(([section]) =>
+    canViewAdminSection(section, access),
+  );
+  const visibleMoreTabs = moreTabs.filter(([section]) =>
+    canViewAdminSection(section, access),
+  );
+  const moreSelected = !visibleTabs.some(([section]) => section === active);
   return (
-    <ScrollView
-      accessibilityRole="tablist"
-      horizontal
-      nestedScrollEnabled
-      directionalLockEnabled
-      scrollEnabled
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.tabBarContent}
-      style={[
-        styles.tabBar,
-        { backgroundColor: palette.surface, borderColor: palette.border },
-      ]}
-      testID="admin-tab-list"
-    >
-      {tabs
-        .filter(([section]) => canViewAdminSection(section, access))
-        .map(([section, label, icon]) => {
-        const selected = section === active;
-        return (
+    <>
+      <View
+        accessibilityRole="tablist"
+        style={[
+          styles.tabBar,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+        testID="admin-tab-list"
+      >
+        {visibleTabs.map(([section, label, icon]) => {
+          const selected = section === active;
+          return (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected }}
+              key={section}
+              onPress={() => onChange(section)}
+              testID={`admin-tab-${section}`}
+              style={[
+                styles.tab,
+                {
+                  backgroundColor: selected
+                    ? palette.surfaceMuted
+                    : "transparent",
+                },
+              ]}
+            >
+              <AppIcon
+                color={selected ? palette.primary : palette.textMuted}
+                name={icon}
+                size={17}
+              />
+              <Text
+                allowFontScaling
+                style={{
+                  color: selected ? palette.primary : palette.textMuted,
+                  fontSize: 12,
+                  fontWeight: selected ? "700" : "500",
+                  textAlign: "center",
+                }}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {visibleMoreTabs.length > 0 && (
           <Pressable
             accessibilityRole="tab"
-            accessibilityLabel={label}
-            accessibilityState={{ selected }}
-            key={section}
-            onPress={() => onChange(section)}
-            testID={`admin-tab-${section}`}
+            accessibilityLabel={dictionary.adminMore}
+            accessibilityState={{ selected: moreSelected }}
+            onPress={() => setMoreOpen(true)}
+            testID="admin-tab-more"
             style={[
               styles.tab,
               {
-                backgroundColor: selected
+                backgroundColor: moreSelected
                   ? palette.surfaceMuted
                   : "transparent",
               },
             ]}
           >
             <AppIcon
-              color={selected ? palette.primary : palette.textMuted}
-              name={icon}
+              color={moreSelected ? palette.primary : palette.textMuted}
+              name="layers"
               size={17}
             />
             <Text
+              allowFontScaling
               style={{
-                color: selected ? palette.primary : palette.textMuted,
+                color: moreSelected ? palette.primary : palette.textMuted,
                 fontSize: 12,
-                fontWeight: selected ? "700" : "500",
+                fontWeight: moreSelected ? "700" : "500",
+                textAlign: "center",
               }}
             >
-              {label}
+              {dictionary.adminMore}
             </Text>
           </Pressable>
-        );
-        })}
-    </ScrollView>
+        )}
+      </View>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setMoreOpen(false)}
+        transparent
+        visible={moreOpen}
+      >
+        <View style={styles.moreBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={dictionary.cancel}
+            onPress={() => setMoreOpen(false)}
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: palette.text, opacity: 0.35 },
+            ]}
+          />
+          <View
+            accessibilityRole="menu"
+            style={[
+              styles.moreSheet,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.border,
+                paddingBottom: Math.max(insets.bottom, spacing.lg),
+              },
+            ]}
+          >
+            <Text style={[styles.moreTitle, { color: palette.text }]}>
+              {dictionary.adminMore}
+            </Text>
+            <ScrollView contentContainerStyle={styles.moreList}>
+              {visibleMoreTabs.map(([section, label, icon]) => (
+                <Pressable
+                  accessibilityRole="menuitem"
+                  accessibilityState={{ selected: section === active }}
+                  key={section}
+                  onPress={() => selectMoreTab(section)}
+                  style={({ pressed }) => [
+                    styles.moreItem,
+                    {
+                      backgroundColor:
+                        section === active || pressed
+                          ? palette.surfaceMuted
+                          : "transparent",
+                    },
+                  ]}
+                >
+                  <AppIcon
+                    color={section === active ? palette.primary : palette.textMuted}
+                    name={icon}
+                    size={18}
+                  />
+                  <Text
+                    allowFontScaling
+                    style={{
+                      color:
+                        section === active ? palette.primary : palette.text,
+                      flex: 1,
+                      fontSize: 16,
+                      fontWeight: section === active ? "700" : "500",
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -4344,7 +4499,30 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     justifyContent: "center",
     minHeight: 60,
-    minWidth: 92,
+    flex: 1,
     paddingHorizontal: spacing.sm,
+  },
+  moreBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  moreSheet: {
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    borderWidth: 1,
+    maxHeight: "75%",
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  moreTitle: { fontSize: 20, fontWeight: "700", marginBottom: spacing.sm },
+  moreList: { gap: spacing.xs, paddingBottom: spacing.md },
+  moreItem: {
+    alignItems: "center",
+    borderRadius: radii.md,
+    flexDirection: "row",
+    gap: spacing.md,
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
   },
 });
