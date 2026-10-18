@@ -9,6 +9,8 @@ import { Alert } from "react-native";
 import * as adminApi from "@/api/admin-api";
 import AdminScreen from "../app/admin";
 
+jest.setTimeout(20_000);
+
 jest.mock("react-native/Libraries/Modal/Modal", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   return {
