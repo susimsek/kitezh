@@ -22,7 +22,6 @@ public record ApplicationProperties(
                 security == null
                         ? new Security(
                                 "https://kitezh.local/oauth2/jwks",
-                                "https://kitezh.local/oauth2/token",
                                 "https://kitezh-mcp.onrender.com/mcp")
                         : security;
         api = api == null ? new Api("http://localhost:9090") : api;
@@ -32,8 +31,6 @@ public record ApplicationProperties(
                                 "https://kitezh-mcp.onrender.com/mcp",
                                 "app://renderer,http://localhost:6274,http://127.0.0.1:6274",
                                 true,
-                                "mcp-server",
-                                "",
                                 true,
                                 new Tools("all", "*"))
                         : mcp;
@@ -47,7 +44,6 @@ public record ApplicationProperties(
 
     public record Security(
             @DefaultValue("https://kitezh.local/oauth2/jwks") String jwkSetUri,
-            @DefaultValue("https://kitezh.local/oauth2/token") String tokenUri,
             @DefaultValue("https://kitezh-mcp.onrender.com/mcp") String audience) {
 
         @ConstructorBinding
@@ -65,8 +61,6 @@ public record ApplicationProperties(
             @DefaultValue("app://renderer,http://localhost:6274,http://127.0.0.1:6274")
                     String allowedOrigins,
             @DefaultValue("true") boolean allowLocalHosts,
-            @DefaultValue("mcp-server") String clientId,
-            @DefaultValue("") String clientSecret,
             @DefaultValue("true") boolean readOnly,
             @DefaultValue Tools tools) {
 

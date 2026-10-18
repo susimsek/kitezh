@@ -1,6 +1,6 @@
 # Kitezh MCP Server
 
-Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, exchanges them at Kitezh's OAuth token endpoint, and calls only the Kitezh Administration API. It has no database dependency. The published container image documentation is in [README-dockerhub.md](README-dockerhub.md).
+Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency. The published container image documentation is in [README-dockerhub.md](README-dockerhub.md).
 
 ## Run locally
 
@@ -9,12 +9,10 @@ APP_AUTHORIZATIONSERVER_ISSUER=http://localhost:9090 \
 APP_SECURITY_AUDIENCE=https://kitezh-mcp.onrender.com/mcp \
 APP_API_BASE_URL=http://localhost:9090 \
 APP_MCP_PUBLIC_URL=https://kitezh-mcp.onrender.com/mcp \
-APP_MCP_CLIENT_ID=mcp-server \
-APP_MCP_CLIENT_SECRET='<service-client-secret>' \
 ./mvnw -f mcp-server/pom.xml spring-boot:run
 ```
 
-The Kitezh Authorization Server must have the dedicated MCP and API resource clients configured before tools can call the API. Register each MCP client's exact OAuth redirect URI, require PKCE S256, and grant only `mcp.read`, `admin-api`, and `roles` scopes. The `mcp.read` access token must have the MCP resource URI and `mcp-server` in its audience. Configure the confidential `mcp-server` client with token exchange, client credentials, delegation, and only the `admin-api` allowed audience. Configure `admin-api` as the API resource audience. Keep the matching confidential client secret in the runtime secret store. Do not use the local demo secret in a deployed environment.
+Register a public OAuth client for each MCP host with its exact redirect URI, Authorization Code + PKCE S256, and the `mcp.read` scope. MCP validates the inbound token's issuer, MCP audience, and scope, then forwards that same user token to the Kitezh Administration API. The API must accept the forwarded token and apply its own read-only endpoint and role authorization rules. No confidential MCP service client or token-exchange secret is required.
 
 The MCP resource URI is a stable identifier and must be identical in the authorization server's `APP_MCP_RESOURCE_AUDIENCE`, the MCP service's `APP_SECURITY_AUDIENCE`, and `APP_MCP_PUBLIC_URL`. The local example uses the Render URL as that stable resource identifier while connecting to the local server process. For a custom production domain, update all three values together.
 
@@ -24,7 +22,7 @@ The remote endpoint is `https://kitezh-mcp.onrender.com/mcp` (replace it with th
 
 ### Before connecting Claude Code or Codex
 
-Kitezh uses pre-registered OAuth clients and does not currently implement Dynamic Client Registration (DCR). Register a separate public OAuth client for each MCP host in the Kitezh Authorization Server. Add that host's exact localhost callback URI to its redirect URI allowlist, enable Authorization Code + PKCE (S256), and grant only `openid` and `mcp.read`. Use the issued client ID in the host configuration below. Do not reuse `mcp-server`; that confidential client is only for server-side token exchange. The seeded `mcp-client` client is for MCP Inspector at `http://localhost:6274/oauth/callback`, not Claude Code or Codex.
+Kitezh uses pre-registered OAuth clients and does not currently implement Dynamic Client Registration (DCR). Register a separate public OAuth client for each MCP host in the Kitezh Authorization Server. Add that host's exact localhost callback URI to its redirect URI allowlist, enable Authorization Code + PKCE (S256), and grant only `openid` and `mcp.read`. Use the issued client ID in the host configuration below. The seeded `mcp-client` client is for MCP Inspector at `http://localhost:6274/oauth/callback`, not Claude Code or Codex.
 
 ### Claude Code
 
@@ -57,7 +55,7 @@ For local protocol checks, configure the seeded `mcp-client` client in MCP Inspe
 
 ### Available tools
 
-All tools are read-only and require the `mcp.read` scope. They expose Kitezh context, users, groups, OAuth clients, sessions, and audit events. The MCP service exchanges the user token for a narrowly scoped token before requesting the Administration API; it never accepts a caller-supplied Kitezh API token.
+All tools are read-only and require the `mcp.read` scope. They expose Kitezh context, users, groups, OAuth clients, sessions, and audit events. MCP forwards the validated inbound user token to the Administration API without exchanging it. The API remains responsible for enforcing its read-only endpoint and role rules.
 
 #### Server-side toolsets and allowlist
 
@@ -86,7 +84,7 @@ The build uses the repository Checkstyle rules, Google Java Format AOSP, and a 9
 
 ## Render and observability
 
-`render-mcp.yaml` defines an independent Blueprint for the `kitezh-mcp` Web Service, so it can be deployed without duplicating the backend service. The service has its own image, readiness check, URL, environment and secret. Set the MCP service's public URL and audience to the same exact HTTPS URI (for example `https://kitezh-mcp.onrender.com/mcp`). Set `APP_API_BASE_URL` to the private Kitezh service URL where Render private networking is available. MCP image publishing and deployment use the shared `backend-release` GitHub environment (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `RENDER_API_KEY`), plus the MCP-specific `MCP_RENDER_RELEASE_DEPLOY_HOOK_URL` secret. Render also needs `APP_MCP_CLIENT_SECRET` for the confidential `mcp-server` OAuth client. The release workflow checks the fixed public readiness URL after deploying the image digest.
+`render-mcp.yaml` defines an independent Blueprint for the `kitezh-mcp` Web Service, so it can be deployed without duplicating the backend service. The service has its own image, readiness check, URL and environment. Set the MCP service's public URL and audience to the same exact HTTPS URI (for example `https://kitezh-mcp.onrender.com/mcp`). Set `APP_API_BASE_URL` to the private Kitezh service URL where Render private networking is available. MCP image publishing and deployment use the shared `backend-release` GitHub environment (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `RENDER_API_KEY`), plus the MCP-specific `MCP_RENDER_RELEASE_DEPLOY_HOOK_URL` secret. The release workflow checks the fixed public readiness URL after deploying the image digest.
 
 OTLP export follows the main Kitezh service environment variables and uses `OTEL_SERVICE_NAME=kitezh-mcp`. The dashboard and Prometheus alert rules are in `observability/`; metric labels contain tool names and outcome only, never user IDs, tokens, query text, or resource IDs.
 
@@ -95,19 +93,16 @@ OTLP export follows the main Kitezh service environment variables and uses `OTEL
 The standalone MCP container is a separate Compose service. Start it with the backend and local PostgreSQL dependencies:
 
 ```bash
-APP_MCP_CLIENT_SECRET='<service-client-secret>' \
 docker compose -f src/main/docker/app.yml up -d
 ```
 
-The MCP endpoint is `http://localhost:10000/mcp`; its health endpoint is available on the internal management port `10001`. The API calls and OAuth token exchange use the backend container network. The MCP OAuth secret is supplied through the environment and is not stored in Compose files.
+The MCP endpoint is `http://localhost:10000/mcp`; its health endpoint is available on the internal management port `10001`. API calls use the backend container network and forward the authenticated user's bearer token.
 
 ## Helm and Terraform
 
-MCP is installed from the independent `helm/kitezh-mcp` chart, in the same namespace as the backend release. Configure its public host and resource audience to match, and create the client secret in Kubernetes before relying on the MCP pod:
+MCP is installed from the independent `helm/kitezh-mcp` chart, in the same namespace as the backend release. Configure its public host and resource audience to match:
 
 ```bash
-kubectl -n apps create secret generic kitezh-mcp-client-secret \
-  --from-literal=client-secret="$APP_MCP_CLIENT_SECRET"
 helm upgrade --install kitezh-mcp helm/kitezh-mcp \
   --namespace apps --create-namespace \
   --set ingress.enabled=true \
@@ -117,4 +112,4 @@ helm upgrade --install kitezh-mcp helm/kitezh-mcp \
   --set app.mcp.publicUrl=https://mcp.kitezh.example.com/mcp
 ```
 
-The chart expects `existingSecret.name` (default `kitezh-mcp-client-secret`) with key `client-secret`. Do not pass the secret as a Helm value. Local Terraform deploys backend and MCP as separate Helm releases; set the ingress hosts and image tags in `terraform/terraform.tfvars`. Terraform does not create or store the OAuth client secret. The example local service endpoints are documented in [`terraform/README.md`](../terraform/README.md).
+Local Terraform deploys backend and MCP as separate Helm releases; set the ingress hosts and image tags in `terraform/terraform.tfvars`. The example local service endpoints are documented in [`terraform/README.md`](../terraform/README.md).

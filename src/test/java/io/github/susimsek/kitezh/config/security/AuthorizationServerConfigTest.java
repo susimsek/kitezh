@@ -497,7 +497,7 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
-    void addsMcpResourceAudienceOnlyToMcpReadAccessTokens() {
+    void addsMcpAndAdminApiAudiencesToMcpReadAccessTokens() {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
 
         config.jwtTokenCustomizer(
@@ -513,7 +513,36 @@ class AuthorizationServerConfigTest {
                                 Set.of("mcp.read")));
 
         assertThat(claims.build().getAudience())
-                .containsExactly("https://kitezh-mcp.onrender.com/mcp", "mcp-server");
+                .containsExactly("https://kitezh-mcp.onrender.com/mcp", "admin-api");
+    }
+
+    @Test
+    void addsOnlyAllowedRolesToMcpReadAccessTokens() {
+        UserEntity user = new UserEntity();
+        user.setAuthorities(
+                Set.of(
+                        new AuthorityEntity(1L, "ROLE_ADMIN"),
+                        new AuthorityEntity(2L, "ROLE_USER"),
+                        new AuthorityEntity(3L, "ROLE_SUPER_SECRET")));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.read")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+        verify(userRepository).findByUsername("admin");
     }
 
     @Test
@@ -544,14 +573,14 @@ class AuthorizationServerConfigTest {
                                 Set.of("mcp.read")));
 
         assertThat(claims.build().getAudience())
-                .containsExactly("https://mcp.example.org/mcp", "mcp-server");
+                .containsExactly("https://mcp.example.org/mcp", "admin-api");
     }
 
     @Test
-    void addsAdminRolesToMcpTokenExchangeOnlyForAdminApiAudience() {
+    void genericTokenExchangeKeepsActorClaimWithoutMcpAdminRoleElevation() {
         RegisteredClient client =
-                RegisteredClient.withId("mcp-server-id")
-                        .clientId("mcp-server")
+                RegisteredClient.withId("service-client-id")
+                        .clientId("service-client")
                         .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                         .authorizationGrantType(
                                 new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
@@ -586,7 +615,7 @@ class AuthorizationServerConfigTest {
                                 new OAuth2TokenExchangeActor(
                                         Map.of(
                                                 "sub",
-                                                "mcp-server",
+                                                "service-client",
                                                 "iat",
                                                 Instant.now(),
                                                 "exp",
@@ -611,9 +640,9 @@ class AuthorizationServerConfigTest {
                 .customize(context);
 
         assertThat(claims.build().getClaims())
-                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"))
-                .containsEntry("act", Map.of("sub", "mcp-server"));
-        verify(userRepository).findByUsername("admin");
+                .doesNotContainKey("roles")
+                .containsEntry("act", Map.of("sub", "service-client"));
+        verify(userRepository, never()).findByUsername(anyString());
     }
 
     @Test

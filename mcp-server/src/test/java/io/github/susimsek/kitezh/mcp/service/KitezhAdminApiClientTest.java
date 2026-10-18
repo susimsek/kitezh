@@ -2,8 +2,6 @@ package io.github.susimsek.kitezh.mcp.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -31,22 +29,18 @@ class KitezhAdminApiClientTest {
     }
 
     @Test
-    void exchangesUserTokenAndCallsAdminApiWithBoundedQueryParameters() {
+    void forwardsUserTokenAndCallsAdminApiWithBoundedQueryParameters() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KitezhTokenExchangeClient tokenExchangeClient = mock(KitezhTokenExchangeClient.class);
-        when(tokenExchangeClient.exchange(org.mockito.ArgumentMatchers.any()))
-                .thenReturn("api-token");
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
                         builder.build(),
-                        tokenExchangeClient,
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(method(HttpMethod.GET))
                 .andExpect(requestTo("https://kitezh.test/api/admin/users?page=0&q=alice&size=20"))
-                .andExpect(header("Authorization", "Bearer api-token"))
+                .andExpect(header("Authorization", "Bearer subject-token"))
                 .andRespond(
                         withSuccess(
                                 "{\"content\":[{\"username\":\"alice\"}]}",
@@ -66,16 +60,10 @@ class KitezhAdminApiClientTest {
     void mapsUpstreamFailureToGenericApiExceptionAndRecordsOutcome() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KitezhTokenExchangeClient tokenExchangeClient = mock(KitezhTokenExchangeClient.class);
-        when(tokenExchangeClient.exchange(org.mockito.ArgumentMatchers.any()))
-                .thenReturn("api-token");
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder.build(),
-                        tokenExchangeClient,
-                        registry,
-                        properties("https://kitezh.test"));
+                        builder.build(), registry, properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(requestTo("https://kitezh.test/api/admin/whoami"))
                 .andRespond(withServerError());
@@ -101,19 +89,15 @@ class KitezhAdminApiClientTest {
     void readsJsonArrayResponsesAsTypedMaps() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KitezhTokenExchangeClient tokenExchangeClient = mock(KitezhTokenExchangeClient.class);
-        when(tokenExchangeClient.exchange(org.mockito.ArgumentMatchers.any()))
-                .thenReturn("api-token");
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
                         builder.build(),
-                        tokenExchangeClient,
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(method(HttpMethod.GET))
                 .andExpect(requestTo("https://kitezh.test/api/admin/groups/3/permissions"))
-                .andExpect(header("Authorization", "Bearer api-token"))
+                .andExpect(header("Authorization", "Bearer subject-token"))
                 .andRespond(
                         withSuccess(
                                 "[{\"userId\":2,\"username\":\"alice\","
@@ -134,16 +118,10 @@ class KitezhAdminApiClientTest {
     void mapsArrayEndpointFailureToGenericApiExceptionAndRecordsOutcome() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KitezhTokenExchangeClient tokenExchangeClient = mock(KitezhTokenExchangeClient.class);
-        when(tokenExchangeClient.exchange(org.mockito.ArgumentMatchers.any()))
-                .thenReturn("api-token");
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
-                        builder.build(),
-                        tokenExchangeClient,
-                        registry,
-                        properties("https://kitezh.test"));
+                        builder.build(), registry, properties("https://kitezh.test"));
         setAuthenticatedUser();
         server.expect(requestTo("https://kitezh.test/api/admin/groups/3/permissions"))
                 .andRespond(withServerError());
@@ -170,7 +148,6 @@ class KitezhAdminApiClientTest {
         KitezhAdminApiClient client =
                 new KitezhAdminApiClient(
                         RestClient.builder().build(),
-                        mock(KitezhTokenExchangeClient.class),
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
 

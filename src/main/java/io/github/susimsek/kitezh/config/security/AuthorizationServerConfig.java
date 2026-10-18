@@ -121,7 +121,6 @@ public class AuthorizationServerConfig {
                     AuthoritiesConstants.EVENT_VIEWER,
                     AuthoritiesConstants.EVENT_MANAGER);
     private static final String MCP_RESOURCE_AUDIENCE = "https://kitezh-mcp.onrender.com/mcp";
-    private static final String MCP_SERVER_CLIENT_ID = "mcp-server";
     private static final String MCP_ADMIN_API_AUDIENCE = "admin-api";
     private static final String EMAIL_CLAIM = "email";
 
@@ -640,23 +639,14 @@ public class AuthorizationServerConfig {
         if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
             return false;
         }
-        if (ConsoleClients.ADMIN_CLIENTS.contains(context.getRegisteredClient().getClientId())) {
-            return true;
-        }
-        return context.getAuthorizationGrant()
-                        instanceof
-                        org.springframework.security.oauth2.server.authorization.authentication
-                                        .OAuth2TokenExchangeAuthenticationToken
-                                tokenExchange
-                && MCP_SERVER_CLIENT_ID.equals(context.getRegisteredClient().getClientId())
-                && tokenExchange.getAudiences().contains(MCP_ADMIN_API_AUDIENCE);
+        return ConsoleClients.ADMIN_CLIENTS.contains(context.getRegisteredClient().getClientId());
     }
 
     private static void appendMcpResourceAudience(
             JwtEncodingContext context, String mcpResourceAudience) {
         if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
                 && context.getAuthorizedScopes().contains(MCP_READ_SCOPE)) {
-            appendAudienceClaim(context, List.of(mcpResourceAudience, MCP_SERVER_CLIENT_ID));
+            appendAudienceClaim(context, List.of(mcpResourceAudience, MCP_ADMIN_API_AUDIENCE));
         }
     }
 
@@ -786,6 +776,7 @@ public class AuthorizationServerConfig {
                 || !groupMappers.isEmpty()
                 || !clientMappers.isEmpty()
                 || isRoleToken(context)
+                || isMcpReadAccessToken(context)
                 || isUserSocialClaimsToken(context)
                 || (organizationClaimsEnabled && isOrganizationClaimToken(context))) {
             return userRepository.findByUsername(context.getPrincipal().getName());
@@ -1510,6 +1501,11 @@ public class AuthorizationServerConfig {
                         || AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                                 context.getAuthorizationGrantType())
                         || isCibaGrant(context));
+    }
+
+    private static boolean isMcpReadAccessToken(JwtEncodingContext context) {
+        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                && context.getAuthorizedScopes().contains(MCP_READ_SCOPE);
     }
 
     private static boolean isCibaGrant(JwtEncodingContext context) {

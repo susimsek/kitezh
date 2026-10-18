@@ -2,7 +2,7 @@
 
 Kitezh MCP Server is a separately deployed, read-only Model Context Protocol (MCP) service for the Kitezh identity platform. It uses Spring Boot, Spring AI, and Streamable HTTP, and runs as a GraalVM Native Image executable compressed with UPX. The published image supports `linux/amd64` and `linux/arm64`.
 
-The MCP endpoint listens on port `10000` at `/mcp`. The server has no database dependency: it authenticates the MCP user's OAuth access token, exchanges it for a narrowly scoped API token, then calls the Kitezh Administration API.
+The MCP endpoint listens on port `10000` at `/mcp`. The server has no database dependency: it authenticates the MCP user's OAuth access token and forwards that same token to the Kitezh Administration API.
 
 ## Image
 
@@ -26,7 +26,7 @@ Docker selects the matching architecture from the `latest` multi-architecture ma
 - Stateless Streamable HTTP MCP endpoint at `/mcp`
 - OAuth 2.0 bearer-token authentication with issuer, audience, and `mcp.read` scope validation
 - Protected Resource Metadata at `/.well-known/oauth-protected-resource`
-- RFC 8693 token exchange for the Kitezh Administration API
+- Forwarding the validated user bearer token to the Kitezh Administration API
 - Read-only tools for Kitezh context, users, groups, OAuth clients, sessions, and audit events
 - Health, readiness, liveness, metrics, and Prometheus endpoints
 - Optional OTLP metrics, traces, and logs for Grafana Cloud or an OpenTelemetry Collector
@@ -36,7 +36,7 @@ All MCP tools are read-only. The server never connects directly to the Kitezh da
 
 ## Run the image
 
-Configure `APP_MCP_CLIENT_SECRET` with the secret for the confidential `mcp-server` client. The MCP resource URL must match the resource audience configured in the Kitezh Authorization Server.
+The MCP resource URL must match the resource audience configured in the Kitezh Authorization Server. The Administration API must accept the forwarded token and apply read-only endpoint and role authorization rules.
 
 ```bash
 docker run --rm -p 10000:10000 \
@@ -46,8 +46,6 @@ docker run --rm -p 10000:10000 \
   -e APP_SECURITY_AUDIENCE=https://kitezh-mcp.onrender.com/mcp \
   -e APP_API_BASE_URL=https://kitezh.onrender.com \
   -e APP_MCP_PUBLIC_URL=https://kitezh-mcp.onrender.com/mcp \
-  -e APP_MCP_CLIENT_ID=mcp-server \
-  -e APP_MCP_CLIENT_SECRET='<mcp-server-client-secret>' \
   -e APP_MCP_READ_ONLY=true \
   -e MANAGEMENT_OPENTELEMETRY_ENABLED=true \
   -e MANAGEMENT_TRACING_EXPORT_ENABLED=true \
@@ -70,7 +68,7 @@ curl http://localhost:10000/actuator/health/readiness
 
 ## Connect an MCP client
 
-Kitezh currently uses pre-registered OAuth clients and does not provide Dynamic Client Registration. Register a separate public OAuth client for each MCP host in Kitezh. Allowlist that host's exact localhost callback URI, enable Authorization Code with PKCE S256, and grant only `openid` and `mcp.read`. Do not use the confidential `mcp-server` service client in a desktop or editor configuration.
+Kitezh currently uses pre-registered OAuth clients and does not provide Dynamic Client Registration. Register a separate public OAuth client for each MCP host in Kitezh. Allowlist that host's exact localhost callback URI, enable Authorization Code with PKCE S256, and grant only `openid` and `mcp.read`.
 
 ### Claude Code
 
@@ -107,14 +105,11 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `SPRING_PROFILES_ACTIVE` | Spring's default profile | Select the Spring profile; set to `prod` for deployment |
 | `APP_AUTHORIZATIONSERVER_ISSUER` | `https://kitezh.onrender.com` | OAuth issuer used to validate user tokens; follows the backend configuration property |
 | `APP_SECURITY_JWK_SET_URI` | `<issuer>/oauth2/jwks` | Override the Authorization Server signing-key endpoint |
-| `APP_SECURITY_TOKEN_URI` | `<issuer>/oauth2/token` | Override the Authorization Server token endpoint |
 | `APP_SECURITY_AUDIENCE` | `https://kitezh-mcp.onrender.com/mcp` | Required audience on MCP access tokens |
 | `APP_API_BASE_URL` | `http://localhost:9090` | Kitezh Administration API base URL |
 | `APP_MCP_PUBLIC_URL` | `https://kitezh-mcp.onrender.com/mcp` | Public MCP resource identifier |
 | `APP_MCP_ALLOWED_ORIGINS` | `app://renderer,http://localhost:6274,http://127.0.0.1:6274` | Additional browser origins allowed by the MCP CORS policy |
 | `APP_MCP_ALLOW_LOCAL_HOSTS` | `true` in default/dev, `false` in prod | Permit localhost Host values for local MCP clients |
-| `APP_MCP_CLIENT_ID` | `mcp-server` | Confidential OAuth client used for token exchange |
-| `APP_MCP_CLIENT_SECRET` | empty | Runtime secret for the confidential MCP client |
 | `APP_MCP_READ_ONLY` | `true` | Keep all MCP operations read-only |
 | `APP_MCP_TOOLSETS` | `all` | Enabled server-side toolsets: `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, `signing-keys`; comma-separated, or `all` |
 | `APP_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets and caller roles; `*` allows all names |
@@ -127,7 +122,7 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT` | empty | OTLP log endpoint |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_URL` | empty | OTLP metrics endpoint |
 
-Keep the OAuth client secret, OTLP authorization headers, and deployment credentials in the platform's secret manager. Never put them in source control, the image, or a shared desktop MCP configuration.
+Keep OTLP authorization headers and deployment credentials in the platform's secret manager. Never put them in source control, the image, or a shared desktop MCP configuration.
 
 Toolset and allowlist values are operator-controlled deployment settings. The effective catalog is the selected toolset union intersected with `APP_MCP_TOOL_ALLOWLIST` and the caller's role permissions. Client headers and tool arguments cannot widen these server-side limits. An empty allowlist disables all tools.
 

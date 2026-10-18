@@ -35,7 +35,6 @@ app:
     issuer: https://kitezh.local
   security:
     jwk-set-uri: ${APP_SECURITY_JWK_SET_URI:${app.authorization-server.issuer}/oauth2/jwks}
-    token-uri: ${APP_SECURITY_TOKEN_URI:${app.authorization-server.issuer}/oauth2/token}
     audience: ${APP_SECURITY_AUDIENCE:https://kitezh-mcp.onrender.com/mcp}
   api:
     base-url: ${APP_API_BASE_URL:http://localhost:9090}
@@ -43,8 +42,6 @@ app:
     public-url: ${APP_MCP_PUBLIC_URL:https://kitezh-mcp.onrender.com/mcp}
     allowed-origins: ${APP_MCP_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
     allow-local-hosts: ${APP_MCP_ALLOW_LOCAL_HOSTS:true}
-    client-id: ${APP_MCP_CLIENT_ID:mcp-server}
-    client-secret: ${APP_MCP_CLIENT_SECRET:}
     read-only: ${APP_MCP_READ_ONLY:true}
     tools:
       toolsets: ${APP_MCP_TOOLSETS:all}
@@ -78,7 +75,6 @@ management:
     distribution:
       percentiles-histogram:
         kitezh_mcp_tool_call_duration_seconds: true
-        kitezh_mcp_token_exchange_duration_seconds: true
         kitezh_mcp_kitezh_api_request_duration_seconds: true
         mcp_server_operation_duration_seconds: true
   endpoint:

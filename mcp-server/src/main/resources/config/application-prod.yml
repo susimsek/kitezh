@@ -14,7 +14,6 @@ management:
       percentiles-histogram:
         http.server.requests: true
         kitezh_mcp_tool_call_duration_seconds: true
-        kitezh_mcp_token_exchange_duration_seconds: true
         kitezh_mcp_kitezh_api_request_duration_seconds: true
         mcp_server_operation_duration_seconds: true
       percentiles:

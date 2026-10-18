@@ -176,18 +176,14 @@ resource "helm_release" "kitezh_mcp" {
   name      = "kitezh-mcp"
   chart     = "${path.module}/../helm/kitezh-mcp"
   namespace = kubernetes_namespace_v1.app.metadata[0].name
-  # The OAuth client secret is supplied out-of-band after the local cluster exists.
-  wait    = false
-  timeout = 600
+  wait      = false
+  timeout   = 600
 
   values = [
     yamlencode({
       image = {
         repository = var.mcp_image_repository
         tag        = var.mcp_image_tag
-      }
-      existingSecret = {
-        name = var.mcp_client_secret_name
       }
       ingress = {
         enabled   = true
@@ -211,7 +207,6 @@ resource "helm_release" "kitezh_mcp" {
         security = {
           issuerUri = "http://${var.ingress_host}:${var.ingress_http_host_port}"
           jwkSetUri = "http://kitezh.${var.namespace}.svc.cluster.local:9090/oauth2/jwks"
-          tokenUri  = "http://kitezh.${var.namespace}.svc.cluster.local:9090/oauth2/token"
           audience  = "http://${var.mcp_ingress_host}:${var.ingress_http_host_port}/mcp"
         }
         api = {

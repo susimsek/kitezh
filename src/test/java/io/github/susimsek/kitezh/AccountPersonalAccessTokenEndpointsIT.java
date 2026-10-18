@@ -66,8 +66,10 @@ class AccountPersonalAccessTokenEndpointsIT {
         var jwtToken = jwtDecoder.decode(token);
         assertThat(jwtToken.getSubject()).isEqualTo(username);
         assertThat(jwtToken.getAudience())
-                .contains("https://kitezh-mcp.onrender.com/mcp", "mcp-server");
+                .contains("https://kitezh-mcp.onrender.com/mcp", "admin-api");
         assertThat(jwtToken.getClaimAsStringList("scope")).containsExactly("mcp.read");
+        assertThat(jwtToken.getClaimAsStringList("roles"))
+                .containsExactly("ROLE_ADMIN", "ROLE_USER");
         assertThat(jwtToken.getExpiresAt())
                 .isBetween(
                         Instant.now().plus(Duration.ofDays(29)),
@@ -138,6 +140,8 @@ class AccountPersonalAccessTokenEndpointsIT {
             var jwtToken = jwtDecoder.decode(authorization.orElseThrow().getAccessTokenValue());
             assertThat(jwtToken.getSubject()).isEqualTo(username);
             assertThat(jwtToken.getClaimAsStringList("scope")).containsExactly("mcp.read");
+            assertThat(jwtToken.getClaimAsStringList("roles"))
+                    .contains(username.equals("admin") ? "ROLE_ADMIN" : "ROLE_USER");
             assertThat(jwtToken.getExpiresAt()).isNull();
         }
     }

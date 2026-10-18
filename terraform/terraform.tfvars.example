@@ -12,6 +12,5 @@ image_tag          = "latest"
 spring_profile     = "prod"
 mcp_image_repository = "docker.io/suayb/kitezh-mcp"
 mcp_image_tag = "0.1.5"
-mcp_client_secret_name = "kitezh-mcp-client-secret"
 
 # Replace for anything beyond local development.

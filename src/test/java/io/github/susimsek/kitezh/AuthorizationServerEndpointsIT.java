@@ -218,7 +218,13 @@ class AuthorizationServerEndpointsIT {
         JsonNode claims = jwtClaims(accessToken);
         String[] tokenScopes = JSON_MAPPER.treeToValue(claims.get("scope"), String[].class);
         assertThat(tokenScopes).containsExactlyInAnyOrder("openid", "mcp.read");
-        assertThat(claims.get("roles").toString()).contains("ROLE_ADMIN");
+        String[] tokenAudiences = JSON_MAPPER.treeToValue(claims.get("aud"), String[].class);
+        assertThat(tokenAudiences)
+                .containsExactlyInAnyOrder(
+                        "mcp-client", "https://kitezh-mcp.onrender.com/mcp", "admin-api")
+                .doesNotContain("mcp-server");
+        assertThat(JSON_MAPPER.treeToValue(claims.get("roles"), String[].class))
+                .containsExactly("ROLE_ADMIN", "ROLE_USER");
         assertThat(claims.has("realm_access")).isFalse();
     }
 

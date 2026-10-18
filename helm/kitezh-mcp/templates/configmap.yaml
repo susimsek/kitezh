@@ -14,7 +14,6 @@ data:
         issuer: {{ .Values.app.authorizationServer.issuer | quote }}
       security:
         jwk-set-uri: {{ .Values.app.security.jwkSetUri | quote }}
-        token-uri: {{ .Values.app.security.tokenUri | quote }}
         audience: {{ .Values.app.security.audience | quote }}
       api:
         base-url: {{ .Values.app.api.baseUrl | quote }}
@@ -22,7 +21,6 @@ data:
         public-url: {{ .Values.app.mcp.publicUrl | quote }}
         allowed-origins: {{ .Values.app.mcp.allowedOrigins | quote }}
         allow-local-hosts: {{ .Values.app.mcp.allowLocalHosts }}
-        client-id: {{ .Values.app.mcp.clientId | quote }}
         read-only: {{ .Values.app.mcp.readOnly }}
         tools:
           toolsets: {{ .Values.app.mcp.tools.toolsets | quote }}

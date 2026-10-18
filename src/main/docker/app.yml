@@ -27,12 +27,9 @@ services:
       - OTEL_SERVICE_NAME=kitezh-mcp
       - APP_AUTHORIZATIONSERVER_ISSUER=http://127.0.0.1:9090
       - APP_SECURITY_JWK_SET_URI=http://app:9090/oauth2/jwks
-      - APP_SECURITY_TOKEN_URI=http://app:9090/oauth2/token
       - APP_SECURITY_AUDIENCE=${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
       - APP_API_BASE_URL=http://app:9090
       - APP_MCP_PUBLIC_URL=${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
-      - APP_MCP_CLIENT_ID=mcp-server
-      - APP_MCP_CLIENT_SECRET=${APP_MCP_CLIENT_SECRET:-}
       - APP_MCP_READ_ONLY=true
     ports:
       - "127.0.0.1:10000:10000"

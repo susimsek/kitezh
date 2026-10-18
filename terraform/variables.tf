@@ -87,9 +87,3 @@ variable "mcp_image_tag" {
   type        = string
   default     = "0.1.5"
 }
-
-variable "mcp_client_secret_name" {
-  description = "Name of the pre-created Kubernetes Secret containing the MCP OAuth client secret."
-  type        = string
-  default     = "kitezh-mcp-client-secret"
-}

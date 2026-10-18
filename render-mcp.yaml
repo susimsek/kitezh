@@ -23,10 +23,6 @@ services:
         value: https://kitezh.onrender.com
       - key: APP_MCP_PUBLIC_URL
         value: https://kitezh-mcp.onrender.com/mcp
-      - key: APP_MCP_CLIENT_ID
-        value: mcp-server
-      - key: APP_MCP_CLIENT_SECRET
-        sync: false
       - key: APP_MCP_READ_ONLY
         value: "true"
       - key: MANAGEMENT_OPENTELEMETRY_ENABLED

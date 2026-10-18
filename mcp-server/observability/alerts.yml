@@ -43,17 +43,6 @@ groups:
           summary: Kitezh MCP tool latency is above target
           description: End-to-end tool call p95 latency has exceeded the three-second target for ten minutes.
 
-      # kitezh_mcp_token_exchange_requests_total uses outcome=success|error.
-      - alert: KitezhMcpTokenExchangeFailures
-        expr: increase(kitezh_mcp_token_exchange_requests_total{service_name="kitezh-mcp",outcome="error"}[5m]) >= 3
-        for: 2m
-        labels:
-          severity: warning
-          service: kitezh-mcp
-        annotations:
-          summary: Kitezh MCP token exchange is failing
-          description: At least three token exchange attempts have failed during a five-minute window.
-
       # kitezh_mcp_kitezh_api_requests_total uses fixed tool name and outcome=success|error.
       - alert: KitezhMcpDownstreamApiErrors
         expr: |

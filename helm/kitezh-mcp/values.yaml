@@ -24,7 +24,6 @@ app:
     issuer: http://kitezh.apps.svc.cluster.local:9090
   security:
     jwkSetUri: http://kitezh.apps.svc.cluster.local:9090/oauth2/jwks
-    tokenUri: http://kitezh.apps.svc.cluster.local:9090/oauth2/token
     audience: https://mcp.kitezh.local/mcp
   api:
     baseUrl: http://kitezh.apps.svc.cluster.local:9090
@@ -32,15 +31,10 @@ app:
     publicUrl: https://mcp.kitezh.local/mcp
     allowedOrigins: app://renderer,http://localhost:6274,http://127.0.0.1:6274
     allowLocalHosts: false
-    clientId: mcp-server
     readOnly: true
     tools:
       toolsets: all
       allowlist: '*'
-
-existingSecret:
-  name: kitezh-mcp-client-secret
-  key: client-secret
 
 serviceAccount:
   create: true

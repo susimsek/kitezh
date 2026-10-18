@@ -23,7 +23,6 @@ public class KitezhAdminApiClient {
             new ParameterizedTypeReference<>() {};
 
     private final RestClient restClient;
-    private final KitezhTokenExchangeClient tokenExchangeClient;
     private final MeterRegistry meterRegistry;
     private final ApplicationProperties properties;
 
@@ -31,7 +30,7 @@ public class KitezhAdminApiClient {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";
         try {
-            String token = tokenExchangeClient.exchange(currentJwt());
+            String token = currentJwt().getTokenValue();
             UriComponentsBuilder uriBuilder =
                     UriComponentsBuilder.fromUriString(properties.api().baseUrl()).path(path);
             parameters.entrySet().stream()
@@ -81,7 +80,7 @@ public class KitezhAdminApiClient {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";
         try {
-            String token = tokenExchangeClient.exchange(currentJwt());
+            String token = currentJwt().getTokenValue();
             UriComponentsBuilder uriBuilder =
                     UriComponentsBuilder.fromUriString(properties.api().baseUrl()).path(path);
             parameters.entrySet().stream()

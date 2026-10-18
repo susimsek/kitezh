@@ -59,11 +59,6 @@ spec:
               value: {{ .Values.spring.profiles.active | quote }}
             - name: OTEL_SERVICE_NAME
               value: kitezh-mcp
-            - name: APP_MCP_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "kitezh-mcp.clientSecretName" . }}
-                  key: {{ .Values.existingSecret.key | quote }}
           volumeMounts:
             - name: config
               mountPath: /opt/config/application.yml
