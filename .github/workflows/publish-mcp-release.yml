@@ -248,7 +248,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          README_PATH="mcp/README-dockerhub.md"
+          README_PATH="mcp/docs/README-dockerhub.md"
           test -f "${README_PATH}" || {
             echo "${README_PATH} not found; refusing to publish an empty image description." >&2
             exit 1
