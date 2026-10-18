@@ -27,6 +27,12 @@ jest.mock("./EmailSettings", () => ({
   __esModule: true,
   default: () => <div data-testid="email-settings" />,
 }));
+jest.mock("./AdminLocalizationSettings", () => ({
+  __esModule: true,
+  default: ({ section, mode }: { section: string; mode: string }) => (
+    <div data-testid="localization-settings">{`${section}:${mode}`}</div>
+  ),
+}));
 jest.unmock("@/routing/Link");
 
 function Location() {
@@ -116,5 +122,24 @@ describe("AdminSettings", () => {
     );
     expect(screen.getByTestId("event-settings")).toBeVisible();
     expect(screen.getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("routes localization creation to overrides and shows its breadcrumb", () => {
+    render(
+      <MemoryRouter initialEntries={["/admin/settings/localization/effective"]}>
+        <Routes>
+          <Route
+            path="/admin/settings/localization/:localizationSection?"
+            element={<AdminSettings localization localizationAction="create" />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("localization-settings")).toHaveTextContent("overrides:create");
+    expect(
+      screen.getByRole("link", { name: dictionary.admin.localization.overridesTab }),
+    ).toHaveAttribute("href", "/admin/settings/localization/overrides");
+    expect(screen.getByText(dictionary.admin.localization.create)).toBeVisible();
   });
 });

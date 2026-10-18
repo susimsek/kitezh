@@ -118,4 +118,17 @@ describe("ClientScopeRoleMappings", () => {
       expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.clientScopes.operationError),
     );
   });
+
+  it("treats an unsuccessful role-list response as a load failure", async () => {
+    mockAdminRequest.mockImplementation(
+      (_token, request) =>
+        Promise.resolve({
+          status: request.url?.includes("application-roles") ? 503 : 200,
+          data: request.url?.endsWith("/role-mappings") ? mapping : { content: [] },
+        }) as never,
+    );
+    render(<ClientScopeRoleMappings scopeId="scope" dictionary={dictionary} />);
+
+    expect(await screen.findByText(dictionary.admin.clientScopes.operationError)).toBeVisible();
+  });
 });

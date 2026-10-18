@@ -83,6 +83,39 @@ describe("AdminUserProfileSettings", () => {
     );
   });
 
+  it("supports the downward keyboard and row drag events", async () => {
+    const first = definition(1, "department", 10);
+    const second = definition(2, "employeeNumber", 20);
+    mockAdminRequest
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { content: [first, second], totalPages: 1, totalElements: 2 },
+      } as never)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: [definition(2, "employeeNumber", 10), definition(1, "department", 11)],
+      } as never);
+
+    render(<AdminUserProfileSettings dictionary={dictionary} />);
+    const handles = await screen.findAllByRole("button", {
+      name: new RegExp(dictionary.admin.userProfileSettings.reorder),
+    });
+    const rows = screen.getAllByRole("row").slice(1);
+    const dataTransfer = { dropEffect: "none" };
+    fireEvent.dragOver(rows[0]!, { dataTransfer });
+    expect(dataTransfer.dropEffect).toBe("move");
+    fireEvent.drop(rows[0]!, { dataTransfer });
+    fireEvent.keyDown(handles[0]!, { key: "ArrowDown" });
+
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith("token", {
+        method: "PUT",
+        url: "/api/admin/settings/user-profile/order",
+        data: { ids: [2, 1] },
+      }),
+    );
+  });
+
   it("persists a pointer reorder for trackpad dragging", async () => {
     const first = definition(1, "department", 10);
     const second = definition(2, "employeeNumber", 20);

@@ -540,6 +540,10 @@ describe("previously uncovered administration components", () => {
       scopes: ["openid", "profile", "email", "admin-api", "account-api"],
       requireAuthorizationConsent: true,
       requireProofKey: true,
+      requireDpop: true,
+      requireDpopJkt: true,
+      dpopRefreshTokenOnly: true,
+      dpopSigningAlgorithms: ["ES256", "RS256"],
     };
     mockAdminRequest.mockResolvedValueOnce(page([client]) as never);
     const clientsView = render(<ClientsTable dictionary={dictionary} locale="en" />);
@@ -548,6 +552,9 @@ describe("previously uncovered administration components", () => {
     expect(screen.getByText("+1")).toBeVisible();
     expect(screen.getByText("authorization_code")).toBeVisible();
     expect(screen.getByText("PKCE On")).toBeVisible();
+    expect(screen.getByText("dpop_jkt On")).toBeVisible();
+    expect(screen.getByText("DPoP refresh")).toBeVisible();
+    expect(screen.getByText("DPoP ES256/RS256")).toBeVisible();
 
     clientsView.unmount();
     authState.access = {

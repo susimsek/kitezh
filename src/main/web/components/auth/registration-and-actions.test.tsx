@@ -189,7 +189,7 @@ describe("registration and account action forms", () => {
     }) as typeof fetch;
     searchParams = new URLSearchParams("token=reset-token");
     mockSubmitAccountAction.mockRejectedValueOnce({
-      violations: [{ field: "otpCode" }],
+      violations: [{ field: "otpCode" }, { field: "newPassword" }, { field: "confirmPassword" }],
     });
     render(<ResetPasswordForm locale="en" dictionary={dictionary} />);
 
@@ -204,6 +204,18 @@ describe("registration and account action forms", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: dictionary.accountActions.reset }));
     expect(await screen.findByText(dictionary.accountActions.otpInvalid)).toBeVisible();
+    expect(screen.getByText(dictionary.account.validation.password)).toBeVisible();
+    expect(screen.getByText(dictionary.accountActions.passwordMismatch)).toBeVisible();
+  });
+
+  it("renders verification links without a token as invalid", () => {
+    searchParams = new URLSearchParams();
+    render(<VerifyEmailView locale="en" dictionary={dictionary} />);
+
+    expect(screen.getByText(dictionary.accountActions.invalidLink)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: dictionary.accountActions.verifyTitle }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens the user menu, falls back to initials, and handles logout", async () => {

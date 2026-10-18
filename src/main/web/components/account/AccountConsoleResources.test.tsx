@@ -134,6 +134,32 @@ describe("Account console resources", () => {
     expect(screen.getByLabelText(/New password/)).toHaveValue("");
   });
 
+  it("saves a new password and resets the form after success", async () => {
+    mockAccountRequest.mockResolvedValueOnce({ status: 204, data: null } as never);
+    renderWithStore(<AccountPasswordForm dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(/Current password/), {
+      target: { value: "old-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/New password/), {
+      target: { value: "a-different-long-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/Confirm.*password/i), {
+      target: { value: "a-different-long-password" },
+    });
+    const save = screen.getByRole("button", { name: dictionary.account.common.save });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(mockAccountRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ method: "PUT", url: "/api/account/password" }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.account.security.saved);
+    expect(screen.getByLabelText(/Current password/)).toHaveValue("");
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     document.documentElement.lang = "en";

@@ -18,6 +18,7 @@ import {
   getRecoveryCodesStatus,
   listAccountApplications,
   listAccountNotifications,
+  listAccountPasskeys,
   listAccountSessions,
   listPersonalAccessTokens,
   listCibaRequests,
@@ -79,6 +80,30 @@ test("account passkey registration uses an authenticated one-time challenge cont
       },
       label: "My phone",
     }));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("account passkey listing uses the authenticated native credentials route", async () => {
+  const originalFetch = globalThis.fetch;
+  let request: { url: string; init?: RequestInit } | undefined;
+  globalThis.fetch = async (input, init) => {
+    request = { url: input.toString(), init };
+    return Response.json({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 100 });
+  };
+
+  try {
+    const page = await listAccountPasskeys("account-token");
+    assert.equal(page.size, 100);
+    assert.equal(
+      new URL(request!.url).pathname + new URL(request!.url).search,
+      "/api/account/webauthn/credentials?page=0&size=100",
+    );
+    assert.equal(
+      new Headers(request!.init?.headers).get("Authorization"),
+      "Bearer account-token",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
