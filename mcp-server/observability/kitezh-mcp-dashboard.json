@@ -1530,12 +1530,12 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(kitezh_mcp_token_exchange_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum(rate(kitezh_mcp_token_exchange_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(kitezh_mcp_token_exchange_duration_seconds_milliseconds_bucket{service_name=\"$service\"}[5m]))) / 1000 and (sum(rate(kitezh_mcp_token_exchange_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])) > 0)",
           "legendFormat": "p95",
           "refId": "A"
         },
         {
-          "expr": "(sum(rate(kitezh_mcp_token_exchange_duration_seconds_sum{service_name=\"$service\"}[5m])) / clamp_min(sum(rate(kitezh_mcp_token_exchange_duration_seconds_count{service_name=\"$service\"}[5m])), 1e-9)) and (sum(rate(kitezh_mcp_token_exchange_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "expr": "(sum(rate(kitezh_mcp_token_exchange_duration_seconds_milliseconds_sum{service_name=\"$service\"}[5m])) / clamp_min(sum(rate(kitezh_mcp_token_exchange_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])), 1e-9)) / 1000 and (sum(rate(kitezh_mcp_token_exchange_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])) > 0)",
           "legendFormat": "average",
           "refId": "B"
         }
@@ -1637,7 +1637,7 @@
       },
       "targets": [
         {
-          "expr": "(histogram_quantile(0.95, sum by (le, tool) (rate(kitezh_mcp_tool_call_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum by (tool) (rate(kitezh_mcp_tool_call_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)) or on() label_replace(vector(0), \"tool\", \"no calls\", \"__name__\", \".*\")",
+          "expr": "(histogram_quantile(0.95, sum by (le, tool) (rate(kitezh_mcp_tool_call_duration_seconds_milliseconds_bucket{service_name=\"$service\"}[5m]))) / 1000 and (sum by (tool) (rate(kitezh_mcp_tool_call_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])) > 0)) or on() label_replace(vector(0), \"tool\", \"no calls\", \"__name__\", \".*\")",
           "legendFormat": "{{tool}} p95",
           "refId": "A"
         }
@@ -1726,12 +1726,12 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(kitezh_mcp_kitezh_api_request_duration_seconds_bucket{service_name=\"$service\"}[5m]))) and (sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(kitezh_mcp_kitezh_api_request_duration_seconds_milliseconds_bucket{service_name=\"$service\"}[5m]))) / 1000 and (sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])) > 0)",
           "legendFormat": "p95",
           "refId": "A"
         },
         {
-          "expr": "(sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_sum{service_name=\"$service\"}[5m])) / clamp_min(sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_count{service_name=\"$service\"}[5m])), 1e-9)) and (sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_count{service_name=\"$service\"}[5m])) > 0)",
+          "expr": "(sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_milliseconds_sum{service_name=\"$service\"}[5m])) / clamp_min(sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])), 1e-9)) / 1000 and (sum(rate(kitezh_mcp_kitezh_api_request_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m])) > 0)",
           "legendFormat": "average",
           "refId": "B"
         }
@@ -1779,7 +1779,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (method) (rate(mcp_server_operation_duration_seconds_count{service_name=\"$service\"}[5m]))",
+          "expr": "sum by (method) (rate(mcp_server_operation_duration_seconds_milliseconds_count{service_name=\"$service\"}[5m]))",
           "legendFormat": "{{method}}"
         }
       ]
@@ -1825,7 +1825,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, method) (rate(mcp_server_operation_duration_seconds_bucket{service_name=\"$service\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, method) (rate(mcp_server_operation_duration_seconds_milliseconds_bucket{service_name=\"$service\"}[5m]))) / 1000",
           "legendFormat": "{{method}} p95"
         }
       ]
@@ -1870,7 +1870,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (method, error_type) (rate(mcp_server_operation_duration_seconds_count{service_name=\"$service\",error_type!=\"none\"}[5m]))",
+          "expr": "sum by (method, error_type) (rate(mcp_server_operation_duration_seconds_milliseconds_count{service_name=\"$service\",error_type!=\"none\"}[5m])) or on() label_replace(label_replace(vector(0), \"method\", \"none\", \"__name__\", \".*\"), \"error_type\", \"none\", \"__name__\", \".*\")",
           "legendFormat": "{{method}} \u00b7 {{error_type}}"
         }
       ]
