@@ -21,7 +21,7 @@ class McpToolAuthorizationFilterTest {
 
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy("all", "*");
+    private final McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy("all", "", "*");
     private final McpToolAuthorizationFilter filter =
             new McpToolAuthorizationFilter(
                     objectMapper,
@@ -96,6 +96,36 @@ class McpToolAuthorizationFilterTest {
                     throw new AssertionError("Batch request must be rejected");
                 });
         assertThat(batchResponse.getContentAsString()).contains("\"code\":-32600");
+    }
+
+    @Test
+    void deniesResourceIdCompletionWhenSearchToolIsNotEnabled() throws Exception {
+        authenticate("ROLE_USER_VIEWER");
+        McpToolCatalogPolicy readOnlyPolicy = new McpToolCatalogPolicy("all", "", "get_user");
+        McpToolAuthorizationFilter readOnlyFilter =
+                new McpToolAuthorizationFilter(
+                        objectMapper,
+                        readOnlyPolicy,
+                        new McpOperationMetrics(meterRegistry, readOnlyPolicy, objectMapper));
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/mcp");
+        request.setContent(
+                ("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"completion/complete\","
+                                + "\"params\":{\"ref\":{\"type\":\"ref/resource\","
+                                + "\"uri\":\"kitezh://users/{userId}\"},"
+                                + "\"argument\":{\"name\":\"userId\",\"value\":\"4\"}}}")
+                        .getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        readOnlyFilter.doFilter(
+                request,
+                response,
+                (ignoredRequest, ignoredResponse) -> {
+                    throw new AssertionError(
+                            "Completion must not call search when search is disabled");
+                });
+
+        assertThat(response.getContentAsString()).contains("\"code\":-32601");
+        assertThat(response.getContentAsString()).doesNotContain("42");
     }
 
     @Test

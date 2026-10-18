@@ -13,7 +13,7 @@ class McpOperationMetricsTest {
     private static final String METRIC_NAME = "mcp_server_operation_duration_seconds";
 
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
-    private final McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy("all", "*");
+    private final McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy("all", "", "*");
     private final McpOperationMetrics metrics =
             new McpOperationMetrics(meterRegistry, catalogPolicy, new ObjectMapper());
 
@@ -66,10 +66,13 @@ class McpOperationMetricsTest {
     }
 
     @Test
-    void ignoresOtherMcpMethods() {
+    void recordsCapabilityMethodsAndIgnoresInitialize() {
         metrics.record(metrics.start("initialize", "", "2025-11-25"), "none");
+        metrics.record(metrics.start("resources/read", "", "2025-11-25"), "none");
 
-        assertThat(meterRegistry.find(METRIC_NAME).timer()).isNull();
+        assertThat(meterRegistry.find(METRIC_NAME).tag("method", "resources/read").timer().count())
+                .isEqualTo(1);
+        assertThat(meterRegistry.find(METRIC_NAME).tag("method", "initialize").timer()).isNull();
     }
 
     @Test

@@ -63,7 +63,7 @@ class McpToolCatalogFilterTest {
 
     private static McpToolAuthorizationFilter filter(String toolsets, String allowlist) {
         ObjectMapper objectMapper = new ObjectMapper();
-        McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy(toolsets, allowlist);
+        McpToolCatalogPolicy catalogPolicy = new McpToolCatalogPolicy(toolsets, "", allowlist);
         return new McpToolAuthorizationFilter(
                 objectMapper,
                 catalogPolicy,

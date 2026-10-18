@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Applies the operator-configured toolsets and exact-name allowlist. */
+/** Applies operator-configured toolsets, additional tools, and exact-name allowlist. */
 final class McpToolCatalogPolicy {
 
     private static final String ALL = "all";
@@ -18,10 +18,15 @@ final class McpToolCatalogPolicy {
 
     private final Set<String> enabledTools;
 
-    McpToolCatalogPolicy(String configuredToolsets, String configuredAllowlist) {
+    McpToolCatalogPolicy(
+            String configuredToolsets,
+            String configuredAdditionalTools,
+            String configuredAllowlist) {
         Set<String> selectedToolsets = parse(configuredToolsets, "toolsets", false);
+        Set<String> additionalTools = parse(configuredAdditionalTools, "additional-tools", true);
         Set<String> allowlist = parse(configuredAllowlist, "allowlist", true);
         validateToolsets(selectedToolsets);
+        validateAdditionalTools(additionalTools);
         validateAllowlist(allowlist);
 
         Set<String> selectedTools = new LinkedHashSet<>();
@@ -30,6 +35,7 @@ final class McpToolCatalogPolicy {
         } else {
             selectedToolsets.stream().map(TOOLSETS::get).forEach(selectedTools::addAll);
         }
+        selectedTools.addAll(additionalTools);
         if (!allowlist.contains(WILDCARD)) {
             selectedTools.retainAll(allowlist);
         }
@@ -86,6 +92,19 @@ final class McpToolCatalogPolicy {
         if (!unknownTools.isEmpty()) {
             throw new IllegalArgumentException(
                     "Unknown MCP tool names in allowlist: " + unknownTools);
+        }
+    }
+
+    private static void validateAdditionalTools(Set<String> additionalTools) {
+        if (additionalTools.contains(WILDCARD)) {
+            throw new IllegalArgumentException(
+                    "MCP additional tools must use exact tool names; use toolsets 'all' for every tool");
+        }
+        Set<String> unknownTools = new LinkedHashSet<>(additionalTools);
+        unknownTools.removeAll(ALL_TOOLS);
+        if (!unknownTools.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Unknown MCP tool names in additional-tools: " + unknownTools);
         }
     }
 

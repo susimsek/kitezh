@@ -24,4 +24,5 @@ data:
         read-only: {{ .Values.app.mcp.readOnly }}
         tools:
           toolsets: {{ .Values.app.mcp.tools.toolsets | quote }}
+          additional-tools: {{ .Values.app.mcp.tools.additionalTools | quote }}
           allowlist: {{ .Values.app.mcp.tools.allowlist | quote }}

@@ -24,7 +24,16 @@ final class McpOperationMetrics {
     private static final String TOOL_NAME = "tool_name";
     private static final String TRANSPORT_TAG = "transport";
     private static final String PROTOCOL_VERSION = "protocol_version";
-    private static final Set<String> SUPPORTED_METHODS = Set.of(METHOD_CALL, METHOD_LIST);
+    private static final Set<String> SUPPORTED_METHODS =
+            Set.of(
+                    METHOD_CALL,
+                    METHOD_LIST,
+                    "resources/list",
+                    "resources/templates/list",
+                    "resources/read",
+                    "prompts/list",
+                    "prompts/get",
+                    "completion/complete");
     private static final Set<String> KNOWN_PROTOCOL_VERSIONS =
             Set.of("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25");
 

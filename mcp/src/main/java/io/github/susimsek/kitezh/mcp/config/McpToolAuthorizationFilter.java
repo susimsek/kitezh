@@ -14,6 +14,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 final class McpToolAuthorizationFilter extends OncePerRequestFilter {
 
-    private static final int TOOL_NOT_FOUND = -32601;
+    private static final int CAPABILITY_NOT_FOUND = -32601;
     private static final int INVALID_REQUEST = -32600;
     private static final String ADMIN = "ROLE_ADMIN";
     private static final String USER_QUERY = "ROLE_USER_QUERY";
@@ -89,7 +90,12 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
                     jsonRequest == null ? NullNode.getInstance() : jsonRequest.path("id");
             if ("tools/call".equals(method) && !canUse(toolName, currentAuthorities())) {
                 errorType = "authorization";
-                writeError(response, requestId, TOOL_NOT_FOUND, "Tool not found");
+                writeError(response, requestId, CAPABILITY_NOT_FOUND, "Tool not found");
+                return;
+            }
+            if (!canUseRequest(method, jsonRequest, currentAuthorities())) {
+                errorType = "authorization";
+                writeError(response, requestId, CAPABILITY_NOT_FOUND, "Capability not found");
                 return;
             }
 
@@ -112,6 +118,7 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
                     replaceResponse(wrappedResponse, responseObject);
                 }
             }
+            filterCapabilityDiscovery(method, jsonRequest, wrappedResponse, currentAuthorities());
             errorType =
                     operationMetrics.responseErrorType(
                             wrappedResponse.getStatus(), wrappedResponse.getContentAsByteArray());
@@ -134,6 +141,158 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
         Set<String> allowedAuthorities = TOOL_AUTHORITIES.get(toolName);
         return allowedAuthorities != null
                 && authorities.stream().anyMatch(allowedAuthorities::contains);
+    }
+
+    private boolean canUseRequest(String method, JsonNode request, Set<String> authorities) {
+        JsonNode params = request == null ? null : request.path("params");
+        return switch (method) {
+            case "resources/read" -> canUse(resourceTool(text(params, "uri")), authorities);
+            case "prompts/get" -> canGetPrompt(params, authorities);
+            case "completion/complete" -> canCompleteRequest(params, authorities);
+            default -> true;
+        };
+    }
+
+    private boolean canCompleteRequest(JsonNode params, Set<String> authorities) {
+        JsonNode reference = params == null ? null : params.path("ref");
+        if ("ref/resource".equals(text(reference, "type"))) {
+            return canCompleteResource(text(reference, "uri"), authorities);
+        }
+        return canComplete(text(reference, "name"), authorities);
+    }
+
+    private void filterCapabilityDiscovery(
+            String method,
+            JsonNode request,
+            ContentCachingResponseWrapper response,
+            Set<String> authorities)
+            throws IOException {
+        if (!("resources/templates/list".equals(method)
+                || "prompts/list".equals(method)
+                || "completion/complete".equals(method))) {
+            return;
+        }
+        JsonNode jsonResponse = readJson(response.getContentAsByteArray());
+        if (!(jsonResponse instanceof ObjectNode responseObject)
+                || !(responseObject.path("result") instanceof ObjectNode result)) {
+            return;
+        }
+        if ("completion/complete".equals(method)) {
+            filterCompletionValues(request, result, authorities);
+            replaceResponse(response, responseObject);
+            return;
+        }
+        String collection =
+                "resources/templates/list".equals(method) ? "resourceTemplates" : "prompts";
+        if (!(result.path(collection) instanceof ArrayNode entries)) {
+            return;
+        }
+        ArrayNode visibleEntries = objectMapper.createArrayNode();
+        for (JsonNode entry : entries) {
+            boolean visible =
+                    "prompts/list".equals(method)
+                            ? "review_resource".equals(text(entry, "name"))
+                                    && canReadAnyResource(authorities)
+                            : canUse(resourceTool(text(entry, "uriTemplate")), authorities);
+            if (visible) {
+                visibleEntries.add(entry);
+            }
+        }
+        result.set(collection, visibleEntries);
+        replaceResponse(response, responseObject);
+    }
+
+    private boolean canComplete(String promptName, Set<String> authorities) {
+        return "review_resource".equals(promptName) && canReadAnyResource(authorities);
+    }
+
+    private boolean canGetPrompt(JsonNode params, Set<String> authorities) {
+        if (!"review_resource".equals(text(params, "name"))) {
+            return false;
+        }
+        JsonNode arguments = params == null ? null : params.path("arguments");
+        String resourceType = text(arguments, "resourceType");
+        if (resourceType.isEmpty()) {
+            return canReadAnyResource(authorities);
+        }
+        return canUse(
+                resourceTool("kitezh://" + resourceType.toLowerCase(Locale.ROOT) + "/"),
+                authorities);
+    }
+
+    private void filterCompletionValues(
+            JsonNode request, ObjectNode result, Set<String> authorities) {
+        JsonNode completion = result.path("completion");
+        if (!(completion instanceof ObjectNode completionObject)
+                || !(completionObject.path("values") instanceof ArrayNode values)) {
+            return;
+        }
+        JsonNode reference = request == null ? null : request.path("params").path("ref");
+        if ("ref/resource".equals(text(reference, "type"))) {
+            if (!canCompleteResource(text(reference, "uri"), authorities)) {
+                completionObject.set("values", objectMapper.createArrayNode());
+                completionObject.put("total", 0);
+            }
+            return;
+        }
+        ArrayNode visibleValues = objectMapper.createArrayNode();
+        for (JsonNode value : values) {
+            if (!value.isTextual()
+                    || canUse(resourceTool("kitezh://" + value.textValue() + "/"), authorities)) {
+                visibleValues.add(value);
+            }
+        }
+        completionObject.set("values", visibleValues);
+        if (completionObject.has("total")) {
+            completionObject.put("total", visibleValues.size());
+        }
+    }
+
+    private boolean canReadAnyResource(Set<String> authorities) {
+        return canUse("get_user", authorities)
+                || canUse("get_group", authorities)
+                || canUse("get_client", authorities);
+    }
+
+    private boolean canCompleteResource(String uri, Set<String> authorities) {
+        String readTool = resourceTool(uri);
+        String searchTool = resourceSearchTool(uri);
+        return !readTool.isEmpty()
+                && !searchTool.isEmpty()
+                && canUse(readTool, authorities)
+                && canUse(searchTool, authorities);
+    }
+
+    private static String resourceTool(String uri) {
+        if (uri == null) {
+            return "";
+        }
+        if (uri.startsWith("kitezh://users/")) {
+            return "get_user";
+        }
+        if (uri.startsWith("kitezh://groups/")) {
+            return "get_group";
+        }
+        if (uri.startsWith("kitezh://clients/")) {
+            return "get_client";
+        }
+        return "";
+    }
+
+    private static String resourceSearchTool(String uri) {
+        if (uri == null) {
+            return "";
+        }
+        if (uri.startsWith("kitezh://users/")) {
+            return "search_users";
+        }
+        if (uri.startsWith("kitezh://groups/")) {
+            return "search_groups";
+        }
+        if (uri.startsWith("kitezh://clients/")) {
+            return "search_clients";
+        }
+        return "";
     }
 
     private static Set<String> currentAuthorities() {

@@ -71,6 +71,7 @@ app:
     read-only: ${APP_MCP_READ_ONLY:true}
     tools:
       toolsets: ${APP_MCP_TOOLSETS:all}
+      additional-tools: ${APP_MCP_ADDITIONAL_TOOLS:}
       allowlist: ${APP_MCP_TOOL_ALLOWLIST:*}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}

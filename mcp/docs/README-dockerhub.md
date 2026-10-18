@@ -111,7 +111,8 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `APP_CORS_ALLOWED_ORIGINS` | `app://renderer,http://localhost:6274,http://127.0.0.1:6274` | Browser origins allowed by MCP CORS; explicitly listed localhost origins also permit matching localhost Host values |
 | `APP_MCP_READ_ONLY` | `true` | Keep all MCP operations read-only |
 | `APP_MCP_TOOLSETS` | `all` | Enabled server-side toolsets: `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, `signing-keys`; comma-separated, or `all` |
-| `APP_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets and caller roles; `*` allows all names |
+| `APP_MCP_ADDITIONAL_TOOLS` | empty | Exact comma-separated MCP tool names to add to the selected toolsets |
+| `APP_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets, additional tools, and caller roles; `*` allows all names |
 | `APP_LOG_CLIENT_ENABLED` | `false` | Enable redacted outbound HTTP request/response logs |
 | `APP_LOG_CLIENT_LEVEL` | `BASIC` | Outbound detail level: `BASIC`, `HEADERS`, or `FULL` |
 | `APP_LOG_CLIENT_EXCLUDE_PATHS` | empty | Comma-separated path prefixes excluded from outbound logs |
@@ -155,7 +156,7 @@ Keep OTLP authorization headers and deployment credentials in the platform's sec
 
 Inbound and outbound body, header, and parameter redaction follows the shared `APP_LOG_OBFUSCATE_*` settings. Cookie values are protected through the `Cookie` and `Set-Cookie` header rules. Outbound logging is opt-in; `FULL` mode can include non-sensitive response content and should only be used for short diagnostic windows. Inbound access logging defaults to `BASIC`; `HEADERS` and `FULL` add more request details and should be enabled only for short diagnostic windows.
 
-Toolset and allowlist values are operator-controlled deployment settings. The effective catalog is the selected toolset union intersected with `APP_MCP_TOOL_ALLOWLIST` and the caller's role permissions. Client headers and tool arguments cannot widen these server-side limits. An empty allowlist disables all tools.
+Toolset, additional-tools, and allowlist values are operator-controlled deployment settings. The effective catalog is the union of selected toolsets and additional tools, intersected with `APP_MCP_TOOL_ALLOWLIST` and the caller's role permissions. Client headers and tool arguments cannot widen these server-side limits. An empty allowlist disables all tools.
 
 ## Deploy
 

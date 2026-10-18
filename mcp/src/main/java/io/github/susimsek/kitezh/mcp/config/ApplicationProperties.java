@@ -29,7 +29,9 @@ public record ApplicationProperties(
         mcp =
                 mcp == null
                         ? new Mcp(
-                                "https://kitezh-mcp.onrender.com/mcp", true, new Tools("all", "*"))
+                                "https://kitezh-mcp.onrender.com/mcp",
+                                true,
+                                new Tools("all", "", "*"))
                         : mcp;
         cors =
                 cors == null
@@ -64,7 +66,7 @@ public record ApplicationProperties(
 
         @ConstructorBinding
         public Mcp {
-            tools = tools == null ? new Tools("all", "*") : tools;
+            tools = tools == null ? new Tools("all", "", "*") : tools;
         }
     }
 
@@ -76,7 +78,10 @@ public record ApplicationProperties(
         public Cors {}
     }
 
-    public record Tools(@DefaultValue("all") String toolsets, @DefaultValue("*") String allowlist) {
+    public record Tools(
+            @DefaultValue("all") String toolsets,
+            @DefaultValue("") String additionalTools,
+            @DefaultValue("*") String allowlist) {
 
         @ConstructorBinding
         public Tools {}

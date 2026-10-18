@@ -90,7 +90,9 @@ public class McpSecurityConfig {
     @Bean
     McpToolCatalogPolicy mcpToolCatalogPolicy(ApplicationProperties properties) {
         return new McpToolCatalogPolicy(
-                properties.mcp().tools().toolsets(), properties.mcp().tools().allowlist());
+                properties.mcp().tools().toolsets(),
+                properties.mcp().tools().additionalTools(),
+                properties.mcp().tools().allowlist());
     }
 
     private static AuthenticationEntryPoint metadataEntryPoint(String publicUrl) {

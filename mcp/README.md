@@ -28,6 +28,7 @@ Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a
     - [Available toolsets](#available-toolsets)
     - [Tool catalog](#tool-catalog)
     - [Server-side toolsets and allowlist](#server-side-toolsets-and-allowlist)
+- [Resources, prompts and completions](#resources-prompts-and-completions)
 - [Installation guides](docs/installation-guides/README.md)
 - [Verify](#verify)
 - [Render and observability](#render-and-observability)
@@ -280,6 +281,23 @@ These are Kitezh administration toolsets, not a one-to-one copy of GitHub-specif
 
 The server exposes the following 40 read-only tools. Input schemas and required parameters are returned by MCP `tools/list` and may also vary with the caller's role permissions.
 
+## Resources, prompts and completions
+
+The server also exposes read-only MCP resource templates, one reusable review prompt, and completions for resource types and matching resource IDs. Resource visibility, reads, and ID suggestions follow the same configured tool allowlist and role permissions as the corresponding `get_user`, `get_group`, and `get_client` tools. The Admin API receives the caller's bearer token and remains responsible for endpoint authorization.
+
+| Capability | Name or URI | Description |
+| --- | --- | --- |
+| Resource template | `kitezh://users/{userId}` | Read a user summary without credentials. |
+| Resource template | `kitezh://groups/{groupId}` | Read a group summary and safe role information. |
+| Resource template | `kitezh://clients/{clientRecordId}` | Read client configuration without secrets or hashes. |
+| Prompt | `review_resource` | Prepare a read-only review for a user, group, or OAuth client resource. |
+| Completion | `review_resource.resourceType` | Suggests `users`, `groups`, or `clients` based on the typed prefix. |
+| Completion | User, group, and client resource URI arguments | Suggests matching IDs from the first 100 authorized Admin API search results. |
+
+Clients can discover templates with `resources/templates/list`, read an authorized URI with `resources/read`, retrieve the prompt with `prompts/get`, and request argument suggestions with `completion/complete`. Resource reads return JSON and use the same typed Admin API GET operations as the existing tools. No generic URL, database, or write operation is exposed.
+
+Resource ID suggestions are capped at the first 100 results from the corresponding authorized, sorted Admin API listing. The Admin API does not currently filter by internal record ID, so IDs outside that page may not appear in completion results.
+
 | Toolset | Tool | Description |
 | --- | --- | --- |
 | `context` | `get_context` | Get the current operator and Kitezh access summary. |
@@ -325,17 +343,18 @@ The server exposes the following 40 read-only tools. Input schemas and required 
 
 #### Server-side toolsets and allowlist
 
-Operators can limit the catalog for a deployment with `APP_MCP_TOOLSETS` and `APP_MCP_TOOL_ALLOWLIST`. `APP_MCP_TOOLSETS` defaults to `all`; `APP_MCP_TOOL_ALLOWLIST` defaults to `*`, preserving the complete catalog. Supported toolset IDs are `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, and `signing-keys`. Set the toolset variable to a comma-separated selection and the allowlist to the exact comma-separated MCP tool names allowed by that deployment. An empty allowlist disables every tool.
+Operators can configure the catalog with `APP_MCP_TOOLSETS`, `APP_MCP_ADDITIONAL_TOOLS`, and `APP_MCP_TOOL_ALLOWLIST`. `APP_MCP_TOOLSETS` defaults to `all`; `APP_MCP_ADDITIONAL_TOOLS` defaults to empty; and `APP_MCP_TOOL_ALLOWLIST` defaults to `*`, preserving the complete catalog. Supported toolset IDs are `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, and `signing-keys`. Set toolsets to a comma-separated selection, and optionally add exact tool names from other toolsets with `APP_MCP_ADDITIONAL_TOOLS`. The allowlist remains the final exact-name upper bound; an empty allowlist disables every tool.
 
-The effective catalog is the union of the configured toolsets, intersected with the server allowlist and the tools authorized for the caller's roles. These are deployment-side settings. MCP client headers, tool arguments, or client preferences cannot expand the configured catalog; the same authorization policy applies to `tools/list` and direct `tools/call` requests. Tool authorization in the Kitezh Administration API remains authoritative.
+The effective catalog is the union of configured toolsets and additional tools, intersected with the server allowlist and the tools authorized for the caller's roles. These are deployment-side settings. MCP client headers, tool arguments, or client preferences cannot expand the configured catalog; the same authorization policy applies to `tools/list` and direct `tools/call` requests. Tool authorization in the Kitezh Administration API remains authoritative.
 
-Unlike the GitHub MCP Server, Kitezh does not accept per-request headers or URL paths to choose toolsets. Operators configure the catalog at deployment time; the exact-name allowlist can narrow it to individual tools.
+Like GitHub's additive tool selection, operators can combine toolsets with individual tool names. Kitezh configures these at deployment time; its exact-name allowlist can only narrow the resulting catalog.
 
 Example deployment settings:
 
 ```bash
 APP_MCP_TOOLSETS=users,groups
-APP_MCP_TOOL_ALLOWLIST=search_users,get_user,search_groups,get_group
+APP_MCP_ADDITIONAL_TOOLS=get_client,search_events
+APP_MCP_TOOL_ALLOWLIST=search_users,get_user,search_groups,get_group,get_client,search_events
 ```
 
 Use `all` and `*` to keep the full catalog enabled. Toolset names and tool names are validated by the server at startup so configuration mistakes fail visibly.
