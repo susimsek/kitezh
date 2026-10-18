@@ -39,13 +39,13 @@ class KitezhAdminNotificationMcpToolsTest {
                 .isEqualTo(java.util.List.of());
         verify(apiClient)
                 .get(
-                        "kitezh_list_admin_notifications",
+                        "list_admin_notifications",
                         "/api/admin/notifications",
                         Map.of("page", 2, "size", 25, "sort", "createdAt,desc"));
         assertThat(
                         meterRegistry
                                 .get("kitezh_mcp_tool_calls_total")
-                                .tag("tool", "kitezh_list_admin_notifications")
+                                .tag("tool", "list_admin_notifications")
                                 .tag("status", "success")
                                 .counter()
                                 .count())
@@ -57,7 +57,7 @@ class KitezhAdminNotificationMcpToolsTest {
         tools.listAdminNotifications(null, null);
         verify(apiClient)
                 .get(
-                        "kitezh_list_admin_notifications",
+                        "list_admin_notifications",
                         "/api/admin/notifications",
                         Map.of("page", 0, "size", 20, "sort", "createdAt,desc"));
     }
@@ -80,7 +80,7 @@ class KitezhAdminNotificationMcpToolsTest {
         assertThat(
                         meterRegistry
                                 .get("kitezh_mcp_tool_calls_total")
-                                .tag("tool", "kitezh_list_admin_notifications")
+                                .tag("tool", "list_admin_notifications")
                                 .tag("status", "error")
                                 .counter()
                                 .count())
@@ -98,7 +98,7 @@ class KitezhAdminNotificationMcpToolsTest {
         assertThat(
                         meterRegistry
                                 .get("kitezh_mcp_tool_calls_total")
-                                .tag("tool", "kitezh_list_admin_notifications")
+                                .tag("tool", "list_admin_notifications")
                                 .tag("status", "client_error")
                                 .counter()
                                 .count())

@@ -20,7 +20,7 @@ public class KitezhMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_get_context",
+            name = "get_context",
             description = "Get the current operator and Kitezh access summary.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -31,12 +31,11 @@ public class KitezhMcpTools {
                             openWorldHint = false))
     public Map<?, ?> getContext() {
         return measured(
-                "kitezh_get_context",
-                () -> apiClient.get("kitezh_get_context", "/api/admin/whoami", Map.of()));
+                "get_context", () -> apiClient.get("get_context", "/api/admin/whoami", Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_search_users",
+            name = "search_users",
             description = "Search Kitezh users with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -53,12 +52,11 @@ public class KitezhMcpTools {
             @McpToolParam(description = "Zero-based page number.", required = false) Integer page,
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
-        return paged(
-                "kitezh_search_users", "/api/admin/users", q, enabled, page, size, "username,asc");
+        return paged("search_users", "/api/admin/users", q, enabled, page, size, "username,asc");
     }
 
     @McpTool(
-            name = "kitezh_get_user",
+            name = "get_user",
             description = "Get a user summary without credentials or password data.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -69,16 +67,14 @@ public class KitezhMcpTools {
                             openWorldHint = false))
     public Map<?, ?> getUser(@McpToolParam(description = "Internal Kitezh user ID.") Long userId) {
         return measured(
-                "kitezh_get_user",
+                "get_user",
                 () ->
                         apiClient.get(
-                                "kitezh_get_user",
-                                "/api/admin/users/" + positiveId(userId),
-                                Map.of()));
+                                "get_user", "/api/admin/users/" + positiveId(userId), Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_list_user_groups",
+            name = "list_user_groups",
             description = "List the groups assigned to a user.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -96,16 +92,16 @@ public class KitezhMcpTools {
                     Integer size) {
         McpPage paging = McpPage.validated(defaultValue(page, 0), defaultValue(size, 20));
         return measured(
-                "kitezh_list_user_groups",
+                "list_user_groups",
                 () ->
                         apiClient.get(
-                                "kitezh_list_user_groups",
+                                "list_user_groups",
                                 "/api/admin/users/" + positiveId(userId) + "/groups",
                                 pageParameters(paging, "name,asc", q, null)));
     }
 
     @McpTool(
-            name = "kitezh_search_groups",
+            name = "search_groups",
             description = "Search Kitezh groups with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -120,11 +116,11 @@ public class KitezhMcpTools {
             @McpToolParam(description = "Zero-based page number.", required = false) Integer page,
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
-        return paged("kitezh_search_groups", "/api/admin/groups", q, null, page, size, "name,asc");
+        return paged("search_groups", "/api/admin/groups", q, null, page, size, "name,asc");
     }
 
     @McpTool(
-            name = "kitezh_get_group",
+            name = "get_group",
             description = "Get a group summary and its safe role information.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -136,16 +132,14 @@ public class KitezhMcpTools {
     public Map<?, ?> getGroup(
             @McpToolParam(description = "Internal Kitezh group ID.") Long groupId) {
         return measured(
-                "kitezh_get_group",
+                "get_group",
                 () ->
                         apiClient.get(
-                                "kitezh_get_group",
-                                "/api/admin/groups/" + positiveId(groupId),
-                                Map.of()));
+                                "get_group", "/api/admin/groups/" + positiveId(groupId), Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_search_clients",
+            name = "search_clients",
             description = "Search registered Kitezh OAuth clients without secrets.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -160,12 +154,11 @@ public class KitezhMcpTools {
             @McpToolParam(description = "Zero-based page number.", required = false) Integer page,
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
-        return paged(
-                "kitezh_search_clients", "/api/admin/clients", q, null, page, size, "clientId,asc");
+        return paged("search_clients", "/api/admin/clients", q, null, page, size, "clientId,asc");
     }
 
     @McpTool(
-            name = "kitezh_get_client",
+            name = "get_client",
             description = "Get a registered client configuration without secrets or hashes.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -180,16 +173,14 @@ public class KitezhMcpTools {
             throw new IllegalArgumentException("clientRecordId is required");
         }
         return measured(
-                "kitezh_get_client",
+                "get_client",
                 () ->
                         apiClient.get(
-                                "kitezh_get_client",
-                                "/api/admin/clients/" + clientRecordId,
-                                Map.of()));
+                                "get_client", "/api/admin/clients/" + clientRecordId, Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_list_sessions",
+            name = "list_sessions",
             description = "Search browser-session metadata. Tokens are never returned.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -215,12 +206,12 @@ public class KitezhMcpTools {
         addOptional(parameters, "clientId", blankToNull(clientId));
         parameters.put("status", status == null || status.isBlank() ? "active" : status);
         return measured(
-                "kitezh_list_sessions",
-                () -> apiClient.get("kitezh_list_sessions", "/api/admin/sessions", parameters));
+                "list_sessions",
+                () -> apiClient.get("list_sessions", "/api/admin/sessions", parameters));
     }
 
     @McpTool(
-            name = "kitezh_search_events",
+            name = "search_events",
             description = "Search administrative audit events with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -250,8 +241,8 @@ public class KitezhMcpTools {
         addOptional(parameters, "from", blankToNull(from));
         addOptional(parameters, "to", blankToNull(to));
         return measured(
-                "kitezh_search_events",
-                () -> apiClient.get("kitezh_search_events", "/api/admin/events", parameters));
+                "search_events",
+                () -> apiClient.get("search_events", "/api/admin/events", parameters));
     }
 
     private Map<?, ?> paged(

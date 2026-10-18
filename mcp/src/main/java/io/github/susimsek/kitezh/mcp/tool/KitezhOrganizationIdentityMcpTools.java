@@ -26,7 +26,7 @@ public class KitezhOrganizationIdentityMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_list_organization_identity_providers",
+            name = "list_organization_identity_providers",
             description = "List linked identity provider metadata for an organization.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -38,11 +38,11 @@ public class KitezhOrganizationIdentityMcpTools {
     public Map<String, Object> listOrganizationIdentityProviders(
             @McpToolParam(description = "Internal Kitezh organization ID.") Long organizationId) {
         return measured(
-                "kitezh_list_organization_identity_providers",
+                "list_organization_identity_providers",
                 () -> {
                     List<Map<String, Object>> providers =
                             apiClient.getList(
-                                    "kitezh_list_organization_identity_providers",
+                                    "list_organization_identity_providers",
                                     "/api/admin/organizations/"
                                             + positiveId(organizationId)
                                             + "/identity-providers",
@@ -53,7 +53,7 @@ public class KitezhOrganizationIdentityMcpTools {
     }
 
     @McpTool(
-            name = "kitezh_list_organization_claims",
+            name = "list_organization_claims",
             description =
                     "List organization token claim names and destinations without exposing claim values.",
             annotations =
@@ -66,11 +66,11 @@ public class KitezhOrganizationIdentityMcpTools {
     public Map<String, Object> listOrganizationClaims(
             @McpToolParam(description = "Internal Kitezh organization ID.") Long organizationId) {
         return measured(
-                "kitezh_list_organization_claims",
+                "list_organization_claims",
                 () -> {
                     List<Map<String, Object>> claims =
                             apiClient.getList(
-                                    "kitezh_list_organization_claims",
+                                    "list_organization_claims",
                                     "/api/admin/organizations/"
                                             + positiveId(organizationId)
                                             + "/claims",

@@ -48,13 +48,13 @@ class McpToolAuthorizationFilterTest {
                             .getWriter()
                             .write(
                                     "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":["
-                                            + "{\"name\":\"kitezh_search_users\"},"
-                                            + "{\"name\":\"kitezh_search_clients\"}]}}");
+                                            + "{\"name\":\"search_users\"},"
+                                            + "{\"name\":\"search_clients\"}]}}");
                 });
 
         assertThat(response.getContentAsString())
-                .contains("kitezh_search_users")
-                .doesNotContain("kitezh_search_clients");
+                .contains("search_users")
+                .doesNotContain("search_clients");
         assertThat(meterRegistry.find("mcp_server_operation_duration_seconds").timer().count())
                 .isEqualTo(1);
         assertThat(
@@ -71,7 +71,7 @@ class McpToolAuthorizationFilterTest {
         authenticate("ROLE_USER_VIEWER");
         MockHttpServletResponse deniedResponse = new MockHttpServletResponse();
         filter.doFilter(
-                request("tools/call", "kitezh_search_clients"),
+                request("tools/call", "search_clients"),
                 deniedResponse,
                 (ignoredRequest, ignoredResponse) -> {
                     throw new AssertionError("Denied tool must not reach the MCP server");
@@ -81,7 +81,7 @@ class McpToolAuthorizationFilterTest {
                         meterRegistry
                                 .find("mcp_server_operation_duration_seconds")
                                 .tag("method", "tools/call")
-                                .tag("tool_name", "kitezh_search_clients")
+                                .tag("tool_name", "search_clients")
                                 .tag("error_type", "authorization")
                                 .timer())
                 .isNotNull();
@@ -121,7 +121,7 @@ class McpToolAuthorizationFilterTest {
                                 .getWriter()
                                 .write(
                                         "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":["
-                                                + "{\"name\":\"kitezh_search_users\"}]}}"));
+                                                + "{\"name\":\"search_users\"}]}}"));
         assertThat(listResponse.getContentAsString()).contains("\"tools\":[]");
     }
 

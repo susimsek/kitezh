@@ -25,7 +25,7 @@ public class KitezhOrganizationMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_search_organizations",
+            name = "search_organizations",
             description = "Search Kitezh organizations with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -42,17 +42,11 @@ public class KitezhOrganizationMcpTools {
             @McpToolParam(description = "Zero-based page number.", required = false) Integer page,
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
-        return paged(
-                "kitezh_search_organizations",
-                "/api/admin/organizations",
-                q,
-                page,
-                size,
-                "name,asc");
+        return paged("search_organizations", "/api/admin/organizations", q, page, size, "name,asc");
     }
 
     @McpTool(
-            name = "kitezh_get_organization",
+            name = "get_organization",
             description = "Get safe metadata and counts for one Kitezh organization.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -64,17 +58,17 @@ public class KitezhOrganizationMcpTools {
     public Map<?, ?> getOrganization(
             @McpToolParam(description = "Internal Kitezh organization ID.") Long organizationId) {
         return measured(
-                "kitezh_get_organization",
+                "get_organization",
                 () ->
                         sanitize(
                                 apiClient.get(
-                                        "kitezh_get_organization",
+                                        "get_organization",
                                         "/api/admin/organizations/" + positiveId(organizationId),
                                         Map.of())));
     }
 
     @McpTool(
-            name = "kitezh_list_organization_members",
+            name = "list_organization_members",
             description = "List organization membership metadata without member email addresses.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -90,7 +84,7 @@ public class KitezhOrganizationMcpTools {
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
         return organizationPage(
-                "kitezh_list_organization_members",
+                "list_organization_members",
                 "/api/admin/organizations/" + positiveId(organizationId) + "/members",
                 q,
                 page,
@@ -99,7 +93,7 @@ public class KitezhOrganizationMcpTools {
     }
 
     @McpTool(
-            name = "kitezh_list_organization_groups",
+            name = "list_organization_groups",
             description = "List organization-scoped groups with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -115,7 +109,7 @@ public class KitezhOrganizationMcpTools {
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
         return organizationPage(
-                "kitezh_list_organization_groups",
+                "list_organization_groups",
                 "/api/admin/organizations/" + positiveId(organizationId) + "/groups",
                 q,
                 page,
@@ -124,7 +118,7 @@ public class KitezhOrganizationMcpTools {
     }
 
     @McpTool(
-            name = "kitezh_list_organization_domains",
+            name = "list_organization_domains",
             description = "List organization domains without DNS verification secrets.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -136,11 +130,11 @@ public class KitezhOrganizationMcpTools {
     public Map<?, ?> listOrganizationDomains(
             @McpToolParam(description = "Internal Kitezh organization ID.") Long organizationId) {
         return measured(
-                "kitezh_list_organization_domains",
+                "list_organization_domains",
                 () -> {
                     List<Map<String, Object>> domains =
                             apiClient.getList(
-                                    "kitezh_list_organization_domains",
+                                    "list_organization_domains",
                                     "/api/admin/organizations/"
                                             + positiveId(organizationId)
                                             + "/domains",
@@ -150,7 +144,7 @@ public class KitezhOrganizationMcpTools {
     }
 
     @McpTool(
-            name = "kitezh_list_organization_group_members",
+            name = "list_organization_group_members",
             description = "List membership metadata for a group inside an organization.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -167,7 +161,7 @@ public class KitezhOrganizationMcpTools {
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
         return organizationPage(
-                "kitezh_list_organization_group_members",
+                "list_organization_group_members",
                 "/api/admin/organizations/"
                         + positiveId(organizationId)
                         + "/groups/"
@@ -180,7 +174,7 @@ public class KitezhOrganizationMcpTools {
     }
 
     @McpTool(
-            name = "kitezh_list_organization_invitations",
+            name = "list_organization_invitations",
             description =
                     "List organization invitation status metadata without invitee emails or tokens.",
             annotations =
@@ -196,7 +190,7 @@ public class KitezhOrganizationMcpTools {
             @McpToolParam(description = "Page size from 1 to 100.", required = false)
                     Integer size) {
         return organizationPage(
-                "kitezh_list_organization_invitations",
+                "list_organization_invitations",
                 "/api/admin/organizations/" + positiveId(organizationId) + "/invitations",
                 null,
                 page,

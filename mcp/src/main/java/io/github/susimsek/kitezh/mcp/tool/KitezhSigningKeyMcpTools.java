@@ -35,7 +35,7 @@ public class KitezhSigningKeyMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_list_signing_key_metadata",
+            name = "list_signing_key_metadata",
             description =
                     "List paged signing-key metadata. Key bytes and private material are omitted.",
             annotations =
@@ -70,9 +70,7 @@ public class KitezhSigningKeyMcpTools {
                 () -> {
                     Map<?, ?> response =
                             apiClient.get(
-                                    "kitezh_list_signing_key_metadata",
-                                    "/api/admin/keys",
-                                    parameters);
+                                    "list_signing_key_metadata", "/api/admin/keys", parameters);
                     return sanitizePage(response);
                 });
     }
@@ -90,13 +88,13 @@ public class KitezhSigningKeyMcpTools {
                     .counter(
                             "kitezh_mcp_tool_calls_total",
                             "tool",
-                            "kitezh_list_signing_key_metadata",
+                            "list_signing_key_metadata",
                             "status",
                             status)
                     .increment();
             sample.stop(
                     Timer.builder("kitezh_mcp_tool_call_duration_seconds")
-                            .tag("tool", "kitezh_list_signing_key_metadata")
+                            .tag("tool", "list_signing_key_metadata")
                             .register(meterRegistry));
         }
     }

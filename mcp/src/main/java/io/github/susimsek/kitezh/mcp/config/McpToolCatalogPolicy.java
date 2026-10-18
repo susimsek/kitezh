@@ -94,54 +94,54 @@ final class McpToolCatalogPolicy {
         toolsets.put(
                 "users",
                 Set.of(
-                        "kitezh_search_users",
-                        "kitezh_get_user",
-                        "kitezh_search_consents",
-                        "kitezh_list_user_consents",
-                        "kitezh_get_user_consent",
-                        "kitezh_list_sessions",
-                        "kitezh_list_offline_sessions",
-                        "kitezh_list_user_required_actions"));
+                        "search_users",
+                        "get_user",
+                        "search_consents",
+                        "list_user_consents",
+                        "get_user_consent",
+                        "list_sessions",
+                        "list_offline_sessions",
+                        "list_user_required_actions"));
         toolsets.put(
                 "groups",
                 Set.of(
-                        "kitezh_search_groups",
-                        "kitezh_get_group",
-                        "kitezh_list_user_groups",
-                        "kitezh_list_group_members",
-                        "kitezh_get_group_permissions"));
+                        "search_groups",
+                        "get_group",
+                        "list_user_groups",
+                        "list_group_members",
+                        "get_group_permissions"));
         toolsets.put(
                 "clients",
                 Set.of(
-                        "kitezh_search_clients",
-                        "kitezh_get_client",
-                        "kitezh_search_client_scopes",
-                        "kitezh_get_client_scope",
-                        "kitezh_get_client_scope_assignments",
-                        "kitezh_evaluate_client_scopes",
-                        "kitezh_search_client_roles",
-                        "kitezh_get_client_role",
-                        "kitezh_list_client_mappers",
-                        "kitezh_list_client_scope_mappers",
-                        "kitezh_get_service_account"));
-        toolsets.put("roles", Set.of("kitezh_search_roles", "kitezh_get_role"));
-        toolsets.put("events", Set.of("kitezh_search_events"));
+                        "search_clients",
+                        "get_client",
+                        "search_client_scopes",
+                        "get_client_scope",
+                        "get_client_scope_assignments",
+                        "evaluate_client_scopes",
+                        "search_client_roles",
+                        "get_client_role",
+                        "list_client_mappers",
+                        "list_client_scope_mappers",
+                        "get_service_account"));
+        toolsets.put("roles", Set.of("search_roles", "get_role"));
+        toolsets.put("events", Set.of("search_events"));
         toolsets.put(
                 "organizations",
                 Set.of(
-                        "kitezh_search_organizations",
-                        "kitezh_get_organization",
-                        "kitezh_list_organization_members",
-                        "kitezh_list_organization_groups",
-                        "kitezh_list_organization_domains",
-                        "kitezh_list_organization_group_members",
-                        "kitezh_list_organization_invitations",
-                        "kitezh_list_organization_identity_providers",
-                        "kitezh_list_organization_claims"));
-        toolsets.put("context", Set.of("kitezh_get_context"));
-        toolsets.put("dashboard", Set.of("kitezh_get_admin_dashboard_summary"));
-        toolsets.put("notifications", Set.of("kitezh_list_admin_notifications"));
-        toolsets.put("signing-keys", Set.of("kitezh_list_signing_key_metadata"));
+                        "search_organizations",
+                        "get_organization",
+                        "list_organization_members",
+                        "list_organization_groups",
+                        "list_organization_domains",
+                        "list_organization_group_members",
+                        "list_organization_invitations",
+                        "list_organization_identity_providers",
+                        "list_organization_claims"));
+        toolsets.put("context", Set.of("get_context"));
+        toolsets.put("dashboard", Set.of("get_admin_dashboard_summary"));
+        toolsets.put("notifications", Set.of("list_admin_notifications"));
+        toolsets.put("signing-keys", Set.of("list_signing_key_metadata"));
         return Map.copyOf(toolsets);
     }
 }

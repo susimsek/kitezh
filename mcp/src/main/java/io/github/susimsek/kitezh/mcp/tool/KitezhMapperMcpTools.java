@@ -36,7 +36,7 @@ public class KitezhMapperMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_list_client_mappers",
+            name = "list_client_mappers",
             description =
                     "List a registered OAuth client's protocol mappers. Hardcoded mapper values and all unrecognized fields are redacted.",
             annotations =
@@ -56,17 +56,17 @@ public class KitezhMapperMcpTools {
         String recordId = validateId(clientId, "clientId");
         Map<String, Object> parameters = mapperParameters(q, page, size);
         return measured(
-                "kitezh_list_client_mappers",
+                "list_client_mappers",
                 () ->
                         redactPage(
                                 apiClient.get(
-                                        "kitezh_list_client_mappers",
+                                        "list_client_mappers",
                                         "/api/admin/clients/" + recordId + "/mappers",
                                         parameters)));
     }
 
     @McpTool(
-            name = "kitezh_list_client_scope_mappers",
+            name = "list_client_scope_mappers",
             description =
                     "List protocol mappers configured on an OAuth client scope. Hardcoded mapper values and all unrecognized fields are redacted.",
             annotations =
@@ -86,11 +86,11 @@ public class KitezhMapperMcpTools {
         String recordId = validateId(scopeId, "scopeId");
         Map<String, Object> parameters = mapperParameters(q, page, size);
         return measured(
-                "kitezh_list_client_scope_mappers",
+                "list_client_scope_mappers",
                 () ->
                         redactPage(
                                 apiClient.get(
-                                        "kitezh_list_client_scope_mappers",
+                                        "list_client_scope_mappers",
                                         "/api/admin/client-scopes/" + recordId + "/mappers",
                                         parameters)));
     }

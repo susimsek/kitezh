@@ -19,7 +19,7 @@ public class KitezhAdminNotificationMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_list_admin_notifications",
+            name = "list_admin_notifications",
             description =
                     "List the current administrator's privacy-safe notification feed with bounded pagination.",
             annotations =
@@ -35,10 +35,10 @@ public class KitezhAdminNotificationMcpTools {
                     Integer size) {
         McpPage paging = McpPage.validated(page == null ? 0 : page, size == null ? 20 : size);
         return measured(
-                "kitezh_list_admin_notifications",
+                "list_admin_notifications",
                 () ->
                         apiClient.get(
-                                "kitezh_list_admin_notifications",
+                                "list_admin_notifications",
                                 "/api/admin/notifications",
                                 Map.of(
                                         "page",

@@ -39,7 +39,7 @@ class KitezhUserSecurityMcpToolsTest {
                 .containsExactly(Map.of("key", "CONFIGURE_TOTP"));
         verify(apiClient)
                 .getList(
-                        "kitezh_list_user_required_actions",
+                        "list_user_required_actions",
                         "/api/admin/required-actions/users/7",
                         Map.of());
     }
@@ -49,7 +49,7 @@ class KitezhUserSecurityMcpToolsTest {
         assertThat(tools.listOfflineSessions(2, 25).get("content")).isEqualTo(List.of());
         verify(apiClient)
                 .get(
-                        "kitezh_list_offline_sessions",
+                        "list_offline_sessions",
                         "/api/admin/offline-sessions",
                         Map.of("page", 2, "size", 25, "sort", "refreshTokenIssuedAt,desc"));
     }

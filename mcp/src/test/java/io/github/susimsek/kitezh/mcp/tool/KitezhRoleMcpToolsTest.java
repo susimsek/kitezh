@@ -38,7 +38,7 @@ class KitezhRoleMcpToolsTest {
         assertThat(tools.searchRoles("USER", null, null)).isEqualTo(Map.of("result", "ok"));
         verify(apiClient)
                 .get(
-                        "kitezh_search_roles",
+                        "search_roles",
                         "/api/admin/roles",
                         Map.of("page", 0, "size", 20, "sort", "name,asc", "q", "USER"));
     }
@@ -48,7 +48,7 @@ class KitezhRoleMcpToolsTest {
         tools.getRole("ROLE_USER", "alice", true, 1, 25);
         verify(apiClient)
                 .get(
-                        "kitezh_get_role",
+                        "get_role",
                         "/api/admin/roles/ROLE_USER",
                         Map.of(
                                 "page",
@@ -68,13 +68,13 @@ class KitezhRoleMcpToolsTest {
         tools.searchClientRoles("billing-api", "invoice", 2, 40);
         verify(apiClient)
                 .get(
-                        "kitezh_search_client_roles",
+                        "search_client_roles",
                         "/api/admin/clients/billing-api/roles",
                         Map.of("page", 2, "size", 40, "sort", "name,asc", "q", "invoice"));
         tools.getClientRole("billing-api", 7L, "alice", 0, 15);
         verify(apiClient)
                 .get(
-                        "kitezh_get_client_role",
+                        "get_client_role",
                         "/api/admin/clients/billing-api/roles/7",
                         Map.of("page", 0, "size", 15, "sort", "username,asc", "q", "alice"));
     }
@@ -84,16 +84,13 @@ class KitezhRoleMcpToolsTest {
         tools.listGroupMembers(3L, "alice", 1, 30);
         verify(apiClient)
                 .get(
-                        "kitezh_list_group_members",
+                        "list_group_members",
                         "/api/admin/groups/3/users",
                         Map.of("page", 1, "size", 30, "sort", "username,asc", "q", "alice"));
         assertThat(tools.getGroupPermissions(3L))
                 .containsExactly(Map.of("permission", "MANAGE_MEMBERS"));
         verify(apiClient)
-                .getList(
-                        "kitezh_get_group_permissions",
-                        "/api/admin/groups/3/permissions",
-                        Map.of());
+                .getList("get_group_permissions", "/api/admin/groups/3/permissions", Map.of());
     }
 
     @Test
@@ -123,7 +120,7 @@ class KitezhRoleMcpToolsTest {
         assertThat(
                         meterRegistry
                                 .get("kitezh_mcp_tool_calls_total")
-                                .tag("tool", "kitezh_search_roles")
+                                .tag("tool", "search_roles")
                                 .tag("status", "success")
                                 .counter()
                                 .count())

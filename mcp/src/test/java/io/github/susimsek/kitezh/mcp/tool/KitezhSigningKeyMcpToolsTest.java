@@ -69,7 +69,7 @@ class KitezhSigningKeyMcpToolsTest {
                                         "createdAt", "2026-10-17T08:30:00Z")));
         verify(apiClient)
                 .get(
-                        "kitezh_list_signing_key_metadata",
+                        "list_signing_key_metadata",
                         "/api/admin/keys",
                         Map.of("q", "", "page", 0, "size", 20, "sort", "createdAt,desc"));
     }
@@ -84,7 +84,7 @@ class KitezhSigningKeyMcpToolsTest {
 
         verify(apiClient)
                 .get(
-                        "kitezh_list_signing_key_metadata",
+                        "list_signing_key_metadata",
                         "/api/admin/keys",
                         Map.of(
                                 "q",

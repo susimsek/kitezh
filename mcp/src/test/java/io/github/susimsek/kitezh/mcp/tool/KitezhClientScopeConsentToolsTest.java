@@ -34,20 +34,19 @@ class KitezhClientScopeConsentToolsTest {
         assertThat(tools.searchClientScopes("account", 1, 30)).isEqualTo(Map.of("result", "ok"));
         verify(apiClient)
                 .get(
-                        "kitezh_search_client_scopes",
+                        "search_client_scopes",
                         "/api/admin/client-scopes",
                         Map.of("page", 1, "size", 30, "sort", "name,asc", "q", "account"));
 
         tools.searchClientScopes("  ", null, null);
         verify(apiClient)
                 .get(
-                        "kitezh_search_client_scopes",
+                        "search_client_scopes",
                         "/api/admin/client-scopes",
                         Map.of("page", 0, "size", 20, "sort", "name,asc"));
 
         tools.getClientScope("scope_1");
-        verify(apiClient)
-                .get("kitezh_get_client_scope", "/api/admin/client-scopes/scope_1", Map.of());
+        verify(apiClient).get("get_client_scope", "/api/admin/client-scopes/scope_1", Map.of());
     }
 
     @Test
@@ -55,14 +54,14 @@ class KitezhClientScopeConsentToolsTest {
         tools.getClientScopeAssignments("client_1");
         verify(apiClient)
                 .get(
-                        "kitezh_get_client_scope_assignments",
+                        "get_client_scope_assignments",
                         "/api/admin/clients/client_1/scope-assignments",
                         Map.of());
 
         tools.evaluateClientScopes("client_1", "openid profile", "alice");
         verify(apiClient)
                 .get(
-                        "kitezh_evaluate_client_scopes",
+                        "evaluate_client_scopes",
                         "/api/admin/clients/client_1/scope-evaluation",
                         Map.of("scopes", "openid profile", "subject", "alice"));
     }
@@ -72,7 +71,7 @@ class KitezhClientScopeConsentToolsTest {
         tools.searchConsents("alice", "account-console", "alice", "account-api", 2, 40);
         verify(apiClient)
                 .get(
-                        "kitezh_search_consents",
+                        "search_consents",
                         "/api/admin/consents",
                         Map.of(
                                 "page",
@@ -93,16 +92,13 @@ class KitezhClientScopeConsentToolsTest {
         tools.listUserConsents(5L, 0, 10);
         verify(apiClient)
                 .get(
-                        "kitezh_list_user_consents",
+                        "list_user_consents",
                         "/api/admin/users/5/consents",
                         Map.of("page", 0, "size", 10, "sort", "id.registeredClientId,asc"));
 
         tools.getUserConsent("account-console", "alice");
         verify(apiClient)
-                .get(
-                        "kitezh_get_user_consent",
-                        "/api/admin/consents/account-console/alice",
-                        Map.of());
+                .get("get_user_consent", "/api/admin/consents/account-console/alice", Map.of());
     }
 
     @Test

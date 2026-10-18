@@ -185,19 +185,18 @@ class McpServerSecurityIT {
                 .andExpect(status().isOk())
                 .andExpect(
                         jsonPath("$.result.tools[*].name")
-                                .value(org.hamcrest.Matchers.hasItem("kitezh_search_users")))
+                                .value(org.hamcrest.Matchers.hasItem("search_users")))
+                .andExpect(
+                        jsonPath("$.result.tools[*].name")
+                                .value(
+                                        org.hamcrest.Matchers.not(
+                                                org.hamcrest.Matchers.hasItem("search_clients"))))
                 .andExpect(
                         jsonPath("$.result.tools[*].name")
                                 .value(
                                         org.hamcrest.Matchers.not(
                                                 org.hamcrest.Matchers.hasItem(
-                                                        "kitezh_search_clients"))))
-                .andExpect(
-                        jsonPath("$.result.tools[*].name")
-                                .value(
-                                        org.hamcrest.Matchers.not(
-                                                org.hamcrest.Matchers.hasItem(
-                                                        "kitezh_list_signing_key_metadata"))));
+                                                        "list_signing_key_metadata"))));
 
         mockMvc.perform(
                         post("/mcp")
@@ -218,7 +217,7 @@ class McpServerSecurityIT {
                                                                 "ROLE_USER_VIEWER")))
                                 .content(
                                         """
-                                        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"kitezh_search_clients","arguments":{}}}
+                                        {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"search_clients","arguments":{}}}
                                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32601))
@@ -268,7 +267,7 @@ class McpServerSecurityIT {
                                                         new SimpleGrantedAuthority("ROLE_UNKNOWN")))
                                 .content(
                                         """
-                                        {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"kitezh_get_context","arguments":{}}}
+                                        {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_context","arguments":{}}}
                                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32601))
@@ -306,13 +305,12 @@ class McpServerSecurityIT {
                 .andExpect(status().isOk())
                 .andExpect(
                         jsonPath("$.result.tools[*].name")
-                                .value(org.hamcrest.Matchers.hasItem("kitezh_search_users")))
+                                .value(org.hamcrest.Matchers.hasItem("search_users")))
                 .andExpect(
                         jsonPath("$.result.tools[*].name")
                                 .value(
                                         org.hamcrest.Matchers.not(
-                                                org.hamcrest.Matchers.hasItem(
-                                                        "kitezh_search_clients"))));
+                                                org.hamcrest.Matchers.hasItem("search_clients"))));
     }
 
     @Test
@@ -349,7 +347,7 @@ class McpServerSecurityIT {
                                                                 "ROLE_USER_VIEWER")))
                                 .content(
                                         """
-                                        {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"kitezh_search_clients","arguments":{}}}
+                                        {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"search_clients","arguments":{}}}
                                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error.code").value(-32601));
@@ -370,7 +368,7 @@ class McpServerSecurityIT {
                                         containsString(
                                                 "mcp_server_operation_duration_seconds_bucket")))
                 .andExpect(content().string(containsString("method=\"tools/list\"")))
-                .andExpect(content().string(containsString("tool_name=\"kitezh_search_clients\"")))
+                .andExpect(content().string(containsString("tool_name=\"search_clients\"")))
                 .andExpect(content().string(containsString("error_type=\"authorization\"")))
                 .andExpect(
                         content()

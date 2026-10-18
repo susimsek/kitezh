@@ -184,58 +184,58 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
 
     private static Map<String, Set<String>> toolAuthorities() {
         Map<String, Set<String>> authorities = new LinkedHashMap<>();
-        add(authorities, users(), "kitezh_search_users", "kitezh_get_user");
-        add(authorities, groups(), "kitezh_search_groups", "kitezh_get_group");
+        add(authorities, users(), "search_users", "get_user");
+        add(authorities, groups(), "search_groups", "get_group");
         add(
                 authorities,
                 union(groups(), users()),
-                "kitezh_list_user_groups",
-                "kitezh_list_group_members",
-                "kitezh_get_group_permissions");
-        add(authorities, clients(), "kitezh_search_clients", "kitezh_get_client");
+                "list_user_groups",
+                "list_group_members",
+                "get_group_permissions");
+        add(authorities, clients(), "search_clients", "get_client");
         add(
                 authorities,
                 clients(),
-                "kitezh_search_client_scopes",
-                "kitezh_get_client_scope",
-                "kitezh_get_client_scope_assignments",
-                "kitezh_evaluate_client_scopes",
-                "kitezh_search_client_roles",
-                "kitezh_get_client_role",
-                "kitezh_list_client_mappers",
-                "kitezh_list_client_scope_mappers",
-                "kitezh_get_service_account");
+                "search_client_scopes",
+                "get_client_scope",
+                "get_client_scope_assignments",
+                "evaluate_client_scopes",
+                "search_client_roles",
+                "get_client_role",
+                "list_client_mappers",
+                "list_client_scope_mappers",
+                "get_service_account");
         add(
                 authorities,
                 users(),
-                "kitezh_search_consents",
-                "kitezh_list_user_consents",
-                "kitezh_get_user_consent",
-                "kitezh_list_sessions",
-                "kitezh_list_offline_sessions",
-                "kitezh_list_user_required_actions");
+                "search_consents",
+                "list_user_consents",
+                "get_user_consent",
+                "list_sessions",
+                "list_offline_sessions",
+                "list_user_required_actions");
         add(
                 authorities,
                 Set.of(ADMIN, "ROLE_USER_MANAGER", USER_VIEWER),
-                "kitezh_search_roles",
-                "kitezh_get_role");
-        add(authorities, Set.of(ADMIN, EVENT_VIEWER, EVENT_MANAGER), "kitezh_search_events");
+                "search_roles",
+                "get_role");
+        add(authorities, Set.of(ADMIN, EVENT_VIEWER, EVENT_MANAGER), "search_events");
         add(
                 authorities,
                 organizations(),
-                "kitezh_search_organizations",
-                "kitezh_get_organization",
-                "kitezh_list_organization_members",
-                "kitezh_list_organization_groups",
-                "kitezh_list_organization_domains",
-                "kitezh_list_organization_group_members",
-                "kitezh_list_organization_invitations",
-                "kitezh_list_organization_identity_providers",
-                "kitezh_list_organization_claims");
-        add(authorities, Set.of(ADMIN), "kitezh_get_context");
-        add(authorities, Set.of(ADMIN), "kitezh_get_admin_dashboard_summary");
-        add(authorities, Set.of(ADMIN), "kitezh_list_admin_notifications");
-        add(authorities, Set.of(ADMIN), "kitezh_list_signing_key_metadata");
+                "search_organizations",
+                "get_organization",
+                "list_organization_members",
+                "list_organization_groups",
+                "list_organization_domains",
+                "list_organization_group_members",
+                "list_organization_invitations",
+                "list_organization_identity_providers",
+                "list_organization_claims");
+        add(authorities, Set.of(ADMIN), "get_context");
+        add(authorities, Set.of(ADMIN), "get_admin_dashboard_summary");
+        add(authorities, Set.of(ADMIN), "list_admin_notifications");
+        add(authorities, Set.of(ADMIN), "list_signing_key_metadata");
         return Map.copyOf(authorities);
     }
 

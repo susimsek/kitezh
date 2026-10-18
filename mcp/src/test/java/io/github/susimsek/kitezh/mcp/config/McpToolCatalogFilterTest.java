@@ -26,7 +26,7 @@ class McpToolCatalogFilterTest {
         authenticateAdmin();
         McpToolAuthorizationFilter filter = filter("users", "");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        MockHttpServletRequest request = request("tools/call", "kitezh_search_clients");
+        MockHttpServletRequest request = request("tools/call", "search_clients");
 
         filter.doFilter(
                 request,
@@ -55,11 +55,10 @@ class McpToolCatalogFilterTest {
                                 .getWriter()
                                 .write(
                                         "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":["
-                                                + "{\"name\":\"kitezh_search_users\"},"
-                                                + "{\"name\":\"kitezh_search_clients\"}]}}"));
+                                                + "{\"name\":\"search_users\"},"
+                                                + "{\"name\":\"search_clients\"}]}}"));
 
-        assertThat(response.getContentAsString())
-                .doesNotContain("kitezh_search_users", "kitezh_search_clients");
+        assertThat(response.getContentAsString()).doesNotContain("search_users", "search_clients");
     }
 
     private static McpToolAuthorizationFilter filter(String toolsets, String allowlist) {

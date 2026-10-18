@@ -73,10 +73,10 @@ class KitezhMapperMcpToolsTest {
                                         100)));
         verify(apiClient)
                 .get(
-                        "kitezh_list_client_mappers",
+                        "list_client_mappers",
                         "/api/admin/clients/client-1/mappers",
                         Map.of("page", 2, "size", 5, "sort", "name,asc", "q", "Email"));
-        assertThat(counter("kitezh_list_client_mappers", "success")).isEqualTo(1);
+        assertThat(counter("list_client_mappers", "success")).isEqualTo(1);
     }
 
     @Test
@@ -90,10 +90,10 @@ class KitezhMapperMcpToolsTest {
         assertThat(result).containsEntry("content", List.of()).containsEntry("number", 0);
         verify(apiClient)
                 .get(
-                        "kitezh_list_client_scope_mappers",
+                        "list_client_scope_mappers",
                         "/api/admin/client-scopes/scope_1/mappers",
                         Map.of("page", 0, "size", 20, "sort", "name,asc"));
-        assertThat(counter("kitezh_list_client_scope_mappers", "success")).isEqualTo(1);
+        assertThat(counter("list_client_scope_mappers", "success")).isEqualTo(1);
     }
 
     @Test
@@ -135,7 +135,7 @@ class KitezhMapperMcpToolsTest {
         doThrow(error).when(apiClient).get(anyString(), anyString(), anyMap());
 
         assertThatThrownBy(() -> tools.listClientMappers("client", null, 0, 20)).isSameAs(error);
-        assertThat(counter("kitezh_list_client_mappers", "error")).isEqualTo(1);
+        assertThat(counter("list_client_mappers", "error")).isEqualTo(1);
     }
 
     private double counter(String tool, String status) {

@@ -51,7 +51,7 @@ class KitezhOrganizationIdentityMcpToolsTest {
                                         "token")))
                 .when(apiClient)
                 .getList(
-                        "kitezh_list_organization_identity_providers",
+                        "list_organization_identity_providers",
                         "/api/admin/organizations/12/identity-providers",
                         Map.of());
 
@@ -90,9 +90,7 @@ class KitezhOrganizationIdentityMcpToolsTest {
                                         true)))
                 .when(apiClient)
                 .getList(
-                        "kitezh_list_organization_claims",
-                        "/api/admin/organizations/12/claims",
-                        Map.of());
+                        "list_organization_claims", "/api/admin/organizations/12/claims", Map.of());
 
         Map<String, Object> result = tools.listOrganizationClaims(12L);
 
@@ -112,9 +110,7 @@ class KitezhOrganizationIdentityMcpToolsTest {
                                         true)));
         verify(apiClient)
                 .getList(
-                        "kitezh_list_organization_claims",
-                        "/api/admin/organizations/12/claims",
-                        Map.of());
+                        "list_organization_claims", "/api/admin/organizations/12/claims", Map.of());
     }
 
     @Test
@@ -123,9 +119,8 @@ class KitezhOrganizationIdentityMcpToolsTest {
                 .isThrownBy(() -> tools.listOrganizationIdentityProviders(0L));
         assertThatIllegalArgumentException().isThrownBy(() -> tools.listOrganizationClaims(null));
         verifyNoInteractions(apiClient);
-        assertThat(counter("kitezh_list_organization_identity_providers", "client_error"))
-                .isEqualTo(1);
-        assertThat(counter("kitezh_list_organization_claims", "client_error")).isEqualTo(1);
+        assertThat(counter("list_organization_identity_providers", "client_error")).isEqualTo(1);
+        assertThat(counter("list_organization_claims", "client_error")).isEqualTo(1);
     }
 
     @Test
@@ -144,9 +139,8 @@ class KitezhOrganizationIdentityMcpToolsTest {
         assertThatThrownBy(() -> tools.listOrganizationIdentityProviders(12L))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(counter("kitezh_list_organization_claims", "upstream_error")).isEqualTo(1);
-        assertThat(counter("kitezh_list_organization_identity_providers", "internal_error"))
-                .isEqualTo(1);
+        assertThat(counter("list_organization_claims", "upstream_error")).isEqualTo(1);
+        assertThat(counter("list_organization_identity_providers", "internal_error")).isEqualTo(1);
     }
 
     private double counter(String tool, String status) {

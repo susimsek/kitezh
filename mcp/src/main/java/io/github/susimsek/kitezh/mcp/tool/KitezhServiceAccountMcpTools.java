@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class KitezhServiceAccountMcpTools {
 
     private static final String CLIENT_RECORD_ID_PATTERN = "[A-Za-z0-9._~-]{1,128}";
-    private static final String TOOL_NAME = "kitezh_get_service_account";
+    private static final String TOOL_NAME = "get_service_account";
 
     private final KitezhAdminApiClient apiClient;
     private final MeterRegistry meterRegistry;

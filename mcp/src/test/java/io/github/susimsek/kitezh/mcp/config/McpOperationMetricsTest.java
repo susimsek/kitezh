@@ -20,7 +20,7 @@ class McpOperationMetricsTest {
     @Test
     void recordsBoundedToolCallDimensions() {
         McpOperationMetrics.Operation operation =
-                metrics.start("tools/call", "kitezh_search_users", "2025-11-25");
+                metrics.start("tools/call", "search_users", "2025-11-25");
 
         metrics.record(operation, "none");
 
@@ -28,7 +28,7 @@ class McpOperationMetricsTest {
                         meterRegistry
                                 .find(METRIC_NAME)
                                 .tag("method", "tools/call")
-                                .tag("tool_name", "kitezh_search_users")
+                                .tag("tool_name", "search_users")
                                 .tag("protocol_version", "2025-11-25")
                                 .tag("transport", "streamable-http")
                                 .tag("error_type", "none")

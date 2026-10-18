@@ -17,7 +17,7 @@ public class KitezhDashboardMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_get_admin_dashboard_summary",
+            name = "get_admin_dashboard_summary",
             description =
                     "Get aggregate counts of Kitezh clients, users, active browser sessions, and consents.",
             annotations =
@@ -29,12 +29,10 @@ public class KitezhDashboardMcpTools {
                             openWorldHint = false))
     public Map<?, ?> getAdminDashboardSummary() {
         return measured(
-                "kitezh_get_admin_dashboard_summary",
+                "get_admin_dashboard_summary",
                 () ->
                         apiClient.get(
-                                "kitezh_get_admin_dashboard_summary",
-                                "/api/admin/dashboard",
-                                Map.of()));
+                                "get_admin_dashboard_summary", "/api/admin/dashboard", Map.of()));
     }
 
     private <T> T measured(String tool, Supplier<T> operation) {

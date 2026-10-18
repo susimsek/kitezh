@@ -24,7 +24,7 @@ public class KitezhRoleMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_search_roles",
+            name = "search_roles",
             description = "Search realm roles with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -42,12 +42,12 @@ public class KitezhRoleMcpTools {
         McpPage paging = McpPage.validated(defaultValue(page, 0), defaultValue(size, 20));
         Map<String, Object> parameters = pageParameters(paging, "name,asc", q);
         return measured(
-                "kitezh_search_roles",
-                () -> apiClient.get("kitezh_search_roles", "/api/admin/roles", parameters));
+                "search_roles",
+                () -> apiClient.get("search_roles", "/api/admin/roles", parameters));
     }
 
     @McpTool(
-            name = "kitezh_get_role",
+            name = "get_role",
             description = "Get a realm role and its paged user/composite-role summary.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -72,12 +72,12 @@ public class KitezhRoleMcpTools {
             parameters.put("enabled", enabled);
         }
         return measured(
-                "kitezh_get_role",
-                () -> apiClient.get("kitezh_get_role", "/api/admin/roles/" + roleName, parameters));
+                "get_role",
+                () -> apiClient.get("get_role", "/api/admin/roles/" + roleName, parameters));
     }
 
     @McpTool(
-            name = "kitezh_search_client_roles",
+            name = "search_client_roles",
             description = "Search roles owned by one OAuth client with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -97,16 +97,16 @@ public class KitezhRoleMcpTools {
         McpPage paging = McpPage.validated(defaultValue(page, 0), defaultValue(size, 20));
         Map<String, Object> parameters = pageParameters(paging, "name,asc", q);
         return measured(
-                "kitezh_search_client_roles",
+                "search_client_roles",
                 () ->
                         apiClient.get(
-                                "kitezh_search_client_roles",
+                                "search_client_roles",
                                 "/api/admin/clients/" + validatedClientId + "/roles",
                                 parameters));
     }
 
     @McpTool(
-            name = "kitezh_get_client_role",
+            name = "get_client_role",
             description = "Get a client role and its paged users, groups, and composite roles.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -127,10 +127,10 @@ public class KitezhRoleMcpTools {
         McpPage paging = McpPage.validated(defaultValue(page, 0), defaultValue(size, 20));
         Map<String, Object> parameters = pageParameters(paging, "username,asc", q);
         return measured(
-                "kitezh_get_client_role",
+                "get_client_role",
                 () ->
                         apiClient.get(
-                                "kitezh_get_client_role",
+                                "get_client_role",
                                 "/api/admin/clients/"
                                         + validatedClientId
                                         + "/roles/"
@@ -139,7 +139,7 @@ public class KitezhRoleMcpTools {
     }
 
     @McpTool(
-            name = "kitezh_list_group_members",
+            name = "list_group_members",
             description = "List members of a group with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -158,16 +158,16 @@ public class KitezhRoleMcpTools {
         McpPage paging = McpPage.validated(defaultValue(page, 0), defaultValue(size, 20));
         Map<String, Object> parameters = pageParameters(paging, "username,asc", q);
         return measured(
-                "kitezh_list_group_members",
+                "list_group_members",
                 () ->
                         apiClient.get(
-                                "kitezh_list_group_members",
+                                "list_group_members",
                                 "/api/admin/groups/" + positiveId(groupId) + "/users",
                                 parameters));
     }
 
     @McpTool(
-            name = "kitezh_get_group_permissions",
+            name = "get_group_permissions",
             description = "List administrator permission assignments for a group.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -179,10 +179,10 @@ public class KitezhRoleMcpTools {
     public List<Map<String, Object>> getGroupPermissions(
             @McpToolParam(description = "Internal Kitezh group ID.") Long groupId) {
         return measured(
-                "kitezh_get_group_permissions",
+                "get_group_permissions",
                 () ->
                         apiClient.getList(
-                                "kitezh_get_group_permissions",
+                                "get_group_permissions",
                                 "/api/admin/groups/" + positiveId(groupId) + "/permissions",
                                 Map.of()));
     }

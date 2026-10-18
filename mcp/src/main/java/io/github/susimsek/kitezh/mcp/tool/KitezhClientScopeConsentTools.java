@@ -26,7 +26,7 @@ public class KitezhClientScopeConsentTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_search_client_scopes",
+            name = "search_client_scopes",
             description = "Search the Kitezh OAuth client-scope catalogue with bounded pagination.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -45,16 +45,14 @@ public class KitezhClientScopeConsentTools {
         Map<String, Object> parameters = pageParameters(paging, "name,asc");
         addOptional(parameters, "q", validatedOptional(q, MAX_SEARCH_LENGTH, "q"));
         return measured(
-                "kitezh_search_client_scopes",
+                "search_client_scopes",
                 () ->
                         apiClient.get(
-                                "kitezh_search_client_scopes",
-                                "/api/admin/client-scopes",
-                                parameters));
+                                "search_client_scopes", "/api/admin/client-scopes", parameters));
     }
 
     @McpTool(
-            name = "kitezh_get_client_scope",
+            name = "get_client_scope",
             description = "Get one OAuth client-scope catalogue entry.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -67,16 +65,16 @@ public class KitezhClientScopeConsentTools {
             @McpToolParam(description = "Internal client-scope record ID.") String scopeRecordId) {
         String scopeId = validatePathId(scopeRecordId, SCOPE_ID_PATTERN, "scopeRecordId");
         return measured(
-                "kitezh_get_client_scope",
+                "get_client_scope",
                 () ->
                         apiClient.get(
-                                "kitezh_get_client_scope",
+                                "get_client_scope",
                                 "/api/admin/client-scopes/" + scopeId,
                                 Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_get_client_scope_assignments",
+            name = "get_client_scope_assignments",
             description = "Get a client's default, optional, and available OAuth scopes.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -90,16 +88,16 @@ public class KitezhClientScopeConsentTools {
                     String clientRecordId) {
         String clientId = validatePathId(clientRecordId, CLIENT_ID_PATTERN, "clientRecordId");
         return measured(
-                "kitezh_get_client_scope_assignments",
+                "get_client_scope_assignments",
                 () ->
                         apiClient.get(
-                                "kitezh_get_client_scope_assignments",
+                                "get_client_scope_assignments",
                                 "/api/admin/clients/" + clientId + "/scope-assignments",
                                 Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_evaluate_client_scopes",
+            name = "evaluate_client_scopes",
             description =
                     "Preview effective OAuth scopes, mapped claims, and roles without issuing a token.",
             annotations =
@@ -123,16 +121,16 @@ public class KitezhClientScopeConsentTools {
         parameters.put("scopes", validatedOptional(scopes, MAX_SCOPES_LENGTH, "scopes"));
         parameters.put("subject", validatedOptional(subject, 128, "subject"));
         return measured(
-                "kitezh_evaluate_client_scopes",
+                "evaluate_client_scopes",
                 () ->
                         apiClient.get(
-                                "kitezh_evaluate_client_scopes",
+                                "evaluate_client_scopes",
                                 "/api/admin/clients/" + clientId + "/scope-evaluation",
                                 parameters));
     }
 
     @McpTool(
-            name = "kitezh_search_consents",
+            name = "search_consents",
             description = "Search OAuth user consents by client, username, or granted scope.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -162,12 +160,12 @@ public class KitezhClientScopeConsentTools {
         addOptional(parameters, "username", validatedOptional(username, 128, "username"));
         addOptional(parameters, "scope", validatedOptional(scope, 128, "scope"));
         return measured(
-                "kitezh_search_consents",
-                () -> apiClient.get("kitezh_search_consents", "/api/admin/consents", parameters));
+                "search_consents",
+                () -> apiClient.get("search_consents", "/api/admin/consents", parameters));
     }
 
     @McpTool(
-            name = "kitezh_list_user_consents",
+            name = "list_user_consents",
             description = "List OAuth consents granted by a Kitezh user.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -187,16 +185,16 @@ public class KitezhClientScopeConsentTools {
         McpPage paging = McpPage.validated(valueOr(page, 0), valueOr(size, 20));
         Map<String, Object> parameters = pageParameters(paging, "id.registeredClientId,asc");
         return measured(
-                "kitezh_list_user_consents",
+                "list_user_consents",
                 () ->
                         apiClient.get(
-                                "kitezh_list_user_consents",
+                                "list_user_consents",
                                 "/api/admin/users/" + userId + "/consents",
                                 parameters));
     }
 
     @McpTool(
-            name = "kitezh_get_user_consent",
+            name = "get_user_consent",
             description = "Get the scopes and metadata a user consented to for one OAuth client.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -211,10 +209,10 @@ public class KitezhClientScopeConsentTools {
         String validatedClientId = validatePathId(clientId, CLIENT_ID_PATTERN, "clientId");
         String validatedUsername = validatePathId(username, USERNAME_PATTERN, "username");
         return measured(
-                "kitezh_get_user_consent",
+                "get_user_consent",
                 () ->
                         apiClient.get(
-                                "kitezh_get_user_consent",
+                                "get_user_consent",
                                 "/api/admin/consents/"
                                         + validatedClientId
                                         + "/"

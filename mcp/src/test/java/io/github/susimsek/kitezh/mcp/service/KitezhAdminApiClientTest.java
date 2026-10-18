@@ -49,7 +49,7 @@ class KitezhAdminApiClientTest {
         assertThat(
                         (Object)
                                 client.get(
-                                        "kitezh_search_users",
+                                        "search_users",
                                         "/api/admin/users",
                                         java.util.Map.of("q", "alice", "page", 0, "size", 20)))
                 .isNotNull();
@@ -68,12 +68,7 @@ class KitezhAdminApiClientTest {
         server.expect(requestTo("https://kitezh.test/api/admin/whoami"))
                 .andRespond(withServerError());
 
-        assertThatThrownBy(
-                        () ->
-                                client.get(
-                                        "kitezh_get_context",
-                                        "/api/admin/whoami",
-                                        java.util.Map.of()))
+        assertThatThrownBy(() -> client.get("get_context", "/api/admin/whoami", java.util.Map.of()))
                 .isInstanceOf(KitezhAdminApiClient.KitezhApiException.class)
                 .hasMessage("Kitezh API request failed");
         assertThat(
@@ -106,7 +101,7 @@ class KitezhAdminApiClientTest {
 
         assertThat(
                         client.getList(
-                                "kitezh_get_group_permissions",
+                                "get_group_permissions",
                                 "/api/admin/groups/3/permissions",
                                 Map.of()))
                 .containsExactly(
@@ -129,7 +124,7 @@ class KitezhAdminApiClientTest {
         assertThatThrownBy(
                         () ->
                                 client.getList(
-                                        "kitezh_get_group_permissions",
+                                        "get_group_permissions",
                                         "/api/admin/groups/3/permissions",
                                         Map.of()))
                 .isInstanceOf(KitezhAdminApiClient.KitezhApiException.class)
@@ -151,12 +146,7 @@ class KitezhAdminApiClientTest {
                         new SimpleMeterRegistry(),
                         properties("https://kitezh.test"));
 
-        assertThatThrownBy(
-                        () ->
-                                client.get(
-                                        "kitezh_get_context",
-                                        "/api/admin/whoami",
-                                        java.util.Map.of()))
+        assertThatThrownBy(() -> client.get("get_context", "/api/admin/whoami", java.util.Map.of()))
                 .isInstanceOf(KitezhAdminApiClient.KitezhApiException.class)
                 .hasMessage("An authenticated Kitezh user is required");
     }

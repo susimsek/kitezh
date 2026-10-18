@@ -35,14 +35,13 @@ class KitezhDashboardMcpToolsTest {
         doReturn(summary).when(apiClient).get(anyString(), anyString(), anyMap());
 
         assertThat(tools.getAdminDashboardSummary()).isEqualTo(summary);
-        verify(apiClient)
-                .get("kitezh_get_admin_dashboard_summary", "/api/admin/dashboard", Map.of());
+        verify(apiClient).get("get_admin_dashboard_summary", "/api/admin/dashboard", Map.of());
         assertThat(
                         meterRegistry
                                 .counter(
                                         "kitezh_mcp_tool_calls_total",
                                         "tool",
-                                        "kitezh_get_admin_dashboard_summary",
+                                        "get_admin_dashboard_summary",
                                         "status",
                                         "success")
                                 .count())
@@ -60,7 +59,7 @@ class KitezhDashboardMcpToolsTest {
                                 .counter(
                                         "kitezh_mcp_tool_calls_total",
                                         "tool",
-                                        "kitezh_get_admin_dashboard_summary",
+                                        "get_admin_dashboard_summary",
                                         "status",
                                         "error")
                                 .count())

@@ -34,7 +34,7 @@ class KitezhOrganizationMcpToolsTest {
         tools.searchOrganizations("acme", null, null);
         verify(apiClient)
                 .get(
-                        "kitezh_search_organizations",
+                        "search_organizations",
                         "/api/admin/organizations",
                         Map.of("page", 0, "size", 20, "sort", "name,asc", "q", "acme"));
     }
@@ -42,12 +42,12 @@ class KitezhOrganizationMcpToolsTest {
     @Test
     void readsOrganizationAndMembers() {
         tools.getOrganization(4L);
-        verify(apiClient).get("kitezh_get_organization", "/api/admin/organizations/4", Map.of());
+        verify(apiClient).get("get_organization", "/api/admin/organizations/4", Map.of());
 
         tools.listOrganizationMembers(4L, "alice", 1, 25);
         verify(apiClient)
                 .get(
-                        "kitezh_list_organization_members",
+                        "list_organization_members",
                         "/api/admin/organizations/4/members",
                         Map.of("page", 1, "size", 25, "sort", "user.username,asc", "q", "alice"));
     }
@@ -57,14 +57,14 @@ class KitezhOrganizationMcpToolsTest {
         tools.listOrganizationGroups(4L, null, 0, 20);
         verify(apiClient)
                 .get(
-                        "kitezh_list_organization_groups",
+                        "list_organization_groups",
                         "/api/admin/organizations/4/groups",
                         Map.of("page", 0, "size", 20, "sort", "name,asc"));
 
         tools.listOrganizationGroupMembers(4L, 7L, null, null, null);
         verify(apiClient)
                 .get(
-                        "kitezh_list_organization_group_members",
+                        "list_organization_group_members",
                         "/api/admin/organizations/4/groups/7/members",
                         Map.of("page", 0, "size", 20, "sort", "user.username,asc"));
     }
@@ -72,7 +72,7 @@ class KitezhOrganizationMcpToolsTest {
     @Test
     void readsOrganizationDomainsWithoutVerificationSecrets() {
         when(apiClient.getList(
-                        "kitezh_list_organization_domains",
+                        "list_organization_domains",
                         "/api/admin/organizations/4/domains",
                         Map.of()))
                 .thenReturn(
@@ -93,7 +93,7 @@ class KitezhOrganizationMcpToolsTest {
                 .isEqualTo(List.of(Map.of("id", 3, "domain", "example.com", "verified", false)));
         verify(apiClient)
                 .getList(
-                        "kitezh_list_organization_domains",
+                        "list_organization_domains",
                         "/api/admin/organizations/4/domains",
                         Map.of());
     }
@@ -103,7 +103,7 @@ class KitezhOrganizationMcpToolsTest {
         tools.listOrganizationInvitations(4L, 2, 15);
         verify(apiClient)
                 .get(
-                        "kitezh_list_organization_invitations",
+                        "list_organization_invitations",
                         "/api/admin/organizations/4/invitations",
                         Map.of("page", 2, "size", 15, "sort", "createdAt,desc"));
     }
@@ -123,7 +123,7 @@ class KitezhOrganizationMcpToolsTest {
         doReturn(response)
                 .when(apiClient)
                 .get(
-                        "kitezh_list_organization_invitations",
+                        "list_organization_invitations",
                         "/api/admin/organizations/4/invitations",
                         Map.of("page", 0, "size", 20, "sort", "createdAt,desc"));
 

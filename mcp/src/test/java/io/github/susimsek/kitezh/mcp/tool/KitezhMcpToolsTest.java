@@ -30,7 +30,7 @@ class KitezhMcpToolsTest {
     @Test
     void callsContextEndpoint() {
         assertThat(tools.getContext()).isNotNull();
-        verify(apiClient).get("kitezh_get_context", "/api/admin/whoami", Map.of());
+        verify(apiClient).get("get_context", "/api/admin/whoami", Map.of());
     }
 
     @Test
@@ -38,7 +38,7 @@ class KitezhMcpToolsTest {
         tools.searchUsers("alice", true, null, null);
         verify(apiClient)
                 .get(
-                        "kitezh_search_users",
+                        "search_users",
                         "/api/admin/users",
                         Map.of(
                                 "page",
@@ -56,11 +56,11 @@ class KitezhMcpToolsTest {
     @Test
     void readsUserAndGroupsWithValidatedId() {
         tools.getUser(9L);
-        verify(apiClient).get("kitezh_get_user", "/api/admin/users/9", Map.of());
+        verify(apiClient).get("get_user", "/api/admin/users/9", Map.of());
         tools.listUserGroups(9L, "ops", 1, 50);
         verify(apiClient)
                 .get(
-                        "kitezh_list_user_groups",
+                        "list_user_groups",
                         "/api/admin/users/9/groups",
                         Map.of("page", 1, "size", 50, "sort", "name,asc", "q", "ops"));
     }
@@ -70,11 +70,11 @@ class KitezhMcpToolsTest {
         tools.searchGroups("ops", 0, 10);
         verify(apiClient)
                 .get(
-                        "kitezh_search_groups",
+                        "search_groups",
                         "/api/admin/groups",
                         Map.of("page", 0, "size", 10, "sort", "name,asc", "q", "ops"));
         tools.getGroup(3L);
-        verify(apiClient).get("kitezh_get_group", "/api/admin/groups/3", Map.of());
+        verify(apiClient).get("get_group", "/api/admin/groups/3", Map.of());
     }
 
     @Test
@@ -82,11 +82,11 @@ class KitezhMcpToolsTest {
         tools.searchClients("account", 2, 40);
         verify(apiClient)
                 .get(
-                        "kitezh_search_clients",
+                        "search_clients",
                         "/api/admin/clients",
                         Map.of("page", 2, "size", 40, "sort", "clientId,asc", "q", "account"));
         tools.getClient("record_1");
-        verify(apiClient).get("kitezh_get_client", "/api/admin/clients/record_1", Map.of());
+        verify(apiClient).get("get_client", "/api/admin/clients/record_1", Map.of());
     }
 
     @Test
@@ -94,7 +94,7 @@ class KitezhMcpToolsTest {
         tools.listSessions("alice", "account-console", null, 0, 20);
         verify(apiClient)
                 .get(
-                        "kitezh_list_sessions",
+                        "list_sessions",
                         "/api/admin/sessions",
                         Map.of(
                                 "page", 0,
@@ -111,7 +111,7 @@ class KitezhMcpToolsTest {
                 "alice", "user.updated", "user", "9", "2026-01-01T00:00:00Z", null, 0, 20);
         verify(apiClient)
                 .get(
-                        "kitezh_search_events",
+                        "search_events",
                         "/api/admin/events",
                         Map.of(
                                 "page", 0,

@@ -18,7 +18,7 @@ public class KitezhUserSecurityMcpTools {
     private final MeterRegistry meterRegistry;
 
     @McpTool(
-            name = "kitezh_list_user_required_actions",
+            name = "list_user_required_actions",
             description = "List required-action assignments for a manageable Kitezh user.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -31,16 +31,16 @@ public class KitezhUserSecurityMcpTools {
             @McpToolParam(description = "Internal Kitezh user ID.") Long userId) {
         long validatedId = positiveId(userId);
         return measured(
-                "kitezh_list_user_required_actions",
+                "list_user_required_actions",
                 () ->
                         apiClient.getList(
-                                "kitezh_list_user_required_actions",
+                                "list_user_required_actions",
                                 "/api/admin/required-actions/users/" + validatedId,
                                 Map.of()));
     }
 
     @McpTool(
-            name = "kitezh_list_offline_sessions",
+            name = "list_offline_sessions",
             description =
                     "List offline session metadata with bounded pagination; tokens are omitted.",
             annotations =
@@ -56,10 +56,10 @@ public class KitezhUserSecurityMcpTools {
                     Integer size) {
         McpPage paging = McpPage.validated(page == null ? 0 : page, size == null ? 20 : size);
         return measured(
-                "kitezh_list_offline_sessions",
+                "list_offline_sessions",
                 () ->
                         apiClient.get(
-                                "kitezh_list_offline_sessions",
+                                "list_offline_sessions",
                                 "/api/admin/offline-sessions",
                                 Map.of(
                                         "page",

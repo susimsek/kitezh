@@ -39,7 +39,7 @@ class KitezhServiceAccountMcpToolsTest {
                 .isEqualTo("service-account-demo");
         verify(apiClient)
                 .get(
-                        "kitezh_get_service_account",
+                        "get_service_account",
                         "/api/admin/clients/client_1/service-account",
                         Map.of());
         assertThat(toolCalls("success")).isEqualTo(1);
@@ -91,7 +91,7 @@ class KitezhServiceAccountMcpToolsTest {
                 .counter(
                         "kitezh_mcp_tool_calls_total",
                         "tool",
-                        "kitezh_get_service_account",
+                        "get_service_account",
                         "status",
                         status)
                 .count();

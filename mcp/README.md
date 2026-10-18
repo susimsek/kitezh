@@ -282,46 +282,46 @@ The server exposes the following 40 read-only tools. Input schemas and required 
 
 | Toolset | Tool | Description |
 | --- | --- | --- |
-| `context` | `kitezh_get_context` | Get the current operator and Kitezh access summary. |
-| `users` | `kitezh_search_users` | Search users with bounded pagination. |
-| `users` | `kitezh_get_user` | Get a user summary without credentials or password data. |
-| `users` | `kitezh_search_consents` | Search OAuth user consents by client, username, or granted scope. |
-| `users` | `kitezh_list_user_consents` | List OAuth consents granted by a user. |
-| `users` | `kitezh_get_user_consent` | Get the scopes and metadata consented to for one OAuth client. |
-| `users` | `kitezh_list_sessions` | Search browser-session metadata; tokens are never returned. |
-| `users` | `kitezh_list_offline_sessions` | List offline-session metadata; tokens are omitted. |
-| `users` | `kitezh_list_user_required_actions` | List required-action assignments for a manageable user. |
-| `groups` | `kitezh_search_groups` | Search groups with bounded pagination. |
-| `groups` | `kitezh_get_group` | Get a group summary and its safe role information. |
-| `groups` | `kitezh_list_user_groups` | List groups assigned to a user. |
-| `groups` | `kitezh_list_group_members` | List members of a group with bounded pagination. |
-| `groups` | `kitezh_get_group_permissions` | List administrator permission assignments for a group. |
-| `clients` | `kitezh_search_clients` | Search registered OAuth clients without secrets. |
-| `clients` | `kitezh_get_client` | Get client configuration without secrets or hashes. |
-| `clients` | `kitezh_search_client_scopes` | Search the OAuth client-scope catalogue. |
-| `clients` | `kitezh_get_client_scope` | Get one OAuth client-scope catalogue entry. |
-| `clients` | `kitezh_get_client_scope_assignments` | Get a client's default, optional, and available OAuth scopes. |
-| `clients` | `kitezh_evaluate_client_scopes` | Preview effective scopes, mapped claims, and roles without issuing a token. |
-| `clients` | `kitezh_search_client_roles` | Search roles owned by one OAuth client. |
-| `clients` | `kitezh_get_client_role` | Get a client role and its paged users, groups, and composite roles. |
-| `clients` | `kitezh_list_client_mappers` | List client protocol mappers; hardcoded values and unrecognized fields are redacted. |
-| `clients` | `kitezh_list_client_scope_mappers` | List scope protocol mappers; hardcoded values and unrecognized fields are redacted. |
-| `clients` | `kitezh_get_service_account` | Get service-account username and effective roles; credentials and tokens are omitted. |
-| `roles` | `kitezh_search_roles` | Search realm roles with bounded pagination. |
-| `roles` | `kitezh_get_role` | Get a realm role and its paged user/composite-role summary. |
-| `events` | `kitezh_search_events` | Search administrative audit events with bounded pagination. |
-| `organizations` | `kitezh_search_organizations` | Search organizations with bounded pagination. |
-| `organizations` | `kitezh_get_organization` | Get safe organization metadata and counts. |
-| `organizations` | `kitezh_list_organization_members` | List membership metadata without member email addresses. |
-| `organizations` | `kitezh_list_organization_groups` | List organization-scoped groups with bounded pagination. |
-| `organizations` | `kitezh_list_organization_domains` | List organization domains without DNS verification secrets. |
-| `organizations` | `kitezh_list_organization_group_members` | List membership metadata for an organization group. |
-| `organizations` | `kitezh_list_organization_invitations` | List invitation status without invitee emails or tokens. |
-| `organizations` | `kitezh_list_organization_identity_providers` | List linked identity-provider metadata. |
-| `organizations` | `kitezh_list_organization_claims` | List claim names and destinations without claim values. |
-| `dashboard` | `kitezh_get_admin_dashboard_summary` | Get aggregate counts of clients, users, active sessions, and consents. |
-| `notifications` | `kitezh_list_admin_notifications` | List the current administrator's privacy-safe notification feed. |
-| `signing-keys` | `kitezh_list_signing_key_metadata` | List signing-key metadata; key bytes and private material are omitted. |
+| `context` | `get_context` | Get the current operator and Kitezh access summary. |
+| `users` | `search_users` | Search users with bounded pagination. |
+| `users` | `get_user` | Get a user summary without credentials or password data. |
+| `users` | `search_consents` | Search OAuth user consents by client, username, or granted scope. |
+| `users` | `list_user_consents` | List OAuth consents granted by a user. |
+| `users` | `get_user_consent` | Get the scopes and metadata consented to for one OAuth client. |
+| `users` | `list_sessions` | Search browser-session metadata; tokens are never returned. |
+| `users` | `list_offline_sessions` | List offline-session metadata; tokens are omitted. |
+| `users` | `list_user_required_actions` | List required-action assignments for a manageable user. |
+| `groups` | `search_groups` | Search groups with bounded pagination. |
+| `groups` | `get_group` | Get a group summary and its safe role information. |
+| `groups` | `list_user_groups` | List groups assigned to a user. |
+| `groups` | `list_group_members` | List members of a group with bounded pagination. |
+| `groups` | `get_group_permissions` | List administrator permission assignments for a group. |
+| `clients` | `search_clients` | Search registered OAuth clients without secrets. |
+| `clients` | `get_client` | Get client configuration without secrets or hashes. |
+| `clients` | `search_client_scopes` | Search the OAuth client-scope catalogue. |
+| `clients` | `get_client_scope` | Get one OAuth client-scope catalogue entry. |
+| `clients` | `get_client_scope_assignments` | Get a client's default, optional, and available OAuth scopes. |
+| `clients` | `evaluate_client_scopes` | Preview effective scopes, mapped claims, and roles without issuing a token. |
+| `clients` | `search_client_roles` | Search roles owned by one OAuth client. |
+| `clients` | `get_client_role` | Get a client role and its paged users, groups, and composite roles. |
+| `clients` | `list_client_mappers` | List client protocol mappers; hardcoded values and unrecognized fields are redacted. |
+| `clients` | `list_client_scope_mappers` | List scope protocol mappers; hardcoded values and unrecognized fields are redacted. |
+| `clients` | `get_service_account` | Get service-account username and effective roles; credentials and tokens are omitted. |
+| `roles` | `search_roles` | Search realm roles with bounded pagination. |
+| `roles` | `get_role` | Get a realm role and its paged user/composite-role summary. |
+| `events` | `search_events` | Search administrative audit events with bounded pagination. |
+| `organizations` | `search_organizations` | Search organizations with bounded pagination. |
+| `organizations` | `get_organization` | Get safe organization metadata and counts. |
+| `organizations` | `list_organization_members` | List membership metadata without member email addresses. |
+| `organizations` | `list_organization_groups` | List organization-scoped groups with bounded pagination. |
+| `organizations` | `list_organization_domains` | List organization domains without DNS verification secrets. |
+| `organizations` | `list_organization_group_members` | List membership metadata for an organization group. |
+| `organizations` | `list_organization_invitations` | List invitation status without invitee emails or tokens. |
+| `organizations` | `list_organization_identity_providers` | List linked identity-provider metadata. |
+| `organizations` | `list_organization_claims` | List claim names and destinations without claim values. |
+| `dashboard` | `get_admin_dashboard_summary` | Get aggregate counts of clients, users, active sessions, and consents. |
+| `notifications` | `list_admin_notifications` | List the current administrator's privacy-safe notification feed. |
+| `signing-keys` | `list_signing_key_metadata` | List signing-key metadata; key bytes and private material are omitted. |
 
 #### Server-side toolsets and allowlist
 
@@ -335,7 +335,7 @@ Example deployment settings:
 
 ```bash
 APP_MCP_TOOLSETS=users,groups
-APP_MCP_TOOL_ALLOWLIST=kitezh_search_users,kitezh_get_user,kitezh_search_groups,kitezh_get_group
+APP_MCP_TOOL_ALLOWLIST=search_users,get_user,search_groups,get_group
 ```
 
 Use `all` and `*` to keep the full catalog enabled. Toolset names and tool names are validated by the server at startup so configuration mistakes fail visibly.
