@@ -58,10 +58,14 @@ class SocialLoginSecretCipherTest {
         SocialLoginProperties properties = new SocialLoginProperties();
         SocialLoginSecretCipher cipher = new SocialLoginSecretCipher(properties);
 
+        assertThat(cipher.isConfigured()).isFalse();
         assertThatThrownBy(() -> cipher.encrypt("client-secret"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(
                         "SOCIAL_LOGIN_ENCRYPTION_KEY must be configured before saving social"
                                 + " secrets");
+
+        properties.setEncryptionKey("test-encryption-key");
+        assertThat(cipher.isConfigured()).isTrue();
     }
 }

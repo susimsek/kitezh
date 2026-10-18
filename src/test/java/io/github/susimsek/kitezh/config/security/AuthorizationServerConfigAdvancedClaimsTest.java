@@ -28,6 +28,7 @@ import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
@@ -68,6 +69,29 @@ class AuthorizationServerConfigAdvancedClaimsTest {
         assertThat(context.getClaims().build().getClaims())
                 .containsEntry("department", List.of("engineering", "security"))
                 .doesNotContainKey("excluded");
+    }
+
+    @Test
+    void emitsSingleOrganizationClaimAsScalar() {
+        UserRepository userRepository = mock(UserRepository.class);
+        OrganizationClaimRepository claimRepository = mock(OrganizationClaimRepository.class);
+        UserEntity user = new UserEntity();
+        user.setId(42L);
+        user.setUsername("sample-client");
+        when(userRepository.findByUsername("sample-client")).thenReturn(Optional.of(user));
+        when(claimRepository.findEnabledClaimsForUser(42L))
+                .thenReturn(List.of(claim("department", "engineering", true, false, false)));
+
+        JwtEncodingContext context =
+                context(
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        AuthorizationGrantType.AUTHORIZATION_CODE,
+                        Set.of("openid"),
+                        null);
+        config.jwtTokenCustomizer(dependencies(userRepository, claimRepository)).customize(context);
+
+        assertThat(context.getClaims().build().getClaims())
+                .containsEntry("department", "engineering");
     }
 
     @Test
@@ -123,6 +147,120 @@ class AuthorizationServerConfigAdvancedClaimsTest {
                 .containsEntry("aud", List.of("billing-api"));
     }
 
+    @Test
+    void addsRequestedTokenExchangeAudiencesToAccessTokenClaims() {
+        OAuth2TokenExchangeAuthenticationToken grant =
+                new OAuth2TokenExchangeAuthenticationToken(
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        "subject-token",
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        clientPrincipal(),
+                        null,
+                        null,
+                        null,
+                        Set.of("z-api", "a-api"),
+                        Set.of(),
+                        Map.of());
+        JwtEncodingContext context =
+                context(
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE),
+                        Set.of(),
+                        grant);
+
+        config.jwtTokenCustomizer(dependencies(null, null)).customize(context);
+
+        assertThat(context.getClaims().build().getClaims())
+                .containsEntry("aud", List.of("a-api", "z-api"));
+    }
+
+    @Test
+    void defaultsTokenExchangeAudienceToTheRegisteredClient() {
+        OAuth2TokenExchangeAuthenticationToken grant =
+                new OAuth2TokenExchangeAuthenticationToken(
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        "subject-token",
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        clientPrincipal(),
+                        null,
+                        null,
+                        null,
+                        Set.of(),
+                        Set.of(),
+                        Map.of());
+        JwtEncodingContext context =
+                context(
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE),
+                        Set.of(),
+                        grant);
+
+        config.jwtTokenCustomizer(dependencies(null, null)).customize(context);
+
+        assertThat(context.getClaims().build().getClaims())
+                .containsEntry("aud", List.of("sample-client"));
+    }
+
+    @Test
+    void addsCibaAuthenticationAndTokenHashClaimsToIdTokens() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("sample-client")).thenReturn(Optional.empty());
+        CibaAuthenticationGrantAuthenticationToken grant =
+                new CibaAuthenticationGrantAuthenticationToken(
+                        "auth-request-1",
+                        clientPrincipal(),
+                        Map.of(
+                                CibaAuthenticationGrantAuthenticationToken.ACR_VALUES_ATTRIBUTE,
+                                "urn:acr:high urn:acr:low",
+                                CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE,
+                                "access-value",
+                                CibaAuthenticationGrantAuthenticationToken.REFRESH_TOKEN_VALUE,
+                                "refresh-value"));
+        JwtEncodingContext context =
+                context(
+                        new OAuth2TokenType(OidcParameterNames.ID_TOKEN),
+                        new AuthorizationGrantType(AuthorizationGrantTypes.CIBA),
+                        Set.of("openid"),
+                        grant);
+
+        config.jwtTokenCustomizer(dependencies(userRepository, null)).customize(context);
+
+        assertThat(context.getClaims().build().getClaims())
+                .containsEntry(
+                        CibaAuthenticationGrantAuthenticationToken.AUTH_REQ_ID_CLAIM,
+                        "auth-request-1")
+                .containsEntry("acr", "urn:acr:high")
+                .containsKey("at_hash")
+                .containsKey("urn:openid:params:jwt:claim:rt_hash");
+    }
+
+    @Test
+    void selectsCibaTokenHashDigestFromTheSigningAlgorithm() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("sample-client")).thenReturn(Optional.empty());
+        for (SignatureAlgorithm algorithm :
+                List.of(SignatureAlgorithm.RS512, SignatureAlgorithm.ES384)) {
+            CibaAuthenticationGrantAuthenticationToken grant =
+                    new CibaAuthenticationGrantAuthenticationToken(
+                            "auth-request-1",
+                            clientPrincipal(),
+                            Map.of(
+                                    CibaAuthenticationGrantAuthenticationToken.ACCESS_TOKEN_VALUE,
+                                    "access-value"));
+            JwtEncodingContext context =
+                    context(
+                            new OAuth2TokenType(OidcParameterNames.ID_TOKEN),
+                            new AuthorizationGrantType(AuthorizationGrantTypes.CIBA),
+                            Set.of("openid"),
+                            grant,
+                            algorithm);
+
+            config.jwtTokenCustomizer(dependencies(userRepository, null)).customize(context);
+
+            assertThat(context.getClaims().build().getClaims()).containsKey("at_hash");
+        }
+    }
+
     private static AuthorizationServerConfig.JwtTokenCustomizerDependencies dependencies(
             UserRepository userRepository, OrganizationClaimRepository claimRepository) {
         return new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
@@ -145,6 +283,15 @@ class AuthorizationServerConfigAdvancedClaimsTest {
             AuthorizationGrantType grantType,
             Set<String> scopes,
             Authentication authorizationGrant) {
+        return context(tokenType, grantType, scopes, authorizationGrant, SignatureAlgorithm.RS256);
+    }
+
+    private static JwtEncodingContext context(
+            OAuth2TokenType tokenType,
+            AuthorizationGrantType grantType,
+            Set<String> scopes,
+            Authentication authorizationGrant,
+            SignatureAlgorithm algorithm) {
         RegisteredClient registeredClient =
                 RegisteredClient.withId("client-id")
                         .clientId("sample-client")
@@ -159,8 +306,7 @@ class AuthorizationServerConfigAdvancedClaimsTest {
                         .build();
         Authentication principal = clientPrincipal();
         JwtEncodingContext.Builder builder =
-                JwtEncodingContext.with(
-                                JwsHeader.with(SignatureAlgorithm.RS256), JwtClaimsSet.builder())
+                JwtEncodingContext.with(JwsHeader.with(algorithm), JwtClaimsSet.builder())
                         .registeredClient(registeredClient)
                         .principal(principal)
                         .authorizedScopes(scopes)

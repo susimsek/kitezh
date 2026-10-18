@@ -126,6 +126,131 @@ class TokenExchangeAuthenticationProviderTest {
     }
 
     @Test
+    void rejectsExchangeWhenTheDelegatedAuthorizationWasNotSaved() {
+        RegisteredClient client = client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        TestingAuthenticationToken principal = new TestingAuthenticationToken("service", null);
+        OAuth2Authorization subjectAuthorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("service")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of("openid"))
+                        .accessToken(accessToken("subject"))
+                        .build();
+        when(authorizationService.findByToken("subject", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(subjectAuthorization);
+        when(tokenGenerator.generate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(accessToken("exchanged-access"));
+        when(authorizationService.findByToken("exchanged-access", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(null);
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+
+        assertThatThrownBy(
+                        () ->
+                                provider()
+                                        .authenticate(
+                                                requestWithRequestedType(
+                                                        client,
+                                                        "urn:ietf:params:oauth:token-type:id_token",
+                                                        Set.of(OidcScopes.OPENID))))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("server_error"));
+    }
+
+    @Test
+    void rejectsRefreshRequestWhenTokenGeneratorReturnsAnAccessToken() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                        .build();
+        TestingAuthenticationToken principal = new TestingAuthenticationToken("service", null);
+        OAuth2Authorization subjectAuthorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("service")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of(OidcScopes.OPENID))
+                        .accessToken(accessToken("subject"))
+                        .build();
+        OAuth2AccessToken exchangedAccessToken = accessToken("exchanged-access");
+        OAuth2Authorization exchangedAuthorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .principalName("service")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of(OidcScopes.OPENID))
+                        .accessToken(exchangedAccessToken)
+                        .build();
+        when(authorizationService.findByToken("subject", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(subjectAuthorization);
+        when(authorizationService.findByToken("exchanged-access", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(exchangedAuthorization);
+        when(tokenGenerator.generate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(exchangedAccessToken);
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+
+        assertThatThrownBy(
+                        () ->
+                                provider()
+                                        .authenticate(
+                                                requestWithRequestedType(
+                                                        client,
+                                                        "urn:ietf:params:oauth:token-type:refresh_token",
+                                                        Set.of(OidcScopes.OPENID))))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("server_error"));
+    }
+
+    @Test
+    void allowsUserAuthorizationExchangeWhenConsentCoversTheGrantedScopes() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .clientSettings(
+                                ClientSettings.builder().requireAuthorizationConsent(true).build())
+                        .build();
+        TestingAuthenticationToken principal = new TestingAuthenticationToken("alice", null);
+        OAuth2Authorization subjectAuthorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .principalName("alice")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of("openid"))
+                        .accessToken(accessToken("subject"))
+                        .build();
+        when(authorizationService.findByToken("subject", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(subjectAuthorization);
+        OAuth2AuthorizationConsentService consentService =
+                mock(OAuth2AuthorizationConsentService.class);
+        when(consentService.findById(client.getId(), "alice"))
+                .thenReturn(
+                        org.springframework.security.oauth2.server.authorization
+                                .OAuth2AuthorizationConsent.withId(client.getId(), "alice")
+                                .scope("openid")
+                                .build());
+        TokenExchangeAuthenticationProvider provider =
+                new TokenExchangeAuthenticationProvider(
+                        authorizationService, clientRepository, consentService, tokenGenerator);
+        when(tokenGenerator.generate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(accessToken("exchanged-access"));
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+
+        assertThat(provider.authenticate(request(client, null, Set.of())))
+                .isInstanceOf(OAuth2AccessTokenAuthenticationToken.class);
+        verify(consentService).findById(client.getId(), "alice");
+    }
+
+    @Test
     void issuesAndReturnsAnIdTokenWhenRequested() {
         RegisteredClient client = client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
         TestingAuthenticationToken principal = new TestingAuthenticationToken("service", null);
@@ -394,6 +519,58 @@ class TokenExchangeAuthenticationProviderTest {
                                 assertThat(((OAuth2AuthenticationException) exception).getError())
                                         .extracting(OAuth2Error::getErrorCode)
                                         .isEqualTo("access_denied"));
+    }
+
+    @Test
+    void acceptsStringSubjectAudienceAndAnAllowedTokenExchangeTarget() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("requester", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .clientSettings(
+                                ClientSettings.withSettings(
+                                                Map.of(
+                                                        ClientSecuritySettings
+                                                                .TOKEN_EXCHANGE_ALLOWED_AUDIENCES,
+                                                        Set.of("reports-api")))
+                                        .build())
+                        .build();
+        RegisteredClient subjectClient =
+                RegisteredClient.withId("subject-client-id")
+                        .clientId("subject-client")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .build();
+        RegisteredClient target =
+                RegisteredClient.withId("reports-client-id")
+                        .clientId("reports-api")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .build();
+        TestingAuthenticationToken principal = new TestingAuthenticationToken("service", null);
+        OAuth2AccessToken subjectToken = accessToken("subject");
+        OAuth2Authorization subjectAuthorization =
+                OAuth2Authorization.withRegisteredClient(subjectClient)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("service")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of("openid"))
+                        .token(
+                                subjectToken,
+                                metadata ->
+                                        metadata.put(
+                                                OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
+                                                Map.of("aud", "requester")))
+                        .build();
+        when(authorizationService.findByToken("subject", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(subjectAuthorization);
+        when(clientRepository.findByClientId("reports-api")).thenReturn(target);
+        when(tokenGenerator.generate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(accessToken("exchanged-access"));
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+
+        assertThat(provider().authenticate(request(client, null, Set.of("reports-api"))))
+                .isInstanceOf(OAuth2AccessTokenAuthenticationToken.class);
     }
 
     @Test

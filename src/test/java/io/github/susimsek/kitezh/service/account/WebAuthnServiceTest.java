@@ -61,6 +61,21 @@ class WebAuthnServiceTest {
     }
 
     @Test
+    void returnsEmptyPageWhenOffsetIsBeyondCredentialCount() {
+        UserEntity user = user();
+        CredentialRecord record =
+                credential(Bytes.random(), WebAuthnUserEntityRepository.userHandle(7L));
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(credentialRepository.findByUserId(WebAuthnUserEntityRepository.userHandle(7L)))
+                .thenReturn(List.of(record));
+
+        var result = service().credentials("alice", PageRequest.of(3, 1));
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
     void deletesOnlyCredentialsOwnedByTheAccount() {
         UserEntity user = user();
         Bytes credentialId = Bytes.random();
