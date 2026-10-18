@@ -405,7 +405,7 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
+    continue-on-error: false
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -473,6 +473,7 @@ jobs:
           ./mvnw -B -ntp -Psonar initialize sonar:sonar \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=susimsek \
+            -Dsonar.qualitygate.wait=true \
             -Dsonar.token="${SONAR_TOKEN}"
 
   native-image:
