@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@/testing/native-testing-library";
+import * as ReactNative from "react-native";
 import { AppState, Platform, StyleSheet } from "react-native";
 import * as Localization from "expo-localization";
 import * as SecureStore from "expo-secure-store";
@@ -14,6 +15,7 @@ import SettingsScreen from "@/app/settings";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { colors } from "@/theme/tokens";
+import { getMobileApiLocale } from "@/i18n/api-locale";
 import type { MobileRelease } from "@/updates/release-check";
 
 const mockStoredPreferences = new Map<string, string>();
@@ -110,7 +112,7 @@ it("updates locale and theme immediately, exposes native radio state, and restor
   const firstRender = renderSettings();
   expect(await screen.findByText("Settings")).toBeTruthy();
   expect(screen.getByTestId("settings-locale-system").props.accessibilityState)
-    .toEqual({ selected: true });
+    .toEqual(expect.objectContaining({ selected: true }));
 
   fireEvent.press(screen.getByTestId("settings-locale-turkish"));
   expect(await screen.findByText("Ayarlar")).toBeTruthy();
@@ -135,9 +137,9 @@ it("updates locale and theme immediately, exposes native radio state, and restor
   renderSettings();
   expect(await screen.findByText("Ayarlar")).toBeTruthy();
   expect(screen.getByTestId("settings-locale-turkish").props.accessibilityState)
-    .toEqual({ selected: true });
+    .toEqual(expect.objectContaining({ selected: true }));
   expect(screen.getByTestId("settings-theme-dark").props.accessibilityState)
-    .toEqual({ selected: true });
+    .toEqual(expect.objectContaining({ selected: true }));
   expect(
     StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
       .backgroundColor,
@@ -157,8 +159,8 @@ it("resets the saved locale and theme back to system preferences", async () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("kitezh.mobile.locale");
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("kitezh.mobile.theme");
   });
-  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual({ selected: true });
-  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
 });
 
 it("keeps settings usable when resetting secure preferences fails", async () => {
@@ -182,8 +184,8 @@ it("falls back to system preferences when secure storage cannot be read", async 
   renderSettings();
 
   expect(await screen.findByText("Settings")).toBeTruthy();
-  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual({ selected: true });
-  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("settings-locale-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
+  expect(screen.getByTestId("settings-theme-system").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
 });
 
 it("refreshes the system language when the app becomes active", async () => {
@@ -201,10 +203,45 @@ it("refreshes the system language when the app becomes active", async () => {
 
   act(() => onChange?.("active"));
   expect(await screen.findByText("Ayarlar")).toBeTruthy();
+  expect(getMobileApiLocale()).toBe("tr");
 
   rendered.unmount();
   addListener.mockRestore();
   getLocales.mockRestore();
+});
+
+it("tracks a system appearance change while the saved theme is system", async () => {
+  const useColorScheme = jest
+    .spyOn(ReactNative, "useColorScheme")
+    .mockReturnValue("light");
+  const rendered = renderSettings();
+  const tree = (
+    <ThemeProvider>
+      <LocaleProvider>
+        <SettingsScreen />
+      </LocaleProvider>
+    </ThemeProvider>
+  );
+
+  try {
+    expect(await screen.findByText("Settings")).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
+        .backgroundColor,
+    ).toBe(colors.light.background);
+
+    useColorScheme.mockReturnValue("dark");
+    rendered.rerender(tree);
+
+    await waitFor(() =>
+      expect(
+        StyleSheet.flatten(screen.getByTestId("settings-screen").props.style)
+          .backgroundColor,
+      ).toBe(colors.dark.background),
+    );
+  } finally {
+    useColorScheme.mockRestore();
+  }
 });
 
 it.each([

@@ -10,4 +10,8 @@ public record CaptchaTokenPropertiesDTO(
                         description = "Whether the token is valid.",
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 boolean valid,
-        @Schema(description = "Resolved action.", nullable = true) String action) {}
+        @Schema(description = "Resolved action.", nullable = true) String action,
+        @Schema(description = "Verified Android application package.", nullable = true)
+                String androidPackageName,
+        @Schema(description = "Verified iOS application bundle identifier.", nullable = true)
+                String iosBundleId) {}

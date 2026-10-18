@@ -1,0 +1,45 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- tapOn: "Settings|Ayarlar"
+- tapOn: "English|İngilizce"
+- tapOn: "Back|Geri"
+- tapOn: "Continue|Devam et"
+- tapOn: "Sign in"
+- tapOn:
+    text: "Use without an account"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn: "Continue with fixture account"
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- assertVisible: "fixture-user"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- assertVisible: "fixture-user"
+- scroll
+- assertVisible: "Sign out"
+- tapOn: "Sign out"
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 180000
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- assertVisible: "Continue|Devam et"

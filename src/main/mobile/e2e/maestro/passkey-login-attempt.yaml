@@ -1,0 +1,32 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- tapOn: "Continue|Devam et"
+- tapOn: "Sign in"
+- tapOn:
+    text: "Username"
+    optional: true
+- tapOn:
+    text: "Use without an account"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- assertVisible: "Sign in with a passkey"
+- tapOn: "Username"
+- inputText: "fixture-user"
+- tapOn: "Sign in with a passkey"
+- tapOn:
+    text: "Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible: "Passkey sign-in failed or was cancelled. Try again."
+    timeout: 60000

@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AccountApiError,
+  beginAccountPasskeyEnrollment,
   changeAccountPassword,
+  completeAccountPasskeyEnrollment,
   createPersonalAccessToken,
   completeNativeSocialLink,
   decideCibaRequest,
+  approveCibaRequestWithMfa,
   deleteAccount,
   generateRecoveryCodes,
   getAccountProfile,
@@ -41,6 +44,45 @@ import {
 import { installAxiosFetchMockCompatibility } from "../testing/axios-fetch-mock.ts";
 
 installAxiosFetchMockCompatibility();
+
+test("account passkey registration uses an authenticated one-time challenge contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: input.toString(), init });
+    return requests.length === 1
+      ? Response.json({ challengeId: "challenge/one", publicKey: { challenge: "server" } })
+      : new Response(null, { status: 204 });
+  };
+
+  try {
+    const options = await beginAccountPasskeyEnrollment("account-token");
+    await completeAccountPasskeyEnrollment(
+      "account-token",
+      options.challengeId,
+      {
+        id: "credential-id", rawId: "credential-id", type: "public-key",
+        authenticatorAttachment: "platform", clientExtensionResults: {},
+        response: { attestationObject: "attestation", clientDataJSON: "client-data" },
+      },
+      "My phone",
+    );
+    assert.equal(new URL(requests[0]!.url).pathname, "/api/account/webauthn/registration-options");
+    assert.equal(requests[0]!.init?.method, "POST");
+    assert.equal(new Headers(requests[0]!.init?.headers).get("Authorization"), "Bearer account-token");
+    assert.equal(new URL(requests[1]!.url).pathname, "/api/account/webauthn/registration/challenge%2Fone");
+    assert.equal(requests[1]!.init?.body, JSON.stringify({
+      credential: {
+        id: "credential-id", rawId: "credential-id", type: "public-key",
+        authenticatorAttachment: "platform", clientExtensionResults: {},
+        response: { attestationObject: "attestation", clientDataJSON: "client-data" },
+      },
+      label: "My phone",
+    }));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("profile attributes use the authenticated account contract", async () => {
   const originalFetch = globalThis.fetch;
@@ -309,6 +351,38 @@ test("CIBA requests use the authenticated account API and preserve encoded IDs",
         },
       ],
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("native CIBA MFA approval sends the TOTP only in the authenticated request body", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: { url: string; init?: RequestInit }[] = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: input.toString(), init });
+    return new Response(null, { status: 204 });
+  };
+
+  try {
+    await approveCibaRequestWithMfa(
+      "access-token",
+      { authReqId: "request/one", userCode: "K7P4M2Q9" },
+      "123456",
+    );
+    const captured = requests[0];
+    assert.ok(captured);
+    assert.equal(
+      new URL(captured.url).pathname,
+      "/api/ciba/requests/request%2Fone/approve/native",
+    );
+    assert.equal(new URL(captured.url).search, "?user_code=K7P4M2Q9");
+    assert.equal(captured.init?.method, "POST");
+    assert.equal(
+      new Headers(captured.init?.headers).get("Authorization"),
+      "Bearer access-token",
+    );
+    assert.equal(captured.init?.body, JSON.stringify({ code: "123456" }));
   } finally {
     globalThis.fetch = originalFetch;
   }

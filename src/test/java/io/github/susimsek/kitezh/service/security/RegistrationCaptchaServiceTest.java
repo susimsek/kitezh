@@ -7,7 +7,9 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import io.github.susimsek.kitezh.config.MobileCaptchaProperties;
 import io.github.susimsek.kitezh.config.http.HttpServiceClientFactory;
+import io.github.susimsek.kitezh.dto.account.MobileLoginPlatform;
 import io.github.susimsek.kitezh.service.client.RegistrationCaptchaClient;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -103,6 +105,82 @@ class RegistrationCaptchaServiceTest {
                                         org.mockito.Mockito.mock(HttpServletRequest.class)))
                 .hasFieldOrPropertyWithValue("errorCodeValue", "captcha_failed");
         server.verify();
+    }
+
+    @Test
+    void verifiesNativeEnterpriseTokenAgainstPlatformKeyActionAndPackage() {
+        RestClient.Builder restClientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+        server.expect(
+                        requestTo(
+                                org.hamcrest.Matchers.containsString(
+                                        "projects/project/assessments?key=api-key")))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(
+                        withSuccess(
+                                "{\"tokenProperties\":{\"valid\":true,\"action\":\"login\","
+                                    + "\"androidPackageName\":\"io.github.susimsek.kitezh.mobile\"},"
+                                    + "\"riskAnalysis\":{\"score\":0.99},"
+                                    + "\"event\":{\"expectedAction\":\"login\"}}",
+                                org.springframework.http.MediaType.APPLICATION_JSON));
+        RegistrationCaptchaService service =
+                service(
+                        new RegistrationCaptchaConfiguration(
+                                true,
+                                "enterprise",
+                                "browser-key",
+                                "",
+                                "project",
+                                "api-key",
+                                "login",
+                                true,
+                                0.7,
+                                false),
+                        HttpServiceClientFactory.create(
+                                RegistrationCaptchaClient.class, restClientBuilder.build()),
+                        new MobileCaptchaProperties(
+                                "android-mobile-key",
+                                "ios-mobile-key",
+                                "io.github.susimsek.kitezh.mobile",
+                                "io.github.susimsek.kitezh.mobile"));
+
+        service.verifyMobileLoginOrThrow(
+                "native-token",
+                MobileLoginPlatform.ANDROID,
+                Mockito.mock(HttpServletRequest.class));
+
+        server.verify();
+    }
+
+    @Test
+    void rejectsNativeCaptchaWhenTheConfiguredKeyIsAWebProvider() {
+        RegistrationCaptchaService service =
+                service(
+                        new RegistrationCaptchaConfiguration(
+                                true,
+                                "recaptcha",
+                                "browser-site-key",
+                                "browser-secret",
+                                "project",
+                                "api-key",
+                                "login",
+                                true,
+                                0.7,
+                                false),
+                        Mockito.mock(RegistrationCaptchaClient.class),
+                        new MobileCaptchaProperties(
+                                "android-mobile-key",
+                                "ios-mobile-key",
+                                "io.github.susimsek.kitezh.mobile",
+                                "io.github.susimsek.kitezh.mobile"));
+
+        assertThatThrownBy(
+                        () ->
+                                service.verifyMobileLoginOrThrow(
+                                        "browser-token",
+                                        MobileLoginPlatform.ANDROID,
+                                        Mockito.mock(HttpServletRequest.class)))
+                .hasFieldOrPropertyWithValue("errorCodeValue", "captcha_failed");
     }
 
     @Test
@@ -598,7 +676,9 @@ class RegistrationCaptchaServiceTest {
                 .thenReturn(loginConfiguration);
         RegistrationCaptchaService service =
                 new RegistrationCaptchaService(
-                        settingsService, Mockito.mock(RegistrationCaptchaClient.class));
+                        settingsService,
+                        Mockito.mock(RegistrationCaptchaClient.class),
+                        new MobileCaptchaProperties());
 
         assertThat(service.publicSettings().enabled()).isTrue();
         assertThat(service.publicLoginSettings().enabled()).isFalse();
@@ -646,13 +726,28 @@ class RegistrationCaptchaServiceTest {
     private static RegistrationCaptchaService service(
             RegistrationCaptchaConfiguration configuration,
             RegistrationCaptchaClient captchaClient) {
+        return service(
+                configuration,
+                captchaClient,
+                new MobileCaptchaProperties(
+                        "",
+                        "",
+                        "io.github.susimsek.kitezh.mobile",
+                        "io.github.susimsek.kitezh.mobile"));
+    }
+
+    private static RegistrationCaptchaService service(
+            RegistrationCaptchaConfiguration configuration,
+            RegistrationCaptchaClient captchaClient,
+            MobileCaptchaProperties mobileCaptchaProperties) {
         RegistrationCaptchaSettingsService settingsService =
                 Mockito.mock(RegistrationCaptchaSettingsService.class);
         Mockito.when(settingsService.publicConfiguration()).thenReturn(configuration);
         Mockito.when(settingsService.verificationConfiguration()).thenReturn(configuration);
         Mockito.when(settingsService.loginPublicConfiguration()).thenReturn(configuration);
         Mockito.when(settingsService.loginVerificationConfiguration()).thenReturn(configuration);
-        return new RegistrationCaptchaService(settingsService, captchaClient);
+        return new RegistrationCaptchaService(
+                settingsService, captchaClient, mobileCaptchaProperties);
     }
 
     private static RegistrationCaptchaService service(

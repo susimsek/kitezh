@@ -12,12 +12,20 @@ type PublicErrorMessageKey =
   | "apiTimeout"
   | "apiUnauthorized"
   | "apiForbidden"
-  | "apiValidation";
+  | "apiValidation"
+  | "apiCancelled"
+  | "apiConflict"
+  | "apiRateLimited"
+  | "apiUnavailable"
+  | "apiServer"
+  | "apiHttp";
 
-export function publicErrorMessage(
+type ApiErrorMessages = Pick<Dictionary, PublicErrorMessageKey>;
+
+export function apiErrorMessage(
   kind: ApiErrorKind | undefined,
-  dictionary: Pick<Dictionary, PublicErrorMessageKey>,
-  fallback: PublicErrorFallback,
+  dictionary: ApiErrorMessages,
+  fallback: string,
 ): string {
   switch (kind) {
     case "offline":
@@ -30,7 +38,27 @@ export function publicErrorMessage(
       return dictionary.apiForbidden;
     case "validation":
       return dictionary.apiValidation;
+    case "cancelled":
+      return dictionary.apiCancelled;
+    case "conflict":
+      return dictionary.apiConflict;
+    case "rate-limited":
+      return dictionary.apiRateLimited;
+    case "unavailable":
+      return dictionary.apiUnavailable;
+    case "server":
+      return dictionary.apiServer;
+    case "http":
+      return dictionary.apiHttp;
     default:
-      return dictionary[fallback];
+      return fallback;
   }
+}
+
+export function publicErrorMessage(
+  kind: ApiErrorKind | undefined,
+  dictionary: ApiErrorMessages,
+  fallback: PublicErrorFallback,
+): string {
+  return apiErrorMessage(kind, dictionary, dictionary[fallback]);
 }

@@ -5,6 +5,7 @@ import io.github.susimsek.kitezh.dto.account.AccountApplicationDTO;
 import io.github.susimsek.kitezh.dto.account.AccountAvatarDTO;
 import io.github.susimsek.kitezh.dto.account.AccountDeleteRequestDTO;
 import io.github.susimsek.kitezh.dto.account.AccountOfflineSessionDTO;
+import io.github.susimsek.kitezh.dto.account.AccountPasskeyRegistrationOptionsDTO;
 import io.github.susimsek.kitezh.dto.account.AccountPasswordRequestDTO;
 import io.github.susimsek.kitezh.dto.account.AccountProfileDTO;
 import io.github.susimsek.kitezh.dto.account.AccountProfileRequestDTO;
@@ -12,6 +13,7 @@ import io.github.susimsek.kitezh.dto.account.AccountSessionDTO;
 import io.github.susimsek.kitezh.dto.account.MfaCodeRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MfaSetupDTO;
 import io.github.susimsek.kitezh.dto.account.MfaStatusDTO;
+import io.github.susimsek.kitezh.dto.account.MobilePasskeyRegistrationRequestDTO;
 import io.github.susimsek.kitezh.dto.account.RecoveryCodesDTO;
 import io.github.susimsek.kitezh.dto.account.RecoveryCodesStatusDTO;
 import io.github.susimsek.kitezh.dto.account.WebAuthnCredentialDTO;
@@ -22,6 +24,7 @@ import io.github.susimsek.kitezh.service.UserProfileService;
 import io.github.susimsek.kitezh.service.account.AccountApplicationService;
 import io.github.susimsek.kitezh.service.account.AccountAvatarService;
 import io.github.susimsek.kitezh.service.account.AccountDeletionService;
+import io.github.susimsek.kitezh.service.account.AccountPasskeyRegistrationService;
 import io.github.susimsek.kitezh.service.account.AccountProfileService;
 import io.github.susimsek.kitezh.service.account.AccountSessionService;
 import io.github.susimsek.kitezh.service.account.MfaService;
@@ -75,6 +78,7 @@ public class AccountController {
     private final MfaService mfaService;
     private final RecoveryCodeService recoveryCodeService;
     private final WebAuthnService webAuthnService;
+    private final AccountPasskeyRegistrationService accountPasskeyRegistrationService;
 
     @GetMapping("/mfa")
     @Operation(
@@ -117,6 +121,43 @@ public class AccountController {
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
                     Pageable pageable) {
         return webAuthnService.credentials(authentication.getName(), pageable);
+    }
+
+    @PostMapping("/webauthn/registration-options")
+    @Operation(
+            summary = "Start authenticated native passkey enrollment",
+            description =
+                    "Creates short-lived WebAuthn registration options bound to the authenticated"
+                            + " account. The challenge can be completed once within five minutes.")
+    @ApiResponse(responseCode = "200", description = "Native passkey creation options returned.")
+    @ApiResponse(responseCode = "401", description = "Account authentication is required.")
+    AccountPasskeyRegistrationOptionsDTO beginPasskeyEnrollment(Authentication authentication) {
+        return accountPasskeyRegistrationService.begin(authentication);
+    }
+
+    @PostMapping("/webauthn/registration/{challengeId}")
+    @Operation(
+            summary = "Complete authenticated native passkey enrollment",
+            description =
+                    "Validates the native WebAuthn attestation against the account-bound,"
+                            + " single-use registration challenge.")
+    @ApiResponse(responseCode = "204", description = "Passkey registered.")
+    @ApiResponse(responseCode = "400", description = "WebAuthn attestation is invalid.")
+    @ApiResponse(responseCode = "404", description = "Challenge expired, consumed, or not owned.")
+    @ApiResponse(responseCode = "401", description = "Account authentication is required.")
+    ResponseEntity<Void> completePasskeyEnrollment(
+            Authentication authentication,
+            @Parameter(description = "Opaque single-use registration challenge identifier.")
+                    @PathVariable
+                    String challengeId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                            description = "Native WebAuthn attestation and user-visible label.",
+                            required = true)
+                    @Valid
+                    @RequestBody
+                    MobilePasskeyRegistrationRequestDTO request) {
+        accountPasskeyRegistrationService.complete(authentication, challengeId, request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/webauthn/credentials/{credentialId}")

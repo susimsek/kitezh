@@ -3,18 +3,23 @@ package io.github.susimsek.kitezh.web;
 import io.github.susimsek.kitezh.config.openapi.OpenApiConfig;
 import io.github.susimsek.kitezh.config.security.MfaAuthorizationFilter;
 import io.github.susimsek.kitezh.domain.CibaAuthenticationRequestEntity;
+import io.github.susimsek.kitezh.dto.account.MfaCodeRequestDTO;
 import io.github.susimsek.kitezh.dto.oauth.CibaBackchannelAuthenticationResponseDTO;
 import io.github.susimsek.kitezh.dto.oauth.CibaErrorResponseDTO;
 import io.github.susimsek.kitezh.dto.oauth.CibaPendingRequestDTO;
+import io.github.susimsek.kitezh.service.account.MfaService;
 import io.github.susimsek.kitezh.service.ciba.CibaAuthenticationService;
 import io.github.susimsek.kitezh.service.ciba.CibaClientAuthenticationService;
 import io.github.susimsek.kitezh.service.ciba.CibaProtocolException;
+import io.github.susimsek.kitezh.service.error.ApiErrorCode;
+import io.github.susimsek.kitezh.service.error.ApiException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.time.Duration;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +32,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,12 +44,15 @@ public class CibaController {
 
     private final CibaAuthenticationService cibaAuthenticationService;
     private final CibaClientAuthenticationService clientAuthenticationService;
+    private final MfaService mfaService;
 
     public CibaController(
             CibaAuthenticationService cibaAuthenticationService,
-            CibaClientAuthenticationService clientAuthenticationService) {
+            CibaClientAuthenticationService clientAuthenticationService,
+            MfaService mfaService) {
         this.cibaAuthenticationService = cibaAuthenticationService;
         this.clientAuthenticationService = clientAuthenticationService;
+        this.mfaService = mfaService;
     }
 
     @PostMapping("/oauth2/bc-authorize")
@@ -224,6 +233,35 @@ public class CibaController {
 
     ResponseEntity<Void> approve(Authentication authentication, String authReqId) {
         cibaAuthenticationService.approve(authReqId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/api/ciba/requests/{authReqId}/approve/native")
+    @Operation(
+            summary = "Approve a CIBA request with native MFA",
+            description =
+                    "Verifies a current TOTP code for the authenticated account and immediately"
+                            + " binds that verification to this CIBA approval. The TOTP counter"
+                            + " and the request state prevent replay.")
+    @ApiResponse(responseCode = "204", description = "CIBA request approved with MFA.")
+    @SecurityRequirement(name = OpenApiConfig.ACCOUNT_BEARER)
+    ResponseEntity<Void> approveNative(
+            Authentication authentication,
+            @Parameter(description = "Opaque CIBA request identifier.", required = true)
+                    @PathVariable
+                    String authReqId,
+            @RequestParam(name = "user_code", required = false) String userCode,
+            @Valid @RequestBody MfaCodeRequestDTO request) {
+        boolean approved =
+                cibaAuthenticationService.approveWithNativeMfa(
+                        authReqId,
+                        authentication.getName(),
+                        userCode,
+                        () -> mfaService.validForStepUp(authentication.getName(), request.code()));
+        if (!approved) {
+            throw ApiException.badRequest(
+                    ApiErrorCode.INVALID_TOTP_CODE, "The authenticator code is invalid");
+        }
         return ResponseEntity.noContent().build();
     }
 

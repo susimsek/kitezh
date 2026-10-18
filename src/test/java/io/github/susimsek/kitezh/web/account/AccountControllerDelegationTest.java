@@ -19,6 +19,7 @@ import io.github.susimsek.kitezh.service.UserProfileService;
 import io.github.susimsek.kitezh.service.account.AccountApplicationService;
 import io.github.susimsek.kitezh.service.account.AccountAvatarService;
 import io.github.susimsek.kitezh.service.account.AccountDeletionService;
+import io.github.susimsek.kitezh.service.account.AccountPasskeyRegistrationService;
 import io.github.susimsek.kitezh.service.account.AccountProfileService;
 import io.github.susimsek.kitezh.service.account.AccountSessionService;
 import io.github.susimsek.kitezh.service.account.MfaService;
@@ -42,6 +43,8 @@ class AccountControllerDelegationTest {
     private final MfaService mfaService = mock(MfaService.class);
     private final RecoveryCodeService recoveryCodeService = mock(RecoveryCodeService.class);
     private final WebAuthnService webAuthnService = mock(WebAuthnService.class);
+    private final AccountPasskeyRegistrationService passkeyRegistrationService =
+            mock(AccountPasskeyRegistrationService.class);
 
     @Test
     void delegatesAccountAvatarEndpoints() {
@@ -55,7 +58,8 @@ class AccountControllerDelegationTest {
                         deletionService,
                         mfaService,
                         recoveryCodeService,
-                        webAuthnService);
+                        webAuthnService,
+                        passkeyRegistrationService);
         final Authentication authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         "alice", "ignored", java.util.List.of());
@@ -86,7 +90,8 @@ class AccountControllerDelegationTest {
                         deletionService,
                         mfaService,
                         recoveryCodeService,
-                        webAuthnService);
+                        webAuthnService,
+                        passkeyRegistrationService);
         final Authentication authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         "alice", "ignored", java.util.List.of());
@@ -149,7 +154,8 @@ class AccountControllerDelegationTest {
                         deletionService,
                         mfaService,
                         recoveryCodeService,
-                        webAuthnService);
+                        webAuthnService,
+                        passkeyRegistrationService);
         final Authentication authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         "alice", "ignored", java.util.List.of());

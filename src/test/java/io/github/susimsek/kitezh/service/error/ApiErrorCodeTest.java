@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,10 @@ class ApiErrorCodeTest {
 
         assertThat(values).hasSize(ApiErrorCode.values().length);
         assertThat(Arrays.stream(ApiErrorCode.values()))
-                .allMatch(errorCode -> errorCode.value().equals(errorCode.name().toLowerCase()));
+                .allMatch(
+                        errorCode ->
+                                errorCode
+                                        .value()
+                                        .equals(errorCode.name().toLowerCase(Locale.ROOT)));
     }
 }

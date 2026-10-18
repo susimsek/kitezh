@@ -13,13 +13,18 @@
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "io.github.susimsek.kitezh.mobile"
+      "bundleIdentifier": "io.github.susimsek.kitezh.mobile",
+      "associatedDomains": [
+        "applinks:kitezh.onrender.com",
+        "webcredentials:kitezh.onrender.com"
+      ]
     },
     "android": {
       "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#0b3b82"
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "io.github.susimsek.kitezh.mobile",
       "intentFilters": [
@@ -31,17 +36,23 @@
         {
           "action": "VIEW",
           "category": ["BROWSABLE", "DEFAULT"],
-          "data": [{ "scheme": "kitezh", "host": "logout", "path": "/callback" }]
+          "data": [
+            { "scheme": "kitezh", "host": "logout", "path": "/callback" }
+          ]
         },
         {
           "action": "VIEW",
           "category": ["BROWSABLE", "DEFAULT"],
-          "data": [{ "scheme": "kitezh", "host": "admin", "path": "/oauth/callback" }]
+          "data": [
+            { "scheme": "kitezh", "host": "admin", "path": "/oauth/callback" }
+          ]
         },
         {
           "action": "VIEW",
           "category": ["BROWSABLE", "DEFAULT"],
-          "data": [{ "scheme": "kitezh", "host": "admin", "path": "/logout/callback" }]
+          "data": [
+            { "scheme": "kitezh", "host": "admin", "path": "/logout/callback" }
+          ]
         },
         {
           "action": "VIEW",
@@ -56,7 +67,98 @@
         {
           "action": "VIEW",
           "category": ["BROWSABLE", "DEFAULT"],
-          "data": [{ "scheme": "kitezh", "host": "reset-password", "path": "/" }]
+          "data": [{ "scheme": "kitezh", "host": "confirm-email", "path": "/" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            { "scheme": "kitezh", "host": "reset-password", "path": "/" }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/verify-email"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/confirm-email"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/reset-password"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/oauth/callback"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/logout/callback"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/admin/oauth/callback"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kitezh.onrender.com",
+              "path": "/admin/logout/callback"
+            }
+          ]
         }
       ]
     },
@@ -77,7 +179,7 @@
           "imageWidth": 112,
           "dark": {
             "backgroundColor": "#212529",
-            "image": "./assets/splash-icon.png"
+            "image": "./assets/splash-icon-dark.png"
           }
         }
       ]

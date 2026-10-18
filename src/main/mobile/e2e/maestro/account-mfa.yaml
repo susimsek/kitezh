@@ -1,0 +1,73 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- tapOn: "Continue|Devam et"
+- tapOn: "Sign in"
+- tapOn:
+    text: "Use without an account"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn: "Continue with fixture account"
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- extendedWaitUntil:
+    visible: "fixture-user"
+    timeout: 180000
+- tapOn: "Account Console"
+- scroll
+- tapOn: "Two-factor authentication"
+- extendedWaitUntil:
+    visible: "Set up authenticator"
+    timeout: 30000
+- tapOn: "Set up authenticator"
+- extendedWaitUntil:
+    visible: "Authenticator code"
+    timeout: 30000
+- assertVisible: "JBSWY3DPEHPK3PXP"
+- tapOn: "Authenticator code"
+- inputText: "000000"
+- tapOn: "Enable two-factor authentication"
+- assertVisible: "Enter a valid authenticator code."
+- eraseText: 6
+- inputText: "123456"
+- tapOn: "Enable two-factor authentication"
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 30000
+- tapOn: "Sign in"
+- tapOn:
+    text: "Use without an account"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn: "Continue with fixture account"
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- tapOn: "Account Console"
+- scroll
+- tapOn: "Two-factor authentication"
+- extendedWaitUntil:
+    visible: "Two-factor authentication is enabled."
+    timeout: 30000
+- assertVisible: "Unused codes: 0"
+- tapOn: "Generate new codes"
+- assertVisible: "F1XT-URE1"
+- assertVisible: "F1XT-URE2"
+- assertVisible: "F1XT-URE3"
+- assertVisible: "Unused codes: 3"

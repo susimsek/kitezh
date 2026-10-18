@@ -248,6 +248,54 @@ test("fixture exposes discovery, authorization, protected account, and failure s
       headers: { Authorization: `Bearer ${token.access_token}` },
     }).then((response) => response.json());
     assert.equal(mfaStatus.available, true);
+    assert.equal(mfaStatus.enabled, false);
+    const setup = await fetch(`${bound.issuer}/api/account/mfa/setup`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token.access_token}` },
+    }).then((response) => response.json());
+    assert.equal(setup.secret, "JBSWY3DPEHPK3PXP");
+    const invalidCode = await fetch(`${bound.issuer}/api/account/mfa/enable`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: "000000" }),
+    });
+    assert.equal(invalidCode.status, 400);
+    assert.equal((await invalidCode.json()).violations[0].field, "code");
+    const enabled = await fetch(`${bound.issuer}/api/account/mfa/enable`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: "123456" }),
+    });
+    assert.equal(enabled.status, 204);
+    const enabledStatus = await fetch(`${bound.issuer}/api/account/mfa`, {
+      headers: { Authorization: `Bearer ${token.access_token}` },
+    }).then((response) => response.json());
+    assert.equal(enabledStatus.enabled, true);
+    const recoveryStatus = await fetch(
+      `${bound.issuer}/api/account/mfa/recovery-codes`,
+      { headers: { Authorization: `Bearer ${token.access_token}` } },
+    ).then((response) => response.json());
+    assert.equal(recoveryStatus.remaining, 0);
+    const generatedCodes = await fetch(
+      `${bound.issuer}/api/account/mfa/recovery-codes`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token.access_token}` },
+      },
+    ).then((response) => response.json());
+    assert.equal(generatedCodes.remaining, 3);
+    assert.equal(generatedCodes.codes.length, 3);
+    const recoveryStatusAfterGeneration = await fetch(
+      `${bound.issuer}/api/account/mfa/recovery-codes`,
+      { headers: { Authorization: `Bearer ${token.access_token}` } },
+    ).then((response) => response.json());
+    assert.equal(recoveryStatusAfterGeneration.remaining, 3);
     assert.equal(
       (await fetch(`${bound.issuer}/fixture/forbidden`)).status,
       403,
@@ -459,6 +507,149 @@ test("fixture completes a state- and PKCE-bound native social-link callback", as
       headers: { Authorization: `Bearer ${accountToken.access_token}` },
     }).then((response) => response.json());
     assert.equal(links[0].linked, true);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("fixture can simulate a one-time discovery outage before recovery", async () => {
+  const fixture = createFixtureServer();
+  const bound = await fixture.listen();
+  try {
+    const control = await fetch(
+      `${bound.issuer}/fixture/discovery-mode?mode=unavailable-once`,
+      { method: "POST" },
+    );
+    assert.equal(control.status, 200);
+    const failed = await fetch(
+      `${bound.issuer}/.well-known/openid-configuration`,
+    );
+    assert.equal(failed.status, 503);
+    const recovered = await fetch(
+      `${bound.issuer}/.well-known/openid-configuration`,
+    );
+    assert.equal(recovered.status, 200);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("fixture passkey challenge reaches the native assertion contract but rejects synthetic assertions", async () => {
+  const fixture = createFixtureServer();
+  const bound = await fixture.listen();
+  try {
+    const challengeResponse = await fetch(
+      `${bound.issuer}/api/auth/mobile/login/passkey/begin`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "fixture-user" }),
+      },
+    );
+    assert.equal(challengeResponse.status, 200);
+    const challenge = await challengeResponse.json();
+    assert.equal(challenge.status, "passkey_required");
+    assert.equal(challenge.publicKey.rpId, "kitezh.onrender.com");
+    assert.equal(challenge.publicKey.allowCredentials[0].type, "public-key");
+    assert.match(challenge.publicKey.challenge, /^[A-Za-z0-9_-]+$/);
+
+    const rejectedAssertion = await fetch(
+      `${bound.issuer}/api/auth/mobile/login/${challenge.transactionId}/passkey/verify`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          credential: {
+            id: "synthetic-credential",
+            type: "public-key",
+            response: { signature: "synthetic-signature" },
+          },
+        }),
+      },
+    );
+    assert.equal(rejectedAssertion.status, 401);
+    assert.equal(
+      (await rejectedAssertion.json()).title,
+      "Fixture cannot verify passkey assertions",
+    );
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("fixture MFA and required-action journey preserves OAuth state and consumes its challenge once", async () => {
+  const fixture = createFixtureServer();
+  const bound = await fixture.listen();
+  try {
+    const authorization = await fetch(
+      `${bound.issuer}/oauth2/authorize?redirect_uri=kitezh%3A%2F%2Foauth%2Fcallback&state=mfa-state`,
+    );
+    const authorizationPage = await authorization.text();
+    const challengeId = authorizationPage.match(
+      /href="\/fixture\/mfa\?challenge=([a-f0-9]+)"/,
+    )?.[1];
+    assert.ok(challengeId);
+
+    const mfaPage = await fetch(
+      `${bound.issuer}/fixture/mfa?challenge=${challengeId}`,
+    );
+    assert.match(await mfaPage.text(), /Two-factor authentication/);
+
+    const rejectedMfa = await fetch(`${bound.issuer}/fixture/mfa`, {
+      method: "POST",
+      body: new URLSearchParams({ challenge: challengeId, value: "000000" }),
+    });
+    assert.equal(rejectedMfa.status, 400);
+    assert.match(await rejectedMfa.text(), /valid authenticator code/);
+
+    const acceptedMfa = await fetch(`${bound.issuer}/fixture/mfa`, {
+      method: "POST",
+      redirect: "manual",
+      body: new URLSearchParams({ challenge: challengeId, value: "123456" }),
+    });
+    assert.equal(acceptedMfa.status, 302);
+    const requiredActionUrl = new URL(
+      acceptedMfa.headers.get("location"),
+      bound.issuer,
+    );
+    assert.equal(requiredActionUrl.pathname, "/fixture/required-action");
+
+    const requiredAction = await fetch(requiredActionUrl);
+    assert.match(await requiredAction.text(), /Update password/);
+
+    const rejectedAction = await fetch(requiredActionUrl, {
+      method: "POST",
+      body: new URLSearchParams({
+        challenge: challengeId,
+        value: "weak",
+      }),
+    });
+    assert.equal(rejectedAction.status, 400);
+    assert.match(await rejectedAction.text(), /does not meet policy/);
+
+    const acceptedAction = await fetch(requiredActionUrl, {
+      method: "POST",
+      redirect: "manual",
+      body: new URLSearchParams({
+        challenge: challengeId,
+        value: "Good",
+      }),
+    });
+    assert.equal(acceptedAction.status, 302);
+    const callback = new URL(acceptedAction.headers.get("location"));
+    assert.equal(callback.protocol, "kitezh:");
+    assert.equal(callback.host, "oauth");
+    assert.ok(callback.searchParams.get("code"));
+    assert.equal(callback.searchParams.get("state"), "mfa-state");
+
+    const replay = await fetch(requiredActionUrl, {
+      method: "POST",
+      body: new URLSearchParams({
+        challenge: challengeId,
+        value: "Good",
+      }),
+    });
+    assert.equal(replay.status, 400);
   } finally {
     await fixture.close();
   }

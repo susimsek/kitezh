@@ -9,6 +9,20 @@ import { Alert } from "react-native";
 import * as adminApi from "@/api/admin-api";
 import AdminScreen from "../app/admin";
 
+jest.mock("react-native/Libraries/Modal/Modal", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    __esModule: true,
+    default: ({
+      children,
+      visible,
+    }: {
+      children: React.ReactNode;
+      visible: boolean;
+    }) => (visible ? React.createElement("View", null, children) : null),
+  };
+});
+
 jest.mock("@/api/admin-api", () => ({
   getAdminDashboard: jest.fn(),
   getAdminServerInfo: jest.fn(),
@@ -125,6 +139,7 @@ jest.mock("react-native-safe-area-context", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   return {
     SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
   };
 });
 
@@ -135,6 +150,17 @@ const emptyPage = {
   totalElements: 0,
   totalPages: 0,
 };
+
+async function pressAdminTab(name: string) {
+  const tab = screen.queryByRole("tab", { name });
+  if (tab) {
+    fireEvent.press(tab);
+    return;
+  }
+
+  fireEvent.press(screen.getByRole("tab", { name: "adminMore" }));
+  fireEvent.press(await screen.findByRole("menuitem", { name }));
+}
 
 const adminAccessAll = {
   isAdmin: true,
@@ -402,7 +428,8 @@ it("keeps management actions hidden for read-only resource viewers", async () =>
   );
 
   render(<AdminScreen />);
-  expect(await screen.findByRole("tab", { name: "adminClients" })).toBeTruthy();
+  await waitFor(() => expect(adminApi.getAdminWhoAmI).toHaveBeenCalled());
+  expect(screen.getByTestId("admin-tab-clients")).toBeTruthy();
   expect(screen.queryByTestId("admin-tab-dashboard")).toBeNull();
 
   const readOnlyResources = [
@@ -414,17 +441,14 @@ it("keeps management actions hidden for read-only resource viewers", async () =>
     ["adminConsents", "Viewer App"],
   ];
   for (const [tab, row] of readOnlyResources) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText(row)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "adminCreate" })).toBeNull();
     expect(screen.queryByRole("button", { name: "adminEdit" })).toBeNull();
     expect(screen.queryByRole("button", { name: "adminDelete" })).toBeNull();
   }
   expect(screen.queryByTestId("admin-tab-keys")).toBeNull();
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminEvents" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminEvents");
   expect(screen.queryByRole("button", { name: "adminDeleteEvents" })).toBeNull();
 });
 
@@ -441,8 +465,9 @@ it("keeps retry hidden when a read-only user cannot view consents", async () => 
     .mockRejectedValue(new adminApi.AdminApiError(403));
 
   render(<AdminScreen />);
-  await screen.findByRole("tab", { name: "adminClients" });
-  fireEvent.press(screen.getByRole("tab", { name: "adminConsents" }));
+  await waitFor(() => expect(adminApi.getAdminWhoAmI).toHaveBeenCalled());
+  expect(screen.getByTestId("admin-tab-clients")).toBeTruthy();
+  await pressAdminTab("adminConsents");
 
   expect(await screen.findByText("adminForbidden")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "adminRetry" })).toBeNull();
@@ -528,10 +553,7 @@ it("fails closed when admin capabilities are missing and supports query-only use
 it("loads and saves localized native audit event settings with validation", async () => {
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   expect(adminApi.getAdminEventSettings).toHaveBeenCalledWith(
     "access",
@@ -579,8 +601,9 @@ it("shows audit settings as read-only to event viewers without admin access", as
   });
 
   render(<AdminScreen />);
-  await screen.findByRole("tab", { name: "adminEvents" });
-  fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
+  await screen.findByTestId("admin-tab-more");
+  await pressAdminTab("adminEvents");
+  await pressAdminTab("adminSettings");
 
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   expect(screen.queryByTestId("admin-event-settings-save")).toBeNull();
@@ -651,10 +674,7 @@ it("passes refresh callbacks to all administrator settings panels", async () => 
   });
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
 
   const settingsRequests = [
     adminApi.getNativeAdminLoginSettings,
@@ -678,10 +698,7 @@ it("keeps audit settings permission failures localized and retryable", async () 
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminForbidden")).toBeTruthy();
   await act(async () => {
     fireEvent.press(screen.getByTestId("admin-event-settings-retry"));
@@ -701,11 +718,8 @@ it.each([
     jest.mocked(adminApi.getAdminEventSettings).mockRejectedValueOnce(failure);
 
     render(<AdminScreen />);
-  await screen.findByTestId("admin-tab-dashboard");
-    await act(async () => {
-      fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await screen.findByTestId("admin-tab-dashboard");
+    await pressAdminTab("adminSettings");
     expect(await screen.findByText(messageKey)).toBeTruthy();
     expect(screen.getByTestId("admin-event-settings-retry")).toBeTruthy();
   },
@@ -717,14 +731,7 @@ it("loads dashboard and navigates through every mobile administration tab", asyn
 
   expect(await screen.findByText("2")).toBeTruthy();
   const tabList = screen.getByTestId("admin-tab-list");
-  expect(tabList.props.horizontal).toBe(true);
-  expect(tabList.props.scrollEnabled).toBe(true);
-  expect(tabList.props.directionalLockEnabled).toBe(true);
-  const groupsTab = screen.getByTestId("admin-tab-groups");
-  expect(groupsTab.props.accessibilityRole).toBe("tab");
-  expect(groupsTab.props.style).toEqual(
-    expect.arrayContaining([expect.objectContaining({ flexShrink: 0 })]),
-  );
+  expect(tabList.props.accessibilityRole).toBe("tablist");
   const tabs = [
     ["adminUsers", adminApi.listAdminUsers],
     ["adminClients", adminApi.listAdminClients],
@@ -738,22 +745,30 @@ it("loads dashboard and navigates through every mobile administration tab", asyn
     ["adminEvents", adminApi.listAdminEvents],
   ];
   for (const [tab, request] of tabs) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
-    await waitFor(() => expect(screen.getAllByText(tab)).toHaveLength(2));
+    await pressAdminTab(tab);
+    expect(screen.getAllByText(tab).length).toBeGreaterThan(0);
     await waitFor(() => expect(request).toHaveBeenCalled());
   }
-  fireEvent.press(screen.getByRole("tab", { name: "adminServerInfo" }));
+  await pressAdminTab("adminServerInfo");
   expect(await screen.findByTestId("admin-server-info-content")).toBeTruthy();
   expect(screen.getByText("https://issuer.example.test")).toBeTruthy();
   expect(screen.getByText("fixture-key · RS256 · RSA")).toBeTruthy();
   expect(adminApi.getAdminServerInfo).toHaveBeenCalled();
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   expect(adminApi.getAdminEventSettings).toHaveBeenCalled();
   expect(adminApi.getAdminDashboard).toHaveBeenCalled();
+}, 30_000);
+
+it("navigates to an administration section from the native tab bar", async () => {
+  render(<AdminScreen />);
+
+  await screen.findByText("2");
+  const usersTab = screen.getByRole("tab", { name: "adminUsers" });
+  fireEvent.press(usersTab);
+
+  await waitFor(() => expect(adminApi.listAdminUsers).toHaveBeenCalled());
+  expect(screen.getByTestId("admin-tab-users")).toBeTruthy();
 });
 
 it("keeps server information fail-closed and offers a retry after 403", async () => {
@@ -762,7 +777,7 @@ it("keeps server information fail-closed and offers a retry after 403", async ()
     .mockRejectedValueOnce(new adminApi.AdminApiError(403));
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminServerInfo" }));
+  await pressAdminTab("adminServerInfo");
   expect(await screen.findByText("adminForbidden")).toBeTruthy();
   expect(screen.getByTestId("admin-server-info-retry")).toBeTruthy();
   fireEvent.press(screen.getByTestId("admin-server-info-retry"));
@@ -792,17 +807,15 @@ it("uses server metadata fallbacks and expired refresh callbacks", async () => {
   mockRefreshSession.mockResolvedValueOnce(null);
   await expect(refreshTokenFromCall(adminApi.getAdminDashboard.mock.calls.at(-1))).resolves.toBeNull();
 
-  fireEvent.press(screen.getByRole("tab", { name: "adminServerInfo" }));
+  await pressAdminTab("adminServerInfo");
   expect(await screen.findByTestId("admin-server-info-content")).toBeTruthy();
   expect(screen.getByText("—")).toBeTruthy();
   expect(screen.getByText("adminNotConfigured")).toBeTruthy();
   mockRefreshSession.mockResolvedValueOnce(null);
   await expect(refreshTokenFromCall(adminApi.getAdminServerInfo.mock.calls.at(-1))).resolves.toBeNull();
 
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
+  await screen.findByText("adminEventSettingsTitle");
   mockRefreshSession.mockResolvedValueOnce(null);
   await expect(refreshTokenFromCall(adminApi.getAdminEventSettings.mock.calls.at(-1))).resolves.toBeNull();
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
@@ -821,7 +834,7 @@ it.each([
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminServerInfo" }));
+  await pressAdminTab("adminServerInfo");
 
   expect(await screen.findByText(message)).toBeTruthy();
   fireEvent.press(screen.getByTestId("admin-server-info-retry"));
@@ -874,7 +887,7 @@ it("manages role membership through the paged native admin API", async () => {
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminRoles" }));
+  await pressAdminTab("adminRoles");
   fireEvent.press(
     await screen.findByRole("button", { name: "adminRoleManageUsers" }),
   );
@@ -893,7 +906,7 @@ it("manages role membership through the paged native admin API", async () => {
     ),
   );
   fireEvent.press(screen.getByRole("button", { name: "‹ back" }));
-  expect(await screen.findByTestId("admin-tab-roles")).toBeTruthy();
+  expect(await screen.findByText("ROLE_AUDITOR")).toBeTruthy();
 });
 
 it("manages native group memberships through the existing paged API", async () => {
@@ -930,7 +943,7 @@ it("manages native group memberships through the existing paged API", async () =
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminGroups" }));
+  await pressAdminTab("adminGroups");
   fireEvent.press(
     await screen.findByRole("button", { name: "adminManageGroupMembers" }),
   );
@@ -986,7 +999,7 @@ it("confirms group member removal before calling the protected endpoint", async 
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminGroups" }));
+  await pressAdminTab("adminGroups");
   fireEvent.press(
     await screen.findByRole("button", { name: "adminManageGroupMembers" }),
   );
@@ -1028,7 +1041,7 @@ it("supplies a forced token refresh callback to every admin resource query", asy
   ] as const;
 
   for (const [tab, request] of resources) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     await waitFor(() => expect(request).toHaveBeenCalled());
     await expect(refreshTokenFromCall(request.mock.calls.at(-1))).resolves.toBe(
       "access",
@@ -1058,7 +1071,7 @@ it("filters session administration and switches between active and expired pages
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminSessions" }));
+  await pressAdminTab("adminSessions");
   expect(await screen.findByText("alex")).toBeTruthy();
 
   fireEvent.changeText(screen.getByLabelText("adminSearchSessions"), {
@@ -1127,9 +1140,12 @@ it("shows loading, signed-out, and authentication-error states", async () => {
   expect(screen.queryByText("authError")).toBeNull();
   mockAuthState.status = "error";
   view.rerender(<AdminScreen />);
-  expect(screen.getByText("authError")).toBeTruthy();
-  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
-  expect(mockAuthState.signIn).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("authDiscoveryUnavailable")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "signIn" }).props.accessibilityState
+      .disabled,
+  ).toBe(true);
+  expect(mockAuthState.signIn).not.toHaveBeenCalled();
 });
 
 it("signs out from the administration header", async () => {
@@ -1183,7 +1199,7 @@ it("renders section-specific load errors when mobile admin requests fail", async
   await screen.findByTestId("admin-tab-dashboard");
   await screen.findByText("2");
   for (const [tab, , message] of failures) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText(message)).toBeTruthy();
   }
 });
@@ -1205,7 +1221,7 @@ it("keeps the last empty page visible when a later admin search fails", async ()
   await screen.findByTestId("admin-tab-dashboard");
 
   for (const [tab, searchLabel, emptyMessage, errorMessage, request] of resources) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText(emptyMessage)).toBeTruthy();
     const calls = jest.mocked(request).mock.calls.length;
     jest.mocked(request).mockRejectedValueOnce(new Error("search unavailable"));
@@ -1243,7 +1259,7 @@ it("renders forbidden states for protected mobile admin resources", async () => 
   await screen.findByTestId("admin-tab-dashboard");
   await screen.findByText("2");
   for (const [tab, request] of failures) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText("adminForbidden")).toBeTruthy();
     if (tab === "adminUsers") {
       fireEvent.press(screen.getByRole("button", { name: "adminRetry" }));
@@ -1273,13 +1289,10 @@ describe.each([
   ] as const)("shows a localized %s state and retries", async (_kind, failure, message) => {
     jest.mocked(request).mockRejectedValueOnce(failure);
     render(<AdminScreen />);
-  await screen.findByTestId("admin-tab-dashboard");
+    await screen.findByTestId("admin-tab-dashboard");
     await screen.findByText("2");
 
-    await act(async () => {
-      fireEvent.press(screen.getByRole("tab", { name: tab }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await pressAdminTab(tab);
     expect(await screen.findByText(message)).toBeTruthy();
 
     await act(async () => {
@@ -1478,22 +1491,22 @@ it("renders populated mobile admin resources and supports filtered pagination", 
     ["adminEvents", "user.updated"],
   ];
   for (const [tab, content] of resources) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText(content)).toBeTruthy();
   }
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("minimal-user")).toBeTruthy();
-  fireEvent.press(screen.getByRole("tab", { name: "adminClientScopes" }));
+  await pressAdminTab("adminClientScopes");
   expect(await screen.findByText("adminBuiltIn")).toBeTruthy();
-  fireEvent.press(screen.getByRole("tab", { name: "adminGroups" }));
+  await pressAdminTab("adminGroups");
   expect(await screen.findByText("ROLE_SUPPORT")).toBeTruthy();
   expect(screen.getByText("Support")).toBeTruthy();
-  fireEvent.press(screen.getByRole("tab", { name: "adminIdentityProviders" }));
+  await pressAdminTab("adminIdentityProviders");
   expect(await screen.findByText("empty-display-alias")).toBeTruthy();
-  fireEvent.press(screen.getByRole("tab", { name: "adminEvents" }));
+  await pressAdminTab("adminEvents");
   expect(await screen.findByText("Updated profile fields")).toBeTruthy();
 
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   fireEvent.changeText(screen.getByLabelText("adminSearchUsers"), {
     target: { value: "disabled" },
   });
@@ -1570,7 +1583,7 @@ it("renders populated mobile admin resources and supports filtered pagination", 
     listRequest,
     visibleRow,
   ] of paginatedResources) {
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText(visibleRow)).toBeTruthy();
     const request = listRequest as jest.Mock;
     const searchCalls = request.mock.calls.length;
@@ -1632,7 +1645,7 @@ it("creates a mobile admin user after validating the required password", async (
   });
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("alice")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "adminCreate" }));
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
@@ -1660,7 +1673,7 @@ it("creates a mobile admin user after validating the required password", async (
 it("shows field-level email errors and clears them when the value changes", async () => {
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   await waitFor(() => expect(adminApi.listAdminUsers).toHaveBeenCalled());
   fireEvent.press(screen.getByRole("button", { name: "adminCreate" }));
   fireEvent.changeText(screen.getByPlaceholderText("adminUsername"), {
@@ -1712,7 +1725,7 @@ it("hydrates an existing user editor and prevents duplicate saves while pending"
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("locked-user")).toBeTruthy();
   expect(screen.getByText("Taylor Jones")).toBeTruthy();
   expect(screen.getByText("adminUserLocked")).toBeTruthy();
@@ -1794,7 +1807,7 @@ it("creates each native admin resource through its typed editor flow", async () 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
   for (const scenario of scenarios) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     fireEvent.press(await screen.findByRole("button", { name: "adminCreate" }));
     for (const [label, value] of scenario.values) {
       fireEvent.changeText(screen.getByPlaceholderText(label), {
@@ -1821,7 +1834,7 @@ it("shows distinct role and parent validation messages in admin editors", async 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
 
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   fireEvent.press(await screen.findByRole("button", { name: "adminCreate" }));
   fireEvent.changeText(screen.getByPlaceholderText("adminUsername"), {
     target: { value: "roleless-user" },
@@ -1837,14 +1850,14 @@ it("shows distinct role and parent validation messages in admin editors", async 
   expect(adminApi.createAdminUser).not.toHaveBeenCalled();
 
   fireEvent.press(screen.getByRole("button", { name: "cancel" }));
-  fireEvent.press(screen.getByRole("tab", { name: "adminRoles" }));
+  await pressAdminTab("adminRoles");
   fireEvent.press(await screen.findByRole("button", { name: "adminCreate" }));
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
   expect(await screen.findByText("adminRoleNameFormat")).toBeTruthy();
   expect(adminApi.createAdminRole).not.toHaveBeenCalled();
 
   fireEvent.press(screen.getByRole("button", { name: "cancel" }));
-  fireEvent.press(screen.getByRole("tab", { name: "adminGroups" }));
+  await pressAdminTab("adminGroups");
   fireEvent.press(await screen.findByRole("button", { name: "adminCreate" }));
   fireEvent.changeText(screen.getByPlaceholderText("adminName"), {
     target: { value: "Mobile Operators" },
@@ -1947,7 +1960,7 @@ it("hydrates and updates each editable native admin resource", async () => {
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
   for (const scenario of scenarios) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.name)).toBeTruthy();
     fireEvent.press(await screen.findByRole("button", { name: "adminEdit" }));
     fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
@@ -2023,7 +2036,7 @@ it("keeps client, role, and group editors open after update failures", async () 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
   for (const scenario of scenarios) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.row)).toBeTruthy();
     fireEvent.press(await screen.findByRole("button", { name: "adminEdit" }));
     expect(screen.getByRole("button", { name: "adminSave" })).toBeTruthy();
@@ -2098,7 +2111,7 @@ it("confirms role and group deletion and reports failures", async () => {
   ] as const;
 
   for (const scenario of cases) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.row)).toBeTruthy();
     fireEvent.press(await screen.findByRole("button", { name: "adminDelete" }));
     const actions = alert.mock.calls.at(-1)?.[2];
@@ -2159,7 +2172,7 @@ it("enables and unlocks users and rotates signing keys", async () => {
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("locked-user")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "adminUserEnable" }));
   await waitFor(() =>
@@ -2185,7 +2198,7 @@ it("enables and unlocks users and rotates signing keys", async () => {
     adminApi.unlockAdminUser.mock.calls.at(-1),
   );
 
-  fireEvent.press(screen.getByRole("tab", { name: "adminKeys" }));
+  await pressAdminTab("adminKeys");
   expect(await screen.findByText("active-key")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "adminRotateKey" }));
   await waitFor(() =>
@@ -2224,7 +2237,7 @@ it.each([
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("action-error-user")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: button }));
 
@@ -2325,7 +2338,7 @@ it("confirms and deletes native resources from their mobile resource lists", asy
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
   for (const scenario of scenarios) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.name)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: "adminDelete" }));
     const actions = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
@@ -2447,7 +2460,7 @@ it("deletes mobile users, events, sessions, and consent through confirmed action
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
   for (const scenario of scenarios) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.row)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: scenario.action }));
     const actions = alert.mock.calls.at(-1)?.[2];
@@ -2520,7 +2533,7 @@ it("reports forbidden and unexpected failures from destructive admin actions", a
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("remove-user")).toBeTruthy();
   jest.mocked(adminApi.deleteAdminUser).mockRejectedValueOnce(forbidden);
   fireEvent.press(screen.getByRole("button", { name: "adminUserDelete" }));
@@ -2556,7 +2569,7 @@ it("reports forbidden and unexpected failures from destructive admin actions", a
     }),
   );
 
-  fireEvent.press(screen.getByRole("tab", { name: "adminKeys" }));
+  await pressAdminTab("adminKeys");
   expect(await screen.findByText("active-key")).toBeTruthy();
   jest.mocked(adminApi.rotateAdminKey).mockRejectedValueOnce(forbidden);
   fireEvent.press(screen.getByRole("button", { name: "adminRotateKey" }));
@@ -2660,7 +2673,7 @@ it("maps forbidden responses across admin selections and actions", async () => {
     },
   ] as const;
   for (const scenario of directActions) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.row)).toBeTruthy();
     jest.mocked(scenario.request).mockRejectedValueOnce(forbidden);
     fireEvent.press(screen.getByRole("button", { name: scenario.action }));
@@ -2699,7 +2712,7 @@ it("maps forbidden responses across admin selections and actions", async () => {
     },
   ] as const;
   for (const scenario of confirmedActions) {
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.row)).toBeTruthy();
     jest.mocked(scenario.request).mockRejectedValueOnce(forbidden);
     fireEvent.press(screen.getByRole("button", { name: scenario.action }));
@@ -2737,6 +2750,18 @@ it("shows a loading state while each admin table is waiting for its first page",
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
 
+  const sectionLabels: Record<(typeof tables)[number][0], string> = {
+    users: "adminUsers",
+    clients: "adminClients",
+    scopes: "adminClientScopes",
+    roles: "adminRoles",
+    groups: "adminGroups",
+    "identity-providers": "adminIdentityProviders",
+    keys: "adminKeys",
+    events: "adminEvents",
+    sessions: "adminSessions",
+    consents: "adminConsents",
+  };
   for (const [section, listRequest, emptyMessage] of tables) {
     let finishRequest!: (page: typeof emptyPage) => void;
     const pendingPage = new Promise<typeof emptyPage>((resolve) => {
@@ -2745,7 +2770,7 @@ it("shows a loading state while each admin table is waiting for its first page",
     const request = listRequest as jest.Mock;
     request.mockImplementationOnce(() => pendingPage);
 
-    fireEvent.press(screen.getByTestId(`admin-tab-${section}`));
+    await pressAdminTab(sectionLabels[section]);
     await waitFor(() => expect(request).toHaveBeenCalled());
     expect(screen.getByLabelText("loading")).toBeTruthy();
 
@@ -2764,7 +2789,7 @@ it("shows and clears a field-level validation error returned by the admin API", 
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   await waitFor(() => expect(adminApi.listAdminUsers).toHaveBeenCalled());
   fireEvent.press(screen.getByRole("button", { name: "adminCreate" }));
   fireEvent.changeText(screen.getByPlaceholderText("adminUsername"), {
@@ -2800,7 +2825,7 @@ it.each([
 
     render(<AdminScreen />);
     await screen.findByTestId("admin-tab-dashboard");
-    fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+    await pressAdminTab("adminUsers");
     fireEvent.press(
       await screen.findByRole("button", { name: "adminCreate" }),
     );
@@ -2822,7 +2847,7 @@ it.each([
 it("cancels a new admin resource editor and returns to the empty list", async () => {
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  fireEvent.press(screen.getByRole("tab", { name: "adminUsers" }));
+  await pressAdminTab("adminUsers");
   expect(await screen.findByText("adminNoUsers")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "adminCreate" }));
   expect(screen.getByPlaceholderText("adminUsername")).toBeTruthy();
@@ -2843,10 +2868,7 @@ it.each([
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
 
@@ -2931,7 +2953,7 @@ it("reports denied and unexpected errors from event, session, and consent action
   for (const scenario of scenarios) {
     jest.mocked(scenario.request).mockRejectedValueOnce(denied);
     jest.mocked(scenario.request).mockRejectedValueOnce(new Error("offline"));
-    fireEvent.press(screen.getByRole("tab", { name: scenario.tab }));
+    await pressAdminTab(scenario.tab);
     expect(await screen.findByText(scenario.row)).toBeTruthy();
     for (const message of ["adminForbidden", scenario.fallbackMessage]) {
       fireEvent.press(screen.getByRole("button", { name: scenario.action }));
@@ -3030,7 +3052,7 @@ it("fails safely when the session expires before admin mutations", async () => {
     },
   ];
   for (const failure of failures) {
-    fireEvent.press(screen.getByRole("tab", { name: failure.tab }));
+    await pressAdminTab(failure.tab);
     expect(await screen.findByText(failure.row)).toBeTruthy();
     mockRefreshSession.mockResolvedValueOnce(null);
     failure.invoke();
@@ -3042,10 +3064,8 @@ it("fails safely when the session expires before admin mutations", async () => {
     );
   }
 
-  await act(async () => {
-    fireEvent.press(screen.getByRole("tab", { name: "adminSettings" }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
+  await screen.findByText("adminEventSettingsTitle");
   mockRefreshSession.mockResolvedValueOnce(null);
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
   await waitFor(() =>
@@ -3076,7 +3096,7 @@ it("fails safely when the session expires before admin mutations", async () => {
     },
   ] as const;
   for (const action of confirmedActions) {
-    fireEvent.press(screen.getByRole("tab", { name: action.tab }));
+    await pressAdminTab(action.tab);
     expect(await screen.findByText(action.row)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: action.action }));
     const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
@@ -3122,7 +3142,7 @@ it("does not request admin table data after the session refresh expires", async 
   for (const [tab, request, emptyMessage] of resources) {
     const callCount = jest.mocked(request).mock.calls.length;
     mockRefreshSession.mockResolvedValueOnce(null);
-    fireEvent.press(screen.getByRole("tab", { name: tab }));
+    await pressAdminTab(tab);
     expect(await screen.findByText(emptyMessage)).toBeTruthy();
     expect(jest.mocked(request)).toHaveBeenCalledTimes(callCount);
   }

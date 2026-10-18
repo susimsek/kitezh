@@ -1,0 +1,23 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Continue|Devam et"
+    timeout: 30000
+- tapOn: "Continue|Devam et"
+- assertVisible: "Sign in|Giriş yap"
+- extendedWaitUntil:
+    visible: "The secure sign-in service is unavailable|Güvenli giriş hizmetine şu anda ulaşılamıyor"
+    timeout: 30000
+- tapOn: "Retry|Tekrar dene"
+- extendedWaitUntil:
+    notVisible: "The secure sign-in service is unavailable|Güvenli giriş hizmetine şu anda ulaşılamıyor"
+    timeout: 30000
+- tapOn: "Sign in|Giriş yap"
+- tapOn:
+    text: "Use without an account"
+    optional: true
+- assertVisible: "Continue with fixture account"
+- back

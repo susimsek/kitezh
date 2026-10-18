@@ -16,7 +16,7 @@ type AuthCallbackScreenProps = {
 function AuthCallbackContent({
   consoleName = "account",
 }: Readonly<AuthCallbackScreenProps>) {
-  const { status } = useMobileAuth();
+  const { status, discoveryStatus } = useMobileAuth();
   const { dictionary } = useLocale();
   const { palette } = useTheme();
   const destination = consoleName === "admin" ? "/admin" : "/account";
@@ -30,7 +30,11 @@ function AuthCallbackContent({
       router.replace("/sign-in");
       return;
     }
-    if (status !== "signed-out") return;
+    if (discoveryStatus === "unavailable" || discoveryStatus === "timeout") {
+      router.replace("/sign-in");
+      return;
+    }
+    if (status !== "signed-out" || discoveryStatus !== "ready") return;
 
     // The provider first loads SecureStore while the browser callback is
     // being delivered. Do not discard an in-flight PKCE result during that
@@ -39,7 +43,7 @@ function AuthCallbackContent({
       router.replace(consoleName === "admin" ? "/admin" : "/sign-in");
     }, 15_000);
     return () => clearTimeout(timeout);
-  }, [consoleName, destination, status]);
+  }, [consoleName, destination, discoveryStatus, status]);
 
   return (
     <SafeAreaView

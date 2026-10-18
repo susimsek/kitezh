@@ -67,11 +67,20 @@ function validateProfileAttributes(
         (definition.minLength !== null && item.length < definition.minLength) ||
         (definition.maxLength !== null && item.length > definition.maxLength);
       if (definition.type === "EMAIL") invalid ||= !isValidEmailAddress(item);
-      if (definition.type === "INTEGER") invalid ||= !/^-?\d+$/.test(item);
-      if (definition.type === "BOOLEAN") invalid ||= !["true", "false"].includes(item);
+      if (definition.type === "INTEGER") {
+        const number = Number(item);
+        invalid ||=
+          !/^-?\d+$/.test(item) ||
+          !Number.isInteger(number) ||
+          number < -2147483648 ||
+          number > 2147483647;
+      }
+      if (definition.type === "BOOLEAN") {
+        invalid ||= !["true", "false"].includes(item.toLowerCase());
+      }
       if (definition.pattern) {
         try {
-          invalid ||= !new RegExp(definition.pattern).test(item);
+          invalid ||= !new RegExp(`^(?:${definition.pattern})$`).test(item);
         } catch {
           invalid = true;
         }

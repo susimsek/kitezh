@@ -148,7 +148,7 @@ test("mobile console contracts isolate account and admin sessions", () => {
   assert.notEqual(sessionStorageKey("account"), sessionStorageKey("admin"));
 });
 
-test("mobile issuer overrides are limited to the development loopback server", () => {
+test("mobile issuer overrides are limited to local development servers", () => {
   assert.equal(
     resolveAuthorizationServerIssuer(undefined, false),
     DEFAULT_AUTHORIZATION_SERVER_ISSUER,
@@ -156,6 +156,14 @@ test("mobile issuer overrides are limited to the development loopback server", (
   assert.equal(
     resolveAuthorizationServerIssuer("http://localhost:9090/", true),
     "http://localhost:9090",
+  );
+  assert.equal(
+    resolveAuthorizationServerIssuer("http://10.0.2.2:8080", true),
+    "http://10.0.2.2:8080",
+  );
+  assert.equal(
+    resolveAuthorizationServerIssuer("http://10.0.2.2:8082", true),
+    "http://10.0.2.2:8082",
   );
   assert.equal(
     resolveAuthorizationServerIssuer(
@@ -174,6 +182,14 @@ test("mobile issuer overrides are limited to the development loopback server", (
   );
   assert.throws(
     () => resolveAuthorizationServerIssuer("http://localhost:9090/path", true),
+    /authorization_server_issuer_invalid/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("http://10.0.2.3:8080", true),
+    /authorization_server_issuer_invalid/,
+  );
+  assert.throws(
+    () => resolveAuthorizationServerIssuer("http://10.0.2.2:8100", true),
     /authorization_server_issuer_invalid/,
   );
   assert.throws(
@@ -290,6 +306,69 @@ test("native OAuth callbacks require the original state and approved scheme", ()
     ),
     false,
   );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://user@oauth/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://@oauth/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      " kitezh://oauth/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://oauth:444/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://oauth/callback#fragment",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://oauth/callback#",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "kitezh://oauth/callback",
+      "kitezh://oauth:444/callback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "https://kitezh.onrender.com/oauth/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    true,
+  );
+  assert.equal(
+    isAllowedNativeRedirect(
+      "https://attacker.example/oauth/callback?code=redacted",
+      "kitezh://oauth/callback",
+    ),
+    false,
+  );
 });
 
 test("native authorization metadata requires a trusted issuer and endpoints", () => {
@@ -344,6 +423,27 @@ test("native authorization metadata requires a trusted issuer and endpoints", ()
     ),
     false,
   );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback",
+      {
+        ...discovery,
+        authorizationEndpoint: "https://attacker.example/authorize",
+      },
+    ),
+    false,
+  );
+  assert.equal(
+    validateNativeAuthorizationConfig(
+      "https://issuer.example.test",
+      "mobile-account-console",
+      "kitezh://oauth/callback?state=unexpected",
+      discovery,
+    ),
+    false,
+  );
   const androidFixtureDiscovery = {
     issuer: "http://10.0.2.2:8080",
     authorizationEndpoint: "http://10.0.2.2:8080/oauth2/authorize",
@@ -381,8 +481,20 @@ test("native deep links accept only registered routes", () => {
       token: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
     },
   );
+  assert.deepEqual(
+    parseNativeDeepLink(
+      "kitezh://confirm-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    {
+      kind: "confirm-email",
+      token: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    },
+  );
   assert.deepEqual(parseNativeDeepLink("kitezh://oauth/callback"), {
     kind: "oauth-callback",
+  });
+  assert.deepEqual(parseNativeDeepLink("kitezh://logout/callback"), {
+    kind: "logout-callback",
   });
   assert.deepEqual(parseNativeDeepLink("kitezh://admin/oauth/callback"), {
     kind: "admin-oauth-callback",
@@ -396,8 +508,80 @@ test("native deep links accept only registered routes", () => {
     ),
     null,
   );
+  assert.deepEqual(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    {
+      kind: "verify-email",
+      token: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    },
+  );
+  assert.deepEqual(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com/confirm-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    {
+      kind: "confirm-email",
+      token: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    },
+  );
+  assert.deepEqual(
+    parseNativeDeepLink("https://kitezh.onrender.com/admin/oauth/callback"),
+    { kind: "admin-oauth-callback" },
+  );
+  assert.deepEqual(
+    parseNativeDeepLink("https://kitezh.onrender.com/logout/callback"),
+    { kind: "logout-callback" },
+  );
+  assert.deepEqual(
+    parseNativeDeepLink("https://kitezh.onrender.com/admin/logout/callback"),
+    { kind: "admin-logout-callback" },
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com.attacker.example/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com:443/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "https://kitezh.onrender.com/verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
   assert.equal(parseNativeDeepLink("kitezh://verify-email/"), null);
   assert.equal(parseNativeDeepLink("kitezh://verify-email/?token=short"), null);
+  assert.equal(
+    parseNativeDeepLink(
+      "kitezh://verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG&token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "kitezh://user@verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "kitezh://verify-email:444/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    null,
+  );
+  assert.equal(
+    parseNativeDeepLink(
+      "kitezh://verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG#fragment",
+    ),
+    null,
+  );
 });
 
 test("native intent routes registered callback links without callback parameters", () => {
@@ -421,9 +605,33 @@ test("native intent routes registered callback links without callback parameters
   );
   assert.equal(
     resolveNativeIntentPath(
+      "https://kitezh.onrender.com/reset-password?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    "/reset-password?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "https://kitezh.onrender.com/oauth/callback?code=secret&state=private",
+    ),
+    "/oauth/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "https://kitezh.onrender.com/admin/logout/callback?state=private",
+    ),
+    "/admin/logout/callback",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
       "kitezh://verify-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
     ),
     "/verify-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+  );
+  assert.equal(
+    resolveNativeIntentPath(
+      "kitezh://confirm-email/?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
+    ),
+    "/confirm-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
   );
   assert.equal(
     resolveNativeIntentPath(

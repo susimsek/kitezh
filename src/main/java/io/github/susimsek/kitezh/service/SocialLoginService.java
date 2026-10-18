@@ -237,6 +237,23 @@ public class SocialLoginService {
                 .toList();
     }
 
+    /** Resolves a visible login alias to its OAuth registration only when it is configured. */
+    public String mobileLoginRegistrationId(String alias) {
+        SocialProviderDTO visibleProvider =
+                availableProviders().stream()
+                        .filter(provider -> provider.provider().equals(alias))
+                        .filter(SocialProviderDTO::configured)
+                        .filter(provider -> !"saml".equalsIgnoreCase(provider.providerType()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("provider_unavailable"));
+        SocialProviderSettingsService.ProviderCredentials configuredProvider =
+                socialProviderSettingsService.provider(visibleProvider.provider());
+        if (configuredProvider == null) {
+            throw new IllegalArgumentException("provider_unavailable");
+        }
+        return configuredProvider.registrationId();
+    }
+
     public List<SocialLinkDTO> socialLinks(String username) {
         Set<String> linked = linkedProviders(username);
         return socialProviderSettingsService.effectiveProviders().stream()

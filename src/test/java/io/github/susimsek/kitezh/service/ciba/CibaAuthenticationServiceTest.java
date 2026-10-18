@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
@@ -302,6 +303,49 @@ class CibaAuthenticationServiceTest {
         when(requestRepository.findByAuthReqIdForUpdate("coded")).thenReturn(Optional.of(coded));
         service.deny("coded", "admin", "K7P4M2Q9");
         assertThat(coded.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.DENIED);
+    }
+
+    @Test
+    void nativeMfaApprovalIsOwnerBoundAndRejectsReplay() {
+        CibaAuthenticationRequestEntity request = request("admin", Instant.now().plusSeconds(60));
+        request.setUserCode("K7P4M2Q9");
+        when(requestRepository.findByAuthReqIdForUpdate("request"))
+                .thenReturn(Optional.of(request));
+
+        AtomicBoolean mfaConsumed = new AtomicBoolean();
+        assertProtocol(
+                () ->
+                        service.approveWithNativeMfa(
+                                "request",
+                                "other",
+                                "K7P4M2Q9",
+                                () -> {
+                                    mfaConsumed.set(true);
+                                    return true;
+                                }),
+                "access_denied");
+        assertThat(mfaConsumed).isFalse();
+
+        assertThat(service.approveWithNativeMfa("request", "admin", "K7P4M2Q9", () -> false))
+                .isFalse();
+        assertThat(request.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.PENDING);
+
+        assertThat(service.approveWithNativeMfa("request", "admin", "K7P4M2Q9", () -> true))
+                .isTrue();
+        assertThat(request.getStatus()).isEqualTo(CibaAuthenticationRequestStatus.APPROVED);
+
+        assertProtocol(
+                () ->
+                        service.approveWithNativeMfa(
+                                "request",
+                                "admin",
+                                "K7P4M2Q9",
+                                () -> {
+                                    mfaConsumed.set(true);
+                                    return true;
+                                }),
+                "access_denied");
+        assertThat(mfaConsumed).isFalse();
     }
 
     @Test

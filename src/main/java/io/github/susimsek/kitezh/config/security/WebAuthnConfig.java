@@ -140,12 +140,14 @@ public class WebAuthnConfig {
             String configuredOrigin = issuer.getScheme() + "://" + issuer.getRawAuthority();
             String configuredOrigins = applicationProperties.webAuthn().allowedOrigins();
             Set<String> allowedOrigins =
-                    configuredOrigins == null || configuredOrigins.isBlank()
-                            ? Set.of(configuredOrigin)
-                            : Arrays.stream(configuredOrigins.split(","))
-                                    .map(String::trim)
-                                    .filter(origin -> !origin.isBlank())
-                                    .collect(Collectors.toUnmodifiableSet());
+                    java.util.stream.Stream.concat(
+                                    java.util.stream.Stream.of(configuredOrigin),
+                                    configuredOrigins == null || configuredOrigins.isBlank()
+                                            ? java.util.stream.Stream.empty()
+                                            : Arrays.stream(configuredOrigins.split(",")))
+                            .map(String::trim)
+                            .filter(origin -> !origin.isBlank())
+                            .collect(Collectors.toUnmodifiableSet());
             String rpName = value(policy.rpName());
             if (rpName.isBlank()) {
                 rpName = applicationProperties.webAuthn().rpName();

@@ -5,6 +5,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(name = "RegistrationCaptcha", description = "Public registration CAPTCHA settings.")
 public record RegistrationCaptchaDTO(
         @Schema(description = "Whether CAPTCHA protection is active.") boolean enabled,
+        @Schema(description = "Whether native clients must provide a CAPTCHA token.")
+                boolean nativeRequired,
+        @Schema(description = "Whether native mobile CAPTCHA keys are configured.")
+                boolean nativeEnabled,
         @Schema(
                         description = "CAPTCHA provider.",
                         allowableValues = {"recaptcha", "enterprise"})
@@ -14,4 +18,8 @@ public record RegistrationCaptchaDTO(
         @Schema(description = "Whether the provider uses invisible score-based v3 mode.")
                 boolean recaptchaV3,
         @Schema(description = "Whether scripts are loaded from recaptcha.net.")
-                boolean useRecaptchaNet) {}
+                boolean useRecaptchaNet,
+        @Schema(description = "Android reCAPTCHA Enterprise mobile key identifier.")
+                String androidSiteKey,
+        @Schema(description = "iOS reCAPTCHA Enterprise mobile key identifier.")
+                String iosSiteKey) {}

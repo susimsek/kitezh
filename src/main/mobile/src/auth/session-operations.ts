@@ -7,6 +7,7 @@ const refreshByNamespace = new Map<
   SingleFlight<MobileSession | null>
 >();
 const generationByNamespace = new Map<MobileSessionNamespace, number>();
+const mutationByNamespace = new Map<MobileSessionNamespace, Promise<void>>();
 
 export function sessionRefreshCoordinator(
   namespace: MobileSessionNamespace,
@@ -38,4 +39,31 @@ export function isSessionOperationCurrent(
   generation: number,
 ): boolean {
   return sessionOperationGeneration(namespace) === generation;
+}
+
+export function runSessionStorageMutation<T>(
+  namespace: MobileSessionNamespace,
+  operation: () => Promise<T>,
+  generation?: number,
+): Promise<T | undefined> {
+  const previous = mutationByNamespace.get(namespace) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => {
+      if (
+        generation !== undefined &&
+        !isSessionOperationCurrent(namespace, generation)
+      ) {
+        return undefined;
+      }
+      return operation();
+    });
+  mutationByNamespace.set(
+    namespace,
+    current.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return current;
 }

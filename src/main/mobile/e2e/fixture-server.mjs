@@ -44,7 +44,7 @@ function redirect(response, location) {
   response.end();
 }
 
-function authorizePage(url, onAuthorizationCode = () => {}) {
+function authorizePage(url, challenges, onAuthorizationCode = () => {}) {
   const redirectUri = url.searchParams.get("redirect_uri");
   const state = url.searchParams.get("state");
   if (!redirectUri || !state) return null;
@@ -69,12 +69,71 @@ function authorizePage(url, onAuthorizationCode = () => {}) {
   callback.searchParams.set("code", code);
   callback.searchParams.set("state", state);
   const callbackUrl = callback.toString();
+  const challengeId = randomBytes(18).toString("hex");
+  challenges.set(challengeId, { redirectUri, state });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Kitezh fixture sign in</title></head>
 <body><main><h1>Kitezh fixture account</h1>
 <p>This deterministic account is used only by native development-build tests.</p>
-<a href="${escapeHtml(callbackUrl)}">Continue with fixture account</a>
+<p><a href="${escapeHtml(callbackUrl)}">Continue with fixture account</a></p>
+<p><a href="/fixture/mfa?challenge=${challengeId}">Continue with MFA and required actions</a></p>
 </main></body></html>`;
+}
+
+function fixtureHtml(response, body, status = 200) {
+  response.writeHead(status, {
+    "Cache-Control": "no-store",
+    "Content-Type": "text/html; charset=utf-8",
+  });
+  response.end(body);
+}
+
+function challengePage(
+  challengeId,
+  { error = "", requiredAction = false } = {},
+) {
+  const heading = requiredAction
+    ? "Update password"
+    : "Two-factor authentication";
+  const label = requiredAction ? "New password" : "Authenticator code";
+  const button = requiredAction ? "Complete required action" : "Verify code";
+  const action = requiredAction ? "required-action" : "mfa";
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${heading}</title></head>
+<body><main><h1>${heading}</h1>
+${error ? `<p role="alert">${error}</p>` : ""}
+<form action="/fixture/${action}" method="post">
+<input type="hidden" name="challenge" value="${challengeId}">
+<label for="challenge-value">${label}</label>
+<input id="challenge-value" name="value" autocomplete="one-time-code" required>
+<button type="submit">${button}</button>
+</form></main></body></html>`;
+}
+
+async function readForm(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+}
+
+async function readJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function finishAuthorization(response, challenges, challengeId) {
+  const transaction = challenges.get(challengeId);
+  if (!transaction) {
+    response.writeHead(400, { "Cache-Control": "no-store" });
+    response.end("Invalid or completed fixture challenge");
+    return;
+  }
+  challenges.delete(challengeId);
+  const callback = new URL(transaction.redirectUri);
+  callback.searchParams.set("code", randomBytes(18).toString("hex"));
+  callback.searchParams.set("state", transaction.state);
+  redirect(response, callback.toString());
 }
 
 function escapeHtml(value) {
@@ -186,6 +245,10 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
   const fixtureSocialTransactions = new Map();
   const fixtureSocialCodes = new Map();
   const fixturePersonalAccessTokens = [];
+  const authorizationChallenges = new Map();
+  let discoveryMode = "normal";
+  let accountMfaEnabled = false;
+  let recoveryCodesRemaining = 0;
   const routes = new Map([
     [
       "GET /health",
@@ -194,6 +257,16 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
     [
       "GET /.well-known/openid-configuration",
       (_request, response, url) => {
+        if (discoveryMode === "unavailable-once") {
+          discoveryMode = "normal";
+          writeJson(response, 503, { title: "Unavailable" });
+          return;
+        }
+        if (discoveryMode === "timeout-once") {
+          discoveryMode = "normal";
+          void timeoutResponse(new URL("/?delay=15000", "http://fixture"), response);
+          return;
+        }
         const issuer = `http://${url.host}`;
         writeJson(response, 200, {
           issuer,
@@ -204,9 +277,50 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       },
     ],
     [
+      "POST /fixture/discovery-mode",
+      (_request, response, url) => {
+        const mode = url.searchParams.get("mode");
+        if (mode !== "normal" && mode !== "unavailable-once" && mode !== "timeout-once") {
+          writeJson(response, 400, { title: "Invalid discovery fixture mode" });
+          return;
+        }
+        discoveryMode = mode;
+        writeJson(response, 200, { mode: discoveryMode });
+      },
+    ],
+    [
+      "POST /api/auth/mobile/login/passkey/begin",
+      async (request, response) => {
+        const body = await readJson(request);
+        if (body.username !== "fixture-user") {
+          writeJson(response, 401, { title: "Passkey authentication failed", status: 401 });
+          return;
+        }
+        writeJson(response, 200, {
+          status: "passkey_required",
+          transactionId: "fixture-passkey",
+          publicKey: {
+            challenge: randomBytes(32).toString("base64url"),
+            rpId: "kitezh.onrender.com",
+            timeout: 60000,
+            userVerification: "preferred",
+            allowCredentials: [
+              { type: "public-key", id: randomBytes(24).toString("base64url") },
+            ],
+          },
+        });
+      },
+    ],
+    [
+      "POST /api/auth/mobile/login/fixture-passkey/passkey/verify",
+      (_request, response) => {
+        writeJson(response, 401, { title: "Fixture cannot verify passkey assertions", status: 401 });
+      },
+    ],
+    [
       "GET /oauth2/authorize",
       (_request, response, url) => {
-        const page = authorizePage(url, (code, state) => {
+        const page = authorizePage(url, authorizationChallenges, (code, state) => {
           const transaction = fixtureSocialTransactions.get(state);
           if (transaction) fixtureSocialCodes.set(code, transaction);
         });
@@ -214,11 +328,81 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
           writeJson(response, 400, { title: "Invalid authorization request" });
           return;
         }
-        response.writeHead(200, {
-          "Cache-Control": "no-store",
-          "Content-Type": "text/html; charset=utf-8",
-        });
-        response.end(page);
+        fixtureHtml(response, page);
+      },
+    ],
+    [
+      "GET /fixture/mfa",
+      (_request, response, url) => {
+        const challengeId = url.searchParams.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        fixtureHtml(response, challengePage(challengeId));
+      },
+    ],
+    [
+      "POST /fixture/mfa",
+      async (request, response) => {
+        const form = await readForm(request);
+        const challengeId = form.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        if (form.get("value") !== "123456") {
+          fixtureHtml(
+            response,
+            challengePage(challengeId, {
+              error: "Enter a valid authenticator code.",
+            }),
+            400,
+          );
+          return;
+        }
+        redirect(response, `/fixture/required-action?challenge=${challengeId}`);
+      },
+    ],
+    [
+      "GET /fixture/required-action",
+      (_request, response, url) => {
+        const challengeId = url.searchParams.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        fixtureHtml(
+          response,
+          challengePage(challengeId, { requiredAction: true }),
+        );
+      },
+    ],
+    [
+      "POST /fixture/required-action",
+      async (request, response) => {
+        const form = await readForm(request);
+        const challengeId = form.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        if (form.get("value") !== "Good") {
+          fixtureHtml(
+            response,
+            challengePage(challengeId, {
+              error: "Password does not meet policy.",
+              requiredAction: true,
+            }),
+            400,
+          );
+          return;
+        }
+        finishAuthorization(response, authorizationChallenges, challengeId);
       },
     ],
     [
@@ -406,7 +590,7 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       "GET /api/account/mfa",
       (request, response) => {
         writeAuthorizedJson(request, response, fixtureTokens, {
-          enabled: false,
+          enabled: accountMfaEnabled,
           available: true,
           required: false,
           issuer: "Kitezh Fixture",
@@ -426,6 +610,76 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
           algorithm: "SHA1",
           digits: 6,
           periodSeconds: 30,
+        });
+      },
+    ],
+    [
+      "POST /api/account/mfa/enable",
+      async (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        const body = await readJson(request);
+        if (body.code !== "123456") {
+          writeJson(response, 400, {
+            title: "Invalid authenticator code",
+            status: 400,
+            violations: [{ field: "code", message: "Enter a valid authenticator code." }],
+          });
+          return;
+        }
+        accountMfaEnabled = true;
+        response.writeHead(204, { "Cache-Control": "no-store" });
+        response.end();
+      },
+    ],
+    [
+      "POST /api/account/mfa/disable",
+      async (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        const body = await readJson(request);
+        if (body.code !== "123456") {
+          writeJson(response, 400, {
+            title: "Invalid authenticator code",
+            status: 400,
+            violations: [{ field: "code", message: "Enter a valid authenticator code." }],
+          });
+          return;
+        }
+        accountMfaEnabled = false;
+        response.writeHead(204, { "Cache-Control": "no-store" });
+        response.end();
+      },
+    ],
+    [
+      "GET /api/account/mfa/recovery-codes",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          remaining: recoveryCodesRemaining,
+          warningThreshold: 2,
+        });
+      },
+    ],
+    [
+      "POST /api/account/mfa/recovery-codes",
+      (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        if (!accountMfaEnabled) {
+          writeJson(response, 409, { title: "MFA is not enabled", status: 409 });
+          return;
+        }
+        const recoveryCodes = ["F1XT-URE1", "F1XT-URE2", "F1XT-URE3"];
+        recoveryCodesRemaining = recoveryCodes.length;
+        writeJson(response, 200, {
+          codes: recoveryCodes,
+          remaining: recoveryCodesRemaining,
         });
       },
     ],

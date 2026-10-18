@@ -5,6 +5,7 @@ import {
   waitFor,
 } from "@/testing/native-testing-library";
 import { cleanup, fireEvent } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import NotificationsScreen from "@/app/notifications";
 import { listAccountNotifications, getAccountUnreadNotificationCount, markAccountNotificationRead } from "@/api/account-api";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
@@ -80,6 +81,35 @@ it("loads localized account notifications and marks them read once", async () =>
   );
   expect(await screen.findByText("Read")).toBeTruthy();
   expect(screen.getByText("Unread notifications: 0")).toBeTruthy();
+});
+
+it("keeps notification navigation and actions at Android's 48 dp touch target", async () => {
+  jest.mocked(listAccountNotifications).mockResolvedValueOnce({
+    content: [
+      {
+        id: "notice-1",
+        messageKey: "notificationAccountMfaEnabled",
+        createdAt: "2026-10-17T10:00:00Z",
+        read: false,
+      },
+    ],
+    totalElements: 2,
+    totalPages: 2,
+    number: 0,
+    size: 1,
+  });
+
+  renderNotifications();
+
+  const controls = [
+    await screen.findByRole("button", { name: "Back" }),
+    await screen.findByRole("button", { name: "Mark as read" }),
+    await screen.findByRole("button", { name: "Next" }),
+  ];
+
+  for (const control of controls) {
+    expect(StyleSheet.flatten(control.props.style).minHeight).toBeGreaterThanOrEqual(48);
+  }
 });
 
 it("uses a safe localized fallback for unknown notification keys", async () => {

@@ -154,6 +154,26 @@ public class MfaService {
         return valid;
     }
 
+    @Transactional(noRollbackFor = ApiException.class)
+    @CacheEvict(cacheNames = UserRepository.USER_BY_USERNAME_CACHE, key = "#username")
+    public boolean validForStepUp(String username, String code) {
+        if (isMfaLocked(username)) {
+            return false;
+        }
+        LoginSettingsEntity settings = settings();
+        UserEntity user = userForMfaUpdate(username);
+        boolean valid =
+                !user.isMfaPermanentlyLocked()
+                        && user.isTotpEnabled()
+                        && consumeCode(user, settings, code, false);
+        if (valid) {
+            recordMfaSuccess(username);
+        } else {
+            recordMfaFailure(username);
+        }
+        return valid;
+    }
+
     private void rejectIfMfaLocked(String username) {
         if (isMfaLocked(username)) {
             throw ApiException.badRequest(
@@ -190,6 +210,11 @@ public class MfaService {
     }
 
     private boolean consumeCode(UserEntity user, LoginSettingsEntity settings, String code) {
+        return consumeCode(user, settings, code, settings.isOtpCodeReusable());
+    }
+
+    private boolean consumeCode(
+            UserEntity user, LoginSettingsEntity settings, String code, boolean allowReusable) {
         if (user.getTotpSecret() == null) {
             return false;
         }
@@ -202,7 +227,7 @@ public class MfaService {
                         settings.getOtpPeriodSeconds(),
                         settings.getOtpLookAheadWindow());
         if (counter.isEmpty()
-                || (!settings.isOtpCodeReusable()
+                || (!allowReusable
                         && counter.getAsLong()
                                 == (user.getTotpLastUsedCounter() == null
                                         ? Long.MIN_VALUE

@@ -1,5 +1,7 @@
 package io.github.susimsek.kitezh.service.security;
 
+import io.github.susimsek.kitezh.config.MobileCaptchaProperties;
+import io.github.susimsek.kitezh.dto.account.MobileLoginPlatform;
 import io.github.susimsek.kitezh.dto.account.RegistrationCaptchaDTO;
 import io.github.susimsek.kitezh.dto.captcha.CaptchaEnterpriseEventDTO;
 import io.github.susimsek.kitezh.dto.captcha.CaptchaEnterpriseRequestDTO;
@@ -28,6 +30,7 @@ public class RegistrationCaptchaService {
 
     private final RegistrationCaptchaSettingsService settingsService;
     private final RegistrationCaptchaClient captchaClient;
+    private final MobileCaptchaProperties mobileCaptchaProperties;
 
     public RegistrationCaptchaDTO publicSettings() {
         return publicSettingsInternal(publicConfiguration());
@@ -38,16 +41,21 @@ public class RegistrationCaptchaService {
     }
 
     private RegistrationCaptchaDTO publicSettingsInternal(RegistrationCaptchaConfiguration config) {
-        if (!isEnabled(config) || !isConfigured(config)) {
-            return new RegistrationCaptchaDTO(false, "", "", "", false, false);
-        }
+        boolean policyEnabled = isEnabled(config);
+        boolean enabled = policyEnabled && isConfigured(config);
+        boolean nativeEnabled = isNativeConfigured(config);
+        boolean browserConfigured = isConfigured(config);
         return new RegistrationCaptchaDTO(
-                true,
-                provider(config),
-                config.siteKey().trim(),
+                enabled,
+                policyEnabled,
+                nativeEnabled,
+                policyEnabled ? provider(config) : "",
+                browserConfigured ? config.siteKey().trim() : "",
                 action(config),
                 config.recaptchaV3(),
-                config.useRecaptchaNet());
+                config.useRecaptchaNet(),
+                nativeEnabled ? nativeSiteKey(MobileLoginPlatform.ANDROID, config) : "",
+                nativeEnabled ? nativeSiteKey(MobileLoginPlatform.IOS, config) : "");
     }
 
     public void verifyOrThrow(String token, HttpServletRequest request) {
@@ -56,6 +64,114 @@ public class RegistrationCaptchaService {
 
     public void verifyLoginOrThrow(String token, HttpServletRequest request) {
         verifyInternal(token, request, loginVerificationConfiguration());
+    }
+
+    public void verifyMobileLoginOrThrow(
+            String token, MobileLoginPlatform platform, HttpServletRequest request) {
+        verifyMobileOrThrow(token, platform, request, loginVerificationConfiguration());
+    }
+
+    public void verifyMobileRegistrationOrThrow(
+            String token, MobileLoginPlatform platform, HttpServletRequest request) {
+        verifyMobileOrThrow(token, platform, request, verificationConfiguration());
+    }
+
+    private void verifyMobileOrThrow(
+            String token,
+            MobileLoginPlatform platform,
+            HttpServletRequest request,
+            RegistrationCaptchaConfiguration config) {
+        if (!isEnabled(config)) {
+            return;
+        }
+        if (platform == null) {
+            throw ApiException.badRequest(
+                    "captchaToken", ApiErrorCode.CAPTCHA_FAILED, "CAPTCHA verification failed");
+        }
+        String siteKey = nativeSiteKey(platform, config);
+        if (!ENTERPRISE_PROVIDER.equals(provider(config))
+                || !present(siteKey)
+                || !present(config.projectId())
+                || !present(config.apiKey())
+                || !validAction(action(config))
+                || !validScoreThreshold(config.scoreThreshold())
+                || token == null
+                || token.isBlank()
+                || !verifyNativeEnterprise(config, token.trim(), platform, siteKey, request)) {
+            throw ApiException.badRequest(
+                    "captchaToken", ApiErrorCode.CAPTCHA_FAILED, "CAPTCHA verification failed");
+        }
+    }
+
+    private boolean verifyNativeEnterprise(
+            RegistrationCaptchaConfiguration config,
+            String token,
+            MobileLoginPlatform platform,
+            String siteKey,
+            HttpServletRequest request) {
+        try {
+            CaptchaEnterpriseEventDTO event =
+                    new CaptchaEnterpriseEventDTO(
+                            token,
+                            siteKey,
+                            request.getHeader("User-Agent"),
+                            request.getRemoteAddr(),
+                            action(config));
+            CaptchaEnterpriseResponseDTO response =
+                    captchaClient.assess(
+                            URI.create(
+                                    "https://recaptchaenterprise.googleapis.com/v1/projects/"
+                                            + config.projectId().trim()
+                                            + "/assessments?key="
+                                            + config.apiKey().trim()),
+                            new CaptchaEnterpriseRequestDTO(event));
+            if (response == null
+                    || response.tokenProperties() == null
+                    || response.riskAnalysis() == null
+                    || response.event() == null) {
+                return false;
+            }
+            var properties = response.tokenProperties();
+            boolean appMatches =
+                    platform == MobileLoginPlatform.ANDROID
+                            ? mobileCaptchaProperties
+                                    .androidPackageName()
+                                    .equals(properties.androidPackageName())
+                            : mobileCaptchaProperties
+                                    .iosBundleId()
+                                    .equals(properties.iosBundleId());
+            return properties.valid()
+                    && appMatches
+                    && actionMatches(properties.action(), action(config))
+                    && actionMatches(response.event().expectedAction(), action(config))
+                    && response.riskAnalysis().score() >= config.scoreThreshold();
+        } catch (Exception exception) {
+            log.warn(
+                    "Native CAPTCHA verification failed ({})",
+                    exception.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    private String nativeSiteKey(
+            MobileLoginPlatform platform, RegistrationCaptchaConfiguration config) {
+        if (!ENTERPRISE_PROVIDER.equals(provider(config))) {
+            return "";
+        }
+        return platform == MobileLoginPlatform.ANDROID
+                ? mobileCaptchaProperties.androidSiteKey()
+                : mobileCaptchaProperties.iosSiteKey();
+    }
+
+    private boolean isNativeConfigured(RegistrationCaptchaConfiguration config) {
+        return isEnabled(config)
+                && ENTERPRISE_PROVIDER.equals(provider(config))
+                && present(mobileCaptchaProperties.androidSiteKey())
+                && present(mobileCaptchaProperties.iosSiteKey())
+                && present(config.projectId())
+                && present(config.apiKey())
+                && validAction(action(config))
+                && validScoreThreshold(config.scoreThreshold());
     }
 
     private void verifyInternal(
