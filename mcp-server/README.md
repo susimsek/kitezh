@@ -16,30 +16,53 @@ Register a public OAuth client for each MCP host with its exact redirect URI, Au
 
 The MCP resource URI is a stable identifier and must be identical in the authorization server's `APP_MCP_RESOURCE_AUDIENCE`, the MCP service's `APP_SECURITY_AUDIENCE`, and `APP_MCP_PUBLIC_URL`. The local example uses the Render URL as that stable resource identifier while connecting to the local server process. For a custom production domain, update all three values together.
 
-## Connect an MCP client
+## Authentication and authorization
 
-The remote endpoint is `https://kitezh-mcp.onrender.com/mcp` (replace it with the MCP service's public URL if you use a custom domain). It uses Streamable HTTP and OAuth bearer tokens. Do not put an access token, client secret, or service credential in a checked-in MCP client config.
+The MCP endpoint is `https://kitezh-mcp.onrender.com/mcp` (replace it with the MCP service's public URL if you use a custom domain). It uses Streamable HTTP and accepts user access tokens. Choose either OAuth 2.0 Authorization Code with PKCE or a personal access token (PAT). Both represent the signed-in user and require `mcp.read`. Do not put a bearer token or client secret in a committed client config.
 
-### Before connecting Claude Code or Codex
+### OAuth 2.0 Authorization Code with PKCE
 
-Kitezh uses pre-registered OAuth clients and does not currently implement Dynamic Client Registration (DCR). Register a separate public OAuth client for each MCP host in the Kitezh Authorization Server. Add that host's exact localhost callback URI to its redirect URI allowlist, enable Authorization Code + PKCE (S256), and grant only `openid` and `mcp.read`. Use the issued client ID in the host configuration below. The seeded `mcp-client` client is for MCP Inspector at `http://localhost:6274/oauth/callback`, not Claude Code or Codex.
+Use OAuth when the MCP client should sign the user in through a browser. The client discovers the protected resource metadata at `/.well-known/oauth-protected-resource`, then uses the Kitezh Authorization Server issuer and its OAuth metadata to start Authorization Code with PKCE (S256). Dynamic Client Registration is not enabled, so register a public client for each MCP host first.
 
-### Claude Code
+Flow:
 
-Pick a fixed callback port and register `http://localhost:8765/callback` on the Claude Code public client. Then add the remote server and authenticate:
+1. The MCP client sends a request to `/mcp` and receives `401` with the protected-resource metadata URL and required `mcp.read` scope.
+2. The MCP client reads the metadata and starts authorization at the Kitezh issuer with its registered `client_id`, exact callback URI, PKCE challenge, and `mcp.read` scope.
+3. The user signs in to Kitezh in the browser. The client receives the authorization code at its local callback and posts it with the PKCE verifier to `/oauth2/token`.
+4. The MCP client calls `/mcp` with the returned access token. MCP verifies its signature, issuer, MCP resource audience, and `mcp.read` scope.
+5. MCP forwards that same user token to the Admin API. The API verifies the token is active and has the MCP and `admin-api` audiences, then applies its GET-only MCP route allowlist and the user's role permissions.
 
-```bash
-claude mcp add --transport http \
-  --client-id '<claude-oauth-client-id>' \
-  --callback-port 8765 \
-  kitezh https://kitezh-mcp.onrender.com/mcp
-```
+No MCP client secret or token exchange is used. Access tokens are short lived; the MCP host handles refresh or asks the user to sign in again according to its OAuth support.
 
-In Claude Code, run `/mcp` and complete the Kitezh sign-in flow in the browser. Confirm the connection with `claude mcp get kitezh` or `claude mcp list`. The callback must match the URI registered for that OAuth client exactly.
+Production discovery and token endpoints:
 
-### Codex
+- MCP protected-resource metadata: `https://kitezh-mcp.onrender.com/.well-known/oauth-protected-resource`
+- Authorization Server metadata: `https://kitezh.onrender.com/.well-known/oauth-authorization-server`
+- Authorization: `https://kitezh.onrender.com/oauth2/authorize`
+- Token: `https://kitezh.onrender.com/oauth2/token`
+- Signing keys: `https://kitezh.onrender.com/oauth2/jwks`
 
-Add the remote endpoint with the separately registered Codex public client ID:
+### Personal access token (PAT)
+
+Use a PAT for a client that accepts a configured bearer token and does not need browser-based OAuth. Sign in to the Account Console (`admin/admin` or `user/user` in local development), open **Security → Personal access tokens**, create a token, and choose its name, description, and expiration. The expiration choices include 7, 30, 60, 90 days, a custom date, and **Never expires**. Copy the bearer value when it is shown; it cannot be retrieved later. Revoking the PAT in the Account Console removes its authorization. Store it in a local secret store or environment variable.
+
+The PAT is a signed user access token with the MCP and `admin-api` audiences and the `mcp.read` scope. MCP forwards it unchanged to the Admin API, which checks that it is active and enforces the same GET-only route allowlist and user role permissions as the OAuth flow. PAT use does not require an OAuth client registration, client secret, or token exchange.
+
+Client-specific OAuth and PAT configuration examples are in [Connect from MCP clients](#connect-from-mcp-clients).
+
+## Connect from MCP clients
+
+The server URL is `https://kitezh-mcp.onrender.com/mcp`. Kitezh supports two user-authentication methods: browser-based OAuth 2.0 Authorization Code + PKCE, and a personal access token (PAT) sent as `Authorization: Bearer <token>`. Use a separate PAT per client so access can be revoked independently. Never commit a token in a project MCP configuration.
+
+### OAuth client registration
+
+Kitezh does not currently support Dynamic Client Registration (DCR). For an OAuth client that allows a pre-registered client ID, create a separate public client in the Kitezh Authorization Server for that MCP host. Enable Authorization Code + PKCE (S256), allow only the exact callback URI used by that host, and grant `openid` and `mcp.read`. Do not configure a client secret for a public client. The seeded `mcp-client` is for MCP Inspector only (`http://localhost:6274/oauth/callback`).
+
+Some clients only support automatic OAuth registration and do not let you provide a pre-registered client ID. Their OAuth sign-in will not work with Kitezh until that client supports a configured client ID or Kitezh enables a compatible registration method. Use PAT where the client supports custom bearer headers. The sections below call out this limitation instead of assuming every OAuth button can connect.
+
+### Codex CLI and IDE extension
+
+[Codex CLI and IDE extension](https://developers.openai.com/codex/mcp) share the same MCP configuration. For OAuth, add the MCP server with a separately registered public client ID:
 
 ```bash
 codex mcp add kitezh \
@@ -47,7 +70,153 @@ codex mcp add kitezh \
   --oauth-client-id '<codex-oauth-client-id>'
 ```
 
-Run `codex mcp login kitezh`, complete the browser sign-in, then check `/mcp` in the Codex TUI or run `codex mcp list`. Codex prints or uses its OAuth callback during setup; register the exact callback URI it requests on that OAuth client before login. Codex CLI and its IDE extension share the MCP configuration.
+Codex prints the callback URI when adding the server. Add that exact URI to the OAuth client's redirect URI list, then run:
+
+```bash
+codex mcp login kitezh
+codex mcp list
+```
+
+For PAT authentication, put the token in the local shell environment before starting Codex:
+
+```bash
+export KITEZH_MCP_TOKEN='<kitezh-pat>'
+```
+
+Add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.kitezh]
+url = "https://kitezh-mcp.onrender.com/mcp"
+bearer_token_env_var = "KITEZH_MCP_TOKEN"
+```
+
+In the Codex TUI, use `/mcp` to confirm the server and its tools are available.
+
+### Claude Code
+
+[Claude Code](https://code.claude.com/docs/en/mcp) supports a pre-registered public client. Choose a fixed callback port and register `http://localhost:8765/callback` on that client, then add the server:
+
+```bash
+claude mcp add --transport http \
+  --client-id '<claude-code-oauth-client-id>' \
+  --callback-port 8765 \
+  kitezh https://kitezh-mcp.onrender.com/mcp
+```
+
+Run `/mcp` in Claude Code and complete Kitezh sign-in in the browser. Verify with `claude mcp get kitezh` or `claude mcp list`. The registered callback must match exactly.
+
+For PAT authentication, export the token before launching Claude Code and use a local `.mcp.json` (do not commit the resolved token):
+
+```bash
+export KITEZH_MCP_TOKEN='<kitezh-pat>'
+```
+
+```json
+{
+  "mcpServers": {
+    "kitezh": {
+      "type": "http",
+      "url": "https://kitezh-mcp.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${KITEZH_MCP_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Claude Code expands environment variables in HTTP headers. Keep this file local or replace the PAT with a secure environment-based configuration before sharing it.
+
+### Claude Desktop and Claude on the web
+
+Add a remote connector from **Settings → Connectors → Add custom connector**, then enter `https://kitezh-mcp.onrender.com/mcp` and continue through the sign-in flow. See Anthropic's [remote MCP connector guide](https://support.anthropic.com/en/articles/11503834-building-custom-integrations-via-remote-mcp). Claude Desktop uses this remote connector flow; a local `claude_desktop_config.json` entry is for local MCP processes, not this hosted HTTP server.
+
+Kitezh currently has DCR disabled, while the Claude connector UI does not expose a field for a Kitezh pre-registered client ID. Therefore the OAuth login is not currently compatible with this UI. This will work once Kitezh or the connector supports a compatible client registration path. Claude Code supports a configured client ID as shown above.
+
+### Cursor
+
+Add the remote HTTP server to `~/.cursor/mcp.json` for all workspaces or `.cursor/mcp.json` for one workspace, following [Cursor's MCP guide](https://docs.cursor.com/context/model-context-protocol):
+
+```json
+{
+  "mcpServers": {
+    "kitezh": {
+      "url": "https://kitezh-mcp.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer <kitezh-pat>"
+      }
+    }
+  }
+}
+```
+
+Replace `<kitezh-pat>` locally and keep the file out of version control. Restart Cursor and authenticate or refresh the server from its MCP settings. Cursor's automatic OAuth registration cannot complete while Kitezh DCR is disabled; use a configured static OAuth client if your Cursor version exposes one, or use the PAT header above.
+
+### Visual Studio Code and GitHub Copilot Chat
+
+Create `.vscode/mcp.json` and use VS Code's secret input prompt for the PAT, following [VS Code's MCP setup guide](https://code.visualstudio.com/docs/agent-customization/mcp-servers):
+
+```json
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "kitezhMcpToken",
+      "description": "Kitezh personal access token",
+      "password": true
+    }
+  ],
+  "servers": {
+    "kitezh": {
+      "type": "http",
+      "url": "https://kitezh-mcp.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:kitezhMcpToken}"
+      }
+    }
+  }
+}
+```
+
+Open Copilot Chat in Agent mode and enable Kitezh in the tools picker. VS Code's OAuth **Auth** action depends on OAuth support for a pre-registered client; Kitezh DCR is currently disabled. For user-wide setup, add the same server under the `servers` object in your VS Code user MCP configuration.
+
+### GitHub Copilot CLI
+
+Add Kitezh as a remote Streamable HTTP server using a PAT, as described in the [Copilot CLI MCP guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers):
+
+```bash
+copilot mcp add --transport http \
+  --header "Authorization: Bearer <kitezh-pat>" \
+  kitezh https://kitezh-mcp.onrender.com/mcp
+```
+
+Run `copilot mcp list`, then `/mcp` in the interactive CLI to check the connection. Treat the PAT as a secret: the command may store the supplied header in the local Copilot configuration and shell history. For a safer setup, configure the header through the CLI's MCP configuration editor and secret/environment substitution supported by your installed version.
+
+### Windsurf Cascade
+
+In Windsurf, open **Cascade → MCPs → Configure** and add the hosted endpoint to `mcp_config.json`, following the [Cascade MCP guide](https://docs.devin.ai/desktop/cascade/mcp). The file is typically `~/.codeium/windsurf/mcp_config.json` on macOS/Linux:
+
+```json
+{
+  "mcpServers": {
+    "kitezh": {
+      "serverUrl": "https://kitezh-mcp.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:KITEZH_MCP_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Set `KITEZH_MCP_TOKEN` in the environment used to launch Windsurf, then reload Cascade. Windsurf supports environment interpolation in remote HTTP headers. Its OAuth path requires a compatible pre-registered client; Kitezh DCR is currently disabled.
+
+### ChatGPT custom MCP connector
+
+In a ChatGPT workspace that allows custom MCP connections, open **Plugins** (or the workspace's custom apps page), choose **Add custom MCP server**, and enter `https://kitezh-mcp.onrender.com/mcp`. Follow OpenAI's [custom MCP connection guide](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt). ChatGPT supports OAuth-based custom MCP connections, but its connection setup requires a supported client-registration method.
+
+Kitezh currently supports pre-registered OAuth clients only; it does not advertise DCR or CIMD. ChatGPT therefore cannot complete OAuth sign-in to this server yet. Do not paste a PAT into a shared workspace connector. Use Codex or Claude Code for pre-registered OAuth, or a local client configuration that supports PAT headers.
 
 ### MCP Inspector
 

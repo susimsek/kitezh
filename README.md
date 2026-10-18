@@ -449,6 +449,8 @@ native migration scope, platform boundaries, acceptance states, and delivery ord
 
 The authorization server browser session provides SSO between the login screen and the console clients. The Admin Console includes client, client-scope, user, role, session, consent, signing-key, event, and server-information screens. The Account Console provides personal information, password, TOTP MFA, and one-time recovery-code security, authorized applications, and session-management screens.
 
+To connect an MCP client, sign in to the Account Console with `admin/admin` or `user/user`, open **Security → Personal access tokens**, create a token with **Never expires**, and copy its value when it is shown. The value is shown only once; keep it in a local secret or environment variable and never commit it.
+
 The registered redirect and post-logout redirect URIs are seeded for `localhost:9090` and `https://kitezh.local`. When deploying elsewhere, set `app.authorization-server.issuer` (or `APP_AUTHORIZATIONSERVER_ISSUER`) to the public address and register matching client redirect URIs.
 
 ## Run Locally
