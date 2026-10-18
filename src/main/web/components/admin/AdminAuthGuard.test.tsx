@@ -15,6 +15,7 @@ const mockSetAccess = jest.fn();
 const mockSetUsername = jest.fn();
 const mockSetAvatarUrl = jest.fn();
 let pathname = "/admin";
+let searchParams = new URLSearchParams();
 let auth = {
   accessToken: "token" as string | null,
   beginAuthorization: mockBeginAuthorization,
@@ -36,7 +37,7 @@ jest.mock("@/lib/admin-api", () => ({
 jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
   usePathname: () => pathname,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
   useRouter: () => ({ replace: mockReplace }),
 }));
 jest.mock("./AdminAuthProvider", () => ({ useAdminAuth: () => auth }));
@@ -50,6 +51,7 @@ describe("AdminAuthGuard", () => {
       data: { username: "admin", authorities: ["ROLE_ADMIN"], access: { viewClients: true } },
     } as never);
     pathname = "/admin";
+    searchParams = new URLSearchParams();
     auth = {
       accessToken: "token",
       beginAuthorization: mockBeginAuthorization,
@@ -70,6 +72,17 @@ describe("AdminAuthGuard", () => {
     render(<AdminAuthGuard locale="en">Callback</AdminAuthGuard>);
     expect(screen.getByText("Callback")).toBeVisible();
     expect(mockAdminRequest).not.toHaveBeenCalled();
+  });
+
+  it("shows the loading state until the console is initialized or finished logging out", () => {
+    auth = { ...auth, initialized: false };
+    const view = render(<AdminAuthGuard locale="en">Dashboard</AdminAuthGuard>);
+    expect(screen.getByRole("status")).toBeVisible();
+
+    auth = { ...auth, initialized: true, isLoggingOut: true };
+    view.rerender(<AdminAuthGuard locale="en">Dashboard</AdminAuthGuard>);
+    expect(screen.getByRole("status")).toBeVisible();
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
   });
 
   it("loads whoami, registers token handlers and renders authorized content", async () => {
@@ -140,6 +153,58 @@ describe("AdminAuthGuard", () => {
     expect(screen.queryByText("Protected")).not.toBeInTheDocument();
   });
 
+  it("shows an authorization error when browser sign-in cannot start", async () => {
+    auth = { ...auth, accessToken: null };
+    mockBeginAuthorization.mockRejectedValueOnce(new Error("authorization unavailable"));
+
+    render(<AdminAuthGuard locale="en">Protected</AdminAuthGuard>);
+
+    expect(
+      await screen.findByText(
+        "Secure sign-in is currently unavailable. Check your connection and try again.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText("Protected")).not.toBeInTheDocument();
+  });
+
+  it("shows the desktop sign-in screen and starts browser authorization on demand", async () => {
+    Object.defineProperty(window, "desktopApi", {
+      configurable: true,
+      value: { isDesktop: true },
+    });
+    auth = { ...auth, accessToken: null };
+    let finishAuthorization: (() => void) | undefined;
+    mockBeginAuthorization.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finishAuthorization = resolve)),
+    );
+
+    render(<AdminAuthGuard locale="tr">Protected</AdminAuthGuard>);
+    const signInButton = screen.getByRole("button");
+    expect(signInButton).toBeEnabled();
+    signInButton.click();
+    await waitFor(() => expect(signInButton).toBeDisabled());
+    expect(mockBeginAuthorization).toHaveBeenCalledWith("tr", "/");
+    finishAuthorization?.();
+    await waitFor(() => expect(signInButton).toBeEnabled());
+    expect(screen.queryByText("Protected")).not.toBeInTheDocument();
+    delete (window as { desktopApi?: unknown }).desktopApi;
+  });
+
+  it("starts the requested desktop authorization flow automatically", async () => {
+    Object.defineProperty(window, "desktopApi", {
+      configurable: true,
+      value: { isDesktop: true },
+    });
+    searchParams = new URLSearchParams("desktopSignIn=1");
+    auth = { ...auth, accessToken: null };
+
+    render(<AdminAuthGuard locale="en">Protected</AdminAuthGuard>);
+
+    await waitFor(() => expect(mockBeginAuthorization).toHaveBeenCalledWith("en", "/"));
+    expect(mockAdminRequest).not.toHaveBeenCalled();
+    delete (window as { desktopApi?: unknown }).desktopApi;
+  });
+
   it("reauthorizes when the API token handler reports an unrecoverable 401", async () => {
     mockAdminRequest.mockResolvedValueOnce({ status: 401, data: null } as never);
     render(<AdminAuthGuard locale="en">Protected</AdminAuthGuard>);
@@ -201,5 +266,13 @@ describe("AdminAuthGuard", () => {
     await waitFor(() => expect(mockAdminRequest).toHaveBeenCalled());
     view.unmount();
     expect(registerAdminTokenHandlers).toHaveBeenCalledWith(undefined);
+  });
+
+  it("redirects when whoami returns a non-success response", async () => {
+    mockAdminRequest.mockResolvedValueOnce({ status: 302, data: null } as never);
+    render(<AdminAuthGuard locale="en">Protected</AdminAuthGuard>);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/auth-error?type=server_error"));
+    expect(screen.queryByText("Protected")).not.toBeInTheDocument();
   });
 });

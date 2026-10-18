@@ -181,6 +181,63 @@ describe("admin shared components", () => {
     await waitFor(() => expect(mockAdminRequest).toHaveBeenCalledTimes(3));
   });
 
+  it("renders dashboard events, readiness, server details, and signing key", async () => {
+    mockAdminRequest
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { clients: 8, users: 7, sessions: 6, consents: 5 },
+      } as never)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: {
+          content: [
+            {
+              id: "event-1",
+              actor: "admin",
+              action: "user.updated",
+              targetType: "user",
+              targetId: "user-1",
+              occurredAt: "2026-10-18T10:00:00Z",
+            },
+          ],
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: {
+          issuer: "https://issuer.example.test",
+          discoveryEndpoint: "https://issuer.example.test/.well-known/openid-configuration",
+          jwksEndpoint: "https://issuer.example.test/oauth2/jwks",
+          activeSigningKey: { kid: "key-1", algorithm: "RS256", createdAt: "2026-10-01" },
+        },
+      } as never);
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "UP" }),
+    }) as jest.MockedFunction<typeof fetch>;
+
+    render(<AdminDashboard dictionary={dictionary} />);
+
+    expect(await screen.findByText("user.updated")).toBeVisible();
+    expect(screen.getByText("UP")).toBeVisible();
+    expect(screen.getByText("https://issuer.example.test")).toBeVisible();
+    expect(screen.getByText("key-1")).toBeVisible();
+    expect(screen.getByText("RS256")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: dictionary.admin.dashboard.openServerInfo }),
+    ).toHaveAttribute("href", "/admin/server-info");
+    expect(
+      screen.getByRole("link", { name: dictionary.admin.dashboard.manageKeys }),
+    ).toHaveAttribute("href", "/admin/keys");
+    expect(screen.getByRole("link", { name: dictionary.admin.dashboard.viewAll })).toHaveAttribute(
+      "href",
+      "/admin/events",
+    );
+
+    global.fetch = originalFetch;
+  });
+
   it("loads clients, displays badges and changes page size", async () => {
     mockAdminRequest.mockResolvedValueOnce({
       status: 200,

@@ -469,6 +469,113 @@ describe("AccountProfileForm loading failures", () => {
     );
   });
 
+  it("validates profile length, boolean, multivalue, and valid pattern rules", async () => {
+    mockRequestAccount.mockImplementation(async (_token, request) => {
+      if (request.url === "/api/account/profile")
+        return {
+          username: "ada",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          email: "ada@example.test",
+          preferredLocale: "en",
+          emailVerified: true,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        } as never;
+      if (request.url === "/api/account/profile/attributes")
+        return {
+          definitions: [
+            {
+              name: "firstName",
+              displayName: "First name override",
+              description: null,
+              type: "STRING",
+              required: true,
+              multivalued: false,
+              minLength: null,
+              maxLength: null,
+              pattern: null,
+            },
+            {
+              name: "departmentCode",
+              displayName: "Department code",
+              description: null,
+              type: "STRING",
+              required: false,
+              multivalued: false,
+              minLength: 2,
+              maxLength: 4,
+              pattern: null,
+            },
+            {
+              name: "activeFlag",
+              displayName: "Active flag",
+              description: null,
+              type: "BOOLEAN",
+              required: false,
+              multivalued: false,
+              minLength: null,
+              maxLength: null,
+              pattern: null,
+            },
+            {
+              name: "labels",
+              displayName: "Labels",
+              description: null,
+              type: "STRING",
+              required: false,
+              multivalued: true,
+              minLength: null,
+              maxLength: null,
+              pattern: null,
+            },
+            {
+              name: "uppercaseCode",
+              displayName: "Uppercase code",
+              description: null,
+              type: "STRING",
+              required: false,
+              multivalued: false,
+              minLength: null,
+              maxLength: null,
+              pattern: "^[A-Z]+$",
+            },
+          ],
+          attributes: {
+            firstName: ["Ada"],
+            departmentCode: ["X"],
+            activeFlag: ["yes"],
+            labels: ["one", "two"],
+            uppercaseCode: ["OK"],
+          },
+        } as never;
+      return { avatarUrl: null } as never;
+    });
+
+    render(<AccountProfileForm dictionary={dictionary} />);
+    await screen.findByLabelText("Department code");
+    fireEvent.change(screen.getByLabelText("Department code"), { target: { value: "Y" } });
+    fireEvent.click(screen.getByTestId("save-profile"));
+    expect(await screen.findAllByText(dictionary.account.validation.invalid)).toHaveLength(2);
+    expect(mockRequestAccount).not.toHaveBeenCalledWith(
+      "access-token",
+      expect.objectContaining({ method: "PUT", url: "/api/account/profile" }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Department code"), { target: { value: "LONGER" } });
+    fireEvent.change(screen.getByLabelText("Department code"), { target: { value: "IT" } });
+    fireEvent.change(screen.getByLabelText("Active flag"), { target: { value: "true" } });
+    fireEvent.change(screen.getByLabelText("Uppercase code"), { target: { value: "ABC" } });
+    fireEvent.click(screen.getByTestId("save-profile"));
+
+    await waitFor(() =>
+      expect(mockRequestAccount).toHaveBeenCalledWith(
+        "access-token",
+        expect.objectContaining({ method: "PUT", url: "/api/account/profile" }),
+      ),
+    );
+  });
+
   it("requests the current password after email reauthentication and completes the retry", async () => {
     let profileUpdates = 0;
     mockRequestAccount.mockImplementation(async (_token, request) => {
