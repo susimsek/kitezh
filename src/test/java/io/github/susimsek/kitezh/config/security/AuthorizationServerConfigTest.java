@@ -54,6 +54,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.ObjectPostProcessor;
@@ -82,6 +85,7 @@ import org.springframework.security.oauth2.server.authorization.authentication.O
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeCompositeAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -183,6 +187,31 @@ class AuthorizationServerConfigTest {
 
         assertThat(jwtEncoder).isNotNull();
         assertThat(tokenGenerator).isNotNull();
+        assertThat(
+                        config.tokenGenerator(
+                                jwtEncoder,
+                                context -> context.getClaims().claim("test", true),
+                                mock(
+                                        io.github.susimsek.kitezh.service.security
+                                                .OAuth2ObservabilityMetrics.class),
+                                mock(
+                                        io.github.susimsek.kitezh.service.admin
+                                                .OfflineAccessPolicyService.class)))
+                .isNotNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void rejectsJwtEncodingWhenNoPrivateSigningKeyIsAvailable() {
+        JwtEncoder jwtEncoder = config.jwtEncoder(config.jwkSource(mock(OAuth2KeyService.class)));
+        Converter<List<JWK>, JWK> selector =
+                (Converter<List<JWK>, JWK>)
+                        org.springframework.test.util.ReflectionTestUtils.getField(
+                                jwtEncoder, "jwkSelector");
+
+        assertThatThrownBy(() -> selector.convert(List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No private OAuth2 signing key is available");
     }
 
     @Test
@@ -227,6 +256,82 @@ class AuthorizationServerConfigTest {
                         new LoggingProperties());
 
         assertThat(chain).isNotNull();
+    }
+
+    @Test
+    void publishesCibaMetadataForAuthorizationServerAndOidcDiscovery() throws Exception {
+        SecurityFilterChain chain =
+                config.authorizationServerSecurityFilterChain(
+                        httpSecurity(),
+                        mock(OAuth2TokenGenerator.class),
+                        mock(RegisteredClientRepository.class),
+                        new AuthorizationServerConfig.AuthorizationServerFilterDependencies(
+                                mock(RequiredActionAuthorizationFilter.class),
+                                mock(MfaAuthorizationFilter.class),
+                                mock(
+                                        org.springframework.security.crypto.password.PasswordEncoder
+                                                .class),
+                                mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                                mock(UmaTicketAuthenticationProvider.class),
+                                mock(TokenExchangeAuthenticationProvider.class),
+                                mock(SocialProviderLogoutSuccessHandler.class),
+                                mock(SecurityContextRepository.class),
+                                new ObservabilityMdcFilter()));
+        var metadataFilter =
+                chain.getFilters().stream()
+                        .filter(
+                                org.springframework.security.oauth2.server.authorization.web
+                                                .OAuth2AuthorizationServerMetadataEndpointFilter
+                                                .class
+                                        ::isInstance)
+                        .map(
+                                org.springframework.security.oauth2.server.authorization.web
+                                                .OAuth2AuthorizationServerMetadataEndpointFilter
+                                                .class
+                                        ::cast)
+                        .findFirst()
+                        .orElseThrow();
+        AuthorizationServerContext serverContext = mock(AuthorizationServerContext.class);
+        AuthorizationServerSettings serverSettings =
+                AuthorizationServerSettings.builder().issuer("https://issuer.example").build();
+        when(serverContext.getAuthorizationServerSettings()).thenReturn(serverSettings);
+        when(serverContext.getIssuer()).thenReturn("https://issuer.example");
+        org.springframework.security.oauth2.server.authorization.context
+                .AuthorizationServerContextHolder.setContext(serverContext);
+        var authorizationMetadataResponse = new MockHttpServletResponse();
+
+        metadataFilter.doFilter(
+                new MockHttpServletRequest("GET", "/.well-known/oauth-authorization-server"),
+                authorizationMetadataResponse,
+                (request, response) -> {});
+
+        assertThat(authorizationMetadataResponse.getStatus()).isEqualTo(200);
+        assertThat(authorizationMetadataResponse.getContentAsString())
+                .contains("backchannel_user_code_parameter");
+
+        var oidcFilter =
+                chain.getFilters().stream()
+                        .filter(
+                                org.springframework.security.oauth2.server.authorization.oidc.web
+                                                .OidcProviderConfigurationEndpointFilter.class
+                                        ::isInstance)
+                        .map(
+                                org.springframework.security.oauth2.server.authorization.oidc.web
+                                                .OidcProviderConfigurationEndpointFilter.class
+                                        ::cast)
+                        .findFirst()
+                        .orElseThrow();
+        var oidcMetadataResponse = new MockHttpServletResponse();
+        oidcFilter.doFilter(
+                new MockHttpServletRequest("GET", "/.well-known/openid-configuration"),
+                oidcMetadataResponse,
+                (request, response) -> {});
+
+        assertThat(oidcMetadataResponse.getStatus()).isEqualTo(200);
+        assertThat(oidcMetadataResponse.getContentAsString())
+                .contains("backchannel_user_code_parameter");
+        org.springframework.security.oauth2.server.authorization.context
+                .AuthorizationServerContextHolder.resetContext();
     }
 
     @Test

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
+import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.repository.AuthorizationRepository;
 import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import java.time.Instant;
@@ -12,14 +13,18 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 class ApiSecurityConfigTest {
@@ -63,6 +68,59 @@ class ApiSecurityConfigTest {
     }
 
     @Test
+    void evaluatesAdminWhoamiAuthorizationForApiAndMcpPurposeTokens() {
+        AdminApiSecurityConfig config = new AdminApiSecurityConfig();
+        JwtDecoder decoder =
+                config.adminApiJwtDecoder(
+                        mock(),
+                        new ApplicationProperties(),
+                        mock(AuthorizationRepository.class),
+                        mock(AuthorizationRevocationPolicyService.class));
+        String mcpAudience = "https://mcp.example.test/resource";
+        SecurityFilterChain chain =
+                config.adminApiSecurityFilterChain(
+                        httpSecurity(),
+                        decoder,
+                        new ApplicationProperties(),
+                        new LoggingProperties(),
+                        mcpAudience);
+        AuthorizationFilter authorizationFilter =
+                chain.getFilters().stream()
+                        .filter(AuthorizationFilter.class::isInstance)
+                        .map(AuthorizationFilter.class::cast)
+                        .findFirst()
+                        .orElseThrow();
+        var adminApiToken =
+                new JwtAuthenticationToken(
+                        jwt("api-token", List.of("admin-api"), "admin-api"),
+                        List.of(new SimpleGrantedAuthority("SCOPE_admin-api")));
+        var mcpToken =
+                new JwtAuthenticationToken(
+                        jwt("mcp-token", List.of(mcpAudience, "admin-api"), "mcp.read"));
+        var unrelatedToken = new JwtAuthenticationToken(jwt("unrelated", List.of(), "profile"));
+        var request = new MockHttpServletRequest("GET", "/api/admin/whoami");
+
+        assertThat(
+                        authorizationFilter
+                                .getAuthorizationManager()
+                                .authorize(() -> adminApiToken, request)
+                                .isGranted())
+                .isTrue();
+        assertThat(
+                        authorizationFilter
+                                .getAuthorizationManager()
+                                .authorize(() -> mcpToken, request)
+                                .isGranted())
+                .isTrue();
+        assertThat(
+                        authorizationFilter
+                                .getAuthorizationManager()
+                                .authorize(() -> unrelatedToken, request)
+                                .isGranted())
+                .isFalse();
+    }
+
+    @Test
     void buildsAccountApiSecurityChainAndCreatesDecoder() {
         AccountApiSecurityConfig config = new AccountApiSecurityConfig();
         JwtDecoder decoder =
@@ -90,5 +148,15 @@ class ApiSecurityConfigTest {
         httpSecurity.setSharedObject(
                 jakarta.servlet.ServletContext.class, new MockServletContext());
         return httpSecurity;
+    }
+
+    private static Jwt jwt(String token, List<String> audience, String scope) {
+        return Jwt.withTokenValue(token)
+                .header("alg", "none")
+                .audience(audience)
+                .claim("scope", scope)
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
     }
 }

@@ -151,6 +151,24 @@ class SamlLoginServiceTest {
     }
 
     @Test
+    void resolvesRegistrationIdWhenProviderAliasDoesNotMatch() {
+        stubProviderSettings();
+        stubMapper();
+        UserEntity user = new UserEntity();
+        user.setUsername("saml_saml-e2e_existing");
+        SocialIdentityEntity identity = new SocialIdentityEntity("saml-e2e", "subject-1", user);
+        when(providerRepository.findByAliasIgnoreCase("registration-id"))
+                .thenReturn(Optional.empty());
+        when(providerRepository.findByRegistrationId("registration-id"))
+                .thenReturn(Optional.of(provider));
+        when(socialIdentityRepository.findByProviderAndSubject("saml-e2e", "subject-1"))
+                .thenReturn(Optional.of(identity));
+
+        assertThat(service().findOrCreate("registration-id", authentication()))
+                .isEqualTo("saml_saml-e2e_existing");
+    }
+
+    @Test
     void linksVerifiedSamlSubjectToAnAuthenticatedLocalUser() {
         stubProviderSettings();
         stubMapper();

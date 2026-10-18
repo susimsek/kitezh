@@ -40,6 +40,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.OAuth2ProtectedResourceMetadataFilter;
 import org.springframework.security.saml2.provider.service.web.HttpSessionSaml2AuthenticationRequestRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -239,6 +240,31 @@ class SecurityConfigTest {
     }
 
     @Test
+    void publishesProtectedResourceMetadataWithIssuerAndDpopAlgorithms() throws Exception {
+        SecurityFilterChain chain =
+                config.defaultSecurityFilterChain(
+                        httpSecurity(),
+                        new ApplicationProperties(),
+                        browserDependencies(),
+                        socialDependencies());
+        OAuth2ProtectedResourceMetadataFilter metadataFilter =
+                chain.getFilters().stream()
+                        .filter(OAuth2ProtectedResourceMetadataFilter.class::isInstance)
+                        .map(OAuth2ProtectedResourceMetadataFilter.class::cast)
+                        .findFirst()
+                        .orElseThrow();
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("GET", "/.well-known/oauth-protected-resource");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        metadataFilter.doFilter(request, response, (servletRequest, servletResponse) -> {});
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getContentAsString())
+                .contains("dpop_signing_alg_values_supported", "RS256", "ES256");
+    }
+
+    @Test
     void createsSamlAuthenticationProvider() {
         assertThat(
                         SecurityConfig.samlAuthenticationProvider(
@@ -419,6 +445,90 @@ class SecurityConfigTest {
                         config.socialProviderLogoutSuccessHandler(
                                 mock(SocialProviderSettingsService.class),
                                 mock(SocialProviderLogoutEndpointResolver.class)))
+                .isNotNull();
+    }
+
+    @Test
+    void createsDependencyAndAuthenticationBeans() {
+        SecurityContextRepository securityContextRepository = mock(SecurityContextRepository.class);
+        LoginRateLimitFilter loginRateLimitFilter = mock(LoginRateLimitFilter.class);
+        LoginCaptchaFilter loginCaptchaFilter = mock(LoginCaptchaFilter.class);
+        AuthenticationManager webAuthnAuthenticationManager = mock(AuthenticationManager.class);
+        AuthenticationManager formAuthenticationManager = mock(AuthenticationManager.class);
+        PublicKeyCredentialRequestOptionsRepository requestOptionsRepository =
+                mock(PublicKeyCredentialRequestOptionsRepository.class);
+        WebAuthnRelyingPartyOperations relyingPartyOperations =
+                mock(WebAuthnRelyingPartyOperations.class);
+
+        SecurityConfig.BrowserSecurityDependencies browserDependencies =
+                config.browserSecurityDependencies(
+                        securityContextRepository,
+                        loginRateLimitFilter,
+                        loginCaptchaFilter,
+                        webAuthnAuthenticationManager,
+                        formAuthenticationManager,
+                        requestOptionsRepository,
+                        relyingPartyOperations);
+        assertThat(browserDependencies.formAuthenticationManager())
+                .isSameAs(formAuthenticationManager);
+
+        SocialLoginService socialLoginService = mock(SocialLoginService.class);
+        SecurityConfig.SocialSecurityDependencies socialDependencies =
+                config.socialSecurityDependencies(
+                        emptyProvider(),
+                        emptyProvider(),
+                        emptyProvider(),
+                        socialLoginService,
+                        mock(OAuth2AuthorizedClientRepository.class),
+                        mock(OAuth2AccessTokenResponseClient.class),
+                        mock(
+                                io.github.susimsek.kitezh.service
+                                        .DesktopSocialLinkTransactionService.class));
+        assertThat(socialDependencies.socialLoginService()).isSameAs(socialLoginService);
+
+        assertThat(
+                        config.socialLoginAuthenticationSuccessHandler(
+                                socialLoginService,
+                                mock(
+                                        org.springframework.security.core.userdetails
+                                                .UserDetailsService.class),
+                                securityContextRepository,
+                                mock(OAuth2AuthorizedClientRepository.class),
+                                mock(SocialTokenService.class),
+                                mock(MfaService.class),
+                                mock(
+                                        io.github.susimsek.kitezh.service
+                                                .DesktopSocialLinkTransactionService.class)))
+                .isNotNull();
+        assertThat(
+                        config.samlLoginAuthenticationSuccessHandler(
+                                mock(io.github.susimsek.kitezh.service.SamlLoginService.class),
+                                mock(
+                                        org.springframework.security.core.userdetails
+                                                .UserDetailsService.class),
+                                securityContextRepository,
+                                mock(MfaService.class),
+                                mock(
+                                        io.github.susimsek.kitezh.service
+                                                .DesktopSocialLinkTransactionService.class)))
+                .isNotNull();
+        assertThat(
+                        config.formAuthenticationManager(
+                                mock(
+                                        org.springframework.security.core.userdetails
+                                                .UserDetailsService.class),
+                                mock(LdapAuthenticationProvider.class),
+                                mock(
+                                        org.springframework.security.crypto.password.PasswordEncoder
+                                                .class)))
+                .isInstanceOf(ProviderManager.class);
+        assertThat(
+                        config.socialProviderLogoutSuccessHandler(
+                                mock(SocialProviderSettingsService.class),
+                                mock(SocialProviderLogoutEndpointResolver.class),
+                                mock(
+                                        io.github.susimsek.kitezh.service.security
+                                                .OAuth2ObservabilityMetrics.class)))
                 .isNotNull();
     }
 

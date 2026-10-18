@@ -34,6 +34,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.saml2.provider.service.authentication.Saml2Authentication;
 
 @ExtendWith(MockitoExtension.class)
 class DesktopSocialLinkTransactionServiceTest {
@@ -179,6 +180,22 @@ class DesktopSocialLinkTransactionServiceTest {
     }
 
     @Test
+    void completesBrowserSamlLinkAndRecordsPendingCompletion() {
+        var transaction = pendingTransaction();
+        when(transactionRepository.findByAuthorizationTokenHash(anyString()))
+                .thenReturn(Optional.of(transaction));
+        Saml2Authentication authentication = mock(Saml2Authentication.class);
+        when(transactionRepository.save(transaction)).thenReturn(transaction);
+
+        var completion = service.completeFromBrowser("opaque-token", "github", authentication);
+
+        assertThat(completion.provider()).isEqualTo("github");
+        assertThat(completion.state()).isEqualTo(STATE);
+        assertThat(completion.code()).isNotBlank();
+        verify(samlLoginService).linkExisting("ada", "github", authentication);
+    }
+
+    @Test
     void rejectsMismatchedAndExpiredAuthorizationTransactions() {
         var transaction = pendingTransaction();
         transaction.setExpiresAt(java.time.Instant.now().minusSeconds(1));
@@ -234,6 +251,39 @@ class DesktopSocialLinkTransactionServiceTest {
     }
 
     @Test
+    void rejectsAvailableProviderWhenTheLocalAccountDoesNotExist() {
+        when(socialLoginService.isProviderEnabled("github")).thenReturn(true);
+        when(clientRegistrationRepository.getIfAvailable())
+                .thenReturn(githubClientRegistrationRepository);
+        when(githubClientRegistrationRepository.findByRegistrationId("github"))
+                .thenReturn(registration());
+        when(userRepository.findForLoginUpdate("ada")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(
+                        () ->
+                                service.start(
+                                        "ada",
+                                        "github",
+                                        new DesktopSocialLinkStartRequestDTO(
+                                                STATE, challenge(VERIFIER)),
+                                        "https://kitezh.example"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Account not found");
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsUnknownAuthorizationTransaction() {
+        when(transactionRepository.findByAuthorizationTokenHash(anyString()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.authorize("unknown-token", "github"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Desktop social-link transaction is invalid");
+    }
+
+    @Test
     void buildsSafeCallbackUrlsAndSanitizesProviderErrors() {
         assertThat(service.callbackUrl("state value", "code/with+chars", null))
                 .isEqualTo(
@@ -280,6 +330,31 @@ class DesktopSocialLinkTransactionServiceTest {
                 .isInstanceOf(RuntimeException.class);
         assertThatThrownBy(() -> service.complete("other", request))
                 .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void rejectsIncorrectPkceVerifierAndIncompleteTransaction() {
+        var transaction = pendingTransaction();
+        transaction.setCompletionCodeHash(sha256("opaque-code"));
+        when(transactionRepository.findByCompletionCodeHash(transaction.getCompletionCodeHash()))
+                .thenReturn(Optional.of(transaction), Optional.of(transaction));
+
+        assertThatThrownBy(
+                        () ->
+                                service.complete(
+                                        "ada",
+                                        new DesktopSocialLinkCompleteRequestDTO(
+                                                "opaque-code", "incorrect-verifier")))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Desktop social-link PKCE verification failed");
+        assertThatThrownBy(
+                        () ->
+                                service.complete(
+                                        "ada",
+                                        new DesktopSocialLinkCompleteRequestDTO(
+                                                "opaque-code", VERIFIER)))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Desktop social-link transaction has expired");
     }
 
     private static DesktopSocialLinkTransactionEntity pendingTransaction() {

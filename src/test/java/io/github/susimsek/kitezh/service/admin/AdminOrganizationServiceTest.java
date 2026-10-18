@@ -483,6 +483,35 @@ class AdminOrganizationServiceTest {
     }
 
     @Test
+    void reportsMissingOrganizationResources() {
+        OrganizationEntity organization = organization(10L, "acme");
+        OrganizationGroupEntity group = new OrganizationGroupEntity();
+        group.setId(60L);
+        group.setOrganization(organization);
+        when(organizationRepository.findById(10L)).thenReturn(Optional.of(organization));
+        when(organizationRepository.findById(99L)).thenReturn(Optional.empty());
+        when(groupRepository.findByIdAndOrganizationId(60L, 10L)).thenReturn(Optional.of(group));
+
+        assertThatThrownBy(() -> service.findById(99L)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.addMember(
+                                        10L, new AdminOrganizationMemberRequestDTO(20L, "member")))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.removeMember(10L, 20L)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.removeDomain(10L, 30L)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.revokeInvitation(10L, 40L))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.removeGroupMember(10L, 60L, 20L))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.deleteClaim(10L, 70L)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.addIdentityProvider(10L, "unknown"))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.removeIdentityProvider(10L, "unknown"))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
     void rejectsInvalidInvitationStates() {
         OrganizationEntity organization = organization(10L, "acme");
         OrganizationInvitationEntity invitation = new OrganizationInvitationEntity();

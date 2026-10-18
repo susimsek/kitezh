@@ -15,6 +15,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ConfigurationSettingNames;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 class AuthorizationServerMapperSupportTest {
@@ -97,5 +98,20 @@ class AuthorizationServerMapperSupportTest {
                 .containsEntry(
                         "claims",
                         Map.of("scope", List.of("mcp.read"), "roles", List.of("ROLE_USER")));
+    }
+
+    @Test
+    void restoresTokenEndpointSigningAlgorithmFromPersistedClientSettings() {
+        String settings =
+                support.writeMap(
+                        Map.of(
+                                ConfigurationSettingNames.Client
+                                        .TOKEN_ENDPOINT_AUTHENTICATION_SIGNING_ALGORITHM,
+                                "RS256"));
+
+        assertThat(
+                        support.readClientSettings(settings)
+                                .getTokenEndpointAuthenticationSigningAlgorithm())
+                .isEqualTo(org.springframework.security.oauth2.jose.jws.SignatureAlgorithm.RS256);
     }
 }
