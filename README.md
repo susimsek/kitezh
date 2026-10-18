@@ -225,8 +225,8 @@ enabled by default and can be configured with `APP_LOG_SERVER_LEVEL` (`BASIC`, `
 `FULL`), `APP_LOG_SERVER_EXCLUDE_PATHS`, and `APP_LOG_SERVER_FILE_ENABLED`. Set
 `APP_LOG_SERVER_ENABLED=false` to disable it. The `enabled` switch controls whether a handler is
 active; there is no `NONE` level. Shared Zalando-style obfuscation is configured under
-`APP_LOG_OBFUSCATE_HEADERS`, `APP_LOG_OBFUSCATE_BODY_FIELDS`, `APP_LOG_OBFUSCATE_COOKIES`, and
-`APP_LOG_OBFUSCATE_PARAMETERS`, and `APP_LOG_OBFUSCATE_REPLACEMENT`. Query parameters are included
+`APP_LOG_OBFUSCATE_HEADERS`, `APP_LOG_OBFUSCATE_BODY_FIELDS`, `APP_LOG_OBFUSCATE_PARAMETERS`, and
+`APP_LOG_OBFUSCATE_REPLACEMENT`. Query parameters are included
 in logged URIs and sensitive names are replaced with `***`. Outgoing HTTP
 request metadata is disabled by default. For temporary diagnostics, set
 `APP_LOG_CLIENT_ENABLED=true`; this logs method, redacted URI, status, duration, and exceptions

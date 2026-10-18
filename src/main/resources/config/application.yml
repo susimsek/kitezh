@@ -170,9 +170,8 @@ app:
     obfuscate:
       replacement: ${APP_LOG_OBFUSCATE_REPLACEMENT:***}
       headers: ${APP_LOG_OBFUSCATE_HEADERS:Authorization,Cookie,Set-Cookie,Proxy-Authorization,DPoP,X-Api-Key}
-      body-fields: ${APP_LOG_OBFUSCATE_BODY_FIELDS:access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,saml_response,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
-      parameters: ${APP_LOG_OBFUSCATE_PARAMETERS:access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
-      cookies: ${APP_LOG_OBFUSCATE_COOKIES:SESSION}
+      body-fields: ${APP_LOG_OBFUSCATE_BODY_FIELDS:access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,saml_response,samlresponse,samlrequest,relaystate,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
+      parameters: ${APP_LOG_OBFUSCATE_PARAMETERS:access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,samlresponse,samlrequest,relaystate,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
     client:
       enabled: ${APP_LOG_CLIENT_ENABLED:false}
       level: ${APP_LOG_CLIENT_LEVEL:BASIC}

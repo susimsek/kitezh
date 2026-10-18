@@ -356,6 +356,10 @@ The build uses the repository Checkstyle rules, Google Java Format AOSP, and a 9
 
 OTLP export follows the main Kitezh service environment variables and uses `OTEL_SERVICE_NAME=kitezh-mcp`. The dashboard and Prometheus alert rules are in `observability/`; metric labels contain tool names and outcome only, never user IDs, tokens, query text, or resource IDs.
 
+Logging follows the backend configuration: inbound MCP requests produce structured access events with trace and authenticated client/user context, while health and metrics paths are excluded by default. Root logs can use asynchronous console, rolling file, or Syslog appenders. Access logs can also be written to a separate rolling file. Configure these with `APP_LOG_*`; file and Syslog outputs are disabled by default, and the async appender is enabled.
+
+Outbound HTTP request/response logging uses the redacting `RestClient` interceptor and is disabled by default. Enable it with `APP_LOG_CLIENT_ENABLED=true`; `APP_LOG_CLIENT_LEVEL` accepts `BASIC`, `HEADERS`, or `FULL`, and `APP_LOG_CLIENT_EXCLUDE_PATHS` accepts comma-separated path prefixes. Body output is bounded by `APP_LOG_MAX_BODY_BYTES` and sensitive headers, query parameters, and body fields are masked using the shared `APP_LOG_OBFUSCATE_*` settings. `FULL` should only be enabled for short diagnostic windows.
+
 ## Docker Compose
 
 Run only the MCP service with Docker Compose. The Kitezh Authorization Server and Administration API must already be running and reachable from the container:

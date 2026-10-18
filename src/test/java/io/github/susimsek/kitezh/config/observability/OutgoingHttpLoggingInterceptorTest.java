@@ -47,7 +47,7 @@ class OutgoingHttpLoggingInterceptorTest {
         LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
         properties.setLevel(HttpLoggingLevel.HEADERS);
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
-        obfuscate.setHeaders(List.of("X-Secret"));
+        obfuscate.setHeaders(List.of("X-Secret", "Authorization", "Set-Cookie"));
         MockClientHttpRequest request =
                 new MockClientHttpRequest(
                         HttpMethod.POST, URI.create("https://idp.example/token?code=secret"));

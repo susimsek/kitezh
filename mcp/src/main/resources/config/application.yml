@@ -31,6 +31,34 @@ spring:
           mcp-endpoint: /mcp
 
 app:
+  logging:
+    file-enabled: ${APP_LOG_FILE_ENABLED:false}
+    file-path: ${APP_LOG_FILE_PATH:logs/application.log}
+    syslog-enabled: ${APP_LOG_SYSLOG_ENABLED:false}
+    syslog-host: ${APP_LOG_SYSLOG_HOST:localhost}
+    syslog-port: ${APP_LOG_SYSLOG_PORT:514}
+    syslog-facility: ${APP_LOG_SYSLOG_FACILITY:USER}
+    syslog-output: ${APP_LOG_SYSLOG_OUTPUT:default}
+    syslog-json-format: ${APP_LOG_SYSLOG_JSON_FORMAT:default}
+    async-enabled: ${APP_LOG_ASYNC_ENABLED:true}
+    async-queue-size: ${APP_LOG_ASYNC_QUEUE_SIZE:512}
+    async-never-block: ${APP_LOG_ASYNC_NEVER_BLOCK:false}
+    max-body-bytes: ${APP_LOG_MAX_BODY_BYTES:8192}
+    obfuscate:
+      replacement: ${APP_LOG_OBFUSCATE_REPLACEMENT:***}
+      headers: ${APP_LOG_OBFUSCATE_HEADERS:Authorization,Cookie,Set-Cookie,Proxy-Authorization,DPoP,X-Api-Key}
+      body-fields: ${APP_LOG_OBFUSCATE_BODY_FIELDS:access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
+      parameters: ${APP_LOG_OBFUSCATE_PARAMETERS:access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
+    client:
+      enabled: ${APP_LOG_CLIENT_ENABLED:false}
+      level: ${APP_LOG_CLIENT_LEVEL:BASIC}
+      exclude-paths: ${APP_LOG_CLIENT_EXCLUDE_PATHS:}
+    server:
+      enabled: ${APP_LOG_SERVER_ENABLED:true}
+      level: ${APP_LOG_SERVER_LEVEL:BASIC}
+      exclude-paths: ${APP_LOG_SERVER_EXCLUDE_PATHS:/actuator/(health(?:/.*)?|prometheus|metrics(?:/.*)?)}
+      file-enabled: ${APP_LOG_SERVER_FILE_ENABLED:false}
+      file-path: ${APP_LOG_SERVER_FILE_PATH:logs/application-access.log}
   authorization-server:
     issuer: https://kitezh.local
   security:
@@ -46,6 +74,18 @@ app:
     tools:
       toolsets: ${APP_MCP_TOOLSETS:all}
       allowlist: ${APP_MCP_TOOL_ALLOWLIST:*}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:app://renderer,http://localhost:6274,http://127.0.0.1:6274}
+
+logging:
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:}
+      file: ${LOGGING_STRUCTURED_FORMAT_FILE:}
+    ecs:
+      service:
+        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:kitezh-mcp}
+        environment: ${LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:dev}}
 
 management:
   opentelemetry:
@@ -107,7 +147,9 @@ management:
         headers:
           Authorization: ${MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION:}
     sampling:
-      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+    exemplars:
+      include: ${MANAGEMENT_TRACING_EXEMPLARS_INCLUDE:sampled-traces}
 
 otel:
   service:

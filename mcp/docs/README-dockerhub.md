@@ -108,14 +108,43 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `APP_SECURITY_AUDIENCE` | `https://kitezh-mcp.onrender.com/mcp` | Required audience on MCP access tokens |
 | `APP_API_BASE_URL` | `http://localhost:9090` | Kitezh Administration API base URL |
 | `APP_MCP_PUBLIC_URL` | `https://kitezh-mcp.onrender.com/mcp` | Public MCP resource identifier |
-| `APP_MCP_ALLOWED_ORIGINS` | `app://renderer,http://localhost:6274,http://127.0.0.1:6274` | Additional browser origins allowed by the MCP CORS policy |
-| `APP_MCP_ALLOW_LOCAL_HOSTS` | `true` in default/dev, `false` in prod | Permit localhost Host values for local MCP clients |
+| `APP_CORS_ALLOWED_ORIGINS` | `app://renderer,http://localhost:6274,http://127.0.0.1:6274` | Browser origins allowed by MCP CORS; explicitly listed localhost origins also permit matching localhost Host values |
 | `APP_MCP_READ_ONLY` | `true` | Keep all MCP operations read-only |
 | `APP_MCP_TOOLSETS` | `all` | Enabled server-side toolsets: `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, `signing-keys`; comma-separated, or `all` |
 | `APP_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets and caller roles; `*` allows all names |
+| `APP_LOG_CLIENT_ENABLED` | `false` | Enable redacted outbound HTTP request/response logs |
+| `APP_LOG_CLIENT_LEVEL` | `BASIC` | Outbound detail level: `BASIC`, `HEADERS`, or `FULL` |
+| `APP_LOG_CLIENT_EXCLUDE_PATHS` | empty | Comma-separated path prefixes excluded from outbound logs |
+| `APP_LOG_SERVER_ENABLED` | `true` | Enable inbound MCP access logs |
+| `APP_LOG_SERVER_LEVEL` | `BASIC` | Inbound detail level: `BASIC`, `HEADERS`, or `FULL` |
+| `APP_LOG_SERVER_EXCLUDE_PATHS` | health and metrics endpoints | Comma-separated regular expressions excluded from inbound access logs |
+| `APP_LOG_SERVER_FILE_ENABLED` | `false` | Write access logs to a separate rolling file |
+| `APP_LOG_SERVER_FILE_PATH` | `logs/application-access.log` | Inbound access log file path |
+| `APP_LOG_FILE_ENABLED` | `false` | Write application logs to a rolling file |
+| `APP_LOG_FILE_PATH` | `logs/application.log` | Application log file path |
+| `APP_LOG_SYSLOG_ENABLED` | `false` | Enable Syslog output |
+| `APP_LOG_SYSLOG_HOST` | `localhost` | Syslog host |
+| `APP_LOG_SYSLOG_PORT` | `514` | Syslog port |
+| `APP_LOG_SYSLOG_FACILITY` | `USER` | Syslog facility |
+| `APP_LOG_SYSLOG_OUTPUT` | `default` | Syslog output format; `json` enables structured output |
+| `APP_LOG_SYSLOG_JSON_FORMAT` | `default` | Structured Syslog format, such as `ecs` or `logstash` |
+| `APP_LOG_ASYNC_ENABLED` | `true` | Send configured appenders through asynchronous queues |
+| `APP_LOG_ASYNC_QUEUE_SIZE` | `512` | Async appender queue size |
+| `APP_LOG_ASYNC_NEVER_BLOCK` | `false` | Drop log events instead of blocking when an async queue is full |
+| `APP_LOG_MAX_BODY_BYTES` | `8192` | Maximum text body size considered for logging; larger/unknown bodies are omitted |
+| `APP_LOG_OBFUSCATE_REPLACEMENT` | `***` | Replacement for sensitive values in logs |
+| `APP_LOG_OBFUSCATE_HEADERS` | Authorization and cookie headers | Comma-separated sensitive header names |
+| `APP_LOG_OBFUSCATE_BODY_FIELDS` | Common token and credential fields | Comma-separated sensitive JSON/form body field names |
+| `APP_LOG_OBFUSCATE_PARAMETERS` | Common token and OAuth parameters | Comma-separated sensitive query/form parameter names |
+| `LOGGING_STRUCTURED_FORMAT_CONSOLE` | `default` | Console format; set to `json` or `ecs` for structured logs |
+| `LOGGING_STRUCTURED_FORMAT_FILE` | `default` | File format; set to `json` or `ecs` for structured logs |
+| `LOGGING_STRUCTURED_ECS_SERVICE_NAME` | `kitezh-mcp` | ECS service name |
+| `LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT` | Active Spring profile | ECS deployment environment |
 | `MANAGEMENT_OPENTELEMETRY_ENABLED` | `false` | Enable OpenTelemetry resource/export configuration |
 | `MANAGEMENT_TRACING_EXPORT_ENABLED` | `false` | Enable trace export |
 | `MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED` | `false` | Enable OTLP trace export |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | Fraction of traces to sample |
+| `MANAGEMENT_TRACING_EXEMPLARS_INCLUDE` | `sampled-traces` | Trace exemplars attached to metrics |
 | `MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED` | `false` | Enable OTLP log export |
 | `MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED` | `false` | Enable OTLP metric export |
 | `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | empty | OTLP trace endpoint |
@@ -123,6 +152,8 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `MANAGEMENT_OTLP_METRICS_EXPORT_URL` | empty | OTLP metrics endpoint |
 
 Keep OTLP authorization headers and deployment credentials in the platform's secret manager. Never put them in source control, the image, or a shared desktop MCP configuration.
+
+Inbound and outbound body, header, and parameter redaction follows the shared `APP_LOG_OBFUSCATE_*` settings. Cookie values are protected through the `Cookie` and `Set-Cookie` header rules. Outbound logging is opt-in; `FULL` mode can include non-sensitive response content and should only be used for short diagnostic windows. Inbound access logging defaults to `BASIC`; `HEADERS` and `FULL` add more request details and should be enabled only for short diagnostic windows.
 
 Toolset and allowlist values are operator-controlled deployment settings. The effective catalog is the selected toolset union intersected with `APP_MCP_TOOL_ALLOWLIST` and the caller's role permissions. Client headers and tool arguments cannot widen these server-side limits. An empty allowlist disables all tools.
 
