@@ -6,6 +6,7 @@ import { accountRequest } from "@/lib/account-api";
 import { StoreProvider } from "@/store/StoreProvider";
 
 import { AccountApplications } from "./AccountApplications";
+import { AccountPasswordForm } from "./AccountPasswordForm";
 import { AccountProfileForm } from "./AccountProfileForm";
 import { AccountSessions } from "./AccountSessions";
 
@@ -97,6 +98,42 @@ describe("Account console resources", () => {
       ).not.toBeInTheDocument();
     },
   );
+
+  it("maps password field failures and clears errors when the form is cancelled", async () => {
+    mockAccountRequest.mockResolvedValueOnce({
+      status: 400,
+      data: {
+        violations: [{ field: "currentPassword" }, { field: "newPassword" }],
+      },
+    } as never);
+
+    renderWithStore(<AccountPasswordForm dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(/Current password/), {
+      target: { value: "old-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/New password/), {
+      target: { value: "a-different-long-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/Confirm.*password/i), {
+      target: { value: "a-different-long-password" },
+    });
+    const save = screen.getByRole("button", { name: dictionary.account.common.save });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      dictionary.account.common.operationError,
+    );
+    expect(screen.getByText(dictionary.account.validation.currentPassword)).toBeVisible();
+    expect(screen.getByText(dictionary.account.validation.password)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.common.cancel }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByLabelText(/Current password/)).toHaveValue("");
+    expect(screen.getByLabelText(/New password/)).toHaveValue("");
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     document.documentElement.lang = "en";
