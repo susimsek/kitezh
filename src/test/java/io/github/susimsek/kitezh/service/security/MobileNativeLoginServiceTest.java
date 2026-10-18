@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.config.security.SecurityJsonMapper;
 import io.github.susimsek.kitezh.domain.AuthenticationFlowBindingType;
+import io.github.susimsek.kitezh.domain.ClientScopeEntity;
 import io.github.susimsek.kitezh.domain.MobileLoginTransactionEntity;
 import io.github.susimsek.kitezh.dto.account.MfaSetupDTO;
 import io.github.susimsek.kitezh.dto.account.MfaStatusDTO;
@@ -21,7 +22,9 @@ import io.github.susimsek.kitezh.dto.account.MobileLoginMfaRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobileLoginPlatform;
 import io.github.susimsek.kitezh.dto.account.MobileLoginRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobileLoginResponseDTO;
+import io.github.susimsek.kitezh.dto.account.MobilePasskeyAssertionRequestDTO;
 import io.github.susimsek.kitezh.dto.account.MobilePasskeyLoginRequestDTO;
+import io.github.susimsek.kitezh.dto.account.MobilePasskeyRegistrationRequestDTO;
 import io.github.susimsek.kitezh.dto.account.RecoveryCodesDTO;
 import io.github.susimsek.kitezh.dto.account.RequiredActionDTO;
 import io.github.susimsek.kitezh.repository.ClientScopeRepository;
@@ -61,7 +64,11 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.web.webauthn.api.Bytes;
+import org.springframework.security.web.webauthn.api.ImmutablePublicKeyCredentialUserEntity;
+import org.springframework.security.web.webauthn.api.PublicKeyCredentialCreationOptions;
 import org.springframework.security.web.webauthn.api.PublicKeyCredentialRequestOptions;
+import org.springframework.security.web.webauthn.api.PublicKeyCredentialRpEntity;
+import org.springframework.security.web.webauthn.api.PublicKeyCredentialUserEntity;
 import org.springframework.security.web.webauthn.management.PublicKeyCredentialRequestOptionsRequest;
 import org.springframework.security.web.webauthn.management.WebAuthnRelyingPartyOperations;
 
@@ -211,6 +218,83 @@ class MobileNativeLoginServiceTest {
     }
 
     @Test
+    void rejectsPasskeyStartWhenRateLimitedOrTheUserHasNoCredential() {
+        when(rateLimitService.check("admin", "127.0.0.1"))
+                .thenReturn(new LoginRateLimitService.RateLimitDecision(false, 10, 0, 60));
+        assertThatThrownBy(() -> service.beginPasskey(passkeyRequest(), servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(webAuthnService, never()).hasCredential("admin");
+
+        when(rateLimitService.check("admin", "127.0.0.1"))
+                .thenReturn(new LoginRateLimitService.RateLimitDecision(true, 10, 9, 60));
+        when(webAuthnService.hasCredential("admin")).thenReturn(false);
+        assertThatThrownBy(() -> service.beginPasskey(passkeyRequest(), servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(transactions, never()).saveAndFlush(any(MobileLoginTransactionEntity.class));
+    }
+
+    @Test
+    void verifiesPasskeyAssertionBeforeIssuingTheAuthorizationCode() {
+        PublicKeyCredentialRequestOptions options =
+                PublicKeyCredentialRequestOptions.builder()
+                        .challenge(Bytes.fromBase64("AAECAwQFBgcICQoLDA0ODw"))
+                        .rpId("localhost")
+                        .build();
+        when(webAuthnRelyingPartyOperations.createCredentialRequestOptions(
+                        any(PublicKeyCredentialRequestOptionsRequest.class)))
+                .thenReturn(options);
+        when(webAuthnRelyingPartyOperations.authenticate(any())).thenReturn(passkeyUser("admin"));
+
+        MobileLoginResponseDTO challenge = service.beginPasskey(passkeyRequest(), servletRequest);
+        MobileLoginResponseDTO result =
+                service.verifyPasskey(
+                        challenge.transactionId(),
+                        new MobilePasskeyAssertionRequestDTO(assertionCredential()));
+
+        assertThat(result.status()).isEqualTo("authorized");
+        assertThat(result.redirectUri()).isEqualTo(REDIRECT_URI);
+        verify(authorizations).save(any(OAuth2Authorization.class));
+        verify(auditEventService)
+                .record("user.mobile-login.passkey-verified", "user", "admin", "android");
+    }
+
+    @Test
+    void completesNativePasskeyEnrollmentForAPendingRequiredAction() {
+        RequiredActionDTO passkey =
+                new RequiredActionDTO("CONFIGURE_PASSKEY", "Passkey", "Register a passkey", 1);
+        when(requiredActionService.pending("admin"))
+                .thenReturn(List.of(passkey), List.of(passkey), List.of(passkey), List.of());
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, false, false, "Kitezh", "SHA1", 6, 30));
+        PublicKeyCredentialCreationOptions options = registrationOptions();
+        when(webAuthnRelyingPartyOperations.createPublicKeyCredentialCreationOptions(any()))
+                .thenReturn(options);
+
+        MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
+        assertThat(challenge.status()).isEqualTo("required_actions");
+        assertThat(
+                        service.passkeyRegistrationOptions(
+                                        challenge.transactionId(), "CONFIGURE_PASSKEY")
+                                .publicKey())
+                .containsEntry("rp", Map.of("id", "localhost", "name", "Kitezh"));
+
+        MobileLoginResponseDTO completed =
+                service.registerPasskey(
+                        challenge.transactionId(),
+                        "CONFIGURE_PASSKEY",
+                        new MobilePasskeyRegistrationRequestDTO(
+                                registrationCredential(), "My phone"),
+                        servletRequest);
+
+        assertThat(completed.status()).isEqualTo("authorized");
+        verify(webAuthnRelyingPartyOperations).registerCredential(any());
+        verify(requiredActionService)
+                .complete("admin", "CONFIGURE_PASSKEY", Map.of(), "127.0.0.1", null);
+        verify(auditEventService)
+                .record("user.mobile-login.passkey-registered", "user", "admin", "android");
+    }
+
+    @Test
     void issuesCodeOnlyAfterRequestBoundMfaAndInvalidatesTransactionAfterSuccess() {
         MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
 
@@ -274,6 +358,76 @@ class MobileNativeLoginServiceTest {
         assertThat(response.redirectUri()).isEqualTo(REDIRECT_URI);
         verify(consentService).save(any(OAuth2AuthorizationConsent.class));
         verify(authorizations).save(any(OAuth2Authorization.class));
+    }
+
+    @Test
+    void rendersConfiguredConsentCopyAndPreservesPreviouslyApprovedScopes() {
+        RegisteredClient consentClient = client(true);
+        when(clients.findByClientId(CLIENT_ID)).thenReturn(consentClient);
+        when(clients.findById("mobile-account-console-id")).thenReturn(consentClient);
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, false, false, "Kitezh", "SHA1", 6, 30));
+        ClientScopeEntity email = new ClientScopeEntity();
+        email.setName("email");
+        email.setDisplayName("Email address");
+        email.setConsentScreenText("Read your email address");
+        ClientScopeEntity profile = new ClientScopeEntity();
+        profile.setName("profile");
+        profile.setDescription("View your profile");
+        when(clientScopeRepository.findByNameIn(any())).thenReturn(List.of(email, profile));
+        OAuth2AuthorizationConsent priorConsent =
+                OAuth2AuthorizationConsent.withId("mobile-account-console-id", "admin")
+                        .authority(new SimpleGrantedAuthority("SCOPE_openid"))
+                        .build();
+        when(consentService.findById("mobile-account-console-id", "admin"))
+                .thenReturn(priorConsent);
+
+        MobileLoginResponseDTO pending = service.begin(request(), servletRequest);
+
+        assertThat(pending.status()).isEqualTo("consent_required");
+        assertThat(pending.scopes())
+                .extracting(scope -> scope.name())
+                .containsExactly("account-api", "email", "profile");
+        assertThat(pending.scopes())
+                .filteredOn(scope -> scope.name().equals("email"))
+                .singleElement()
+                .satisfies(
+                        scope -> {
+                            assertThat(scope.displayName()).isEqualTo("Email address");
+                            assertThat(scope.description()).isEqualTo("Read your email address");
+                        });
+        assertThat(pending.scopes())
+                .filteredOn(scope -> scope.name().equals("profile"))
+                .singleElement()
+                .satisfies(
+                        scope -> {
+                            assertThat(scope.displayName()).isEqualTo("profile");
+                            assertThat(scope.description()).isEqualTo("View your profile");
+                        });
+
+        service.decideConsent(pending.transactionId(), true);
+
+        org.mockito.ArgumentCaptor<OAuth2AuthorizationConsent> consentCaptor =
+                org.mockito.ArgumentCaptor.forClass(OAuth2AuthorizationConsent.class);
+        verify(consentService).save(consentCaptor.capture());
+        assertThat(consentCaptor.getValue().getAuthorities())
+                .extracting(authority -> authority.getAuthority())
+                .contains("SCOPE_openid", "SCOPE_email", "SCOPE_profile", "SCOPE_account-api");
+    }
+
+    @Test
+    void rejectsInvalidMfaWithoutIssuingAuthorization() {
+        MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
+
+        assertThatThrownBy(
+                        () ->
+                                service.verifyMfa(
+                                        challenge.transactionId(),
+                                        new MobileLoginMfaRequestDTO("000000"),
+                                        servletRequest))
+                .isInstanceOf(ApiException.class);
+
+        verify(authorizations, never()).save(any(OAuth2Authorization.class));
     }
 
     @Test
@@ -506,6 +660,66 @@ class MobileNativeLoginServiceTest {
                 "admin",
                 "admin",
                 null);
+    }
+
+    private static MobilePasskeyLoginRequestDTO passkeyRequest() {
+        return new MobilePasskeyLoginRequestDTO(
+                CLIENT_ID,
+                REDIRECT_URI,
+                "openid profile email account-api",
+                STATE,
+                CHALLENGE,
+                "S256",
+                "nonce_0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                MobileLoginPlatform.ANDROID,
+                "admin");
+    }
+
+    private static PublicKeyCredentialUserEntity passkeyUser(String username) {
+        return ImmutablePublicKeyCredentialUserEntity.builder()
+                .name(username)
+                .id(new Bytes(new byte[] {1, 2, 3}))
+                .displayName(username)
+                .build();
+    }
+
+    private static Map<String, Object> assertionCredential() {
+        return Map.of(
+                "id",
+                "assertion-id",
+                "rawId",
+                "AQID",
+                "type",
+                "public-key",
+                "response",
+                Map.of(
+                        "authenticatorData", "AQID",
+                        "clientDataJSON", "AQID",
+                        "signature", "AQID"));
+    }
+
+    private static PublicKeyCredentialCreationOptions registrationOptions() {
+        return PublicKeyCredentialCreationOptions.builder()
+                .rp(PublicKeyCredentialRpEntity.builder().id("localhost").name("Kitezh").build())
+                .user(passkeyUser("admin"))
+                .challenge(new Bytes(new byte[] {4, 5, 6}))
+                .pubKeyCredParams(
+                        List.of(
+                                org.springframework.security.web.webauthn.api
+                                        .PublicKeyCredentialParameters.RS256))
+                .build();
+    }
+
+    private static Map<String, Object> registrationCredential() {
+        return Map.of(
+                "id",
+                "registration-id",
+                "rawId",
+                "AQID",
+                "type",
+                "public-key",
+                "response",
+                Map.of("attestationObject", "AQID", "clientDataJSON", "AQID"));
     }
 
     private static RegisteredClient client() {
