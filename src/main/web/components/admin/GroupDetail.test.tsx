@@ -116,23 +116,24 @@ it("shows validation feedback for malformed group attributes without saving", as
   mockGroupIsAdmin = true;
   const request = jest.mocked(adminRequest);
   request.mockReset();
-  request.mockImplementation(async (_token, config) =>
-    ({
-      status: 200,
-      data:
-        config.url === "/api/admin/groups/7"
-          ? {
-              id: 7,
-              name: "Operators",
-              path: "/Operators",
-              parentId: null,
-              roles: [],
-              userCount: 0,
-              attributes: {},
-              defaultGroup: false,
-            }
-          : { content: [], totalPages: 0, totalElements: 0 },
-    }) as never,
+  request.mockImplementation(
+    async (_token, config) =>
+      ({
+        status: 200,
+        data:
+          config.url === "/api/admin/groups/7"
+            ? {
+                id: 7,
+                name: "Operators",
+                path: "/Operators",
+                parentId: null,
+                roles: [],
+                userCount: 0,
+                attributes: {},
+                defaultGroup: false,
+              }
+            : { content: [], totalPages: 0, totalElements: 0 },
+      }) as never,
   );
 
   render(<GroupDetail id="7" locale="en" dictionary={en} />);
@@ -390,8 +391,7 @@ it("keeps group settings and member removal recoverable after API rejection", as
         },
       } as never;
     }
-    if (config.method === "DELETE")
-      return { status: 500, data: null } as never;
+    if (config.method === "DELETE") return { status: 500, data: null } as never;
     if (config.url?.includes("/users?")) {
       return {
         status: 200,
@@ -642,9 +642,9 @@ it("does not show failed member suggestions and renders disabled member status",
     target: { value: "unknown" },
   });
   await waitFor(() =>
-    expect(request.mock.calls.some(([, config]) => config.url?.includes("available-users?q=unknown"))).toBe(
-      true,
-    ),
+    expect(
+      request.mock.calls.some(([, config]) => config.url?.includes("available-users?q=unknown")),
+    ).toBe(true),
   );
   expect(screen.queryByRole("button", { name: "unknown" })).not.toBeInTheDocument();
 });

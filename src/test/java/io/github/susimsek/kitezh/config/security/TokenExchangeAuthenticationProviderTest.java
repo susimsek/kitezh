@@ -192,6 +192,56 @@ class TokenExchangeAuthenticationProviderTest {
     }
 
     @Test
+    void rejectsAnIdTokenRequestWithoutTheOpenidScope() {
+        RegisteredClient client =
+                RegisteredClient.from(
+                                client("client", ClientAuthenticationMethod.CLIENT_SECRET_BASIC))
+                        .scope("profile")
+                        .build();
+        TestingAuthenticationToken principal = new TestingAuthenticationToken("service", null);
+        OAuth2Authorization subjectAuthorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .principalName("service")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of("profile"))
+                        .accessToken(accessToken("subject"))
+                        .build();
+        OAuth2AccessToken exchangedAccessToken = accessToken("exchanged-access");
+        OAuth2Authorization exchangedAuthorization =
+                OAuth2Authorization.withRegisteredClient(client)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .principalName("service")
+                        .attribute(Principal.class.getName(), principal)
+                        .authorizedScopes(Set.of("profile"))
+                        .accessToken(exchangedAccessToken)
+                        .build();
+        when(authorizationService.findByToken("subject", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(subjectAuthorization);
+        when(authorizationService.findByToken("exchanged-access", OAuth2TokenType.ACCESS_TOKEN))
+                .thenReturn(exchangedAuthorization);
+        when(tokenGenerator.generate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(exchangedAccessToken);
+        AuthorizationServerContextHolder.setContext(mock(AuthorizationServerContext.class));
+
+        assertThatThrownBy(
+                        () ->
+                                provider()
+                                        .authenticate(
+                                                requestWithRequestedType(
+                                                        client,
+                                                        "urn:ietf:params:oauth:token-type:id_token",
+                                                        Set.of("profile"))))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(
+                        exception ->
+                                assertThat(((OAuth2AuthenticationException) exception).getError())
+                                        .extracting(OAuth2Error::getErrorCode)
+                                        .isEqualTo("invalid_scope"));
+    }
+
+    @Test
     void rejectsPublicClients() {
         RegisteredClient client = client("client", ClientAuthenticationMethod.NONE);
         OAuth2TokenExchangeAuthenticationToken request = request(client, null, Set.of());

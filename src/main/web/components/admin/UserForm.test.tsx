@@ -355,8 +355,7 @@ describe("UserForm", () => {
     mockAdminRequest.mockImplementation(async (_token, config) => {
       if (config.url === "/api/admin/roles?page=0&size=100")
         return { status: 200, data: rolePage({ name: "ROLE_USER" }) } as never;
-      if (config.url === "/api/admin/profile-attributes")
-        return { status: 200, data: [] } as never;
+      if (config.url === "/api/admin/profile-attributes") return { status: 200, data: [] } as never;
       return {
         status: 400,
         data: { errorCode, violations: [{ field }] },
