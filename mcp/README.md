@@ -5,7 +5,7 @@
 [![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh-mcp.onrender.com/mcp)
 [![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/kitezh-mcp/kitezh-mcp-server)
 
-Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency.
+Kitezh MCP Server is an independent Spring Boot service with read-only tools enabled by default and a small, opt-in set of guarded write tools. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency.
 
 ## Table of Contents
 
@@ -44,13 +44,13 @@ Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a
 
 The Maven `dev` profile is active by default. Its issuer is configured in `src/main/resources/config/application-dev.yml`; the local Admin API URL and the stable MCP resource URI use the defaults in `application.yml`. Override them with environment variables only when your local backend or public MCP resource URI is different.
 
-Register a public OAuth client for each MCP host with its exact redirect URI, Authorization Code + PKCE S256, and the `mcp.read` scope. MCP validates the inbound token's issuer, MCP audience, and scope, then forwards that same user token to the Kitezh Administration API. The API must accept the forwarded token and apply its own read-only endpoint and role authorization rules. No confidential MCP service client or token-exchange secret is required.
+Register a public OAuth client for each MCP host with its exact redirect URI, Authorization Code + PKCE S256, and the `mcp.read` scope. MCP validates the inbound token's issuer, MCP audience, and scope, then forwards that same user token to the Kitezh Administration API. The API accepts the forwarded token and independently enforces its MCP audience, scope, route, HTTP method, and existing role authorization rules. No confidential MCP service client or token-exchange secret is required.
 
 The MCP resource URI is a stable identifier and must be identical in the authorization server's `APP_MCP_RESOURCE_AUDIENCE`, the MCP service's `APP_SECURITY_AUDIENCE`, and `APP_MCP_PUBLIC_URL`. The local example uses the Render URL as that stable resource identifier while connecting to the local server process. For a custom production domain, update all three values together.
 
 ## Authentication and authorization
 
-The MCP endpoint is `https://kitezh-mcp.onrender.com/mcp` (replace it with the MCP service's public URL if you use a custom domain). It uses Streamable HTTP and accepts user access tokens. Choose either OAuth 2.0 Authorization Code with PKCE or a personal access token (PAT). Both represent the signed-in user and require `mcp.read`. Do not put a bearer token or client secret in a committed client config.
+The MCP endpoint is `https://kitezh-mcp.onrender.com/mcp` (replace it with the MCP service's public URL if you use a custom domain). It uses Streamable HTTP and accepts user access tokens. Choose either OAuth 2.0 Authorization Code with PKCE or a personal access token (PAT). Both represent the signed-in user and require `mcp.read` for read tools. Write tools additionally require `mcp.write`, an eligible Kitezh role, and an explicitly enabled write toolset. Do not put a bearer token or client secret in a committed client config.
 
 ### OAuth 2.0 Authorization Code with PKCE
 
@@ -58,11 +58,11 @@ Use OAuth when the MCP client should sign the user in through a browser. The cli
 
 Flow:
 
-1. The MCP client sends a request to `/mcp` and receives `401` with the protected-resource metadata URL and required `mcp.read` scope.
-2. The MCP client reads the metadata and starts authorization at the Kitezh issuer with its registered `client_id`, exact callback URI, PKCE challenge, and `mcp.read` scope.
+1. The MCP client sends a request to `/mcp` and receives `401` with the protected-resource metadata URL and supported `mcp.read` and `mcp.write` scopes.
+2. The MCP client reads the metadata and starts authorization at the Kitezh issuer with its registered `client_id`, exact callback URI, PKCE challenge, and `mcp.read` or `mcp.write` scope.
 3. The user signs in to Kitezh in the browser. The client receives the authorization code at its local callback and posts it with the PKCE verifier to `/oauth2/token`.
-4. The MCP client calls `/mcp` with the returned access token. MCP verifies its signature, issuer, MCP resource audience, and `mcp.read` scope.
-5. MCP forwards that same user token to the Admin API. The API verifies the token is active and has the MCP and `admin-api` audiences, then applies its GET-only MCP route allowlist and the user's role permissions.
+4. The MCP client calls `/mcp` with the returned access token. MCP verifies its signature, issuer, MCP resource audience, and `mcp.read` or `mcp.write` scope.
+5. MCP forwards that same user token to the Admin API. The API verifies the token is active and has the MCP and `admin-api` audiences, then applies the MCP HTTP method/path allowlist and the user's role permissions.
 
 No MCP client secret or token exchange is used. Access tokens are short lived; the MCP host handles refresh or asks the user to sign in again according to its OAuth support.
 
@@ -78,7 +78,7 @@ Production discovery and token endpoints:
 
 Use a PAT for a client that accepts a configured bearer token and does not need browser-based OAuth. Sign in to the Account Console (`admin/admin` or `user/user` in local development), open **Security → Personal access tokens**, create a token, and choose its name, description, and expiration. The expiration choices include 7, 30, 60, 90 days, a custom date, and **Never expires**. Copy the bearer value when it is shown; it cannot be retrieved later. Revoking the PAT in the Account Console removes its authorization. Store it in a local secret store or environment variable.
 
-The PAT is a signed user access token with the MCP and `admin-api` audiences and the `mcp.read` scope. MCP forwards it unchanged to the Admin API, which checks that it is active and enforces the same GET-only route allowlist and user role permissions as the OAuth flow. PAT use does not require an OAuth client registration, client secret, or token exchange.
+The PAT is a signed user access token with the MCP and `admin-api` audiences and the `mcp.read` scope. PATs remain read-only; MCP forwards the token unchanged to the Admin API, which checks that it is active and enforces the GET route allowlist and user role permissions. `mcp.write` is available through OAuth clients configured for that scope; PAT scope selection is not currently supported. PAT use does not require an OAuth client registration, client secret, or token exchange.
 
 Client-specific OAuth and PAT configuration examples are in [Connect from MCP clients](#connect-from-mcp-clients).
 
@@ -90,7 +90,7 @@ Host-specific setup guides, an authentication support matrix, and secure configu
 
 ### OAuth client registration
 
-Kitezh does not currently support Dynamic Client Registration (DCR). For an OAuth client that allows a pre-registered client ID, create a separate public client in the Kitezh Authorization Server for that MCP host. Enable Authorization Code + PKCE (S256), allow only the exact callback URI used by that host, and grant `openid` and `mcp.read`. Do not configure a client secret for a public client. The seeded `mcp-client` is for MCP Inspector only (`http://localhost:6274/oauth/callback`).
+Kitezh does not currently support Dynamic Client Registration (DCR). For an OAuth client that allows a pre-registered client ID, create a separate public client in the Kitezh Authorization Server for that MCP host. Enable Authorization Code + PKCE (S256), allow only the exact callback URI used by that host, and grant `openid` and `mcp.read`; grant `mcp.write` only when the operator explicitly enables write toolsets. Do not configure a client secret for a public client. The seeded `mcp-client` is for MCP Inspector only (`http://localhost:6274/oauth/callback`).
 
 Some clients only support automatic OAuth registration and do not let you provide a pre-registered client ID. Their OAuth sign-in will not work with Kitezh until that client supports a configured client ID or Kitezh enables a compatible registration method. Use PAT where the client supports custom bearer headers. The sections below call out this limitation instead of assuming every OAuth button can connect.
 
@@ -254,11 +254,11 @@ Kitezh currently supports pre-registered OAuth clients only; it does not adverti
 
 ### MCP Inspector
 
-For local protocol checks, run the MCP server locally and connect MCP Inspector to `http://localhost:10000/mcp` (the hosted endpoint is `https://kitezh-mcp.onrender.com/mcp`). Configure the seeded `mcp-client` OAuth client with callback `http://localhost:6274/oauth/callback` and request the `mcp.read` scope. See the verification workflow below for the automated protocol tests.
+For local protocol checks, run the MCP server locally and connect MCP Inspector to `http://localhost:10000/mcp` (the hosted endpoint is `https://kitezh-mcp.onrender.com/mcp`). Configure the seeded `mcp-client` OAuth client with callback `http://localhost:6274/oauth/callback` and request `mcp.read`; request `mcp.write` only when testing an explicitly enabled write toolset. See the verification workflow below for the automated protocol tests.
 
 ### Available tools
 
-All tools are read-only and require the `mcp.read` scope. They expose Kitezh context, users, groups, OAuth clients, sessions, and audit events. MCP forwards the validated inbound user token to the Administration API without exchanging it. The API remains responsible for enforcing its read-only endpoint and role rules.
+Read tools require `mcp.read` or `mcp.write`. Eight guarded write tools require `mcp.write`, a matching role, and an explicitly enabled write toolset. Each write follows preview then apply: the preview creates a caller/action-bound, five-minute, single-use token; apply rechecks that the target state has not changed. MCP forwards the validated user token unchanged; the Admin API enforces its own allowlist, role checks, audit, and session invalidation. MCP does not connect directly to the database.
 
 #### Available toolsets
 
@@ -274,12 +274,27 @@ All tools are read-only and require the `mcp.read` scope. They expose Kitezh con
 | `dashboard` | Administration dashboard summary |
 | `notifications` | Administrative notifications |
 | `signing-keys` | Signing-key metadata; private key material is never exposed |
+| `users_write` | Preview/apply user enable or disable; excluded from `all` |
+| `groups_write` | Preview/apply group membership changes; excluded from `all` |
+| `sessions_write` | Preview/apply revocation of one session; excluded from `all` |
 
 These are Kitezh administration toolsets, not a one-to-one copy of GitHub-specific categories such as repositories, pull requests, or Actions. The closest security coverage is provided by the `users`, `roles`, and `signing-keys` toolsets.
 
 #### Tool catalog
 
-The server exposes the following 40 read-only tools. Input schemas and required parameters are returned by MCP `tools/list` and may also vary with the caller's role permissions.
+The server exposes 40 read tools and 8 opt-in write tools (48 total). Input schemas and required parameters are returned by MCP `tools/list` and may also vary with the caller's role permissions.
+
+
+#### Guarded write tools
+
+| Toolset | Tool | Description |
+| --- | --- | --- |
+| `users_write` | `preview_set_user_enabled` / `apply_set_user_enabled` | Preview and then enable or disable a user. |
+| `groups_write` | `preview_add_user_to_group` / `apply_add_user_to_group` | Preview and then add a user to a group. |
+| `groups_write` | `preview_remove_user_from_group` / `apply_remove_user_from_group` | Preview and then remove a user from a group. |
+| `sessions_write` | `preview_revoke_session` / `apply_revoke_session` | Preview and then revoke one browser session. |
+
+Write toolsets are excluded from `all`. Add a specific category to all read tools with, for example, `APP_MCP_TOOLSETS=all,users_write`; the write names must also pass the configured allowlist. The token must carry `mcp.write`, the caller must have the matching Kitezh role, and the Admin API enforces its own method/path allowlist. Each preview expires after five minutes, is bound to its caller and action, and can be applied once. If the target state changes after preview, apply fails and requires a new preview. The MCP client should ask the user before making an `apply_*` call; the server also checks scope, role, and preview validity. Preview state is kept in the running MCP process, so restart or routing apply to another instance safely requires creating a fresh preview; use a single instance or sticky routing when enabling writes.
 
 ## Resources, prompts and completions
 
@@ -294,7 +309,7 @@ The server also exposes read-only MCP resource templates, one reusable review pr
 | Completion | `review_resource.resourceType` | Suggests `users`, `groups`, or `clients` based on the typed prefix. |
 | Completion | User, group, and client resource URI arguments | Suggests matching IDs from the first 100 authorized Admin API search results. |
 
-Clients can discover templates with `resources/templates/list`, read an authorized URI with `resources/read`, retrieve the prompt with `prompts/get`, and request argument suggestions with `completion/complete`. Resource reads return JSON and use the same typed Admin API GET operations as the existing tools. No generic URL, database, or write operation is exposed.
+Clients can discover templates with `resources/templates/list`, read an authorized URI with `resources/read`, retrieve the prompt with `prompts/get`, and request argument suggestions with `completion/complete`. Resource reads return JSON and use the same typed Admin API GET operations as the existing tools. No generic URL or database operation is exposed. Write tools are separate from resources and prompts, and remain disabled unless explicitly selected.
 
 Resource ID suggestions are capped at the first 100 results from the corresponding authorized, sorted Admin API listing. The Admin API does not currently filter by internal record ID, so IDs outside that page may not appear in completion results.
 

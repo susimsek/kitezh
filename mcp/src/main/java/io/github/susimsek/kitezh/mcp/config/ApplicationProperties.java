@@ -28,10 +28,7 @@ public record ApplicationProperties(
         api = api == null ? new Api("http://localhost:9090") : api;
         mcp =
                 mcp == null
-                        ? new Mcp(
-                                "https://kitezh-mcp.onrender.com/mcp",
-                                true,
-                                new Tools("all", "", "*"))
+                        ? new Mcp("https://kitezh-mcp.onrender.com/mcp", new Tools("all", "", "*"))
                         : mcp;
         cors =
                 cors == null
@@ -61,7 +58,6 @@ public record ApplicationProperties(
 
     public record Mcp(
             @DefaultValue("https://kitezh-mcp.onrender.com/mcp") String publicUrl,
-            @DefaultValue("true") boolean readOnly,
             @DefaultValue Tools tools) {
 
         @ConstructorBinding

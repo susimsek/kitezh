@@ -622,6 +622,31 @@ class AuthorizationServerConfigTest {
     }
 
     @Test
+    void addsMcpAndAdminApiAudiencesToMcpWriteAccessTokens() {
+        UserEntity user = new UserEntity();
+        user.setAuthorities(Set.of(new AuthorityEntity(1L, "ROLE_USER_MANAGER")));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.write")));
+
+        assertThat(claims.build().getAudience())
+                .containsExactly("https://kitezh-mcp.onrender.com/mcp", "admin-api");
+        assertThat(claims.build().getClaims()).containsEntry("roles", List.of("ROLE_USER_MANAGER"));
+    }
+
+    @Test
     void addsOnlyAllowedRolesToMcpReadAccessTokens() {
         UserEntity user = new UserEntity();
         user.setAuthorities(

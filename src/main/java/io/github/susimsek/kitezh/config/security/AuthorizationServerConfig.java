@@ -101,6 +101,7 @@ public class AuthorizationServerConfig {
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
     private static final String MCP_READ_SCOPE = "mcp.read";
+    private static final String MCP_WRITE_SCOPE = "mcp.write";
     private static final Set<String> MCP_ROLE_CLAIMS =
             Set.of(
                     AuthoritiesConstants.ADMIN,
@@ -644,8 +645,7 @@ public class AuthorizationServerConfig {
 
     private static void appendMcpResourceAudience(
             JwtEncodingContext context, String mcpResourceAudience) {
-        if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
-                && context.getAuthorizedScopes().contains(MCP_READ_SCOPE)) {
+        if (isMcpAccessToken(context)) {
             appendAudienceClaim(context, List.of(mcpResourceAudience, MCP_ADMIN_API_AUDIENCE));
         }
     }
@@ -776,7 +776,7 @@ public class AuthorizationServerConfig {
                 || !groupMappers.isEmpty()
                 || !clientMappers.isEmpty()
                 || isRoleToken(context)
-                || isMcpReadAccessToken(context)
+                || isMcpAccessToken(context)
                 || isUserSocialClaimsToken(context)
                 || (organizationClaimsEnabled && isOrganizationClaimToken(context))) {
             return userRepository.findByUsername(context.getPrincipal().getName());
@@ -1187,7 +1187,7 @@ public class AuthorizationServerConfig {
     private static void appendMcpRoleClaims(
             JwtEncodingContext context, Optional<UserEntity> tokenUser) {
         if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
-                || !context.getAuthorizedScopes().contains(MCP_READ_SCOPE)
+                || !isMcpAccessToken(context)
                 || tokenUser.isEmpty()) {
             return;
         }
@@ -1503,9 +1503,10 @@ public class AuthorizationServerConfig {
                         || isCibaGrant(context));
     }
 
-    private static boolean isMcpReadAccessToken(JwtEncodingContext context) {
+    private static boolean isMcpAccessToken(JwtEncodingContext context) {
         return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
-                && context.getAuthorizedScopes().contains(MCP_READ_SCOPE);
+                && (context.getAuthorizedScopes().contains(MCP_READ_SCOPE)
+                        || context.getAuthorizedScopes().contains(MCP_WRITE_SCOPE));
     }
 
     private static boolean isCibaGrant(JwtEncodingContext context) {

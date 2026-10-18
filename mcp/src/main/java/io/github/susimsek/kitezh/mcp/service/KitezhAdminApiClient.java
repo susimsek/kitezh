@@ -29,6 +29,33 @@ public class KitezhAdminApiClient {
         return execute(tool, () -> httpClient.getList(buildUri(path, parameters)));
     }
 
+    public void put(String tool, String path, Map<String, ?> body) {
+        execute(
+                tool,
+                () -> {
+                    httpClient.put(buildUri(path, Map.of()), body);
+                    return null;
+                });
+    }
+
+    public void post(String tool, String path, Map<String, ?> body) {
+        execute(
+                tool,
+                () -> {
+                    httpClient.post(buildUri(path, Map.of()), body);
+                    return null;
+                });
+    }
+
+    public void delete(String tool, String path) {
+        execute(
+                tool,
+                () -> {
+                    httpClient.delete(buildUri(path, Map.of()));
+                    return null;
+                });
+    }
+
     private <T> T execute(String tool, Supplier<T> operation) {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";

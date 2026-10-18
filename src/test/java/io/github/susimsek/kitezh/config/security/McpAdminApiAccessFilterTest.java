@@ -117,6 +117,37 @@ class McpAdminApiAccessFilterTest {
     }
 
     @Test
+    void allowsOnlyExplicitWriteRoutesForMcpWriteScope() {
+        Jwt writeToken = mcpWriteToken();
+        Jwt readToken = mcpPurposeToken();
+
+        assertThat(
+                        McpAdminApiAccessFilter.isAllowedMcpRequest(
+                                "PUT", "/api/admin/users/12/enabled", writeToken))
+                .isTrue();
+        assertThat(
+                        McpAdminApiAccessFilter.isAllowedMcpRequest(
+                                "POST", "/api/admin/groups/3/users", writeToken))
+                .isTrue();
+        assertThat(
+                        McpAdminApiAccessFilter.isAllowedMcpRequest(
+                                "DELETE", "/api/admin/groups/3/users/12", writeToken))
+                .isTrue();
+        assertThat(
+                        McpAdminApiAccessFilter.isAllowedMcpRequest(
+                                "DELETE", "/api/admin/sessions/session-1", writeToken))
+                .isTrue();
+        assertThat(
+                        McpAdminApiAccessFilter.isAllowedMcpRequest(
+                                "DELETE", "/api/admin/users/12", writeToken))
+                .isFalse();
+        assertThat(
+                        McpAdminApiAccessFilter.isAllowedMcpRequest(
+                                "PUT", "/api/admin/users/12/enabled", readToken))
+                .isFalse();
+    }
+
+    @Test
     void allowsMcpPurposeTokenOnReadOnlyPathAfterRemovingContextPath()
             throws ServletException, IOException {
         setAuthentication(jwtAuthentication(mcpPurposeToken()));
@@ -192,6 +223,16 @@ class McpAdminApiAccessFilterTest {
                 .header("alg", "none")
                 .audience(List.of(MCP_AUDIENCE, "admin-api"))
                 .claim("scope", "openid mcp.read")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
+    }
+
+    private static Jwt mcpWriteToken() {
+        return Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .audience(List.of(MCP_AUDIENCE, "admin-api"))
+                .claim("scope", "mcp.write")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60))
                 .build();

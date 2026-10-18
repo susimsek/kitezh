@@ -33,6 +33,22 @@ class McpSecurityConfigTest {
     }
 
     @Test
+    void mapsMcpWriteScopeFromJwtClaims() {
+        Jwt jwt =
+                Jwt.withTokenValue("token")
+                        .header("alg", "none")
+                        .claim("scope", "mcp.write")
+                        .build();
+
+        Set<String> authorities =
+                config.jwtAuthenticationConverter().convert(jwt).getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.toSet());
+
+        assertThat(authorities).contains("SCOPE_mcp.write");
+    }
+
+    @Test
     void validatesMcpAudience() {
         Jwt matchingAudience =
                 Jwt.withTokenValue("token")

@@ -8,13 +8,32 @@ import org.junit.jupiter.api.Test;
 class McpToolCatalogPolicyTest {
 
     @Test
-    void enablesAllKnownToolsByDefault() {
+    void enablesDefaultReadToolsAndOmitsWriteTools() {
         McpToolCatalogPolicy policy = new McpToolCatalogPolicy("all", "", "*");
 
         assertThat(policy.isEnabled("search_users")).isTrue();
         assertThat(policy.isEnabled("search_clients")).isTrue();
         assertThat(policy.isEnabled("get_admin_dashboard_summary")).isTrue();
+        assertThat(policy.isEnabled("preview_set_user_enabled")).isFalse();
         assertThat(policy.isEnabled("unknown_tool")).isFalse();
+    }
+
+    @Test
+    void enablesWriteToolsOnlyWhenTheirWriteToolsetIsSelected() {
+        McpToolCatalogPolicy policy = new McpToolCatalogPolicy("users_write", "", "*");
+
+        assertThat(policy.isEnabled("preview_set_user_enabled")).isTrue();
+        assertThat(policy.isEnabled("apply_set_user_enabled")).isTrue();
+        assertThat(policy.isEnabled("search_users")).isFalse();
+    }
+
+    @Test
+    void enablesSelectedWriteToolsetsAlongsideAllReadTools() {
+        McpToolCatalogPolicy policy = new McpToolCatalogPolicy("all,users_write", "", "*");
+
+        assertThat(policy.isEnabled("search_users")).isTrue();
+        assertThat(policy.isEnabled("preview_set_user_enabled")).isTrue();
+        assertThat(policy.isEnabled("preview_add_user_to_group")).isFalse();
     }
 
     @Test

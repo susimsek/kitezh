@@ -68,7 +68,6 @@ app:
     base-url: ${APP_API_BASE_URL:http://localhost:9090}
   mcp:
     public-url: ${APP_MCP_PUBLIC_URL:https://kitezh-mcp.onrender.com/mcp}
-    read-only: ${APP_MCP_READ_ONLY:true}
     tools:
       toolsets: ${APP_MCP_TOOLSETS:all}
       additional-tools: ${APP_MCP_ADDITIONAL_TOOLS:}

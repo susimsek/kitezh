@@ -31,7 +31,14 @@ final class McpToolCatalogPolicy {
 
         Set<String> selectedTools = new LinkedHashSet<>();
         if (selectedToolsets.contains(ALL)) {
-            selectedTools.addAll(ALL_TOOLS);
+            TOOLSETS.entrySet().stream()
+                    .filter(entry -> !entry.getKey().endsWith("_write"))
+                    .flatMap(entry -> entry.getValue().stream())
+                    .forEach(selectedTools::add);
+            selectedToolsets.stream()
+                    .filter(toolset -> toolset.endsWith("_write"))
+                    .map(TOOLSETS::get)
+                    .forEach(selectedTools::addAll);
         } else {
             selectedToolsets.stream().map(TOOLSETS::get).forEach(selectedTools::addAll);
         }
@@ -69,9 +76,12 @@ final class McpToolCatalogPolicy {
     }
 
     private static void validateToolsets(Set<String> configuredToolsets) {
-        if (configuredToolsets.contains(ALL) && configuredToolsets.size() != 1) {
+        Set<String> nonWriteToolsets = new LinkedHashSet<>(configuredToolsets);
+        nonWriteToolsets.remove(ALL);
+        nonWriteToolsets.removeIf(toolset -> toolset.endsWith("_write"));
+        if (configuredToolsets.contains(ALL) && !nonWriteToolsets.isEmpty()) {
             throw new IllegalArgumentException(
-                    "MCP toolset 'all' cannot be combined with categories");
+                    "MCP toolset 'all' cannot be combined with read categories");
         }
         Set<String> unknownToolsets = new LinkedHashSet<>(configuredToolsets);
         unknownToolsets.remove(ALL);
@@ -161,6 +171,15 @@ final class McpToolCatalogPolicy {
         toolsets.put("dashboard", Set.of("get_admin_dashboard_summary"));
         toolsets.put("notifications", Set.of("list_admin_notifications"));
         toolsets.put("signing-keys", Set.of("list_signing_key_metadata"));
+        toolsets.put("users_write", Set.of("preview_set_user_enabled", "apply_set_user_enabled"));
+        toolsets.put(
+                "groups_write",
+                Set.of(
+                        "preview_add_user_to_group",
+                        "apply_add_user_to_group",
+                        "preview_remove_user_from_group",
+                        "apply_remove_user_from_group"));
+        toolsets.put("sessions_write", Set.of("preview_revoke_session", "apply_revoke_session"));
         return Map.copyOf(toolsets);
     }
 }

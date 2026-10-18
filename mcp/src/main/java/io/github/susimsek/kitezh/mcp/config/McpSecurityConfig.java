@@ -49,7 +49,7 @@ public class McpSecurityConfig {
                                                 "/actuator/health/**")
                                         .permitAll()
                                         .anyRequest()
-                                        .hasAuthority("SCOPE_mcp.read"))
+                                        .hasAnyAuthority("SCOPE_mcp.read", "SCOPE_mcp.write"))
                 .oauth2ResourceServer(
                         resourceServer ->
                                 resourceServer
@@ -64,6 +64,8 @@ public class McpSecurityConfig {
                                                                                                 issuer)
                                                                                         .scope(
                                                                                                 "mcp.read")
+                                                                                        .scope(
+                                                                                                "mcp.write")
                                                                                         .bearerMethod(
                                                                                                 "header")
                                                                                         .tlsClientCertificateBoundAccessTokens(
@@ -103,7 +105,9 @@ public class McpSecurityConfig {
             new BearerTokenAuthenticationEntryPoint().commence(request, response, exception);
             response.setHeader(
                     "WWW-Authenticate",
-                    "Bearer resource_metadata=\"" + metadataUrl + "\", scope=\"mcp.read\"");
+                    "Bearer resource_metadata=\""
+                            + metadataUrl
+                            + "\", scope=\"mcp.read mcp.write\"");
         };
     }
 

@@ -98,7 +98,7 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
   - Gatling performance tests: `src/test/java/gatling/simulations`
 - MCP server: `mcp`
   - Independent Spring Boot/Spring AI Streamable HTTP service; no JPA, Liquibase, or direct database access.
-  - MCP tools call the versioned Kitezh Admin API through OAuth 2.0 Token Exchange.
+  - MCP tools call the versioned Kitezh Admin API by forwarding the authenticated user access token unchanged; there is no token exchange or confidential MCP client secret.
   - Separate Docker image, Render Web Service, quality job, release workflow, Sonar inputs, and observability assets.
   - Unit and integration tests live under `mcp/src/test/java`.
 
@@ -279,7 +279,7 @@ curl http://localhost:9090/actuator/health/readiness
 
 ## Authentication
 
-- Keep the MCP service separately deployable under `mcp/`; authenticate inbound bearer tokens against its configured issuer and MCP resource audience, require `mcp.read`, and forward the same user token to the Kitezh Admin API. MCP access tokens also carry the `admin-api` audience. The backend must restrict MCP-purpose tokens to the explicit read-only GET endpoint allowlist and preserve each endpoint's existing role authorization. MCP tools remain read-only and must use typed API operations; never add direct JPA/database access or generic URL/SQL tools.
+- Keep the MCP service separately deployable under `mcp/`; authenticate inbound bearer tokens against its configured issuer and MCP resource audience, require `mcp.read` for reads and `mcp.write` for explicitly enabled guarded writes, and forward the same user token to the Kitezh Admin API. MCP access tokens also carry the `admin-api` audience. The backend must restrict MCP-purpose tokens to explicit HTTP method/path allowlists and preserve each endpoint's existing role authorization. Writes must use preview/apply with short-lived caller-bound confirmation state, verify target state again before mutation, and use typed API operations; never add direct JPA/database access or generic URL/SQL tools.
 - Keep the MCP public resource URI synchronized across `AuthorizationServerConfig`, `APP_SECURITY_AUDIENCE`, `APP_MCP_PUBLIC_URL`, and the Render service. MCP does not use a confidential service client or client secret.
 
 - Form login is used for end-user authentication.

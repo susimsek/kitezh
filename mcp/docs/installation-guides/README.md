@@ -41,7 +41,7 @@ There is no local stdio process to install or start for these hosted guides. Loc
 - An MCP host with remote Streamable HTTP support.
 - A Kitezh account authorized to use the requested Administration API tools.
 - Either a public OAuth client registered with the host's exact redirect URI, or a Kitezh personal access token accepted by that host.
-- For OAuth, the `mcp.read` scope and Authorization Code with PKCE (S256).
+- For OAuth, the `mcp.read` scope and Authorization Code with PKCE (S256). Add `mcp.write` only if the server operator has enabled a write toolset and the user has its Kitezh role.
 
 PATs are created in the Kitezh Account Console under **Security → Personal access tokens**. Select a name, description, and expiration (7, 30, 60, or 90 days, a custom date, or no expiration). Copy the value at creation time and store it in the host's secret store or an environment variable. The full token cannot be viewed again; revoke it in the Account Console when it is no longer needed.
 
@@ -49,7 +49,7 @@ PATs are created in the Kitezh Account Console under **Security → Personal acc
 
 ### OAuth 2.0 Authorization Code with PKCE
 
-Use OAuth when the host supports a configured public client ID and browser sign-in. Register the exact callback URI shown by the host, enable PKCE S256, and allow `mcp.read`. Never configure a client secret for a public client. Each host should have its own client registration and redirect URI.
+Use OAuth when the host supports a configured public client ID and browser sign-in. Register the exact callback URI shown by the host, enable PKCE S256, and allow `mcp.read`. Add `mcp.write` only for explicitly enabled write toolsets; it still requires a matching Kitezh role and server-side allowlist. Never configure a client secret for a public client. Each host should have its own client registration and redirect URI.
 
 ### Personal access token
 
@@ -62,7 +62,7 @@ Use a PAT when the host supports custom HTTP headers. Configure it as `Authoriza
 3. Create one PAT per client and grant only the account permissions needed for the tasks.
 4. Prefer an expiration date; revoke credentials that are no longer in use.
 5. Do not paste a PAT into a shared ChatGPT or team connector configuration.
-6. Remember that Kitezh forwards the authenticated user's token to the Admin API, where user roles and read-only route rules are enforced.
+6. Remember that Kitezh forwards the authenticated user's token to the Admin API, where scope, user roles, and explicit read/write route rules are enforced.
 
 ## References
 

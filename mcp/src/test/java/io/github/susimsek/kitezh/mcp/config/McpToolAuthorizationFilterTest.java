@@ -49,12 +49,13 @@ class McpToolAuthorizationFilterTest {
                             .write(
                                     "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":["
                                             + "{\"name\":\"search_users\"},"
-                                            + "{\"name\":\"search_clients\"}]}}");
+                                            + "{\"name\":\"search_clients\"},"
+                                            + "{\"name\":\"preview_set_user_enabled\"}]}}");
                 });
 
         assertThat(response.getContentAsString())
                 .contains("search_users")
-                .doesNotContain("search_clients");
+                .doesNotContain("search_clients", "preview_set_user_enabled");
         assertThat(meterRegistry.find("mcp_server_operation_duration_seconds").timer().count())
                 .isEqualTo(1);
         assertThat(
@@ -96,6 +97,36 @@ class McpToolAuthorizationFilterTest {
                     throw new AssertionError("Batch request must be rejected");
                 });
         assertThat(batchResponse.getContentAsString()).contains("\"code\":-32600");
+    }
+
+    @Test
+    void exposesWriteToolsOnlyWithWriteScopeAndManagerRole() throws Exception {
+        McpToolCatalogPolicy writePolicy = new McpToolCatalogPolicy("users_write", "", "*");
+        McpToolAuthorizationFilter writeFilter =
+                new McpToolAuthorizationFilter(
+                        objectMapper,
+                        writePolicy,
+                        new McpOperationMetrics(meterRegistry, writePolicy, objectMapper));
+        authenticate("ROLE_USER_MANAGER", "SCOPE_mcp.write");
+        MockHttpServletResponse writeResponse = new MockHttpServletResponse();
+        writeFilter.doFilter(
+                request("tools/call", "preview_set_user_enabled"),
+                writeResponse,
+                (wrappedRequest, wrappedResponse) ->
+                        wrappedResponse.getWriter().write("{\"jsonrpc\":\"2.0\",\"id\":1}"));
+
+        assertThat(writeResponse.getContentAsString()).doesNotContain("-32601");
+
+        authenticate("ROLE_USER_MANAGER", "SCOPE_mcp.read");
+        MockHttpServletResponse readResponse = new MockHttpServletResponse();
+        writeFilter.doFilter(
+                request("tools/call", "preview_set_user_enabled"),
+                readResponse,
+                (ignoredRequest, ignoredResponse) -> {
+                    throw new AssertionError("Write tool must not reach a read-only caller");
+                });
+
+        assertThat(readResponse.getContentAsString()).contains("\"code\":-32601");
     }
 
     @Test
@@ -176,10 +207,18 @@ class McpToolAuthorizationFilterTest {
     }
 
     private static void authenticate(String role) {
+        authenticate(role, "SCOPE_mcp.read");
+    }
+
+    private static void authenticate(String role, String scope) {
         SecurityContextHolder.getContext()
                 .setAuthentication(
                         new UsernamePasswordAuthenticationToken(
-                                "user", "n/a", List.of(new SimpleGrantedAuthority(role))));
+                                "user",
+                                "n/a",
+                                List.of(
+                                        new SimpleGrantedAuthority(role),
+                                        new SimpleGrantedAuthority(scope))));
     }
 
     private static void assertReadableReplay(jakarta.servlet.ServletRequest request)

@@ -1,6 +1,6 @@
 # Kitezh MCP Server
 
-Kitezh MCP Server is a separately deployed, read-only Model Context Protocol (MCP) service for the Kitezh identity platform. It uses Spring Boot, Spring AI, and Streamable HTTP, and runs as a GraalVM Native Image executable compressed with UPX. The published image supports `linux/amd64` and `linux/arm64`.
+Kitezh MCP Server is a separately deployed Model Context Protocol (MCP) service with read-only tools enabled by default and guarded, opt-in write tools for the Kitezh identity platform. It uses Spring Boot, Spring AI, and Streamable HTTP, and runs as a GraalVM Native Image executable compressed with UPX. The published image supports `linux/amd64` and `linux/arm64`.
 
 The MCP endpoint listens on port `10000` at `/mcp`. The server has no database dependency: it authenticates the MCP user's OAuth access token and forwards that same token to the Kitezh Administration API.
 
@@ -24,19 +24,20 @@ Docker selects the matching architecture from the `latest` multi-architecture ma
 ## Capabilities
 
 - Stateless Streamable HTTP MCP endpoint at `/mcp`
-- OAuth 2.0 bearer-token authentication with issuer, audience, and `mcp.read` scope validation
+- OAuth 2.0 bearer-token authentication with issuer, audience, and `mcp.read`/`mcp.write` scope validation
 - Protected Resource Metadata at `/.well-known/oauth-protected-resource`
 - Forwarding the validated user bearer token to the Kitezh Administration API
-- Read-only tools for Kitezh context, users, groups, OAuth clients, sessions, and audit events
+- Read tools for Kitezh context, users, groups, OAuth clients, sessions, and audit events
+- Eight opt-in preview/apply write tools for user status, group membership, and single-session revocation
 - Health, readiness, liveness, metrics, and Prometheus endpoints
 - Optional OTLP metrics, traces, and logs for Grafana Cloud or an OpenTelemetry Collector
 - GraalVM Native Image runtime assembled with the Jib Native Image extension
 
-All MCP tools are read-only. The server never connects directly to the Kitezh database and never returns passwords, tokens, client secrets, or recovery codes.
+Write toolsets are excluded from `all` and require `mcp.write`, an eligible user role, and explicit server-side enablement. Each write uses a caller-bound, five-minute, single-use preview and checks for stale target state before applying. The client must request user confirmation before an `apply_*` call. The server never connects directly to the Kitezh database and never returns passwords, tokens, client secrets, or recovery codes.
 
 ## Run the image
 
-The MCP resource URL must match the resource audience configured in the Kitezh Authorization Server. The Administration API must accept the forwarded token and apply read-only endpoint and role authorization rules.
+The MCP resource URL must match the resource audience configured in the Kitezh Authorization Server. The Administration API must accept the forwarded token and enforce the MCP purpose-token route/method allowlist and the existing role authorization rules.
 
 ```bash
 docker run --rm -p 10000:10000 \
@@ -46,7 +47,6 @@ docker run --rm -p 10000:10000 \
   -e APP_SECURITY_AUDIENCE=https://kitezh-mcp.onrender.com/mcp \
   -e APP_API_BASE_URL=https://kitezh.onrender.com \
   -e APP_MCP_PUBLIC_URL=https://kitezh-mcp.onrender.com/mcp \
-  -e APP_MCP_READ_ONLY=true \
   -e MANAGEMENT_OPENTELEMETRY_ENABLED=true \
   -e MANAGEMENT_TRACING_EXPORT_ENABLED=true \
   -e MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=true \
@@ -68,7 +68,7 @@ curl http://localhost:10000/actuator/health/readiness
 
 ## Connect an MCP client
 
-Kitezh currently uses pre-registered OAuth clients and does not provide Dynamic Client Registration. Register a separate public OAuth client for each MCP host in Kitezh. Allowlist that host's exact localhost callback URI, enable Authorization Code with PKCE S256, and grant only `openid` and `mcp.read`.
+Kitezh currently uses pre-registered OAuth clients and does not provide Dynamic Client Registration. Register a separate public OAuth client for each MCP host in Kitezh. Allowlist that host's exact localhost callback URI, enable Authorization Code with PKCE S256, and grant `openid` and `mcp.read`; add `mcp.write` only for hosts allowed to call explicitly enabled write tools.
 
 ### Claude Code
 
@@ -95,7 +95,7 @@ codex mcp add kitezh \
 
 Run `codex mcp login kitezh` and finish signing in through the browser. The Codex CLI and IDE extension use the same MCP configuration.
 
-For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback `http://localhost:6274/oauth/callback` and scope `mcp.read`.
+For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback `http://localhost:6274/oauth/callback` and scope `mcp.read`; request `mcp.write` only when testing a write toolset.
 
 ## Configuration
 
@@ -109,10 +109,9 @@ For MCP Inspector, configure the seeded `mcp-client` OAuth client with callback 
 | `APP_API_BASE_URL` | `http://localhost:9090` | Kitezh Administration API base URL |
 | `APP_MCP_PUBLIC_URL` | `https://kitezh-mcp.onrender.com/mcp` | Public MCP resource identifier |
 | `APP_CORS_ALLOWED_ORIGINS` | `app://renderer,http://localhost:6274,http://127.0.0.1:6274` | Browser origins allowed by MCP CORS; explicitly listed localhost origins also permit matching localhost Host values |
-| `APP_MCP_READ_ONLY` | `true` | Keep all MCP operations read-only |
-| `APP_MCP_TOOLSETS` | `all` | Enabled server-side toolsets: `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, `signing-keys`; comma-separated, or `all` |
+| `APP_MCP_TOOLSETS` | `all` | Enabled toolsets. `all` excludes `users_write`, `groups_write`, and `sessions_write`; combine `all` with a named write toolset, such as `all,users_write`, to opt in |
 | `APP_MCP_ADDITIONAL_TOOLS` | empty | Exact comma-separated MCP tool names to add to the selected toolsets |
-| `APP_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets, additional tools, and caller roles; `*` allows all names |
+| `APP_MCP_TOOL_ALLOWLIST` | `*` | Exact comma-separated MCP tool names allowed by this deployment, intersected with selected toolsets, additional tools, and caller roles; `*` allows all selected names; scope and caller roles still apply |
 | `APP_LOG_CLIENT_ENABLED` | `false` | Enable redacted outbound HTTP request/response logs |
 | `APP_LOG_CLIENT_LEVEL` | `BASIC` | Outbound detail level: `BASIC`, `HEADERS`, or `FULL` |
 | `APP_LOG_CLIENT_EXCLUDE_PATHS` | empty | Comma-separated path prefixes excluded from outbound logs |

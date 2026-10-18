@@ -50,6 +50,16 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
     private static final String ORGANIZATION_MANAGER = "ROLE_ORGANIZATION_MANAGER";
     private static final String EVENT_VIEWER = "ROLE_EVENT_VIEWER";
     private static final String EVENT_MANAGER = "ROLE_EVENT_MANAGER";
+    private static final Set<String> WRITE_TOOLS =
+            Set.of(
+                    "preview_set_user_enabled",
+                    "apply_set_user_enabled",
+                    "preview_add_user_to_group",
+                    "apply_add_user_to_group",
+                    "preview_remove_user_from_group",
+                    "apply_remove_user_from_group",
+                    "preview_revoke_session",
+                    "apply_revoke_session");
     private static final Map<String, Set<String>> TOOL_AUTHORITIES = toolAuthorities();
 
     private final ObjectMapper objectMapper;
@@ -133,6 +143,14 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
 
     private boolean canUse(String toolName, Set<String> authorities) {
         if (!catalogPolicy.isEnabled(toolName)) {
+            return false;
+        }
+        if (WRITE_TOOLS.contains(toolName)) {
+            if (!authorities.contains("SCOPE_mcp.write")) {
+                return false;
+            }
+        } else if (!authorities.contains("SCOPE_mcp.read")
+                && !authorities.contains("SCOPE_mcp.write")) {
             return false;
         }
         if (authorities.contains(ADMIN)) {
@@ -395,6 +413,19 @@ final class McpToolAuthorizationFilter extends OncePerRequestFilter {
         add(authorities, Set.of(ADMIN), "get_admin_dashboard_summary");
         add(authorities, Set.of(ADMIN), "list_admin_notifications");
         add(authorities, Set.of(ADMIN), "list_signing_key_metadata");
+        add(authorities, users(), "preview_set_user_enabled", "apply_set_user_enabled");
+        add(
+                authorities,
+                Set.of(ADMIN, USER_MANAGER, GROUP_MANAGER),
+                "preview_add_user_to_group",
+                "apply_add_user_to_group",
+                "preview_remove_user_from_group",
+                "apply_remove_user_from_group");
+        add(
+                authorities,
+                Set.of(ADMIN, USER_MANAGER),
+                "preview_revoke_session",
+                "apply_revoke_session");
         return Map.copyOf(authorities);
     }
 
