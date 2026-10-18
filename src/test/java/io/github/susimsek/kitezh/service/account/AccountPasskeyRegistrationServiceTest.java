@@ -24,8 +24,8 @@ import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.web.webauthn.api.PublicKeyCredential;
 import org.springframework.security.web.webauthn.api.PublicKeyCredentialCreationOptions;
 import org.springframework.security.web.webauthn.management.RelyingPartyRegistrationRequest;
@@ -90,7 +90,8 @@ class AccountPasskeyRegistrationServiceTest {
         AccountPasskeyRegistrationService enrollmentService =
                 serviceWithMapper(mapper, delegate, options, credential);
         Authentication authentication =
-                UsernamePasswordAuthenticationToken.authenticated("alice", null, java.util.List.of());
+                UsernamePasswordAuthenticationToken.authenticated(
+                        "alice", null, java.util.List.of());
         when(relyingParty.createPublicKeyCredentialCreationOptions(any())).thenReturn(options);
         when(mapper.toWebauthnMap(options)).thenReturn(Map.of("challenge", "server-challenge"));
 
@@ -192,11 +193,14 @@ class AccountPasskeyRegistrationServiceTest {
             SecurityJsonMapper mapper,
             JsonMapper delegate,
             PublicKeyCredentialCreationOptions options,
-            PublicKeyCredential<?> credential) throws IOException {
+            PublicKeyCredential<?> credential)
+            throws IOException {
         doAnswer(
                         invocation -> {
                             OutputStream stream = invocation.getArgument(1);
-                            stream.write("stored-options".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                            stream.write(
+                                    "stored-options"
+                                            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
                             return null;
                         })
                 .when(mapper)
@@ -205,7 +209,8 @@ class AccountPasskeyRegistrationServiceTest {
         when(mapper.readSessionAttribute(any(InputStream.class))).thenReturn(options);
         when(mapper.delegate()).thenReturn(delegate);
         when(delegate.convertValue(any(), any(TypeReference.class))).thenReturn(credential);
-        return new AccountPasskeyRegistrationService(repository, relyingParty, mapper, auditEventService);
+        return new AccountPasskeyRegistrationService(
+                repository, relyingParty, mapper, auditEventService);
     }
 
     private static AccountPasskeyRegistrationChallengeEntity challenge(
