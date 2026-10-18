@@ -3103,6 +3103,12 @@ test("native Admin SAML provider creation validates metadata and clears private 
     );
     form.elements.namedItem("samlMetadataUri").value =
       "https://issuer.example.test/metadata";
+    form.elements.namedItem("samlAssertingPartyEntityId").value =
+      "https://issuer.example.test/entity";
+    form.elements.namedItem("samlSingleSignOnServiceUrl").value =
+      "https://issuer.example.test/sso";
+    form.elements.namedItem("samlIdpCertificate").value =
+      "-----BEGIN CERTIFICATE-----\nIDP\n-----END CERTIFICATE-----";
     form.elements.namedItem("samlSigningPrivateKey").value =
       "-----BEGIN PRIVATE KEY-----\\nSIGNING_SENTINEL\\n-----END PRIVATE KEY-----";
     form.elements.namedItem("samlDecryptionPrivateKey").value =
@@ -3144,6 +3150,10 @@ test("native Admin SAML provider creation validates metadata and clears private 
     assert.equal(
       save.body.samlMetadataUri,
       "https://issuer.example.test/metadata",
+    );
+    assert.equal(
+      save.body.samlAssertingPartyEntityId,
+      "https://issuer.example.test/entity",
     );
     assert.equal(
       save.body.samlSigningPrivateKey.includes("SIGNING_SENTINEL"),
@@ -3262,6 +3272,148 @@ test("native Admin SAML provider details save native policy options", async () =
     harness.restore();
   }
 });
+test("native Admin SAML creation rejects malformed identifiers and unsafe metadata", async () => {
+  const harness = await renderConsole("admin");
+  try {
+    const { calls, document } = harness;
+    document.querySelector('[data-route="identity-providers"]').click();
+    for (let turn = 0; turn < 30; turn += 1) {
+      await settle();
+      if (!document.querySelector('[data-route="identity-providers"]').disabled)
+        break;
+    }
+    document.querySelector('[data-action="admin-provider-create"]').click();
+    const providerType = document.querySelector("[data-provider-create-type]");
+    providerType.value = "saml";
+    providerType.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
+    await settle();
+    const form = document.querySelector(
+      '[data-form="admin-saml-identity-provider-connection"]',
+    );
+    form.elements.namedItem("registrationId").value = "Bad Alias";
+    form.elements.namedItem("displayName").value = "   ";
+    form.elements.namedItem("alias").value = "Bad Alias";
+    form.elements.namedItem("iconKey").value = "Bad Icon";
+    form.elements.namedItem("samlMetadataUri").value = "file:///etc/passwd";
+    form.elements.namedItem("samlAssertingPartyEntityId").value = "no-scheme";
+    form.elements.namedItem("samlSigningPrivateKey").value = "not a private key";
+    form.elements.namedItem("samlDecryptionPrivateKey").value = "not a private key";
+    form.elements.namedItem("samlIdpCertificate").value = "not a certificate";
+    form.elements.namedItem("samlSigningCertificate").value = "not a certificate";
+    form.elements.namedItem("samlDecryptionCertificate").value = "not a certificate";
+    form.elements.namedItem("samlSignAuthnRequests").checked = true;
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(document.querySelector('[name="registrationId"] + .field-error')?.textContent);
+    assert.ok(document.querySelector('[name="samlMetadataUri"] + .field-error')?.textContent);
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/identity-providers" && method === "POST",
+      ),
+      false,
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native Admin SAML connection edit validates certificates and saves the existing provider", async () => {
+  const harness = await renderConsole("admin");
+  const providerPath = "/api/admin/identity-providers/example-saml";
+  const provider = {
+    id: "example-saml",
+    providerType: "saml",
+    alias: "example-saml",
+    registrationId: "example-saml",
+    displayName: "Example SAML",
+    iconKey: "generic",
+    enabled: true,
+    configured: true,
+    samlMetadataUri: "https://issuer.example.test/metadata",
+    samlWantAssertionsSigned: true,
+    samlSigningPrivateKeyConfigured: true,
+    samlDecryptionPrivateKeyConfigured: true,
+  };
+  harness.setResponse(
+    "/api/admin/identity-providers?q=&page=0&size=10&sort=guiOrder%2Casc",
+    "GET",
+    () => ({ content: [provider], totalElements: 1, totalPages: 1, number: 0 }),
+  );
+  harness.setResponse(providerPath, "GET", () => provider);
+  harness.setResponse(`${providerPath}/native-policy`, "GET", () => provider);
+  harness.setResponse(providerPath, "PUT", ({ body }) => ({ ...provider, ...body }));
+  try {
+    const { calls, document } = harness;
+    document.querySelector('[data-route="identity-providers"]').click();
+    for (let turn = 0; turn < 30; turn += 1) {
+      await settle();
+      if (!document.querySelector('[data-route="identity-providers"]').disabled)
+        break;
+    }
+    document
+      .querySelector('a[data-action="admin-provider-open"][data-id="example-saml"]')
+      .click();
+    await settle();
+
+    let form = document.querySelector(
+      '[data-form="admin-saml-identity-provider-connection"]',
+    );
+    assert.ok(form);
+    form.elements.namedItem("samlSignAuthnRequests").checked = true;
+    form.elements.namedItem("samlSigningCertificate").value = "not a PEM";
+    form.elements.namedItem("samlDecryptionCertificate").value = "also not PEM";
+    form.elements.namedItem("samlServiceProviderEntityId").value = "not-a-uri";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(
+      calls.some(({ path, method }) => path === providerPath && method === "PUT"),
+      false,
+    );
+
+    form = document.querySelector(
+      '[data-form="admin-saml-identity-provider-connection"]',
+    );
+    form.elements.namedItem("samlSignAuthnRequests").checked = false;
+    form.elements.namedItem("samlSigningCertificate").value =
+      "-----BEGIN CERTIFICATE-----\nSIGNING\n-----END CERTIFICATE-----";
+    form.elements.namedItem("samlDecryptionCertificate").value =
+      "-----BEGIN CERTIFICATE-----\nDECRYPTION\n-----END CERTIFICATE-----";
+    form.elements.namedItem("samlServiceProviderEntityId").value =
+      "https://sp.example.test/entity";
+    form.elements.namedItem("samlSignatureAlgorithm").value =
+      "https://example.test/signature";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+
+    const save = calls.find(({ path, method }) => path === providerPath && method === "PUT");
+    assert.ok(save);
+    assert.equal(save.body.providerType, "saml");
+    assert.equal(save.body.samlServiceProviderEntityId, "https://sp.example.test/entity");
+    assert.equal(save.body.samlSigningPrivateKey, null);
+    assert.match(document.querySelector(".content").textContent, /updated/i);
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native Admin OIDC details match the Web form and save policy options together", async () => {
   const harness = await renderConsole("admin");
   const providerPath = "/api/admin/identity-providers/example/native-policy";

@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.service.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,11 +39,13 @@ import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
 import io.github.susimsek.kitezh.service.requiredaction.RequiredActionService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -50,6 +53,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
@@ -256,6 +260,295 @@ class MobileNativeLoginServiceTest {
         verify(authorizations).save(any(OAuth2Authorization.class));
         verify(auditEventService)
                 .record("user.mobile-login.passkey-verified", "user", "admin", "android");
+    }
+
+    @Test
+    void rejectsFailedAndMismatchedPasskeyAssertionsWithoutIssuingAuthorization() {
+        PublicKeyCredentialRequestOptions options =
+                PublicKeyCredentialRequestOptions.builder()
+                        .challenge(Bytes.fromBase64("AAECAwQFBgcICQoLDA0ODw"))
+                        .rpId("localhost")
+                        .build();
+        when(webAuthnRelyingPartyOperations.createCredentialRequestOptions(any()))
+                .thenReturn(options);
+        when(webAuthnRelyingPartyOperations.authenticate(any()))
+                .thenThrow(new IllegalStateException("invalid assertion"))
+                .thenReturn(passkeyUser("someone-else"));
+
+        MobileLoginResponseDTO challenge = service.beginPasskey(passkeyRequest(), servletRequest);
+
+        assertThatThrownBy(
+                        () ->
+                                service.verifyPasskey(
+                                        challenge.transactionId(),
+                                        new MobilePasskeyAssertionRequestDTO(
+                                                assertionCredential())))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.verifyPasskey(
+                                        challenge.transactionId(),
+                                        new MobilePasskeyAssertionRequestDTO(
+                                                assertionCredential())))
+                .isInstanceOf(ApiException.class);
+
+        verify(authorizations, never()).save(any(OAuth2Authorization.class));
+        verify(eventPublisher).publishEvent(any());
+    }
+
+    @Test
+    void rejectsPasskeyVerificationWhenTheTransactionAwaitsAnotherChallenge() {
+        RequiredActionDTO profile =
+                new RequiredActionDTO("UPDATE_PROFILE", "Profile", "Complete profile", 1);
+        when(requiredActionService.pending("admin")).thenReturn(List.of(profile));
+        MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
+
+        assertThatThrownBy(
+                        () ->
+                                service.verifyPasskey(
+                                        challenge.transactionId(),
+                                        new MobilePasskeyAssertionRequestDTO(
+                                                assertionCredential())))
+                .isInstanceOf(ApiException.class);
+        verify(webAuthnRelyingPartyOperations, never()).authenticate(any());
+    }
+
+    @Test
+    void rejectsPasskeyStartWhenTheAccountIsMissingOrDisabled() {
+        when(userDetailsService.loadUserByUsername("admin"))
+                .thenThrow(new UsernameNotFoundException("missing"));
+        assertThatThrownBy(() -> service.beginPasskey(passkeyRequest(), servletRequest))
+                .isInstanceOf(ApiException.class);
+
+        doReturn(
+                        User.withUsername("admin")
+                                .password("encoded")
+                                .authorities("ROLE_ADMIN")
+                                .disabled(true)
+                                .build())
+                .when(userDetailsService)
+                .loadUserByUsername("admin");
+        assertThatThrownBy(() -> service.beginPasskey(passkeyRequest(), servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(transactions, never()).saveAndFlush(any(MobileLoginTransactionEntity.class));
+    }
+
+    @Test
+    void rejectsExpiredAndMissingTransactionsBeforeAnyCredentialOperation() {
+        assertThatThrownBy(
+                        () ->
+                                service.verifyMfa(
+                                        "", new MobileLoginMfaRequestDTO("123456"), servletRequest))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.verifyMfa(
+                                        "missing-transaction",
+                                        new MobileLoginMfaRequestDTO("123456"),
+                                        servletRequest))
+                .isInstanceOf(ApiException.class);
+
+        PublicKeyCredentialRequestOptions options =
+                PublicKeyCredentialRequestOptions.builder()
+                        .challenge(Bytes.fromBase64("AAECAwQFBgcICQoLDA0ODw"))
+                        .rpId("localhost")
+                        .build();
+        when(webAuthnRelyingPartyOperations.createCredentialRequestOptions(any()))
+                .thenReturn(options);
+        MobileLoginResponseDTO challenge = service.beginPasskey(passkeyRequest(), servletRequest);
+        ArgumentCaptor<MobileLoginTransactionEntity> entityCaptor =
+                ArgumentCaptor.forClass(MobileLoginTransactionEntity.class);
+        verify(transactions).saveAndFlush(entityCaptor.capture());
+        MobileLoginTransactionEntity entity = entityCaptor.getValue();
+        entity.setExpiresAt(Instant.now().minusSeconds(1));
+
+        assertThatThrownBy(
+                        () ->
+                                service.verifyPasskey(
+                                        challenge.transactionId(),
+                                        new MobilePasskeyAssertionRequestDTO(
+                                                assertionCredential())))
+                .isInstanceOf(ApiException.class);
+        verify(transactions).delete(entity);
+        verify(webAuthnRelyingPartyOperations, never()).authenticate(any());
+    }
+
+    @Test
+    void rejectsUnsupportedPasskeyEnrollmentAndUnavailableWebAuthnOptions() {
+        RequiredActionDTO passkey =
+                new RequiredActionDTO("CONFIGURE_PASSKEY", "Passkey", "Register", 1);
+        when(requiredActionService.pending("admin")).thenReturn(List.of(passkey));
+        MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
+        ArgumentCaptor<MobileLoginTransactionEntity> entityCaptor =
+                ArgumentCaptor.forClass(MobileLoginTransactionEntity.class);
+        verify(transactions).saveAndFlush(entityCaptor.capture());
+        MobileLoginTransactionEntity entity = entityCaptor.getValue();
+
+        assertThatThrownBy(
+                        () ->
+                                service.passkeyRegistrationOptions(
+                                        challenge.transactionId(), "UPDATE_PROFILE"))
+                .isInstanceOf(ApiException.class);
+        entity.setWebAuthnOptions(null);
+        assertThatThrownBy(
+                        () ->
+                                service.registerPasskey(
+                                        challenge.transactionId(),
+                                        "CONFIGURE_PASSKEY",
+                                        new MobilePasskeyRegistrationRequestDTO(
+                                                registrationCredential(), "Phone"),
+                                        servletRequest))
+                .isInstanceOf(ApiException.class);
+        entity.setWebAuthnOptions("%%%invalid-base64%%%");
+        assertThatThrownBy(
+                        () ->
+                                service.registerPasskey(
+                                        challenge.transactionId(),
+                                        "CONFIGURE_PASSKEY",
+                                        new MobilePasskeyRegistrationRequestDTO(
+                                                registrationCredential(), "Phone"),
+                                        servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(webAuthnRelyingPartyOperations, never())
+                .createPublicKeyCredentialCreationOptions(any());
+    }
+
+    @Test
+    void rejectsMalformedPasskeyRegistrationCredentialsBeforePersistingAKey() {
+        RequiredActionDTO passkey =
+                new RequiredActionDTO("CONFIGURE_PASSKEY", "Passkey", "Register", 1);
+        when(requiredActionService.pending("admin"))
+                .thenReturn(List.of(passkey), List.of(passkey), List.of(passkey));
+        when(webAuthnRelyingPartyOperations.createPublicKeyCredentialCreationOptions(any()))
+                .thenReturn(registrationOptions());
+        MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
+        service.passkeyRegistrationOptions(challenge.transactionId(), "CONFIGURE_PASSKEY");
+
+        assertThatThrownBy(
+                        () ->
+                                service.registerPasskey(
+                                        challenge.transactionId(),
+                                        "CONFIGURE_PASSKEY",
+                                        new MobilePasskeyRegistrationRequestDTO(Map.of(), "Phone"),
+                                        servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(webAuthnRelyingPartyOperations, never()).registerCredential(any());
+    }
+
+    @Test
+    void rejectsInvalidNativeClientAndScopeCombinations() {
+        assertThatThrownBy(
+                        () -> service.validateSocialLoginRequest(socialRequest("other", "openid")))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.validateSocialLoginRequest(
+                                        socialRequest(CLIENT_ID, "openid openid")))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(
+                        () ->
+                                service.validateSocialLoginRequest(
+                                        socialRequest(CLIENT_ID, "profile")))
+                .isInstanceOf(ApiException.class);
+
+        RegisteredClient accountWithAdminScope =
+                RegisteredClient.withId("mobile-account-console-id")
+                        .clientId(CLIENT_ID)
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri(REDIRECT_URI)
+                        .scope("openid")
+                        .scope("admin-api")
+                        .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+                        .tokenSettings(TokenSettings.builder().build())
+                        .build();
+        when(clients.findByClientId(CLIENT_ID)).thenReturn(accountWithAdminScope);
+        assertThatThrownBy(
+                        () ->
+                                service.validateSocialLoginRequest(
+                                        socialRequest(CLIENT_ID, "openid admin-api")))
+                .isInstanceOf(ApiException.class);
+
+        RegisteredClient adminWithAccountScope =
+                RegisteredClient.withId("mobile-admin-console-id")
+                        .clientId("mobile-admin-console")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                        .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                        .redirectUri(REDIRECT_URI)
+                        .scope("openid")
+                        .scope("account-api")
+                        .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+                        .tokenSettings(TokenSettings.builder().build())
+                        .build();
+        when(clients.findByClientId("mobile-admin-console")).thenReturn(adminWithAccountScope);
+        assertThatThrownBy(
+                        () ->
+                                service.validateSocialLoginRequest(
+                                        socialRequest(
+                                                "mobile-admin-console", "openid account-api")))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void rejectsPasswordLoginWhenRateLimitedOrTheClientWasRemovedMidFlow() {
+        when(rateLimitService.check("admin", "127.0.0.1"))
+                .thenReturn(new LoginRateLimitService.RateLimitDecision(false, 10, 0, 60));
+        assertThatThrownBy(() -> service.begin(request(), servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(captchaService, never())
+                .verifyMobileLoginOrThrow(any(), any(), any(HttpServletRequest.class));
+
+        when(rateLimitService.check("admin", "127.0.0.1"))
+                .thenReturn(new LoginRateLimitService.RateLimitDecision(true, 10, 9, 60));
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, false, false, "Kitezh", "SHA1", 6, 30));
+        when(clients.findById("mobile-account-console-id")).thenReturn(null);
+        assertThatThrownBy(() -> service.begin(request(), servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(transactions).delete(any(MobileLoginTransactionEntity.class));
+    }
+
+    @Test
+    void rejectsConsentWhenTheClientIsRemovedBeforeTheConsentScreenLoads() {
+        when(clients.findByClientId(CLIENT_ID)).thenReturn(client(true));
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, false, false, "Kitezh", "SHA1", 6, 30));
+        when(clients.findById("mobile-account-console-id")).thenReturn(null);
+
+        assertThatThrownBy(() -> service.begin(request(), servletRequest))
+                .isInstanceOf(ApiException.class);
+        verify(transactions).delete(any(MobileLoginTransactionEntity.class));
+        verify(consentService, never()).save(any(OAuth2AuthorizationConsent.class));
+    }
+
+    @Test
+    void marksTotpRequiredActionAsVerifiedAndRejectsStaleRecoveryEnrollment() {
+        RequiredActionDTO totp =
+                new RequiredActionDTO("CONFIGURE_TOTP", "Authenticator", "Set up MFA", 1);
+        when(requiredActionService.pending("admin"))
+                .thenReturn(List.of(totp), List.of(totp), List.of());
+        MobileLoginResponseDTO challenge = service.begin(request(), servletRequest);
+
+        assertThat(
+                        service.completeAction(
+                                        challenge.transactionId(),
+                                        "CONFIGURE_TOTP",
+                                        new MobileLoginActionRequestDTO(Map.of()),
+                                        servletRequest)
+                                .status())
+                .isEqualTo("authorized");
+        verify(requiredActionService)
+                .complete("admin", "CONFIGURE_TOTP", Map.of(), "127.0.0.1", null);
+
+        RequiredActionDTO recovery =
+                new RequiredActionDTO("RECOVERY_CODES", "Recovery codes", "Generate", 1);
+        when(requiredActionService.pending("admin")).thenReturn(List.of(recovery));
+        when(mfaService.status("admin"))
+                .thenReturn(new MfaStatusDTO(false, false, false, "Kitezh", "SHA1", 6, 30));
+        MobileLoginResponseDTO recoveryChallenge = service.begin(request(), servletRequest);
+        assertThatThrownBy(() -> service.setupRecoveryCodes(recoveryChallenge.transactionId()))
+                .isInstanceOf(ApiException.class);
+        verify(recoveryCodeService, never()).generate("admin");
     }
 
     @Test
@@ -635,10 +928,14 @@ class MobileNativeLoginServiceTest {
     }
 
     private static MobileGoogleLoginRequestDTO socialRequest() {
+        return socialRequest(CLIENT_ID, "openid profile email account-api");
+    }
+
+    private static MobileGoogleLoginRequestDTO socialRequest(String clientId, String scopes) {
         return new MobileGoogleLoginRequestDTO(
-                CLIENT_ID,
+                clientId,
                 REDIRECT_URI,
-                "openid profile email account-api",
+                scopes,
                 STATE,
                 CHALLENGE,
                 "S256",
