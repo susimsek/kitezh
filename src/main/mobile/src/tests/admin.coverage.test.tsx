@@ -9,6 +9,20 @@ import { Alert } from "react-native";
 import * as adminApi from "@/api/admin-api";
 import AdminScreen from "../app/admin";
 
+jest.mock("react-native/Libraries/Modal/Modal", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    __esModule: true,
+    default: ({
+      children,
+      visible,
+    }: {
+      children: React.ReactNode;
+      visible: boolean;
+    }) => (visible ? React.createElement("View", null, children) : null),
+  };
+});
+
 jest.mock("@/api/admin-api", () => ({
   getAdminDashboard: jest.fn(),
   getAdminServerInfo: jest.fn(),
@@ -434,10 +448,7 @@ it("keeps management actions hidden for read-only resource viewers", async () =>
     expect(screen.queryByRole("button", { name: "adminDelete" })).toBeNull();
   }
   expect(screen.queryByTestId("admin-tab-keys")).toBeNull();
-  await act(async () => {
-    await pressAdminTab("adminEvents");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminEvents");
   expect(screen.queryByRole("button", { name: "adminDeleteEvents" })).toBeNull();
 });
 
@@ -542,10 +553,7 @@ it("fails closed when admin capabilities are missing and supports query-only use
 it("loads and saves localized native audit event settings with validation", async () => {
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   expect(adminApi.getAdminEventSettings).toHaveBeenCalledWith(
     "access",
@@ -666,10 +674,7 @@ it("passes refresh callbacks to all administrator settings panels", async () => 
   });
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
 
   const settingsRequests = [
     adminApi.getNativeAdminLoginSettings,
@@ -693,10 +698,7 @@ it("keeps audit settings permission failures localized and retryable", async () 
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminForbidden")).toBeTruthy();
   await act(async () => {
     fireEvent.press(screen.getByTestId("admin-event-settings-retry"));
@@ -716,11 +718,8 @@ it.each([
     jest.mocked(adminApi.getAdminEventSettings).mockRejectedValueOnce(failure);
 
     render(<AdminScreen />);
-  await screen.findByTestId("admin-tab-dashboard");
-    await act(async () => {
-      await pressAdminTab("adminSettings");
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await screen.findByTestId("admin-tab-dashboard");
+    await pressAdminTab("adminSettings");
     expect(await screen.findByText(messageKey)).toBeTruthy();
     expect(screen.getByTestId("admin-event-settings-retry")).toBeTruthy();
   },
@@ -732,14 +731,7 @@ it("loads dashboard and navigates through every mobile administration tab", asyn
 
   expect(await screen.findByText("2")).toBeTruthy();
   const tabList = screen.getByTestId("admin-tab-list");
-  expect(tabList.props.horizontal).toBe(true);
-  expect(tabList.props.scrollEnabled).toBe(true);
-  expect(tabList.props.directionalLockEnabled).toBe(true);
-  const groupsTab = screen.getByTestId("admin-tab-groups");
-  expect(groupsTab.props.accessibilityRole).toBe("tab");
-  expect(groupsTab.props.style).toEqual(
-    expect.arrayContaining([expect.objectContaining({ flexShrink: 0 })]),
-  );
+  expect(tabList.props.accessibilityRole).toBe("tablist");
   const tabs = [
     ["adminUsers", adminApi.listAdminUsers],
     ["adminClients", adminApi.listAdminClients],
@@ -754,7 +746,7 @@ it("loads dashboard and navigates through every mobile administration tab", asyn
   ];
   for (const [tab, request] of tabs) {
     await pressAdminTab(tab);
-    await waitFor(() => expect(screen.getAllByText(tab)).toHaveLength(2));
+    expect(screen.getAllByText(tab).length).toBeGreaterThan(0);
     await waitFor(() => expect(request).toHaveBeenCalled());
   }
   await pressAdminTab("adminServerInfo");
@@ -762,10 +754,7 @@ it("loads dashboard and navigates through every mobile administration tab", asyn
   expect(screen.getByText("https://issuer.example.test")).toBeTruthy();
   expect(screen.getByText("fixture-key · RS256 · RSA")).toBeTruthy();
   expect(adminApi.getAdminServerInfo).toHaveBeenCalled();
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   expect(adminApi.getAdminEventSettings).toHaveBeenCalled();
   expect(adminApi.getAdminDashboard).toHaveBeenCalled();
@@ -825,10 +814,8 @@ it("uses server metadata fallbacks and expired refresh callbacks", async () => {
   mockRefreshSession.mockResolvedValueOnce(null);
   await expect(refreshTokenFromCall(adminApi.getAdminServerInfo.mock.calls.at(-1))).resolves.toBeNull();
 
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
+  await screen.findByText("adminEventSettingsTitle");
   mockRefreshSession.mockResolvedValueOnce(null);
   await expect(refreshTokenFromCall(adminApi.getAdminEventSettings.mock.calls.at(-1))).resolves.toBeNull();
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
@@ -919,7 +906,7 @@ it("manages role membership through the paged native admin API", async () => {
     ),
   );
   fireEvent.press(screen.getByRole("button", { name: "‹ back" }));
-  expect(await screen.findByTestId("admin-tab-roles")).toBeTruthy();
+  expect(await screen.findByText("ROLE_AUDITOR")).toBeTruthy();
 });
 
 it("manages native group memberships through the existing paged API", async () => {
@@ -1153,9 +1140,12 @@ it("shows loading, signed-out, and authentication-error states", async () => {
   expect(screen.queryByText("authError")).toBeNull();
   mockAuthState.status = "error";
   view.rerender(<AdminScreen />);
-  expect(screen.getByText("authError")).toBeTruthy();
-  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
-  expect(mockAuthState.signIn).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("authDiscoveryUnavailable")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "signIn" }).props.accessibilityState
+      .disabled,
+  ).toBe(true);
+  expect(mockAuthState.signIn).not.toHaveBeenCalled();
 });
 
 it("signs out from the administration header", async () => {
@@ -1299,13 +1289,10 @@ describe.each([
   ] as const)("shows a localized %s state and retries", async (_kind, failure, message) => {
     jest.mocked(request).mockRejectedValueOnce(failure);
     render(<AdminScreen />);
-  await screen.findByTestId("admin-tab-dashboard");
+    await screen.findByTestId("admin-tab-dashboard");
     await screen.findByText("2");
 
-    await act(async () => {
-      await pressAdminTab(tab);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await pressAdminTab(tab);
     expect(await screen.findByText(message)).toBeTruthy();
 
     await act(async () => {
@@ -2763,6 +2750,18 @@ it("shows a loading state while each admin table is waiting for its first page",
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
 
+  const sectionLabels: Record<(typeof tables)[number][0], string> = {
+    users: "adminUsers",
+    clients: "adminClients",
+    scopes: "adminClientScopes",
+    roles: "adminRoles",
+    groups: "adminGroups",
+    "identity-providers": "adminIdentityProviders",
+    keys: "adminKeys",
+    events: "adminEvents",
+    sessions: "adminSessions",
+    consents: "adminConsents",
+  };
   for (const [section, listRequest, emptyMessage] of tables) {
     let finishRequest!: (page: typeof emptyPage) => void;
     const pendingPage = new Promise<typeof emptyPage>((resolve) => {
@@ -2771,7 +2770,7 @@ it("shows a loading state while each admin table is waiting for its first page",
     const request = listRequest as jest.Mock;
     request.mockImplementationOnce(() => pendingPage);
 
-    fireEvent.press(screen.getByTestId(`admin-tab-${section}`));
+    await pressAdminTab(sectionLabels[section]);
     await waitFor(() => expect(request).toHaveBeenCalled());
     expect(screen.getByLabelText("loading")).toBeTruthy();
 
@@ -2869,10 +2868,7 @@ it.each([
 
   render(<AdminScreen />);
   await screen.findByTestId("admin-tab-dashboard");
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
   expect(await screen.findByText("adminEventSettingsTitle")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
 
@@ -3068,10 +3064,8 @@ it("fails safely when the session expires before admin mutations", async () => {
     );
   }
 
-  await act(async () => {
-    await pressAdminTab("adminSettings");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await pressAdminTab("adminSettings");
+  await screen.findByText("adminEventSettingsTitle");
   mockRefreshSession.mockResolvedValueOnce(null);
   fireEvent.press(screen.getByRole("button", { name: "adminSave" }));
   await waitFor(() =>

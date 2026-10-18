@@ -8,6 +8,7 @@ import io.github.susimsek.kitezh.config.ApplicationProperties;
 import io.github.susimsek.kitezh.config.observability.LoggingProperties;
 import io.github.susimsek.kitezh.security.LocalizedAccessDeniedHandler;
 import io.github.susimsek.kitezh.security.LocalizedAuthenticationEntryPoint;
+import io.github.susimsek.kitezh.service.MobileSocialLoginTransactionService;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialProviderSettingsService;
 import io.github.susimsek.kitezh.service.SocialTokenService;
@@ -483,7 +484,8 @@ class SecurityConfigTest {
                         mock(OAuth2AccessTokenResponseClient.class),
                         mock(
                                 io.github.susimsek.kitezh.service
-                                        .DesktopSocialLinkTransactionService.class));
+                                        .DesktopSocialLinkTransactionService.class),
+                        mock(MobileSocialLoginTransactionService.class));
         assertThat(socialDependencies.socialLoginService()).isSameAs(socialLoginService);
 
         assertThat(
@@ -498,7 +500,8 @@ class SecurityConfigTest {
                                 mock(MfaService.class),
                                 mock(
                                         io.github.susimsek.kitezh.service
-                                                .DesktopSocialLinkTransactionService.class)))
+                                                .DesktopSocialLinkTransactionService.class),
+                                mock(MobileSocialLoginTransactionService.class)))
                 .isNotNull();
         assertThat(
                         config.samlLoginAuthenticationSuccessHandler(

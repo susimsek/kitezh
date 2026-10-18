@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+	<changeSet id="037-create-mobile-login-transactions" author="susimsek">
+		<createTable tableName="mobile_login_transactions">
+			<column name="id" type="varchar(64)">
+				<constraints primaryKey="true" nullable="false" primaryKeyName="pk_mobile_login_transactions"/>
+			</column>
+			<column name="registered_client_id" type="varchar(100)"><constraints nullable="false"/></column>
+			<column name="principal_name" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="redirect_uri" type="varchar(2048)"><constraints nullable="false"/></column>
+			<column name="scope" type="varchar(1000)"><constraints nullable="false"/></column>
+			<column name="state" type="varchar(256)"><constraints nullable="false"/></column>
+			<column name="code_challenge" type="varchar(43)"><constraints nullable="false"/></column>
+			<column name="nonce" type="varchar(256)"><constraints nullable="false"/></column>
+			<column name="platform" type="varchar(16)"><constraints nullable="false"/></column>
+			<column name="challenge_kind" type="varchar(32)"><constraints nullable="false"/></column>
+			<column name="pending_action_keys" type="varchar(1000)"/>
+			<column name="mfa_verified" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="provider_mfa_required" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="recovery_codes_issued" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="webauthn_options" type="varchar(32000)"/>
+			<column name="expires_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="version" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+		</createTable>
+		<createIndex tableName="mobile_login_transactions" indexName="ix_mobile_login_transactions_expiry">
+			<column name="expires_at"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

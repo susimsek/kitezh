@@ -101,6 +101,7 @@ jest.mock("../auth/discovery", () => {
 });
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
+  dismissBrowser: jest.fn(async () => undefined),
   openAuthSessionAsync: jest.fn(async () => ({ type: "success" })),
   openBrowserAsync: jest.fn(async () => ({ type: "opened" })),
 }));
@@ -185,12 +186,8 @@ function AuthProbe() {
       <Text>{auth.status}</Text>
       <Text>{auth.error ?? "no-error"}</Text>
       <Text>{auth.session?.accessToken ?? "no-session"}</Text>
+      <Text>{auth.loginChallenge?.kind ?? "no-login-challenge"}</Text>
       <Pressable accessibilityRole="button" onPress={() => void auth.signIn()}><Text>sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google-alias")}><Text>provider-sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google")}><Text>native-google-sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.nativeLogin("alice", "secret")}><Text>native-sign-in</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginMfa("123456")}><Text>submit-login-mfa</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void auth.submitLoginAction({ newPassword: "a-long-password" })}><Text>submit-login-action</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google-alias")}><Text>provider-sign-in</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.signIn("google")}><Text>native-google-sign-in</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => void auth.nativeLogin("alice", "secret")}><Text>native-sign-in</Text></Pressable>
@@ -436,7 +433,7 @@ it("refuses an authorization endpoint from mismatched discovery metadata", async
 });
 
 it("reports unavailable discovery without starting an authorization request", async () => {
-  mockSetDiscovery(null);
+  mockFetchDiscovery.mockRejectedValueOnce(new Error("discovery unavailable"));
   renderProvider();
   await screen.findByText("signed-out");
 
@@ -1010,6 +1007,12 @@ it("completes native MFA and a required action before the PKCE exchange", async 
       },
     ],
   });
+  jest.mocked(mockSubmitMobileLoginAction).mockResolvedValueOnce({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://account/oauth/callback",
+  });
   renderProvider();
   await screen.findByText("signed-out");
 
@@ -1076,7 +1079,7 @@ it("clears the pending transaction when a cold-start callback has no state", asy
     expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
   );
   expect(mockExchangeCode).not.toHaveBeenCalled();
-  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
 });
 
 it.each([
@@ -1109,7 +1112,7 @@ it("ignores duplicate cold-start callback parameters", async () => {
     expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
   );
   expect(mockExchangeCode).not.toHaveBeenCalled();
-  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
 });
 
 it("clears a session after refresh failure and rejects use outside its provider", async () => {
