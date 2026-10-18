@@ -1,6 +1,11 @@
 # Kitezh MCP Server
 
-Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency. The published container image documentation is in [README-dockerhub.md](README-dockerhub.md).
+[![MCP Server](https://img.shields.io/badge/MCP-Server-8250DF?logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io/)
+[![Docker Image Size](https://img.shields.io/docker/image-size/suayb/kitezh-mcp/latest?label=Image%20size)](https://hub.docker.com/r/suayb/kitezh-mcp)
+[![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh-mcp.onrender.com/mcp)
+[![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/kitezh-mcp/kitezh-mcp-server)
+
+Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency. The published container image documentation is in [README-dockerhub.md](docs/README-dockerhub.md).
 
 ## Table of Contents
 
@@ -25,7 +30,8 @@ Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a
 - [Verify](#verify)
 - [Render and observability](#render-and-observability)
 - [Docker Compose](#docker-compose)
-- [Helm and Terraform](#helm-and-terraform)
+- [Helm](#helm)
+- [Terraform](#terraform)
 
 ## Run locally
 
@@ -245,7 +251,7 @@ Kitezh currently supports pre-registered OAuth clients only; it does not adverti
 
 ### MCP Inspector
 
-For local protocol checks, configure the seeded `mcp-client` client in MCP Inspector with its callback `http://localhost:6274/oauth/callback`, the local/remote MCP URL, and the `mcp.read` scope. See the verification workflow below for the automated protocol tests.
+For local protocol checks, run the MCP server locally and connect MCP Inspector to `http://localhost:10000/mcp` (the hosted endpoint is `https://kitezh-mcp.onrender.com/mcp`). Configure the seeded `mcp-client` OAuth client with callback `http://localhost:6274/oauth/callback` and request the `mcp.read` scope. See the verification workflow below for the automated protocol tests.
 
 ### Available tools
 
@@ -284,26 +290,37 @@ OTLP export follows the main Kitezh service environment variables and uses `OTEL
 
 ## Docker Compose
 
-The standalone MCP container is a separate Compose service. Start it with the backend and local PostgreSQL dependencies:
+Run only the MCP service with Docker Compose. The Kitezh Authorization Server and Administration API must already be running and reachable from the container:
 
 ```bash
-docker compose -f src/main/docker/app.yml up -d
+docker compose -f mcp/src/main/docker/app.yml up -d
 ```
 
-The MCP endpoint is `http://localhost:10000/mcp`; its health endpoint is available on the internal management port `10001`. API calls use the backend container network and forward the authenticated user's bearer token.
+The MCP endpoint is `http://localhost:10000/mcp`; its management endpoints are available on `http://localhost:10001/actuator`. The Compose file defaults to a backend running on the host at port `9090`. Override `APP_API_BASE_URL` and `APP_SECURITY_JWK_SET_URI` if the backend is elsewhere, and set `APP_AUTHORIZATIONSERVER_ISSUER` to the exact issuer in the user's access token.
 
-## Helm and Terraform
+The backend must issue tokens for the same MCP resource URI configured in `APP_MCP_PUBLIC_URL` and `APP_SECURITY_AUDIENCE`. For the Compose defaults, configure the backend's `APP_MCP_RESOURCE_AUDIENCE` as `http://localhost:10000/mcp`. The OAuth issuer and resource audience are different settings: the issuer must match the token's `iss` claim, while the audience must match the MCP URL.
 
-MCP is installed from the independent `helm/kitezh-mcp` chart, in the same namespace as the backend release. Configure its public host and resource audience to match:
+The variables can be supplied through the shell or a local `.env` file next to the Compose file. Do not commit secrets in `.env` files.
+
+## Helm
+
+MCP is deployed independently with the `helm/kitezh-mcp` chart. The Kitezh Authorization Server and Administration API must already be reachable from the cluster. Configure the issuer to match issued tokens, the JWK and API URLs to reach the backend, and the MCP public URL as the resource audience:
 
 ```bash
 helm upgrade --install kitezh-mcp helm/kitezh-mcp \
   --namespace apps --create-namespace \
+  --set image.tag=latest \
   --set ingress.enabled=true \
   --set 'ingress.hosts[0].host=mcp.kitezh.example.com' \
-  --set app.security.issuerUri=https://kitezh.example.com \
+  --set app.authorizationServer.issuer=https://kitezh.example.com \
+  --set app.security.jwkSetUri=http://kitezh.apps.svc.cluster.local:9090/oauth2/jwks \
   --set app.security.audience=https://mcp.kitezh.example.com/mcp \
-  --set app.mcp.publicUrl=https://mcp.kitezh.example.com/mcp
+  --set app.mcp.publicUrl=https://mcp.kitezh.example.com/mcp \
+  --set app.api.baseUrl=http://kitezh.apps.svc.cluster.local:9090
 ```
 
-Local Terraform deploys backend and MCP as separate Helm releases; set the ingress hosts and image tags in `terraform/terraform.tfvars`. The example local service endpoints are documented in [`terraform/README.md`](../terraform/README.md).
+Set the backend's MCP resource audience to the same `https://mcp.kitezh.example.com/mcp` value. The example assumes the backend release is named `kitezh` in namespace `apps`; adjust the in-cluster URLs to match your installation. Configure TLS on the ingress for production.
+
+## Terraform
+
+The repository's local Terraform environment provisions the Kubernetes cluster and installs the backend and MCP as separate Helm releases. See the shared [Terraform setup guide](../terraform/README.md); its MCP-specific host and image settings are in `terraform/terraform.tfvars.example`.

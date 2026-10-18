@@ -1,0 +1,23 @@
+# Standalone MCP service for local development and self-hosted testing.
+# The Kitezh Authorization Server and Administration API must already be running.
+services:
+  mcp:
+    image: docker.io/suayb/kitezh-mcp:${MCP_IMAGE_TAG:-latest}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 10000
+      MANAGEMENT_SERVER_PORT: 10001
+      OTEL_SERVICE_NAME: kitezh-mcp
+      APP_AUTHORIZATIONSERVER_ISSUER: ${APP_AUTHORIZATIONSERVER_ISSUER:-http://localhost:9090}
+      APP_SECURITY_JWK_SET_URI: ${APP_SECURITY_JWK_SET_URI:-http://host.docker.internal:9090/oauth2/jwks}
+      APP_SECURITY_AUDIENCE: ${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
+      APP_API_BASE_URL: ${APP_API_BASE_URL:-http://host.docker.internal:9090}
+      APP_MCP_PUBLIC_URL: ${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
+      APP_MCP_ALLOW_LOCAL_HOSTS: ${APP_MCP_ALLOW_LOCAL_HOSTS:-true}
+      APP_MCP_READ_ONLY: "true"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:10000:10000"
+      - "127.0.0.1:10001:10001"
+    restart: unless-stopped
