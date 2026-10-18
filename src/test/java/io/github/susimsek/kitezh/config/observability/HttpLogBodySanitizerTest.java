@@ -61,7 +61,7 @@ class HttpLogBodySanitizerTest {
 
         assertThat(sanitized)
                 .startsWith("{\"password\":\"[masked]\",\"note\":\"")
-                .contains("�")
+                .contains("\uFFFD")
                 .endsWith(HttpLogBodySanitizer.BODY_TRUNCATED);
     }
 

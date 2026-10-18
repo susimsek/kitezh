@@ -4,7 +4,7 @@ import axios from "axios";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useConsoleAuth } from "./console-auth";
 import { codeChallenge } from "./console-auth-crypto";
-import { isDesktopRuntime } from "./desktop-api";
+import { isDesktopRuntime, type DesktopAuthCallback } from "./desktop-api";
 import {
   readAndRemoveTransaction,
   readPersistedTokens,
@@ -54,6 +54,7 @@ const mockReadTokens = readPersistedTokens as jest.MockedFunction<typeof readPer
 const mockTransaction = readAndRemoveTransaction as jest.MockedFunction<
   typeof readAndRemoveTransaction
 >;
+let desktopAuthCallback: ((callback: DesktopAuthCallback) => void) | undefined;
 
 const config = {
   clientId: "web-client",
@@ -95,7 +96,10 @@ function useDesktopRuntime() {
       getStorageStatus: jest.fn().mockResolvedValue("available"),
       startLogin: jest.fn().mockResolvedValue(undefined),
     },
-    onAuthCallback: jest.fn().mockReturnValue(jest.fn()),
+    onAuthCallback: jest.fn((callback: (event: DesktopAuthCallback) => void) => {
+      desktopAuthCallback = callback;
+      return jest.fn();
+    }),
   };
   Object.defineProperty(window, "desktopApi", { configurable: true, value: api });
   (isDesktopRuntime as jest.Mock).mockReturnValue(true);
@@ -106,6 +110,7 @@ describe("useConsoleAuth token lifecycle", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     Reflect.deleteProperty(window, "desktopApi");
+    desktopAuthCallback = undefined;
     (isDesktopRuntime as jest.Mock).mockReturnValue(false);
     (persistTokens as jest.MockedFunction<typeof persistTokens>).mockResolvedValue(undefined);
     (removePersistedTokens as jest.MockedFunction<typeof removePersistedTokens>).mockResolvedValue(
@@ -494,5 +499,27 @@ describe("useConsoleAuth token lifecycle", () => {
       "Missing desktop session",
     );
     expect(mockTransaction).toHaveBeenCalledWith(config, "desktop-state");
+  });
+
+  it("ignores desktop callbacks for other consoles and callbacks without a state", async () => {
+    const desktopApi = useDesktopRuntime();
+    renderHook(() => useConsoleAuth(config, "admin"));
+    await waitFor(() => expect(desktopApi.onAuthCallback).toHaveBeenCalled());
+
+    act(() =>
+      desktopAuthCallback?.({
+        console: "account",
+        url: "kitezh://oauth/callback?code=wrong-console&state=state-1",
+      }),
+    );
+    act(() =>
+      desktopAuthCallback?.({
+        console: "admin",
+        url: "kitezh://oauth/callback#code=missing-state",
+      }),
+    );
+
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockAxios.post).not.toHaveBeenCalled();
   });
 });

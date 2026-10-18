@@ -148,6 +148,52 @@ class AuthorizationServerConfigAdvancedClaimsTest {
     }
 
     @Test
+    void omitsEmptyUmaPermissionsAndIgnoresNonStringResourceServerAudience() {
+        List<Map<String, Object>> permissions =
+                List.of(Map.of("resource_id", "invoice-1", "scopes", List.of("read")));
+        UmaTicketAuthenticationToken noPermissionsGrant =
+                new UmaTicketAuthenticationToken(
+                        clientPrincipal(),
+                        Map.of(
+                                UmaTicketAuthenticationToken.AUTHORIZATION_PERMISSIONS,
+                                List.of(),
+                                "resource_server_client_id",
+                                "billing-api"));
+        JwtEncodingContext emptyPermissionsContext =
+                context(
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        new org.springframework.security.oauth2.core.AuthorizationGrantType(
+                                AuthorizationGrantTypes.UMA_TICKET),
+                        Set.of(),
+                        noPermissionsGrant);
+        config.jwtTokenCustomizer(dependencies(null, null)).customize(emptyPermissionsContext);
+        assertThat(emptyPermissionsContext.getClaims().build().getClaims())
+                .doesNotContainKey("authorization");
+
+        UmaTicketAuthenticationToken invalidAudienceGrant =
+                new UmaTicketAuthenticationToken(
+                        clientPrincipal(),
+                        Map.of(
+                                UmaTicketAuthenticationToken.AUTHORIZATION_PERMISSIONS,
+                                permissions,
+                                "resource_server_client_id",
+                                42));
+        JwtEncodingContext invalidAudienceContext =
+                context(
+                        OAuth2TokenType.ACCESS_TOKEN,
+                        new org.springframework.security.oauth2.core.AuthorizationGrantType(
+                                AuthorizationGrantTypes.UMA_TICKET),
+                        Set.of(),
+                        invalidAudienceGrant);
+
+        config.jwtTokenCustomizer(dependencies(null, null)).customize(invalidAudienceContext);
+
+        assertThat(invalidAudienceContext.getClaims().build().getClaims())
+                .containsEntry("authorization", Map.of("permissions", permissions))
+                .doesNotContainKey("aud");
+    }
+
+    @Test
     void addsRequestedTokenExchangeAudiencesToAccessTokenClaims() {
         OAuth2TokenExchangeAuthenticationToken grant =
                 new OAuth2TokenExchangeAuthenticationToken(

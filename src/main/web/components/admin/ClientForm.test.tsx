@@ -8,10 +8,15 @@ import { ClientForm } from "./ClientForm";
 const mockPush = jest.fn();
 const mockRefresh = jest.fn();
 const mockAdminRequest = adminRequest as jest.MockedFunction<typeof adminRequest>;
+let mockAccessToken: string | null = "token";
+let mockCanManageClients = true;
 
 jest.mock("@/lib/admin-api", () => ({ adminRequest: jest.fn() }));
 jest.mock("./AdminAuthProvider", () => ({
-  useAdminAuth: () => ({ accessToken: "token", access: { manageClients: true } }),
+  useAdminAuth: () => ({
+    accessToken: mockAccessToken,
+    access: { manageClients: mockCanManageClients },
+  }),
 }));
 jest.mock("@/routing/navigation", () => ({
   useParams: () => ({ lang: "en" }),
@@ -25,6 +30,8 @@ function advanceCreateStep(label = "Next") {
 describe("ClientForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAccessToken = "token";
+    mockCanManageClients = true;
   });
 
   it("shows the edit not-found state when the route id is absent", () => {
@@ -454,6 +461,71 @@ describe("ClientForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/clients/client-2/settings"));
+  });
+
+  it("does not send a save request when the access token is no longer available", async () => {
+    mockAccessToken = null;
+    render(<ClientForm dictionary={dictionary} locale="en" mode="create" />);
+    fireEvent.change(document.querySelector('input[name="clientId"]')!, {
+      target: { value: "expired-token-client" },
+    });
+    fireEvent.change(document.querySelector('input[name="clientName"]')!, {
+      target: { value: "Expired token client" },
+    });
+    advanceCreateStep();
+    advanceCreateStep();
+    fireEvent.change(document.querySelector('textarea[name="redirectUris"]')!, {
+      target: { value: "https://app.example/callback" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: dictionary.admin.common.save }),
+      ).not.toHaveAttribute("aria-busy", "true"),
+    );
+    expect(mockAdminRequest).not.toHaveBeenCalled();
+  });
+
+  it("maps server field validation errors for scope, URI and selection fields", async () => {
+    mockAdminRequest.mockImplementation(async (_token, request) => {
+      if (request.url === "/api/admin/client-scopes?page=0&size=100") {
+        return { status: 200, data: { content: [] } } as never;
+      }
+      return {
+        status: 400,
+        data: {
+          errorCode: "validation_failed",
+          violations: [
+            { field: "scopes" },
+            { field: "redirectUris" },
+            { field: "clientAuthenticationMethods" },
+            { field: "authorizationGrantTypes" },
+          ],
+        },
+      } as never;
+    });
+    render(<ClientForm dictionary={dictionary} locale="en" mode="create" />);
+    fireEvent.change(document.querySelector('input[name="clientId"]')!, {
+      target: { value: "server-invalid-client" },
+    });
+    fireEvent.change(document.querySelector('input[name="clientName"]')!, {
+      target: { value: "Server invalid client" },
+    });
+    advanceCreateStep();
+    advanceCreateStep();
+    fireEvent.change(document.querySelector('textarea[name="redirectUris"]')!, {
+      target: { value: "https://app.example/callback" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    expect(await screen.findByText(dictionary.admin.clients.saveError)).toBeVisible();
+    expect(await screen.findByText(dictionary.admin.common.validation.scope)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.common.validation.uri)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /2 Capability configuration/ }));
+    expect(await screen.findAllByText(dictionary.admin.common.validation.selection)).toHaveLength(
+      2,
+    );
   });
 
   it("shows edit load errors and maps duplicate client errors", async () => {

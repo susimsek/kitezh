@@ -92,11 +92,14 @@ jest.mock("@/auth/MobileAuthProvider", () => ({
     const session = { accessToken: "access" };
     const mockRefreshSession = jest.fn(async () => session);
     const mockAuthState = {
+      error: null,
       session,
       signIn: jest.fn(),
       signOut: jest.fn(),
       status: "signed-in",
       refreshSession: mockRefreshSession,
+      discoveryStatus: "ready",
+      retryDiscovery: jest.fn(),
     };
     return {
       mockAuthState,
@@ -227,6 +230,10 @@ beforeEach(() => {
   const { mockRefreshSession } = jest.requireMock("@/auth/MobileAuthProvider");
   mockAuthState.session = { accessToken: "access" };
   mockAuthState.status = "signed-in";
+  mockAuthState.error = null;
+  mockAuthState.discoveryStatus = "ready";
+  mockAuthState.retryDiscovery.mockReset().mockResolvedValue(undefined);
+  mockAuthState.signIn.mockReset().mockResolvedValue(undefined);
   mockRefreshSession.mockReset().mockResolvedValue({ accessToken: "access" });
   jest.mocked(adminApi.getAdminDashboard).mockResolvedValue({
     clients: 2,
@@ -1141,8 +1148,53 @@ it("shows loading, signed-out, and authentication-error states", async () => {
   view.rerender(<AdminScreen />);
   expect(screen.queryByText("authError")).toBeNull();
   mockAuthState.status = "error";
+  mockAuthState.discoveryStatus = "unavailable";
   view.rerender(<AdminScreen />);
   expect(screen.getByText("authDiscoveryUnavailable")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "signIn" }).props.accessibilityState
+      .disabled,
+  ).toBe(true);
+  expect(mockAuthState.signIn).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["authorization-timeout", "authTimeout"],
+  ["authorization-cancelled", "authCancelled"],
+  ["unexpected-error", "authError"],
+] as const)("localizes the signed-out %s authentication result", async (error, message) => {
+  const { mockAuthState } = jest.requireMock("@/auth/MobileAuthProvider");
+  mockAuthState.session = null;
+  mockAuthState.status = "signed-out";
+  mockAuthState.error = error;
+  mockAuthState.discoveryStatus = "ready";
+
+  render(<AdminScreen />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "signIn" }));
+  expect(mockAuthState.signIn).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  ["loading", "authDiscoveryLoading", true],
+  ["timeout", "authDiscoveryTimeout", false],
+  ["unavailable", "authDiscoveryUnavailable", false],
+] as const)("shows and retries %s discovery state", async (status, message, busy) => {
+  const { mockAuthState } = jest.requireMock("@/auth/MobileAuthProvider");
+  mockAuthState.session = null;
+  mockAuthState.status = "signed-out";
+  mockAuthState.discoveryStatus = status;
+
+  render(<AdminScreen />);
+
+  expect(await screen.findByText(message)).toBeTruthy();
+  const retry = screen.getByRole("button", { name: "retry" });
+  expect(retry.props.accessibilityState?.disabled ?? false).toBe(busy);
+  if (!busy) {
+    fireEvent.press(retry);
+    expect(mockAuthState.retryDiscovery).toHaveBeenCalledTimes(1);
+  }
   expect(
     screen.getByRole("button", { name: "signIn" }).props.accessibilityState
       .disabled,
@@ -1203,6 +1255,45 @@ it("renders section-specific load errors when mobile admin requests fail", async
   for (const [tab, , message] of failures) {
     await pressAdminTab(tab);
     expect(await screen.findByText(message)).toBeTruthy();
+  }
+});
+
+it("retries failed mobile admin resource lists and clears their errors", async () => {
+  const resources = [
+    ["adminClients", adminApi.listAdminClients, "adminClientsLoadError"],
+    [
+      "adminClientScopes",
+      adminApi.listAdminClientScopes,
+      "adminClientScopesLoadError",
+    ],
+    ["adminRoles", adminApi.listAdminRoles, "adminRolesLoadError"],
+    ["adminGroups", adminApi.listAdminGroups, "adminGroupsLoadError"],
+    [
+      "adminIdentityProviders",
+      adminApi.listAdminIdentityProviders,
+      "adminIdentityProvidersLoadError",
+    ],
+    ["adminSessions", adminApi.listAdminSessions, "adminSessionsLoadError"],
+    ["adminConsents", adminApi.listAdminConsents, "adminConsentsLoadError"],
+  ] as const;
+  render(<AdminScreen />);
+  await screen.findByTestId("admin-tab-dashboard");
+
+  for (const [tab, request, errorMessage] of resources) {
+    jest.mocked(request).mockRejectedValueOnce(new Error("temporary failure"));
+    const previousCalls = jest.mocked(request).mock.calls.length;
+    await pressAdminTab(tab);
+    expect(await screen.findByText(errorMessage)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "adminRetry" }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() =>
+      expect(jest.mocked(request)).toHaveBeenCalledTimes(previousCalls + 2),
+    );
+    await waitFor(() => expect(screen.queryByText(errorMessage)).toBeNull());
   }
 });
 
