@@ -5,7 +5,7 @@
 [![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh-mcp.onrender.com/mcp)
 [![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/kitezh-mcp/kitezh-mcp-server)
 
-Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency. The published container image documentation is in [README-dockerhub.md](docs/README-dockerhub.md).
+Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency.
 
 ## Table of Contents
 
@@ -25,6 +25,8 @@ Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a
   - [ChatGPT custom MCP connector](#chatgpt-custom-mcp-connector)
   - [MCP Inspector](#mcp-inspector)
   - [Available tools](#available-tools)
+    - [Available toolsets](#available-toolsets)
+    - [Tool catalog](#tool-catalog)
     - [Server-side toolsets and allowlist](#server-side-toolsets-and-allowlist)
 - [Installation guides](docs/installation-guides/README.md)
 - [Verify](#verify)
@@ -257,11 +259,77 @@ For local protocol checks, run the MCP server locally and connect MCP Inspector 
 
 All tools are read-only and require the `mcp.read` scope. They expose Kitezh context, users, groups, OAuth clients, sessions, and audit events. MCP forwards the validated inbound user token to the Administration API without exchanging it. The API remains responsible for enforcing its read-only endpoint and role rules.
 
+#### Available toolsets
+
+| Toolset | Description |
+| --- | --- |
+| `context` | Current Kitezh caller context and available administration capabilities |
+| `users` | User search and details, consent records, sessions, and required actions |
+| `groups` | Groups, membership, and group permission mappings |
+| `clients` | OAuth clients, client scopes, scope assignments, mappers, and service accounts |
+| `roles` | Realm and client roles, group members, and effective group permissions |
+| `events` | Search administrative audit events |
+| `organizations` | Organizations, members, groups, domains, invitations, identity providers, and claims |
+| `dashboard` | Administration dashboard summary |
+| `notifications` | Administrative notifications |
+| `signing-keys` | Signing-key metadata; private key material is never exposed |
+
+These are Kitezh administration toolsets, not a one-to-one copy of GitHub-specific categories such as repositories, pull requests, or Actions. The closest security coverage is provided by the `users`, `roles`, and `signing-keys` toolsets.
+
+#### Tool catalog
+
+The server exposes the following 40 read-only tools. Input schemas and required parameters are returned by MCP `tools/list` and may also vary with the caller's role permissions.
+
+| Toolset | Tool | Description |
+| --- | --- | --- |
+| `context` | `kitezh_get_context` | Get the current operator and Kitezh access summary. |
+| `users` | `kitezh_search_users` | Search users with bounded pagination. |
+| `users` | `kitezh_get_user` | Get a user summary without credentials or password data. |
+| `users` | `kitezh_search_consents` | Search OAuth user consents by client, username, or granted scope. |
+| `users` | `kitezh_list_user_consents` | List OAuth consents granted by a user. |
+| `users` | `kitezh_get_user_consent` | Get the scopes and metadata consented to for one OAuth client. |
+| `users` | `kitezh_list_sessions` | Search browser-session metadata; tokens are never returned. |
+| `users` | `kitezh_list_offline_sessions` | List offline-session metadata; tokens are omitted. |
+| `users` | `kitezh_list_user_required_actions` | List required-action assignments for a manageable user. |
+| `groups` | `kitezh_search_groups` | Search groups with bounded pagination. |
+| `groups` | `kitezh_get_group` | Get a group summary and its safe role information. |
+| `groups` | `kitezh_list_user_groups` | List groups assigned to a user. |
+| `groups` | `kitezh_list_group_members` | List members of a group with bounded pagination. |
+| `groups` | `kitezh_get_group_permissions` | List administrator permission assignments for a group. |
+| `clients` | `kitezh_search_clients` | Search registered OAuth clients without secrets. |
+| `clients` | `kitezh_get_client` | Get client configuration without secrets or hashes. |
+| `clients` | `kitezh_search_client_scopes` | Search the OAuth client-scope catalogue. |
+| `clients` | `kitezh_get_client_scope` | Get one OAuth client-scope catalogue entry. |
+| `clients` | `kitezh_get_client_scope_assignments` | Get a client's default, optional, and available OAuth scopes. |
+| `clients` | `kitezh_evaluate_client_scopes` | Preview effective scopes, mapped claims, and roles without issuing a token. |
+| `clients` | `kitezh_search_client_roles` | Search roles owned by one OAuth client. |
+| `clients` | `kitezh_get_client_role` | Get a client role and its paged users, groups, and composite roles. |
+| `clients` | `kitezh_list_client_mappers` | List client protocol mappers; hardcoded values and unrecognized fields are redacted. |
+| `clients` | `kitezh_list_client_scope_mappers` | List scope protocol mappers; hardcoded values and unrecognized fields are redacted. |
+| `clients` | `kitezh_get_service_account` | Get service-account username and effective roles; credentials and tokens are omitted. |
+| `roles` | `kitezh_search_roles` | Search realm roles with bounded pagination. |
+| `roles` | `kitezh_get_role` | Get a realm role and its paged user/composite-role summary. |
+| `events` | `kitezh_search_events` | Search administrative audit events with bounded pagination. |
+| `organizations` | `kitezh_search_organizations` | Search organizations with bounded pagination. |
+| `organizations` | `kitezh_get_organization` | Get safe organization metadata and counts. |
+| `organizations` | `kitezh_list_organization_members` | List membership metadata without member email addresses. |
+| `organizations` | `kitezh_list_organization_groups` | List organization-scoped groups with bounded pagination. |
+| `organizations` | `kitezh_list_organization_domains` | List organization domains without DNS verification secrets. |
+| `organizations` | `kitezh_list_organization_group_members` | List membership metadata for an organization group. |
+| `organizations` | `kitezh_list_organization_invitations` | List invitation status without invitee emails or tokens. |
+| `organizations` | `kitezh_list_organization_identity_providers` | List linked identity-provider metadata. |
+| `organizations` | `kitezh_list_organization_claims` | List claim names and destinations without claim values. |
+| `dashboard` | `kitezh_get_admin_dashboard_summary` | Get aggregate counts of clients, users, active sessions, and consents. |
+| `notifications` | `kitezh_list_admin_notifications` | List the current administrator's privacy-safe notification feed. |
+| `signing-keys` | `kitezh_list_signing_key_metadata` | List signing-key metadata; key bytes and private material are omitted. |
+
 #### Server-side toolsets and allowlist
 
 Operators can limit the catalog for a deployment with `APP_MCP_TOOLSETS` and `APP_MCP_TOOL_ALLOWLIST`. `APP_MCP_TOOLSETS` defaults to `all`; `APP_MCP_TOOL_ALLOWLIST` defaults to `*`, preserving the complete catalog. Supported toolset IDs are `users`, `groups`, `clients`, `roles`, `events`, `organizations`, `context`, `dashboard`, `notifications`, and `signing-keys`. Set the toolset variable to a comma-separated selection and the allowlist to the exact comma-separated MCP tool names allowed by that deployment. An empty allowlist disables every tool.
 
 The effective catalog is the union of the configured toolsets, intersected with the server allowlist and the tools authorized for the caller's roles. These are deployment-side settings. MCP client headers, tool arguments, or client preferences cannot expand the configured catalog; the same authorization policy applies to `tools/list` and direct `tools/call` requests. Tool authorization in the Kitezh Administration API remains authoritative.
+
+Unlike the GitHub MCP Server, Kitezh does not accept per-request headers or URL paths to choose toolsets. Operators configure the catalog at deployment time; the exact-name allowlist can narrow it to individual tools.
 
 Example deployment settings:
 
