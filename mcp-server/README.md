@@ -5,12 +5,10 @@ Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a
 ## Run locally
 
 ```bash
-APP_AUTHORIZATIONSERVER_ISSUER=http://localhost:9090 \
-APP_SECURITY_AUDIENCE=https://kitezh-mcp.onrender.com/mcp \
-APP_API_BASE_URL=http://localhost:9090 \
-APP_MCP_PUBLIC_URL=https://kitezh-mcp.onrender.com/mcp \
 ./mvnw -f mcp-server/pom.xml spring-boot:run
 ```
+
+The Maven `dev` profile is active by default. Its issuer is configured in `src/main/resources/config/application-dev.yml`; the local Admin API URL and the stable MCP resource URI use the defaults in `application.yml`. Override them with environment variables only when your local backend or public MCP resource URI is different.
 
 Register a public OAuth client for each MCP host with its exact redirect URI, Authorization Code + PKCE S256, and the `mcp.read` scope. MCP validates the inbound token's issuer, MCP audience, and scope, then forwards that same user token to the Kitezh Administration API. The API must accept the forwarded token and apply its own read-only endpoint and role authorization rules. No confidential MCP service client or token-exchange secret is required.
 
