@@ -2,10 +2,35 @@
 
 Kitezh MCP Server is an independent, read-only Spring Boot service. It exposes a stateless Streamable HTTP MCP endpoint at `/mcp`, validates user bearer tokens for its own resource audience, forwards them to the Kitezh Administration API, and has no database dependency. The published container image documentation is in [README-dockerhub.md](README-dockerhub.md).
 
+## Table of Contents
+
+- [Run locally](#run-locally)
+- [Authentication and authorization](#authentication-and-authorization)
+  - [OAuth 2.0 Authorization Code with PKCE](#oauth-20-authorization-code-with-pkce)
+  - [Personal access token (PAT)](#personal-access-token-pat)
+- [Connect from MCP clients](#connect-from-mcp-clients)
+  - [OAuth client registration](#oauth-client-registration)
+  - [Codex CLI and IDE extension](#codex-cli-and-ide-extension)
+  - [Claude Code](#claude-code)
+  - [Claude Desktop and Claude on the web](#claude-desktop-and-claude-on-the-web)
+  - [Cursor](#cursor)
+  - [Visual Studio Code and GitHub Copilot Chat](#visual-studio-code-and-github-copilot-chat)
+  - [GitHub Copilot CLI](#github-copilot-cli)
+  - [Windsurf Cascade](#windsurf-cascade)
+  - [ChatGPT custom MCP connector](#chatgpt-custom-mcp-connector)
+  - [MCP Inspector](#mcp-inspector)
+  - [Available tools](#available-tools)
+    - [Server-side toolsets and allowlist](#server-side-toolsets-and-allowlist)
+- [Installation guides](docs/installation-guides/README.md)
+- [Verify](#verify)
+- [Render and observability](#render-and-observability)
+- [Docker Compose](#docker-compose)
+- [Helm and Terraform](#helm-and-terraform)
+
 ## Run locally
 
 ```bash
-./mvnw -f mcp-server/pom.xml spring-boot:run
+./mvnw -f mcp/pom.xml spring-boot:run
 ```
 
 The Maven `dev` profile is active by default. Its issuer is configured in `src/main/resources/config/application-dev.yml`; the local Admin API URL and the stable MCP resource URI use the defaults in `application.yml`. Override them with environment variables only when your local backend or public MCP resource URI is different.
@@ -51,6 +76,8 @@ Client-specific OAuth and PAT configuration examples are in [Connect from MCP cl
 ## Connect from MCP clients
 
 The server URL is `https://kitezh-mcp.onrender.com/mcp`. Kitezh supports two user-authentication methods: browser-based OAuth 2.0 Authorization Code + PKCE, and a personal access token (PAT) sent as `Authorization: Bearer <token>`. Use a separate PAT per client so access can be revoked independently. Never commit a token in a project MCP configuration.
+
+Host-specific setup guides, an authentication support matrix, and secure configuration notes are in the [Installation Guides](docs/installation-guides/README.md) index.
 
 ### OAuth client registration
 
@@ -244,10 +271,10 @@ These examples follow the remote HTTP setup model used by the [Grafana MCP docum
 ## Verify
 
 ```bash
-./mvnw -f mcp-server/pom.xml verify
+./mvnw -f mcp/pom.xml verify
 ```
 
-The build uses the repository Checkstyle rules, Google Java Format AOSP, and a 96% JaCoCo line coverage gate. Production runs as a GraalVM Native Image executable, compressed with UPX in CI. Build it with GraalVM Native Image installed using `./mvnw -f mcp-server/pom.xml -Pnative -DskipTests native:compile`. The native runtime image is assembled and published through the same Jib Native Image extension used by the backend. CI builds Linux AMD64 and ARM64 executables, and the release creates matching architecture images and a multi-architecture manifest.
+The build uses the repository Checkstyle rules, Google Java Format AOSP, and a 96% JaCoCo line coverage gate. Production runs as a GraalVM Native Image executable, compressed with UPX in CI. Build it with GraalVM Native Image installed using `./mvnw -f mcp/pom.xml -Pnative -DskipTests native:compile`. The native runtime image is assembled and published through the same Jib Native Image extension used by the backend. CI builds Linux AMD64 and ARM64 executables, and the release creates matching architecture images and a multi-architecture manifest.
 
 ## Render and observability
 

@@ -96,7 +96,7 @@ out/
 ######################
 /log/
 /target/
-/mcp-server/target/
+/mcp/target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 

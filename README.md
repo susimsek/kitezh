@@ -951,9 +951,9 @@ curl http://127.0.0.1:9090/actuator/health/readiness
 
 ## Kitezh MCP Server
 
-Kitezh MCP Server is configured as an independent Render service with the default public endpoint `https://kitezh-mcp.onrender.com/mcp`. It authenticates user tokens for the MCP resource audience and `mcp.read` scope, then forwards the same token to Kitezh's Admin API. MCP tokens also carry the `admin-api` audience; the backend restricts them to allowlisted GET endpoints and enforces its existing role checks. Its tool set is read-only and covers users, groups, OAuth clients, sessions, audit events, and the current operator context.
+Kitezh MCP Server is a separately deployed, read-only Streamable HTTP service that lets AI clients access Kitezh administration tools with the user's authorization.
 
-The module has its own Spring Boot application, Docker image, Render Web Service, CI quality job, release workflow, Sonar coverage inputs, and Grafana dashboard/alert definitions. See [`mcp-server/README.md`](mcp-server/README.md) for local setup, OAuth client registration, and deployment secrets. The public MCP resource URI must match `APP_MCP_RESOURCE_AUDIENCE`, `APP_SECURITY_AUDIENCE`, and `APP_MCP_PUBLIC_URL`.
+See the [MCP Server README](mcp/README.md) for client setup, authentication, and deployment instructions.
 
 ## Client Registration and Seed Data
 

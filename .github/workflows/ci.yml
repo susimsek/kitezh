@@ -135,19 +135,19 @@ jobs:
         run: chmod +x mvnw
 
       - name: Verify MCP server
-        run: ./mvnw -B -ntp -f mcp-server/pom.xml verify
+        run: ./mvnw -B -ntp -f mcp/pom.xml verify
 
       - name: Upload MCP Sonar inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mcp-server-sonar-inputs
           path: |
-            mcp-server/target/classes/**
-            mcp-server/target/test-classes/**
-            mcp-server/target/surefire-reports/**
-            mcp-server/target/failsafe-reports/**
-            mcp-server/target/site/**
-            mcp-server/target/checkstyle-result.xml
+            mcp/target/classes/**
+            mcp/target/test-classes/**
+            mcp/target/surefire-reports/**
+            mcp/target/failsafe-reports/**
+            mcp/target/site/**
+            mcp/target/checkstyle-result.xml
           if-no-files-found: error
           retention-days: 1
 
@@ -216,18 +216,18 @@ jobs:
           MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "true"
           MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "true"
         run: |
-          ./mvnw -B -ntp -f mcp-server/pom.xml -Pnative -DskipTests \
+          ./mvnw -B -ntp -f mcp/pom.xml -Pnative -DskipTests \
             -DbuildArgs="${NATIVE_IMAGE_ARGS}" \
             native:compile
 
       - name: Compress MCP native executable
-        run: upx --lzma --best mcp-server/target/native-executable
+        run: upx --lzma --best mcp/target/native-executable
 
       - name: Verify compressed executable
         run: |
-          file mcp-server/target/native-executable
-          test -x mcp-server/target/native-executable
-          test -s mcp-server/target/native-executable
+          file mcp/target/native-executable
+          test -x mcp/target/native-executable
+          test -s mcp/target/native-executable
 
       - name: Upload MCP native executable
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -235,8 +235,8 @@ jobs:
         with:
           name: mcp-native-${{ matrix.architecture }}
           path: |
-            mcp-server/target/native-executable
-            mcp-server/target/classes/**
+            mcp/target/native-executable
+            mcp/target/classes/**
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -446,7 +446,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: mcp-server-sonar-inputs
-          path: mcp-server/target
+          path: mcp/target
 
       - name: Download client coverage reports
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

@@ -14,7 +14,7 @@ Official links:
 
 - Source: [github.com/susimsek/kitezh](https://github.com/susimsek/kitezh)
 - Docker Hub: [hub.docker.com/r/suayb/kitezh-mcp](https://hub.docker.com/r/suayb/kitezh-mcp)
-- MCP client setup: [mcp-server/README.md](https://github.com/susimsek/kitezh/blob/main/mcp-server/README.md)
+- MCP client setup: [mcp/README.md](https://github.com/susimsek/kitezh/blob/main/mcp/README.md)
 - Product requirements: [Kitezh MCP Server PRD](https://github.com/susimsek/kitezh/blob/main/docs/KITEZH-MCP-SERVER-PRD.md)
 - Kitezh Authorization Server: [kitezh.onrender.com](https://kitezh.onrender.com)
 - Kitezh MCP endpoint: [kitezh-mcp.onrender.com/mcp](https://kitezh-mcp.onrender.com/mcp)

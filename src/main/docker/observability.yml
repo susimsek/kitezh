@@ -13,10 +13,10 @@ services:
       - "127.0.0.1:4318:4318"
     volumes:
       - ./observability/grafana/kitezh.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh.json:ro
-      - ../../../mcp-server/observability/kitezh-mcp-dashboard.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh-mcp.json:ro
+      - ../../../mcp/observability/kitezh-mcp-dashboard.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/kitezh-mcp.json:ro
       - ./observability/grafana/dashboards-provisioning.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro
       - ./observability/prometheus/alerts.yml:/otel-lgtm/kitezh-alerts.yml:ro
-      - ../../../mcp-server/observability/alerts.yml:/otel-lgtm/kitezh-mcp-alerts.yml:ro
+      - ../../../mcp/observability/alerts.yml:/otel-lgtm/kitezh-mcp-alerts.yml:ro
     healthcheck:
       test: ['CMD-SHELL', 'test -f /tmp/ready']
       start_period: 30s

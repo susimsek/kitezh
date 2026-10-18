@@ -44,9 +44,9 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
 | Package | `./mvnw -DskipTests package` |
 | Native executable | `./mvnw -Pprod,native -DskipTests native:compile` |
 | Sonar scan | `./mvnw -Psonar sonar:sonar` |
-| Verify MCP server | `./mvnw -f mcp-server/pom.xml verify` |
-| Run MCP server | `./mvnw -f mcp-server/pom.xml spring-boot:run` |
-| Build MCP native executable | `./mvnw -f mcp-server/pom.xml -Pnative -DskipTests native:compile` |
+| Verify MCP server | `./mvnw -f mcp/pom.xml verify` |
+| Run MCP server | `./mvnw -f mcp/pom.xml spring-boot:run` |
+| Build MCP native executable | `./mvnw -f mcp/pom.xml -Pnative -DskipTests native:compile` |
 
 ## Prerequisites
 
@@ -96,11 +96,11 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
 - Tests: `src/test/java`
   - Unit and integration tests: `src/test/java/io/github/susimsek/kitezh`
   - Gatling performance tests: `src/test/java/gatling/simulations`
-- MCP server: `mcp-server`
+- MCP server: `mcp`
   - Independent Spring Boot/Spring AI Streamable HTTP service; no JPA, Liquibase, or direct database access.
   - MCP tools call the versioned Kitezh Admin API through OAuth 2.0 Token Exchange.
   - Separate Docker image, Render Web Service, quality job, release workflow, Sonar inputs, and observability assets.
-  - Unit and integration tests live under `mcp-server/src/test/java`.
+  - Unit and integration tests live under `mcp/src/test/java`.
 
 ## Code Style and Quality Gates
 
@@ -177,7 +177,7 @@ This repo is a Java 25 + Spring Boot 4.1 application for the Authorization Serve
   - `AuthorizationServerEndpointsIT`
 - Keep integration tests focused on end-to-end wiring of Spring Boot, Spring Security, authorization server endpoints, persistence, and Liquibase-seeded client data.
 - Maintain strong JaCoCo coverage for handwritten application code.
-- The independent MCP module uses the same root Spotless AOSP and Checkstyle configurations and enforces at least 96% line coverage over its handwritten classes. Run `./mvnw -f mcp-server/pom.xml verify` after changing MCP code, security, configuration, or tools.
+- The independent MCP module uses the same root Spotless AOSP and Checkstyle configurations and enforces at least 96% line coverage over its handwritten classes. Run `./mvnw -f mcp/pom.xml verify` after changing MCP code, security, configuration, or tools.
 - New service behavior requires focused unit tests. New controller behavior requires an HTTP-level integration test when it changes an externally observable contract, authorization rule, persistence behavior, or Problem Detail response.
 - Security-sensitive changes must test the affected authorization decision and session/token invalidation behavior.
 - The current verification command is:
@@ -267,7 +267,7 @@ curl http://localhost:9090/actuator/health/readiness
 
 - Native builds use Spring Boot AOT and GraalVM Native Build Tools.
 - Build with `./mvnw -Pprod,native -DskipTests native:compile`.
-- The independent MCP module uses `./mvnw -f mcp-server/pom.xml -Pnative -DskipTests native:compile`; CI builds Linux AMD64/ARM64 executables and compresses them with UPX. Publish its minimal native runtime image through the Jib Native Image extension, matching the backend release flow.
+- The independent MCP module uses `./mvnw -f mcp/pom.xml -Pnative -DskipTests native:compile`; CI builds Linux AMD64/ARM64 executables and compresses them with UPX. Publish its minimal native runtime image through the Jib Native Image extension, matching the backend release flow.
 - Runtime hints live in `config/aot/NativeRuntimeHints`; resource-based reflection/resource config lives under `src/main/resources/META-INF/native-image`.
 - Update `NativeRuntimeHints` when adding:
   - New i18n message bundles
@@ -279,7 +279,7 @@ curl http://localhost:9090/actuator/health/readiness
 
 ## Authentication
 
-- Keep the MCP service separately deployable under `mcp-server/`; authenticate inbound bearer tokens against its configured issuer and MCP resource audience, require `mcp.read`, and forward the same user token to the Kitezh Admin API. MCP access tokens also carry the `admin-api` audience. The backend must restrict MCP-purpose tokens to the explicit read-only GET endpoint allowlist and preserve each endpoint's existing role authorization. MCP tools remain read-only and must use typed API operations; never add direct JPA/database access or generic URL/SQL tools.
+- Keep the MCP service separately deployable under `mcp/`; authenticate inbound bearer tokens against its configured issuer and MCP resource audience, require `mcp.read`, and forward the same user token to the Kitezh Admin API. MCP access tokens also carry the `admin-api` audience. The backend must restrict MCP-purpose tokens to the explicit read-only GET endpoint allowlist and preserve each endpoint's existing role authorization. MCP tools remain read-only and must use typed API operations; never add direct JPA/database access or generic URL/SQL tools.
 - Keep the MCP public resource URI synchronized across `AuthorizationServerConfig`, `APP_SECURITY_AUDIENCE`, `APP_MCP_PUBLIC_URL`, and the Render service. MCP does not use a confidential service client or client secret.
 
 - Form login is used for end-user authentication.
