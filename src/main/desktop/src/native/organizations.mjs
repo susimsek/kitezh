@@ -118,9 +118,34 @@ export function createOrganizationScreens({
         return;
       }
       try {
-        data.organizationDetail = await request(
-          `/api/admin/organizations/${id}`,
-        );
+        const base = `/api/admin/organizations/${id}`;
+        const [
+          organization,
+          members,
+          domains,
+          invitations,
+          groups,
+          claims,
+          providers,
+        ] = await Promise.all([
+          request(base),
+          request(`${base}/members?page=0&size=20&sort=user.username,asc`),
+          request(`${base}/domains`),
+          request(`${base}/invitations?page=0&size=20&sort=createdAt,desc`),
+          request(`${base}/groups?page=0&size=20&sort=name,asc`),
+          request(`${base}/claims`),
+          request(`${base}/identity-providers`),
+        ]);
+        data.organizationDetail = organization;
+        data.organizationMembers = organizationPage(members, 20).content;
+        data.organizationDomains = Array.isArray(domains) ? domains : [];
+        data.organizationInvitations = organizationPage(
+          invitations,
+          20,
+        ).content;
+        data.organizationGroups = organizationPage(groups, 20).content;
+        data.organizationClaims = Array.isArray(claims) ? claims : [];
+        data.organizationProviders = Array.isArray(providers) ? providers : [];
         data.organizationDetailLoadError = false;
       } catch {
         data.organizationDetail = null;
@@ -206,12 +231,179 @@ export function createOrganizationScreens({
   function detail() {
     const organization = data.organizationDetail;
     if (!organization || data.organizationDetailLoadError)
-      return `${breadcrumb()}<section class="card organization-detail-card"><p role="alert">${esc(text("adminOrganizationDetailLoadError"))}</p>${button(text("adminRetry"), { action: "organization-retry", busy: state.busy === "organization-retry", disabled: blocked(), variant: "secondary", icon: "reset" })}</section>`;
-    const value = (label, content) =>
-      `<div class="organization-detail-field"><span>${esc(label)}</span><strong>${esc(content || "—")}</strong></div>`;
-    const count = (label, number) =>
-      `<div class="organization-detail-count"><span>${esc(label)}</span><strong>${Number.isSafeInteger(number) ? number : 0}</strong></div>`;
-    return `${breadcrumb()}<section class="card organization-detail-card"><div class="organization-detail-fields">${value(text("adminOrganizationAlias"), organization.alias)}${value(text("adminOrganizationName"), organization.name)}${value(text("adminOrganizationDisplayName"), organization.displayName)}${value(text("adminOrganizationDescription"), organization.description)}${value(text("adminOrganizationStatus"), text(organization.enabled ? "adminOrganizationEnabled" : "adminOrganizationDisabled"))}</div><div class="organization-detail-counts">${count(text("adminOrganizationMembers"), organization.memberCount)}${count(text("adminOrganizationDomains"), organization.domainCount)}${count(text("adminOrganizationGroups"), organization.groupCount)}${count(text("adminOrganizationClaims"), organization.claimCount)}${count(text("adminOrganizationProviders"), organization.identityProviderCount)}</div></section>`;
+      return `<section class="card organization-detail-card"><p role="alert">${esc(text("adminOrganizationDetailLoadError"))}</p>${button(text("adminRetry"), { action: "organization-retry", busy: state.busy === "organization-retry", disabled: blocked(), variant: "secondary", icon: "reset" })}</section>`;
+    const canEdit = canManage() && !blocked();
+    const draft = data.organizationDetailDraft ?? {};
+    const errors = data.organizationDetailErrors ?? {};
+    const rows = (items, columns) =>
+      `<div class="organization-detail-table-wrap"><table class="organization-detail-table"><thead><tr>${columns.map((column) => `<th scope="col">${esc(text(column.label))}</th>`).join("")}</tr></thead><tbody>${items.map((item) => `<tr>${columns.map((column) => `<td>${column.value(item)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    const field = (name, key, options = {}) => {
+      const type = options.type ?? "text";
+      return `<div class="organization-detail-field"><input name="${esc(name)}" type="${type}" maxlength="${options.maxlength}" placeholder="${esc(text(key))}" value="${esc(draft[name] ?? "")}" aria-label="${esc(text(key))}" aria-invalid="${Boolean(errors[name])}" aria-describedby="organization-detail-${name}-error" ${canEdit ? "" : "disabled"}/><div class="field-error" id="organization-detail-${name}-error" role="alert">${esc(errors[name] ?? "")}</div></div>`;
+    };
+    const roleSelect = `<div class="organization-detail-role-field"><select name="role" aria-label="${esc(text("adminOrganizationMemberRole"))}" aria-invalid="${Boolean(errors.role)}" aria-describedby="organization-detail-role-error" ${canEdit ? "" : "disabled"}><option value="MEMBER" ${(draft.role ?? "MEMBER") === "MEMBER" ? "selected" : ""}>MEMBER</option><option value="ADMIN" ${draft.role === "ADMIN" ? "selected" : ""}>ADMIN</option><option value="OWNER" ${draft.role === "OWNER" ? "selected" : ""}>OWNER</option></select><div class="field-error" id="organization-detail-role-error" role="alert">${esc(errors.role ?? "")}</div></div>`;
+    const form = (key, content, labelKey, extraClass = "") =>
+      canManage()
+        ? `<form data-organization-form="${key}" class="organization-detail-form ${extraClass}" novalidate>${content}${button(text(labelKey), { type: "submit", icon: "add", busy: state.busy === `organization-mutation:${key}`, disabled: blocked() })}</form>`
+        : "";
+    const section = (title, content) =>
+      `<section class="card organization-detail-section"><h2>${esc(text(title))}</h2>${content}</section>`;
+    const memberForm = form(
+      "member",
+      `${field("userId", "adminOrganizationUserId", { type: "number", maxlength: 16 })}${roleSelect}`,
+      "adminOrganizationAddMember",
+    );
+    const domainForm = form(
+      "domain",
+      field("domain", "adminOrganizationDomain", { maxlength: 255 }),
+      "adminOrganizationAddDomain",
+    );
+    const invitationForm = form(
+      "invitation",
+      `${field("email", "adminOrganizationInviteEmail", { type: "email", maxlength: 254 })}${roleSelect}`,
+      "adminOrganizationInvite",
+    );
+    const groupForm = form(
+      "group",
+      field("name", "adminOrganizationGroupName", { maxlength: 100 }),
+      "adminOrganizationAddGroup",
+    );
+    const claimForm = form(
+      "claim",
+      `${field("claimName", "adminOrganizationClaimName", { maxlength: 200 })}${field("claimValue", "adminOrganizationClaimValue", { maxlength: 2000 })}`,
+      "adminOrganizationAddClaim",
+      "is-stacked",
+    );
+    const providerForm = form(
+      "provider",
+      field("providerAlias", "adminOrganizationProviderAlias", {
+        maxlength: 100,
+      }),
+      "adminOrganizationLinkProvider",
+    );
+    const memberRows = (data.organizationMembers ?? []).map((member) => ({
+      ...member,
+      username: esc(member.username ?? "—"),
+      role: esc(member.role ?? "—"),
+    }));
+    const domainRows = (data.organizationDomains ?? []).map((domain) => ({
+      ...domain,
+      domain: esc(domain.domain ?? "—"),
+      verifiedLabel: esc(domain.verified ? "✓" : "—"),
+      action:
+        canManage() && !domain.verified
+          ? button(text("adminOrganizationVerify"), {
+              action: "organization-domain-verify",
+              id: domain.id,
+              busy: state.busy === `organization-mutation:verify:${domain.id}`,
+              disabled: blocked(),
+              className: "primary-button small-button",
+            })
+          : "",
+    }));
+    const invitationRows = (data.organizationInvitations ?? []).map(
+      (invitation) => ({
+        ...invitation,
+        email: esc(invitation.email ?? "—"),
+        role: esc(invitation.role ?? "—"),
+        status: esc(
+          invitation.revokedAt ? text("adminOrganizationRevoked") : "",
+        ),
+      }),
+    );
+    const groupRows = (data.organizationGroups ?? []).map((group) => ({
+      ...group,
+      name: esc(group.name ?? "—"),
+      memberCount: Number.isSafeInteger(group.memberCount)
+        ? group.memberCount
+        : 0,
+    }));
+    const claimRows = (data.organizationClaims ?? []).map((claim) => ({
+      ...claim,
+      claimName: esc(claim.claimName ?? "—"),
+      claimValue: esc(claim.claimValue ?? "—"),
+    }));
+    const providerRows = (data.organizationProviders ?? []).map((provider) => ({
+      ...provider,
+      displayName: esc(provider.displayName || provider.providerAlias || "—"),
+      enabledLabel: esc(provider.enabled ? "✓" : "—"),
+    }));
+    const alert = data.organizationMutationError
+      ? `<p role="alert" class="notice error organization-detail-error">${esc(text("adminOrganizationOperationError"))}</p>`
+      : "";
+    return `${alert}<div class="organization-detail-grid">${section(
+      "adminOrganizationMembers",
+      `${memberForm}${rows(memberRows, [
+        { label: "adminOrganizationUsername", value: (item) => item.username },
+        { label: "adminOrganizationMemberRole", value: (item) => item.role },
+        {
+          label: "adminOrganizationActions",
+          value: (item) =>
+            canManage()
+              ? button(text("adminOrganizationRemoveMember"), {
+                  action: "organization-member-remove",
+                  id: item.userId,
+                  busy:
+                    state.busy ===
+                    `organization-mutation:remove:${item.userId}`,
+                  disabled: blocked(),
+                  danger: true,
+                  className: "danger-button small-button",
+                })
+              : "",
+        },
+      ])}`,
+    )}${section(
+      "adminOrganizationDomains",
+      `${domainForm}${rows(domainRows, [
+        { label: "adminOrganizationDomain", value: (item) => item.domain },
+        {
+          label: "adminOrganizationVerified",
+          value: (item) => item.verifiedLabel,
+        },
+        { label: "adminOrganizationActions", value: (item) => item.action },
+      ])}`,
+    )}${section(
+      "adminOrganizationInvitations",
+      `${invitationForm}${rows(invitationRows, [
+        { label: "adminOrganizationInviteEmail", value: (item) => item.email },
+        { label: "adminOrganizationMemberRole", value: (item) => item.role },
+        { label: "adminOrganizationStatus", value: (item) => item.status },
+      ])}`,
+    )}${section(
+      "adminOrganizationGroups",
+      `${groupForm}${rows(groupRows, [
+        { label: "adminOrganizationGroupName", value: (item) => item.name },
+        {
+          label: "adminOrganizationMembers",
+          value: (item) => item.memberCount,
+        },
+      ])}`,
+    )}${section(
+      "adminOrganizationClaims",
+      `${claimForm}${rows(claimRows, [
+        {
+          label: "adminOrganizationClaimName",
+          value: (item) => item.claimName,
+        },
+        {
+          label: "adminOrganizationClaimValue",
+          value: (item) => item.claimValue,
+        },
+      ])}`,
+    )}${section(
+      "adminOrganizationProviders",
+      `${providerForm}${rows(providerRows, [
+        {
+          label: "adminOrganizationProviderAlias",
+          value: (item) => item.displayName,
+        },
+        {
+          label: "adminOrganizationEnabled",
+          value: (item) => item.enabledLabel,
+        },
+      ])}`,
+    )}</div>`;
   }
 
   async function reload(busy, keepContent = false) {
@@ -303,6 +495,158 @@ export function createOrganizationScreens({
     }
   }
 
+  async function mutate(path, method = "POST", body, busyKey, draftKey) {
+    if (blocked() || !canManage()) return;
+    state.busy = `organization-mutation:${busyKey}`;
+    state.error = null;
+    data.organizationMutationError = false;
+    render();
+    try {
+      await request(path, { method, ...(body === undefined ? {} : { body }) });
+      if (draftKey) {
+        data.organizationDetailDraft ??= {};
+        const fields = {
+          member: ["userId", "role"],
+          domain: ["domain"],
+          invitation: ["email", "role"],
+          group: ["name"],
+          claim: ["claimName", "claimValue"],
+          provider: ["providerAlias"],
+        }[draftKey] ?? [draftKey];
+        for (const fieldName of fields)
+          delete data.organizationDetailDraft[fieldName];
+        if (["member", "invitation"].includes(draftKey))
+          data.organizationDetailDraft.role = "MEMBER";
+      }
+      data.organizationDetailErrors = {};
+      await loadRoute({ keepContent: true });
+    } catch {
+      const fieldErrors = violations(state.error?.body);
+      const allowedFields = [
+        "userId",
+        "role",
+        "domain",
+        "email",
+        "name",
+        "claimName",
+        "claimValue",
+        "providerAlias",
+      ];
+      data.organizationDetailErrors = Object.fromEntries(
+        allowedFields.flatMap((fieldName) =>
+          fieldErrors[fieldName] ? [[fieldName, fieldErrors[fieldName]]] : [],
+        ),
+      );
+      data.organizationMutationError =
+        Object.keys(data.organizationDetailErrors).length === 0;
+      state.error = null;
+    } finally {
+      state.busy = null;
+      render();
+    }
+  }
+
+  function submitDetailForm(form) {
+    if (blocked() || !canManage()) return;
+    const kind = form.dataset.organizationForm;
+    const values = Object.fromEntries(new FormData(form));
+    const draft = (data.organizationDetailDraft ??= {});
+    for (const [key, value] of Object.entries(values))
+      draft[key] = String(value);
+    const errors = {};
+    const required = (key) => {
+      const value = String(values[key] ?? "").trim();
+      if (!value) errors[key] = text("adminOrganizationRequired");
+      return value;
+    };
+    const id = data.organizationDetailId;
+    if (kind === "member") {
+      const userId = Number(required("userId"));
+      if (!errors.userId && (!Number.isSafeInteger(userId) || userId < 1))
+        errors.userId = text("adminOrganizationUserIdInvalid");
+      if (!["OWNER", "ADMIN", "MEMBER"].includes(values.role))
+        errors.role = text("adminOrganizationRoleInvalid");
+      if (!errors.userId && !errors.role)
+        void mutate(
+          `/api/admin/organizations/${id}/members`,
+          "POST",
+          { userId, role: values.role },
+          kind,
+          kind,
+        );
+    } else if (kind === "domain") {
+      const domain = required("domain");
+      if (!errors.domain && domain.length > 255)
+        errors.domain = text("adminOrganizationDomainTooLong");
+      if (!errors.domain)
+        void mutate(
+          `/api/admin/organizations/${id}/domains`,
+          "POST",
+          { domain },
+          kind,
+          kind,
+        );
+    } else if (kind === "invitation") {
+      const email = required("email").trim();
+      if (
+        !errors.email &&
+        (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
+      )
+        errors.email = text("adminOrganizationEmailInvalid");
+      if (!["OWNER", "ADMIN", "MEMBER"].includes(values.role))
+        errors.role = text("adminOrganizationRoleInvalid");
+      if (!errors.email && !errors.role)
+        void mutate(
+          `/api/admin/organizations/${id}/invitations`,
+          "POST",
+          { email, role: values.role },
+          kind,
+          kind,
+        );
+    } else if (kind === "group") {
+      const name = required("name");
+      if (!errors.name && name.length > 100)
+        errors.name = text("adminOrganizationGroupTooLong");
+      if (!errors.name)
+        void mutate(
+          `/api/admin/organizations/${id}/groups`,
+          "POST",
+          { name },
+          kind,
+          kind,
+        );
+    } else if (kind === "claim") {
+      const claimName = required("claimName");
+      const claimValue = required("claimValue");
+      if (!errors.claimName && claimName.length > 200)
+        errors.claimName = text("adminOrganizationClaimNameTooLong");
+      if (!errors.claimValue && claimValue.length > 2000)
+        errors.claimValue = text("adminOrganizationClaimValueTooLong");
+      if (!Object.keys(errors).length)
+        void mutate(
+          `/api/admin/organizations/${id}/claims`,
+          "POST",
+          { claimName, claimValue, addToAccessToken: true },
+          kind,
+          kind,
+        );
+    } else if (kind === "provider") {
+      const providerAlias = required("providerAlias");
+      if (!errors.providerAlias && providerAlias.length > 100)
+        errors.providerAlias = text("adminOrganizationProviderAliasTooLong");
+      if (!errors.providerAlias)
+        void mutate(
+          `/api/admin/organizations/${id}/identity-providers`,
+          "POST",
+          { providerAlias },
+          kind,
+          kind,
+        );
+    }
+    data.organizationDetailErrors = errors;
+    if (Object.keys(errors).length) render();
+  }
+
   async function handle(name, element) {
     if (name === "create-organization") await openCreate();
     else if (name === "organization-open") {
@@ -324,6 +668,24 @@ export function createOrganizationScreens({
       await reload("organization-read-back", true);
     } else if (name === "organization-retry") {
       await reload("organization-retry", true);
+    } else if (name === "organization-member-remove") {
+      const userId = Number(element.dataset.id);
+      if (Number.isSafeInteger(userId) && userId > 0)
+        await mutate(
+          `/api/admin/organizations/${data.organizationDetailId}/members/${userId}`,
+          "DELETE",
+          undefined,
+          `remove:${userId}`,
+        );
+    } else if (name === "organization-domain-verify") {
+      const domainId = Number(element.dataset.id);
+      if (Number.isSafeInteger(domainId) && domainId > 0)
+        await mutate(
+          `/api/admin/organizations/${data.organizationDetailId}/domains/${domainId}/verify`,
+          "POST",
+          {},
+          `verify:${domainId}`,
+        );
     } else if (name === "organization-clear") {
       if (blocked()) return;
       data.organizationQuery = "";
@@ -375,6 +737,36 @@ export function createOrganizationScreens({
   }
 
   function bind(root = document) {
+    root.querySelectorAll("[data-organization-form]").forEach((form) => {
+      form.addEventListener("input", (event) => {
+        const target = event.target;
+        if (!target?.name) return;
+        data.organizationDetailDraft ??= {};
+        data.organizationDetailDraft[target.name] = target.value;
+        if (data.organizationDetailErrors?.[target.name]) {
+          delete data.organizationDetailErrors[target.name];
+          target.setAttribute("aria-invalid", "false");
+          const feedback = root.getElementById(
+            `organization-detail-${target.name}-error`,
+          );
+          if (feedback) feedback.textContent = "";
+        }
+      });
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitDetailForm(event.currentTarget);
+      });
+    });
+    root
+      .querySelectorAll(
+        '[data-action="organization-member-remove"], [data-action="organization-domain-verify"]',
+      )
+      .forEach((element) => {
+        element.addEventListener(
+          "click",
+          () => void handle(element.dataset.action, element),
+        );
+      });
     root
       .getElementById("organization-query")
       ?.addEventListener("input", (event) => {

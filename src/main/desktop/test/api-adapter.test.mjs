@@ -13,7 +13,7 @@ const session = {
 
 test("client detail bridge permits exact scoped contracts and rejects widened variants", async () => {
   const { adapter } = harness(async () => new Response("{}", { status: 200 }));
-  for (const [method, path] of [
+  for (const [method, path, body] of [
     [
       "GET",
       "/api/admin/clients/account-console/scope-evaluation?scopes=openid+profile&subject=user",
@@ -126,25 +126,96 @@ test("group bridge accepts detail, settings, permissions, roles and bounded memb
   );
 });
 
-test("organization bridge permits bounded lists, exact details, and create routes", async () => {
+test("organization bridge permits bounded collection reads and only exact organization mutations", async () => {
   const { adapter } = harness(async () => new Response("{}", { status: 200 }));
-  for (const [method, path] of [
+  for (const [method, path, body] of [
     ["GET", "/api/admin/organizations?q=acme&page=0&size=20&sort=name,asc"],
     ["GET", "/api/admin/organizations?page=2&size=100&sort=name,desc"],
     ["GET", "/api/admin/organizations/7"],
+    [
+      "GET",
+      "/api/admin/organizations/7/members?page=0&size=20&sort=user.username,asc",
+    ],
+    ["GET", "/api/admin/organizations/7/domains"],
+    [
+      "GET",
+      "/api/admin/organizations/7/invitations?page=0&size=20&sort=createdAt,desc",
+    ],
+    ["GET", "/api/admin/organizations/7/groups?page=0&size=20&sort=name,asc"],
+    ["GET", "/api/admin/organizations/7/claims"],
+    ["GET", "/api/admin/organizations/7/identity-providers"],
     ["POST", "/api/admin/organizations"],
+    [
+      "POST",
+      "/api/admin/organizations/7/members",
+      { userId: 3, role: "MEMBER" },
+    ],
+    ["POST", "/api/admin/organizations/7/domains", { domain: "example.com" }],
+    [
+      "POST",
+      "/api/admin/organizations/7/invitations",
+      { email: "user@example.com", role: "MEMBER" },
+    ],
+    ["POST", "/api/admin/organizations/7/groups", { name: "Operators" }],
+    [
+      "POST",
+      "/api/admin/organizations/7/claims",
+      { claimName: "department", claimValue: "ops", addToAccessToken: true },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/identity-providers",
+      { providerAlias: "google" },
+    ],
+    ["POST", "/api/admin/organizations/7/domains/5/verify", {}],
+    ["DELETE", "/api/admin/organizations/7/members/3"],
   ])
     assert.equal(
-      (await adapter.request({ console: "admin", method, path })).status,
+      (
+        await adapter.request({
+          console: "admin",
+          method,
+          path,
+          ...(body ? { body } : {}),
+        })
+      ).status,
       200,
       path,
     );
-  for (const [method, path] of [
+  for (const [method, path, body] of [
     ["GET", "/api/admin/organizations/0"],
     ["GET", "/api/admin/organizations/07"],
     ["GET", "/api/admin/organizations/9007199254740992"],
     ["GET", "/api/admin/organizations/7?extra=1"],
     ["GET", "/api/admin/organizations/7/nested"],
+    ["GET", "/api/admin/organizations/7/groups?sort=id,asc"],
+    ["GET", "/api/admin/organizations/7/domains?size=20"],
+    ["GET", "/api/admin/organizations/7/claims?extra=1"],
+    ["GET", "/api/admin/organizations/7/members?page=01"],
+    ["GET", "/api/admin/organizations/9007199254740992/members?page=0"],
+    [
+      "POST",
+      "/api/admin/organizations/7/members",
+      { userId: "3", role: "MEMBER" },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/members",
+      { userId: 3, role: "ROLE_ADMIN" },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/claims",
+      { claimName: "role", claimValue: "admin", addToAccessToken: false },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/identity-providers",
+      { providerAlias: "google", enabled: true },
+    ],
+    ["POST", "/api/admin/organizations/7/domains/5/verify", { force: true }],
+    ["POST", "/api/admin/organizations/7/groups/2"],
+    ["DELETE", "/api/admin/organizations/7/domains/2"],
     ["GET", "/api/admin/organizations/7#fragment"],
     ["PUT", "/api/admin/organizations/7"],
     ["DELETE", "/api/admin/organizations/7"],
@@ -158,8 +229,13 @@ test("organization bridge permits bounded lists, exact details, and create route
     ["DELETE", "/api/admin/organizations/7"],
   ])
     await assert.rejects(
-      adapter.request({ console: "admin", method, path }),
-      /not allowed/,
+      adapter.request({
+        console: "admin",
+        method,
+        path,
+        ...(body ? { body } : {}),
+      }),
+      /not allowed|Invalid organization mutation request|Invalid organization domain verification request/,
       path,
     );
   await assert.rejects(

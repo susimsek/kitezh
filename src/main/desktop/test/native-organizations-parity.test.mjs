@@ -62,6 +62,16 @@ const harness = (options = {}) =>
         method === "GET"
       )
         return { ...organization, id: Number(path.split("/").at(-1)) };
+      if (
+        /\/organizations\/[1-9]\d*\/(members|invitations|groups)\?/.test(path)
+      )
+        return page([]);
+      if (
+        /\/organizations\/[1-9]\d*\/(domains|claims|identity-providers)$/.test(
+          path,
+        )
+      )
+        return [];
       if (path === "/api/admin/organizations" && method === "POST")
         return { id: 42, ...body };
       return undefined;
@@ -133,14 +143,141 @@ test("native organization list opens the localized detail screen", async () => {
       "#/admin/organizations/8",
     );
     assert.match(h.document.querySelector("h1").textContent, /Acme/);
-    assert.match(h.document.body.textContent, /Acme Corporation/);
+    assert.match(h.document.querySelector("h1").textContent, /Acme/);
+    assert.match(h.document.querySelector(".topbar p").textContent, /acme/i);
     assert.match(h.document.body.textContent, /Identity providers/);
+    assert.deepEqual(
+      [...h.document.querySelectorAll(".organization-detail-section h2")].map(
+        (heading) => heading.textContent,
+      ),
+      [
+        "Members",
+        "Domains",
+        "Invitations",
+        "Groups",
+        "Claims",
+        "Identity providers",
+      ],
+    );
+    assert.equal(
+      h.document.querySelectorAll(".organization-detail-grid").length,
+      1,
+    );
+    assert.ok(h.document.querySelector('[data-organization-form="member"]'));
+    assert.ok(h.document.querySelector('[data-organization-form="claim"]'));
+    for (const path of [
+      "/api/admin/organizations/8/members?page=0&size=20&sort=user.username,asc",
+      "/api/admin/organizations/8/domains",
+      "/api/admin/organizations/8/invitations?page=0&size=20&sort=createdAt,desc",
+      "/api/admin/organizations/8/groups?page=0&size=20&sort=name,asc",
+      "/api/admin/organizations/8/claims",
+      "/api/admin/organizations/8/identity-providers",
+    ])
+      assert.ok(
+        h.calls.some((call) => call.path === path),
+        path,
+      );
     assert.ok(
       h.calls.some((call) => call.path === "/api/admin/organizations/8"),
     );
     h.callbacks.language("tr");
     assert.match(h.document.body.textContent, /Kimlik sağlayıcıları/);
   } finally {
+    h.restore();
+  }
+});
+
+test("native organization detail submits validated additions through the matching backend contracts", async () => {
+  const h = await harness();
+  try {
+    await settle();
+    await click(h, '[data-route="organizations"]');
+    await click(h, '[data-action="organization-open"][data-id="8"]');
+    const invalidGroup = h.document.querySelector(
+      '[data-organization-form="group"]',
+    );
+    invalidGroup.dispatchEvent(
+      new h.dom.window.Event("submit", { bubbles: true, cancelable: true }),
+    );
+    await settle();
+    assert.match(
+      h.document.getElementById("organization-detail-name-error").textContent,
+      /required/i,
+    );
+    assert.equal(
+      h.calls.some(
+        (call) => call.method === "POST" && call.path.endsWith("/groups"),
+      ),
+      false,
+    );
+
+    const groupName = h.document.querySelector(
+      '[data-organization-form="group"] input[name="name"]',
+    );
+    groupName.value = "Operators";
+    groupName.dispatchEvent(new h.dom.window.Event("input", { bubbles: true }));
+    h.document
+      .querySelector('[data-organization-form="group"]')
+      .dispatchEvent(
+        new h.dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await settle();
+    assert.deepEqual(
+      h.calls.find(
+        (call) =>
+          call.method === "POST" &&
+          call.path === "/api/admin/organizations/8/groups",
+      ).body,
+      { name: "Operators" },
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("native organization mutation shows inline progress and blocks duplicate submits", async () => {
+  let resolveMutation;
+  const mutationResult = new Promise((resolve) => {
+    resolveMutation = resolve;
+  });
+  const h = await harness({
+    response: (path, method) =>
+      method === "POST" && path.endsWith("/groups")
+        ? mutationResult
+        : undefined,
+  });
+  try {
+    await settle();
+    await click(h, '[data-route="organizations"]');
+    await click(h, '[data-action="organization-open"][data-id="8"]');
+    const form = h.document.querySelector('[data-organization-form="group"]');
+    const name = form.querySelector('input[name="name"]');
+    name.value = "Operators";
+    name.dispatchEvent(new h.dom.window.Event("input", { bubbles: true }));
+    form.dispatchEvent(
+      new h.dom.window.Event("submit", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const busyForm = h.document.querySelector(
+      '[data-organization-form="group"]',
+    );
+    const submit = busyForm.querySelector('button[type="submit"]');
+    assert.equal(submit.disabled, true);
+    assert.ok(submit.querySelector(".spinner"));
+    busyForm.dispatchEvent(
+      new h.dom.window.Event("submit", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      h.calls.filter(
+        (call) => call.method === "POST" && call.path.endsWith("/groups"),
+      ).length,
+      1,
+    );
+    resolveMutation({ id: 2, name: "Operators", memberCount: 0 });
+    await settle();
+  } finally {
+    resolveMutation?.({ id: 2, name: "Operators", memberCount: 0 });
     h.restore();
   }
 });

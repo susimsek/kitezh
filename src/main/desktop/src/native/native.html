@@ -2052,6 +2052,101 @@
         gap: 24px;
         padding: 24px;
       }
+      .organization-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        gap: 20px;
+      }
+      .organization-detail-section {
+        display: grid;
+        min-width: 0;
+        align-content: start;
+        gap: 10px;
+        padding: 20px;
+      }
+      .organization-detail-section h2 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 600;
+      }
+      .organization-detail-form {
+        display: flex;
+        min-width: 0;
+        align-items: start;
+        gap: 8px;
+        margin: 0 0 4px;
+      }
+      .organization-detail-form > .organization-detail-field {
+        flex: 1 1 auto;
+      }
+      .organization-detail-field .field-error:empty,
+      .organization-detail-role-field .field-error:empty {
+        display: none;
+      }
+      .organization-detail-role-field {
+        flex: 0 0 140px;
+      }
+      .organization-detail-form input,
+      .organization-detail-form select {
+        width: 100%;
+        min-width: 0;
+        height: 41px;
+        padding: 9px 11px;
+        border: 1px solid var(--border);
+        border-radius: var(--admin-control-radius);
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+      }
+      .organization-detail-form select {
+        flex: 0 0 100%;
+      }
+      .organization-detail-form button {
+        min-height: 41px;
+        flex: 0 0 auto;
+        padding: 9px 12px;
+      }
+      .organization-detail-form.is-stacked {
+        display: grid;
+      }
+      .organization-detail-form.is-stacked button {
+        width: 100%;
+      }
+      .organization-detail-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+      }
+      .organization-detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .organization-detail-table th {
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        text-align: left;
+        text-transform: uppercase;
+      }
+      .organization-detail-table td {
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--border);
+        overflow-wrap: anywhere;
+      }
+      .organization-detail-table tr:last-child td {
+        border-bottom: 0;
+      }
+      .organization-detail-table button.small-button {
+        min-height: 30px;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .organization-detail-error {
+        margin: 0 0 16px;
+      }
       .organization-detail-fields {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2110,6 +2205,15 @@
         background: rgb(0 0 0 / 45%);
       }
       @media (max-width: 900px) {
+        .organization-detail-grid {
+          grid-template-columns: 1fr;
+        }
+        .organization-detail-form select {
+          flex-basis: 100%;
+        }
+        .organization-detail-role-field {
+          flex-basis: 118px;
+        }
         .app {
           grid-template-columns: 1fr;
         }

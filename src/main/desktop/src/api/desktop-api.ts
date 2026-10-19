@@ -106,6 +106,80 @@ function isAllowedApiPath(
             Number.isSafeInteger(Number(detailMatch[1])) &&
             url.search === ""
           );
+        const collectionMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/(members|domains|invitations|groups|claims|identity-providers)$/.exec(
+            url.pathname,
+          );
+        if (collectionMatch && method === "GET") {
+          if (!Number.isSafeInteger(Number(collectionMatch[1]))) return false;
+          const collection = collectionMatch[2];
+          const keys = [...url.searchParams.keys()];
+          if (
+            keys.some((key) => url.searchParams.getAll(key).length !== 1) ||
+            keys.some(
+              (key) =>
+                ![
+                  "page",
+                  "size",
+                  "sort",
+                  ...(collection === "members" || collection === "groups"
+                    ? ["q"]
+                    : []),
+                ].includes(key),
+            )
+          )
+            return false;
+          const page = url.searchParams.get("page");
+          const size = url.searchParams.get("size");
+          const sort = url.searchParams.get("sort");
+          const expectedSort: Record<string, string> = {
+            members: "user.username,asc",
+            invitations: "createdAt,desc",
+            groups: "name,asc",
+          };
+          const paged = Object.hasOwn(expectedSort, collection);
+          return (
+            (paged || keys.length === 0) &&
+            (page === null || /^(0|[1-9]\d{0,6})$/.test(page)) &&
+            Number(page ?? 0) <= 1_000_000 &&
+            (size === null ||
+              (/^[1-9]\d{0,2}$/.test(size) && Number(size) <= 100)) &&
+            (sort === null || sort === expectedSort[collection]) &&
+            (url.searchParams.get("q")?.length ?? 0) <= 200
+          );
+        }
+        const memberRemovalMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/members\/([1-9]\d*)$/.exec(
+            url.pathname,
+          );
+        if (memberRemovalMatch)
+          return (
+            method === "DELETE" &&
+            Number.isSafeInteger(Number(memberRemovalMatch[1])) &&
+            Number.isSafeInteger(Number(memberRemovalMatch[2])) &&
+            url.search === ""
+          );
+        const domainVerifyMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/domains\/([1-9]\d*)\/verify$/.exec(
+            url.pathname,
+          );
+        if (domainVerifyMatch)
+          return (
+            method === "POST" &&
+            Number.isSafeInteger(Number(domainVerifyMatch[1])) &&
+            Number.isSafeInteger(Number(domainVerifyMatch[2])) &&
+            url.search === ""
+          );
+        const addMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/(members|domains|invitations|groups|claims|identity-providers)$/.exec(
+            url.pathname,
+          );
+        if (addMatch)
+          return (
+            method === "POST" &&
+            Number.isSafeInteger(Number(addMatch[1])) &&
+            url.search === ""
+          );
         if (url.pathname !== "/api/admin/organizations") return false;
         if (method === "POST") return !url.search;
         if (method !== "GET") return false;
@@ -1268,6 +1342,72 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
 
   return {
     async request(request: NativeApiRequest): Promise<NativeApiResponse> {
+      if (
+        request.console === "admin" &&
+        request.method === "POST" &&
+        /^\/api\/admin\/organizations\/[1-9]\d*\/domains\/[1-9]\d*\/verify$/.test(
+          request.path,
+        ) &&
+        request.body !== undefined &&
+        (!request.body ||
+          typeof request.body !== "object" ||
+          Array.isArray(request.body) ||
+          Object.keys(request.body).length !== 0)
+      )
+        throw new Error("Invalid organization domain verification request");
+      if (
+        request.console === "admin" &&
+        request.method === "POST" &&
+        /^\/api\/admin\/organizations\/[1-9]\d*\/(members|domains|invitations|groups|claims|identity-providers)$/.test(
+          request.path,
+        )
+      ) {
+        const body = request.body as Record<string, unknown> | null;
+        const route = request.path.split("/").at(-1);
+        const keys =
+          body && typeof body === "object" && !Array.isArray(body)
+            ? Object.keys(body).sort().join(",")
+            : "";
+        const validRole =
+          body && ["OWNER", "ADMIN", "MEMBER"].includes(String(body.role));
+        const valid =
+          route === "members"
+            ? keys === "role,userId" &&
+              typeof body?.userId === "number" &&
+              Number.isSafeInteger(body.userId) &&
+              body.userId > 0 &&
+              validRole
+            : route === "domains"
+              ? keys === "domain" &&
+                typeof body?.domain === "string" &&
+                body.domain.trim().length > 0 &&
+                body.domain.length <= 255
+              : route === "invitations"
+                ? keys === "email,role" &&
+                  typeof body?.email === "string" &&
+                  body.email.length <= 254 &&
+                  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) &&
+                  validRole
+                : route === "groups"
+                  ? keys === "name" &&
+                    typeof body?.name === "string" &&
+                    body.name.trim().length > 0 &&
+                    body.name.length <= 100
+                  : route === "claims"
+                    ? keys === "addToAccessToken,claimName,claimValue" &&
+                      body?.addToAccessToken === true &&
+                      typeof body.claimName === "string" &&
+                      body.claimName.trim().length > 0 &&
+                      body.claimName.length <= 200 &&
+                      typeof body.claimValue === "string" &&
+                      body.claimValue.trim().length > 0 &&
+                      body.claimValue.length <= 2000
+                    : keys === "providerAlias" &&
+                      typeof body?.providerAlias === "string" &&
+                      body.providerAlias.trim().length > 0 &&
+                      body.providerAlias.length <= 100;
+        if (!valid) throw new Error("Invalid organization mutation request");
+      }
       if (
         request.console === "admin" &&
         request.method === "POST" &&
