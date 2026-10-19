@@ -164,6 +164,64 @@ class AccountProfileServiceTest {
                 .executeActionsEmail(7L, UserAction.UPDATE_EMAIL, null, java.util.Locale.ENGLISH);
     }
 
+    @Test
+    void updatesNamesWithoutStartingEmailVerificationWhenEmailIsUnchanged() {
+        UserEntity user = user();
+        user.setEmail("alice@example.test");
+        var request = new AccountProfileRequestDTO("Alice", "Updated", "alice@example.test");
+        var expected =
+                new AccountProfileDTO(
+                        "alice", "Alice", "Updated", "alice@example.test", null, null);
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(accountProfileMapper.normalize(request)).thenReturn(request);
+        when(accountProfileMapper.toDTO(user)).thenReturn(expected);
+
+        assertThat(service().updateProfile("alice", request, Instant.EPOCH)).isEqualTo(expected);
+
+        verify(accountProfileMapper).updateEntity(request, user);
+        verify(ldapFederationWriteService)
+                .updateProfile(user, "alice", "alice@example.test", "Alice", "Updated");
+        verify(userActionService, org.mockito.Mockito.never()).invalidateActions(7L);
+    }
+
+    @Test
+    void rejectsDuplicateEmailBeforeUpdatingTheFederatedProfile() {
+        UserEntity user = user();
+        var request = new AccountProfileRequestDTO("Alice", "User", "taken@example.test");
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(accountProfileMapper.normalize(request)).thenReturn(request);
+        when(userRepository.existsByEmailIgnoreCaseAndIdNot("taken@example.test", 7L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> service().updateProfile("alice", request, Instant.now()))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Email is already registered");
+
+        verify(ldapFederationWriteService, org.mockito.Mockito.never())
+                .updateProfile(
+                        org.mockito.Mockito.any(),
+                        org.mockito.Mockito.anyString(),
+                        org.mockito.Mockito.any(),
+                        org.mockito.Mockito.any(),
+                        org.mockito.Mockito.any());
+    }
+
+    @Test
+    void rejectsEmailChangeWhenAuthenticationTimeIsMissing() {
+        UserEntity user = user();
+        user.setEmail("old@example.test");
+        var request = new AccountProfileRequestDTO("Alice", "User", "new@example.test");
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(accountProfileMapper.normalize(request)).thenReturn(request);
+        when(loginSettingsService.emailUpdateReauthenticationAge())
+                .thenReturn(Duration.ofMinutes(5));
+
+        assertThatThrownBy(() -> service().updateProfile("alice", request, null))
+                .isInstanceOf(ApiException.class)
+                .extracting(exception -> ((ApiException) exception).getErrorCode())
+                .isEqualTo(ApiErrorCode.REAUTHENTICATION_REQUIRED);
+    }
+
     private AccountProfileService service() {
         return new AccountProfileService(
                 userRepository,

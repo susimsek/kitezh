@@ -321,6 +321,7 @@ describe("Account console resources", () => {
   });
 
   it("moves back a page after removing its last session and handles failures", async () => {
+    window.history.replaceState({}, "", "/account/sessions?page=1");
     mockAccountRequest.mockImplementation(async (_token, config) => {
       if (!config.method) {
         return {
@@ -402,6 +403,139 @@ describe("Account console resources", () => {
         method: "DELETE",
         url: "/api/account/applications/web-client",
       }),
+    );
+  });
+
+  it("shows empty applications and reports a failed consent revocation", async () => {
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [],
+            totalPages: 0,
+            totalElements: 0,
+          },
+        } as never;
+      }
+      throw new Error("consent revocation failed");
+    });
+
+    const view = renderWithStore(<AccountApplications dictionary={dictionary} />);
+    expect(await screen.findByText(dictionary.account.common.empty)).toBeVisible();
+    view.unmount();
+
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                clientId: "web-client",
+                clientName: "Web Client",
+                scopes: [],
+                createdAt: "2026-08-20T10:00:00Z",
+                updatedAt: "2026-08-21T10:00:00Z",
+              },
+            ],
+            totalPages: 1,
+            totalElements: 1,
+          },
+        } as never;
+      }
+      throw new Error("consent revocation failed");
+    });
+    renderWithStore(<AccountApplications dictionary={dictionary} />);
+    expect(await screen.findByText("Web Client")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.applications.revoke }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.applications.revoke,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.account.common.operationError),
+    );
+  });
+
+  it("returns to the previous page after revoking its final application and session", async () => {
+    window.history.replaceState({}, "", "/account/applications?page=1");
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (config.url?.includes("/applications") && !config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                clientId: "web-client",
+                clientName: "Web Client",
+                scopes: [],
+                createdAt: "2026-08-20T10:00:00Z",
+                updatedAt: "2026-08-21T10:00:00Z",
+              },
+            ],
+            totalPages: 2,
+            totalElements: 11,
+          },
+        } as never;
+      }
+      return { status: 204, data: null } as never;
+    });
+
+    const view = renderWithStore(<AccountApplications dictionary={dictionary} />);
+    expect(await screen.findByText("Web Client")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.applications.revoke }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.applications.revoke,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAccountRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ url: "/api/account/applications?page=0&size=10" }),
+      ),
+    );
+    view.unmount();
+
+    window.history.replaceState({}, "", "/account/sessions?page=1");
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                id: "sid-other",
+                createdAt: "2026-08-22T10:00:00Z",
+                lastAccessedAt: "2026-08-22T10:30:00Z",
+                expiresAt: "2026-08-24T11:00:00Z",
+                current: false,
+                clients: [],
+              },
+            ],
+            totalPages: 2,
+            totalElements: 11,
+          },
+        } as never;
+      }
+      return { status: 204, data: null } as never;
+    });
+
+    renderWithStore(<AccountSessions dictionary={dictionary} />);
+    expect(await screen.findByText("sid-other")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.sessions.signOut }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.sessions.signOut,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAccountRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ url: "/api/account/sessions?page=0&size=10" }),
+      ),
     );
   });
 

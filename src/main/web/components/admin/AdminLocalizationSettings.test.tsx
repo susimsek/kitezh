@@ -163,10 +163,16 @@ describe("AdminLocalizationSettings", () => {
   });
 
   it("filters effective messages and changes pagination", async () => {
-    render(<AdminLocalizationSettings dictionary={dictionary} section="effective" />);
+    await act(async () => {
+      render(<AdminLocalizationSettings dictionary={dictionary} section="effective" />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(await screen.findByText(dictionary.admin.localization.effectiveTitle)).toBeVisible();
-    fireEvent.change(screen.getByLabelText(dictionary.admin.localization.bundle), {
-      target: { value: "backend" },
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(dictionary.admin.localization.bundle), {
+        target: { value: "backend" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(await screen.findByText("Welcome effective")).toBeVisible();
     fireEvent.change(screen.getByLabelText(dictionary.admin.localization.searchEffective), {
@@ -300,6 +306,56 @@ describe("AdminLocalizationSettings", () => {
     expect(mockAdminRequest).toHaveBeenCalledWith(
       "admin-token",
       expect.objectContaining({ url: expect.stringContaining("/bundled?locale=tr&bundle=email") }),
+    );
+  });
+
+  it("sorts bundled-only messages in descending order and clears the active search", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    }) as unknown as typeof fetch;
+    mockAdminRequest.mockImplementation((_token, request) => {
+      if (request.url?.endsWith("/settings/localization"))
+        return Promise.resolve({ status: 200, data: settings }) as never;
+      if (request.url?.includes("/settings/localization/messages"))
+        return Promise.resolve({
+          status: 200,
+          data: { content: [], totalPages: 0, totalElements: 0 },
+        }) as never;
+      if (request.url?.includes("/settings/localization/bundled"))
+        return Promise.resolve({
+          status: 200,
+          data: { "a.key": "Alpha", "z.key": "Zulu" },
+        }) as never;
+      return Promise.resolve({ status: 200, data: settings }) as never;
+    });
+
+    await act(async () => {
+      render(<AdminLocalizationSettings dictionary={dictionary} section="effective" />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(await screen.findByText(dictionary.admin.localization.effectiveTitle)).toBeVisible();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(dictionary.admin.localization.bundle), {
+        target: { value: "backend" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(await screen.findByText("Alpha")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(dictionary.admin.resources.sort), {
+      target: { value: "messageKey,desc" },
+    });
+    const rows = screen.getByRole("table").querySelectorAll("tbody tr");
+    expect(rows[0]).toHaveTextContent("z.key");
+    expect(rows[1]).toHaveTextContent("a.key");
+
+    fireEvent.change(screen.getByLabelText(dictionary.admin.localization.searchEffective), {
+      target: { value: "zulu" },
+    });
+    expect(screen.getByRole("table").querySelectorAll("tbody tr")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "clear-filters" }));
+    await waitFor(() =>
+      expect(screen.getByRole("table").querySelectorAll("tbody tr")).toHaveLength(2),
     );
   });
 
