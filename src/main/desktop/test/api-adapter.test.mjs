@@ -126,6 +126,43 @@ test("group bridge accepts detail, settings, permissions, roles and bounded memb
   );
 });
 
+test("organization bridge permits only the bounded list and exact create routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/organizations?q=acme&page=0&size=20&sort=name,asc"],
+    ["GET", "/api/admin/organizations?page=2&size=100&sort=name,desc"],
+    ["POST", "/api/admin/organizations"],
+  ])
+    assert.equal(
+      (await adapter.request({ console: "admin", method, path })).status,
+      200,
+      path,
+    );
+  for (const [method, path] of [
+    ["GET", "/api/admin/organizations/7"],
+    ["GET", "/api/admin/organizations?size=101"],
+    ["GET", "/api/admin/organizations?page=-1"],
+    ["GET", "/api/admin/organizations?sort=alias,asc"],
+    ["GET", "/api/admin/organizations?q=a&q=b"],
+    ["GET", "/api/admin/organizations#fragment"],
+    ["POST", "/api/admin/organizations?extra=1"],
+    ["PUT", "/api/admin/organizations"],
+    ["DELETE", "/api/admin/organizations/7"],
+  ])
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path }),
+      /not allowed/,
+      path,
+    );
+  await assert.rejects(
+    adapter.request({
+      console: "account",
+      path: "/api/admin/organizations?page=0&size=10&sort=name,asc",
+    }),
+    /not allowed/,
+  );
+});
+
 test("role membership bridge accepts exact bounded contracts and rejects malformed paths, parameters and bodies", async () => {
   const requests = [];
   const { adapter } = harness(async (url, options) => {

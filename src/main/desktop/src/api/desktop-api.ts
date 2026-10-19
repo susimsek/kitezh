@@ -93,6 +93,37 @@ function isAllowedApiPath(
     }
   }
   if (namespace === "admin") {
+    if (path.startsWith("/api/admin/organizations")) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        if (
+          url.origin !== "https://desktop.invalid" ||
+          url.hash ||
+          url.pathname !== "/api/admin/organizations"
+        )
+          return false;
+        if (method === "POST") return !url.search;
+        if (method !== "GET") return false;
+        const keys = [...url.searchParams.keys()];
+        const page = url.searchParams.get("page");
+        const size = url.searchParams.get("size");
+        const sort = url.searchParams.get("sort");
+        return (
+          keys.every((key) => ["q", "page", "size", "sort"].includes(key)) &&
+          [...new Set(keys)].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          (page === null || /^(0|[1-9]\d{0,6})$/.test(page)) &&
+          Number(page ?? 0) <= 1_000_000 &&
+          (size === null ||
+            (/^[1-9]\d{0,2}$/.test(size) && Number(size) <= 100)) &&
+          (sort === null || ["name,asc", "name,desc"].includes(sort)) &&
+          (url.searchParams.get("q")?.length ?? 0) <= 200
+        );
+      } catch {
+        return false;
+      }
+    }
     // Client detail contracts are exact and bounded independently of global resources.
     const clientDetailRoute =
       /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/(scope-evaluation|secret|sessions(?:\/[A-Za-z0-9_-]{1,100})?|consents|events)(?:\?|#|$)/.exec(
@@ -1006,9 +1037,16 @@ function isAllowedApiPath(
         (!isEvents ||
           ((url.searchParams.get("action")?.length ?? 0) <= 100 &&
             (url.searchParams.get("targetId")?.length ?? 0) <= 100 &&
-            ["", "client", "user", "session", "consent", "key", "role", "client-scope"].includes(
-              url.searchParams.get("targetType") ?? "",
-            ) &&
+            [
+              "",
+              "client",
+              "user",
+              "session",
+              "consent",
+              "key",
+              "role",
+              "client-scope",
+            ].includes(url.searchParams.get("targetType") ?? "") &&
             ["from", "to"].every((key) => {
               const value = url.searchParams.get(key);
               return (
