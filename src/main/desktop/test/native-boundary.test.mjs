@@ -210,7 +210,11 @@ test("native organization create form matches Web control layout", async () => {
   );
   assert.match(
     source,
-    /\.organization-cancel-button\s*\{\s*border-color:\s*#6c757d/s,
+    /\.organization-create-card \.organization-cancel-button\s*\{[^}]*border-color:\s*#6c757d/s,
+  );
+  assert.match(
+    source,
+    /\.organization-create-card \.organization-cancel-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*text-align:\s*center;/s,
   );
 });
 
