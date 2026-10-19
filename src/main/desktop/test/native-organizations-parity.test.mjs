@@ -183,6 +183,47 @@ test("organization row settings menu is localized and opens its detail page", as
   }
 });
 
+test("organization list renders disabled rows and falls back for missing values", async () => {
+  const h = await harness({
+    response: (path, method) => {
+      if (path.startsWith("/api/admin/organizations?") && method === "GET")
+        return page(
+          [
+            {
+              id: 9,
+              name: "Legacy organization",
+              enabled: false,
+              memberCount: null,
+            },
+            { id: 10, enabled: false },
+          ],
+          { totalElements: 2, totalPages: 1 },
+        );
+      return undefined;
+    },
+  });
+  try {
+    await settle();
+    await click(h, '[data-route="organizations"]');
+    const rows = h.document.querySelectorAll(".organization-table tbody tr");
+    assert.equal(rows.length, 2);
+    assert.match(rows[0].textContent, /Legacy organization/);
+    assert.match(rows[0].textContent, /—/);
+    assert.match(rows[1].textContent, /—/);
+    assert.equal(
+      rows[0].querySelector('[data-label="Enabled"]').textContent,
+      "—",
+    );
+    assert.equal(
+      rows[0].querySelector('[data-label="Members"]').textContent,
+      "0",
+    );
+    assert.equal(rows[1].querySelector('[data-label="Name"]').textContent, "—");
+  } finally {
+    h.restore();
+  }
+});
+
 test("native organization list opens the localized detail screen", async () => {
   const h = await harness();
   try {

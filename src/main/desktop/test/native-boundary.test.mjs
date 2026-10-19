@@ -218,6 +218,31 @@ test("native organization create form matches Web control layout", async () => {
   );
 });
 
+test("native organization list styles match Web table columns and row actions", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "src", "native", "native.html"),
+    "utf8",
+  );
+  for (const width of ["15%", "12%", "16%", "14%", "56px"]) {
+    assert.match(
+      source,
+      new RegExp(
+        `\\.organization-table th[^}]*width:\\s*${width.replace("%", "\\%")}`,
+        "s",
+      ),
+    );
+  }
+  assert.match(
+    source,
+    /\.organization-enabled-cell\s*\{[^}]*text-align:\s*center/s,
+  );
+  assert.match(
+    source,
+    /\.organization-row-actions\s*\{[^}]*text-align:\s*center/s,
+  );
+  assert.match(source, /\.organization-row-menu\s*\{[^}]*text-align:\s*left/s);
+});
+
 test("desktop runtime sources do not write directly to console logs", async () => {
   const sourcePaths = [
     path.join(desktopDirectory, "src", "main.ts"),
