@@ -90,5 +90,11 @@ await writeFile(
         await readFile(path.join(sourceDirectory, "roles.mjs"), "utf8")
       ).replaceAll("export function", "function"),
     )
+    .replace(
+      'import { createOrganizationScreens } from "./organizations.mjs";',
+      (
+        await readFile(path.join(sourceDirectory, "organizations.mjs"), "utf8")
+      ).replaceAll("export function", "function"),
+    )
     .replace(messageImport, userMessageSource.replace("export const", "const")),
 );

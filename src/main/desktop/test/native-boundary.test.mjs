@@ -183,6 +183,18 @@ test("native desktop renderer does not depend on the Web component tree", async 
   assert.match(source, /onCallback/);
 });
 
+test("native build bundles the organizations screen into its single renderer module", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "scripts", "build-native-renderer.mjs"),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /import \{ createOrganizationScreens \} from "\.\/organizations\.mjs"/,
+  );
+  assert.match(source, /path\.join\(sourceDirectory, "organizations\.mjs"\)/);
+});
+
 test("desktop runtime sources do not write directly to console logs", async () => {
   const sourcePaths = [
     path.join(desktopDirectory, "src", "main.ts"),
