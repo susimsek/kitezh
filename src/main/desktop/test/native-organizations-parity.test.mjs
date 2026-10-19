@@ -57,6 +57,11 @@ const harness = (options = {}) =>
             new URL(path, "https://test.invalid").searchParams.get("page"),
           ),
         });
+      if (
+        /^\/api\/admin\/organizations\/[1-9]\d*$/.test(path) &&
+        method === "GET"
+      )
+        return { ...organization, id: Number(path.split("/").at(-1)) };
       if (path === "/api/admin/organizations" && method === "POST")
         return { id: 42, ...body };
       return undefined;
@@ -112,6 +117,29 @@ test("native organizations menu respects server access and renders list in Engli
     assert.equal(h.document.documentElement.dataset.theme, "dark");
     h.callbacks.theme("light");
     assert.equal(h.document.documentElement.dataset.theme, "light");
+  } finally {
+    h.restore();
+  }
+});
+
+test("native organization list opens the localized detail screen", async () => {
+  const h = await harness();
+  try {
+    await settle();
+    await click(h, '[data-route="organizations"]');
+    await click(h, '[data-action="organization-open"][data-id="8"]');
+    assert.equal(
+      h.document.defaultView.location.hash,
+      "#/admin/organizations/8",
+    );
+    assert.match(h.document.querySelector("h1").textContent, /Acme/);
+    assert.match(h.document.body.textContent, /Acme Corporation/);
+    assert.match(h.document.body.textContent, /Identity providers/);
+    assert.ok(
+      h.calls.some((call) => call.path === "/api/admin/organizations/8"),
+    );
+    h.callbacks.language("tr");
+    assert.match(h.document.body.textContent, /Kimlik sağlayıcıları/);
   } finally {
     h.restore();
   }

@@ -35,6 +35,12 @@ export const userMessages = {
     adminOrganizationDisplayTooLong: "Use at most 200 characters.",
     adminOrganizationDescriptionTooLong: "Use at most 2,000 characters.",
     adminOrganizationCreated: "Organization created.",
+    adminOrganizationDetailTitle: "Organization details",
+    adminOrganizationDetailSubtitle:
+      "Organization settings and activity summary.",
+    adminOrganizationDetailLoadError: "We could not load this organization.",
+    adminOrganizationClaims: "Claims",
+    adminOrganizationProviders: "Identity providers",
     adminIdentityProvidersSubtitle:
       "Configure external identity providers and their user claims.",
     adminCreateProvider: "Create provider",
@@ -169,6 +175,11 @@ export const userMessages = {
     adminOrganizationDisplayTooLong: "En fazla 200 karakter kullanın.",
     adminOrganizationDescriptionTooLong: "En fazla 2.000 karakter kullanın.",
     adminOrganizationCreated: "Organizasyon oluşturuldu.",
+    adminOrganizationDetailTitle: "Organizasyon ayrıntıları",
+    adminOrganizationDetailSubtitle: "Organizasyon ayarları ve etkinlik özeti.",
+    adminOrganizationDetailLoadError: "Bu organizasyon yüklenemedi.",
+    adminOrganizationClaims: "Claim'ler",
+    adminOrganizationProviders: "Kimlik sağlayıcıları",
     adminIdentityProvidersSubtitle:
       "Harici kimlik sağlayıcılarını ve kullanıcı claim eşlemelerini yapılandırın.",
     adminCreateProvider: "Sağlayıcı oluştur",

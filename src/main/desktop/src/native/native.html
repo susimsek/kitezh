@@ -2034,6 +2034,59 @@
         border-color: #5c636a;
         background: #5c636a;
       }
+      .organization-detail-link {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--primary);
+        font: inherit;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+      }
+      .organization-detail-link:hover {
+        text-decoration: underline;
+      }
+      .organization-detail-card {
+        display: grid;
+        gap: 24px;
+        padding: 24px;
+      }
+      .organization-detail-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px 28px;
+      }
+      .organization-detail-field {
+        display: grid;
+        min-width: 0;
+        gap: 6px;
+      }
+      .organization-detail-field > span,
+      .organization-detail-count > span {
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+      .organization-detail-field > strong {
+        overflow-wrap: anywhere;
+        font-weight: 500;
+      }
+      .organization-detail-counts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+        gap: 12px;
+      }
+      .organization-detail-count {
+        display: grid;
+        gap: 6px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--admin-control-radius);
+        background: var(--surface-muted);
+      }
+      .organization-detail-count > strong {
+        font-size: 22px;
+      }
       .admin-user-avatar {
         width: 5rem;
         height: 5rem;

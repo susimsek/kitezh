@@ -126,11 +126,12 @@ test("group bridge accepts detail, settings, permissions, roles and bounded memb
   );
 });
 
-test("organization bridge permits only the bounded list and exact create routes", async () => {
+test("organization bridge permits bounded lists, exact details, and create routes", async () => {
   const { adapter } = harness(async () => new Response("{}", { status: 200 }));
   for (const [method, path] of [
     ["GET", "/api/admin/organizations?q=acme&page=0&size=20&sort=name,asc"],
     ["GET", "/api/admin/organizations?page=2&size=100&sort=name,desc"],
+    ["GET", "/api/admin/organizations/7"],
     ["POST", "/api/admin/organizations"],
   ])
     assert.equal(
@@ -139,7 +140,14 @@ test("organization bridge permits only the bounded list and exact create routes"
       path,
     );
   for (const [method, path] of [
-    ["GET", "/api/admin/organizations/7"],
+    ["GET", "/api/admin/organizations/0"],
+    ["GET", "/api/admin/organizations/07"],
+    ["GET", "/api/admin/organizations/9007199254740992"],
+    ["GET", "/api/admin/organizations/7?extra=1"],
+    ["GET", "/api/admin/organizations/7/nested"],
+    ["GET", "/api/admin/organizations/7#fragment"],
+    ["PUT", "/api/admin/organizations/7"],
+    ["DELETE", "/api/admin/organizations/7"],
     ["GET", "/api/admin/organizations?size=101"],
     ["GET", "/api/admin/organizations?page=-1"],
     ["GET", "/api/admin/organizations?sort=alias,asc"],

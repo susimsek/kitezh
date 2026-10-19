@@ -53,7 +53,9 @@ export function createOrganizationScreens({
     const path =
       state.route === "organization-create"
         ? "/admin/organizations/new"
-        : "/admin/organizations";
+        : state.route === "organization-detail"
+          ? `/admin/organizations/${data.organizationDetailId}`
+          : "/admin/organizations";
     const query =
       state.route === "organizations" ? `?${searchParams().toString()}` : "";
     const hash = `#${path}${query}`;
@@ -67,10 +69,19 @@ export function createOrganizationScreens({
       window.location.hash.slice(1) || "/",
       "https://native.invalid",
     );
-    if (!/^\/admin\/organizations(?:\/new)?$/.test(url.pathname)) return false;
+    if (!/^\/admin\/organizations(?:\/new|\/[1-9]\d*)?$/.test(url.pathname))
+      return false;
+    const detailMatch = /^\/admin\/organizations\/([1-9]\d*)$/.exec(
+      url.pathname,
+    );
+    const detailId = detailMatch ? Number(detailMatch[1]) : null;
+    if (detailMatch && !Number.isSafeInteger(detailId)) return false;
     state.route = url.pathname.endsWith("/new")
       ? "organization-create"
-      : "organizations";
+      : detailMatch
+        ? "organization-detail"
+        : "organizations";
+    if (detailId !== null) data.organizationDetailId = detailId;
     const page = Number(url.searchParams.get("page") ?? 0);
     const size = Number(url.searchParams.get("size") ?? 10);
     const sort = url.searchParams.get("sort");
@@ -100,6 +111,23 @@ export function createOrganizationScreens({
   }
 
   async function load() {
+    if (state.route === "organization-detail") {
+      const id = data.organizationDetailId;
+      if (!Number.isSafeInteger(id) || id < 1) {
+        data.organizationDetailLoadError = true;
+        return;
+      }
+      try {
+        data.organizationDetail = await request(
+          `/api/admin/organizations/${id}`,
+        );
+        data.organizationDetailLoadError = false;
+      } catch {
+        data.organizationDetail = null;
+        data.organizationDetailLoadError = true;
+      }
+      return;
+    }
     if (state.route !== "organizations") return;
     const currentGeneration = ++generation;
     const route = state.route;
@@ -135,7 +163,7 @@ export function createOrganizationScreens({
     const rows = page.content
       .map((organization) => {
         const enabled = organization.enabled === true;
-        return `<tr><td data-label="${esc(text("adminOrganizationName"))}">${esc(organization.displayName || organization.name || "—")}</td><td data-label="${esc(text("adminOrganizationAlias"))}">${esc(organization.alias || "—")}</td><td data-label="${esc(text("adminOrganizationMembers"))}">${Number.isSafeInteger(organization.memberCount) ? organization.memberCount : 0}</td><td data-label="${esc(text("adminOrganizationDomains"))}">${Number.isSafeInteger(organization.domainCount) ? organization.domainCount : 0}</td><td data-label="${esc(text("adminOrganizationGroups"))}">${Number.isSafeInteger(organization.groupCount) ? organization.groupCount : 0}</td><td data-label="${esc(text("adminOrganizationStatus"))}"><span class="admin-user-status ${enabled ? "is-enabled" : "is-disabled"}">${esc(text(enabled ? "adminOrganizationEnabled" : "adminOrganizationDisabled"))}</span></td></tr>`;
+        return `<tr><td data-label="${esc(text("adminOrganizationName"))}"><button type="button" class="organization-detail-link" data-action="organization-open" data-id="${esc(organization.id)}" ${blocked() ? "disabled" : ""}>${esc(organization.displayName || organization.name || "—")}</button></td><td data-label="${esc(text("adminOrganizationAlias"))}">${esc(organization.alias || "—")}</td><td data-label="${esc(text("adminOrganizationMembers"))}">${Number.isSafeInteger(organization.memberCount) ? organization.memberCount : 0}</td><td data-label="${esc(text("adminOrganizationDomains"))}">${Number.isSafeInteger(organization.domainCount) ? organization.domainCount : 0}</td><td data-label="${esc(text("adminOrganizationGroups"))}">${Number.isSafeInteger(organization.groupCount) ? organization.groupCount : 0}</td><td data-label="${esc(text("adminOrganizationStatus"))}"><span class="admin-user-status ${enabled ? "is-enabled" : "is-disabled"}">${esc(text(enabled ? "adminOrganizationEnabled" : "adminOrganizationDisabled"))}</span></td></tr>`;
       })
       .join("");
     const control = (target, key, label, disabled) =>
@@ -168,7 +196,22 @@ export function createOrganizationScreens({
   }
 
   function breadcrumb() {
+    if (state.route === "organization-detail") {
+      const organization = data.organizationDetail;
+      return `<nav class="admin-user-detail-breadcrumb organization-breadcrumb" aria-label="${esc(text("adminOrganizationBreadcrumb"))}"><a href="#/admin/organizations" data-action="organization-cancel">${esc(text("adminOrganizationTitle"))}</a><span aria-hidden="true">/</span><span aria-current="page">${esc(organization?.displayName || organization?.name || text("adminOrganizationDetailTitle"))}</span></nav>`;
+    }
     return `<nav class="admin-user-detail-breadcrumb organization-breadcrumb" aria-label="${esc(text("adminOrganizationBreadcrumb"))}"><a href="#/admin/organizations" data-action="organization-cancel">${esc(text("adminOrganizationTitle"))}</a><span aria-hidden="true">/</span><span aria-current="page">${esc(text("adminOrganizationCreateTitle"))}</span></nav>`;
+  }
+
+  function detail() {
+    const organization = data.organizationDetail;
+    if (!organization || data.organizationDetailLoadError)
+      return `${breadcrumb()}<section class="card organization-detail-card"><p role="alert">${esc(text("adminOrganizationDetailLoadError"))}</p>${button(text("adminRetry"), { action: "organization-retry", busy: state.busy === "organization-retry", disabled: blocked(), variant: "secondary", icon: "reset" })}</section>`;
+    const value = (label, content) =>
+      `<div class="organization-detail-field"><span>${esc(label)}</span><strong>${esc(content || "—")}</strong></div>`;
+    const count = (label, number) =>
+      `<div class="organization-detail-count"><span>${esc(label)}</span><strong>${Number.isSafeInteger(number) ? number : 0}</strong></div>`;
+    return `${breadcrumb()}<section class="card organization-detail-card"><div class="organization-detail-fields">${value(text("adminOrganizationAlias"), organization.alias)}${value(text("adminOrganizationName"), organization.name)}${value(text("adminOrganizationDisplayName"), organization.displayName)}${value(text("adminOrganizationDescription"), organization.description)}${value(text("adminOrganizationStatus"), text(organization.enabled ? "adminOrganizationEnabled" : "adminOrganizationDisabled"))}</div><div class="organization-detail-counts">${count(text("adminOrganizationMembers"), organization.memberCount)}${count(text("adminOrganizationDomains"), organization.domainCount)}${count(text("adminOrganizationGroups"), organization.groupCount)}${count(text("adminOrganizationClaims"), organization.claimCount)}${count(text("adminOrganizationProviders"), organization.identityProviderCount)}</div></section>`;
   }
 
   async function reload(busy, keepContent = false) {
@@ -237,7 +280,10 @@ export function createOrganizationScreens({
       });
       if (!Number.isSafeInteger(response?.id) || response.id < 1)
         throw new Error("Invalid organization create response");
-      state.route = "organizations";
+      state.route = "organization-detail";
+      data.organizationDetailId = response.id;
+      data.organizationDetail = response;
+      data.organizationDetailLoadError = false;
       data.organizationQuery = "";
       data.organizationSearchDraft = "";
       data.organizationPage = 0;
@@ -259,7 +305,18 @@ export function createOrganizationScreens({
 
   async function handle(name, element) {
     if (name === "create-organization") await openCreate();
-    else if (name === "organization-cancel") {
+    else if (name === "organization-open") {
+      if (blocked()) return;
+      const id = Number(element.dataset.id);
+      if (!Number.isSafeInteger(id) || id < 1) return;
+      data.organizationDetailId = id;
+      data.organizationDetail = null;
+      data.organizationDetailLoadError = false;
+      state.route = "organization-detail";
+      state.notice = null;
+      syncUrl();
+      await reload("organization-detail-route");
+    } else if (name === "organization-cancel") {
       if (blocked()) return;
       state.route = "organizations";
       state.notice = null;
@@ -406,5 +463,15 @@ export function createOrganizationScreens({
     }
   }
 
-  return { load, list, create, breadcrumb, handle, bind, restoreUrl, syncUrl };
+  return {
+    load,
+    list,
+    create,
+    detail,
+    breadcrumb,
+    handle,
+    bind,
+    restoreUrl,
+    syncUrl,
+  };
 }

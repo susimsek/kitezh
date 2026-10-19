@@ -96,12 +96,17 @@ function isAllowedApiPath(
     if (path.startsWith("/api/admin/organizations")) {
       try {
         const url = new URL(path, "https://desktop.invalid");
-        if (
-          url.origin !== "https://desktop.invalid" ||
-          url.hash ||
-          url.pathname !== "/api/admin/organizations"
-        )
-          return false;
+        if (url.origin !== "https://desktop.invalid" || url.hash) return false;
+        const detailMatch = /^\/api\/admin\/organizations\/([1-9]\d*)$/.exec(
+          url.pathname,
+        );
+        if (detailMatch)
+          return (
+            method === "GET" &&
+            Number.isSafeInteger(Number(detailMatch[1])) &&
+            url.search === ""
+          );
+        if (url.pathname !== "/api/admin/organizations") return false;
         if (method === "POST") return !url.search;
         if (method !== "GET") return false;
         const keys = [...url.searchParams.keys()];

@@ -628,6 +628,13 @@ function adminRouteAllowed(route) {
   if (route === "group-detail") return access.queryGroups || access.viewGroups;
   if (route === "organization-create")
     return access.manageOrganizations || access.isAdmin;
+  if (route === "organization-detail")
+    return (
+      access.queryOrganizations ||
+      access.viewOrganizations ||
+      access.manageOrganizations ||
+      access.isAdmin
+    );
   if (["client-scope-create"].includes(route)) return access.manageClients;
   if (route === "client-scope-detail")
     return access.queryClients || access.viewClients || access.manageClients;
@@ -836,7 +843,8 @@ function navButton(route, label, icon) {
       ["client-detail", "client-create"].includes(state.route)) ||
     (route === "groups" &&
       ["group-detail", "group-create"].includes(state.route)) ||
-    (route === "organizations" && state.route === "organization-create");
+    (route === "organizations" &&
+      ["organization-create", "organization-detail"].includes(state.route));
   return `<button type="button" data-route="${route}" aria-current="${current ? "page" : "false"}" ${busy ? 'disabled aria-busy="true"' : ""}>${spin(busy)}${actionIcon(icon)}${escapeHtml(label)}</button>`;
 }
 
@@ -855,6 +863,10 @@ function routeTitle() {
       "group-detail": state.data.groupDetail?.name ?? text("adminGroups"),
       organizations: text("adminOrganizationTitle"),
       "organization-create": text("adminOrganizationCreateTitle"),
+      "organization-detail":
+        state.data.organizationDetail?.displayName ||
+        state.data.organizationDetail?.name ||
+        text("adminOrganizationDetailTitle"),
       "client-scopes": text("adminClientScopes"),
       "client-scope-create": text("adminCreateClientScope"),
       "client-scope-detail":
@@ -912,6 +924,9 @@ function routeDescription() {
       "group-detail": groupScreens.subtitle(),
       organizations: text("adminOrganizationSubtitle"),
       "organization-create": text("adminOrganizationCreateSubtitle"),
+      "organization-detail": state.data.organizationDetail?.alias
+        ? `${text("adminOrganizationAlias")}: ${state.data.organizationDetail.alias}`
+        : text("adminOrganizationDetailSubtitle"),
       "client-scopes": text("adminClientScopesDescription"),
       "client-scope-detail":
         state.data.clientScopeDetail?.displayName ||
@@ -980,6 +995,8 @@ function adminContent() {
   if (state.route === "organizations") return organizationScreens.list();
   if (state.route === "organization-create")
     return organizationScreens.create();
+  if (state.route === "organization-detail")
+    return organizationScreens.detail();
   if (state.route === "client-scopes") return adminClientScopesContent();
   if (state.route === "client-scope-detail")
     return adminClientScopeDetailContent();
@@ -5892,7 +5909,9 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
       await groupScreens.load();
     if (
       state.console === "admin" &&
-      ["organizations", "organization-create"].includes(state.route)
+      ["organizations", "organization-create", "organization-detail"].includes(
+        state.route,
+      )
     )
       await organizationScreens.load();
     if (state.console === "admin" && state.route === "client-scopes") {

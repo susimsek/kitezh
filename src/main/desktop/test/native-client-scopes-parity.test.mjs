@@ -59,6 +59,9 @@ async function fixture({ manage = true, hash = "", response } = {}) {
             queryGroups: true,
             viewGroups: true,
             manageGroups: true,
+            queryOrganizations: true,
+            viewOrganizations: true,
+            manageOrganizations: true,
             queryClients: true,
             viewClients: true,
             manageClients: manage,
@@ -211,11 +214,7 @@ test("read-only viewers see Details only and can open a built-in scope by keyboa
       .querySelector('[data-action="admin-client-scope-mappers-toggle"]')
       .click();
     await settle();
-    assert.ok(
-      document.querySelector(
-        '[aria-label="Protocol mapper’lar"]',
-      ),
-    );
+    assert.ok(document.querySelector('[aria-label="Protocol mapper’lar"]'));
     assert.equal(
       document.querySelector(
         '[data-action="admin-client-scope-mapper-create"]',
