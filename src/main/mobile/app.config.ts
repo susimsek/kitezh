@@ -1,5 +1,9 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
-import { withAppBuildGradle, withDangerousMod } from "expo/config-plugins";
+import {
+  withAppBuildGradle,
+  withDangerousMod,
+  withProjectBuildGradle,
+} from "expo/config-plugins";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -61,6 +65,21 @@ function withRecaptchaKotlinPlugin(config: ExpoConfig): ExpoConfig {
   }]);
 }
 
+function withKotlinGradlePluginVersion(config: ExpoConfig): ExpoConfig {
+  return withProjectBuildGradle(config, (modConfig) => {
+    const plugin = "org.jetbrains.kotlin:kotlin-gradle-plugin";
+    const versionedPlugin = `${plugin}:2.3.0`;
+    modConfig.modResults.contents = modConfig.modResults.contents.replace(
+      /classpath\(['"]org\.jetbrains\.kotlin:kotlin-gradle-plugin['"]\)/,
+      `classpath('${versionedPlugin}')`,
+    );
+    if (!modConfig.modResults.contents.includes(versionedPlugin)) {
+      throw new Error("Could not set the Kotlin Gradle plugin version to 2.3.0.");
+    }
+    return modConfig;
+  });
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "";
   const iosUrlScheme = googleIosUrlScheme(iosClientId);
@@ -73,7 +92,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   );
   plugins.push([
     "expo-build-properties",
-    { ios: { useFrameworks: "static" } },
+    { android: { kotlinVersion: "2.3.0" }, ios: { useFrameworks: "static" } },
   ]);
   if (iosUrlScheme) {
     plugins.push([
@@ -82,6 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ]);
   }
   return withRecaptchaKotlinPlugin(
-    withAndroidCoreLibraryDesugaring({ ...config, plugins } as ExpoConfig),
+    withKotlinGradlePluginVersion(
+      withAndroidCoreLibraryDesugaring({ ...config, plugins } as ExpoConfig),
+    ),
   );
 };

@@ -22,6 +22,9 @@ const iosDomains = config.ios?.associatedDomains ?? [];
 const splashPlugin = config.plugins?.find(
   ([pluginName]) => pluginName === "expo-splash-screen",
 );
+const buildPropertiesPlugin = config.plugins?.find(
+  ([pluginName]) => pluginName === "expo-build-properties",
+);
 const requiredRoutes = new Set([
   "oauth/callback",
   "logout/callback",
@@ -113,6 +116,7 @@ if (
   !iosDomains.includes("applinks:kitezh.onrender.com") ||
   !iosDomains.includes("webcredentials:kitezh.onrender.com") ||
   new Set(iosDomains).size !== iosDomains.length ||
+  buildPropertiesPlugin?.[1]?.android?.kotlinVersion !== "2.3.0" ||
   !validAppLinkFilters ||
   !validCustomSchemeFilters ||
   requiredRoutes.size !== configuredRoutes.size ||
@@ -128,5 +132,5 @@ if (
 }
 
 console.log(
-  "Expo Kitezh branding, custom schemes, and verified Android/iOS app links are configured.",
+  "Expo Kitezh branding, Kotlin compatibility, custom schemes, and verified Android/iOS app links are configured.",
 );
