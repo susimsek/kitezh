@@ -141,6 +141,14 @@ test("organization creation validates locally and submits only the existing DTO 
       ),
     );
     h.callbacks.language("tr");
+    assert.equal(
+      h.document.querySelector('label[for="organization-alias"]').textContent,
+      "Takma ad",
+    );
+    assert.equal(
+      h.document.querySelector('label[for="organization-name"]').textContent,
+      "Ad",
+    );
     assert.match(
       h.document.querySelector(".organization-cancel-button").textContent,
       /İptal/,
