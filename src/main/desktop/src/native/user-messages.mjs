@@ -62,6 +62,7 @@ export const userMessages = {
     adminOrganizationProviderAlias: "Provider alias",
     adminOrganizationLinkProvider: "Link provider",
     adminOrganizationActions: "Actions",
+    adminOrganizationSettings: "Settings",
     adminOrganizationOperationError:
       "The organization change could not be completed.",
     adminOrganizationUserIdInvalid: "Enter a valid positive user ID.",
@@ -232,6 +233,7 @@ export const userMessages = {
     adminOrganizationProviderAlias: "Sağlayıcı takma adı",
     adminOrganizationLinkProvider: "Sağlayıcı bağla",
     adminOrganizationActions: "İşlemler",
+    adminOrganizationSettings: "Ayarlar",
     adminOrganizationOperationError: "Organizasyon işlemi tamamlanamadı.",
     adminOrganizationUserIdInvalid:
       "Geçerli bir pozitif kullanıcı kimliği girin.",

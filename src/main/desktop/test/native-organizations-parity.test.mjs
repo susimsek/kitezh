@@ -109,6 +109,31 @@ test("native organizations menu respects server access and renders list in Engli
     assert.match(h.document.querySelector("h1").textContent, /Organizations/);
     assert.match(h.document.body.textContent, /Acme/);
     assert.match(h.document.body.textContent, /12/);
+    assert.deepEqual(
+      [...h.document.querySelectorAll(".organization-table thead th")].map(
+        (heading) => heading.textContent.trim(),
+      ),
+      ["Name", "Alias", "Members", "Domains", "Groups", "Enabled", "Actions"],
+    );
+    assert.equal(
+      h.document.querySelector('.organization-table [data-label="Enabled"]')
+        .textContent,
+      "✓",
+    );
+    assert.ok(
+      h.document.querySelector(
+        '.organization-row-menu [data-action="organization-open"][data-id="8"]',
+      ),
+    );
+    const paginationControls = h.document.querySelector(
+      ".organization-pagination .admin-pagination-controls",
+    );
+    assert.equal(paginationControls.children[0].tagName, "LABEL");
+    assert.equal(paginationControls.children[1].id, "organization-size");
+    assert.equal(
+      paginationControls.children[2].dataset.action,
+      "organization-page",
+    );
     assert.match(
       h.document.querySelector("#organization-sort").value,
       /name,asc/,
@@ -127,6 +152,32 @@ test("native organizations menu respects server access and renders list in Engli
     assert.equal(h.document.documentElement.dataset.theme, "dark");
     h.callbacks.theme("light");
     assert.equal(h.document.documentElement.dataset.theme, "light");
+  } finally {
+    h.restore();
+  }
+});
+
+test("organization row settings menu is localized and opens its detail page", async () => {
+  const h = await harness();
+  try {
+    await settle();
+    await click(h, '[data-route="organizations"]');
+    const settings = h.document.querySelector(
+      '.organization-row-menu [data-action="organization-open"][data-id="8"]',
+    );
+    assert.equal(settings.textContent.trim(), "Settings");
+    h.callbacks.language("tr");
+    assert.equal(
+      h.document
+        .querySelector(".organization-row-menu button")
+        .textContent.trim(),
+      "Ayarlar",
+    );
+    await click(h, ".organization-row-menu button");
+    assert.equal(
+      h.document.defaultView.location.hash,
+      "#/admin/organizations/8",
+    );
   } finally {
     h.restore();
   }
