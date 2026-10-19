@@ -167,6 +167,10 @@ export function createOrganizationScreens({
     return `<section class="card organization-create-card"><form data-form="organization-create" novalidate><div class="organization-create-fields">${field("alias", "adminOrganizationAlias", "text", 100)}${field("name", "adminOrganizationName", "text", 200)}${field("displayName", "adminOrganizationDisplayName", "text", 200)}<div class="field"><label for="organization-description">${esc(text("adminOrganizationDescription"))}</label><textarea id="organization-description" name="description" maxlength="2000" aria-invalid="${Boolean(errors.description)}" aria-describedby="organization-description-error" ${disabled ? "disabled" : ""}>${esc(draft.description ?? "")}</textarea><div class="field-error" id="organization-description-error" role="alert">${esc(errors.description ?? "")}</div></div></div><label class="settings-row organization-enabled"><input name="enabled" type="checkbox" ${draft.enabled ? "checked" : ""} ${disabled ? "disabled" : ""}/><span class="settings-row-control" aria-hidden="true"></span><span>${esc(text("adminOrganizationEnabled"))}</span></label><div class="actions">${button(text("cancel"), { action: "organization-cancel", icon: "cancel", variant: "secondary", disabled: Boolean(state.busy) })}${button(text("adminOrganizationCreate"), { type: "submit", icon: "add", busy: state.busy === "organization-create", disabled })}</div></form></section>`;
   }
 
+  function breadcrumb() {
+    return `<nav class="admin-user-detail-breadcrumb organization-breadcrumb" aria-label="${esc(text("adminOrganizationBreadcrumb"))}"><a href="#/admin/organizations" data-action="organization-cancel">${esc(text("adminOrganizationTitle"))}</a><span aria-hidden="true">/</span><span aria-current="page">${esc(text("adminOrganizationCreateTitle"))}</span></nav>`;
+  }
+
   async function reload(busy, keepContent = false) {
     if (blocked()) return;
     state.busy = busy;
@@ -402,5 +406,5 @@ export function createOrganizationScreens({
     }
   }
 
-  return { load, list, create, handle, bind, restoreUrl, syncUrl };
+  return { load, list, create, breadcrumb, handle, bind, restoreUrl, syncUrl };
 }

@@ -125,6 +125,16 @@ test("organization creation validates locally and submits only the existing DTO 
     await click(h, '[data-action="create-organization"]');
     let form = h.document.querySelector('[data-form="organization-create"]');
     assert.ok(form);
+    assert.equal(
+      h.document.defaultView.location.hash,
+      "#/admin/organizations/new",
+    );
+    assert.ok(h.document.querySelector(".organization-breadcrumb"));
+    assert.match(
+      h.document.querySelector("h1").textContent,
+      /Create organization/,
+    );
+    assert.ok(h.document.getElementById("organization-description"));
     h.document.getElementById("organization-alias").value = "Bad Alias";
     h.document.getElementById("organization-name").value = "Acme";
     form.dispatchEvent(

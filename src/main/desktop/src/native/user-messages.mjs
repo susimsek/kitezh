@@ -3,6 +3,7 @@ export const userMessages = {
   en: {
     adminNavOrganizations: "Organizations",
     adminOrganizationTitle: "Organizations",
+    adminOrganizationBreadcrumb: "Organization navigation",
     adminOrganizationSubtitle:
       "Manage organization members, domains, invitations, groups, providers and claims.",
     adminOrganizationCreate: "Create organization",
@@ -134,6 +135,7 @@ export const userMessages = {
   tr: {
     adminNavOrganizations: "Organizasyonlar",
     adminOrganizationTitle: "Organizasyonlar",
+    adminOrganizationBreadcrumb: "Organizasyon gezintisi",
     adminOrganizationSubtitle:
       "Organizasyon üyelerini, alan adlarını, davetleri, grupları, sağlayıcıları ve claim'leri yönetin.",
     adminOrganizationCreate: "Organizasyon oluştur",
