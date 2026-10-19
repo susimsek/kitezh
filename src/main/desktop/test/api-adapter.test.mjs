@@ -245,6 +245,18 @@ test("organization bridge permits bounded collection reads and only exact organi
     }),
     /not allowed/,
   );
+  let coercions = 0;
+  const malformedPath = {
+    startsWith: () => true,
+    [Symbol.toPrimitive]() {
+      coercions += 1;
+      throw new Error(`invalid path value ${coercions}`);
+    },
+  };
+  await assert.rejects(
+    adapter.request({ console: "admin", path: malformedPath }),
+    /not allowed/,
+  );
 });
 
 test("role membership bridge accepts exact bounded contracts and rejects malformed paths, parameters and bodies", async () => {
