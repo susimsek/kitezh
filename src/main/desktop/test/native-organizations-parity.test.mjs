@@ -134,7 +134,19 @@ test("organization creation validates locally and submits only the existing DTO 
       h.document.querySelector("h1").textContent,
       /Create organization/,
     );
-    assert.ok(h.document.getElementById("organization-description"));
+    assert.equal(h.document.getElementById("organization-description").rows, 3);
+    assert.ok(
+      h.document.querySelector(
+        "label.organization-enabled.admin-user-detail-switch",
+      ),
+    );
+    h.callbacks.language("tr");
+    assert.match(
+      h.document.querySelector(".organization-cancel-button").textContent,
+      /İptal/,
+    );
+    h.callbacks.language("en");
+    form = h.document.querySelector('[data-form="organization-create"]');
     h.document.getElementById("organization-alias").value = "Bad Alias";
     h.document.getElementById("organization-name").value = "Acme";
     form.dispatchEvent(

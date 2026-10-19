@@ -195,6 +195,25 @@ test("native build bundles the organizations screen into its single renderer mod
   assert.match(source, /path\.join\(sourceDirectory, "organizations\.mjs"\)/);
 });
 
+test("native organization create form matches Web control layout", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "src", "native", "native.html"),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /\.organization-create-card \.actions\s*\{\s*justify-content:\s*flex-end/s,
+  );
+  assert.match(
+    source,
+    /\.organization-create-card textarea\s*\{\s*min-height:\s*104px/s,
+  );
+  assert.match(
+    source,
+    /\.organization-cancel-button\s*\{\s*border-color:\s*#6c757d/s,
+  );
+});
+
 test("desktop runtime sources do not write directly to console logs", async () => {
   const sourcePaths = [
     path.join(desktopDirectory, "src", "main.ts"),
