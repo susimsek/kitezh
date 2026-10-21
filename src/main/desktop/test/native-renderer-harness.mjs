@@ -486,7 +486,7 @@ async function renderConsole(consoleName = "account", options = {}) {
   }
 
   rendererInstance += 1;
-  await import(
+  const renderer = await import(
     `${pathToFileURL(rendererPath).href}?coverage-instance=${rendererInstance}`
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -495,6 +495,7 @@ async function renderConsole(consoleName = "account", options = {}) {
     api,
     calls,
     callbacks,
+    renderer,
     setResponse,
     document: dom.window.document,
     dom,

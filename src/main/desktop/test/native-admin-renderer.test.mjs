@@ -5,6 +5,1177 @@ import {
   renderConsole,
   settle,
 } from "./native-renderer-harness.mjs";
+
+test("native Authentication mirrors policy tabs and saves through the existing settings API", async () => {
+  const harness = await renderConsole("admin", {
+    messages: {
+      en: {
+        adminFlowAliasPatternError:
+          "Start with a lowercase letter or number; use lowercase letters, numbers, dots, underscores or hyphens.",
+        adminFlowNameRequired: "Enter a name.",
+        adminFlowList: "Admin Top-level flows",
+        adminFlowSettings: "Admin Flow settings",
+        adminFlowGraph: "Flow graph",
+        adminExecutions: "Admin Executions",
+        adminFlowBindings: "Admin Bindings",
+        adminPasswordPolicy: "Admin Password policy",
+        adminOtpPolicy: "Admin OTP policy",
+        adminWebAuthnPolicy: "Admin WebAuthn policy",
+        adminSaveFlow: "Save flow",
+        adminUnbind: "Remove binding",
+      },
+    },
+  });
+  const defaults = {
+    passwordMinimumLength: 12,
+    passwordMaximumLength: 128,
+    passwordMinimumUppercase: 1,
+    passwordMinimumLowercase: 1,
+    passwordMinimumDigits: 1,
+    passwordMinimumSpecialCharacters: 1,
+    passwordRejectUsername: true,
+    passwordRejectEmail: true,
+    passwordRejectCommonPasswords: true,
+    passwordHistorySize: 5,
+    passwordExpirationDays: 90,
+    passwordCommonPasswords: "password,123456",
+    otpEnabled: false,
+    otpRequired: false,
+    otpIssuer: "Kitezh",
+    otpAlgorithm: "SHA1",
+    otpDigits: 6,
+    otpPeriodSeconds: 30,
+    otpLookAheadWindow: 1,
+    otpCodeReusable: false,
+    otpAddRecoveryCodes: false,
+    recoveryCodeWarningThreshold: 2,
+    webauthnMediation: "none",
+    webauthnPolicy: {
+      rpName: "Kitezh",
+      rpId: "",
+      signatureAlgorithms: "ES256,RS256,EdDSA",
+      attestation: "none",
+      authenticatorAttachment: "any",
+      residentKey: "preferred",
+      userVerification: "preferred",
+      timeoutSeconds: 300,
+      avoidSameAuthenticator: true,
+      acceptableAaguids: "",
+    },
+    webauthnPasswordlessPolicy: {
+      rpName: "Kitezh",
+      rpId: "",
+      signatureAlgorithms: "ES256,RS256,EdDSA",
+      attestation: "none",
+      authenticatorAttachment: "any",
+      residentKey: "required",
+      userVerification: "required",
+      timeoutSeconds: 300,
+      avoidSameAuthenticator: true,
+      acceptableAaguids: "",
+    },
+  };
+  harness.setResponse("/api/admin/settings/login", "GET", () => defaults);
+  const flow = {
+    id: 9,
+    alias: "browser",
+    name: "Browser flow",
+    description: "Interactive login",
+    flowType: "BASIC",
+    requirement: null,
+    priority: 0,
+    builtIn: false,
+    topLevel: true,
+  };
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=0&size=20&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 1, totalPages: 1, number: 0 }),
+  );
+  harness.setResponse("/api/admin/authentication/bindings", "GET", () => [
+    { bindingType: "BROWSER", flowId: 9, flowName: "Browser flow" },
+  ]);
+  harness.setResponse(
+    "/api/admin/authentication/execution-providers",
+    "GET",
+    () => ["password-form"],
+  );
+  harness.setResponse("/api/admin/authentication/flows/9", "GET", () => ({
+    flow,
+    executions: [],
+    subFlows: [],
+    nodes: [],
+  }));
+  harness.setResponse(
+    "/api/admin/authentication/bindings/BROWSER",
+    "DELETE",
+    () => ({
+      bindingType: "BROWSER",
+      flowId: null,
+      flowName: null,
+      flowAlias: null,
+    }),
+  );
+  try {
+    const { calls, document, renderer } = harness;
+    Object.defineProperty(document.defaultView, "confirm", {
+      configurable: true,
+      value: () => true,
+    });
+    for (
+      let turn = 0;
+      turn < 40 && !document.querySelector('[data-route="authentication"]');
+      turn += 1
+    )
+      await settle();
+    document.querySelector('[data-route="authentication"]').click();
+    await settle();
+    assert.equal(
+      document.querySelectorAll(
+        '[data-action="admin-authentication-policy-tab"]',
+      ).length,
+      3,
+    );
+    assert.deepEqual(
+      [
+        ...document.querySelectorAll(
+          '[data-action="admin-authentication-policy-tab"]',
+        ),
+      ].map((tab) => tab.textContent.trim()),
+      ["Password policy", "OTP policy", "WebAuthn policy"],
+    );
+    assert.ok(
+      document.querySelector(
+        '[data-form="admin-authentication-policy"] [name="passwordMaximumLength"]',
+      ),
+    );
+    assert.equal(
+      document.querySelectorAll(
+        '[data-form="admin-authentication-policy"] input[role="switch"]',
+      ).length,
+      3,
+    );
+    assert.equal(
+      document.querySelectorAll(
+        '[data-form="admin-authentication-policy"] input[type="checkbox"]:not([role="switch"])',
+      ).length,
+      0,
+    );
+    assert.ok(
+      document.querySelector(
+        '[data-form="admin-authentication-policy"] input[role="switch"] + .admin-user-detail-switch-control',
+      ),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-authentication-policy-tab"][data-tab="otp-policy"]',
+      )
+      .click();
+    await settle();
+    assert.equal(
+      document.querySelectorAll(
+        '[data-form="admin-authentication-policy"] input[role="switch"]',
+      ).length,
+      4,
+    );
+    assert.ok(
+      document.querySelector(
+        '[data-form="admin-authentication-policy"] [name="otpRecoveryCodes"]',
+      ) === null,
+    );
+    assert.ok(
+      document.querySelector(
+        '[data-form="admin-authentication-policy"] [name="otpAddRecoveryCodes"]',
+      ),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-authentication-policy-tab"][data-tab="webauthn"]',
+      )
+      .click();
+    await settle();
+    assert.equal(
+      document.querySelectorAll(
+        '[data-form="admin-authentication-policy"] input[role="switch"]',
+      ).length,
+      2,
+    );
+    assert.ok(document.querySelector('[name="webauthnPolicy.rpId"]'));
+    assert.ok(
+      document.querySelector(
+        '[name="webauthnPasswordlessPolicy.userVerification"]',
+      ),
+    );
+    assert.equal(
+      document.querySelector('[name="webauthnPolicy.residentKey"]').value,
+      "preferred",
+    );
+    assert.equal(
+      document.querySelector(
+        '[name="webauthnPasswordlessPolicy.userVerification"]',
+      ).value,
+      "required",
+    );
+    const webauthnSwitch = document.querySelector(
+      '[name="webauthnPolicy.avoidSameAuthenticator"]',
+    );
+    webauthnSwitch.checked = false;
+    webauthnSwitch.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-authentication-tab"][data-tab="flows"]',
+      )
+      .click();
+    await settle();
+    assert.equal(
+      document
+        .querySelector(
+          '[data-action="admin-authentication-tab"][data-tab="flows"]',
+        )
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    assert.ok(
+      document.querySelector(
+        '[data-action="admin-auth-flow-tab"][data-tab="flow-list"]',
+      ),
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-action="admin-auth-flow-tab"]')].map(
+        (tab) => tab.dataset.tab,
+      ),
+      ["flow-list", "settings", "graph", "executions", "bindings"],
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-action="admin-auth-flow-tab"]')].map(
+        (tab) => tab.textContent.trim(),
+      ),
+      [
+        "Top-level flows",
+        "Flow settings",
+        "Flow graph",
+        "Executions",
+        "Bindings",
+      ],
+    );
+    assert.ok(
+      document.querySelector(
+        '.admin-auth-page-header [data-action="admin-auth-flow-create"]',
+      ),
+    );
+    assert.equal(
+      document.querySelectorAll('[data-action="admin-auth-flow-create"]')
+        .length,
+      1,
+    );
+    const flowCreateButton = document.querySelector(
+      '[data-action="admin-auth-flow-create"]',
+    );
+    flowCreateButton.click();
+    await settle();
+    const createForm = document.querySelector(
+      '[data-form="admin-auth-flow"][data-kind="create"]',
+    );
+    assert.equal(createForm.elements.namedItem("priority").value, "10");
+    createForm.elements.namedItem("alias").value = "Invalid Alias";
+    createForm.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.match(
+      createForm
+        .querySelector('[name="alias"]')
+        .closest(".field")
+        .querySelector(".field-error").textContent,
+      /lowercase/i,
+    );
+    assert.match(
+      createForm
+        .querySelector('[name="name"]')
+        .closest(".field")
+        .querySelector(".field-error").textContent,
+      /name/i,
+    );
+    assert.equal(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/authentication/flows" && method === "POST",
+      ),
+      false,
+    );
+    createForm.querySelector('[data-action="admin-auth-flow-cancel"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="flow-list"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-select"][data-id="9"]')
+      .click();
+    await settle();
+    assert.deepEqual(
+      [...document.querySelectorAll('[data-action="admin-auth-flow-tab"]')].map(
+        (tab) => tab.dataset.tab,
+      ),
+      ["flow-list", "settings", "graph", "executions", "bindings"],
+    );
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="settings"]')
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector('[data-form="admin-auth-flow"][data-kind="edit"]'),
+    );
+    assert.equal(
+      document.querySelector(".admin-auth-flow-detail-heading h2").textContent,
+      "Flow graph",
+    );
+    assert.equal(
+      document
+        .querySelector('[data-form="admin-auth-flow"] [type="submit"]')
+        .textContent.trim(),
+      "Save flow",
+    );
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="graph"]')
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector('[data-action="admin-auth-flow-sub-create"]'),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-auth-flow-tab"][data-tab="executions"]',
+      )
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector('[data-action="admin-auth-execution-create"]'),
+    );
+    document
+      .querySelector('[data-action="admin-auth-execution-create"]')
+      .click();
+    await settle();
+    const executionForm = document.querySelector(
+      '[data-form="admin-auth-execution"]',
+    );
+    assert.equal(executionForm.elements.namedItem("priority").value, "10");
+    assert.ok(executionForm.elements.namedItem("authenticatorReference"));
+    assert.ok(executionForm.elements.namedItem("configuration"));
+    executionForm
+      .querySelector('[data-action="admin-auth-flow-cancel"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="bindings"]')
+      .click();
+    await settle();
+    const bindingSelect = document.querySelector(
+      '[data-auth-binding-select="true"][data-binding="BROWSER"]',
+    );
+    assert.ok(document.querySelector(".admin-auth-binding-table"));
+    assert.equal(bindingSelect.value, "9");
+    bindingSelect.value = "";
+    bindingSelect.dispatchEvent(new document.defaultView.Event("change"));
+    assert.match(
+      document.querySelector('[data-action="admin-auth-binding-save"]')
+        .textContent,
+      /Remove binding/,
+    );
+    bindingSelect.value = "9";
+    bindingSelect.dispatchEvent(new document.defaultView.Event("change"));
+    bindingSelect.value = "";
+    bindingSelect.dispatchEvent(new document.defaultView.Event("change"));
+    document.querySelector('[data-action="admin-auth-binding-save"]').click();
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/authentication/bindings/BROWSER" &&
+          method === "DELETE",
+      ),
+    );
+    document
+      .querySelector(
+        '[data-action="admin-authentication-tab"][data-tab="policies"]',
+      )
+      .click();
+    await settle();
+    document
+      .querySelector(
+        '[data-action="admin-authentication-policy-tab"][data-tab="otp-policy"]',
+      )
+      .click();
+    await settle();
+    const form = document.querySelector(
+      '[data-form="admin-authentication-policy"]',
+    );
+    form.elements.namedItem("otpRequired").checked = true;
+    form.elements.namedItem("otpRequired").dispatchEvent(
+      new document.defaultView.Event("change"),
+    );
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.match(document.querySelector('[role="alert"]').textContent, /OTP/i);
+    assert.equal(
+      calls.filter(
+        ({ path, method }) =>
+          path === "/api/admin/settings/login" && method === "PUT",
+      ).length,
+      0,
+    );
+    form.elements.namedItem("otpEnabled").checked = true;
+    form.elements.namedItem("otpIssuer").value = "Kitezh Desktop";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    const saved = calls.find(
+      ({ path, method }) =>
+        path === "/api/admin/settings/login" && method === "PUT",
+    );
+    assert.equal(saved.body.otpEnabled, true);
+    assert.equal(saved.body.otpIssuer, "Kitezh Desktop");
+    document
+      .querySelector('[data-action="admin-authentication-policy-cancel"]')
+      .click();
+    await settle();
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native built-in flow settings keep Web's editable save action and submit only flow fields", async () => {
+  const harness = await renderConsole("admin");
+  const flow = {
+    id: 9,
+    alias: "browser",
+    name: "Browser",
+    description: "Default browser authentication flow.",
+    flowType: "BASIC",
+    requirement: null,
+    priority: 0,
+    builtIn: true,
+    topLevel: true,
+  };
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=0&size=20&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 1, totalPages: 1, number: 0 }),
+  );
+  harness.setResponse("/api/admin/authentication/bindings", "GET", () => []);
+  harness.setResponse(
+    "/api/admin/authentication/execution-providers",
+    "GET",
+    () => ["username-password-form"],
+  );
+  harness.setResponse("/api/admin/authentication/flows/9", "GET", () => ({
+    flow,
+    executions: [],
+    subFlows: [],
+    nodes: [],
+  }));
+  harness.setResponse("/api/admin/authentication/flows/9", "PUT", (body) => ({
+    ...flow,
+    ...body,
+  }));
+  try {
+    const { calls, document } = harness;
+    document.defaultView.confirm = () => true;
+    for (
+      let turn = 0;
+      turn < 40 && !document.querySelector('[data-route="authentication"]');
+      turn += 1
+    )
+      await settle();
+    document.querySelector('[data-route="authentication"]').click();
+    await settle();
+    document
+      .querySelector(
+        '[data-action="admin-authentication-tab"][data-tab="flows"]',
+      )
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="settings"]')
+      .click();
+    await settle();
+    const form = document.querySelector(
+      '[data-form="admin-auth-flow"][data-kind="edit"]',
+    );
+    assert.ok(form.elements.namedItem("alias").disabled);
+    assert.ok(form.elements.namedItem("name").disabled);
+    assert.equal(form.querySelector('[type="submit"]').disabled, false);
+    assert.equal(
+      form.querySelector('[data-action="admin-auth-flow-cancel"]'),
+      null,
+    );
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    const saved = calls.find(
+      ({ path, method }) =>
+        path === "/api/admin/authentication/flows/9" && method === "PUT",
+    );
+    assert.deepEqual(saved.body, {
+      alias: "browser",
+      name: "Browser",
+      description: "Default browser authentication flow.",
+      flowType: "BASIC",
+      priority: 0,
+      requirement: null,
+    });
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="bindings"]')
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector(
+        '.admin-auth-binding-table [role="status"]',
+      ),
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native authentication flow editor covers flow, graph, execution and binding actions", async () => {
+  const harness = await renderConsole("admin");
+  const flow = {
+    id: 9,
+    alias: "browser",
+    name: "Browser flow",
+    description: "Interactive login",
+    flowType: "BASIC",
+    requirement: null,
+    priority: 0,
+    builtIn: false,
+    topLevel: true,
+  };
+  const details = {
+    flow,
+    executions: [
+      {
+        id: 34,
+        providerId: "password-form",
+        displayName: "Password form",
+        requirement: "REQUIRED",
+        priority: 10,
+        authenticatorReference: "password",
+        configuration: "{}",
+      },
+    ],
+    subFlows: [{ id: 35, alias: "forms", name: "Forms" }],
+    nodes: [
+      {
+        id: 34,
+        nodeType: "EXECUTION",
+        name: "Password form",
+        providerId: "password-form",
+        requirement: "REQUIRED",
+      },
+      {
+        id: 35,
+        nodeType: "SUB_FLOW",
+        name: "Forms",
+        providerId: null,
+        requirement: "ALTERNATIVE",
+      },
+    ],
+  };
+  let rejectFlowDetail = false;
+  let rejectFlowCreate = false;
+  let rejectSubFlowDetail = false;
+  let rejectMove = false;
+  let rejectExecutionCreate = false;
+  let rejectExecutionDelete = false;
+  let rejectBindingSave = false;
+  let rejectFlowDelete = false;
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=0&size=20&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 25, totalPages: 2, number: 0 }),
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=0&size=10&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 25, totalPages: 3, number: 0 }),
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=1&size=20&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 25, totalPages: 2, number: 1 }),
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=1&size=10&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 25, totalPages: 3, number: 1 }),
+  );
+  harness.setResponse("/api/admin/authentication/bindings", "GET", () => [
+    { bindingType: "BROWSER", flowId: 9, flowName: "Browser flow" },
+  ]);
+  harness.setResponse(
+    "/api/admin/authentication/execution-providers",
+    "GET",
+    () => ["password-form", "webauthn-authenticator"],
+  );
+  harness.setResponse("/api/admin/authentication/flows/9", "GET", () => {
+    if (rejectFlowDetail) {
+      rejectFlowDetail = false;
+      throw new Error("expected flow detail failure");
+    }
+    return details;
+  });
+  harness.setResponse("/api/admin/authentication/flows", "POST", () => {
+    if (rejectFlowCreate) {
+      rejectFlowCreate = false;
+      throw new Error("expected flow create failure");
+    }
+    return { id: 10 };
+  });
+  harness.setResponse("/api/admin/authentication/flows/35", "GET", () => {
+    if (rejectSubFlowDetail) {
+      rejectSubFlowDetail = false;
+      throw new Error("expected sub-flow detail failure");
+    }
+    return {
+      ...details,
+      flow: { ...flow, id: 35, alias: "forms", name: "Forms" },
+      nodes: [],
+    };
+  });
+  harness.setResponse(
+    "/api/admin/authentication/bindings/BROWSER",
+    "PUT",
+    () => {
+      if (rejectBindingSave) {
+        rejectBindingSave = false;
+        throw new Error("expected binding save failure");
+      }
+      return undefined;
+    },
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9",
+    "PUT",
+    () => flow,
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9/sub-flows",
+    "POST",
+    () => ({ id: 35 }),
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9/executions",
+    "POST",
+    () => {
+      if (rejectExecutionCreate) {
+        rejectExecutionCreate = false;
+        throw new Error("expected execution create failure");
+      }
+      return { id: 36 };
+    },
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9/executions/34",
+    "PUT",
+    () => ({ id: 34 }),
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9/executions/34",
+    "DELETE",
+    () => {
+      if (rejectExecutionDelete) {
+        rejectExecutionDelete = false;
+        throw new Error("expected execution delete failure");
+      }
+      return { status: 204 };
+    },
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9/nodes/EXECUTION/34/position",
+    "PUT",
+    () => {
+      if (rejectMove) {
+        rejectMove = false;
+        throw new Error("expected move failure");
+      }
+      return details;
+    },
+  );
+  harness.setResponse(
+    "/api/admin/authentication/flows/9",
+    "DELETE",
+    () => {
+      if (rejectFlowDelete) {
+        rejectFlowDelete = false;
+        throw new Error("expected flow delete failure");
+      }
+      return { status: 204 };
+    },
+  );
+
+  try {
+    const { calls, document, renderer } = harness;
+    Object.defineProperty(document.defaultView, "confirm", {
+      configurable: true,
+      value: () => true,
+    });
+    for (
+      let turn = 0;
+      turn < 40 && !document.querySelector('[data-route="authentication"]');
+      turn += 1
+    )
+      await settle();
+    document.querySelector('[data-route="authentication"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-authentication-tab"][data-tab="flows"]')
+      .click();
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    const invalidPage = document.querySelector(
+      '[data-action="admin-auth-flow-page"][data-page="0"]',
+    );
+    invalidPage.dataset.page = "-1";
+    invalidPage.click();
+    rejectFlowDetail = true;
+    document
+      .querySelector('[data-action="admin-auth-flow-select"][data-id="9"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="flow-list"]')
+      .click();
+    await settle();
+
+    const nextFlowPage = document.querySelector(
+      '[data-action="admin-auth-flow-page"][data-page="1"]',
+    );
+    assert.ok(nextFlowPage);
+    assert.equal(nextFlowPage.disabled, false);
+    await renderer.action("admin-auth-flow-page", nextFlowPage);
+    const pageSize = document.querySelector(
+      '[data-action="admin-auth-flow-page-size"]',
+    );
+    pageSize.value = "10";
+    pageSize.dispatchEvent(new document.defaultView.Event("change"));
+    await settle();
+
+    document.querySelector('[data-action="admin-auth-flow-create"]').click();
+    await settle();
+    let form = document.querySelector(
+      '[data-form="admin-auth-flow"][data-kind="create"]',
+    );
+    form.elements.namedItem("alias").value = "new-flow";
+    form.elements.namedItem("name").value = "New flow";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(
+      calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/authentication/flows" && method === "POST",
+      ),
+    );
+    rejectFlowCreate = true;
+    document.querySelector('[data-action="admin-auth-flow-create"]').click();
+    await settle();
+    form = document.querySelector(
+      '[data-form="admin-auth-flow"][data-kind="create"]',
+    );
+    form.elements.namedItem("alias").value = "retry-flow";
+    form.elements.namedItem("name").value = "Retry flow";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="flow-list"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-select"][data-id="9"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="settings"]')
+      .click();
+    await settle();
+    form = document.querySelector('[data-form="admin-auth-flow"][data-kind="edit"]');
+    form.elements.namedItem("description").value = "Updated";
+    const aliasControl = form.elements.namedItem("alias");
+    aliasControl.setAttribute("aria-invalid", "true");
+    aliasControl.dispatchEvent(new document.defaultView.Event("input", { bubbles: true }));
+    assert.equal(aliasControl.getAttribute("aria-invalid"), "false");
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(calls.some(({ method, path }) => method === "PUT" && path.endsWith("/flows/9")));
+
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="graph"]')
+      .click();
+    await settle();
+    rejectMove = true;
+    document
+      .querySelector('[data-action="admin-auth-flow-move"][data-node-id="34"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-move"][data-node-id="34"]')
+      .click();
+    await settle();
+    rejectSubFlowDetail = true;
+    document
+      .querySelector('[data-action="admin-auth-flow-open-node"][data-node-type="SUB_FLOW"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-open-node"][data-node-type="SUB_FLOW"]')
+      .click();
+    await settle();
+    assert.equal(
+      document.querySelector('[data-action="admin-auth-flow-tab"][data-tab="graph"]').getAttribute("aria-selected"),
+      "true",
+    );
+
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="flow-list"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-select"][data-id="9"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="graph"]')
+      .click();
+    await settle();
+    document.querySelector('[data-action="admin-auth-flow-sub-create"]').click();
+    await settle();
+    form = document.querySelector('[data-form="admin-auth-flow"][data-kind="sub"]');
+    form.elements.namedItem("alias").value = "sub-flow";
+    form.elements.namedItem("name").value = "Sub flow";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(calls.some(({ method, path }) => method === "POST" && path.endsWith("/flows/9/sub-flows")));
+
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="executions"]')
+      .click();
+    await settle();
+    document.querySelector('[data-action="admin-auth-execution-create"]').click();
+    await settle();
+    form = document.querySelector('[data-form="admin-auth-execution"]');
+    form.elements.namedItem("displayName").value = "Authenticator";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(calls.some(({ method, path }) => method === "POST" && path.endsWith("/flows/9/executions")));
+    rejectExecutionCreate = true;
+    document.querySelector('[data-action="admin-auth-execution-create"]').click();
+    await settle();
+    form = document.querySelector('[data-form="admin-auth-execution"]');
+    form.elements.namedItem("displayName").value = "Retry authenticator";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+
+    document
+      .querySelector('[data-action="admin-auth-flow-open-node"][data-node-type="EXECUTION"]')
+      .click();
+    await settle();
+    form = document.querySelector('[data-form="admin-auth-execution"]');
+    form.elements.namedItem("displayName").value = "Edited authenticator";
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.ok(calls.some(({ method, path }) => method === "PUT" && path.endsWith("/executions/34")));
+    rejectExecutionDelete = true;
+    document
+      .querySelector('[data-action="admin-auth-execution-delete"][data-id="34"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-execution-delete"][data-id="34"]')
+      .click();
+    await settle();
+
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="bindings"]')
+      .click();
+    await settle();
+    const bindingSelect = document.querySelector('[data-auth-binding-select="true"]');
+    bindingSelect.value = "9";
+    bindingSelect.dispatchEvent(new document.defaultView.Event("change"));
+    rejectBindingSave = true;
+    document.querySelector('[data-action="admin-auth-binding-save"]').click();
+    await settle();
+    document.querySelector('[data-action="admin-auth-binding-save"]').click();
+    await settle();
+    assert.ok(calls.some(({ method, path }) => method === "PUT" && path.endsWith("/bindings/BROWSER")));
+
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="flow-list"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-select"][data-id="9"]')
+      .click();
+    await settle();
+    rejectFlowDelete = true;
+    document
+      .querySelector('[data-action="admin-auth-flow-delete"]')
+      .dispatchEvent(new document.defaultView.MouseEvent("click", { bubbles: true }));
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-delete"]')
+      .dispatchEvent(new document.defaultView.MouseEvent("click", { bubbles: true }));
+    await settle();
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native authentication flow empty states cover missing flows and bindings", async () => {
+  const harness = await renderConsole("admin");
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=0&size=20&sort=name,asc",
+    "GET",
+    () => ({ content: [], totalElements: 0, totalPages: 0, number: 0 }),
+  );
+  harness.setResponse("/api/admin/authentication/bindings", "GET", () => []);
+  harness.setResponse(
+    "/api/admin/authentication/execution-providers",
+    "GET",
+    () => [],
+  );
+  try {
+    const { document } = harness;
+    for (
+      let turn = 0;
+      turn < 40 && !document.querySelector('[data-route="authentication"]');
+      turn += 1
+    )
+      await settle();
+    document.querySelector('[data-route="authentication"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-authentication-tab"][data-tab="flows"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="settings"]')
+      .click();
+    await settle();
+    assert.ok(document.querySelector(".card .muted"));
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native authentication binding table renders its empty state", async () => {
+  const harness = await renderConsole("admin");
+  const flow = {
+    id: 9,
+    alias: "browser",
+    name: "Browser",
+    flowType: "BASIC",
+    priority: 0,
+    builtIn: true,
+    topLevel: true,
+  };
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
+  harness.setResponse(
+    "/api/admin/authentication/flows?page=0&size=20&sort=name,asc",
+    "GET",
+    () => ({ content: [flow], totalElements: 1, totalPages: 1, number: 0 }),
+  );
+  harness.setResponse("/api/admin/authentication/bindings", "GET", () => []);
+  harness.setResponse(
+    "/api/admin/authentication/execution-providers",
+    "GET",
+    () => [],
+  );
+  harness.setResponse("/api/admin/authentication/flows/9", "GET", () => ({
+    flow,
+    executions: [],
+    subFlows: [],
+    nodes: [],
+  }));
+  try {
+    const { document } = harness;
+    for (
+      let turn = 0;
+      turn < 40 && !document.querySelector('[data-route="authentication"]');
+      turn += 1
+    )
+      await settle();
+    document.querySelector('[data-route="authentication"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-authentication-tab"][data-tab="flows"]')
+      .click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-auth-flow-tab"][data-tab="bindings"]')
+      .click();
+    await settle();
+    assert.ok(
+      document.querySelector('.admin-auth-binding-table [role="status"]'),
+    );
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native WebAuthn policy drafts and saves nested settings", async () => {
+  const harness = await renderConsole("admin");
+  const settings = {
+    webauthnMediation: "conditional",
+    webauthnPolicy: {
+      rpName: "Kitezh",
+      rpId: "example.test",
+      signatureAlgorithms: "ES256,RS256",
+      attestation: "none",
+      authenticatorAttachment: "any",
+      residentKey: "preferred",
+      userVerification: "preferred",
+      timeoutSeconds: 300,
+      avoidSameAuthenticator: true,
+      acceptableAaguids: "",
+    },
+    webauthnPasswordlessPolicy: {
+      rpName: "Kitezh",
+      rpId: "example.test",
+      signatureAlgorithms: "ES256,RS256",
+      attestation: "none",
+      authenticatorAttachment: "any",
+      residentKey: "required",
+      userVerification: "required",
+      timeoutSeconds: 300,
+      avoidSameAuthenticator: true,
+      acceptableAaguids: "",
+    },
+  };
+  let rejectPolicySave = true;
+  harness.setResponse("/api/admin/settings/login", "GET", () => settings);
+  harness.setResponse("/api/admin/settings/login", "PUT", ({ body }) => {
+    if (rejectPolicySave) {
+      rejectPolicySave = false;
+      throw new Error("expected login policy save failure");
+    }
+    return body;
+  });
+  try {
+    const { calls, document } = harness;
+    for (
+      let turn = 0;
+      turn < 40 && !document.querySelector('[data-route="authentication"]');
+      turn += 1
+    )
+      await settle();
+    document.querySelector('[data-route="authentication"]').click();
+    await settle();
+    document
+      .querySelector('[data-action="admin-authentication-policy-tab"][data-tab="webauthn"]')
+      .click();
+    await settle();
+    const form = document.querySelector(
+      '[data-form="admin-authentication-policy"]',
+    );
+    const rpId = form.elements.namedItem("webauthnPolicy.rpId");
+    rpId.value = "login.example.test";
+    rpId.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
+    const switchControl = form.elements.namedItem(
+      "webauthnPolicy.avoidSameAuthenticator",
+    );
+    switchControl.checked = false;
+    switchControl.dispatchEvent(
+      new document.defaultView.Event("change", { bubbles: true }),
+    );
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    form.dispatchEvent(
+      new document.defaultView.Event("submit", {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    const saved = calls.find(
+      ({ path, method }) =>
+        path === "/api/admin/settings/login" && method === "PUT",
+    );
+    assert.equal(saved.body.webauthnPolicy.rpId, "login.example.test");
+    assert.equal(saved.body.webauthnPolicy.avoidSameAuthenticator, false);
+    document
+      .querySelector('[data-action="admin-authentication-policy-cancel"]')
+      .click();
+    await settle();
+  } finally {
+    harness.restore();
+  }
+});
+
 async function openClientTab(document, tab) {
   document
     .querySelector(
@@ -47,6 +1218,10 @@ test("native Admin renderer covers every authorized primary route", async () => 
   }));
   try {
     const { calls, document } = harness;
+    Object.defineProperty(document.defaultView, "confirm", {
+      configurable: true,
+      value: () => true,
+    });
     for (let turn = 0; turn < 60; turn += 1) {
       await settle();
       if (
@@ -3500,13 +4675,35 @@ test("native Admin identity-provider mapper CRUD validates and persists mappings
       .querySelector('[data-action="admin-provider-tab"][data-tab="mappers"]')
       .click();
     await settle();
-    assert.ok(document.querySelector(".provider-mappers-card .admin-detail-heading h2"));
+    assert.ok(
+      document.querySelector(".provider-mappers-card .admin-detail-heading h2"),
+    );
     assert.ok(document.querySelector(".provider-mappers-table-surface"));
-    assert.ok(document.querySelector(".provider-mapper-search-input .provider-search-icon svg"));
-    assert.equal(document.querySelectorAll("#admin-provider-mapper-search button[type=submit]").length, 0);
-    assert.match(document.querySelector(".provider-mapper-result-count").textContent, /1\s+records?/);
-    assert.equal(document.querySelectorAll(".provider-mapper-pagination .provider-page-button").length, 4);
-    assert.equal(document.querySelector("#admin-provider-mapper-size").value, "10");
+    assert.ok(
+      document.querySelector(
+        ".provider-mapper-search-input .provider-search-icon svg",
+      ),
+    );
+    assert.equal(
+      document.querySelectorAll(
+        "#admin-provider-mapper-search button[type=submit]",
+      ).length,
+      0,
+    );
+    assert.match(
+      document.querySelector(".provider-mapper-result-count").textContent,
+      /1\s+records?/,
+    );
+    assert.equal(
+      document.querySelectorAll(
+        ".provider-mapper-pagination .provider-page-button",
+      ).length,
+      4,
+    );
+    assert.equal(
+      document.querySelector("#admin-provider-mapper-size").value,
+      "10",
+    );
     const searchInput = document.querySelector(
       "#admin-provider-mapper-search input[name=q]",
     );

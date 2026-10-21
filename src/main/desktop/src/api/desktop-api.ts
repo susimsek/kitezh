@@ -810,6 +810,7 @@ function isAllowedApiPath(
         path === "/api/admin/settings/branding" ||
         path === "/api/admin/settings/localization" ||
         path === "/api/admin/settings/email" ||
+        path === "/api/admin/settings/login" ||
         path === "/api/admin/settings/login/native")
     )
       return true;
@@ -843,6 +844,63 @@ function isAllowedApiPath(
       /^\/api\/admin\/sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
+    const authenticationFlowPath = path.split("?")[0];
+    const authenticationFlowMatch =
+      /^\/api\/admin\/authentication\/flows(?:\/([1-9]\d*)(?:\/(sub-flows|executions(?:\/[1-9]\d*)?|nodes\/(?:EXECUTION|SUB_FLOW)\/[1-9]\d*\/position))?)?$/.exec(
+        authenticationFlowPath,
+      );
+    const authenticationBindingMatch =
+      /^\/api\/admin\/authentication\/bindings\/(BROWSER|DIRECT_GRANT|REGISTRATION|RESET_CREDENTIALS|FIRST_BROKER_LOGIN|POST_BROKER_LOGIN)$/.exec(
+        path,
+      );
+    const authenticationFlowDetailMatch =
+      /^\/api\/admin\/authentication\/flows\/([1-9]\d*)$/.exec(path);
+    if (
+      method === "GET" &&
+      authenticationFlowDetailMatch &&
+      Number.isSafeInteger(Number(authenticationFlowDetailMatch[1]))
+    )
+      return true;
+    if (authenticationFlowMatch) {
+      const id = authenticationFlowMatch[1];
+      const action = authenticationFlowMatch[2];
+      if (!id) {
+        if (method === "POST")
+          return path === "/api/admin/authentication/flows";
+        if (method !== "GET") return false;
+        try {
+          const url = new URL(path, "https://desktop.invalid");
+          return (
+            [...url.searchParams.keys()].every((key) =>
+              ["page", "size", "sort"].includes(key),
+            ) &&
+            [...new Set(url.searchParams.keys())].every(
+              (key) => url.searchParams.getAll(key).length === 1,
+            ) &&
+            /^(0|[1-9]\d{0,6})$/.test(url.searchParams.get("page") ?? "0") &&
+            Number(url.searchParams.get("page") ?? 0) <= 1_000_000 &&
+            /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&
+            ["name,asc", "name,desc"].includes(
+              url.searchParams.get("sort") ?? "name,asc",
+            )
+          );
+        } catch {
+          return false;
+        }
+      }
+      if (path !== authenticationFlowPath) return false;
+      if (!Number.isSafeInteger(Number(id))) return false;
+      if (!action) return ["GET", "PUT", "DELETE"].includes(method);
+      if (action === "sub-flows") return method === "POST";
+      if (action === "executions") return method === "POST";
+      if (/^executions\/[1-9]\d*$/.test(action))
+        return (
+          Number.isSafeInteger(Number(action.split("/").at(-1))) &&
+          ["PUT", "DELETE"].includes(method)
+        );
+      if (/^nodes\//.test(action)) return method === "PUT";
+    }
+    if (authenticationBindingMatch) return ["PUT", "DELETE"].includes(method);
     if (method === "DELETE" && path === "/api/admin/events") return true;
     if (method !== "GET") return false;
     if (

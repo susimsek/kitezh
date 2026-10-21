@@ -64,6 +64,85 @@ test("client detail bridge permits exact scoped contracts and rejects widened va
   );
 });
 
+test("authentication flow bridge allows the Web flow contracts and rejects widened routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/authentication/flows?page=0&size=20&sort=name,asc"],
+    ["GET", "/api/admin/authentication/flows/12"],
+    ["POST", "/api/admin/authentication/flows"],
+    ["PUT", "/api/admin/authentication/flows/12"],
+    ["DELETE", "/api/admin/authentication/flows/12"],
+    ["POST", "/api/admin/authentication/flows/12/sub-flows"],
+    ["POST", "/api/admin/authentication/flows/12/executions"],
+    ["PUT", "/api/admin/authentication/flows/12/executions/34"],
+    ["DELETE", "/api/admin/authentication/flows/12/executions/34"],
+    ["PUT", "/api/admin/authentication/flows/12/nodes/EXECUTION/34/position"],
+    ["PUT", "/api/admin/authentication/bindings/FIRST_BROKER_LOGIN"],
+    ["DELETE", "/api/admin/authentication/bindings/RESET_CREDENTIALS"],
+    ["GET", "/api/admin/authentication/flows?page=2&size=50&sort=name,desc"],
+  ])
+    try {
+      assert.equal(
+        (await adapter.request({ console: "admin", method, path, body: {} }))
+          .status,
+        200,
+        `${method} ${path}`,
+      );
+    } catch (error) {
+      error.message = `${method} ${path}: ${error.message}`;
+      throw error;
+    }
+  for (const [method, path] of [
+    ["POST", "/api/admin/authentication/flows/12"],
+    ["GET", "/api/admin/authentication/flows/12?extra=true"],
+    ["PUT", "/api/admin/authentication/flows/12/nodes/UNKNOWN/34/position"],
+    ["PUT", "/api/admin/authentication/bindings/UNKNOWN"],
+    ["DELETE", "/api/admin/authentication/flows/12/sub-flows"],
+    ["PUT", "/api/admin/authentication/flows"],
+    ["PATCH", "/api/admin/authentication/flows"],
+    ["GET", "/api/admin/authentication/flows?page=1000001"],
+    ["GET", "/api/admin/authentication/flows?page=-1"],
+    ["GET", "/api/admin/authentication/flows?size=0"],
+    ["GET", "/api/admin/authentication/flows?size=101"],
+    ["GET", "/api/admin/authentication/flows?sort=priority,asc"],
+    ["GET", "/api/admin/authentication/flows?extra=true"],
+    ["GET", "/api/admin/authentication/flows?page=0&page=1"],
+    ["GET", "/api/admin/authentication/flows/9007199254740992"],
+    [
+      "PUT",
+      "/api/admin/authentication/flows/12/executions/9007199254740992",
+    ],
+  ])
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path, body: {} }),
+      /not allowed/,
+      `${method} ${path}`,
+    );
+});
+
+test("authentication flow bridge rejects malformed URL parsing", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  const NativeURL = globalThis.URL;
+  globalThis.URL = class extends NativeURL {
+    constructor(input, base) {
+      if (String(input).startsWith("/api/admin/authentication/flows?"))
+        throw new TypeError("malformed URL");
+      super(input, base);
+    }
+  };
+  try {
+    await assert.rejects(
+      adapter.request({
+        console: "admin",
+        path: "/api/admin/authentication/flows?page=0",
+      }),
+      /not allowed/,
+    );
+  } finally {
+    globalThis.URL = NativeURL;
+  }
+});
+
 test("group bridge accepts detail, settings, permissions, roles and bounded members only", async () => {
   const { adapter } = harness(async () => new Response("{}", { status: 200 }));
   for (const [method, path, body] of [
@@ -1525,6 +1604,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/settings/login",
   });
   assert.equal(loginSettings.status, 200);
+  const updatedLoginSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/login",
+    method: "PUT",
+    body: { passwordMinimumLength: 14, otpEnabled: true },
+  });
+  assert.equal(updatedLoginSettings.status, 200);
   const emailSettings = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/email",
@@ -1620,7 +1706,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/settings/login",
-      method: "PUT",
+      method: "POST",
     }),
     /not allowed/,
   );
@@ -1898,7 +1984,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/authentication/flows/1",
+      path: "/api/admin/authentication/flows/1/sub-flows",
       method: "DELETE",
     }),
     /not allowed/,
